@@ -19,7 +19,7 @@ import { LevelDef, PipeShape } from './types';
  *     → S to (4,5) [EMPTY – player places Straight N-S]
  *     → S to (5,5) Sink (WIN!)
  *
- * Water budget:  start 20 + tank 8 = 28 total; path costs 8 regular pipes → 20 units remain on win.
+ * Water budget:  start 5 + tank 5 = 10 total; path costs 8 regular pipes → 2 units remain on win.
  * The Tank at (1,3) is interior (row 1, col 3) so edge-validation passes.
  */
 
@@ -28,20 +28,20 @@ const LEVEL_1: LevelDef = {
   name: 'Tutorial',
   rows: 6,
   cols: 6,
-  sourceCapacity: 20,
+  sourceCapacity: 5,
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source, rotation: 0, isFixed: true, capacity: 20 },
+      { shape: PipeShape.Source, rotation: 0, isFixed: true, capacity: 5 },
       null, null, null, null, null,
     ],
     // Row 1
     [
-      { shape: PipeShape.Elbow,    rotation: 0,   isFixed: true },           // (1,0) N-E
+      null,                                                                  // (1,0) player fills
       { shape: PipeShape.Straight, rotation: 90,  isFixed: true },           // (1,1) E-W
-      { shape: PipeShape.Straight, rotation: 90,  isFixed: true },           // (1,2) E-W
-      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 8 }, // (1,3)
-      null,                                                                   // (1,4) player fills
+      null,                                                                  // (1,2) player fills
+      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 5 }, // (1,3)
+      null,                                                                  // (1,4) player fills
       { shape: PipeShape.Elbow,    rotation: 180, isFixed: true },           // (1,5) S-W
     ],
     // Row 2 – (2,5) left empty for player
