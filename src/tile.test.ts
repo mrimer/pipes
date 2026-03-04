@@ -62,6 +62,13 @@ describe('getConnections', () => {
       expect(c.size).toBe(4);
     }
   });
+
+  it('Tank connects all four directions regardless of rotation', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const c = getConnections(PipeShape.Tank, rot);
+      expect(c.size).toBe(4);
+    }
+  });
 });
 
 describe('Tile', () => {
@@ -89,5 +96,13 @@ describe('Tile', () => {
     tile.rotate(); // 90°
     expect(tile.connections.has(Direction.East)).toBe(true);
     expect(tile.connections.has(Direction.North)).toBe(false);
+  });
+
+  it('stores capacity and defaults to 0', () => {
+    const plain = new Tile(PipeShape.Straight, 0);
+    expect(plain.capacity).toBe(0);
+
+    const tank = new Tile(PipeShape.Tank, 0, true, 12);
+    expect(tank.capacity).toBe(12);
   });
 });
