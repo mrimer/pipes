@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipes – Puzzle Game</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      color: #eee;
+    }
+    h1 { margin-bottom: 16px; font-size: 2rem; letter-spacing: 2px; }
+    #game-canvas {
+      border: 3px solid #4a90d9;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #message {
+      margin-top: 16px;
+      font-size: 1.2rem;
+      min-height: 1.5em;
+      color: #7ed321;
+    }
+    #restart-btn {
+      margin-top: 12px;
+      padding: 8px 24px;
+      font-size: 1rem;
+      background: #4a90d9;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #restart-btn:hover { background: #357abd; }
+  </style>
+</head>
+<body>
+  <h1>🔧 Pipes</h1>
+  <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
+  <p id="message" aria-live="polite"></p>
+  <button id="restart-btn" type="button">New Game</button>
+</body>
+</html>
