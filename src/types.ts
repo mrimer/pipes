@@ -13,6 +13,7 @@ export enum Direction {
  * Key: shape name, Value: array of connected directions before rotation.
  */
 export enum PipeShape {
+  /** Empty tile: no pipe placed; players may fill these with inventory pieces */
   Empty = 'EMPTY',
   /** Straight pipe: North–South */
   Straight = 'STRAIGHT',
