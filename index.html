@@ -6,45 +6,231 @@
   <title>Pipes – Puzzle Game</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       background: #1a1a2e;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
       min-height: 100vh;
       font-family: Arial, sans-serif;
       color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-    h1 { margin-bottom: 16px; font-size: 2rem; letter-spacing: 2px; }
+
+    h1 {
+      margin: 20px 0 16px;
+      font-size: 2rem;
+      letter-spacing: 2px;
+    }
+
+    /* ── Level-select screen ─────────────────────────────────────── */
+    #level-select {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 420px;
+      padding: 0 16px 32px;
+    }
+
+    #level-select h2 {
+      font-size: 1.4rem;
+      color: #7ed321;
+      margin-bottom: 8px;
+    }
+
+    #level-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .level-btn {
+      padding: 14px 20px;
+      font-size: 1rem;
+      background: #16213e;
+      color: #eee;
+      border: 2px solid #4a90d9;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s;
+    }
+    .level-btn:hover:not(:disabled) { background: #1e2a4a; }
+    .level-btn.completed { border-color: #7ed321; }
+    .level-btn.locked    { border-color: #555; color: #777; cursor: default; }
+
+    /* ── Play screen ─────────────────────────────────────────────── */
+    #play-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding-bottom: 24px;
+    }
+
+    #play-area {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
     #game-canvas {
       border: 3px solid #4a90d9;
       border-radius: 4px;
       cursor: pointer;
+      flex-shrink: 0;
     }
-    #message {
-      margin-top: 16px;
-      font-size: 1.2rem;
-      min-height: 1.5em;
+
+    /* ── Inventory bar ────────────────────────────────────────────── */
+    #inventory-bar {
+      width: 140px;
+      background: #16213e;
+      border: 2px solid #4a90d9;
+      border-radius: 6px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .inv-title {
+      font-size: 0.9rem;
+      color: #7ed321;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .inv-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0d1a30;
+      border: 2px solid #2a3a5e;
+      border-radius: 4px;
+      padding: 6px 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .inv-item:hover:not(.depleted) { border-color: #4a90d9; background: #1e2a4a; }
+    .inv-item.selected  { border-color: #f0c040; background: #2a3a1a; }
+    .inv-item.depleted  { opacity: 0.4; cursor: default; }
+
+    .inv-shape { font-size: 0.85rem; }
+    .inv-count { font-size: 0.9rem; color: #7ed321; font-weight: bold; }
+
+    /* ── HUD ──────────────────────────────────────────────────────── */
+    #hud {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    #water-display {
+      font-size: 1.1rem;
+      font-weight: bold;
       color: #7ed321;
     }
-    #restart-btn {
-      margin-top: 12px;
-      padding: 8px 24px;
-      font-size: 1rem;
-      background: #4a90d9;
-      color: #fff;
-      border: none;
+
+    #exit-btn {
+      padding: 6px 18px;
+      font-size: 0.9rem;
+      background: #2a2a4a;
+      color: #aaa;
+      border: 1px solid #555;
       border-radius: 4px;
       cursor: pointer;
     }
-    #restart-btn:hover { background: #357abd; }
+    #exit-btn:hover { background: #3a3a5a; color: #eee; }
+
+    /* ── Modal overlay ────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .modal-box {
+      background: #16213e;
+      border: 3px solid #4a90d9;
+      border-radius: 10px;
+      padding: 32px 40px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 280px;
+    }
+
+    .modal-box h2 { font-size: 1.6rem; }
+    .modal-box p  { font-size: 0.95rem; color: #aaa; }
+
+    .modal-btn {
+      padding: 10px 24px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .modal-btn:hover { opacity: 0.85; }
+    .modal-btn.primary   { background: #4a90d9; color: #fff; }
+    .modal-btn.secondary { background: #2a2a4a; color: #aaa; border: 1px solid #555; }
+
+    .modal-actions { display: flex; gap: 12px; justify-content: center; }
   </style>
 </head>
 <body>
   <h1>🔧 Pipes</h1>
-  <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
-  <p id="message" aria-live="polite"></p>
-  <button id="restart-btn" type="button">New Game</button>
+
+  <!-- ── Level-select screen ────────────────────────────────────── -->
+  <div id="level-select">
+    <h2>Select a Level</h2>
+    <div id="level-list"></div>
+  </div>
+
+  <!-- ── Play screen ────────────────────────────────────────────── -->
+  <div id="play-screen">
+    <div id="hud">
+      <span id="water-display">💧 Water: –</span>
+      <button id="exit-btn" type="button">← Menu</button>
+    </div>
+    <div id="play-area">
+      <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
+      <div id="inventory-bar"></div>
+    </div>
+  </div>
+
+  <!-- ── Win modal ──────────────────────────────────────────────── -->
+  <div id="win-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>🎉 You Win!</h2>
+      <p>The water reached its destination.</p>
+      <div class="modal-actions">
+        <button id="win-retry-btn" class="modal-btn secondary" type="button">Retry</button>
+        <button id="win-menu-btn"  class="modal-btn primary"   type="button">Level Select</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Game-over modal ────────────────────────────────────────── -->
+  <div id="gameover-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>💧 Out of Water!</h2>
+      <p id="gameover-msg"></p>
+      <div class="modal-actions">
+        <button id="gameover-retry-btn" class="modal-btn primary"   type="button">Retry</button>
+        <button id="gameover-menu-btn"  class="modal-btn secondary" type="button">Level Select</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

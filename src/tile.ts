@@ -9,6 +9,7 @@ const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.Cross]:    [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.Source]:   [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.Sink]:     [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.Tank]:     [Direction.North, Direction.East, Direction.South, Direction.West],
 };
 
 /**
@@ -60,16 +61,20 @@ export class Tile {
   shape: PipeShape;
   rotation: Rotation;
   readonly isFixed: boolean;
+  /** Water capacity for Source and Tank tiles. */
+  capacity: number;
 
   /**
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
+   * @param capacity - Water capacity (Source / Tank tiles only).
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
+    this.capacity = capacity;
   }
 
   /** Rotate the tile 90° clockwise. */
