@@ -140,6 +140,8 @@ export class Game {
     this.screen = GameScreen.LevelSelect;
     this.levelSelectEl.style.display = 'flex';
     this.playScreenEl.style.display = 'none';
+    // Explicitly hide both modal overlays so they cannot cover the level-select
+    // screen when returning from a completed or failed level.
     this.winModalEl.style.display = 'none';
     this.gameoverModalEl.style.display = 'none';
     this._renderLevelList();
