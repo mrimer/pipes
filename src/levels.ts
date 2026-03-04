@@ -73,9 +73,66 @@ const LEVEL_2: LevelDef = {
   name: 'Through the Woods',
   rows: 6,
   cols: 6,
-  sourceCapacity: 15,
-  grid: [],
-  inventory: [],
+  sourceCapacity: 12,
+  /**
+   * Solution path:
+   *   Source(0,0) → [player: Straight E-W at (0,1)] → DirtBlock(cost=2, 0,2)
+   *     → [player: Straight E-W at (0,3)] → Elbow(W-S, 0,4) → [player: Straight N-S at (1,4)]
+   *     → Straight(N-S, 2,4) → DirtBlock(cost=3, 3,4) → [player: Straight N-S at (4,4)]
+   *     → Sink(5,4)
+   *
+   * Water budget: 12 (source)
+   *   − 1 (Straight 0,1) − 2 (DirtBlock 0,2) − 1 (Straight 0,3) − 1 (Elbow 0,4)
+   *   − 1 (Straight 1,4) − 1 (Straight 2,4) − 3 (DirtBlock 3,4) − 1 (Straight 4,4)
+   *   = 1 remaining on win.
+   * Player places 4 Straight tiles.
+   */
+  grid: [
+    // Row 0
+    [
+      { shape: PipeShape.Source,    rotation: 0,   isFixed: true, capacity: 12 }, // (0,0)
+      null,                                                                         // (0,1) player fills: Straight E-W
+      { shape: PipeShape.DirtBlock, rotation: 0,   isFixed: true, dirtCost: 2 },  // (0,2)
+      null,                                                                         // (0,3) player fills: Straight E-W
+      { shape: PipeShape.Elbow,     rotation: 180, isFixed: true },                // (0,4) W-S
+      null,
+    ],
+    // Row 1
+    [
+      null, null, null, null,
+      null,                                                                         // (1,4) player fills: Straight N-S
+      null,
+    ],
+    // Row 2
+    [
+      null, null, null, null,
+      { shape: PipeShape.Straight, rotation: 0, isFixed: true },                  // (2,4) N-S
+      null,
+    ],
+    // Row 3
+    [
+      null, null, null, null,
+      { shape: PipeShape.DirtBlock, rotation: 0, isFixed: true, dirtCost: 3 },   // (3,4)
+      null,
+    ],
+    // Row 4
+    [
+      null, null, null, null,
+      null,                                                                         // (4,4) player fills: Straight N-S
+      null,
+    ],
+    // Row 5
+    [
+      null, null, null, null,
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true },                      // (5,4)
+      null,
+    ],
+  ],
+  inventory: [
+    { shape: PipeShape.Straight, count: 4 },
+    { shape: PipeShape.Elbow,    count: 2 },
+    { shape: PipeShape.Tee,      count: 1 },
+  ],
 };
 
 /** Placeholder stub – locked until level 2 is completed. */

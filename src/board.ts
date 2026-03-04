@@ -69,7 +69,7 @@ export class Board {
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
-          this.grid[r][c] = new Tile(def.shape, rot, def.isFixed ?? false, def.capacity ?? 0);
+          this.grid[r][c] = new Tile(def.shape, rot, def.isFixed ?? false, def.capacity ?? 0, def.dirtCost ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -91,7 +91,8 @@ export class Board {
     if (
       tile.shape === PipeShape.Source ||
       tile.shape === PipeShape.Sink   ||
-      tile.shape === PipeShape.Tank
+      tile.shape === PipeShape.Tank   ||
+      tile.shape === PipeShape.DirtBlock
     ) return false;
 
     const idx = this.inventory.findIndex((it) => it.shape === tile.shape);
@@ -141,6 +142,8 @@ export class Board {
         pipeCost++;
       } else if (tile.shape === PipeShape.Tank) {
         tankGain += tile.capacity;
+      } else if (tile.shape === PipeShape.DirtBlock) {
+        pipeCost += tile.dirtCost;
       }
     }
     return this.sourceCapacity - pipeCost + tankGain;

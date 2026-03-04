@@ -2,14 +2,15 @@ import { Direction, PipeShape, Rotation, ConnectionSet } from './types';
 
 /** Base connections for each pipe shape (at 0° rotation). */
 const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
-  [PipeShape.Empty]:    [],
-  [PipeShape.Straight]: [Direction.North, Direction.South],
-  [PipeShape.Elbow]:    [Direction.North, Direction.East],
-  [PipeShape.Tee]:      [Direction.North, Direction.East, Direction.South],
-  [PipeShape.Cross]:    [Direction.North, Direction.East, Direction.South, Direction.West],
-  [PipeShape.Source]:   [Direction.North, Direction.East, Direction.South, Direction.West],
-  [PipeShape.Sink]:     [Direction.North, Direction.East, Direction.South, Direction.West],
-  [PipeShape.Tank]:     [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.Empty]:     [],
+  [PipeShape.Straight]:  [Direction.North, Direction.South],
+  [PipeShape.Elbow]:     [Direction.North, Direction.East],
+  [PipeShape.Tee]:       [Direction.North, Direction.East, Direction.South],
+  [PipeShape.Cross]:     [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.Source]:    [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.Sink]:      [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.Tank]:      [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.DirtBlock]: [Direction.North, Direction.East, Direction.South, Direction.West],
 };
 
 /**
@@ -63,18 +64,22 @@ export class Tile {
   readonly isFixed: boolean;
   /** Water capacity for Source and Tank tiles. */
   capacity: number;
+  /** Water cost for DirtBlock tiles – deducted from the source when water flows through. */
+  dirtCost: number;
 
   /**
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
    * @param capacity - Water capacity (Source / Tank tiles only).
+   * @param dirtCost - Water cost (DirtBlock tiles only).
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
     this.capacity = capacity;
+    this.dirtCost = dirtCost;
   }
 
   /** Rotate the tile 90° clockwise. */
