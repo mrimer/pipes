@@ -11,10 +11,19 @@ const BG_COLOR = '#1a1a2e';
 const TILE_BG = '#16213e';
 const FOCUS_COLOR = '#f0c040';
 const SOURCE_COLOR = '#e67e22';
+const SOURCE_WATER_COLOR = '#f39c12';
 const SINK_COLOR = '#8e44ad';
+const SINK_WATER_COLOR = '#9b59b6';
 const TANK_COLOR = '#2196f3';
 const TANK_WATER_COLOR = '#00bcd4';
+const TANK_FILL_COLOR = '#0d2b45';
+const TANK_FILL_WATER_COLOR = '#004d60';
+const FIXED_PIPE_COLOR = '#2980b9';
+const FIXED_PIPE_WATER_COLOR = '#5dade2';
 const EMPTY_COLOR = '#2a2a4a';
+const EMPTY_TARGET_COLOR = '#1e2a4a';
+const LOW_WATER_COLOR = '#e74c3c';
+const LABEL_COLOR = '#fff';
 
 /** Human-readable labels for pipe shapes in the inventory. */
 const SHAPE_LABELS: Partial<Record<PipeShape, string>> = {
@@ -183,7 +192,7 @@ export class Game {
     if (!this.board) return;
     const w = this.board.getCurrentWater();
     this.waterDisplayEl.textContent = `💧 Water: ${w}`;
-    this.waterDisplayEl.style.color = w <= 5 ? '#e74c3c' : '#7ed321';
+    this.waterDisplayEl.style.color = w <= 5 ? LOW_WATER_COLOR : WATER_COLOR;
   }
 
   // ─── Main render loop ──────────────────────────────────────────────────────
@@ -213,7 +222,7 @@ export class Game {
 
         // Tile background
         ctx.fillStyle = tile.shape === PipeShape.Empty
-          ? (isTarget ? '#1e2a4a' : EMPTY_COLOR)
+          ? (isTarget ? EMPTY_TARGET_COLOR : EMPTY_COLOR)
           : TILE_BG;
         ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
 
@@ -243,14 +252,14 @@ export class Game {
 
     let color: string;
     if (shape === PipeShape.Source) {
-      color = isWater ? '#f39c12' : SOURCE_COLOR;
+      color = isWater ? SOURCE_WATER_COLOR : SOURCE_COLOR;
     } else if (shape === PipeShape.Sink) {
-      color = isWater ? '#9b59b6' : SINK_COLOR;
+      color = isWater ? SINK_WATER_COLOR : SINK_COLOR;
     } else if (shape === PipeShape.Tank) {
       color = isWater ? TANK_WATER_COLOR : TANK_COLOR;
     } else {
       color = isFixed
-        ? (isWater ? '#5dade2' : '#2980b9')
+        ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
         : isWater ? WATER_COLOR : PIPE_COLOR;
     }
 
@@ -260,7 +269,7 @@ export class Game {
 
     if (shape === PipeShape.Empty) {
       // Draw a subtle dot so the tile is visually distinct from fixed tiles
-      ctx.fillStyle = '#2a2a4a';
+      ctx.fillStyle = EMPTY_COLOR;
       ctx.beginPath();
       ctx.arc(0, 0, 4, 0, Math.PI * 2);
       ctx.fill();
@@ -310,7 +319,7 @@ export class Game {
         ctx.restore();
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = LABEL_COLOR;
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -323,13 +332,13 @@ export class Game {
       ctx.translate(cx, cy);
       const bw = half * 0.7;
       const bh = half * 0.7;
-      ctx.fillStyle = isWater ? '#004d60' : '#0d2b45';
+      ctx.fillStyle = isWater ? TANK_FILL_WATER_COLOR : TANK_FILL_COLOR;
       ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
       // Capacity label
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = LABEL_COLOR;
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
