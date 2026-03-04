@@ -25,13 +25,28 @@ const EMPTY_TARGET_COLOR = '#1e2a4a';
 const LOW_WATER_COLOR = '#e74c3c';
 const LABEL_COLOR = '#fff';
 
-/** Human-readable labels for pipe shapes in the inventory. */
-const SHAPE_LABELS: Partial<Record<PipeShape, string>> = {
-  [PipeShape.Straight]: 'Straight',
-  [PipeShape.Elbow]:    'Elbow',
-  [PipeShape.Tee]:      'T-piece',
-  [PipeShape.Cross]:    'Cross',
-};
+/** Inline SVG icons for pipe shapes in the inventory. */
+function _shapeIcon(shape: PipeShape): string {
+  const S = 32;
+  const H = S / 2;
+  const sw = 5;
+  const color = '#4a90d9';
+  const base = `width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"`;
+  const line = (x1: number, y1: number, x2: number, y2: number) =>
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
+  switch (shape) {
+    case PipeShape.Straight:
+      return `<svg ${base}>${line(H, 0, H, S)}</svg>`;
+    case PipeShape.Elbow:
+      return `<svg ${base}><polyline points="${H},0 ${H},${H} ${S},${H}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    case PipeShape.Tee:
+      return `<svg ${base}>${line(H, 0, H, S)}${line(H, H, S, H)}</svg>`;
+    case PipeShape.Cross:
+      return `<svg ${base}>${line(H, 0, H, S)}${line(0, H, S, H)}</svg>`;
+    default:
+      return '';
+  }
+}
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -59,6 +74,15 @@ export class Game {
 
   /** The pipe shape currently selected from the inventory, ready to be placed. */
   private selectedShape: PipeShape | null = null;
+
+  /** Most-recent mouse position over the canvas in canvas-pixel coordinates. */
+  private mouseCanvasPos: { x: number; y: number } | null = null;
+
+  /** Whether the Ctrl key is currently held. */
+  private ctrlHeld = false;
+
+  /** Tooltip element for displaying grid coordinates under Ctrl. */
+  private readonly tooltipEl: HTMLElement;
 
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
@@ -91,8 +115,20 @@ export class Game {
     // Load persisted completions
     this.completedLevels = this._loadCompletedLevels();
 
-    canvas.addEventListener('click', (e) => this._handleCanvasClick(e));
-    canvas.addEventListener('keydown', (e) => this._handleKey(e));
+    // Create the tooltip element for Ctrl+hover grid coordinates
+    this.tooltipEl = document.createElement('div');
+    this.tooltipEl.style.cssText =
+      'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
+      'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
+    document.body.appendChild(this.tooltipEl);
+
+    canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
+    canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
+    canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
+    canvas.addEventListener('mouseleave',   ()  => this._hideTooltip());
+    canvas.addEventListener('keydown',      (e) => this._handleKey(e));
+    document.addEventListener('keydown',    (e) => this._handleDocKeyDown(e));
+    document.addEventListener('keyup',      (e) => this._handleDocKeyUp(e));
 
     this._showLevelSelect();
     this._loop();
@@ -104,6 +140,8 @@ export class Game {
     this.screen = GameScreen.LevelSelect;
     this.levelSelectEl.style.display = 'flex';
     this.playScreenEl.style.display = 'none';
+    this.winModalEl.style.display = 'none';
+    this.gameoverModalEl.style.display = 'none';
     this._renderLevelList();
   }
 
@@ -168,9 +206,9 @@ export class Game {
       if (item.shape === this.selectedShape) el.classList.add('selected');
       if (item.count === 0) el.classList.add('depleted');
 
-      const label = SHAPE_LABELS[item.shape] ?? item.shape;
+      const icon = _shapeIcon(item.shape);
       el.innerHTML =
-        `<span class="inv-shape">${label}</span>` +
+        `<span class="inv-shape">${icon}</span>` +
         `<span class="inv-count">×${item.count}</span>`;
 
       el.dataset['shape'] = item.shape;
@@ -403,6 +441,69 @@ export class Game {
       this._updateWaterDisplay();
       this._checkWinLose();
     }
+  }
+
+  private _handleCanvasRightClick(e: MouseEvent): void {
+    e.preventDefault();
+    if (this.screen !== GameScreen.Play) return;
+    if (this.gameState !== GameState.Playing) return;
+    if (!this.board) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+    const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
+
+    if (this.board.reclaimTile({ row, col })) {
+      this._renderInventoryBar();
+      this._updateWaterDisplay();
+    }
+  }
+
+  private _handleCanvasMouseMove(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (this.ctrlHeld) {
+      this._showTooltip(e.clientX, e.clientY);
+    }
+  }
+
+  private _handleDocKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Control' && !this.ctrlHeld) {
+      this.ctrlHeld = true;
+      if (this.mouseCanvasPos) {
+        const rect = this.canvas.getBoundingClientRect();
+        this._showTooltip(
+          this.mouseCanvasPos.x + rect.left,
+          this.mouseCanvasPos.y + rect.top,
+        );
+      }
+    }
+  }
+
+  private _handleDocKeyUp(e: KeyboardEvent): void {
+    if (e.key === 'Control') {
+      this.ctrlHeld = false;
+      this._hideTooltip();
+    }
+  }
+
+  private _showTooltip(clientX: number, clientY: number): void {
+    if (this.screen !== GameScreen.Play || !this.mouseCanvasPos) return;
+    const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+    const row = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+    if (!this.board || row < 0 || row >= this.board.rows || col < 0 || col >= this.board.cols) {
+      this._hideTooltip();
+      return;
+    }
+    // Display as (row, col) to match the GridPos convention used throughout the codebase.
+    this.tooltipEl.textContent = `(${row}, ${col})`;
+    this.tooltipEl.style.display = 'block';
+    this.tooltipEl.style.left = `${clientX + 12}px`;
+    this.tooltipEl.style.top  = `${clientY + 12}px`;
+  }
+
+  private _hideTooltip(): void {
+    this.tooltipEl.style.display = 'none';
   }
 
   private _handleKey(e: KeyboardEvent): void {

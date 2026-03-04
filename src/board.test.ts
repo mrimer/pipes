@@ -166,6 +166,52 @@ describe('Board.placeInventoryTile', () => {
   });
 });
 
+// ─── New: tile reclaim ────────────────────────────────────────────────────────
+
+describe('Board.reclaimTile', () => {
+  function makeLevel1Board(): Board {
+    const level = LEVELS[0];
+    return new Board(level.rows, level.cols, level);
+  }
+
+  it('returns tile to inventory and empties the cell', () => {
+    const board = makeLevel1Board();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    const before = board.inventory.find((i) => i.shape === PipeShape.Straight)!.count;
+    const result = board.reclaimTile({ row: 0, col: 1 });
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(before + 1);
+  });
+
+  it('returns false for an empty cell', () => {
+    const board = makeLevel1Board();
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+
+  it('returns false for a fixed tile', () => {
+    const board = makeLevel1Board();
+    // (0,0) is Source fixed
+    expect(board.reclaimTile({ row: 0, col: 0 })).toBe(false);
+  });
+
+  it('returns false for a fixed pipe tile', () => {
+    const board = makeLevel1Board();
+    // (1,0) is Elbow fixed
+    expect(board.reclaimTile({ row: 1, col: 0 })).toBe(false);
+  });
+
+  it('returns false for Source / Sink / Tank even if not marked fixed', () => {
+    const board = new Board(1, 3);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, false);
+    board.grid[0][1] = new Tile(PipeShape.Tank,   0, false, 5);
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, false);
+    expect(board.reclaimTile({ row: 0, col: 0 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 2 })).toBe(false);
+  });
+});
+
 // ─── New: water tracking ─────────────────────────────────────────────────────
 
 describe('Board.getCurrentWater', () => {

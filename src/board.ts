@@ -80,6 +80,30 @@ export class Board {
     }
   }
 
+  /**
+   * Return a player-placed pipe tile back to the inventory.
+   * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross) can be reclaimed.
+   * @returns true if the tile was successfully reclaimed.
+   */
+  reclaimTile(pos: GridPos): boolean {
+    const tile = this.getTile(pos);
+    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    if (
+      tile.shape === PipeShape.Source ||
+      tile.shape === PipeShape.Sink   ||
+      tile.shape === PipeShape.Tank
+    ) return false;
+
+    const idx = this.inventory.findIndex((it) => it.shape === tile.shape);
+    if (idx !== -1) {
+      this.inventory[idx].count++;
+    } else {
+      this.inventory.push({ shape: tile.shape, count: 1 });
+    }
+    this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+    return true;
+  }
+
   // ─── Inventory placement ───────────────────────────────────────────────────
 
   /**
