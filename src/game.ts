@@ -24,6 +24,11 @@ const EMPTY_COLOR = '#2a2a4a';
 const EMPTY_TARGET_COLOR = '#1e2a4a';
 const LOW_WATER_COLOR = '#e74c3c';
 const LABEL_COLOR = '#fff';
+const DIRT_COLOR = '#8b5a2b';
+const DIRT_WATER_COLOR = '#c4a265';
+const DIRT_FILL_COLOR = '#3d2b1f';
+const DIRT_FILL_WATER_COLOR = '#5a3d2b';
+const DIRT_COST_COLOR = '#e74c3c';
 
 /** Inline SVG icons for pipe shapes in the inventory. */
 function _shapeIcon(shape: PipeShape): string {
@@ -280,7 +285,7 @@ export class Game {
 
   /** Draw a single pipe tile at canvas position (x, y). */
   private _drawPipe(x: number, y: number, tile: Tile, isWater: boolean, currentWater: number): void {
-    const { shape, rotation, isFixed, capacity } = tile;
+    const { shape, rotation, isFixed, capacity, dirtCost } = tile;
     const { ctx } = this;
     const cx = x + TILE_SIZE / 2;
     const cy = y + TILE_SIZE / 2;
@@ -297,6 +302,8 @@ export class Game {
       color = isWater ? SINK_WATER_COLOR : SINK_COLOR;
     } else if (shape === PipeShape.Tank) {
       color = isWater ? TANK_WATER_COLOR : TANK_COLOR;
+    } else if (shape === PipeShape.DirtBlock) {
+      color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
     } else {
       color = isFixed
         ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
@@ -383,6 +390,32 @@ export class Game {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(capacity), 0, 0);
+      // Connection stubs (lines from box edges to tile edges)
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    } else if (shape === PipeShape.DirtBlock) {
+      // Dirt block – brown rectangle with a red negative cost label
+      ctx.restore();
+      ctx.save();
+      ctx.translate(cx, cy);
+      const bw = half * 0.7;
+      const bh = half * 0.7;
+      ctx.fillStyle = isWater ? DIRT_FILL_WATER_COLOR : DIRT_FILL_COLOR;
+      ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+      ctx.strokeStyle = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+      // Show cost label in red when not washed away; fade when water is flowing through
+      ctx.fillStyle = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`-${dirtCost}`, 0, 0);
       // Connection stubs (lines from box edges to tile edges)
       ctx.strokeStyle = color;
       ctx.lineWidth = LINE_WIDTH;

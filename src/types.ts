@@ -29,6 +29,8 @@ export enum PipeShape {
   Sink = 'SINK',
   /** Water tank – accessible on all four sides, stores extra water */
   Tank = 'TANK',
+  /** Dirt block – accessible on all four sides; wastes water equal to its dirtCost when water flows through it */
+  DirtBlock = 'DIRT_BLOCK',
 }
 
 /** Valid rotation values (clockwise, in degrees). */
@@ -69,6 +71,8 @@ export interface TileDef {
   isFixed?: boolean;
   /** Water capacity (Source and Tank tiles only). */
   capacity?: number;
+  /** Water cost for DirtBlock tiles – water wasted when water flows through this tile. */
+  dirtCost?: number;
 }
 
 /** Complete definition of a game level. */

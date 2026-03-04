@@ -280,3 +280,77 @@ describe('Board.validateGrid', () => {
     expect(board.validateGrid()).toHaveLength(0);
   });
 });
+
+// ─── New: DirtBlock tile ──────────────────────────────────────────────────────
+
+describe('DirtBlock tile', () => {
+  it('connects on all four sides regardless of rotation', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const tile = new Tile(PipeShape.DirtBlock, rot, true, 0, 2);
+      expect(tile.connections.has(Direction.North)).toBe(true);
+      expect(tile.connections.has(Direction.East)).toBe(true);
+      expect(tile.connections.has(Direction.South)).toBe(true);
+      expect(tile.connections.has(Direction.West)).toBe(true);
+    }
+  });
+
+  it('carries its dirtCost value', () => {
+    const tile = new Tile(PipeShape.DirtBlock, 0, true, 0, 5);
+    expect(tile.dirtCost).toBe(5);
+  });
+
+  it('deducts dirtCost from water when in the fill path', () => {
+    // Source → DirtBlock(cost=4) → Sink (1-cell line)
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,    0, true);
+    board.grid[0][1] = new Tile(PipeShape.DirtBlock, 0, true, 0, 4);
+    board.grid[0][2] = new Tile(PipeShape.Sink,      0, true);
+    board.sourceCapacity = 10;
+    // All four directions are open; source → dirt (costs 4) → sink
+    expect(board.getCurrentWater()).toBe(6);
+  });
+
+  it('is not reclaimable', () => {
+    const board = new Board(1, 3);
+    board.grid[0][1] = new Tile(PipeShape.DirtBlock, 0, false, 0, 3);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+});
+
+// ─── New: Level 2 definition ──────────────────────────────────────────────────
+
+describe('Level 2 (Through the Woods)', () => {
+  const level = LEVELS[1];
+
+  it('has a valid grid (non-empty)', () => {
+    expect(level.grid.length).toBe(level.rows);
+  });
+
+  it('loads without errors from validateGrid', () => {
+    const board = new Board(level.rows, level.cols, level);
+    expect(board.validateGrid()).toHaveLength(0);
+  });
+
+  it('contains DirtBlock tiles', () => {
+    const board = new Board(level.rows, level.cols, level);
+    const dirtBlocks = board.grid
+      .flat()
+      .filter((t) => t.shape === PipeShape.DirtBlock);
+    expect(dirtBlocks.length).toBeGreaterThan(0);
+  });
+
+  it('has sufficient water to complete the solution path', () => {
+    // Manually place the four Straight tiles the player needs
+    const board = new Board(level.rows, level.cols, level);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight); // E-W
+    board.grid[0][1].rotation = 90; // rotate to E-W
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight); // E-W
+    board.grid[0][3].rotation = 90;
+    board.placeInventoryTile({ row: 1, col: 4 }, PipeShape.Straight); // N-S (default 0°)
+    board.placeInventoryTile({ row: 4, col: 4 }, PipeShape.Straight); // N-S (default 0°)
+    expect(board.isSolved()).toBe(true);
+    expect(board.getCurrentWater()).toBeGreaterThan(0);
+  });
+});

@@ -69,6 +69,13 @@ describe('getConnections', () => {
       expect(c.size).toBe(4);
     }
   });
+
+  it('DirtBlock connects all four directions regardless of rotation', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const c = getConnections(PipeShape.DirtBlock, rot);
+      expect(c.size).toBe(4);
+    }
+  });
 });
 
 describe('Tile', () => {
@@ -104,5 +111,13 @@ describe('Tile', () => {
 
     const tank = new Tile(PipeShape.Tank, 0, true, 12);
     expect(tank.capacity).toBe(12);
+  });
+
+  it('stores dirtCost and defaults to 0', () => {
+    const plain = new Tile(PipeShape.Straight, 0);
+    expect(plain.dirtCost).toBe(0);
+
+    const dirt = new Tile(PipeShape.DirtBlock, 0, true, 0, 3);
+    expect(dirt.dirtCost).toBe(3);
   });
 });
