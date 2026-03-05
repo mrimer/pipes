@@ -113,12 +113,12 @@ describe('Board (level mode)', () => {
   });
 });
 
-// ─── New: Tank tile connections ──────────────────────────────────────────────
+// ─── New: Chamber tile (tank) connections ──────────────────────────────────────
 
-describe('Tank tile', () => {
+describe('Chamber tile (tank content)', () => {
   it('connects on all four sides regardless of rotation (default)', () => {
     for (const rot of [0, 90, 180, 270] as const) {
-      const tile = new Tile(PipeShape.Tank, rot, true, 10);
+      const tile = new Tile(PipeShape.Chamber, rot, true, 10, 0, null, 1, null, 'tank');
       expect(tile.connections.has(Direction.North)).toBe(true);
       expect(tile.connections.has(Direction.East)).toBe(true);
       expect(tile.connections.has(Direction.South)).toBe(true);
@@ -128,7 +128,7 @@ describe('Tank tile', () => {
 
   it('respects customConnections when provided (north-only)', () => {
     const northOnly = new Set([Direction.North]);
-    const tile = new Tile(PipeShape.Tank, 0, true, 5, 0, null, 1, northOnly);
+    const tile = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, northOnly, 'tank');
     expect(tile.connections.has(Direction.North)).toBe(true);
     expect(tile.connections.has(Direction.East)).toBe(false);
     expect(tile.connections.has(Direction.South)).toBe(false);
@@ -136,7 +136,7 @@ describe('Tank tile', () => {
   });
 
   it('carries its capacity value', () => {
-    const tile = new Tile(PipeShape.Tank, 0, true, 8);
+    const tile = new Tile(PipeShape.Chamber, 0, true, 8, 0, null, 1, null, 'tank');
     expect(tile.capacity).toBe(8);
   });
 });
@@ -228,11 +228,11 @@ describe('Board.reclaimTile', () => {
     expect(board.reclaimTile({ row: 1, col: 0 })).toBe(false);
   });
 
-  it('returns false for Source / Sink / Tank even if not marked fixed', () => {
+  it('returns false for Source / Sink / Chamber even if not marked fixed', () => {
     const board = new Board(1, 3);
-    board.grid[0][0] = new Tile(PipeShape.Source, 0, false);
-    board.grid[0][1] = new Tile(PipeShape.Tank,   0, false, 5);
-    board.grid[0][2] = new Tile(PipeShape.Sink,   0, false);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, false);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 5, 0, null, 1, null, 'tank');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, false);
     expect(board.reclaimTile({ row: 0, col: 0 })).toBe(false);
     expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
     expect(board.reclaimTile({ row: 0, col: 2 })).toBe(false);
@@ -271,15 +271,15 @@ describe('Board.getCurrentWater', () => {
     expect(board.getCurrentWater()).toBe(9);
   });
 
-  it('increases when a Tank tile is included in the fill', () => {
+  it('increases when a Chamber(tank) tile is included in the fill', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
-    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);   // all-dir source
-    board.grid[0][1] = new Tile(PipeShape.Tank,   0, true, 5); // tank cap=5
-    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);   // all-dir sink
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, null, 'tank'); // cap=5
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
     board.sourceCapacity = 10;
-    // All mutually connected; tank adds 5, no pipe tiles → currentWater = 10 + 5 = 15
+    // All mutually connected; chamber-tank adds 5, no pipe tiles → currentWater = 10 + 5 = 15
     expect(board.getCurrentWater()).toBe(15);
   });
 });
@@ -293,33 +293,34 @@ describe('Board.validateGrid', () => {
     expect(board.validateGrid()).toHaveLength(0);
   });
 
-  it('reports an error when a Tank is placed on the edge', () => {
+  it('reports an error when a Chamber(tank) is placed on the edge', () => {
     const board = new Board(3, 3);
     board.sourceCapacity = 10;
-    // Place a tank at (0,0) – corner; its N and W connections go off-grid
-    board.grid[0][0] = new Tile(PipeShape.Tank, 0, true, 5);
+    // Place a Chamber(tank) at (0,0) – corner; its N and W connections go off-grid
+    board.grid[0][0] = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, null, 'tank');
     const errors = board.validateGrid();
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('returns no errors when no Tanks are present', () => {
+  it('returns no errors when no Chambers are present', () => {
     const board = new Board(3, 3);
     expect(board.validateGrid()).toHaveLength(0);
   });
 
-  it('north-only tank on the south edge does not trigger an error', () => {
-    // 3×3 board; south row is row 2.  A north-only tank there faces row 1 (in-bounds).
+  it('north-only Chamber(tank) on the south edge does not trigger an error', () => {
+    // 3×3 board; south row is row 2.  A north-only chamber there faces row 1 (in-bounds).
     const board = new Board(3, 3);
     const northOnly = new Set([Direction.North]);
-    board.grid[2][1] = new Tile(PipeShape.Tank, 0, true, 5, 0, null, 1, northOnly);
+    board.grid[2][1] = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, northOnly, 'tank');
     expect(board.validateGrid()).toHaveLength(0);
   });
 
-  it('Tutorial level tank (3,0) has only a North connection', () => {
+  it('Tutorial level Chamber(tank) at (3,0) has only a North connection', () => {
     const level = LEVELS[0];
     const board = new Board(level.rows, level.cols, level);
     const tank = board.grid[3][0];
-    expect(tank.shape).toBe(PipeShape.Tank);
+    expect(tank.shape).toBe(PipeShape.Chamber);
+    expect(tank.chamberContent).toBe('tank');
     expect(tank.connections.has(Direction.North)).toBe(true);
     expect(tank.connections.has(Direction.East)).toBe(false);
     expect(tank.connections.has(Direction.South)).toBe(false);
@@ -327,12 +328,12 @@ describe('Board.validateGrid', () => {
   });
 });
 
-// ─── New: DirtBlock tile ──────────────────────────────────────────────────────
+// ─── New: Chamber tile (dirt content) ──────────────────────────────────────────
 
-describe('DirtBlock tile', () => {
+describe('Chamber tile (dirt content)', () => {
   it('connects on all four sides regardless of rotation', () => {
     for (const rot of [0, 90, 180, 270] as const) {
-      const tile = new Tile(PipeShape.DirtBlock, rot, true, 0, 2);
+      const tile = new Tile(PipeShape.Chamber, rot, true, 0, 2, null, 1, null, 'dirt');
       expect(tile.connections.has(Direction.North)).toBe(true);
       expect(tile.connections.has(Direction.East)).toBe(true);
       expect(tile.connections.has(Direction.South)).toBe(true);
@@ -341,26 +342,26 @@ describe('DirtBlock tile', () => {
   });
 
   it('carries its dirtCost value', () => {
-    const tile = new Tile(PipeShape.DirtBlock, 0, true, 0, 5);
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'dirt');
     expect(tile.dirtCost).toBe(5);
   });
 
   it('deducts dirtCost from water when in the fill path', () => {
-    // Source → DirtBlock(cost=4) → Sink (1-cell line)
+    // Source → Chamber(dirt, cost=4) → Sink
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
-    board.grid[0][0] = new Tile(PipeShape.Source,    0, true);
-    board.grid[0][1] = new Tile(PipeShape.DirtBlock, 0, true, 0, 4);
-    board.grid[0][2] = new Tile(PipeShape.Sink,      0, true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, null, 'dirt');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
     board.sourceCapacity = 10;
-    // All four directions are open; source → dirt (costs 4) → sink
+    // All four directions are open; source → chamber-dirt (costs 4) → sink
     expect(board.getCurrentWater()).toBe(6);
   });
 
   it('is not reclaimable', () => {
     const board = new Board(1, 3);
-    board.grid[0][1] = new Tile(PipeShape.DirtBlock, 0, false, 0, 3);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 3, null, 1, null, 'dirt');
     expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
   });
 });
@@ -379,12 +380,12 @@ describe('Level 2 (Through the Woods)', () => {
     expect(board.validateGrid()).toHaveLength(0);
   });
 
-  it('contains DirtBlock tiles', () => {
+  it('contains Chamber(dirt) tiles', () => {
     const board = new Board(level.rows, level.cols, level);
-    const dirtBlocks = board.grid
+    const dirtChambers = board.grid
       .flat()
-      .filter((t) => t.shape === PipeShape.DirtBlock);
-    expect(dirtBlocks.length).toBeGreaterThan(0);
+      .filter((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'dirt');
+    expect(dirtChambers.length).toBeGreaterThan(0);
   });
 
   it('has sufficient water to complete the solution path', () => {
@@ -401,12 +402,12 @@ describe('Level 2 (Through the Woods)', () => {
   });
 });
 
-// ─── New: ItemContainer tile ──────────────────────────────────────────────────
+// ─── New: Chamber tile (item content) ──────────────────────────────────────────
 
-describe('ItemContainer tile', () => {
+describe('Chamber tile (item content)', () => {
   it('connects on all four sides regardless of rotation', () => {
     for (const rot of [0, 90, 180, 270] as const) {
-      const tile = new Tile(PipeShape.ItemContainer, rot, true, 0, 0, PipeShape.Straight, 1);
+      const tile = new Tile(PipeShape.Chamber, rot, true, 0, 0, PipeShape.Straight, 1, null, 'item');
       expect(tile.connections.has(Direction.North)).toBe(true);
       expect(tile.connections.has(Direction.East)).toBe(true);
       expect(tile.connections.has(Direction.South)).toBe(true);
@@ -415,27 +416,27 @@ describe('ItemContainer tile', () => {
   });
 
   it('stores itemShape and itemCount', () => {
-    const tile = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Elbow, 2);
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item');
     expect(tile.itemShape).toBe(PipeShape.Elbow);
     expect(tile.itemCount).toBe(2);
   });
 
   it('is not reclaimable', () => {
     const board = new Board(1, 3);
-    board.grid[0][1] = new Tile(PipeShape.ItemContainer, 0, false, 0, 0, PipeShape.Straight, 1);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 0, PipeShape.Straight, 1, null, 'item');
     expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
   });
 
   it('does not affect water cost', () => {
-    // Source → ItemContainer → Sink (inline, all-direction tiles)
+    // Source → Chamber(item) → Sink
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0, true);
-    board.grid[0][1] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][2] = new Tile(PipeShape.Sink,          0, true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
     board.sourceCapacity = 10;
-    // Container does not consume water
+    // Chamber-item does not consume water
     expect(board.getCurrentWater()).toBe(10);
   });
 });
@@ -456,9 +457,9 @@ describe('Board.getContainerBonuses', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0, true);
-    board.grid[0][1] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Elbow, 2);
-    board.grid[0][2] = new Tile(PipeShape.Sink,          0, true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
     const bonuses = board.getContainerBonuses();
     expect(bonuses.get(PipeShape.Elbow)).toBe(2);
   });
@@ -467,22 +468,22 @@ describe('Board.getContainerBonuses', () => {
     const board = new Board(1, 4);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 3 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0, true);
-    board.grid[0][1] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][2] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][3] = new Tile(PipeShape.Sink,          0, true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
     const bonuses = board.getContainerBonuses();
     expect(bonuses.get(PipeShape.Straight)).toBe(2);
   });
 
   it('does not count containers not in the fill path', () => {
-    // Use a Straight N-S (rotation=0) between Source and Container to block E-W connection.
+    // Use a Straight N-S (rotation=0) between Source and Chamber to block E-W connection.
     // Source.East → (0,1 Straight N-S): Straight has no West → NOT mutual → fill stops.
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0, true);
-    board.grid[0][1] = new Tile(PipeShape.Straight,      0);         // N-S only – blocks E-W
-    board.grid[0][2] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 1);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 0);         // N-S only – blocks E-W
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
     expect(board.getContainerBonuses().size).toBe(0);
   });
 });
@@ -491,18 +492,18 @@ describe('Board.getContainerBonuses', () => {
 
 describe('Board.placeInventoryTile (with container grants)', () => {
   it('allows placing a tile using a container grant when base count is 0', () => {
-    // Source → ItemContainer (grants 1 Straight) → Sink
+    // Source → Chamber(item, grants 1 Straight) → Sink
     const board = new Board(1, 4);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 3 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0, true);
-    board.grid[0][1] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][2] = new Tile(PipeShape.Empty,         0);
-    board.grid[0][3] = new Tile(PipeShape.Sink,          0, true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
     board.sourceCapacity = 10;
     board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
 
-    // Container is reachable (fill: source → container via mutual all-dir connections)
+    // Chamber is reachable (fill: source → chamber via mutual all-dir connections)
     // Base count is 0 but grant is 1 → effective = 1 → allow placement
     const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight);
     expect(result).toBe(true);
@@ -526,17 +527,17 @@ describe('Board.placeInventoryTile (with container grants)', () => {
 
 describe('Board.reclaimTile (inventory constraint)', () => {
   /**
-   * Build a 1×4 board: Source(0) → ItemContainer(1, grants 1 Straight) → Straight(2) → Sink(3).
-   * Container is connected from the start, so the player can use the grant immediately.
+   * Build a 1×4 board: Source(0) → Chamber(1, item, grants 1 Straight) → Empty(2) → Sink(3).
+   * Chamber is connected from the start, so the player can use the grant immediately.
    */
   function makeConstraintBoard(): Board {
     const board = new Board(1, 4);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 3 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0, true);
-    board.grid[0][1] = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][2] = new Tile(PipeShape.Empty,         0);
-    board.grid[0][3] = new Tile(PipeShape.Sink,          0, true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
     board.sourceCapacity = 10;
     board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
     return board;
@@ -544,30 +545,30 @@ describe('Board.reclaimTile (inventory constraint)', () => {
 
   it('allows reclaiming when no container grants are lost', () => {
     const board = makeConstraintBoard();
-    // Place Straight at col 2 using the container grant
+    // Place Straight at col 2 using the chamber grant
     board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight);
-    // Container is still in fill path, so reclaiming col 2 is safe
+    // Chamber is still in fill path, so reclaiming col 2 is safe
     expect(board.reclaimTile({ row: 0, col: 2 })).toBe(true);
     expect(board.lastError).toBeNull();
   });
 
-  it('blocks reclaiming when it would remove a container from the fill path and inventory would go below 0', () => {
-    // Board: Source(0) → Straight E-W(1) → ItemContainer(2) → Straight E-W(3) → Sink(4)
-    // Straight(1) is a player-placed tile; if removed, Container(2) leaves the fill path.
-    // We simulate the state after the player used the container grant: base Straight count = -1.
+  it('blocks reclaiming when it would remove a chamber from the fill path and inventory would go below 0', () => {
+    // Board: Source(0) → Straight E-W(1) → Chamber(2, item) → Straight E-W(3) → Sink(4)
+    // Straight(1) is a player-placed tile; if removed, Chamber(2) leaves the fill path.
+    // We simulate the state after the player used the chamber grant: base Straight count = -1.
     const board = new Board(1, 5);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 4 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0,  true);
-    board.grid[0][1] = new Tile(PipeShape.Straight,      90);         // E-W, player-placed
-    board.grid[0][2] = new Tile(PipeShape.ItemContainer, 0,  true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][3] = new Tile(PipeShape.Straight,      90);         // E-W, placed using grant
-    board.grid[0][4] = new Tile(PipeShape.Sink,          0,  true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);         // E-W, player-placed
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0,  true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);         // E-W, placed using grant
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0,  true);
     board.sourceCapacity = 10;
     // Two Straights placed: 1 from base (depleted) + 1 from grant → base count = -1
     board.inventory = [{ shape: PipeShape.Straight, count: -1 }];
 
-    // Try to reclaim col 1: this would disconnect the container → base(-1) + newGrant(0) = -1 < 0
+    // Try to reclaim col 1: this would disconnect the chamber → base(-1) + newGrant(0) = -1 < 0
     const result = board.reclaimTile({ row: 0, col: 1 });
     expect(result).toBe(false);
     expect(board.lastError).not.toBeNull();
@@ -575,20 +576,20 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 
-  it('allows reclaiming the piece that used the grant (container remains connected)', () => {
-    // Same board as above; reclaiming col 3 is safe because the container stays in the fill path.
+  it('allows reclaiming the piece that used the grant (chamber remains connected)', () => {
+    // Same board as above; reclaiming col 3 is safe because the chamber stays in the fill path.
     const board = new Board(1, 5);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 4 };
-    board.grid[0][0] = new Tile(PipeShape.Source,        0,  true);
-    board.grid[0][1] = new Tile(PipeShape.Straight,      90);         // E-W, player-placed
-    board.grid[0][2] = new Tile(PipeShape.ItemContainer, 0,  true, 0, 0, PipeShape.Straight, 1);
-    board.grid[0][3] = new Tile(PipeShape.Straight,      90);         // E-W, placed using grant
-    board.grid[0][4] = new Tile(PipeShape.Sink,          0,  true);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);         // E-W, player-placed
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0,  true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);         // E-W, placed using grant
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0,  true);
     board.sourceCapacity = 10;
     board.inventory = [{ shape: PipeShape.Straight, count: -1 }];
 
-    // Container is still reachable via col 1 even after col 3 is removed.
+    // Chamber is still reachable via col 1 even after col 3 is removed.
     // base(-1) + newGrant(1) = 0 >= 0 → allowed.
     const result = board.reclaimTile({ row: 0, col: 3 });
     expect(result).toBe(true);
@@ -619,9 +620,9 @@ describe('Level 3 (Mountain Stream)', () => {
     expect(board.validateGrid()).toHaveLength(0);
   });
 
-  it('contains an ItemContainer tile', () => {
+  it('contains a Chamber(item) tile', () => {
     const board = new Board(level.rows, level.cols, level);
-    const containers = board.grid.flat().filter((t) => t.shape === PipeShape.ItemContainer);
+    const containers = board.grid.flat().filter((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'item');
     expect(containers.length).toBeGreaterThan(0);
   });
 
@@ -669,12 +670,12 @@ describe('Level 4 (The Workshop)', () => {
     expect(board.validateGrid()).toHaveLength(0);
   });
 
-  it('contains ItemContainer, Tank, and DirtBlock tiles', () => {
+  it('contains Chamber tiles for item, tank, and dirt content', () => {
     const board = new Board(level.rows, level.cols, level);
     const tiles = board.grid.flat();
-    expect(tiles.some((t) => t.shape === PipeShape.ItemContainer)).toBe(true);
-    expect(tiles.some((t) => t.shape === PipeShape.Tank)).toBe(true);
-    expect(tiles.some((t) => t.shape === PipeShape.DirtBlock)).toBe(true);
+    expect(tiles.some((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'item')).toBe(true);
+    expect(tiles.some((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'tank')).toBe(true);
+    expect(tiles.some((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'dirt')).toBe(true);
   });
 
   it('is solvable with correct placements', () => {
@@ -693,6 +694,86 @@ describe('Level 4 (The Workshop)', () => {
 
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
+  });
+});
+
+// ─── Chamber tile ─────────────────────────────────────────────────────────────
+
+describe('Chamber tile', () => {
+  it('connects on all four sides by default (tank content)', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const tile = new Tile(PipeShape.Chamber, rot, true, 5, 0, null, 1, null, 'tank');
+      expect(tile.connections.has(Direction.North)).toBe(true);
+      expect(tile.connections.has(Direction.East)).toBe(true);
+      expect(tile.connections.has(Direction.South)).toBe(true);
+      expect(tile.connections.has(Direction.West)).toBe(true);
+    }
+  });
+
+  it('respects customConnections when provided', () => {
+    const northOnly = new Set([Direction.North]);
+    const tile = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, northOnly, 'tank');
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(false);
+    expect(tile.connections.has(Direction.South)).toBe(false);
+    expect(tile.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('tank content adds water capacity to getCurrentWater', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 7, 0, null, 1, null, 'tank');
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
+    board.sourceCapacity = 10;
+    // Water = 10 (source) + 7 (chamber-tank)
+    expect(board.getCurrentWater()).toBe(17);
+  });
+
+  it('dirt content subtracts dirtCost from getCurrentWater', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'dirt');
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
+    board.sourceCapacity = 10;
+    // Water = 10 (source) - 3 (chamber-dirt cost)
+    expect(board.getCurrentWater()).toBe(7);
+  });
+
+  it('item content grants inventory bonuses via getContainerBonuses', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
+    const bonuses = board.getContainerBonuses();
+    expect(bonuses.get(PipeShape.Elbow)).toBe(2);
+  });
+
+  it('cannot be reclaimed regardless of isFixed flag', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 0, null, 1, null, 'tank');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+
+  it('tank content in validateGrid reports error when facing off-grid', () => {
+    const board = new Board(1, 3);
+    // Chamber(tank) at column 0 facing West (off-grid)
+    board.grid[0][0] = new Tile(
+      PipeShape.Chamber, 0, true, 5, 0, null, 1,
+      new Set([Direction.West]), 'tank',
+    );
+    const errors = board.validateGrid();
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toContain('Chamber(tank)');
   });
 });
 

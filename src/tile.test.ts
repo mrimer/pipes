@@ -63,22 +63,9 @@ describe('getConnections', () => {
     }
   });
 
-  it('Tank connects all four directions regardless of rotation', () => {
+  it('Chamber connects all four directions regardless of rotation', () => {
     for (const rot of [0, 90, 180, 270] as const) {
-      const c = getConnections(PipeShape.Tank, rot);
-      expect(c.size).toBe(4);
-    }
-  });
-  it('DirtBlock connects all four directions regardless of rotation', () => {
-    for (const rot of [0, 90, 180, 270] as const) {
-      const c = getConnections(PipeShape.DirtBlock, rot);
-      expect(c.size).toBe(4);
-    }
-  });
-
-  it('ItemContainer connects all four directions regardless of rotation', () => {
-    for (const rot of [0, 90, 180, 270] as const) {
-      const c = getConnections(PipeShape.ItemContainer, rot);
+      const c = getConnections(PipeShape.Chamber, rot);
       expect(c.size).toBe(4);
     }
   });
@@ -122,16 +109,16 @@ describe('Tile', () => {
     const plain = new Tile(PipeShape.Straight, 0);
     expect(plain.capacity).toBe(0);
 
-    const tank = new Tile(PipeShape.Tank, 0, true, 12);
-    expect(tank.capacity).toBe(12);
+    const chamber = new Tile(PipeShape.Chamber, 0, true, 12, 0, null, 1, null, 'tank');
+    expect(chamber.capacity).toBe(12);
   });
 
   it('stores dirtCost and defaults to 0', () => {
     const plain = new Tile(PipeShape.Straight, 0);
     expect(plain.dirtCost).toBe(0);
 
-    const dirt = new Tile(PipeShape.DirtBlock, 0, true, 0, 3);
-    expect(dirt.dirtCost).toBe(3);
+    const chamber = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'dirt');
+    expect(chamber.dirtCost).toBe(3);
   });
 
   it('stores itemShape and itemCount, defaulting to null and 1', () => {
@@ -139,23 +126,23 @@ describe('Tile', () => {
     expect(plain.itemShape).toBeNull();
     expect(plain.itemCount).toBe(1);
 
-    const container = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 2);
-    expect(container.itemShape).toBe(PipeShape.Straight);
-    expect(container.itemCount).toBe(2);
+    const chamber = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 2, null, 'item');
+    expect(chamber.itemShape).toBe(PipeShape.Straight);
+    expect(chamber.itemCount).toBe(2);
   });
 
   it('customConnections overrides rotation-based connections when set', () => {
     const northOnly = new Set([Direction.North]);
-    const tank = new Tile(PipeShape.Tank, 0, true, 5, 0, null, 1, northOnly);
-    expect(tank.connections.has(Direction.North)).toBe(true);
-    expect(tank.connections.has(Direction.East)).toBe(false);
-    expect(tank.connections.has(Direction.South)).toBe(false);
-    expect(tank.connections.has(Direction.West)).toBe(false);
+    const chamber = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, northOnly, 'tank');
+    expect(chamber.connections.has(Direction.North)).toBe(true);
+    expect(chamber.connections.has(Direction.East)).toBe(false);
+    expect(chamber.connections.has(Direction.South)).toBe(false);
+    expect(chamber.connections.has(Direction.West)).toBe(false);
   });
 
   it('customConnections defaults to null (rotation-based connections used)', () => {
-    const tank = new Tile(PipeShape.Tank, 0, true, 5);
-    expect(tank.customConnections).toBeNull();
-    expect(tank.connections.size).toBe(4);
+    const chamber = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, null, 'tank');
+    expect(chamber.customConnections).toBeNull();
+    expect(chamber.connections.size).toBe(4);
   });
 });
