@@ -3,6 +3,7 @@
  */
 
 import { Game } from './game';
+import { PipeShape } from './types';
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
@@ -174,3 +175,140 @@ describe('Game – screen transitions', () => {
     expect(gameoverModalEl.style.display).toBe('none');
   });
 });
+
+// ─── Type helper for accessing Game private members in tests ──────────────────
+
+/** Typed view of Game internals needed for testing. */
+type GameTestHooks = {
+  selectedShape: PipeShape | null;
+  focusPos: { row: number; col: number };
+  completedLevels: Set<number>;
+  resetConfirmModalEl: HTMLElement;
+  _handleKey(e: KeyboardEvent): void;
+  _renderLevelList(): void;
+};
+
+function gameHooks(g: Game): GameTestHooks {
+  return g as unknown as GameTestHooks;
+}
+
+// ─── Tests: inventory selection kept after placement ──────────────────────────
+
+describe('Game – inventory selection kept when stock remains', () => {
+  it('keeps selectedShape after placement when effective count is still > 0', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+
+    // Level 1 has Straight ×4 in inventory – select it and place at empty (0,1)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // 3 Straight pipes remain → selection should be kept
+    expect(hooks.selectedShape).toBe(PipeShape.Straight);
+  });
+
+  it('clears selectedShape after placement when effective count drops to 0', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+
+    // Level 1 has Tee ×1 in inventory – select it and place at empty (0,1)
+    hooks.selectedShape = PipeShape.Tee;
+    hooks.focusPos = { row: 0, col: 1 };
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // 0 Tee pipes remain → selection should be cleared
+    expect(hooks.selectedShape).toBeNull();
+  });
+});
+
+// ─── Tests: inventory bar updates on tile rotation ────────────────────────────
+
+describe('Game – inventory bar re-renders on tile rotation', () => {
+  it('calls _renderInventoryBar when a non-empty tile is rotated via keyboard', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const renderSpy = jest.spyOn(game as unknown as { _renderInventoryBar(): void }, '_renderInventoryBar');
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = null;
+    // (1,1) is a fixed Straight tile in level 1
+    hooks.focusPos = { row: 1, col: 1 };
+
+    // Enter with no selected shape rotates the focused tile
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(renderSpy).toHaveBeenCalled();
+  });
+});
+
+// ─── Tests: reset progress ────────────────────────────────────────────────────
+
+describe('Game – reset progress', () => {
+  it('renders a reset progress button in the level list', () => {
+    makeGame();
+    const levelListEl = document.getElementById('level-list')!;
+    const buttons = levelListEl.querySelectorAll('button');
+    const resetBtn = Array.from(buttons).find((b) => b.textContent?.includes('Reset Progress'));
+    expect(resetBtn).toBeTruthy();
+  });
+
+  it('shows the reset confirm modal when the reset button is clicked', () => {
+    const { game } = makeGame();
+    const levelListEl = document.getElementById('level-list')!;
+    const resetBtn = Array.from(levelListEl.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Reset Progress'))!;
+
+    resetBtn.click();
+
+    expect(gameHooks(game).resetConfirmModalEl.style.display).toBe('flex');
+  });
+
+  it('hides the reset confirm modal when cancel is clicked', () => {
+    const { game } = makeGame();
+    const levelListEl = document.getElementById('level-list')!;
+    const resetBtn = Array.from(levelListEl.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Reset Progress'))!;
+    resetBtn.click();
+
+    const modal = gameHooks(game).resetConfirmModalEl;
+    const cancelBtn = Array.from(modal.querySelectorAll('button'))
+      .find((b) => b.textContent === 'Cancel')! as HTMLButtonElement;
+    cancelBtn.click();
+
+    expect(modal.style.display).toBe('none');
+  });
+
+  it('clears completed levels and re-renders level list when reset is confirmed', () => {
+    const { game } = makeGame();
+    const hooks = gameHooks(game);
+
+    // Mark level 1 as completed internally, then re-render
+    hooks.completedLevels.add(1);
+    hooks._renderLevelList();
+
+    const levelListEl = document.getElementById('level-list')!;
+    const resetBtn = Array.from(levelListEl.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Reset Progress'))!;
+    resetBtn.click();
+
+    const modal = hooks.resetConfirmModalEl;
+    const confirmBtn = Array.from(modal.querySelectorAll('button'))
+      .find((b) => b.textContent === 'Reset')! as HTMLButtonElement;
+    confirmBtn.click();
+
+    // Completed levels should be cleared
+    expect(hooks.completedLevels.size).toBe(0);
+    // The first level button should no longer have the 'completed' class
+    const firstLevelBtn = levelListEl.querySelector('.level-btn');
+    expect(firstLevelBtn?.classList.contains('completed')).toBe(false);
+  });
+});
+

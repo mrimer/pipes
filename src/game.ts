@@ -104,6 +104,9 @@ export class Game {
   /** Timer ID for auto-hiding the error flash message. */
   private _errorFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Modal overlay for confirming a progress reset. */
+  private readonly resetConfirmModalEl: HTMLElement;
+
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
 
@@ -150,6 +153,48 @@ export class Game {
       'border-radius:6px;padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;' +
       'text-align:center;max-width:360px;';
     document.body.appendChild(this.errorFlashEl);
+
+    // Create the reset-progress confirmation modal
+    this.resetConfirmModalEl = document.createElement('div');
+    this.resetConfirmModalEl.style.cssText =
+      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);' +
+      'justify-content:center;align-items:center;z-index:100;';
+    const resetModalBox = document.createElement('div');
+    resetModalBox.style.cssText =
+      'background:#16213e;border:3px solid #e74c3c;border-radius:10px;' +
+      'padding:32px 40px;text-align:center;display:flex;flex-direction:column;' +
+      'gap:16px;min-width:280px;';
+    const resetTitle = document.createElement('h2');
+    resetTitle.textContent = '⚠️ Reset Progress?';
+    const resetMsg = document.createElement('p');
+    resetMsg.style.cssText = 'font-size:0.95rem;color:#aaa;';
+    resetMsg.textContent = 'This will remove all level completion data. Are you sure?';
+    const resetActions = document.createElement('div');
+    resetActions.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+    const resetCancelBtn = document.createElement('button');
+    resetCancelBtn.textContent = 'Cancel';
+    resetCancelBtn.style.cssText =
+      'padding:10px 24px;font-size:1rem;background:#2a2a4a;color:#aaa;' +
+      'border:1px solid #555;border-radius:6px;cursor:pointer;';
+    resetCancelBtn.addEventListener('click', () => {
+      this.resetConfirmModalEl.style.display = 'none';
+    });
+    const resetConfirmBtn = document.createElement('button');
+    resetConfirmBtn.textContent = 'Reset';
+    resetConfirmBtn.style.cssText =
+      'padding:10px 24px;font-size:1rem;background:#e74c3c;color:#fff;' +
+      'border:none;border-radius:6px;cursor:pointer;';
+    resetConfirmBtn.addEventListener('click', () => {
+      this._resetProgress();
+      this.resetConfirmModalEl.style.display = 'none';
+    });
+    resetActions.appendChild(resetCancelBtn);
+    resetActions.appendChild(resetConfirmBtn);
+    resetModalBox.appendChild(resetTitle);
+    resetModalBox.appendChild(resetMsg);
+    resetModalBox.appendChild(resetActions);
+    this.resetConfirmModalEl.appendChild(resetModalBox);
+    document.body.appendChild(this.resetConfirmModalEl);
 
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
@@ -223,6 +268,17 @@ export class Game {
       }
       this.levelListEl.appendChild(btn);
     }
+
+    // Reset-progress button at the bottom of the level list
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = '🔄 Reset Progress';
+    resetBtn.style.cssText =
+      'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#e74c3c;' +
+      'border:1px solid #e74c3c;border-radius:6px;cursor:pointer;width:100%;';
+    resetBtn.addEventListener('click', () => {
+      this.resetConfirmModalEl.style.display = 'flex';
+    });
+    this.levelListEl.appendChild(resetBtn);
   }
 
   // ─── Inventory bar rendering ──────────────────────────────────────────────
@@ -521,7 +577,14 @@ export class Game {
     if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
       // Place pipe from inventory
       if (this.board.placeInventoryTile(pos, this.selectedShape)) {
-        this.selectedShape = null;
+        // Keep selected shape if there is still stock remaining
+        const placedShape = this.selectedShape;
+        const inv = this.board.inventory.find((it) => it.shape === placedShape);
+        const bonuses = this.board.getContainerBonuses();
+        const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
+        if (effectiveCount <= 0) {
+          this.selectedShape = null;
+        }
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._checkWinLose();
@@ -529,6 +592,7 @@ export class Game {
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe
       this.board.rotateTile(pos);
+      this._renderInventoryBar();
       this._updateWaterDisplay();
       this._checkWinLose();
     }
@@ -640,7 +704,14 @@ export class Game {
           const tile = board.getTile(focusPos);
           if (tile?.shape === PipeShape.Empty) {
             if (board.placeInventoryTile(focusPos, this.selectedShape)) {
-              this.selectedShape = null;
+              // Keep selected shape if there is still stock remaining
+              const placedShape = this.selectedShape;
+              const inv = board.inventory.find((it) => it.shape === placedShape);
+              const bonuses = board.getContainerBonuses();
+              const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
+              if (effectiveCount <= 0) {
+                this.selectedShape = null;
+              }
               this._renderInventoryBar();
               this._updateWaterDisplay();
               this._checkWinLose();
@@ -648,6 +719,7 @@ export class Game {
           }
         } else {
           board.rotateTile(focusPos);
+          this._renderInventoryBar();
           this._updateWaterDisplay();
           this._checkWinLose();
         }
@@ -693,6 +765,17 @@ export class Game {
     } catch {
       // ignore storage errors
     }
+  }
+
+  /** Clear all level-completion progress and refresh the level list. */
+  private _resetProgress(): void {
+    this.completedLevels.clear();
+    try {
+      localStorage.removeItem('pipes_completed');
+    } catch {
+      // ignore storage errors
+    }
+    this._renderLevelList();
   }
 }
 
