@@ -820,3 +820,97 @@ describe('Gold pipes and gold spaces', () => {
     expect(board.isSolved()).toBe(true);
   });
 });
+
+// ─── Undo support ────────────────────────────────────────────────────────────
+
+describe('Board.saveSnapshot / canUndo / undoMove', () => {
+  it('canUndo() returns false before any snapshot is saved', () => {
+    const board = new Board(2, 2);
+    expect(board.canUndo()).toBe(false);
+  });
+
+  it('canUndo() returns true after saveSnapshot()', () => {
+    const board = new Board(2, 2);
+    board.saveSnapshot();
+    expect(board.canUndo()).toBe(true);
+  });
+
+  it('undoMove() returns false and leaves board unchanged when no snapshot', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 2 };
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);
+    const result = board.undoMove();
+    expect(result).toBe(false);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+
+  it('undoMove() restores a placed tile back to Empty and returns inventory item', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
+    board.sourceCapacity = 5;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+
+    board.saveSnapshot();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.inventory[0].count).toBe(1);
+
+    const restored = board.undoMove();
+
+    expect(restored).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+    expect(board.inventory[0].count).toBe(2);
+  });
+
+  it('undoMove() restores a rotated tile back to its original rotation', () => {
+    const board = new Board(2, 2);
+    board.grid[0][0] = new Tile(PipeShape.Elbow, 0);
+
+    board.saveSnapshot();
+    board.rotateTile({ row: 0, col: 0 });
+
+    expect(board.grid[0][0].rotation).toBe(90);
+
+    board.undoMove();
+
+    expect(board.grid[0][0].rotation).toBe(0);
+  });
+
+  it('canUndo() returns false after undoMove() consumes the snapshot', () => {
+    const board = new Board(2, 2);
+    board.saveSnapshot();
+    board.undoMove();
+    expect(board.canUndo()).toBe(false);
+  });
+
+  it('saveSnapshot() overwrites the previous snapshot', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+
+    // First snapshot (count = 3, cell empty)
+    board.saveSnapshot();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90); // count → 2
+
+    // Second snapshot (count = 2, cell filled)
+    board.saveSnapshot();
+    board.rotateTile({ row: 0, col: 1 }); // rotate but don't place a new tile
+
+    board.undoMove();
+
+    // Should restore to second snapshot: Straight at (0,1) with rotation 90, count = 2
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.grid[0][1].rotation).toBe(90);
+    expect(board.inventory[0].count).toBe(2);
+  });
+});

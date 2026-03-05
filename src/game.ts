@@ -274,7 +274,7 @@ export class Game {
 
     if (this.board.getCurrentWater() <= 0) {
       this.gameState = GameState.GameOver;
-      this.gameoverMsgEl.textContent = 'The tank ran dry! Reset the level or return to the menu.';
+      this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
       this.gameoverModalEl.style.display = 'flex';
     }
   }
@@ -295,6 +295,7 @@ export class Game {
 
     if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
       // Place pipe from inventory
+      this.board.saveSnapshot();
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         // Remember the rotation used so the next placement defaults to it
         const placedShape = this.selectedShape;
@@ -312,6 +313,7 @@ export class Game {
       }
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe
+      this.board.saveSnapshot();
       this.board.rotateTile(pos);
       this._renderInventoryBar();
       this._updateWaterDisplay();
@@ -437,6 +439,7 @@ export class Game {
         if (this.selectedShape !== null) {
           const tile = board.getTile(focusPos);
           if (tile?.shape === PipeShape.Empty) {
+            board.saveSnapshot();
             if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
               // Remember the rotation used so the next placement defaults to it
               const placedShape = this.selectedShape;
@@ -454,6 +457,7 @@ export class Game {
             }
           }
         } else {
+          board.saveSnapshot();
           board.rotateTile(focusPos);
           this._renderInventoryBar();
           this._updateWaterDisplay();
@@ -479,6 +483,20 @@ export class Game {
   /** Retry the current level from scratch. */
   retryLevel(): void {
     if (this.currentLevel) this.startLevel(this.currentLevel.id);
+  }
+
+  /**
+   * Undo the last player action and resume playing from the restored state.
+   * Only meaningful when the game-over modal is showing and a snapshot exists.
+   */
+  undoLastMove(): void {
+    if (!this.board || !this.board.canUndo()) return;
+    this.board.undoMove();
+    this.gameState = GameState.Playing;
+    this.gameoverModalEl.style.display = 'none';
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._renderBoard();
   }
 
   /** Exit to the level-selection screen. */

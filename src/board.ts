@@ -58,6 +58,9 @@ export class Board {
    */
   lastError: string | null = null;
 
+  /** Saved board state for undo support (one level deep). */
+  private _snapshot: { grid: Tile[][]; inventory: InventoryItem[] } | null = null;
+
   /**
    * @param rows - Number of rows.
    * @param cols - Number of columns.
@@ -110,6 +113,54 @@ export class Board {
         }
       }
     }
+  }
+
+  // ─── Undo support ─────────────────────────────────────────────────────────
+
+  /**
+   * Save a snapshot of the current grid and inventory so the last action can be
+   * undone.  Only one snapshot is retained; each call overwrites the previous one.
+   */
+  saveSnapshot(): void {
+    this._snapshot = {
+      grid: this.grid.map((row) =>
+        row.map(
+          (tile) =>
+            new Tile(
+              tile.shape,
+              tile.rotation,
+              tile.isFixed,
+              tile.capacity,
+              tile.dirtCost,
+              tile.itemShape,
+              tile.itemCount,
+              tile.customConnections !== null ? new Set(tile.customConnections) : null,
+            ),
+        ),
+      ),
+      inventory: this.inventory.map((item) => ({ ...item })),
+    };
+  }
+
+  /** Returns true if an undo snapshot is available. */
+  canUndo(): boolean {
+    return this._snapshot !== null;
+  }
+
+  /**
+   * Restore the board to the previously saved snapshot, undoing the last action.
+   * @returns true if the snapshot was restored; false if there was no snapshot.
+   */
+  undoMove(): boolean {
+    if (!this._snapshot) return false;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        this.grid[r][c] = this._snapshot.grid[r][c];
+      }
+    }
+    this.inventory = this._snapshot.inventory;
+    this._snapshot = null;
+    return true;
   }
 
   /**

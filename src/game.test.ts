@@ -423,3 +423,68 @@ describe('Game – pending rotation', () => {
 
 // ─── Tests: board.placeInventoryTile with rotation ───────────────────────────
 
+
+// ─── Tests: undoLastMove ──────────────────────────────────────────────────────
+
+import { Board } from './board';
+import { GameState } from './types';
+
+describe('Game – undoLastMove', () => {
+  it('undoLastMove() hides the gameover modal and resumes playing when a snapshot exists', () => {
+    const { game, gameoverModalEl } = makeGame();
+    game.startLevel(1);
+
+    // Access board and simulate a snapshot being saved before a move
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+    boardAccess.board.saveSnapshot();
+
+    // Simulate game-over state (as _checkWinLose would set)
+    boardAccess.gameState = GameState.GameOver;
+    gameoverModalEl.style.display = 'flex';
+
+    game.undoLastMove();
+
+    expect(boardAccess.gameState).toBe(GameState.Playing);
+    expect(gameoverModalEl.style.display).toBe('none');
+  });
+
+  it('undoLastMove() does nothing when there is no snapshot', () => {
+    const { game, gameoverModalEl } = makeGame();
+    game.startLevel(1);
+
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+    boardAccess.gameState = GameState.GameOver;
+    gameoverModalEl.style.display = 'flex';
+
+    // No saveSnapshot() called → canUndo() is false
+    game.undoLastMove();
+
+    // State should be unchanged
+    expect(boardAccess.gameState).toBe(GameState.GameOver);
+    expect(gameoverModalEl.style.display).toBe('flex');
+  });
+
+  it('undoLastMove() restores the board grid to its pre-move state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+
+    // Place a tile via keyboard (saves snapshot automatically)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Verify the tile was placed
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+
+    // Simulate game-over
+    boardAccess.gameState = GameState.GameOver;
+
+    game.undoLastMove();
+
+    // The placed tile should be gone
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Empty);
+  });
+});
