@@ -69,7 +69,6 @@ describe('getConnections', () => {
       expect(c.size).toBe(4);
     }
   });
-
   it('DirtBlock connects all four directions regardless of rotation', () => {
     for (const rot of [0, 90, 180, 270] as const) {
       const c = getConnections(PipeShape.DirtBlock, rot);
@@ -143,5 +142,20 @@ describe('Tile', () => {
     const container = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 2);
     expect(container.itemShape).toBe(PipeShape.Straight);
     expect(container.itemCount).toBe(2);
+  });
+
+  it('customConnections overrides rotation-based connections when set', () => {
+    const northOnly = new Set([Direction.North]);
+    const tank = new Tile(PipeShape.Tank, 0, true, 5, 0, null, 1, northOnly);
+    expect(tank.connections.has(Direction.North)).toBe(true);
+    expect(tank.connections.has(Direction.East)).toBe(false);
+    expect(tank.connections.has(Direction.South)).toBe(false);
+    expect(tank.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('customConnections defaults to null (rotation-based connections used)', () => {
+    const tank = new Tile(PipeShape.Tank, 0, true, 5);
+    expect(tank.customConnections).toBeNull();
+    expect(tank.connections.size).toBe(4);
   });
 });

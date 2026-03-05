@@ -4,7 +4,7 @@
 
 import { Board, GOLD_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
-import { GridPos, PipeShape } from './types';
+import { GridPos, PipeShape, Direction } from './types';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
   EMPTY_COLOR, EMPTY_TARGET_COLOR,
@@ -184,14 +184,22 @@ export function drawPipe(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(capacity), 0, 0);
-    // Connection stubs (lines from box edges to tile edges)
+    // Connection stubs (lines from box edges to tile edges) – only for open sides
     ctx.strokeStyle = color;
     ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    if (tile.connections.has(Direction.North)) {
+      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.South)) {
+      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+    }
+    if (tile.connections.has(Direction.West)) {
+      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.East)) {
+      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    }
   } else if (shape === PipeShape.DirtBlock) {
     // Dirt block – brown rectangle with a red negative cost label
     ctx.restore();
