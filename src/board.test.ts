@@ -647,3 +647,41 @@ describe('Level 4 (The Workshop)', () => {
     expect(board.getCurrentWater()).toBeGreaterThan(0);
   });
 });
+
+// ─── New: Granite tile ────────────────────────────────────────────────────────
+
+describe('Granite tile', () => {
+  it('has no connections and cannot carry water', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Granite, 0, true);  // blocks the path
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.isSolved()).toBe(false);
+    expect(board.getFilledPositions().has('0,1')).toBe(false);
+  });
+
+  it('cannot be placed on by placeInventoryTile', () => {
+    const board = new Board(1, 3);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 5 }];
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+  });
+
+  it('cannot be reclaimed even when not marked fixed', () => {
+    const board = new Board(1, 3);
+    board.grid[0][1] = new Tile(PipeShape.Granite, 0, false);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+
+  it('is preset in levels as an immovable obstacle', () => {
+    // Level 1 contains granite tiles added as obstacles
+    const board = new Board(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0]);
+    const graniteTiles = board.grid.flat().filter((t) => t.shape === PipeShape.Granite);
+    expect(graniteTiles.length).toBeGreaterThan(0);
+    graniteTiles.forEach((t) => expect(t.isFixed).toBe(true));
+  });
+});
