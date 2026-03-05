@@ -5,22 +5,8 @@ import { Direction, LevelDef, PipeShape } from './types';
  *
  * Level 1 – Tutorial
  * ==================
- * 6 × 6 grid.  The solution path runs:
+ * 6 × 6 grid
  *
- *   Source(0,0)
- *     → S to (1,0) Elbow(N-E, fixed)
- *     → E to (1,1) Straight(E-W, fixed)
- *     → E to (1,2) Straight(E-W, fixed)
- *     → E to (1,3) TANK(cap=8, fixed)
- *     → E to (1,4) [EMPTY – player places Straight E-W]
- *     → E to (1,5) Elbow(S-W, fixed)
- *     → S to (2,5) [EMPTY – player places Straight N-S]
- *     → S to (3,5) Straight(N-S, fixed)
- *     → S to (4,5) [EMPTY – player places Straight N-S]
- *     → S to (5,5) Sink (WIN!)
- *
- * Water budget:  start 5 + tank 5 = 10 total; path costs 8 regular pipes → 2 units remain on win.
- * The Tank at (1,3) is interior (row 1, col 3) so edge-validation passes.
  */
 
 const LEVEL_1: LevelDef = {
@@ -28,7 +14,7 @@ const LEVEL_1: LevelDef = {
   name: 'Tutorial',
   rows: 6,
   cols: 6,
-  sourceCapacity: 5,
+  sourceCapacity: 6,
   grid: [
     // Row 0
     [
