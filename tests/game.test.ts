@@ -62,6 +62,7 @@ function makeGame(): {
       <div id="level-list"></div>
     </div>
     <div id="play-screen">
+      <div id="level-header"></div>
       <span id="water-display"></span>
       <div id="inventory-bar"></div>
       <button id="undo-btn"></button>
@@ -76,6 +77,7 @@ function makeGame(): {
   const levelSelectEl  = get('level-select');
   const levelListEl    = get('level-list');
   const playScreenEl   = get('play-screen');
+  const levelHeaderEl  = get('level-header');
   const inventoryBarEl = get('inventory-bar');
   const waterDisplayEl = get('water-display');
   const winModalEl     = get('win-modal');
@@ -91,6 +93,7 @@ function makeGame(): {
     levelSelectEl,
     levelListEl,
     playScreenEl,
+    levelHeaderEl,
     inventoryBarEl,
     waterDisplayEl,
     winModalEl,

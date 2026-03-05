@@ -1,4 +1,4 @@
-import { Direction, LevelDef, PipeShape } from './types';
+import { Direction, LevelDef, ChapterDef, PipeShape } from './types';
 
 /**
  * All game levels.
@@ -278,3 +278,9 @@ const LEVEL_4: LevelDef = {
 };
 
 export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4];
+
+/** All game chapters, each containing an ordered set of levels. */
+export const CHAPTERS: ChapterDef[] = [
+  { id: 1, name: 'Intro', levels: [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4] },
+  { id: 2, name: 'Rising Waters', levels: [] },
+];
