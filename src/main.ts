@@ -33,6 +33,7 @@ getEl('win-retry-btn').addEventListener('click', () => game.retryLevel());
 getEl('win-menu-btn').addEventListener('click',  () => game.exitToMenu());
 
 // Game-over modal buttons
+getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove());
 getEl('gameover-retry-btn').addEventListener('click', () => game.retryLevel());
 getEl('gameover-menu-btn').addEventListener('click',  () => game.exitToMenu());
 
