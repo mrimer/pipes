@@ -183,6 +183,32 @@ describe('Game – screen transitions', () => {
   });
 });
 
+// ─── Tests: undo winning move ─────────────────────────────────────────────────
+
+describe('Game – undoWinningMove', () => {
+  it('hides the win modal when undoWinningMove is called after a move was made', () => {
+    const { game, winModalEl } = makeGame();
+
+    game.startLevel(1);
+    // Simulate a move being recorded so that canUndo() returns true, as it would
+    // after the player makes the winning move.
+    gameHooks(game).board!.recordMove();
+    winModalEl.style.display = 'flex';
+
+    game.undoWinningMove();
+
+    expect(winModalEl.style.display).toBe('none');
+  });
+
+  it('does not throw when undoWinningMove is called with no history', () => {
+    const { game } = makeGame();
+
+    game.startLevel(1);
+    // No moves made, so canUndo() returns false – method should be a no-op.
+    expect(() => game.undoWinningMove()).not.toThrow();
+  });
+});
+
 // ─── Type helper for accessing Game private members in tests ──────────────────
 
 /** Typed view of Game internals needed for testing. */
@@ -193,6 +219,7 @@ type GameTestHooks = {
   focusPos: { row: number; col: number };
   completedLevels: Set<number>;
   resetConfirmModalEl: HTMLElement;
+  board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _handleKey(e: KeyboardEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
   _renderLevelList(): void;

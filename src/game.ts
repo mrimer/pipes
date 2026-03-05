@@ -502,6 +502,21 @@ export class Game {
   }
 
   /**
+   * Undo the last (winning) move from the win modal and resume playing the level.
+   * Dismisses the win modal and restores the board to the state before the winning move.
+   */
+  undoWinningMove(): void {
+    if (!this.board || !this.board.canUndo()) return;
+    this.board.undoMove();
+    this.gameState = GameState.Playing;
+    this.winModalEl.style.display = 'none';
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
+    this._renderBoard();
+  }
+
+  /**
    * Undo the last player action.
    * When called from the game-over modal, also dismisses the modal and resumes play.
    */

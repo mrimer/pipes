@@ -33,6 +33,7 @@ const game = new Game(
 );
 
 // Win modal buttons
+getEl('win-undo-btn').addEventListener('click',  () => game.undoWinningMove());
 getEl('win-retry-btn').addEventListener('click', () => game.retryLevel());
 getEl('win-menu-btn').addEventListener('click',  () => game.exitToMenu());
 
