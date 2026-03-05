@@ -35,6 +35,16 @@ export enum PipeShape {
   ItemContainer = 'ITEM_CONTAINER',
   /** Granite block – an impassable obstacle; cannot be moved and water cannot flow through it */
   Granite = 'GRANITE',
+  /** Gold space – background tile; only gold pipes may be placed here */
+  GoldSpace = 'GOLD_SPACE',
+  /** Gold straight pipe – behaves like Straight but may only be placed on gold spaces */
+  GoldStraight = 'GOLD_STRAIGHT',
+  /** Gold elbow pipe – behaves like Elbow but may only be placed on gold spaces */
+  GoldElbow = 'GOLD_ELBOW',
+  /** Gold T-junction – behaves like Tee but may only be placed on gold spaces */
+  GoldTee = 'GOLD_TEE',
+  /** Gold cross junction – behaves like Cross but may only be placed on gold spaces */
+  GoldCross = 'GOLD_CROSS',
 }
 
 /** Valid rotation values (clockwise, in degrees). */

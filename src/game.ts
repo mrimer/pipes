@@ -1,4 +1,4 @@
-import { Board } from './board';
+import { Board, GOLD_PIPE_SHAPES } from './board';
 import { LEVELS } from './levels';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
@@ -35,23 +35,37 @@ const CONTAINER_FILL_COLOR = '#3d2b00';
 const CONTAINER_FILL_WATER_COLOR = '#5a4000';
 const GRANITE_COLOR = '#9ca3af';
 const GRANITE_FILL_COLOR = '#374151';
+const GOLD_PIPE_COLOR = '#ffd700';
+const GOLD_PIPE_WATER_COLOR = '#ffec6e';
+const GOLD_SPACE_BASE_COLOR = '#3d2b00';
+const GOLD_SPACE_SHIMMER_COLOR = 'rgba(255,215,0,';  // prefix; alpha appended at runtime
+const GOLD_SPACE_BORDER_COLOR = '#b8860b';
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
-  [PipeShape.Straight]: 'St',
-  [PipeShape.Elbow]:    'El',
-  [PipeShape.Tee]:      'Te',
-  [PipeShape.Cross]:    'Cr',
+  [PipeShape.Straight]:     'St',
+  [PipeShape.Elbow]:        'El',
+  [PipeShape.Tee]:          'Te',
+  [PipeShape.Cross]:        'Cr',
+  [PipeShape.GoldStraight]: 'St',
+  [PipeShape.GoldElbow]:    'El',
+  [PipeShape.GoldTee]:      'Te',
+  [PipeShape.GoldCross]:    'Cr',
 };
-function _shapeIcon(shape: PipeShape): string {
+function _shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
   const S = 32;
   const H = S / 2;
   const sw = 5;
-  const color = '#4a90d9';
   const base = `width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"`;
   const line = (x1: number, y1: number, x2: number, y2: number) =>
     `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
-  switch (shape) {
+  // Map gold pipe shapes to their base shape for icon rendering
+  let drawShape = shape;
+  if (shape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
+  else if (shape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
+  else if (shape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
+  else if (shape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
+  switch (drawShape) {
     case PipeShape.Straight:
       return `<svg ${base}>${line(H, 0, H, S)}</svg>`;
     case PipeShape.Elbow:
@@ -301,12 +315,17 @@ export class Game {
 
     for (const item of this.board.inventory) {
       const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
+      // Gold pipe items are only shown when there is at least one available
+      if (GOLD_PIPE_SHAPES.has(item.shape) && effectiveCount <= 0) continue;
+
+      const isGold = GOLD_PIPE_SHAPES.has(item.shape);
       const el = document.createElement('div');
       el.classList.add('inv-item');
+      if (isGold) el.classList.add('gold');
       if (item.shape === this.selectedShape) el.classList.add('selected');
       if (effectiveCount === 0) el.classList.add('depleted');
 
-      const icon = _shapeIcon(item.shape);
+      const icon = _shapeIcon(item.shape, isGold ? GOLD_PIPE_COLOR : '#4a90d9');
       el.innerHTML =
         `<span class="inv-shape">${icon}</span>` +
         `<span class="inv-count">×${effectiveCount}</span>`;
@@ -352,20 +371,50 @@ export class Game {
     const filled = board.getFilledPositions();
     const currentWater = board.getCurrentWater();
 
+    // Shimmer phase for gold spaces (oscillates smoothly over time)
+    const shimmerAlpha = 0.2 + 0.25 * ((Math.sin(Date.now() / 500) + 1) / 2);
+
+    const selectedIsGold = this.selectedShape !== null && GOLD_PIPE_SHAPES.has(this.selectedShape);
+
     for (let r = 0; r < board.rows; r++) {
       for (let c = 0; c < board.cols; c++) {
         const tile = board.grid[r][c];
         const x = c * TILE_SIZE;
         const y = r * TILE_SIZE;
-        const isWater   = filled.has(`${r},${c}`);
-        const isFocused = this.focusPos.row === r && this.focusPos.col === c;
-        const isTarget  = this.selectedShape !== null && tile.shape === PipeShape.Empty;
+        const isWater    = filled.has(`${r},${c}`);
+        const isFocused  = this.focusPos.row === r && this.focusPos.col === c;
+        const isGoldCell = board.goldSpaces.has(`${r},${c}`);
+
+        // A cell is a valid placement target only when the selected shape matches the cell type
+        const isTarget = this.selectedShape !== null &&
+          tile.shape === PipeShape.Empty &&
+          (isGoldCell === selectedIsGold);
 
         // Tile background
-        ctx.fillStyle = tile.shape === PipeShape.Empty
-          ? (isTarget ? EMPTY_TARGET_COLOR : EMPTY_COLOR)
-          : TILE_BG;
-        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        if (tile.shape === PipeShape.Empty) {
+          if (isGoldCell) {
+            // Shimmering gold background
+            ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
+            ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            ctx.fillStyle = `${GOLD_SPACE_SHIMMER_COLOR}${shimmerAlpha.toFixed(3)})`;
+            ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            // Gold border to make the cell clearly distinct
+            ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+            // Brighten when it's a valid drop target
+            if (isTarget) {
+              ctx.fillStyle = 'rgba(255,215,0,0.2)';
+              ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            }
+          } else {
+            ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : EMPTY_COLOR;
+            ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+          }
+        } else {
+          ctx.fillStyle = TILE_BG;
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        }
 
         // Focus highlight
         if (isFocused) {
@@ -384,7 +433,8 @@ export class Game {
       const hoverRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
       if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
         const hoverTile = board.grid[hoverRow][hoverCol];
-        if (hoverTile.shape === PipeShape.Empty) {
+        const isGoldCell = board.goldSpaces.has(`${hoverRow},${hoverCol}`);
+        if (hoverTile.shape === PipeShape.Empty && isGoldCell === selectedIsGold) {
           const previewTile = new Tile(this.selectedShape, this.pendingRotation);
           const px = hoverCol * TILE_SIZE;
           const py = hoverRow * TILE_SIZE;
@@ -422,6 +472,8 @@ export class Game {
       color = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
     } else if (shape === PipeShape.Granite) {
       color = GRANITE_COLOR;
+    } else if (GOLD_PIPE_SHAPES.has(shape)) {
+      color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
     } else {
       color = isFixed
         ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
@@ -438,18 +490,18 @@ export class Game {
       ctx.beginPath();
       ctx.arc(0, 0, 4, 0, Math.PI * 2);
       ctx.fill();
-    } else if (shape === PipeShape.Straight) {
+    } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight) {
       ctx.beginPath();
       ctx.moveTo(0, -half);
       ctx.lineTo(0, half);
       ctx.stroke();
-    } else if (shape === PipeShape.Elbow) {
+    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow) {
       ctx.beginPath();
       ctx.moveTo(0, -half);
       ctx.lineTo(0, 0);
       ctx.lineTo(half, 0);
       ctx.stroke();
-    } else if (shape === PipeShape.Tee) {
+    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee) {
       ctx.beginPath();
       ctx.moveTo(0, -half);
       ctx.lineTo(0, half);
@@ -458,7 +510,7 @@ export class Game {
       ctx.moveTo(0, 0);
       ctx.lineTo(half, 0);
       ctx.stroke();
-    } else if (shape === PipeShape.Cross) {
+    } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross) {
       ctx.beginPath();
       ctx.moveTo(0, -half);
       ctx.lineTo(0, half);
@@ -555,9 +607,14 @@ export class Game {
       ctx.lineWidth = 3;
       ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
       // Show item shape abbreviation label (use lookup map to avoid single-char ambiguities)
-      const label = (itemShape && SHAPE_ABBREV[itemShape]) ?? '?';
-      ctx.fillStyle = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
-      ctx.font = 'bold 13px Arial';
+      // Prefix gold-type items with 'G' to distinguish them visually
+      const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
+      const abbrev = (itemShape && SHAPE_ABBREV[itemShape]) ?? '?';
+      const label = isGoldItem ? `G${abbrev}` : abbrev;
+      ctx.fillStyle = isGoldItem
+        ? (isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR)
+        : (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR);
+      ctx.font = 'bold 11px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, 0, 0);

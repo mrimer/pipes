@@ -603,11 +603,12 @@ describe('Level 3 (Mountain Stream)', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
     board.grid[0][1].rotation = 90; // E-W
 
-    // Container at (0,2) is now in fill path; grant = 1 Straight
-    expect(board.getContainerBonuses().get(PipeShape.Straight)).toBe(1);
+    // Container at (0,2) is now in fill path; grant = 1 GoldStraight (not Straight)
+    expect(board.getContainerBonuses().get(PipeShape.GoldStraight)).toBe(1);
+    expect(board.getContainerBonuses().get(PipeShape.Straight)).toBeUndefined();
 
-    // Place Straight N-S at (1,3) using the container grant
-    board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.Straight);
+    // Place GoldStraight N-S at (1,3) on the gold space using the container grant
+    board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.GoldStraight);
 
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
@@ -617,9 +618,9 @@ describe('Level 3 (Mountain Stream)', () => {
     const board = new Board(level.rows, level.cols, level);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
     board.grid[0][1].rotation = 90;
-    board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.Straight);
+    board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.GoldStraight);
 
-    // Reclaiming (0,1) would disconnect the container; base Straight = -1, newGrant = 0 → blocked
+    // Reclaiming (0,1) would disconnect the container; base GoldStraight = -1, newGrant = 0 → blocked
     const result = board.reclaimTile({ row: 0, col: 1 });
     expect(result).toBe(false);
     expect(board.lastError).not.toBeNull();
@@ -654,11 +655,12 @@ describe('Level 4 (The Workshop)', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
     board.grid[0][1].rotation = 90;
 
-    // Container at (0,2) is now in fill path
-    expect(board.getContainerBonuses().get(PipeShape.Straight)).toBe(1);
+    // Container at (0,2) is now in fill path – grants GoldStraight (not Straight)
+    expect(board.getContainerBonuses().get(PipeShape.GoldStraight)).toBe(1);
+    expect(board.getContainerBonuses().get(PipeShape.Straight)).toBeUndefined();
 
-    // Place Straight E-W at (0,3) using the grant
-    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight);
+    // Place GoldStraight E-W at (0,3) on the gold space using the grant
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.GoldStraight);
     board.grid[0][3].rotation = 90;
 
     expect(board.isSolved()).toBe(true);
@@ -701,5 +703,92 @@ describe('Granite tile', () => {
     const graniteTiles = board.grid.flat().filter((t) => t.shape === PipeShape.Granite);
     expect(graniteTiles.length).toBeGreaterThan(0);
     graniteTiles.forEach((t) => expect(t.isFixed).toBe(true));
+  });
+});
+
+// ─── New: Gold pipe tiles and gold spaces ─────────────────────────────────────
+
+describe('Gold pipes and gold spaces', () => {
+  /** Build a minimal 1×3 board with a gold space at (0,1). */
+  function makeGoldSpaceBoard(): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.goldSpaces.add('0,1');
+    board.inventory = [
+      { shape: PipeShape.GoldStraight, count: 1 },
+      { shape: PipeShape.Straight,     count: 1 },
+    ];
+    return board;
+  }
+
+  it('allows gold pipe placement on a gold space', () => {
+    const board = makeGoldSpaceBoard();
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
+  });
+
+  it('blocks regular pipe placement on a gold space', () => {
+    const board = makeGoldSpaceBoard();
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+  });
+
+  it('blocks gold pipe placement on a regular empty cell', () => {
+    const board = new Board(1, 3);
+    board.inventory = [{ shape: PipeShape.GoldStraight, count: 1 }];
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    // (0,1) is NOT in goldSpaces → gold pipe should be rejected
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(false);
+  });
+
+  it('gold pipe carries water and counts as a pipe cost', () => {
+    const board = makeGoldSpaceBoard();
+    board.sourceCapacity = 10;
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90); // E-W
+    // Source(all) → GoldStraight(E-W, cost 1) → Sink(all) → solved
+    expect(board.isSolved()).toBe(true);
+    expect(board.getCurrentWater()).toBe(9); // 10 − 1 gold straight
+  });
+
+  it('allows reclaiming a gold pipe from a gold space', () => {
+    const board = makeGoldSpaceBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
+    const result = board.reclaimTile({ row: 0, col: 1 });
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+    // GoldStraight returned to inventory
+    const inv = board.inventory.find((it) => it.shape === PipeShape.GoldStraight);
+    expect(inv?.count).toBe(1);
+  });
+
+  it('level 3 gold space is registered in board.goldSpaces', () => {
+    const level = LEVELS[2]; // Mountain Stream
+    const board = new Board(level.rows, level.cols, level);
+    expect(board.goldSpaces.has('1,3')).toBe(true);
+    // The cell should be Empty (gold space is a background marker)
+    expect(board.grid[1][3].shape).toBe(PipeShape.Empty);
+  });
+
+  it('level 4 gold space is registered in board.goldSpaces', () => {
+    const level = LEVELS[3]; // The Workshop
+    const board = new Board(level.rows, level.cols, level);
+    expect(board.goldSpaces.has('0,3')).toBe(true);
+    expect(board.grid[0][3].shape).toBe(PipeShape.Empty);
+  });
+
+  it('GoldStraight getConnections matches Straight', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,       0, true);
+    board.grid[0][1] = new Tile(PipeShape.GoldStraight, 90); // E-W
+    board.grid[0][2] = new Tile(PipeShape.Sink,         0, true);
+    expect(board.isSolved()).toBe(true);
   });
 });
