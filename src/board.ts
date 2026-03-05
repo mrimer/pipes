@@ -15,6 +15,18 @@ const PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.Elbow,
   PipeShape.Tee,
   PipeShape.Cross,
+  PipeShape.GoldStraight,
+  PipeShape.GoldElbow,
+  PipeShape.GoldTee,
+  PipeShape.GoldCross,
+]);
+
+/** Gold pipe shapes – may only be placed on gold spaces. */
+export const GOLD_PIPE_SHAPES = new Set<PipeShape>([
+  PipeShape.GoldStraight,
+  PipeShape.GoldElbow,
+  PipeShape.GoldTee,
+  PipeShape.GoldCross,
 ]);
 
 /**
@@ -35,6 +47,12 @@ export class Board {
   inventory: InventoryItem[];
 
   /**
+   * Set of "row,col" keys that are gold space cells.
+   * Populated from the level definition; never changes during play.
+   */
+  goldSpaces: Set<string>;
+
+  /**
    * Set to a human-readable reason after any failed reclaim attempt, so callers
    * can display an appropriate error message.  Cleared on each new attempt.
    */
@@ -52,6 +70,7 @@ export class Board {
     this.sink = { row: rows - 1, col: cols - 1 };
     this.sourceCapacity = 0;
     this.inventory = [];
+    this.goldSpaces = new Set();
 
     if (level) {
       this.grid = this._emptyGrid();
@@ -73,6 +92,10 @@ export class Board {
         const def = level.grid[r]?.[c] ?? null;
         if (def === null) {
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+        } else if (def.shape === PipeShape.GoldSpace) {
+          // Gold spaces are tracked separately; the cell behaves like Empty
+          this.goldSpaces.add(`${r},${c}`);
+          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
           const itemShape = def.itemShape ?? null;
@@ -90,7 +113,8 @@ export class Board {
 
   /**
    * Return a player-placed pipe tile back to the inventory.
-   * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross) can be reclaimed.
+   * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross and their gold
+   * variants) can be reclaimed.
    * Returns false (and sets {@link lastError}) if reclaiming would reduce an
    * inventory value below zero due to lost ItemContainer grants.
    * @returns true if the tile was successfully reclaimed.
@@ -147,6 +171,7 @@ export class Board {
   /**
    * Place a pipe from the inventory onto an empty cell.
    * The effective inventory count (base + ItemContainer grants) must be positive.
+   * Gold pipes may only be placed on gold spaces; regular pipes may not be placed on gold spaces.
    * @param rotation - Initial rotation to apply to the placed tile (default 0).
    * @returns true if the placement succeeded.
    */
@@ -154,14 +179,25 @@ export class Board {
     const tile = this.getTile(pos);
     if (!tile || tile.shape !== PipeShape.Empty) return false;
 
+    const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
+    const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
+
+    // Gold spaces only accept gold pipes; gold pipes only go on gold spaces
+    if (isGoldSpace !== isGoldPipe) return false;
+
     const idx = this.inventory.findIndex((it) => it.shape === shape);
-    if (idx === -1) return false;
+    const baseCount = idx !== -1 ? this.inventory[idx].count : 0;
 
     const bonuses = this.getContainerBonuses();
-    const effectiveCount = this.inventory[idx].count + (bonuses.get(shape) ?? 0);
+    const effectiveCount = baseCount + (bonuses.get(shape) ?? 0);
     if (effectiveCount <= 0) return false;
 
-    this.inventory[idx].count--;
+    if (idx !== -1) {
+      this.inventory[idx].count--;
+    } else {
+      // Shape comes entirely from container bonuses – track usage with a negative base count
+      this.inventory.push({ shape, count: -1 });
+    }
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
     return true;
   }

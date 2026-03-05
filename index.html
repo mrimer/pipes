@@ -96,6 +96,25 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      /* Support up to 6 item rows before scrolling (title ~24px + 6×48px items + gaps) */
+      max-height: 344px;
+      overflow-y: auto;
+    }
+
+    /* Custom scrollbar styling for the inventory bar */
+    #inventory-bar::-webkit-scrollbar {
+      width: 6px;
+    }
+    #inventory-bar::-webkit-scrollbar-track {
+      background: #0d1a30;
+      border-radius: 3px;
+    }
+    #inventory-bar::-webkit-scrollbar-thumb {
+      background: #4a90d9;
+      border-radius: 3px;
+    }
+    #inventory-bar::-webkit-scrollbar-thumb:hover {
+      background: #5da0e9;
     }
 
     .inv-title {
@@ -119,6 +138,9 @@
     .inv-item:hover:not(.depleted) { border-color: #4a90d9; background: #1e2a4a; }
     .inv-item.selected  { border-color: #f0c040; background: #2a3a1a; }
     .inv-item.depleted  { opacity: 0.4; cursor: default; }
+    .inv-item.gold      { border-color: #b8860b; background: #1e1600; }
+    .inv-item.gold:hover:not(.depleted) { border-color: #ffd700; background: #2a2000; }
+    .inv-item.gold.selected { border-color: #f0c040; background: #2a2000; }
 
     .inv-shape { font-size: 0.85rem; }
     .inv-count { font-size: 0.9rem; color: #7ed321; font-weight: bold; }
