@@ -41,7 +41,7 @@ const LEVEL_1: LevelDef = {
     ],
     // Row 3
     [
-      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 5, connections: [Direction.North] }, // (3,0)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, isFixed: true, capacity: 5, connections: [Direction.North] }, // (3,0)
       null,
       { shape: PipeShape.Granite, isFixed: true },                              // (3,2) granite obstacle
       { shape: PipeShape.Granite, isFixed: true },                              // (3,3) granite obstacle
@@ -89,7 +89,7 @@ const LEVEL_2: LevelDef = {
     [
       { shape: PipeShape.Source,    rotation: 0,   isFixed: true, capacity: 12 }, // (0,0)
       null,                                                                         // (0,1) player fills: Straight E-W
-      { shape: PipeShape.DirtBlock, rotation: 0,   isFixed: true, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },  // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, isFixed: true, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },  // (0,2)
       null,                                                                         // (0,3) player fills: Straight E-W
       { shape: PipeShape.Elbow,     rotation: 180, isFixed: true },                // (0,4) W-S
       null,
@@ -115,7 +115,7 @@ const LEVEL_2: LevelDef = {
       null, null,
       { shape: PipeShape.Granite, isFixed: true },                              // (3,2) granite obstacle
       null,
-      { shape: PipeShape.DirtBlock, rotation: 0, isFixed: true, dirtCost: 3, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },   // (3,4)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, isFixed: true, dirtCost: 3, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },   // (3,4)
       null,
     ],
     // Row 4
@@ -166,7 +166,7 @@ const LEVEL_3: LevelDef = {
     [
       { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 10 }, // (0,0)
       null,                                                                             // (0,1) player fills: Straight E-W
-      { shape: PipeShape.ItemContainer, rotation: 0,   isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
       { shape: PipeShape.Elbow,         rotation: 180, isFixed: true },                // (0,3) S-W
       null, null,
     ],
@@ -236,7 +236,7 @@ const LEVEL_4: LevelDef = {
     [
       { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 12 }, // (0,0)
       null,                                                                             // (0,1) player fills: Straight E-W
-      { shape: PipeShape.ItemContainer, rotation: 0,   isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
       { shape: PipeShape.GoldSpace },                                                  // (0,3) gold space – player places GoldStraight here
       { shape: PipeShape.Elbow,         rotation: 180, isFixed: true },                // (0,4) S-W
       null,
@@ -250,7 +250,7 @@ const LEVEL_4: LevelDef = {
     // Row 2
     [
       null, null, null, null,
-      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 4 },       // (2,4)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, isFixed: true, capacity: 4 },       // (2,4)
       null,
     ],
     // Row 3
@@ -262,7 +262,7 @@ const LEVEL_4: LevelDef = {
     // Row 4
     [
       null, null, null, null,
-      { shape: PipeShape.DirtBlock, rotation: 0,  isFixed: true, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },       // (4,4)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, isFixed: true, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },       // (4,4)
       null,
     ],
     // Row 5

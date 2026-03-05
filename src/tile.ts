@@ -1,4 +1,4 @@
-import { Direction, PipeShape, Rotation, ConnectionSet } from './types';
+import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent } from './types';
 
 /** Base connections for each pipe shape (at 0° rotation). */
 const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
@@ -12,6 +12,7 @@ const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.Tank]:      [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.DirtBlock]: [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.ItemContainer]: [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.Chamber]:       [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.Granite]: [],
   [PipeShape.GoldSpace]:    [],
   [PipeShape.GoldStraight]: [Direction.North, Direction.South],
@@ -78,8 +79,13 @@ export class Tile {
   /** Number of inventory items granted by this ItemContainer tile. */
   itemCount: number;
   /**
+   * Content type for Chamber tiles – determines the chamber's behaviour.
+   * 'tank' adds water capacity, 'dirt' wastes water, 'item' grants inventory items.
+   */
+  chamberContent: ChamberContent | null;
+  /**
    * Optional explicit connection set that overrides the rotation-based computation.
-   * Currently used for Tank, DirtBlock, and ItemContainer tiles whose open sides
+   * Currently used for Tank, DirtBlock, ItemContainer, and Chamber tiles whose open sides
    * are defined per-tile in the level.
    */
   customConnections: ConnectionSet | null;
@@ -88,13 +94,14 @@ export class Tile {
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
-   * @param capacity - Water capacity (Source / Tank tiles only).
-   * @param dirtCost - Water cost (DirtBlock tiles only).
-   * @param itemShape - Inventory item shape (ItemContainer tiles only).
-   * @param itemCount - Number of items granted (ItemContainer tiles only, defaults to 1).
-   * @param customConnections - Explicit connection set (Tank, DirtBlock, and ItemContainer tiles; overrides rotation-based default).
+   * @param capacity - Water capacity (Source / Tank / Chamber-tank tiles only).
+   * @param dirtCost - Water cost (DirtBlock / Chamber-dirt tiles only).
+   * @param itemShape - Inventory item shape (ItemContainer / Chamber-item tiles only).
+   * @param itemCount - Number of items granted (ItemContainer / Chamber-item tiles only, defaults to 1).
+   * @param customConnections - Explicit connection set (Tank, DirtBlock, ItemContainer, and Chamber tiles; overrides rotation-based default).
+   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', or 'item').
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
@@ -103,6 +110,7 @@ export class Tile {
     this.itemShape = itemShape;
     this.itemCount = itemCount;
     this.customConnections = customConnections;
+    this.chamberContent = chamberContent;
   }
 
   /** Rotate the tile 90° clockwise. */

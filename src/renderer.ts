@@ -16,6 +16,7 @@ import {
   FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR,
   DIRT_COLOR, DIRT_WATER_COLOR, DIRT_FILL_COLOR, DIRT_FILL_WATER_COLOR, DIRT_COST_COLOR,
   CONTAINER_COLOR, CONTAINER_WATER_COLOR, CONTAINER_FILL_COLOR, CONTAINER_FILL_WATER_COLOR,
+  CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
@@ -95,6 +96,8 @@ export function drawPipe(
     color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
   } else if (shape === PipeShape.ItemContainer) {
     color = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
+  } else if (shape === PipeShape.Chamber) {
+    color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
   } else if (shape === PipeShape.Granite) {
     color = GRANITE_COLOR;
   } else if (GOLD_PIPE_SHAPES.has(shape)) {
@@ -259,6 +262,63 @@ export function drawPipe(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, 0, 0);
+    // Connection stubs
+    ctx.strokeStyle = color;
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.lineCap = 'round';
+    if (tile.connections.has(Direction.North)) {
+      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.South)) {
+      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+    }
+    if (tile.connections.has(Direction.West)) {
+      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.East)) {
+      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    }
+  } else if (shape === PipeShape.Chamber) {
+    // Chamber – a steel-blue enclosure whose interior display varies by content
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    const bw = half * 0.7;
+    const bh = half * 0.7;
+    ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
+    ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+    // Draw inner content based on chamberContent
+    const { chamberContent } = tile;
+    if (chamberContent === 'tank') {
+      // Show capacity number in tank-like color
+      ctx.fillStyle = isWater ? TANK_WATER_COLOR : TANK_COLOR;
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(capacity), 0, 0);
+    } else if (chamberContent === 'dirt') {
+      // Show negative cost label in dirt-like color
+      ctx.fillStyle = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
+      ctx.font = 'bold 14px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`-${dirtCost}`, 0, 0);
+    } else if (chamberContent === 'item') {
+      // Show item shape abbreviation in container-like color
+      const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
+      const abbrev = (itemShape && SHAPE_ABBREV[itemShape]) ?? '?';
+      const chamberLabel = isGoldItem ? `G${abbrev}` : abbrev;
+      ctx.fillStyle = isGoldItem
+        ? (isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR)
+        : (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR);
+      ctx.font = isGoldItem ? 'bold 11px Arial' : 'bold 13px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(chamberLabel, 0, 0);
+    }
     // Connection stubs
     ctx.strokeStyle = color;
     ctx.lineWidth = LINE_WIDTH;
