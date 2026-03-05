@@ -394,7 +394,7 @@ export class Board {
   // ─── Grid validation ───────────────────────────────────────────────────────
 
   /**
-   * Validate that no Tank tile (or Chamber with tank content) on the border of
+   * Validate that no tank-like tile (Tank or Chamber with tank content) on the border of
    * the grid has a connection pointing outside the grid, and that adjacent such
    * tiles have symmetric (mutually matching) connections.
    * @returns Array of human-readable error messages (empty = valid).

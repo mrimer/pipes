@@ -79,7 +79,7 @@ export class Tile {
   /** Number of inventory items granted by this ItemContainer tile. */
   itemCount: number;
   /**
-   * Content type for Chamber tiles – determines the chamber's behaviour.
+   * Content type for Chamber tiles – determines the chamber's behavior.
    * 'tank' adds water capacity, 'dirt' wastes water, 'item' grants inventory items.
    */
   chamberContent: ChamberContent | null;
