@@ -337,6 +337,93 @@ export class Board {
     return true;
   }
 
+  /**
+   * Atomically replace the tile at the given position with a new pipe from the
+   * inventory.  The existing tile is reclaimed (returned to inventory) and the
+   * new tile is placed in a single operation – without the intermediate
+   * container-grant constraint check that {@link reclaimTile} applies.
+   * The constraint is validated once against the fully-replaced board state; if
+   * it fails the entire operation is rolled back.
+   *
+   * Prerequisites:
+   *  - The tile at `pos` must satisfy the same "replaceable" rules as reclaimTile
+   *    (non-fixed, not Empty, not Source / Sink / Chamber / Granite).
+   *  - The new shape must have a positive effective inventory count after the old
+   *    tile has been returned.
+   *  - Gold-space / gold-pipe constraints apply to the new shape.
+   *
+   * @returns true on success; false on failure (lastError is set when relevant).
+   */
+  replaceInventoryTile(pos: GridPos, newShape: PipeShape, rotation: Rotation = 0): boolean {
+    this.lastError = null;
+    const tile = this.getTile(pos);
+
+    // Must be a replaceable tile (same guard as reclaimTile)
+    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    if (
+      tile.shape === PipeShape.Source  ||
+      tile.shape === PipeShape.Sink    ||
+      tile.shape === PipeShape.Chamber ||
+      tile.shape === PipeShape.Granite
+    ) return false;
+
+    // Gold-space / gold-pipe constraint for the incoming shape
+    const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
+    const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
+    if (isGoldSpace !== isGoldPipe) return false;
+
+    // Save inventory snapshot so we can roll back cleanly on failure
+    const savedInventory = this.inventory.map((item) => ({ ...item }));
+    const oldShape = tile.shape;
+
+    // ── Step 1: Reclaim old tile into inventory (no constraint check yet) ──────
+    const oldIdx = this.inventory.findIndex((it) => it.shape === oldShape);
+    if (oldIdx !== -1) {
+      this.inventory[oldIdx].count++;
+    } else {
+      this.inventory.push({ shape: oldShape, count: 1 });
+    }
+    this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+
+    // ── Step 2: Place new tile from inventory ──────────────────────────────────
+    const newIdx = this.inventory.findIndex((it) => it.shape === newShape);
+    const baseCount = newIdx !== -1 ? this.inventory[newIdx].count : 0;
+    const bonuses = this.getContainerBonuses();
+    const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
+
+    if (effectiveCount <= 0) {
+      // New shape not available – roll back step 1
+      this.inventory = savedInventory;
+      this.grid[pos.row][pos.col] = tile;
+      return false;
+    }
+
+    if (newIdx !== -1) {
+      this.inventory[newIdx].count--;
+    } else {
+      this.inventory.push({ shape: newShape, count: -1 });
+    }
+    this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
+
+    // ── Step 3: Post-replacement state validation ──────────────────────────────
+    // Check that no inventory item's effective count has gone below zero as a
+    // result of reduced container-grant bonuses after the replacement.
+    const finalBonuses = this.getContainerBonuses();
+    for (const item of this.inventory) {
+      const bonus = finalBonuses.get(item.shape) ?? 0;
+      if (item.count + bonus < 0) {
+        this.lastError =
+          'Cannot replace: you have used items granted by a connected container. ' +
+          'Reconfigure the path first.';
+        this.inventory = savedInventory;
+        this.grid[pos.row][pos.col] = tile;
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   // ─── Water tracking ────────────────────────────────────────────────────────
 
   /**
