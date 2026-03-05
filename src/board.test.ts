@@ -639,6 +639,11 @@ describe('Level 3 (Mountain Stream)', () => {
     // Place GoldStraight N-S at (1,3) on the gold space using the container grant
     board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.GoldStraight);
 
+    // Place Tee W-N-E at (2,3) to connect (1,3) down to the row-2 pipe chain and
+    // branch East into the tank at (2,4) for the water budget
+    board.placeInventoryTile({ row: 2, col: 3 }, PipeShape.Tee);
+    board.grid[2][3].rotation = 270; // W-N-E
+
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
   });
@@ -691,6 +696,9 @@ describe('Level 4 (The Workshop)', () => {
     // Place GoldStraight E-W at (0,3) on the gold space using the grant
     board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.GoldStraight);
     board.grid[0][3].rotation = 90;
+
+    // Place Straight N-S at (3,4) to bridge from the tank at (2,4) to the dirt block at (4,4)
+    board.placeInventoryTile({ row: 3, col: 4 }, PipeShape.Straight);
 
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
