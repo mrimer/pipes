@@ -82,7 +82,7 @@ export class Tile {
   chamberContent: ChamberContent | null;
   /**
    * Optional explicit connection set that overrides the rotation-based computation.
-   * Currently used for Chamber tiles whose open sides are defined per-tile in the level.
+   * Used for Source, Sink, and Chamber tiles whose open sides are defined per-tile in the level.
    */
   customConnections: ConnectionSet | null;
 
@@ -94,7 +94,7 @@ export class Tile {
    * @param dirtCost - Water cost (Chamber-dirt tiles only).
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
-   * @param customConnections - Explicit connection set (Chamber tiles; overrides rotation-based default).
+   * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
    * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', or 'item').
    */
   constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null) {

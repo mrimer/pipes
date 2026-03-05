@@ -1266,3 +1266,79 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.lastError).toBeNull();
   });
 });
+
+// ─── Source and Sink optional connections ─────────────────────────────────────
+
+describe('Source / Sink optional connections', () => {
+  it('Source defaults to all four connections when no customConnections are set', () => {
+    const tile = new Tile(PipeShape.Source, 0, true, 5);
+    expect(tile.connections.size).toBe(4);
+  });
+
+  it('Sink defaults to all four connections when no customConnections are set', () => {
+    const tile = new Tile(PipeShape.Sink, 0, true);
+    expect(tile.connections.size).toBe(4);
+  });
+
+  it('Source with customConnections [E,S] only connects East and South', () => {
+    const tile = new Tile(PipeShape.Source, 0, true, 5, 0, null, 1, new Set([Direction.East, Direction.South]));
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.North)).toBe(false);
+    expect(tile.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('Sink with customConnections [N,W] only connects North and West', () => {
+    const tile = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.North, Direction.West]));
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.West)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(false);
+    expect(tile.connections.has(Direction.South)).toBe(false);
+  });
+
+  it('each level Source has no connections pointing off the grid', () => {
+    for (const level of LEVELS) {
+      const board = new Board(level.rows, level.cols, level);
+      const srcTile = board.grid[board.source.row][board.source.col];
+      for (const dir of Object.values(Direction)) {
+        if (!srcTile.connections.has(dir)) continue;
+        const delta = { [Direction.North]: [-1, 0], [Direction.East]: [0, 1], [Direction.South]: [1, 0], [Direction.West]: [0, -1] }[dir];
+        const nr = board.source.row + delta[0];
+        const nc = board.source.col + delta[1];
+        expect(nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols).toBe(true);
+      }
+    }
+  });
+
+  it('each level Sink has no connections pointing off the grid', () => {
+    for (const level of LEVELS) {
+      const board = new Board(level.rows, level.cols, level);
+      const sinkTile = board.grid[board.sink.row][board.sink.col];
+      for (const dir of Object.values(Direction)) {
+        if (!sinkTile.connections.has(dir)) continue;
+        const delta = { [Direction.North]: [-1, 0], [Direction.East]: [0, 1], [Direction.South]: [1, 0], [Direction.West]: [0, -1] }[dir];
+        const nr = board.sink.row + delta[0];
+        const nc = board.sink.col + delta[1];
+        expect(nr >= 0 && nr < board.rows && nc >= 0 && nc < board.cols).toBe(true);
+      }
+    }
+  });
+
+  it('Level 1 Source(0,0) connects East and South only', () => {
+    const board = new Board(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0]);
+    const src = board.grid[0][0];
+    expect(src.connections.has(Direction.East)).toBe(true);
+    expect(src.connections.has(Direction.South)).toBe(true);
+    expect(src.connections.has(Direction.North)).toBe(false);
+    expect(src.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('Level 1 Sink(5,5) connects North and West only', () => {
+    const board = new Board(LEVELS[0].rows, LEVELS[0].cols, LEVELS[0]);
+    const sink = board.grid[5][5];
+    expect(sink.connections.has(Direction.North)).toBe(true);
+    expect(sink.connections.has(Direction.West)).toBe(true);
+    expect(sink.connections.has(Direction.East)).toBe(false);
+    expect(sink.connections.has(Direction.South)).toBe(false);
+  });
+});

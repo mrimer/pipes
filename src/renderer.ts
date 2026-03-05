@@ -142,22 +142,33 @@ export function drawPipe(
     ctx.lineTo(half, 0);
     ctx.stroke();
   } else if (shape === PipeShape.Source || shape === PipeShape.Sink) {
-    // Filled circle + four radiating lines
+    // Restore to un-rotated state so we can draw based on actual connections
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    // Filled circle
+    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
-    ctx.fillStyle = color;
     ctx.fill();
-    for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(angle) * half, Math.sin(angle) * half);
-      ctx.stroke();
+    // Radiating lines – only for connected directions
+    ctx.strokeStyle = color;
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.lineCap = 'round';
+    if (tile.connections.has(Direction.North)) {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -half); ctx.stroke();
     }
-    // Show capacity number on Source
+    if (tile.connections.has(Direction.South)) {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, half); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.East)) {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.West)) {
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-half, 0); ctx.stroke();
+    }
+    // Show capacity number on Source (drawn last so it appears on top)
     if (shape === PipeShape.Source) {
-      ctx.restore();
-      ctx.save();
-      ctx.translate(cx, cy);
       ctx.fillStyle = LABEL_COLOR;
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
