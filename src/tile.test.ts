@@ -140,6 +140,24 @@ describe('Tile', () => {
     expect(chamber.connections.has(Direction.West)).toBe(false);
   });
 
+  it('customConnections works for Source tiles (east+south only)', () => {
+    const eastSouth = new Set([Direction.East, Direction.South]);
+    const source = new Tile(PipeShape.Source, 0, true, 5, 0, null, 1, eastSouth);
+    expect(source.connections.has(Direction.East)).toBe(true);
+    expect(source.connections.has(Direction.South)).toBe(true);
+    expect(source.connections.has(Direction.North)).toBe(false);
+    expect(source.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('customConnections works for Sink tiles (north+west only)', () => {
+    const northWest = new Set([Direction.North, Direction.West]);
+    const sink = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, northWest);
+    expect(sink.connections.has(Direction.North)).toBe(true);
+    expect(sink.connections.has(Direction.West)).toBe(true);
+    expect(sink.connections.has(Direction.East)).toBe(false);
+    expect(sink.connections.has(Direction.South)).toBe(false);
+  });
+
   it('customConnections defaults to null (rotation-based connections used)', () => {
     const chamber = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, null, 'tank');
     expect(chamber.customConnections).toBeNull();

@@ -93,7 +93,7 @@ export interface TileDef {
   /** Content type for Chamber tiles ('tank', 'dirt', or 'item'). */
   chamberContent?: ChamberContent;
   /**
-   * Explicit set of open connection directions for Chamber tiles.
+   * Explicit set of open connection directions for Source, Sink, and Chamber tiles.
    * When provided, overrides the default (all four sides).
    */
   connections?: Direction[];

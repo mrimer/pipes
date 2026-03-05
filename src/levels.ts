@@ -18,7 +18,7 @@ const LEVEL_1: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source, rotation: 0, isFixed: true, capacity: 5 },
+      { shape: PipeShape.Source, rotation: 0, isFixed: true, capacity: 5, connections: [Direction.East, Direction.South] },
       null, null, null, null, null,
     ],
     // Row 1
@@ -53,7 +53,7 @@ const LEVEL_1: LevelDef = {
     // Row 5
     [
       null, null, null, null, null,
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true },                 // (5,5)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.West] },                 // (5,5)
     ],
   ],
   inventory: [
@@ -87,7 +87,7 @@ const LEVEL_2: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source,    rotation: 0,   isFixed: true, capacity: 12 }, // (0,0)
+      { shape: PipeShape.Source,    rotation: 0,   isFixed: true, capacity: 12, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                         // (0,1) player fills: Straight E-W
       { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, isFixed: true, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },  // (0,2)
       null,                                                                         // (0,3) player fills: Straight E-W
@@ -127,7 +127,7 @@ const LEVEL_2: LevelDef = {
     // Row 5
     [
       null, null, null, null,
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true },                      // (5,4)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East, Direction.West] },      // (5,4)
       null,
     ],
   ],
@@ -164,7 +164,7 @@ const LEVEL_3: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 10 }, // (0,0)
+      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 10, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                             // (0,1) player fills: Straight E-W
       { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
       { shape: PipeShape.Elbow,         rotation: 180, isFixed: true },                // (0,3) S-W
@@ -196,7 +196,7 @@ const LEVEL_3: LevelDef = {
     ],
     // Row 5
     [
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true },                          // (5,0)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East] },                          // (5,0)
       null, null, null, null, null,
     ],
   ],
@@ -234,7 +234,7 @@ const LEVEL_4: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 12 }, // (0,0)
+      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 12, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                             // (0,1) player fills: Straight E-W
       { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
       { shape: PipeShape.GoldSpace },                                                  // (0,3) gold space – player places GoldStraight here
@@ -268,7 +268,7 @@ const LEVEL_4: LevelDef = {
     // Row 5
     [
       null, null, null, null,
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true },                          // (5,4)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East, Direction.West] },          // (5,4)
       null,
     ],
   ],
