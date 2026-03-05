@@ -35,6 +35,12 @@ export class Board {
   inventory: InventoryItem[];
 
   /**
+   * Set to a human-readable reason after any failed reclaim attempt, so callers
+   * can display an appropriate error message.  Cleared on each new attempt.
+   */
+  lastError: string | null = null;
+
+  /**
    * @param rows - Number of rows.
    * @param cols - Number of columns.
    * @param level - Optional level definition.  If omitted a random grid is built.
@@ -69,7 +75,9 @@ export class Board {
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
-          this.grid[r][c] = new Tile(def.shape, rot, def.isFixed ?? false, def.capacity ?? 0, def.dirtCost ?? 0);
+          const itemShape = def.itemShape ?? null;
+          const itemCount = def.itemCount ?? 1;
+          this.grid[r][c] = new Tile(def.shape, rot, def.isFixed ?? false, def.capacity ?? 0, def.dirtCost ?? 0, itemShape, itemCount);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -83,17 +91,42 @@ export class Board {
   /**
    * Return a player-placed pipe tile back to the inventory.
    * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross) can be reclaimed.
+   * Returns false (and sets {@link lastError}) if reclaiming would reduce an
+   * inventory value below zero due to lost ItemContainer grants.
    * @returns true if the tile was successfully reclaimed.
    */
   reclaimTile(pos: GridPos): boolean {
+    this.lastError = null;
     const tile = this.getTile(pos);
     if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
     if (
-      tile.shape === PipeShape.Source ||
-      tile.shape === PipeShape.Sink   ||
-      tile.shape === PipeShape.Tank   ||
-      tile.shape === PipeShape.DirtBlock
+      tile.shape === PipeShape.Source        ||
+      tile.shape === PipeShape.Sink          ||
+      tile.shape === PipeShape.Tank          ||
+      tile.shape === PipeShape.DirtBlock     ||
+      tile.shape === PipeShape.ItemContainer
     ) return false;
+
+    // ── Container-grant constraint check ─────────────────────────────────────
+    // Simulate tile removal and verify no inventory count would go below zero.
+    const currentBonuses = this.getContainerBonuses();
+    const savedTile = this.grid[pos.row][pos.col];
+    this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+    const newBonuses = this.getContainerBonuses();
+    this.grid[pos.row][pos.col] = savedTile; // restore
+
+    for (const [shape, currentBonus] of currentBonuses) {
+      const newBonus = newBonuses.get(shape) ?? 0;
+      if (newBonus < currentBonus) {
+        const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
+        if (baseCount + newBonus < 0) {
+          this.lastError =
+            'Cannot remove: you have used items granted by a connected container. ' +
+            'Reconfigure the path first.';
+          return false;
+        }
+      }
+    }
 
     const idx = this.inventory.findIndex((it) => it.shape === tile.shape);
     if (idx !== -1) {
@@ -109,14 +142,19 @@ export class Board {
 
   /**
    * Place a pipe from the inventory onto an empty cell.
+   * The effective inventory count (base + ItemContainer grants) must be positive.
    * @returns true if the placement succeeded.
    */
   placeInventoryTile(pos: GridPos, shape: PipeShape): boolean {
     const tile = this.getTile(pos);
     if (!tile || tile.shape !== PipeShape.Empty) return false;
 
-    const idx = this.inventory.findIndex((it) => it.shape === shape && it.count > 0);
+    const idx = this.inventory.findIndex((it) => it.shape === shape);
     if (idx === -1) return false;
+
+    const bonuses = this.getContainerBonuses();
+    const effectiveCount = this.inventory[idx].count + (bonuses.get(shape) ?? 0);
+    if (effectiveCount <= 0) return false;
 
     this.inventory[idx].count--;
     this.grid[pos.row][pos.col] = new Tile(shape, 0);
@@ -124,6 +162,25 @@ export class Board {
   }
 
   // ─── Water tracking ────────────────────────────────────────────────────────
+
+  /**
+   * Compute the map of inventory item bonuses granted by ItemContainer tiles
+   * that are currently in the water fill path.
+   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
+   * @returns A map of PipeShape → bonus count from connected containers.
+   */
+  getContainerBonuses(filled?: Set<string>): Map<PipeShape, number> {
+    const filledSet = filled ?? this.getFilledPositions();
+    const bonuses = new Map<PipeShape, number>();
+    for (const key of filledSet) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.ItemContainer && tile.itemShape !== null) {
+        bonuses.set(tile.itemShape, (bonuses.get(tile.itemShape) ?? 0) + tile.itemCount);
+      }
+    }
+    return bonuses;
+  }
 
   /**
    * Compute current water remaining in the source tank based on the live fill state.

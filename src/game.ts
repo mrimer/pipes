@@ -29,6 +29,10 @@ const DIRT_WATER_COLOR = '#c4a265';
 const DIRT_FILL_COLOR = '#3d2b1f';
 const DIRT_FILL_WATER_COLOR = '#5a3d2b';
 const DIRT_COST_COLOR = '#e74c3c';
+const CONTAINER_COLOR = '#f0a500';
+const CONTAINER_WATER_COLOR = '#ffd04f';
+const CONTAINER_FILL_COLOR = '#3d2b00';
+const CONTAINER_FILL_WATER_COLOR = '#5a4000';
 
 /** Inline SVG icons for pipe shapes in the inventory. */
 function _shapeIcon(shape: PipeShape): string {
@@ -89,6 +93,11 @@ export class Game {
   /** Tooltip element for displaying grid coordinates under Ctrl. */
   private readonly tooltipEl: HTMLElement;
 
+  /** Floating error message element shown briefly when an action is blocked. */
+  private readonly errorFlashEl: HTMLElement;
+  /** Timer ID for auto-hiding the error flash message. */
+  private _errorFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
 
@@ -126,6 +135,15 @@ export class Game {
       'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
       'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
     document.body.appendChild(this.tooltipEl);
+
+    // Create the error-flash element for brief action-blocked messages
+    this.errorFlashEl = document.createElement('div');
+    this.errorFlashEl.style.cssText =
+      'display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);' +
+      'background:#c0392b;color:#fff;border:2px solid #e74c3c;' +
+      'border-radius:6px;padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;' +
+      'text-align:center;max-width:360px;';
+    document.body.appendChild(this.errorFlashEl);
 
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
@@ -207,19 +225,22 @@ export class Game {
     if (!this.board) return;
     this.inventoryBarEl.innerHTML = '<h3 class="inv-title">Inventory</h3>';
 
+    const bonuses = this.board.getContainerBonuses();
+
     for (const item of this.board.inventory) {
+      const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
       const el = document.createElement('div');
       el.classList.add('inv-item');
       if (item.shape === this.selectedShape) el.classList.add('selected');
-      if (item.count === 0) el.classList.add('depleted');
+      if (effectiveCount === 0) el.classList.add('depleted');
 
       const icon = _shapeIcon(item.shape);
       el.innerHTML =
         `<span class="inv-shape">${icon}</span>` +
-        `<span class="inv-count">×${item.count}</span>`;
+        `<span class="inv-count">×${effectiveCount}</span>`;
 
       el.dataset['shape'] = item.shape;
-      el.addEventListener('click', () => this._handleInventoryClick(item.shape, item.count));
+      el.addEventListener('click', () => this._handleInventoryClick(item.shape, effectiveCount));
       this.inventoryBarEl.appendChild(el);
     }
   }
@@ -285,7 +306,7 @@ export class Game {
 
   /** Draw a single pipe tile at canvas position (x, y). */
   private _drawPipe(x: number, y: number, tile: Tile, isWater: boolean, currentWater: number): void {
-    const { shape, rotation, isFixed, capacity, dirtCost } = tile;
+    const { shape, rotation, isFixed, capacity, dirtCost, itemShape } = tile;
     const { ctx } = this;
     const cx = x + TILE_SIZE / 2;
     const cy = y + TILE_SIZE / 2;
@@ -304,6 +325,8 @@ export class Game {
       color = isWater ? TANK_WATER_COLOR : TANK_COLOR;
     } else if (shape === PipeShape.DirtBlock) {
       color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
+    } else if (shape === PipeShape.ItemContainer) {
+      color = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
     } else {
       color = isFixed
         ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
@@ -424,6 +447,33 @@ export class Game {
       ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    } else if (shape === PipeShape.ItemContainer) {
+      // Item container – amber/gold rectangle with a small pipe-shape label inside
+      ctx.restore();
+      ctx.save();
+      ctx.translate(cx, cy);
+      const bw = half * 0.7;
+      const bh = half * 0.7;
+      ctx.fillStyle = isWater ? CONTAINER_FILL_WATER_COLOR : CONTAINER_FILL_COLOR;
+      ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+      // Show item shape abbreviation label
+      const label = itemShape ? itemShape.charAt(0).toUpperCase() : '?';
+      ctx.fillStyle = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
+      ctx.font = 'bold 13px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 0, 0);
+      // Connection stubs
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
     }
 
     ctx.restore();
@@ -491,6 +541,8 @@ export class Game {
     if (this.board.reclaimTile({ row, col })) {
       this._renderInventoryBar();
       this._updateWaterDisplay();
+    } else if (this.board.lastError) {
+      this._showErrorFlash(this.board.lastError);
     }
   }
 
@@ -539,6 +591,17 @@ export class Game {
 
   private _hideTooltip(): void {
     this.tooltipEl.style.display = 'none';
+  }
+
+  /** Show a brief error message that auto-dismisses after ~2 seconds. */
+  private _showErrorFlash(message: string): void {
+    this.errorFlashEl.textContent = message;
+    this.errorFlashEl.style.display = 'block';
+    if (this._errorFlashTimer !== null) clearTimeout(this._errorFlashTimer);
+    this._errorFlashTimer = setTimeout(() => {
+      this.errorFlashEl.style.display = 'none';
+      this._errorFlashTimer = null;
+    }, 2000);
   }
 
   private _handleKey(e: KeyboardEvent): void {
