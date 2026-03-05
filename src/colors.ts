@@ -1,0 +1,38 @@
+/** Color palette used across game rendering. */
+
+export const PIPE_COLOR              = '#4a90d9';
+export const WATER_COLOR             = '#7ed321';
+export const BG_COLOR                = '#1a1a2e';
+export const TILE_BG                 = '#16213e';
+export const FOCUS_COLOR             = '#f0c040';
+export const SOURCE_COLOR            = '#e67e22';
+export const SOURCE_WATER_COLOR      = '#f39c12';
+export const SINK_COLOR              = '#8e44ad';
+export const SINK_WATER_COLOR        = '#9b59b6';
+export const TANK_COLOR              = '#2196f3';
+export const TANK_WATER_COLOR        = '#00bcd4';
+export const TANK_FILL_COLOR         = '#0d2b45';
+export const TANK_FILL_WATER_COLOR   = '#004d60';
+export const FIXED_PIPE_COLOR        = '#2980b9';
+export const FIXED_PIPE_WATER_COLOR  = '#5dade2';
+export const EMPTY_COLOR             = '#2a2a4a';
+export const EMPTY_TARGET_COLOR      = '#1e2a4a';
+export const LOW_WATER_COLOR         = '#e74c3c';
+export const LABEL_COLOR             = '#fff';
+export const DIRT_COLOR              = '#8b5a2b';
+export const DIRT_WATER_COLOR        = '#c4a265';
+export const DIRT_FILL_COLOR         = '#3d2b1f';
+export const DIRT_FILL_WATER_COLOR   = '#5a3d2b';
+export const DIRT_COST_COLOR         = '#e74c3c';
+export const CONTAINER_COLOR         = '#f0a500';
+export const CONTAINER_WATER_COLOR   = '#ffd04f';
+export const CONTAINER_FILL_COLOR    = '#3d2b00';
+export const CONTAINER_FILL_WATER_COLOR = '#5a4000';
+export const GRANITE_COLOR           = '#9ca3af';
+export const GRANITE_FILL_COLOR      = '#374151';
+export const GOLD_PIPE_COLOR         = '#ffd700';
+export const GOLD_PIPE_WATER_COLOR   = '#ffec6e';
+export const GOLD_SPACE_BASE_COLOR   = '#3d2b00';
+/** Prefix for gold-space shimmer fill; append alpha value + ')' at runtime. */
+export const GOLD_SPACE_SHIMMER_COLOR = 'rgba(255,215,0,';
+export const GOLD_SPACE_BORDER_COLOR = '#b8860b';
