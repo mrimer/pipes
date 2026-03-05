@@ -25,6 +25,12 @@ export class Game {
   private readonly gameoverModalEl: HTMLElement;
   private readonly gameoverMsgEl: HTMLElement;
 
+  /** Undo button in the play-screen HUD. */
+  private readonly undoBtnEl: HTMLButtonElement;
+
+  /** Redo button in the play-screen HUD. */
+  private readonly redoBtnEl: HTMLButtonElement;
+
   private screen: GameScreen = GameScreen.LevelSelect;
   private gameState: GameState = GameState.Playing;
   private board: Board | null = null;
@@ -70,6 +76,8 @@ export class Game {
     winModalEl: HTMLElement,
     gameoverModalEl: HTMLElement,
     gameoverMsgEl: HTMLElement,
+    undoBtnEl: HTMLButtonElement,
+    redoBtnEl: HTMLButtonElement,
   ) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
@@ -84,6 +92,8 @@ export class Game {
     this.winModalEl = winModalEl;
     this.gameoverModalEl = gameoverModalEl;
     this.gameoverMsgEl = gameoverMsgEl;
+    this.undoBtnEl = undoBtnEl;
+    this.redoBtnEl = redoBtnEl;
 
     // Load persisted completions
     this.completedLevels = loadCompletedLevels();
@@ -179,6 +189,7 @@ export class Game {
 
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level);
+    this.board.initHistory();
     this.gameState = GameState.Playing;
     this.focusPos = { row: 0, col: 0 };
     this.selectedShape = null;
@@ -195,6 +206,7 @@ export class Game {
 
     this._renderInventoryBar();
     this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
     this.canvas.focus();
   }
 
@@ -295,8 +307,8 @@ export class Game {
 
     if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
       // Place pipe from inventory
-      this.board.saveSnapshot();
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
+        this.board.recordMove();
         // Remember the rotation used so the next placement defaults to it
         const placedShape = this.selectedShape;
         this.lastPlacedRotations.set(placedShape, this.pendingRotation);
@@ -309,14 +321,16 @@ export class Game {
         }
         this._renderInventoryBar();
         this._updateWaterDisplay();
+        this._updateUndoRedoButtons();
         this._checkWinLose();
       }
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe
-      this.board.saveSnapshot();
       this.board.rotateTile(pos);
+      this.board.recordMove();
       this._renderInventoryBar();
       this._updateWaterDisplay();
+      this._updateUndoRedoButtons();
       this._checkWinLose();
     }
   }
@@ -439,8 +453,8 @@ export class Game {
         if (this.selectedShape !== null) {
           const tile = board.getTile(focusPos);
           if (tile?.shape === PipeShape.Empty) {
-            board.saveSnapshot();
             if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
+              board.recordMove();
               // Remember the rotation used so the next placement defaults to it
               const placedShape = this.selectedShape;
               this.lastPlacedRotations.set(placedShape, this.pendingRotation);
@@ -453,14 +467,16 @@ export class Game {
               }
               this._renderInventoryBar();
               this._updateWaterDisplay();
+              this._updateUndoRedoButtons();
               this._checkWinLose();
             }
           }
         } else {
-          board.saveSnapshot();
           board.rotateTile(focusPos);
+          board.recordMove();
           this._renderInventoryBar();
           this._updateWaterDisplay();
+          this._updateUndoRedoButtons();
           this._checkWinLose();
         }
         break;
@@ -486,22 +502,53 @@ export class Game {
   }
 
   /**
-   * Undo the last player action and resume playing from the restored state.
-   * Only meaningful when the game-over modal is showing and a snapshot exists.
+   * Undo the last player action.
+   * When called from the game-over modal, also dismisses the modal and resumes play.
    */
-  undoLastMove(): void {
+  performUndo(): void {
     if (!this.board || !this.board.canUndo()) return;
     this.board.undoMove();
     this.gameState = GameState.Playing;
     this.gameoverModalEl.style.display = 'none';
     this._renderInventoryBar();
     this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
     this._renderBoard();
+  }
+
+  /** Redo the last undone player action. */
+  performRedo(): void {
+    if (!this.board || !this.board.canRedo()) return;
+    this.board.redoMove();
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
+    this._renderBoard();
+    this._checkWinLose();
+  }
+
+  /**
+   * Undo the last player action and resume playing from the restored state.
+   * Only meaningful when the game-over modal is showing and a snapshot exists.
+   * @deprecated Use {@link performUndo} instead.
+   */
+  undoLastMove(): void {
+    this.performUndo();
   }
 
   /** Exit to the level-selection screen. */
   exitToMenu(): void {
     this._showLevelSelect();
+  }
+
+  // ─── Undo / redo button state ─────────────────────────────────────────────
+
+  /** Enable or disable the undo/redo HUD buttons based on current history state. */
+  private _updateUndoRedoButtons(): void {
+    const canUndo = !!(this.board?.canUndo());
+    const canRedo = !!(this.board?.canRedo());
+    this.undoBtnEl.disabled = !canUndo;
+    this.redoBtnEl.disabled = !canRedo;
   }
 
   // ─── Persistence helpers ──────────────────────────────────────────────────

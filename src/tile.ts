@@ -79,7 +79,8 @@ export class Tile {
   itemCount: number;
   /**
    * Optional explicit connection set that overrides the rotation-based computation.
-   * Currently used for Tank tiles whose open sides are defined per-tile in the level.
+   * Currently used for Tank, DirtBlock, and ItemContainer tiles whose open sides
+   * are defined per-tile in the level.
    */
   customConnections: ConnectionSet | null;
 
@@ -91,7 +92,7 @@ export class Tile {
    * @param dirtCost - Water cost (DirtBlock tiles only).
    * @param itemShape - Inventory item shape (ItemContainer tiles only).
    * @param itemCount - Number of items granted (ItemContainer tiles only, defaults to 1).
-   * @param customConnections - Explicit connection set (Tank tiles only, overrides rotation-based default).
+   * @param customConnections - Explicit connection set (Tank, DirtBlock, and ItemContainer tiles; overrides rotation-based default).
    */
   constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null) {
     this.shape = shape;

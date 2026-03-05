@@ -821,21 +821,29 @@ describe('Gold pipes and gold spaces', () => {
   });
 });
 
-// ─── Undo support ────────────────────────────────────────────────────────────
+// ─── Undo / redo support ─────────────────────────────────────────────────────
 
-describe('Board.saveSnapshot / canUndo / undoMove', () => {
-  it('canUndo() returns false before any snapshot is saved', () => {
+describe('Board.initHistory / canUndo / undoMove / canRedo / redoMove', () => {
+  it('canUndo() returns false on a fresh board with no history', () => {
     const board = new Board(2, 2);
     expect(board.canUndo()).toBe(false);
   });
 
-  it('canUndo() returns true after saveSnapshot()', () => {
+  it('canUndo() returns false immediately after initHistory() (no moves yet)', () => {
     const board = new Board(2, 2);
-    board.saveSnapshot();
+    board.initHistory();
+    expect(board.canUndo()).toBe(false);
+  });
+
+  it('canUndo() returns true after initHistory() and one recordMove()', () => {
+    const board = new Board(2, 2);
+    board.initHistory();
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();
     expect(board.canUndo()).toBe(true);
   });
 
-  it('undoMove() returns false and leaves board unchanged when no snapshot', () => {
+  it('undoMove() returns false and leaves board unchanged when no history', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink = { row: 0, col: 2 };
@@ -855,8 +863,9 @@ describe('Board.saveSnapshot / canUndo / undoMove', () => {
     board.sourceCapacity = 5;
     board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
 
-    board.saveSnapshot();
+    board.initHistory();
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();
 
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.inventory[0].count).toBe(1);
@@ -872,8 +881,9 @@ describe('Board.saveSnapshot / canUndo / undoMove', () => {
     const board = new Board(2, 2);
     board.grid[0][0] = new Tile(PipeShape.Elbow, 0);
 
-    board.saveSnapshot();
+    board.initHistory();
     board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();
 
     expect(board.grid[0][0].rotation).toBe(90);
 
@@ -882,14 +892,16 @@ describe('Board.saveSnapshot / canUndo / undoMove', () => {
     expect(board.grid[0][0].rotation).toBe(0);
   });
 
-  it('canUndo() returns false after undoMove() consumes the snapshot', () => {
+  it('canUndo() returns false after undoMove() reaches the initial state', () => {
     const board = new Board(2, 2);
-    board.saveSnapshot();
+    board.initHistory();
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();
     board.undoMove();
     expect(board.canUndo()).toBe(false);
   });
 
-  it('saveSnapshot() overwrites the previous snapshot', () => {
+  it('multiple recordMove() calls retain full history for repeated undos', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink = { row: 0, col: 2 };
@@ -898,19 +910,131 @@ describe('Board.saveSnapshot / canUndo / undoMove', () => {
     board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
     board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
 
-    // First snapshot (count = 3, cell empty)
-    board.saveSnapshot();
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90); // count → 2
+    // Move 1: place Straight at (0,1)
+    board.initHistory();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();  // count → 2
 
-    // Second snapshot (count = 2, cell filled)
-    board.saveSnapshot();
-    board.rotateTile({ row: 0, col: 1 }); // rotate but don't place a new tile
+    // Move 2: rotate the placed tile
+    board.rotateTile({ row: 0, col: 1 });
+    board.recordMove();  // rotation → 180
 
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.grid[0][1].rotation).toBe(180);
+    expect(board.inventory[0].count).toBe(2);
+
+    // Undo move 2 → back to rotation 90, count 2
     board.undoMove();
-
-    // Should restore to second snapshot: Straight at (0,1) with rotation 90, count = 2
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.grid[0][1].rotation).toBe(90);
     expect(board.inventory[0].count).toBe(2);
+
+    // Undo move 1 → back to initial (Empty, count 3)
+    board.undoMove();
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+    expect(board.inventory[0].count).toBe(3);
+    expect(board.canUndo()).toBe(false);
+  });
+
+  it('canRedo() returns false when at the latest state', () => {
+    const board = new Board(2, 2);
+    board.initHistory();
+    expect(board.canRedo()).toBe(false);
+  });
+
+  it('canRedo() returns true after undoMove()', () => {
+    const board = new Board(2, 2);
+    board.initHistory();
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();
+    board.undoMove();
+    expect(board.canRedo()).toBe(true);
+  });
+
+  it('redoMove() re-applies the undone action', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty,  0);
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 1 }];
+
+    board.initHistory();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();
+
+    // Undo the placement
+    board.undoMove();
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+
+    // Redo restores the placement
+    const redid = board.redoMove();
+    expect(redid).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.grid[0][1].rotation).toBe(90);
+    expect(board.inventory[0].count).toBe(0);
+  });
+
+  it('redoMove() returns false when there is nothing to redo', () => {
+    const board = new Board(2, 2);
+    board.initHistory();
+    expect(board.redoMove()).toBe(false);
+  });
+
+  it('new action after undo clears the redo chain when result differs', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory  = [
+      { shape: PipeShape.Straight, count: 1 },
+      { shape: PipeShape.Elbow,    count: 1 },
+    ];
+
+    board.initHistory();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();
+
+    // Undo the placement
+    board.undoMove();
+    expect(board.canRedo()).toBe(true);
+
+    // Take a DIFFERENT action (place Elbow instead of Straight)
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 0);
+    board.recordMove();
+
+    // The old redo chain (Straight) should be gone
+    expect(board.canRedo()).toBe(false);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Elbow);
+  });
+
+  it('new action after undo advances without truncating when result matches next state', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 2 }];
+
+    board.initHistory();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();  // history: [S0, S1], index 1
+
+    // Undo
+    board.undoMove();  // index 0
+    expect(board.canRedo()).toBe(true);
+
+    // Redo by re-making the EXACT same move
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();  // should match S1 → advance index to 1
+
+    // Redo chain is preserved (index advanced to 1, same as before)
+    expect(board.canRedo()).toBe(false);  // at the end of history
+    expect(board.canUndo()).toBe(true);   // can still undo
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 });

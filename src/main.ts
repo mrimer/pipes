@@ -15,6 +15,8 @@ const waterDisplayEl = getEl('water-display');
 const winModalEl     = getEl('win-modal');
 const gameoverModalEl = getEl('gameover-modal');
 const gameoverMsgEl  = getEl('gameover-msg');
+const undoBtnEl      = getEl<HTMLButtonElement>('undo-btn');
+const redoBtnEl      = getEl<HTMLButtonElement>('redo-btn');
 
 const game = new Game(
   canvas,
@@ -26,6 +28,8 @@ const game = new Game(
   winModalEl,
   gameoverModalEl,
   gameoverMsgEl,
+  undoBtnEl,
+  redoBtnEl,
 );
 
 // Win modal buttons
@@ -36,6 +40,10 @@ getEl('win-menu-btn').addEventListener('click',  () => game.exitToMenu());
 getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove());
 getEl('gameover-retry-btn').addEventListener('click', () => game.retryLevel());
 getEl('gameover-menu-btn').addEventListener('click',  () => game.exitToMenu());
+
+// HUD undo / redo buttons
+undoBtnEl.addEventListener('click', () => game.performUndo());
+redoBtnEl.addEventListener('click', () => game.performRedo());
 
 // Exit to menu button on play screen
 getEl('exit-btn').addEventListener('click', () => game.exitToMenu());

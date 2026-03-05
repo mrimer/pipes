@@ -64,6 +64,8 @@ function makeGame(): {
     <div id="play-screen">
       <span id="water-display"></span>
       <div id="inventory-bar"></div>
+      <button id="undo-btn"></button>
+      <button id="redo-btn"></button>
     </div>
     <div id="win-modal"></div>
     <div id="gameover-modal"><p id="gameover-msg"></p></div>
@@ -79,6 +81,8 @@ function makeGame(): {
   const winModalEl     = get('win-modal');
   const gameoverModalEl = get('gameover-modal');
   const gameoverMsgEl  = get('gameover-msg');
+  const undoBtnEl      = get('undo-btn') as HTMLButtonElement;
+  const redoBtnEl      = get('redo-btn') as HTMLButtonElement;
 
   const canvas = get('game-canvas') as HTMLCanvasElement;
 
@@ -92,6 +96,8 @@ function makeGame(): {
     winModalEl,
     gameoverModalEl,
     gameoverMsgEl,
+    undoBtnEl,
+    redoBtnEl,
   );
 
   return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl };
@@ -434,9 +440,9 @@ describe('Game – undoLastMove', () => {
     const { game, gameoverModalEl } = makeGame();
     game.startLevel(1);
 
-    // Access board and simulate a snapshot being saved before a move
+    // Access board and record a move so that canUndo() returns true
     const boardAccess = game as unknown as { board: Board; gameState: GameState };
-    boardAccess.board.saveSnapshot();
+    boardAccess.board.recordMove();
 
     // Simulate game-over state (as _checkWinLose would set)
     boardAccess.gameState = GameState.GameOver;
@@ -456,7 +462,7 @@ describe('Game – undoLastMove', () => {
     boardAccess.gameState = GameState.GameOver;
     gameoverModalEl.style.display = 'flex';
 
-    // No saveSnapshot() called → canUndo() is false
+    // No recordMove() called after startLevel → canUndo() is false
     game.undoLastMove();
 
     // State should be unchanged
@@ -471,7 +477,7 @@ describe('Game – undoLastMove', () => {
     const hooks = gameHooks(game);
     const boardAccess = game as unknown as { board: Board; gameState: GameState };
 
-    // Place a tile via keyboard (saves snapshot automatically)
+    // Place a tile via keyboard (records move automatically)
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
