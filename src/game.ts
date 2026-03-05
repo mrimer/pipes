@@ -1,7 +1,7 @@
 import { Board } from './board';
 import { LEVELS } from './levels';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
 
 const TILE_SIZE = 64; // px
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -91,6 +91,12 @@ export class Game {
 
   /** The pipe shape currently selected from the inventory, ready to be placed. */
   private selectedShape: PipeShape | null = null;
+
+  /** Rotation that will be applied when the pending inventory item is placed. */
+  private pendingRotation: Rotation = 0;
+
+  /** Last-used placement rotation per pipe shape, so the same orientation is reused next time. */
+  private readonly lastPlacedRotations = new Map<PipeShape, Rotation>();
 
   /** Most-recent mouse position over the canvas in canvas-pixel coordinates. */
   private mouseCanvasPos: { x: number; y: number } | null = null;
@@ -203,6 +209,7 @@ export class Game {
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
     canvas.addEventListener('mouseleave',   ()  => this._hideTooltip());
     canvas.addEventListener('keydown',      (e) => this._handleKey(e));
+    canvas.addEventListener('wheel',        (e) => this._handleCanvasWheel(e), { passive: false });
     document.addEventListener('keydown',    (e) => this._handleDocKeyDown(e));
     document.addEventListener('keyup',      (e) => this._handleDocKeyUp(e));
 
@@ -233,6 +240,7 @@ export class Game {
     this.gameState = GameState.Playing;
     this.focusPos = { row: 0, col: 0 };
     this.selectedShape = null;
+    this.pendingRotation = 0;
 
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
@@ -313,6 +321,9 @@ export class Game {
     if (this.gameState !== GameState.Playing) return;
     if (count === 0) return;
     this.selectedShape = this.selectedShape === shape ? null : shape;
+    if (this.selectedShape !== null) {
+      this.pendingRotation = this.lastPlacedRotations.get(shape) ?? 0;
+    }
     this._renderInventoryBar();
   }
 
@@ -364,6 +375,24 @@ export class Game {
         }
 
         this._drawPipe(x, y, tile, isWater, currentWater);
+      }
+    }
+
+    // Draw semi-transparent hover preview of the pending inventory item
+    if (this.selectedShape !== null && this.mouseCanvasPos) {
+      const hoverCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+      const hoverRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
+        const hoverTile = board.grid[hoverRow][hoverCol];
+        if (hoverTile.shape === PipeShape.Empty) {
+          const previewTile = new Tile(this.selectedShape, this.pendingRotation);
+          const px = hoverCol * TILE_SIZE;
+          const py = hoverRow * TILE_SIZE;
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          this._drawPipe(px, py, previewTile, false, currentWater);
+          ctx.restore();
+        }
       }
     }
   }
@@ -598,9 +627,11 @@ export class Game {
 
     if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
       // Place pipe from inventory
-      if (this.board.placeInventoryTile(pos, this.selectedShape)) {
-        // Keep selected shape if there is still stock remaining
+      if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
+        // Remember the rotation used so the next placement defaults to it
         const placedShape = this.selectedShape;
+        this.lastPlacedRotations.set(placedShape, this.pendingRotation);
+        // Keep selected shape if there is still stock remaining
         const inv = this.board.inventory.find((it) => it.shape === placedShape);
         const bonuses = this.board.getContainerBonuses();
         const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
@@ -643,6 +674,19 @@ export class Game {
     this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     if (this.ctrlHeld) {
       this._showTooltip(e.clientX, e.clientY);
+    }
+  }
+
+  private _handleCanvasWheel(e: WheelEvent): void {
+    if (this.screen !== GameScreen.Play) return;
+    if (this.gameState !== GameState.Playing) return;
+    if (this.selectedShape === null) return;
+    e.preventDefault();
+    // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
+    if (e.deltaY > 0) {
+      this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
+    } else {
+      this.pendingRotation = ((this.pendingRotation + 270) % 360) as Rotation;
     }
   }
 
@@ -725,9 +769,11 @@ export class Game {
         if (this.selectedShape !== null) {
           const tile = board.getTile(focusPos);
           if (tile?.shape === PipeShape.Empty) {
-            if (board.placeInventoryTile(focusPos, this.selectedShape)) {
-              // Keep selected shape if there is still stock remaining
+            if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
+              // Remember the rotation used so the next placement defaults to it
               const placedShape = this.selectedShape;
+              this.lastPlacedRotations.set(placedShape, this.pendingRotation);
+              // Keep selected shape if there is still stock remaining
               const inv = board.inventory.find((it) => it.shape === placedShape);
               const bonuses = board.getContainerBonuses();
               const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
@@ -744,6 +790,13 @@ export class Game {
           this._renderInventoryBar();
           this._updateWaterDisplay();
           this._checkWinLose();
+        }
+        break;
+      case 'Tab':
+        e.preventDefault();
+        if (this.gameState !== GameState.Playing) break;
+        if (this.selectedShape !== null) {
+          this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
         }
         break;
       case 'Escape':

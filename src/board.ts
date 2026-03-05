@@ -147,9 +147,10 @@ export class Board {
   /**
    * Place a pipe from the inventory onto an empty cell.
    * The effective inventory count (base + ItemContainer grants) must be positive.
+   * @param rotation - Initial rotation to apply to the placed tile (default 0).
    * @returns true if the placement succeeded.
    */
-  placeInventoryTile(pos: GridPos, shape: PipeShape): boolean {
+  placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): boolean {
     const tile = this.getTile(pos);
     if (!tile || tile.shape !== PipeShape.Empty) return false;
 
@@ -161,7 +162,7 @@ export class Board {
     if (effectiveCount <= 0) return false;
 
     this.inventory[idx].count--;
-    this.grid[pos.row][pos.col] = new Tile(shape, 0);
+    this.grid[pos.row][pos.col] = new Tile(shape, rotation);
     return true;
   }
 
