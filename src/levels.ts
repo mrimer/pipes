@@ -45,11 +45,21 @@ const LEVEL_1: LevelDef = {
       { shape: PipeShape.Elbow,    rotation: 180, isFixed: true },           // (1,5) S-W
     ],
     // Row 2 – (2,5) left empty for player
-    [null, null, null, null, null, null],
+    [
+      null,
+      null,
+      { shape: PipeShape.Granite, isFixed: true },                              // (2,2) granite obstacle
+      { shape: PipeShape.Granite, isFixed: true },                              // (2,3) granite obstacle
+      null,
+      null,
+    ],
     // Row 3
     [
-      null, null, null, null, null,
-      { shape: PipeShape.Straight, rotation: 0, isFixed: true },             // (3,5) N-S
+      null, null,
+      { shape: PipeShape.Granite, isFixed: true },                              // (3,2) granite obstacle
+      { shape: PipeShape.Granite, isFixed: true },                              // (3,3) granite obstacle
+      null,
+      { shape: PipeShape.Straight, rotation: 0, isFixed: true },               // (3,5) N-S
     ],
     // Row 4 – (4,5) left empty for player
     [null, null, null, null, null, null],
@@ -99,19 +109,25 @@ const LEVEL_2: LevelDef = {
     ],
     // Row 1
     [
-      null, null, null, null,
+      null, null,
+      { shape: PipeShape.Granite, isFixed: true },                              // (1,2) granite obstacle
+      null,
       null,                                                                         // (1,4) player fills: Straight N-S
       null,
     ],
     // Row 2
     [
-      null, null, null, null,
+      null, null,
+      { shape: PipeShape.Granite, isFixed: true },                              // (2,2) granite obstacle
+      null,
       { shape: PipeShape.Straight, rotation: 0, isFixed: true },                  // (2,4) N-S
       null,
     ],
     // Row 3
     [
-      null, null, null, null,
+      null, null,
+      { shape: PipeShape.Granite, isFixed: true },                              // (3,2) granite obstacle
+      null,
       { shape: PipeShape.DirtBlock, rotation: 0, isFixed: true, dirtCost: 3 },   // (3,4)
       null,
     ],

@@ -33,6 +33,8 @@ const CONTAINER_COLOR = '#f0a500';
 const CONTAINER_WATER_COLOR = '#ffd04f';
 const CONTAINER_FILL_COLOR = '#3d2b00';
 const CONTAINER_FILL_WATER_COLOR = '#5a4000';
+const GRANITE_COLOR = '#9ca3af';
+const GRANITE_FILL_COLOR = '#374151';
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
@@ -389,6 +391,8 @@ export class Game {
       color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
     } else if (shape === PipeShape.ItemContainer) {
       color = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
+    } else if (shape === PipeShape.Granite) {
+      color = GRANITE_COLOR;
     } else {
       color = isFixed
         ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
@@ -536,6 +540,24 @@ export class Game {
       ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    } else if (shape === PipeShape.Granite) {
+      // Granite – solid impassable stone block; no connections
+      ctx.restore();
+      ctx.save();
+      ctx.translate(cx, cy);
+      const bw = half * 0.7;
+      const bh = half * 0.7;
+      ctx.fillStyle = GRANITE_FILL_COLOR;
+      ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+      ctx.strokeStyle = GRANITE_COLOR;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+      // Stone texture – a few crack-like lines
+      ctx.strokeStyle = GRANITE_COLOR;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-bw + 4, -bh + 10); ctx.lineTo(bw - 6, -bh + 16); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw + 2, 2);         ctx.lineTo(bw - 8, 8);        ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-bw + 6, bh - 14);   ctx.lineTo(bw - 4, bh - 8);  ctx.stroke();
     }
 
     ctx.restore();

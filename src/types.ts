@@ -33,6 +33,8 @@ export enum PipeShape {
   DirtBlock = 'DIRT_BLOCK',
   /** Item container – accessible on all four sides; grants an inventory item when water connects to it */
   ItemContainer = 'ITEM_CONTAINER',
+  /** Granite block – an impassable obstacle; cannot be moved and water cannot flow through it */
+  Granite = 'GRANITE',
 }
 
 /** Valid rotation values (clockwise, in degrees). */

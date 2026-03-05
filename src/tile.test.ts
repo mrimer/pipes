@@ -83,6 +83,13 @@ describe('getConnections', () => {
       expect(c.size).toBe(4);
     }
   });
+
+  it('Granite has no connections (water cannot flow through it)', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const c = getConnections(PipeShape.Granite, rot);
+      expect(c.size).toBe(0);
+    }
+  });
 });
 
 describe('Tile', () => {

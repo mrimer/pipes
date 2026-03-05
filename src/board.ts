@@ -104,7 +104,8 @@ export class Board {
       tile.shape === PipeShape.Sink          ||
       tile.shape === PipeShape.Tank          ||
       tile.shape === PipeShape.DirtBlock     ||
-      tile.shape === PipeShape.ItemContainer
+      tile.shape === PipeShape.ItemContainer ||
+      tile.shape === PipeShape.Granite
     ) return false;
 
     // ── Container-grant constraint check ─────────────────────────────────────
