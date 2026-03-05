@@ -109,7 +109,7 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, def.isFixed ?? false, def.capacity ?? 0, def.dirtCost ?? 0, itemShape, itemCount, customConnections, chamberContent);
+          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.dirtCost ?? 0, itemShape, itemCount, customConnections, chamberContent);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {

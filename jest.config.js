@@ -2,7 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/src/**/*.test.ts'],
+  testMatch: ['**/tests/**/*.test.ts'],
   collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/game.ts'],
   coverageThreshold: {
     './src/board.ts': { lines: 80 },

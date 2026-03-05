@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { createGameRulesModal } from './rulesModal';
+import { createGameRulesModal } from '../src/rulesModal';
 
 describe('createGameRulesModal', () => {
   beforeEach(() => {

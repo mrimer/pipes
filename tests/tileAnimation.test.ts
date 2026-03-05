@@ -8,7 +8,7 @@ import {
   ANIM_NEGATIVE_COLOR,
   ANIM_ZERO_COLOR,
   ANIM_RISE_PX,
-} from './tileAnimation';
+} from '../src/tileAnimation';
 
 // ─── animColor ────────────────────────────────────────────────────────────────
 
