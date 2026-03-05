@@ -614,7 +614,7 @@ export class Game {
       ctx.fillStyle = isGoldItem
         ? (isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR)
         : (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR);
-      ctx.font = 'bold 11px Arial';
+      ctx.font = isGoldItem ? 'bold 11px Arial' : 'bold 13px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(label, 0, 0);
