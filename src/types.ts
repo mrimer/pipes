@@ -81,7 +81,6 @@ export interface InventoryItem {
 export interface TileDef {
   shape: PipeShape;
   rotation?: Rotation;
-  isFixed?: boolean;
   /** Water capacity (Source and Chamber-tank tiles only). */
   capacity?: number;
   /** Water cost for Chamber-dirt tiles – water wasted when water flows through this tile. */

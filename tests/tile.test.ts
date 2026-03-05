@@ -1,5 +1,5 @@
-import { Tile, getConnections, rotateDirection, oppositeDirection } from './tile';
-import { Direction, PipeShape } from './types';
+import { Tile, getConnections, rotateDirection, oppositeDirection } from '../src/tile';
+import { Direction, PipeShape } from '../src/types';
 
 describe('rotateDirection', () => {
   it('rotates North → East', () => {

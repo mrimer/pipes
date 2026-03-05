@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { Game } from './game';
-import { PipeShape } from './types';
+import { Game } from '../src/game';
+import { PipeShape } from '../src/types';
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
@@ -460,8 +460,8 @@ describe('Game – pending rotation', () => {
 
 // ─── Tests: undoLastMove ──────────────────────────────────────────────────────
 
-import { Board } from './board';
-import { GameState } from './types';
+import { Board } from '../src/board';
+import { GameState } from '../src/types';
 
 describe('Game – undoLastMove', () => {
   it('undoLastMove() hides the gameover modal and resumes playing when a snapshot exists', () => {
@@ -525,7 +525,7 @@ describe('Game – undoLastMove', () => {
 
 // ─── Tests: tile connection animations ───────────────────────────────────────
 
-import { ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from './tileAnimation';
+import { ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from '../src/tileAnimation';
 
 describe('Game – tile connection animations (_spawnConnectionAnimations)', () => {
   it('spawns a "-1" animation when a regular pipe becomes newly connected', () => {

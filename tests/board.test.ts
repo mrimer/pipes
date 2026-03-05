@@ -1,7 +1,7 @@
-import { Board } from './board';
-import { Direction, PipeShape } from './types';
-import { Tile } from './tile';
-import { LEVELS } from './levels';
+import { Board } from '../src/board';
+import { Direction, PipeShape } from '../src/types';
+import { Tile } from '../src/tile';
+import { LEVELS } from '../src/levels';
 
 /** Build a minimal 2×1 board and manually set the tiles for deterministic testing. */
 function makeTwoTileBoard(): Board {
