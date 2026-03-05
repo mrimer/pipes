@@ -92,7 +92,7 @@ export interface TileDef {
   /** Number of inventory items granted by an ItemContainer tile (defaults to 1). */
   itemCount?: number;
   /**
-   * Explicit set of open connection directions for Tank tiles.
+   * Explicit set of open connection directions for Tank, DirtBlock, and ItemContainer tiles.
    * When provided, overrides the default (all four sides).
    */
   connections?: Direction[];

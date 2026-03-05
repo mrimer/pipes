@@ -36,3 +36,5 @@ export const GOLD_SPACE_BASE_COLOR   = '#3d2b00';
 /** Prefix for gold-space shimmer fill; append alpha value + ')' at runtime. */
 export const GOLD_SPACE_SHIMMER_COLOR = 'rgba(255,215,0,';
 export const GOLD_SPACE_BORDER_COLOR = '#b8860b';
+/** Background color for player-placed tiles that can be removed (non-fixed pipes). */
+export const REMOVABLE_BG_COLOR      = '#1a3050';

@@ -10,7 +10,7 @@ const NEIGHBOUR_DELTA: Record<Direction, GridPos> = {
 };
 
 /** Shapes that consume one water unit when filled (not source/sink/tank). */
-const PIPE_SHAPES = new Set<PipeShape>([
+export const PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.Straight,
   PipeShape.Elbow,
   PipeShape.Tee,
@@ -28,6 +28,9 @@ export const GOLD_PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.GoldTee,
   PipeShape.GoldCross,
 ]);
+
+/** Snapshot of the board state (grid + inventory) used for undo/redo. */
+type Snapshot = { grid: Tile[][]; inventory: InventoryItem[] };
 
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
@@ -58,8 +61,10 @@ export class Board {
    */
   lastError: string | null = null;
 
-  /** Saved board state for undo support (one level deep). */
-  private _snapshot: { grid: Tile[][]; inventory: InventoryItem[] } | null = null;
+  /** Full move history for undo/redo support. history[0] is the initial state. */
+  private _history: Snapshot[] = [];
+  /** Index of the current state in _history (-1 if history is uninitialised). */
+  private _historyIndex: number = -1;
 
   /**
    * @param rows - Number of rows.
@@ -115,14 +120,82 @@ export class Board {
     }
   }
 
-  // ─── Undo support ─────────────────────────────────────────────────────────
+  // ─── Undo / redo support ───────────────────────────────────────────────────
 
   /**
-   * Save a snapshot of the current grid and inventory so the last action can be
-   * undone.  Only one snapshot is retained; each call overwrites the previous one.
+   * Initialise the move history with the current board state as the starting point.
+   * Must be called once after a level is fully set up (e.g. at the start of play).
+   * Calling this resets any existing history.
    */
-  saveSnapshot(): void {
-    this._snapshot = {
+  initHistory(): void {
+    this._history = [this._captureSnapshot()];
+    this._historyIndex = 0;
+  }
+
+  /**
+   * Record the current board state as the next move in the history.
+   * Call this AFTER each successful player action (place, rotate).
+   *
+   * If the player is currently at a position earlier than the end of the history
+   * (i.e. some moves were undone), the behaviour is:
+   * - If the new state matches the next state in the existing history, advance
+   *   the index without modifying the history (the redo chain is preserved).
+   * - Otherwise, truncate all future states and append the new state.
+   */
+  recordMove(): void {
+    if (this._historyIndex < this._history.length - 1) {
+      // There are "future" (undone) states.
+      // Compare the live board to the next entry WITHOUT allocating a new snapshot first.
+      if (this._liveBoardMatchesSnapshot(this._history[this._historyIndex + 1])) {
+        // Exact same result as the next history state – advance the pointer, preserve the redo chain.
+        this._historyIndex++;
+        return;
+      }
+      // Different – discard the future branch before appending the new state.
+      this._history = this._history.slice(0, this._historyIndex + 1);
+    }
+
+    this._history.push(this._captureSnapshot());
+    this._historyIndex++;
+  }
+
+  /** Returns true if there is a previous state to undo to. */
+  canUndo(): boolean {
+    return this._historyIndex > 0;
+  }
+
+  /**
+   * Restore the board to the previous state in the history.
+   * @returns true if the undo was applied; false if there was no previous state.
+   */
+  undoMove(): boolean {
+    if (!this.canUndo()) return false;
+    this._historyIndex--;
+    this._restoreSnapshot(this._history[this._historyIndex]);
+    return true;
+  }
+
+  /** Returns true if there is a future state to redo to. */
+  canRedo(): boolean {
+    return this._historyIndex >= 0 && this._historyIndex < this._history.length - 1;
+  }
+
+  /**
+   * Re-apply the next state in the history (i.e. redo the last undone move).
+   * @returns true if redo was applied; false if there was no future state.
+   */
+  redoMove(): boolean {
+    if (!this.canRedo()) return false;
+    this._historyIndex++;
+    this._restoreSnapshot(this._history[this._historyIndex]);
+    return true;
+  }
+
+  // ─── Snapshot helpers ──────────────────────────────────────────────────────
+
+  /** Capture a deep copy of the current grid and inventory. */
+  private _captureSnapshot(): Snapshot {
+    return {
       grid: this.grid.map((row) =>
         row.map(
           (tile) =>
@@ -142,24 +215,34 @@ export class Board {
     };
   }
 
-  /** Returns true if an undo snapshot is available. */
-  canUndo(): boolean {
-    return this._snapshot !== null;
+  /** Restore the board grid and inventory from a snapshot. */
+  private _restoreSnapshot(snap: Snapshot): void {
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        this.grid[r][c] = snap.grid[r][c];
+      }
+    }
+    // InventoryItem only contains primitive fields (shape + count), so spread is a full copy –
+    // consistent with the spread used in _captureSnapshot.
+    this.inventory = snap.inventory.map((item) => ({ ...item }));
   }
 
   /**
-   * Restore the board to the previously saved snapshot, undoing the last action.
-   * @returns true if the snapshot was restored; false if there was no snapshot.
+   * Compare the LIVE board state against a snapshot without allocating a new Snapshot object.
+   * Used by {@link recordMove} to check whether a redo entry can be reused.
    */
-  undoMove(): boolean {
-    if (!this._snapshot) return false;
+  private _liveBoardMatchesSnapshot(snap: Snapshot): boolean {
+    if (this.inventory.length !== snap.inventory.length) return false;
+    for (let i = 0; i < this.inventory.length; i++) {
+      if (this.inventory[i].shape !== snap.inventory[i].shape) return false;
+      if (this.inventory[i].count !== snap.inventory[i].count) return false;
+    }
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        this.grid[r][c] = this._snapshot.grid[r][c];
+        if (this.grid[r][c].shape    !== snap.grid[r][c].shape)    return false;
+        if (this.grid[r][c].rotation !== snap.grid[r][c].rotation) return false;
       }
     }
-    this.inventory = this._snapshot.inventory;
-    this._snapshot = null;
     return true;
   }
 

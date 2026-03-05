@@ -158,6 +158,21 @@
       color: #7ed321;
     }
 
+    #undo-btn,
+    #redo-btn {
+      padding: 6px 14px;
+      font-size: 0.9rem;
+      background: #2a2a4a;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #undo-btn:hover:not(:disabled),
+    #redo-btn:hover:not(:disabled) { background: #3a3a5a; color: #eee; }
+    #undo-btn:disabled,
+    #redo-btn:disabled { opacity: 0.35; cursor: default; }
+
     #exit-btn {
       padding: 6px 18px;
       font-size: 0.9rem;
@@ -223,6 +238,8 @@
   <div id="play-screen">
     <div id="hud">
       <span id="water-display">💧 Water: –</span>
+      <button id="undo-btn" type="button" disabled>↩ Undo</button>
+      <button id="redo-btn" type="button" disabled>↪ Redo</button>
       <button id="exit-btn" type="button">← Menu</button>
     </div>
     <div id="play-area">

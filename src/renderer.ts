@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES } from './board';
+import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { GridPos, PipeShape, Direction } from './types';
 import {
@@ -19,6 +19,7 @@ import {
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
+  REMOVABLE_BG_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -222,10 +223,18 @@ export function drawPipe(
     ctx.strokeStyle = color;
     ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    if (tile.connections.has(Direction.North)) {
+      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.South)) {
+      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+    }
+    if (tile.connections.has(Direction.West)) {
+      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.East)) {
+      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    }
   } else if (shape === PipeShape.ItemContainer) {
     // Item container – amber/gold rectangle with a small pipe-shape label inside
     ctx.restore();
@@ -254,10 +263,18 @@ export function drawPipe(
     ctx.strokeStyle = color;
     ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    if (tile.connections.has(Direction.North)) {
+      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.South)) {
+      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+    }
+    if (tile.connections.has(Direction.West)) {
+      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.East)) {
+      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    }
   } else if (shape === PipeShape.Granite) {
     // Granite – solid impassable stone block; no connections
     ctx.restore();
@@ -338,7 +355,10 @@ export function renderBoard(
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
         }
       } else {
-        ctx.fillStyle = TILE_BG;
+        // Non-empty, non-gold tile: player-placed (removable) pipes get a distinct background
+        const isRemovable = !tile.isFixed &&
+          (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
+        ctx.fillStyle = isRemovable ? REMOVABLE_BG_COLOR : TILE_BG;
         ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
       }
 
