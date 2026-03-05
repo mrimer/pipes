@@ -84,10 +84,10 @@ describe('Board.rotateTile', () => {
 // ─── New: level loading ──────────────────────────────────────────────────────
 
 describe('Board (level mode)', () => {
-  it('initialises source capacity from level definition', () => {
+  it('initialises source capacity from source tile capacity', () => {
     const level = LEVELS[0]; // Tutorial
     const board = new Board(level.rows, level.cols, level);
-    expect(board.sourceCapacity).toBe(level.sourceCapacity);
+    expect(board.sourceCapacity).toBe(board.grid[board.source.row][board.source.col].capacity);
   });
 
   it('places fixed tiles correctly (Source at 0,0)', () => {
