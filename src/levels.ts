@@ -89,7 +89,7 @@ const LEVEL_2: LevelDef = {
     [
       { shape: PipeShape.Source,    rotation: 0,   isFixed: true, capacity: 12, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                         // (0,1) player fills: Straight E-W
-      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, isFixed: true, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },  // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, isFixed: true, dirtCost: 2, connections: [Direction.East, Direction.West] },  // (0,2)
       null,                                                                         // (0,3) player fills: Straight E-W
       { shape: PipeShape.Elbow,     rotation: 180, isFixed: true },                // (0,4) W-S
       null,
@@ -127,7 +127,7 @@ const LEVEL_2: LevelDef = {
     // Row 5
     [
       null, null, null, null,
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East, Direction.West] },      // (5,4)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East] },      // (5,4)
       null,
     ],
   ],
@@ -144,7 +144,7 @@ const LEVEL_3: LevelDef = {
   name: 'Mountain Stream',
   rows: 6,
   cols: 6,
-  sourceCapacity: 10,
+  sourceCapacity: 6,
   /**
    * Solution path:
    *   Source(0,0) → [player: Straight E-W at (0,1)] → ItemContainer(0,2, grants 1 GoldStraight)
@@ -164,9 +164,9 @@ const LEVEL_3: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 10, connections: [Direction.East, Direction.South] }, // (0,0)
+      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 6, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                             // (0,1) player fills: Straight E-W
-      { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.East, Direction.West] }, // (0,2)
       { shape: PipeShape.Elbow,         rotation: 180, isFixed: true },                // (0,3) S-W
       null, null,
     ],
@@ -181,8 +181,9 @@ const LEVEL_3: LevelDef = {
       { shape: PipeShape.Elbow,    rotation: 90,  isFixed: true },                    // (2,0) E-S
       { shape: PipeShape.Straight, rotation: 90,  isFixed: true },                    // (2,1) E-W
       { shape: PipeShape.Straight, rotation: 90,  isFixed: true },                    // (2,2) E-W
-      { shape: PipeShape.Elbow,    rotation: 270, isFixed: true },                    // (2,3) W-N
-      null, null,
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, isFixed: true, capacity: 5, connections: [Direction.West] }, // (2,4)
+      null,
     ],
     // Row 3
     [
@@ -196,12 +197,12 @@ const LEVEL_3: LevelDef = {
     ],
     // Row 5
     [
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East] },                          // (5,0)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North] },                          // (5,0)
       null, null, null, null, null,
     ],
   ],
   inventory: [
-    { shape: PipeShape.Straight,     count: 1 },
+    { shape: PipeShape.Straight,     count: 2 },
     { shape: PipeShape.Elbow,        count: 1 },
     { shape: PipeShape.Tee,          count: 1 },
     { shape: PipeShape.GoldStraight, count: 0 },
@@ -214,7 +215,7 @@ const LEVEL_4: LevelDef = {
   name: 'The Workshop',
   rows: 6,
   cols: 6,
-  sourceCapacity: 12,
+  sourceCapacity: 8,
   /**
    * Solution path:
    *   Source(0,0) → [player: Straight E-W at (0,1)] → ItemContainer(0,2, grants 1 GoldStraight)
@@ -234,9 +235,9 @@ const LEVEL_4: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 12, connections: [Direction.East, Direction.South] }, // (0,0)
+      { shape: PipeShape.Source,        rotation: 0,   isFixed: true, capacity: 8, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                             // (0,1) player fills: Straight E-W
-      { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.North, Direction.East, Direction.South, Direction.West] }, // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'item', rotation: 0, isFixed: true, itemShape: PipeShape.GoldStraight, itemCount: 1, connections: [Direction.East, Direction.South, Direction.West] }, // (0,2)
       { shape: PipeShape.GoldSpace },                                                  // (0,3) gold space – player places GoldStraight here
       { shape: PipeShape.Elbow,         rotation: 180, isFixed: true },                // (0,4) S-W
       null,
@@ -249,15 +250,15 @@ const LEVEL_4: LevelDef = {
     ],
     // Row 2
     [
-      null, null, null, null,
+      null, null,
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, isFixed: true, capacity: 5, connections: [Direction.North] },
+      null,
       { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, isFixed: true, capacity: 4 },       // (2,4)
       null,
     ],
     // Row 3
     [
-      null, null, null, null,
-      { shape: PipeShape.Straight, rotation: 0,   isFixed: true },                    // (3,4) N-S
-      null,
+      null, null, null, null, null, null,
     ],
     // Row 4
     [
@@ -268,12 +269,12 @@ const LEVEL_4: LevelDef = {
     // Row 5
     [
       null, null, null, null,
-      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North, Direction.East, Direction.West] },          // (5,4)
+      { shape: PipeShape.Sink, rotation: 0, isFixed: true, connections: [Direction.North] },          // (5,4)
       null,
     ],
   ],
   inventory: [
-    { shape: PipeShape.Straight,     count: 1 },
+    { shape: PipeShape.Straight,     count: 3 },
     { shape: PipeShape.Elbow,        count: 1 },
     { shape: PipeShape.Tee,          count: 1 },
     { shape: PipeShape.GoldStraight, count: 0 },
