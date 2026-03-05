@@ -11,6 +11,7 @@ const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.Sink]:      [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.Tank]:      [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.DirtBlock]: [Direction.North, Direction.East, Direction.South, Direction.West],
+  [PipeShape.ItemContainer]: [Direction.North, Direction.East, Direction.South, Direction.West],
 };
 
 /**
@@ -66,6 +67,10 @@ export class Tile {
   capacity: number;
   /** Water cost for DirtBlock tiles – deducted from the source when water flows through. */
   dirtCost: number;
+  /** Inventory item shape granted when an ItemContainer tile is in the fill path. */
+  itemShape: PipeShape | null;
+  /** Number of inventory items granted by this ItemContainer tile. */
+  itemCount: number;
 
   /**
    * @param shape - The pipe shape of this tile.
@@ -73,13 +78,17 @@ export class Tile {
    * @param isFixed - If true the tile cannot be rotated by the player.
    * @param capacity - Water capacity (Source / Tank tiles only).
    * @param dirtCost - Water cost (DirtBlock tiles only).
+   * @param itemShape - Inventory item shape (ItemContainer tiles only).
+   * @param itemCount - Number of items granted (ItemContainer tiles only, defaults to 1).
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0, itemShape: PipeShape | null = null, itemCount = 1) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
     this.capacity = capacity;
     this.dirtCost = dirtCost;
+    this.itemShape = itemShape;
+    this.itemCount = itemCount;
   }
 
   /** Rotate the tile 90° clockwise. */

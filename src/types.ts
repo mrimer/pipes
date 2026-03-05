@@ -31,6 +31,8 @@ export enum PipeShape {
   Tank = 'TANK',
   /** Dirt block – accessible on all four sides; wastes water equal to its dirtCost when water flows through it */
   DirtBlock = 'DIRT_BLOCK',
+  /** Item container – accessible on all four sides; grants an inventory item when water connects to it */
+  ItemContainer = 'ITEM_CONTAINER',
 }
 
 /** Valid rotation values (clockwise, in degrees). */
@@ -73,6 +75,10 @@ export interface TileDef {
   capacity?: number;
   /** Water cost for DirtBlock tiles – water wasted when water flows through this tile. */
   dirtCost?: number;
+  /** Shape of the inventory item stored inside an ItemContainer tile. */
+  itemShape?: PipeShape;
+  /** Number of inventory items granted by an ItemContainer tile (defaults to 1). */
+  itemCount?: number;
 }
 
 /** Complete definition of a game level. */

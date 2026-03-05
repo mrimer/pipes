@@ -76,6 +76,13 @@ describe('getConnections', () => {
       expect(c.size).toBe(4);
     }
   });
+
+  it('ItemContainer connects all four directions regardless of rotation', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const c = getConnections(PipeShape.ItemContainer, rot);
+      expect(c.size).toBe(4);
+    }
+  });
 });
 
 describe('Tile', () => {
@@ -119,5 +126,15 @@ describe('Tile', () => {
 
     const dirt = new Tile(PipeShape.DirtBlock, 0, true, 0, 3);
     expect(dirt.dirtCost).toBe(3);
+  });
+
+  it('stores itemShape and itemCount, defaulting to null and 1', () => {
+    const plain = new Tile(PipeShape.Straight, 0);
+    expect(plain.itemShape).toBeNull();
+    expect(plain.itemCount).toBe(1);
+
+    const container = new Tile(PipeShape.ItemContainer, 0, true, 0, 0, PipeShape.Straight, 2);
+    expect(container.itemShape).toBe(PipeShape.Straight);
+    expect(container.itemCount).toBe(2);
   });
 });
