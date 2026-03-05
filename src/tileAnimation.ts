@@ -67,7 +67,7 @@ export function renderAnimations(
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = 'bold 15px Arial';
+    ctx.font = 'bold 30px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = anim.color;

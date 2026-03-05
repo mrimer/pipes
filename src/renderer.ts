@@ -14,7 +14,7 @@ import {
   SINK_COLOR, SINK_WATER_COLOR,
   TANK_COLOR, TANK_WATER_COLOR,
   FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR,
-  DIRT_WATER_COLOR, DIRT_COST_COLOR,
+  DIRT_WATER_COLOR, DIRT_COST_COLOR, DIRT_COLOR,
   CONTAINER_COLOR, CONTAINER_WATER_COLOR,
   CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
@@ -91,7 +91,16 @@ export function drawPipe(
   } else if (shape === PipeShape.Sink) {
     color = isWater ? SINK_WATER_COLOR : SINK_COLOR;
   } else if (shape === PipeShape.Chamber) {
-    color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
+    const { chamberContent } = tile;
+    if (chamberContent === 'tank') {
+      color = isWater ? TANK_WATER_COLOR : TANK_COLOR;
+    } else if (chamberContent === 'dirt') {
+      color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
+    } else if (chamberContent === 'item') {
+      color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+    } else {
+      color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
+    }
   } else if (shape === PipeShape.Granite) {
     color = GRANITE_COLOR;
   } else if (GOLD_PIPE_SHAPES.has(shape)) {
@@ -285,10 +294,11 @@ export function renderBoard(
       const isFocused  = focusPos.row === r && focusPos.col === c;
       const isGoldCell = board.goldSpaces.has(`${r},${c}`);
 
-      // A cell is a valid placement target only when the selected shape matches the cell type
+      // A cell is a valid placement target when it's empty and either:
+      // it's not a gold space (any pipe fits), or it IS a gold space (gold pipe required)
       const isTarget = selectedShape !== null &&
         tile.shape === PipeShape.Empty &&
-        (isGoldCell === selectedIsGold);
+        (!isGoldCell || selectedIsGold);
 
       // Tile background
       if (tile.shape === PipeShape.Empty) {
@@ -337,7 +347,7 @@ export function renderBoard(
     if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
       const hoverTile = board.grid[hoverRow][hoverCol];
       const isGoldCell = board.goldSpaces.has(`${hoverRow},${hoverCol}`);
-      if (hoverTile.shape === PipeShape.Empty && isGoldCell === selectedIsGold) {
+      if (hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold)) {
         const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
         const px = hoverCol * TILE_SIZE;
         const py = hoverRow * TILE_SIZE;
