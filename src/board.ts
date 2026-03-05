@@ -263,9 +263,6 @@ export class Board {
     if (
       tile.shape === PipeShape.Source        ||
       tile.shape === PipeShape.Sink          ||
-      tile.shape === PipeShape.Tank          ||
-      tile.shape === PipeShape.DirtBlock     ||
-      tile.shape === PipeShape.ItemContainer ||
       tile.shape === PipeShape.Chamber       ||
       tile.shape === PipeShape.Granite
     ) return false;
@@ -343,10 +340,10 @@ export class Board {
   // ─── Water tracking ────────────────────────────────────────────────────────
 
   /**
-   * Compute the map of inventory item bonuses granted by ItemContainer tiles
+   * Compute the map of inventory item bonuses granted by Chamber-item tiles
    * that are currently in the water fill path.
    * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
-   * @returns A map of PipeShape → bonus count from connected containers.
+   * @returns A map of PipeShape → bonus count from connected chambers.
    */
   getContainerBonuses(filled?: Set<string>): Map<PipeShape, number> {
     const filledSet = filled ?? this.getFilledPositions();
@@ -354,9 +351,6 @@ export class Board {
     for (const key of filledSet) {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.ItemContainer && tile.itemShape !== null) {
-        bonuses.set(tile.itemShape, (bonuses.get(tile.itemShape) ?? 0) + tile.itemCount);
-      }
       if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null) {
         bonuses.set(tile.itemShape, (bonuses.get(tile.itemShape) ?? 0) + tile.itemCount);
       }
@@ -379,10 +373,6 @@ export class Board {
       if (!tile) continue;
       if (PIPE_SHAPES.has(tile.shape)) {
         pipeCost++;
-      } else if (tile.shape === PipeShape.Tank) {
-        tankGain += tile.capacity;
-      } else if (tile.shape === PipeShape.DirtBlock) {
-        pipeCost += tile.dirtCost;
       } else if (tile.shape === PipeShape.Chamber) {
         if (tile.chamberContent === 'tank') tankGain += tile.capacity;
         else if (tile.chamberContent === 'dirt') pipeCost += tile.dirtCost;
@@ -403,15 +393,14 @@ export class Board {
     const errors: string[] = [];
 
     const isTankLike = (t: Tile) =>
-      t.shape === PipeShape.Tank ||
-      (t.shape === PipeShape.Chamber && t.chamberContent === 'tank');
+      t.shape === PipeShape.Chamber && t.chamberContent === 'tank';
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.grid[r][c];
         if (!isTankLike(tile)) continue;
 
-        const label = tile.shape === PipeShape.Chamber ? 'Chamber(tank)' : 'Tank';
+        const label = 'Chamber(tank)';
 
         // ── Edge check: no access point may lead off-grid ──────────────
         for (const dir of Object.values(Direction)) {

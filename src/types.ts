@@ -27,12 +27,6 @@ export enum PipeShape {
   Source = 'SOURCE',
   /** Sink / destination */
   Sink = 'SINK',
-  /** Water tank – accessible on all four sides, stores extra water */
-  Tank = 'TANK',
-  /** Dirt block – accessible on all four sides; wastes water equal to its dirtCost when water flows through it */
-  DirtBlock = 'DIRT_BLOCK',
-  /** Item container – accessible on all four sides; grants an inventory item when water connects to it */
-  ItemContainer = 'ITEM_CONTAINER',
   /** Chamber – a unified enclosure that houses a Tank, DirtBlock, or inventory item grant */
   Chamber = 'CHAMBER',
   /** Granite block – an impassable obstacle; cannot be moved and water cannot flow through it */
@@ -88,18 +82,18 @@ export interface TileDef {
   shape: PipeShape;
   rotation?: Rotation;
   isFixed?: boolean;
-  /** Water capacity (Source and Tank tiles only). */
+  /** Water capacity (Source and Chamber-tank tiles only). */
   capacity?: number;
-  /** Water cost for DirtBlock tiles – water wasted when water flows through this tile. */
+  /** Water cost for Chamber-dirt tiles – water wasted when water flows through this tile. */
   dirtCost?: number;
-  /** Shape of the inventory item stored inside an ItemContainer tile. */
+  /** Shape of the inventory item stored inside a Chamber-item tile. */
   itemShape?: PipeShape;
-  /** Number of inventory items granted by an ItemContainer tile (defaults to 1). */
+  /** Number of inventory items granted by a Chamber-item tile (defaults to 1). */
   itemCount?: number;
   /** Content type for Chamber tiles ('tank', 'dirt', or 'item'). */
   chamberContent?: ChamberContent;
   /**
-   * Explicit set of open connection directions for Tank, DirtBlock, and ItemContainer tiles.
+   * Explicit set of open connection directions for Chamber tiles.
    * When provided, overrides the default (all four sides).
    */
   connections?: Direction[];
