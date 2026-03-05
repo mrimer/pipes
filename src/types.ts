@@ -91,6 +91,11 @@ export interface TileDef {
   itemShape?: PipeShape;
   /** Number of inventory items granted by an ItemContainer tile (defaults to 1). */
   itemCount?: number;
+  /**
+   * Explicit set of open connection directions for Tank tiles.
+   * When provided, overrides the default (all four sides).
+   */
+  connections?: Direction[];
 }
 
 /** Complete definition of a game level. */

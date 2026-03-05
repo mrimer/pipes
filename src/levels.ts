@@ -1,4 +1,4 @@
-import { LevelDef, PipeShape } from './types';
+import { Direction, LevelDef, PipeShape } from './types';
 
 /**
  * All game levels.
@@ -55,7 +55,7 @@ const LEVEL_1: LevelDef = {
     ],
     // Row 3
     [
-      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 5 }, // (3,1)
+      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 5, connections: [Direction.North] }, // (3,0)
       null,
       { shape: PipeShape.Granite, isFixed: true },                              // (3,2) granite obstacle
       { shape: PipeShape.Granite, isFixed: true },                              // (3,3) granite obstacle

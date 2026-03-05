@@ -116,7 +116,7 @@ describe('Board (level mode)', () => {
 // ─── New: Tank tile connections ──────────────────────────────────────────────
 
 describe('Tank tile', () => {
-  it('connects on all four sides regardless of rotation', () => {
+  it('connects on all four sides regardless of rotation (default)', () => {
     for (const rot of [0, 90, 180, 270] as const) {
       const tile = new Tile(PipeShape.Tank, rot, true, 10);
       expect(tile.connections.has(Direction.North)).toBe(true);
@@ -124,6 +124,15 @@ describe('Tank tile', () => {
       expect(tile.connections.has(Direction.South)).toBe(true);
       expect(tile.connections.has(Direction.West)).toBe(true);
     }
+  });
+
+  it('respects customConnections when provided (north-only)', () => {
+    const northOnly = new Set([Direction.North]);
+    const tile = new Tile(PipeShape.Tank, 0, true, 5, 0, null, 1, northOnly);
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(false);
+    expect(tile.connections.has(Direction.South)).toBe(false);
+    expect(tile.connections.has(Direction.West)).toBe(false);
   });
 
   it('carries its capacity value', () => {
@@ -296,6 +305,25 @@ describe('Board.validateGrid', () => {
   it('returns no errors when no Tanks are present', () => {
     const board = new Board(3, 3);
     expect(board.validateGrid()).toHaveLength(0);
+  });
+
+  it('north-only tank on the south edge does not trigger an error', () => {
+    // 3×3 board; south row is row 2.  A north-only tank there faces row 1 (in-bounds).
+    const board = new Board(3, 3);
+    const northOnly = new Set([Direction.North]);
+    board.grid[2][1] = new Tile(PipeShape.Tank, 0, true, 5, 0, null, 1, northOnly);
+    expect(board.validateGrid()).toHaveLength(0);
+  });
+
+  it('Tutorial level tank (3,0) has only a North connection', () => {
+    const level = LEVELS[0];
+    const board = new Board(level.rows, level.cols, level);
+    const tank = board.grid[3][0];
+    expect(tank.shape).toBe(PipeShape.Tank);
+    expect(tank.connections.has(Direction.North)).toBe(true);
+    expect(tank.connections.has(Direction.East)).toBe(false);
+    expect(tank.connections.has(Direction.South)).toBe(false);
+    expect(tank.connections.has(Direction.West)).toBe(false);
   });
 });
 
