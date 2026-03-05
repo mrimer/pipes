@@ -306,26 +306,20 @@ export class Game {
     if (!tile) return;
 
     if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
-      // Place pipe from inventory
+      // Place pipe from inventory onto an empty cell
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
-        this.board.recordMove();
-        // Remember the rotation used so the next placement defaults to it
-        const placedShape = this.selectedShape;
-        this.lastPlacedRotations.set(placedShape, this.pendingRotation);
-        // Keep selected shape if there is still stock remaining
-        const inv = this.board.inventory.find((it) => it.shape === placedShape);
-        const bonuses = this.board.getContainerBonuses();
-        const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
-        if (effectiveCount <= 0) {
-          this.selectedShape = null;
-        }
-        this._renderInventoryBar();
-        this._updateWaterDisplay();
-        this._updateUndoRedoButtons();
-        this._checkWinLose();
+        this._afterTilePlaced(this.selectedShape);
+      }
+    } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty && tile.shape !== this.selectedShape) {
+      // Replace the existing tile with the selected inventory shape (single atomic action).
+      // Same-shape tiles fall through to the rotate branch below for consistency.
+      if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
+        this._afterTilePlaced(this.selectedShape);
+      } else if (this.board.lastError) {
+        this._showErrorFlash(this.board.lastError);
       }
     } else if (tile.shape !== PipeShape.Empty) {
-      // Rotate existing pipe
+      // Rotate existing pipe (no inventory item selected, or same shape as selected)
       this.board.rotateTile(pos);
       this.board.recordMove();
       this._renderInventoryBar();
@@ -424,6 +418,27 @@ export class Game {
     }, 2000);
   }
 
+  /**
+   * Post-placement bookkeeping shared by both place and replace actions.
+   * Records the move, updates last-used rotation, deselects the shape when
+   * inventory is exhausted, and refreshes all affected UI elements.
+   */
+  private _afterTilePlaced(placedShape: PipeShape): void {
+    if (!this.board) return;
+    this.board.recordMove();
+    this.lastPlacedRotations.set(placedShape, this.pendingRotation);
+    const inv = this.board.inventory.find((it) => it.shape === placedShape);
+    const bonuses = this.board.getContainerBonuses();
+    const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
+    if (effectiveCount <= 0) {
+      this.selectedShape = null;
+    }
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
+    this._checkWinLose();
+  }
+
   private _handleKey(e: KeyboardEvent): void {
     if (this.screen !== GameScreen.Play) return;
     if (!this.board) return;
@@ -454,21 +469,15 @@ export class Game {
           const tile = board.getTile(focusPos);
           if (tile?.shape === PipeShape.Empty) {
             if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
-              board.recordMove();
-              // Remember the rotation used so the next placement defaults to it
-              const placedShape = this.selectedShape;
-              this.lastPlacedRotations.set(placedShape, this.pendingRotation);
-              // Keep selected shape if there is still stock remaining
-              const inv = board.inventory.find((it) => it.shape === placedShape);
-              const bonuses = board.getContainerBonuses();
-              const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
-              if (effectiveCount <= 0) {
-                this.selectedShape = null;
-              }
-              this._renderInventoryBar();
-              this._updateWaterDisplay();
-              this._updateUndoRedoButtons();
-              this._checkWinLose();
+              this._afterTilePlaced(this.selectedShape);
+            }
+          } else if (tile && tile.shape !== this.selectedShape) {
+            // Replace the existing tile with the selected inventory shape.
+            // Same-shape tiles fall through to the rotate branch below for consistency.
+            if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
+              this._afterTilePlaced(this.selectedShape);
+            } else if (board.lastError) {
+              this._showErrorFlash(board.lastError);
             }
           }
         } else {

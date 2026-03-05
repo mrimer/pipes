@@ -1119,3 +1119,150 @@ describe('Board.initHistory / canUndo / undoMove / canRedo / redoMove', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 });
+
+// ─── New: replaceInventoryTile ────────────────────────────────────────────────
+
+describe('Board.replaceInventoryTile', () => {
+  /** Build a simple 1×3 board: Source(0,0) → Empty(0,1) → Sink(0,2). */
+  function makeSimpleBoard(): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty,    0);
+    board.grid[0][2] = new Tile(PipeShape.Sink,     0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [
+      { shape: PipeShape.Straight, count: 2 },
+      { shape: PipeShape.Elbow,    count: 1 },
+    ];
+    return board;
+  }
+
+  it('replaces a player-placed tile with a different selected shape', () => {
+    const board = makeSimpleBoard();
+    // Place a Straight first
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    const straightBefore = board.inventory.find((i) => i.shape === PipeShape.Straight)!.count;
+    const elbowBefore    = board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count;
+
+    // Replace the Straight with an Elbow
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Elbow);
+    // Old tile (Straight) returned → count goes up by 1
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(straightBefore + 1);
+    // New tile (Elbow) consumed → count goes down by 1
+    expect(board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count).toBe(elbowBefore - 1);
+  });
+
+  it('applies the given rotation to the new tile', () => {
+    const board = makeSimpleBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 0);
+    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 90);
+    expect(board.grid[0][1].rotation).toBe(90);
+  });
+
+  it('returns false when the target tile is empty', () => {
+    const board = makeSimpleBoard();
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+    expect(result).toBe(false);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+  });
+
+  it('returns false when the target tile is a fixed tile', () => {
+    const board = makeSimpleBoard();
+    // (0,0) is Source and fixed
+    const result = board.replaceInventoryTile({ row: 0, col: 0 }, PipeShape.Elbow);
+    expect(result).toBe(false);
+  });
+
+  it('returns false for non-replaceable special tiles (Source, Sink, Chamber, Granite)', () => {
+    const board = new Board(1, 4);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, false);
+    board.grid[0][1] = new Tile(PipeShape.Sink,    0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, false, 5, 0, null, 1, null, 'tank');
+    board.grid[0][3] = new Tile(PipeShape.Granite, 0, false);
+    board.inventory = [{ shape: PipeShape.Straight, count: 5 }];
+    expect(board.replaceInventoryTile({ row: 0, col: 0 }, PipeShape.Straight)).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 2 }, PipeShape.Straight)).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 3 }, PipeShape.Straight)).toBe(false);
+  });
+
+  it('returns false when the new shape has no available inventory', () => {
+    const board = makeSimpleBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count = 0;
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+    expect(result).toBe(false);
+    // Old tile should be unchanged
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+
+  it('rolls back inventory when the new shape cannot be placed', () => {
+    const board = makeSimpleBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    const straightBefore = board.inventory.find((i) => i.shape === PipeShape.Straight)!.count;
+    board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count = 0;
+
+    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+
+    // Straight count must be unchanged (rollback restored it)
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(straightBefore);
+  });
+
+  it('enforces gold-space / gold-pipe constraint', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0, true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);  // regular pipe on regular cell
+    board.grid[0][2] = new Tile(PipeShape.Sink,     0, true);
+    board.inventory  = [{ shape: PipeShape.GoldStraight, count: 1 }];
+    // Gold pipe cannot go on a non-gold space
+    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(false);
+  });
+
+  it('sets lastError and rolls back when post-replacement constraint check fails', () => {
+    // Source → Straight(1, connector) → Chamber(2, grants 2 Straights) → Straight(3) → Straight(4) → Sink(5)
+    // inventory = [{Straight, count: -2}] — both Straights at (3) and (4) placed using grants,
+    // plus the connector at (1) placed from the original base stock of 1.
+    // (base 1 − placed 3 = −2; with grant 2, effective = 0)
+    // Replacing Straight(1) with Elbow disconnects the chamber:
+    //   reclaim → count: −2 → −1
+    //   final bonus: 0 (chamber no longer reachable)
+    //   check: −1 + 0 = −1 < 0 → must block
+    const board = new Board(1, 6);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 5 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);                                             // E-W connector
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0,  true, 0, 0, PipeShape.Straight, 2, null, 'item'); // grants 2
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);                                             // placed using grant
+    board.grid[0][4] = new Tile(PipeShape.Straight, 90);                                             // placed using grant
+    board.grid[0][5] = new Tile(PipeShape.Sink,     0,  true);
+    board.sourceCapacity = 10;
+    // base 1 − 3 placed = −2; grant 2 → effective 0 (valid current state)
+    board.inventory = [{ shape: PipeShape.Straight, count: -2 }, { shape: PipeShape.Elbow, count: 1 }];
+
+    // Replacing Straight(1) with Elbow breaks the chamber connection
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+    expect(result).toBe(false);
+    expect(board.lastError).not.toBeNull();
+    // Board and inventory must be fully rolled back
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-2);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count).toBe(1);
+  });
+
+  it('clears lastError on success', () => {
+    const board = makeSimpleBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    // Force a prior error
+    board.lastError = 'previous error';
+    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+    expect(board.lastError).toBeNull();
+  });
+});
