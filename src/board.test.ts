@@ -140,6 +140,24 @@ describe('Board.placeInventoryTile', () => {
     return new Board(level.rows, level.cols, level);
   }
 
+  it('places a pipe on an empty cell with default rotation 0', () => {
+    const board = makeLevel1Board();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(board.grid[0][1].rotation).toBe(0);
+  });
+
+  it('places a pipe with the specified rotation', () => {
+    const board = makeLevel1Board();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(board.grid[0][1].rotation).toBe(90);
+  });
+
+  it('places a pipe with rotation 270', () => {
+    const board = makeLevel1Board();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 270);
+    expect(board.grid[0][1].rotation).toBe(270);
+  });
+
   it('places a pipe on an empty cell and decrements inventory', () => {
     const board = makeLevel1Board();
     const before = board.inventory.find((i) => i.shape === PipeShape.Straight)!.count;

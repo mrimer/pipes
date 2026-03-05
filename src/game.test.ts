@@ -15,6 +15,7 @@ const MOCK_CTX = {
   font: '',
   textAlign: '',
   textBaseline: '',
+  globalAlpha: 1,
   fillRect:   jest.fn(),
   strokeRect: jest.fn(),
   clearRect:  jest.fn(),
@@ -181,10 +182,13 @@ describe('Game – screen transitions', () => {
 /** Typed view of Game internals needed for testing. */
 type GameTestHooks = {
   selectedShape: PipeShape | null;
+  pendingRotation: number;
+  lastPlacedRotations: Map<PipeShape, number>;
   focusPos: { row: number; col: number };
   completedLevels: Set<number>;
   resetConfirmModalEl: HTMLElement;
   _handleKey(e: KeyboardEvent): void;
+  _handleCanvasWheel(e: WheelEvent): void;
   _renderLevelList(): void;
 };
 
@@ -311,4 +315,111 @@ describe('Game – reset progress', () => {
     expect(firstLevelBtn?.classList.contains('completed')).toBe(false);
   });
 });
+
+// ─── Tests: pendingRotation and placement orientation ─────────────────────────
+
+describe('Game – pending rotation', () => {
+  it('initialises pendingRotation to 0 when starting a level', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    expect(gameHooks(game).pendingRotation).toBe(0);
+  });
+
+  it('Tab key advances pendingRotation by 90° when a shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(hooks.pendingRotation).toBe(90);
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(hooks.pendingRotation).toBe(180);
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(hooks.pendingRotation).toBe(270);
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
+  it('Tab key does nothing when no shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = null;
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
+  it('wheel scroll down advances pendingRotation clockwise', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Elbow;
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    expect(hooks.pendingRotation).toBe(90);
+  });
+
+  it('wheel scroll up advances pendingRotation counter-clockwise', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Elbow;
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: -1 }));
+    expect(hooks.pendingRotation).toBe(270);
+  });
+
+  it('wheel scroll does nothing when no shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = null;
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
+  it('places tile at pendingRotation and records it in lastPlacedRotations', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Placed tile should have rotation 90
+    const placedGame = game as unknown as { board: { grid: { rotation: number }[][] } };
+    expect(placedGame.board.grid[0][1].rotation).toBe(90);
+
+    // lastPlacedRotations should record 90 for Straight
+    expect(hooks.lastPlacedRotations.get(PipeShape.Straight)).toBe(90);
+  });
+
+  it('restores lastPlacedRotations when re-selecting a shape', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Manually set a remembered rotation
+    hooks.lastPlacedRotations.set(PipeShape.Elbow, 180);
+
+    // Select Elbow from inventory (simulate what _handleInventoryClick does)
+    hooks.selectedShape = null;
+    // Use the inventory bar click mechanism by directly calling the method via hooks
+    (game as unknown as { _handleInventoryClick(s: PipeShape, n: number): void })
+      ._handleInventoryClick(PipeShape.Elbow, 2);
+
+    expect(hooks.selectedShape).toBe(PipeShape.Elbow);
+    expect(hooks.pendingRotation).toBe(180);
+  });
+});
+
+// ─── Tests: board.placeInventoryTile with rotation ───────────────────────────
 
