@@ -9,12 +9,14 @@ import { LEVELS } from './levels';
  * @param completedLevels - Set of level IDs that the player has already completed.
  * @param startLevel - Callback invoked when the player selects a level to play.
  * @param onResetClick - Callback invoked when the player clicks the reset-progress button.
+ * @param onRulesClick - Callback invoked when the player clicks the "Game Rules" button.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
   completedLevels: Set<number>,
   startLevel: (levelId: number) => void,
   onResetClick: () => void,
+  onRulesClick: () => void,
 ): void {
   levelListEl.innerHTML = '';
   for (const level of LEVELS) {
@@ -35,6 +37,15 @@ export function renderLevelList(
     }
     levelListEl.appendChild(btn);
   }
+
+  // Game Rules button above the reset button
+  const rulesBtn = document.createElement('button');
+  rulesBtn.textContent = '📋 Game Rules';
+  rulesBtn.style.cssText =
+    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#16213e;color:#7ed321;' +
+    'border:1px solid #7ed321;border-radius:6px;cursor:pointer;width:100%;';
+  rulesBtn.addEventListener('click', onRulesClick);
+  levelListEl.appendChild(rulesBtn);
 
   // Reset-progress button at the bottom of the level list
   const resetBtn = document.createElement('button');

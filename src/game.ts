@@ -6,6 +6,7 @@ import { TILE_SIZE, renderBoard } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels } from './persistence';
+import { createGameRulesModal } from './rulesModal';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -62,6 +63,9 @@ export class Game {
 
   /** Modal overlay for confirming a progress reset. */
   private readonly resetConfirmModalEl: HTMLElement;
+
+  /** Modal overlay showing game rules and tile legend. */
+  private readonly rulesModalEl: HTMLElement;
 
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
@@ -156,6 +160,9 @@ export class Game {
     this.resetConfirmModalEl.appendChild(resetModalBox);
     document.body.appendChild(this.resetConfirmModalEl);
 
+    // Create the game-rules modal (appends itself to document.body)
+    this.rulesModalEl = createGameRulesModal();
+
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
@@ -218,6 +225,7 @@ export class Game {
       this.completedLevels,
       (id) => this.startLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
+      () => { this.rulesModalEl.style.display = 'flex'; },
     );
   }
 
