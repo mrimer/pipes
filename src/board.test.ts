@@ -855,12 +855,12 @@ describe('Gold pipes and gold spaces', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 
-  it('blocks gold pipe placement on a regular empty cell', () => {
+  it('allows gold pipe placement on a regular empty cell', () => {
     const board = new Board(1, 3);
     board.inventory = [{ shape: PipeShape.GoldStraight, count: 1 }];
     board.grid[0][1] = new Tile(PipeShape.Empty, 0);
-    // (0,1) is NOT in goldSpaces → gold pipe should be rejected
-    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(false);
+    // (0,1) is NOT in goldSpaces → gold pipe should now be allowed
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(true);
   });
 
   it('gold pipe carries water and counts as a pipe cost', () => {
@@ -1221,7 +1221,7 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(straightBefore);
   });
 
-  it('enforces gold-space / gold-pipe constraint', () => {
+  it('allows gold pipe placement on a non-gold space (replaceInventoryTile)', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
@@ -1229,8 +1229,8 @@ describe('Board.replaceInventoryTile', () => {
     board.grid[0][1] = new Tile(PipeShape.Straight, 90);  // regular pipe on regular cell
     board.grid[0][2] = new Tile(PipeShape.Sink,     0, true);
     board.inventory  = [{ shape: PipeShape.GoldStraight, count: 1 }];
-    // Gold pipe cannot go on a non-gold space
-    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(false);
+    // Gold pipe can now go on a non-gold space
+    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(true);
   });
 
   it('sets lastError and rolls back when post-replacement constraint check fails', () => {

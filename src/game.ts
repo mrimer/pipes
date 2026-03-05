@@ -457,9 +457,9 @@ export class Game {
       const tile = this.board.grid[r]?.[c];
       if (!tile) continue;
 
-      // Canvas centre of this tile
-      const cx = c * TILE_SIZE + TILE_SIZE / 2;
-      const cy = r * TILE_SIZE + TILE_SIZE / 2;
+      // Lower-right quadrant of this tile (avoids drawing over the pipe image)
+      const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
+      const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
 
       let text: string | null = null;
       let color: string = ANIM_NEGATIVE_COLOR;

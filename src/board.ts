@@ -307,7 +307,7 @@ export class Board {
   /**
    * Place a pipe from the inventory onto an empty cell.
    * The effective inventory count (base + ItemContainer grants) must be positive.
-   * Gold pipes may only be placed on gold spaces; regular pipes may not be placed on gold spaces.
+   * Gold spaces only accept gold pipes; gold pipes may be placed on any empty cell.
    * @param rotation - Initial rotation to apply to the placed tile (default 0).
    * @returns true if the placement succeeded.
    */
@@ -318,8 +318,8 @@ export class Board {
     const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
 
-    // Gold spaces only accept gold pipes; gold pipes only go on gold spaces
-    if (isGoldSpace !== isGoldPipe) return false;
+    // Gold spaces only accept gold pipes; regular pipes may not go on gold spaces
+    if (isGoldSpace && !isGoldPipe) return false;
 
     const idx = this.inventory.findIndex((it) => it.shape === shape);
     const baseCount = idx !== -1 ? this.inventory[idx].count : 0;
@@ -351,7 +351,7 @@ export class Board {
    *    (non-fixed, not Empty, not Source / Sink / Chamber / Granite).
    *  - The new shape must have a positive effective inventory count after the old
    *    tile has been returned.
-   *  - Gold-space / gold-pipe constraints apply to the new shape.
+   *  - Gold spaces only accept gold pipes; gold pipes may be placed on any empty cell.
    *
    * @returns true on success; false on failure (lastError is set when relevant).
    */
@@ -371,7 +371,7 @@ export class Board {
     // Gold-space / gold-pipe constraint for the incoming shape
     const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
-    if (isGoldSpace !== isGoldPipe) return false;
+    if (isGoldSpace && !isGoldPipe) return false;
 
     // Save inventory snapshot so we can roll back cleanly on failure
     const savedInventory = this.inventory.map((item) => ({ ...item }));

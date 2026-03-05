@@ -17,6 +17,7 @@ export const EMPTY_COLOR             = '#2a2a4a';
 export const EMPTY_TARGET_COLOR      = '#1e2a4a';
 export const LOW_WATER_COLOR         = '#e74c3c';
 export const LABEL_COLOR             = '#fff';
+export const DIRT_COLOR              = '#8d5524';
 export const DIRT_WATER_COLOR        = '#c4a265';
 export const DIRT_COST_COLOR         = '#e74c3c';
 export const CONTAINER_COLOR         = '#f0a500';
