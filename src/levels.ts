@@ -40,7 +40,7 @@ const LEVEL_1: LevelDef = {
       null,                                                                  // (1,0) player fills
       { shape: PipeShape.Straight, rotation: 90,  isFixed: true },           // (1,1) E-W
       null,                                                                  // (1,2) player fills
-      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 5 }, // (1,3)
+      { shape: PipeShape.Straight, rotation: 90,  isFixed: true },           // (1,3) E-W
       null,                                                                  // (1,4) player fills
       { shape: PipeShape.Elbow,    rotation: 180, isFixed: true },           // (1,5) S-W
     ],
@@ -55,7 +55,8 @@ const LEVEL_1: LevelDef = {
     ],
     // Row 3
     [
-      null, null,
+      { shape: PipeShape.Tank,     rotation: 0,   isFixed: true, capacity: 5 }, // (3,1)
+      null,
       { shape: PipeShape.Granite, isFixed: true },                              // (3,2) granite obstacle
       { shape: PipeShape.Granite, isFixed: true },                              // (3,3) granite obstacle
       null,
