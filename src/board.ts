@@ -92,7 +92,6 @@ export class Board {
 
   /** Initialise the board from a level definition. */
   private _initFromLevel(level: LevelDef): void {
-    this.sourceCapacity = level.sourceCapacity;
     this.inventory = level.inventory.map((item) => ({ ...item }));
 
     for (let r = 0; r < this.rows; r++) {
@@ -119,6 +118,8 @@ export class Board {
         }
       }
     }
+
+    this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
   }
 
   // ─── Undo / redo support ───────────────────────────────────────────────────

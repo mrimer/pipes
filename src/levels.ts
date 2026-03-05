@@ -14,11 +14,10 @@ const LEVEL_1: LevelDef = {
   name: 'Tutorial',
   rows: 6,
   cols: 6,
-  sourceCapacity: 6,
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source, rotation: 0, isFixed: true, capacity: 5, connections: [Direction.East, Direction.South] },
+      { shape: PipeShape.Source, rotation: 0, isFixed: true, capacity: 6, connections: [Direction.East, Direction.South] },
       null, null, null, null, null,
     ],
     // Row 1
@@ -70,7 +69,6 @@ const LEVEL_2: LevelDef = {
   name: 'Through the Woods',
   rows: 6,
   cols: 6,
-  sourceCapacity: 12,
   /**
    * Solution path:
    *   Source(0,0) → [player: Straight E-W at (0,1)] → DirtBlock(cost=2, 0,2)
@@ -144,7 +142,6 @@ const LEVEL_3: LevelDef = {
   name: 'Mountain Stream',
   rows: 6,
   cols: 6,
-  sourceCapacity: 6,
   /**
    * Solution path:
    *   Source(0,0) → [player: Straight E-W at (0,1)] → ItemContainer(0,2, grants 1 GoldStraight)
@@ -215,7 +212,6 @@ const LEVEL_4: LevelDef = {
   name: 'The Workshop',
   rows: 6,
   cols: 6,
-  sourceCapacity: 8,
   /**
    * Solution path:
    *   Source(0,0) → [player: Straight E-W at (0,1)] → ItemContainer(0,2, grants 1 GoldStraight)

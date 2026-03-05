@@ -109,6 +109,4 @@ export interface LevelDef {
   grid: (TileDef | null)[][];
   /** Starting inventory of pipe pieces available for the player to place. */
   inventory: InventoryItem[];
-  /** Initial water capacity of the source tank. */
-  sourceCapacity: number;
 }
