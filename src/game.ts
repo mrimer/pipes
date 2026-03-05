@@ -1,4 +1,4 @@
-import { Board } from './board';
+import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES } from './board';
 import { LEVELS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
@@ -7,6 +7,7 @@ import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels } from './persistence';
 import { createGameRulesModal } from './rulesModal';
+import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR } from './tileAnimation';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -69,6 +70,9 @@ export class Game {
 
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
+
+  /** Active floating animation labels shown over the canvas. */
+  private _animations: TileAnimation[] = [];
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -263,7 +267,10 @@ export class Game {
   // ─── Main render loop ──────────────────────────────────────────────────────
 
   private _loop(): void {
-    if (this.screen === GameScreen.Play) this._renderBoard();
+    if (this.screen === GameScreen.Play) {
+      this._renderBoard();
+      renderAnimations(this.ctx, this._animations);
+    }
     requestAnimationFrame(() => this._loop());
   }
 
@@ -313,16 +320,18 @@ export class Game {
     const tile = this.board.getTile(pos);
     if (!tile) return;
 
+    const filledBefore = this.board.getFilledPositions();
+
     if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
       // Place pipe from inventory onto an empty cell
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
-        this._afterTilePlaced(this.selectedShape);
+        this._afterTilePlaced(this.selectedShape, filledBefore);
       }
     } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty && tile.shape !== this.selectedShape) {
       // Replace the existing tile with the selected inventory shape (single atomic action).
       // Same-shape tiles fall through to the rotate branch below for consistency.
       if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
-        this._afterTilePlaced(this.selectedShape);
+        this._afterTilePlaced(this.selectedShape, filledBefore);
       } else if (this.board.lastError) {
         this._showErrorFlash(this.board.lastError);
       }
@@ -330,6 +339,7 @@ export class Game {
       // Rotate existing pipe (no inventory item selected, or same shape as selected)
       this.board.rotateTile(pos);
       this.board.recordMove();
+      this._spawnConnectionAnimations(filledBefore);
       this._renderInventoryBar();
       this._updateWaterDisplay();
       this._updateUndoRedoButtons();
@@ -427,13 +437,67 @@ export class Game {
   }
 
   /**
+   * Spawn floating animation labels for all tiles that became newly connected to
+   * the fill path since `filledBefore` was captured.  Called after every player
+   * action that may change the fill state (place, replace, rotate, undo, redo).
+   *
+   * - Regular pipe tiles (Straight, Elbow, Tee, Cross and gold variants): "-1" (red)
+   * - Chamber-tank tiles: "+capacity" (green / gray / red)
+   * - Chamber-dirt tiles: "-dirtCost" (red / gray / green)
+   * - Chamber-item tiles: "+itemCount" (green / gray / red)
+   */
+  private _spawnConnectionAnimations(filledBefore: Set<string>): void {
+    if (!this.board) return;
+    const filledAfter = this.board.getFilledPositions();
+    const now = performance.now();
+
+    for (const key of filledAfter) {
+      if (filledBefore.has(key)) continue; // was already filled – skip
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.board.grid[r]?.[c];
+      if (!tile) continue;
+
+      // Canvas centre of this tile
+      const cx = c * TILE_SIZE + TILE_SIZE / 2;
+      const cy = r * TILE_SIZE + TILE_SIZE / 2;
+
+      let text: string | null = null;
+      let color: string = ANIM_NEGATIVE_COLOR;
+
+      if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
+        text = '-1';
+        color = ANIM_NEGATIVE_COLOR;
+      } else if (tile.shape === PipeShape.Chamber) {
+        if (tile.chamberContent === 'tank') {
+          const val = tile.capacity;
+          text = val >= 0 ? `+${val}` : `${val}`;
+          color = animColor(val);
+        } else if (tile.chamberContent === 'dirt') {
+          const val = -tile.dirtCost;
+          text = val >= 0 ? `+${val}` : `${val}`;
+          color = animColor(val);
+        } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
+          const val = tile.itemCount;
+          text = val >= 0 ? `+${val}` : `${val}`;
+          color = animColor(val);
+        }
+      }
+
+      if (text !== null) {
+        this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
+      }
+    }
+  }
+
+  /**
    * Post-placement bookkeeping shared by both place and replace actions.
    * Records the move, updates last-used rotation, deselects the shape when
    * inventory is exhausted, and refreshes all affected UI elements.
    */
-  private _afterTilePlaced(placedShape: PipeShape): void {
+  private _afterTilePlaced(placedShape: PipeShape, filledBefore: Set<string>): void {
     if (!this.board) return;
     this.board.recordMove();
+    this._spawnConnectionAnimations(filledBefore);
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     const inv = this.board.inventory.find((it) => it.shape === placedShape);
     const bonuses = this.board.getContainerBonuses();
@@ -475,22 +539,25 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           const tile = board.getTile(focusPos);
+          const filledBefore = board.getFilledPositions();
           if (tile?.shape === PipeShape.Empty) {
             if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
-              this._afterTilePlaced(this.selectedShape);
+              this._afterTilePlaced(this.selectedShape, filledBefore);
             }
           } else if (tile && tile.shape !== this.selectedShape) {
             // Replace the existing tile with the selected inventory shape.
             // Same-shape tiles fall through to the rotate branch below for consistency.
             if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
-              this._afterTilePlaced(this.selectedShape);
+              this._afterTilePlaced(this.selectedShape, filledBefore);
             } else if (board.lastError) {
               this._showErrorFlash(board.lastError);
             }
           }
         } else {
+          const filledBefore = board.getFilledPositions();
           board.rotateTile(focusPos);
           board.recordMove();
+          this._spawnConnectionAnimations(filledBefore);
           this._renderInventoryBar();
           this._updateWaterDisplay();
           this._updateUndoRedoButtons();
@@ -524,9 +591,11 @@ export class Game {
    */
   undoWinningMove(): void {
     if (!this.board || !this.board.canUndo()) return;
+    const filledBefore = this.board.getFilledPositions();
     this.board.undoMove();
     this.gameState = GameState.Playing;
     this.winModalEl.style.display = 'none';
+    this._spawnConnectionAnimations(filledBefore);
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
@@ -539,9 +608,11 @@ export class Game {
    */
   performUndo(): void {
     if (!this.board || !this.board.canUndo()) return;
+    const filledBefore = this.board.getFilledPositions();
     this.board.undoMove();
     this.gameState = GameState.Playing;
     this.gameoverModalEl.style.display = 'none';
+    this._spawnConnectionAnimations(filledBefore);
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
@@ -551,7 +622,9 @@ export class Game {
   /** Redo the last undone player action. */
   performRedo(): void {
     if (!this.board || !this.board.canRedo()) return;
+    const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
+    this._spawnConnectionAnimations(filledBefore);
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();

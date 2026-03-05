@@ -220,6 +220,7 @@ type GameTestHooks = {
   completedLevels: Set<number>;
   resetConfirmModalEl: HTMLElement;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
+  _animations: { x: number; y: number; text: string; color: string }[];
   _handleKey(e: KeyboardEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
   _renderLevelList(): void;
@@ -519,5 +520,109 @@ describe('Game – undoLastMove', () => {
 
     // The placed tile should be gone
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Empty);
+  });
+});
+
+// ─── Tests: tile connection animations ───────────────────────────────────────
+
+import { ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from './tileAnimation';
+
+describe('Game – tile connection animations (_spawnConnectionAnimations)', () => {
+  it('spawns a "-1" animation when a regular pipe becomes newly connected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Level 1: Source(0,0) connects East and South.
+    // Place a Straight (N-S) at (1,0) → connects North back to Source's South opening.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;       // N-S orientation
+    hooks.focusPos = { row: 1, col: 0 };
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const waterAnims = hooks._animations.filter((a) => a.text === '-1');
+    expect(waterAnims.length).toBeGreaterThanOrEqual(1);
+    expect(waterAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
+  });
+
+  it('spawns a positive animation when a Chamber-tank becomes newly connected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Level 1: Chamber-tank at (3,0) capacity=5, connects North only.
+    // Build the path to connect it:
+    //   Place Straight N-S at (1,0), Straight N-S at (2,0)
+    // This will connect Source(0,0)→(1,0)→(2,0)→Chamber-tank(3,0).
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 1, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Clear animations from step 1 so we can inspect only step 2 results
+    hooks._animations.length = 0;
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 2, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // The Chamber-tank at (3,0) should now be newly connected → +5 animation
+    const tankAnims = hooks._animations.filter((a) => a.text === '+5');
+    expect(tankAnims.length).toBeGreaterThanOrEqual(1);
+    expect(tankAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
+  });
+
+  it('spawns a zero-color animation when a Chamber-tank with capacity 0 becomes connected', () => {
+    // Directly exercise _spawnConnectionAnimations via a board with a chamber-tank capacity=0
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Manually set the chamber at (3,0) capacity to 0 to test gray color
+    const boardAccess = game as unknown as { board: Board };
+    boardAccess.board.grid[3][0].capacity = 0;
+
+    // Connect path: (1,0) and (2,0)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 1, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    hooks._animations.length = 0;
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 2, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const tankAnims = hooks._animations.filter((a) => a.text === '+0');
+    expect(tankAnims.length).toBeGreaterThanOrEqual(1);
+    expect(tankAnims[0].color).toBe(ANIM_ZERO_COLOR);
+  });
+
+  it('spawns no animation for a tile that was already in the fill path', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place first pipe at (1,0) to connect it
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 1, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const animCountAfterFirstPlacement = hooks._animations.length;
+
+    // Rotating the source tile (it's fixed so rotate is a no-op) changes no fill state.
+    // No new tiles become connected, so no new animations should be created.
+    hooks.selectedShape = null;
+    hooks.focusPos = { row: 0, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // The animation list should not have grown (no new tiles entered the fill path)
+    expect(hooks._animations.length).toBeLessThanOrEqual(animCountAfterFirstPlacement);
   });
 });
