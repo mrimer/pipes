@@ -34,7 +34,13 @@ const CONTAINER_WATER_COLOR = '#ffd04f';
 const CONTAINER_FILL_COLOR = '#3d2b00';
 const CONTAINER_FILL_WATER_COLOR = '#5a4000';
 
-/** Inline SVG icons for pipe shapes in the inventory. */
+/** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
+const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
+  [PipeShape.Straight]: 'St',
+  [PipeShape.Elbow]:    'El',
+  [PipeShape.Tee]:      'Te',
+  [PipeShape.Cross]:    'Cr',
+};
 function _shapeIcon(shape: PipeShape): string {
   const S = 32;
   const H = S / 2;
@@ -459,8 +465,8 @@ export class Game {
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
-      // Show item shape abbreviation label
-      const label = itemShape ? itemShape.charAt(0).toUpperCase() : '?';
+      // Show item shape abbreviation label (use lookup map to avoid single-char ambiguities)
+      const label = (itemShape && SHAPE_ABBREV[itemShape]) ?? '?';
       ctx.fillStyle = isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
       ctx.font = 'bold 13px Arial';
       ctx.textAlign = 'center';

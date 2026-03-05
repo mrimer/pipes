@@ -118,6 +118,9 @@ export class Board {
     for (const [shape, currentBonus] of currentBonuses) {
       const newBonus = newBonuses.get(shape) ?? 0;
       if (newBonus < currentBonus) {
+        // `baseCount` may be negative when the player has used more items than were in the
+        // base inventory (drawing on container grants).  After this removal the new effective
+        // count would be `baseCount + newBonus`; block if that would go below zero.
         const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
         if (baseCount + newBonus < 0) {
           this.lastError =
