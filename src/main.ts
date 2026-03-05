@@ -10,6 +10,7 @@ const canvas         = getEl<HTMLCanvasElement>('game-canvas');
 const levelSelectEl  = getEl('level-select');
 const levelListEl    = getEl('level-list');
 const playScreenEl   = getEl('play-screen');
+const levelHeaderEl  = getEl('level-header');
 const inventoryBarEl = getEl('inventory-bar');
 const waterDisplayEl = getEl('water-display');
 const winModalEl     = getEl('win-modal');
@@ -23,6 +24,7 @@ const game = new Game(
   levelSelectEl,
   levelListEl,
   playScreenEl,
+  levelHeaderEl,
   inventoryBarEl,
   waterDisplayEl,
   winModalEl,

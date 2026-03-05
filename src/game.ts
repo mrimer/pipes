@@ -1,5 +1,5 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES } from './board';
-import { LEVELS } from './levels';
+import { LEVELS, CHAPTERS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard } from './renderer';
@@ -21,6 +21,7 @@ export class Game {
   private readonly levelSelectEl: HTMLElement;
   private readonly levelListEl: HTMLElement;
   private readonly playScreenEl: HTMLElement;
+  private readonly levelHeaderEl: HTMLElement;
   private readonly inventoryBarEl: HTMLElement;
   private readonly waterDisplayEl: HTMLElement;
   private readonly winModalEl: HTMLElement;
@@ -79,6 +80,7 @@ export class Game {
     levelSelectEl: HTMLElement,
     levelListEl: HTMLElement,
     playScreenEl: HTMLElement,
+    levelHeaderEl: HTMLElement,
     inventoryBarEl: HTMLElement,
     waterDisplayEl: HTMLElement,
     winModalEl: HTMLElement,
@@ -95,6 +97,7 @@ export class Game {
     this.levelSelectEl = levelSelectEl;
     this.levelListEl = levelListEl;
     this.playScreenEl = playScreenEl;
+    this.levelHeaderEl = levelHeaderEl;
     this.inventoryBarEl = inventoryBarEl;
     this.waterDisplayEl = waterDisplayEl;
     this.winModalEl = winModalEl;
@@ -215,10 +218,27 @@ export class Game {
     this.winModalEl.style.display      = 'none';
     this.gameoverModalEl.style.display = 'none';
 
+    this._updateLevelHeader(levelId);
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
     this.canvas.focus();
+  }
+
+  /** Update the level-header element with the current chapter, level number and name. */
+  private _updateLevelHeader(levelId: number): void {
+    for (const chapter of CHAPTERS) {
+      const idx = chapter.levels.findIndex((l) => l.id === levelId);
+      if (idx !== -1) {
+        const level = chapter.levels[idx];
+        this.levelHeaderEl.textContent =
+          `Chapter ${chapter.id}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
+        return;
+      }
+    }
+    // Fallback if level isn't in any chapter
+    const level = LEVELS.find((l) => l.id === levelId);
+    this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}` : '';
   }
 
   // ─── Level-select rendering ───────────────────────────────────────────────

@@ -109,3 +109,10 @@ export interface LevelDef {
   /** Starting inventory of pipe pieces available for the player to place. */
   inventory: InventoryItem[];
 }
+
+/** A chapter groups a set of levels under a shared name. */
+export interface ChapterDef {
+  id: number;
+  name: string;
+  levels: LevelDef[];
+}
