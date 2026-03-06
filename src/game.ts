@@ -470,25 +470,26 @@ export class Game {
     let tooltipText = `(${row}, ${col})`;
     const tile = this.board.grid[row][col];
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
-      let currentCost: number;
-      if (tile.chamberContent === 'dirt') {
-        currentCost = tile.cost;
-      } else if (tile.chamberContent === 'ice') {
-        // Show the locked cost when the tile is already in the fill path; otherwise
-        // compute dynamically from the current temperature (tile not yet connected).
-        const locked = this.board.getLockedWaterImpact({ row, col });
-        if (locked !== null) {
-          currentCost = -locked; // locked impact is negative for costs
-        } else {
+      // Only show a predicted cost for tiles that are NOT yet in the fill path.
+      // Once a tile is connected its cost is already reflected in the water display;
+      // re-showing it in the tooltip would be misleading.
+      const isConnected = this.board.getLockedWaterImpact({ row, col }) !== null;
+      if (!isConnected) {
+        let predictedCost: number;
+        if (tile.chamberContent === 'dirt') {
+          predictedCost = tile.cost;
+        } else if (tile.chamberContent === 'ice') {
+          // Predicted cost uses the current live temperature so the estimate updates
+          // as connections (e.g. heaters on other branches) change the temperature.
           const currentTemp = this.board.getCurrentTemperature();
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          currentCost = tile.cost * deltaTemp;
+          predictedCost = tile.cost * deltaTemp;
+        } else {
+          predictedCost = 0;
         }
-      } else {
-        currentCost = 0;
-      }
-      if (currentCost > 0) {
-        tooltipText += ` cost: ${currentCost}`;
+        if (predictedCost > 0) {
+          tooltipText += ` cost: ${predictedCost}`;
+        }
       }
     }
     this.tooltipEl.textContent = tooltipText;
