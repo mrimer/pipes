@@ -368,9 +368,8 @@ export class Board {
    *    (non-fixed, not Empty, not Source / Sink / Chamber / Granite).
    *  - The new shape must have a positive effective inventory count after the old
    *    tile has been returned.
-   *  - Pipes and gold pipes may freely replace each other; the gold-space
-   *    constraint (gold spaces only accept gold pipes) applies only to fresh
-   *    placement on empty cells ({@link placeInventoryTile}).
+   *  - Gold spaces only accept gold pipes (same constraint as fresh placement);
+   *    gold pipes may replace regular pipes on non-gold spaces and vice versa.
    *
    * @returns true on success; false on failure (lastError is set when relevant).
    */
@@ -387,6 +386,11 @@ export class Board {
       tile.shape === PipeShape.Granite
     ) return false;
 
+    // Gold-space / gold-pipe constraint for the incoming shape
+    const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
+    const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
+    if (isGoldSpace && !isGoldPipe) return false;
+
     // Save inventory snapshot so we can roll back cleanly on failure
     const savedInventory = this.inventory.map((item) => ({ ...item }));
     const oldShape = tile.shape;
@@ -398,16 +402,20 @@ export class Board {
     } else {
       this.inventory.push({ shape: oldShape, count: 1 });
     }
-    this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
 
     // ── Step 2: Place new tile from inventory ──────────────────────────────────
+    // Evaluate container bonuses with the new tile already in place so that a
+    // container bridged by this position remains connected in the affordability
+    // check.  (Computing bonuses with an Empty cell here would temporarily
+    // disconnect such a container and produce a false "not available" result.)
     const newIdx = this.inventory.findIndex((it) => it.shape === newShape);
     const baseCount = newIdx !== -1 ? this.inventory[newIdx].count : 0;
+    this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
     const bonuses = this.getContainerBonuses();
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
 
     if (effectiveCount <= 0) {
-      // New shape not available – roll back step 1
+      // New shape not available – roll back step 1 and the provisional placement
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile;
       return false;
@@ -418,7 +426,7 @@ export class Board {
     } else {
       this.inventory.push({ shape: newShape, count: -1 });
     }
-    this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
+    // grid[pos.row][pos.col] is already set to new Tile(newShape, rotation) above
 
     // ── Step 3: Post-replacement state validation ──────────────────────────────
     // Check that no inventory item's effective count has gone below zero as a

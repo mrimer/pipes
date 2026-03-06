@@ -1233,7 +1233,7 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(true);
   });
 
-  it('allows regular pipe to replace gold pipe on a gold space (replaceInventoryTile)', () => {
+  it('blocks regular pipe from replacing gold pipe on a gold space (replaceInventoryTile)', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
@@ -1246,12 +1246,11 @@ describe('Board.replaceInventoryTile', () => {
       { shape: PipeShape.Straight,     count: 1 },
     ];
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(true);
-    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
-    // Gold pipe returned to inventory
-    expect(board.inventory.find((i) => i.shape === PipeShape.GoldStraight)!.count).toBe(1);
-    // Regular pipe consumed from inventory
-    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(0);
+    expect(result).toBe(false);
+    // Board state is unchanged
+    expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
+    expect(board.inventory.find((i) => i.shape === PipeShape.GoldStraight)!.count).toBe(0);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
   });
 
   it('allows gold pipe to replace regular pipe on a gold space (replaceInventoryTile)', () => {
@@ -1314,6 +1313,41 @@ describe('Board.replaceInventoryTile', () => {
     board.lastError = 'previous error';
     board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
     expect(board.lastError).toBeNull();
+  });
+
+  it('allows replacing the bridge tile with a different-type pipe when the grant covers the new shape', () => {
+    // Source → Straight(1, bridge) → Chamber(2, grants 1 GoldStraight) → Sink(3)
+    // The bridge tile (1) keeps the chamber connected.  The player has used their
+    // base Straight stock (count 0) and wants to swap the bridge for a GoldStraight
+    // that is available only via the container grant.
+    //
+    // Bug (before fix): getContainerBonuses() in Step 2 was called after setting
+    // the bridge cell to Empty, which temporarily disconnected the container and
+    // made the GoldStraight grant disappear → effectiveCount = 0 → false block.
+    //
+    // After fix: bonuses are evaluated with the new tile already in place so the
+    // container remains connected → effectiveCount = 0 (base) + 1 (grant) = 1 → allowed.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);  // E-W bridge; will be replaced
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0,  true, 0, 0, PipeShape.GoldStraight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0,  true);
+    board.sourceCapacity = 10;
+    // Straight was placed using base stock; 0 remaining.  No GoldStraight in base
+    // inventory – the only supply is the container grant.
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
+    // Straight returned to inventory
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
+    // GoldStraight drawn via grant (base count −1, grant covers it)
+    const goldEntry = board.inventory.find((i) => i.shape === PipeShape.GoldStraight);
+    expect(goldEntry).toBeDefined();
+    expect(goldEntry!.count).toBe(-1); // grant of 1 makes effective count 0 – valid
   });
 });
 
