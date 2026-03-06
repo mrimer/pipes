@@ -334,6 +334,14 @@ export class Game {
   private _checkWinLose(): void {
     if (!this.board || this.gameState !== GameState.Playing) return;
 
+    // Fail condition takes precedence: negative water is always a loss, even if the sink was reached.
+    if (this.board.getCurrentWater() < 0) {
+      this.gameState = GameState.GameOver;
+      this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
+      this.gameoverModalEl.style.display = 'flex';
+      return;
+    }
+
     if (this.board.isSolved()) {
       this.gameState = GameState.Won;
       this._markLevelCompleted(this.currentLevel!.id);
@@ -341,7 +349,7 @@ export class Game {
       return;
     }
 
-    if (this.board.getCurrentWater() <= 0) {
+    if (this.board.getCurrentWater() === 0) {
       this.gameState = GameState.GameOver;
       this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
       this.gameoverModalEl.style.display = 'flex';

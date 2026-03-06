@@ -238,12 +238,14 @@ export function drawPipe(
       ctx.textBaseline = 'middle';
       ctx.fillText(`+${tile.temperature}°`, 0, 0);
     } else if (chamberContent === 'ice') {
-      // Show the product value (cost × temperature threshold) in ice color
+      // Show three lines: negative cost, "x", and the temperature threshold (deltaTemp reference)
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
-      ctx.font = 'bold 14px Arial';
+      ctx.font = 'bold 9px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`-${cost * tile.temperature}`, 0, 0);
+      ctx.fillText(`-${cost}`, 0, -9);
+      ctx.fillText('x', 0, 0);
+      ctx.fillText(String(tile.temperature), 0, 9);
     }
     // Connection stubs
     ctx.strokeStyle = color;
