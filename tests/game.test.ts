@@ -606,6 +606,55 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     expect(tankAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
 
+  it('spawns a "-0" animation when a Chamber-dirt with cost 0 becomes connected', () => {
+    // Level 2: Source(0,0) connects East; Dirt at (0,2,E-W,cost=2).
+    // Set cost to 0 to verify the "-0" label (not "+0").
+    const { game } = makeGame();
+    game.startLevel(2);
+    const hooks = gameHooks(game);
+
+    const boardAccess = game as unknown as { board: Board };
+    boardAccess.board.grid[0][2].cost = 0;
+
+    // Place Straight E-W at (0,1) to connect Source → Dirt(0,2).
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90; // E-W
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const dirtAnims = hooks._animations.filter((a) => a.text === '-0');
+    expect(dirtAnims.length).toBeGreaterThanOrEqual(1);
+    expect(dirtAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
+  });
+
+  it('spawns a "-0" animation when a Chamber-ice becomes connected at zero cost', () => {
+    // Level 6 has Ice tiles at (1,2) and (1,3) with threshold=2.
+    // After connecting the Heater at (1,1), currentTemp=2.
+    // Ice(1,2) with thresh=2: deltaTemp=max(0,2−2)=0 → val=0 → should show "-0".
+    const { game } = makeGame();
+    game.startLevel(6);
+    const hooks = gameHooks(game);
+
+    // Place Tee E-S-W at (0,1) to connect Heater(1,1), raising temp to 2.
+    // Tee base connections are N-E-S; at rotation=90 they become E-S-W.
+    hooks.selectedShape = PipeShape.Tee;
+    hooks.pendingRotation = 90; // E-S-W
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    hooks._animations.length = 0;
+
+    // Place Tee E-S-W at (0,2) to connect Ice(1,2) with currentTemp=2 (free).
+    hooks.selectedShape = PipeShape.Tee;
+    hooks.pendingRotation = 90; // E-S-W
+    hooks.focusPos = { row: 0, col: 2 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const iceAnims = hooks._animations.filter((a) => a.text === '-0');
+    expect(iceAnims.length).toBeGreaterThanOrEqual(1);
+    expect(iceAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
+  });
+
   it('spawns no animation for a tile that was already in the fill path', () => {
     const { game } = makeGame();
     game.startLevel(1);
