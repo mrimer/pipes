@@ -3,7 +3,8 @@
  */
 
 import { Game } from '../src/game';
-import { PipeShape } from '../src/types';
+import { LevelDef, PipeShape } from '../src/types';
+import { LEVELS } from '../src/levels';
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ function makeGame(): {
   playScreenEl: HTMLElement;
   winModalEl: HTMLElement;
   gameoverModalEl: HTMLElement;
+  exitBtnEl: HTMLButtonElement;
 } {
   document.body.innerHTML = `
     <canvas id="game-canvas"></canvas>
@@ -67,6 +69,7 @@ function makeGame(): {
       <div id="inventory-bar"></div>
       <button id="undo-btn"></button>
       <button id="redo-btn"></button>
+      <button id="exit-btn">← Menu</button>
     </div>
     <div id="win-modal"><button id="win-menu-btn">Level Select</button></div>
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
@@ -85,6 +88,7 @@ function makeGame(): {
   const gameoverMsgEl  = get('gameover-msg');
   const undoBtnEl      = get('undo-btn') as HTMLButtonElement;
   const redoBtnEl      = get('redo-btn') as HTMLButtonElement;
+  const exitBtnEl      = get('exit-btn') as HTMLButtonElement;
 
   const canvas = get('game-canvas') as HTMLCanvasElement;
 
@@ -101,9 +105,10 @@ function makeGame(): {
     gameoverMsgEl,
     undoBtnEl,
     redoBtnEl,
+    exitBtnEl,
   );
 
-  return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl };
+  return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl, exitBtnEl };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -186,6 +191,27 @@ describe('Game – screen transitions', () => {
   });
 });
 
+// ─── Tests: playtest mode button labels ───────────────────────────────────────
+
+describe('Game – playtest mode button labels', () => {
+  it('changes exit button text to "← Edit" when playtesting from the editor', () => {
+    const { game, exitBtnEl } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+
+    expect(exitBtnEl.textContent).toBe('← Edit');
+  });
+
+  it('resets exit button text to "← Menu" when exitToMenu is called after playtesting', () => {
+    const { game, exitBtnEl } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+    game.exitToMenu();
+
+    expect(exitBtnEl.textContent).toBe('← Menu');
+  });
+});
+
 // ─── Tests: undo winning move ─────────────────────────────────────────────────
 
 describe('Game – undoWinningMove', () => {
@@ -228,6 +254,7 @@ type GameTestHooks = {
   _handleCanvasRightClick(e: MouseEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
   _renderLevelList(): void;
+  _playtestLevel(level: LevelDef): void;
 };
 
 function gameHooks(g: Game): GameTestHooks {
