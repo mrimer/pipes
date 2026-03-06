@@ -219,23 +219,45 @@ export function drawPipe(
       ctx.textBaseline = 'middle';
       ctx.fillText(`-${cost}`, 0, 0);
     } else if (chamberContent === 'item') {
-      // Show item shape abbreviation in container-like color
+      // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
       const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
-      const abbrev = (itemShape && SHAPE_ABBREV[itemShape]) ?? '?';
-      const chamberLabel = isGoldItem ? `G${abbrev}` : abbrev;
-      ctx.fillStyle = isGoldItem
+      const itemColor = isGoldItem
         ? (isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR)
         : (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      if (itemShape !== null) {
+        let drawShape = itemShape;
+        if (itemShape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
+        else if (itemShape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
+        else if (itemShape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
+        else if (itemShape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
+        ctx.save();
+        const scale = bw / half;
+        ctx.scale(scale, scale);
+        ctx.strokeStyle = itemColor;
+        ctx.lineWidth = LINE_WIDTH;
+        ctx.lineCap = 'round';
+        if (drawShape === PipeShape.Straight) {
+          ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+        } else if (drawShape === PipeShape.Elbow) {
+          ctx.beginPath();
+          ctx.moveTo(0, -half); ctx.lineTo(0, 0); ctx.lineTo(half, 0);
+          ctx.stroke();
+        } else if (drawShape === PipeShape.Tee) {
+          ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
+        } else if (drawShape === PipeShape.Cross) {
+          ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      // Draw quantity number centered with 3x larger font
       if (itemCount > 1) {
-        ctx.font = isGoldItem ? 'bold 10px Arial' : 'bold 11px Arial';
-        ctx.fillText(chamberLabel, 0, -7);
-        ctx.font = 'bold 10px Arial';
-        ctx.fillText(String(itemCount), 0, 7);
-      } else {
-        ctx.font = isGoldItem ? 'bold 11px Arial' : 'bold 13px Arial';
-        ctx.fillText(chamberLabel, 0, 0);
+        ctx.fillStyle = itemColor;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 30px Arial';
+        ctx.fillText(String(itemCount), 0, 0);
       }
     } else if (chamberContent === 'heater') {
       // Show positive temperature bonus in heater color
