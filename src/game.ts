@@ -1,11 +1,16 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES } from './board';
 import { LEVELS, CHAPTERS } from './levels';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
-import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels, markAllLevelsCompleted } from './persistence';
+import {
+  loadCompletedLevels, markLevelCompleted, clearCompletedLevels, markAllLevelsCompleted,
+  loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
+  loadActiveCampaignId, saveActiveCampaignId, clearActiveCampaignId,
+  computeCampaignCompletionPct,
+} from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR } from './tileAnimation';
 import { CampaignEditor } from './campaignEditor';
@@ -90,6 +95,15 @@ export class Game {
 
   /** Element showing the current source temperature (shown for Chapter 2+ levels). */
   private readonly tempDisplayEl: HTMLElement;
+
+  /**
+   * The non-official campaign currently activated for play, or null when playing
+   * the built-in official campaign.
+   */
+  private _activeCampaign: CampaignDef | null = null;
+
+  /** Completion progress for the active campaign (level IDs that have been completed). */
+  private _activeCampaignProgress: Set<number> = new Set();
 
   /**
    * Optional callback invoked instead of `_showLevelSelect()` when exiting play mode.
@@ -202,9 +216,16 @@ export class Game {
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
-      () => this._showLevelSelect(),        // onClose: return to level select
+      () => this._showLevelSelect(),         // onClose: return to level select
       (level) => this._playtestLevel(level), // onPlaytest: start the level in play mode
+      (campaign) => this._activateCampaign(campaign), // onPlayCampaign: activate campaign for play
     );
+
+    // Restore active campaign from localStorage (needs campaign editor to resolve the ID)
+    const savedCampaignId = loadActiveCampaignId();
+    if (savedCampaignId) {
+      this._restoreActiveCampaign(savedCampaignId);
+    }
 
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
@@ -237,7 +258,17 @@ export class Game {
 
   /** Start (or restart) the given level. */
   startLevel(levelId: number): void {
-    const level = LEVELS.find((l) => l.id === levelId);
+    // Look up the level in either the active campaign or the official levels
+    let level: LevelDef | undefined;
+    if (this._activeCampaign) {
+      for (const ch of this._activeCampaign.chapters) {
+        level = ch.levels.find((l) => l.id === levelId);
+        if (level) break;
+      }
+    }
+    if (!level) {
+      level = LEVELS.find((l) => l.id === levelId);
+    }
     if (!level) return;
 
     this.currentLevel = level;
@@ -266,13 +297,18 @@ export class Game {
 
   /** Update the level-header element with the current chapter, level number and name. */
   private _updateLevelHeader(levelId: number): void {
-    for (const chapter of CHAPTERS) {
+    // Search active campaign chapters first, then fall back to official chapters
+    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    for (const chapter of chapters) {
       const idx = chapter.levels.findIndex((l) => l.id === levelId);
       if (idx !== -1) {
         this.currentChapterId = chapter.id;
         const level = chapter.levels[idx];
+        const campaignPrefix = this._activeCampaign
+          ? `${this._activeCampaign.name}  ·  `
+          : '';
         this.levelHeaderEl.textContent =
-          `Chapter ${chapter.id}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
+          `${campaignPrefix}Chapter ${chapter.id}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
         return;
       }
     }
@@ -285,14 +321,27 @@ export class Game {
   // ─── Level-select rendering ───────────────────────────────────────────────
 
   private _renderLevelList(): void {
+    let activeCampaignInfo;
+    let campaignChapters;
+    if (this._activeCampaign) {
+      const pct = computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress);
+      activeCampaignInfo = {
+        name: this._activeCampaign.name,
+        author: this._activeCampaign.author,
+        completionPct: pct,
+      };
+      campaignChapters = this._activeCampaign.chapters;
+    }
     renderLevelList(
       this.levelListEl,
-      this.completedLevels,
+      this._activeCampaign ? this._activeCampaignProgress : this.completedLevels,
       (id) => this.startLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
       () => { this.rulesModalEl.style.display = 'flex'; },
       () => { this._openCampaignEditor(); },
       () => { this._unlockAll(); },
+      activeCampaignInfo,
+      campaignChapters,
     );
   }
 
@@ -844,19 +893,75 @@ export class Game {
   // ─── Persistence helpers ──────────────────────────────────────────────────
 
   private _markLevelCompleted(levelId: number): void {
-    markLevelCompleted(this.completedLevels, levelId);
+    if (this._activeCampaign) {
+      markCampaignLevelCompleted(this._activeCampaign.id, levelId, this._activeCampaignProgress);
+    } else {
+      markLevelCompleted(this.completedLevels, levelId);
+    }
   }
 
   /** Clear all level-completion progress and refresh the level list. */
   private _resetProgress(): void {
-    clearCompletedLevels(this.completedLevels);
+    if (this._activeCampaign) {
+      clearCampaignProgress(this._activeCampaign.id, this._activeCampaignProgress);
+    } else {
+      clearCompletedLevels(this.completedLevels);
+    }
     this._renderLevelList();
   }
 
   /** Dev cheat: mark all levels completed and refresh the level list. */
   private _unlockAll(): void {
-    markAllLevelsCompleted(this.completedLevels, LEVELS.map((l) => l.id));
+    if (this._activeCampaign) {
+      const allIds = this._activeCampaign.chapters.flatMap((ch) => ch.levels.map((l) => l.id));
+      for (const id of allIds) {
+        markCampaignLevelCompleted(this._activeCampaign.id, id, this._activeCampaignProgress);
+      }
+    } else {
+      markAllLevelsCompleted(this.completedLevels, LEVELS.map((l) => l.id));
+    }
     this._renderLevelList();
+  }
+
+  // ─── Active campaign management ───────────────────────────────────────────
+
+  /** Activate a campaign for play on the main menu.
+   * Passing the official campaign (id === 'official') deactivates any active non-official campaign
+   * and returns to the built-in level set. */
+  private _activateCampaign(campaign: CampaignDef): void {
+    if (campaign.id === 'official') {
+      this._deactivateCampaign();
+      return;
+    }
+    this._activeCampaign = campaign;
+    this._activeCampaignProgress = loadCampaignProgress(campaign.id);
+    saveActiveCampaignId(campaign.id);
+    this._showLevelSelect();
+  }
+
+  /** Deactivate the current campaign and return to the official campaign. */
+  private _deactivateCampaign(): void {
+    this._activeCampaign = null;
+    this._activeCampaignProgress = new Set();
+    clearActiveCampaignId();
+    this._showLevelSelect();
+  }
+
+  /**
+   * Restore the active campaign from a persisted campaign ID.
+   * Called during construction to reload the previous session's active campaign.
+   */
+  private _restoreActiveCampaign(campaignId: string): void {
+    // The campaign editor manages user campaigns; reload them to find the campaign.
+    const allCampaigns = this.campaignEditor.getAllCampaigns();
+    const campaign = allCampaigns.find((c) => c.id === campaignId);
+    if (campaign && campaign.id !== 'official') {
+      this._activeCampaign = campaign;
+      this._activeCampaignProgress = loadCampaignProgress(campaign.id);
+    } else {
+      // Campaign no longer exists – clear the persisted ID.
+      clearActiveCampaignId();
+    }
   }
 }
 

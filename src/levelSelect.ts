@@ -1,6 +1,14 @@
 /** Helpers for rendering the level-selection screen. */
 
 import { CHAPTERS } from './levels';
+import { ChapterDef } from './types';
+
+/** Optional metadata for an active (non-official) campaign shown on the main menu. */
+export interface ActiveCampaignInfo {
+  name: string;
+  author: string;
+  completionPct: number;
+}
 
 /**
  * Populate the level-list element with chapters (expandable/collapsible) and
@@ -13,6 +21,8 @@ import { CHAPTERS } from './levels';
  * @param onRulesClick - Callback invoked when the player clicks the "Game Rules" button.
  * @param onCampaignEditorClick - Callback invoked when the player clicks the "Campaign Editor" button.
  * @param onUnlockAllClick - Callback invoked when the dev cheat "Unlock All" button is clicked.
+ * @param activeCampaign - When set, the non-official campaign currently activated for play.
+ * @param campaignChapters - When set, the chapters to render (from the active campaign).
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -22,14 +32,55 @@ export function renderLevelList(
   onRulesClick: () => void,
   onCampaignEditorClick: () => void,
   onUnlockAllClick: () => void,
+  activeCampaign?: ActiveCampaignInfo,
+  campaignChapters?: ChapterDef[],
 ): void {
   levelListEl.innerHTML = '';
 
-  for (let ci = 0; ci < CHAPTERS.length; ci++) {
-    const chapter = CHAPTERS[ci];
+  const chapters = campaignChapters ?? CHAPTERS;
+
+  // ── Active campaign header ─────────────────────────────────────────────────
+  if (activeCampaign) {
+    const header = document.createElement('div');
+    header.style.cssText =
+      'background:#16213e;border:2px solid #f0c040;border-radius:8px;' +
+      'padding:14px 16px;display:flex;flex-direction:column;gap:8px;';
+
+    const titleEl = document.createElement('div');
+    titleEl.style.cssText = 'font-size:1.05rem;font-weight:bold;color:#f0c040;';
+    titleEl.textContent = `🎯 ${activeCampaign.name}`;
+
+    const metaEl = document.createElement('div');
+    metaEl.style.cssText = 'font-size:0.8rem;color:#aaa;';
+    metaEl.textContent = `By ${activeCampaign.author}`;
+
+    const progressRow = document.createElement('div');
+    progressRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    const progressLabel = document.createElement('span');
+    progressLabel.style.cssText = 'font-size:0.85rem;color:#7ed321;white-space:nowrap;';
+    progressLabel.textContent = `Progress: ${activeCampaign.completionPct}%`;
+    const progressBar = document.createElement('div');
+    progressBar.style.cssText =
+      'flex:1;height:8px;background:#0d1a30;border-radius:4px;overflow:hidden;';
+    const progressFill = document.createElement('div');
+    progressFill.style.cssText =
+      `height:100%;width:${activeCampaign.completionPct}%;background:#7ed321;border-radius:4px;` +
+      'transition:width 0.3s;';
+    progressBar.appendChild(progressFill);
+    progressRow.appendChild(progressLabel);
+    progressRow.appendChild(progressBar);
+
+    header.appendChild(titleEl);
+    header.appendChild(metaEl);
+    header.appendChild(progressRow);
+    levelListEl.appendChild(header);
+  }
+
+  for (let ci = 0; ci < chapters.length; ci++) {
+    const chapter = chapters[ci];
 
     // A chapter is locked if a previous chapter exists and not all its levels are done.
-    const prevChapter = ci > 0 ? CHAPTERS[ci - 1] : null;
+    const prevChapter = ci > 0 ? chapters[ci - 1] : null;
     const chapterLocked = prevChapter !== null &&
       prevChapter.levels.some((l) => !completedLevels.has(l.id));
 
