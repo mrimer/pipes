@@ -8,6 +8,7 @@ import { renderLevelList } from './levelSelect';
 import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels, markAllLevelsCompleted } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR } from './tileAnimation';
+import { CampaignEditor } from './campaignEditor';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -69,6 +70,9 @@ export class Game {
   /** Modal overlay showing game rules and tile legend. */
   private readonly rulesModalEl: HTMLElement;
 
+  /** Campaign editor overlay (manages its own DOM). */
+  private readonly campaignEditor: CampaignEditor;
+
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
 
@@ -80,6 +84,12 @@ export class Game {
 
   /** Element showing the current source temperature (shown for Chapter 2+ levels). */
   private readonly tempDisplayEl: HTMLElement;
+
+  /**
+   * Optional callback invoked instead of `_showLevelSelect()` when exiting play mode.
+   * Used when a level was launched for playtesting from the campaign editor.
+   */
+  private _playtestExitCallback: (() => void) | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -182,6 +192,12 @@ export class Game {
     // Create the game-rules modal (appends itself to document.body)
     this.rulesModalEl = createGameRulesModal();
 
+    // Create the campaign editor (appends its own overlay to document.body)
+    this.campaignEditor = new CampaignEditor(
+      () => this._showLevelSelect(),        // onClose: return to level select
+      (level) => this._playtestLevel(level), // onPlaytest: start the level in play mode
+    );
+
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
@@ -264,6 +280,7 @@ export class Game {
       (id) => this.startLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
       () => { this.rulesModalEl.style.display = 'flex'; },
+      () => { this._openCampaignEditor(); },
       () => { this._unlockAll(); },
     );
   }
@@ -737,7 +754,67 @@ export class Game {
 
   /** Exit to the level-selection screen. */
   exitToMenu(): void {
-    this._showLevelSelect();
+    if (this._playtestExitCallback) {
+      const cb = this._playtestExitCallback;
+      this._playtestExitCallback = null;
+      this._showLevelSelect();
+      cb(); // re-open the campaign editor
+    } else {
+      this._showLevelSelect();
+    }
+  }
+
+  // ─── Campaign Editor integration ──────────────────────────────────────────
+
+  /** Open the campaign editor overlay (hides the level-select screen first). */
+  private _openCampaignEditor(): void {
+    this.screen = GameScreen.CampaignEditor;
+    this.levelSelectEl.style.display = 'none';
+    this.campaignEditor.show();
+  }
+
+  /**
+   * Start a level in play-mode for playtesting from the campaign editor.
+   * When the player exits, the campaign editor is re-opened.
+   */
+  private _playtestLevel(level: LevelDef): void {
+    this.campaignEditor.hide();
+    this._playtestExitCallback = () => {
+      this.levelSelectEl.style.display = 'none';
+      this.campaignEditor.show();
+    };
+    this.startLevelDef(level);
+  }
+
+  /**
+   * Start any given LevelDef in play mode.
+   * Similar to {@link startLevel} but accepts a LevelDef directly instead of a level ID.
+   */
+  startLevelDef(level: LevelDef): void {
+    this.currentLevel = level;
+    this.board = new Board(level.rows, level.cols, level);
+    this.board.initHistory();
+    this.gameState = GameState.Playing;
+    this.focusPos = { row: 0, col: 0 };
+    this.selectedShape = null;
+    this.pendingRotation = 0;
+
+    this.canvas.width  = level.cols * TILE_SIZE;
+    this.canvas.height = level.rows * TILE_SIZE;
+
+    this.screen = GameScreen.Play;
+    this.levelSelectEl.style.display = 'none';
+    this.playScreenEl.style.display  = 'flex';
+    this.winModalEl.style.display      = 'none';
+    this.gameoverModalEl.style.display = 'none';
+
+    // Show level name in the header (no chapter context for ad-hoc levels)
+    this.currentChapterId = 0;
+    this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
+    this.canvas.focus();
   }
 
   // ─── Undo / redo button state ─────────────────────────────────────────────
