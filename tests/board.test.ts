@@ -1306,6 +1306,34 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count).toBe(1);
   });
 
+  it('blocks replacing same shape with different rotation when doing so would disconnect a container', () => {
+    // Source → Straight(1,R=90,E-W) → Chamber(2, grants 2 Straights) → Straight(3,R=90) → Straight(4,R=90) → Sink(5)
+    // inventory = [{Straight, count: -2}]: 3 placed, 2 from grants → effective count 0 (valid state)
+    // Replacing Straight(1) with Straight(R=0, N-S) would disconnect the chamber:
+    //   reclaim → count: −2 → −1
+    //   bonuses after reclaim: 0 (chamber no longer reachable)
+    //   effectiveCount: −1 + 0 = −1 ≤ 0 → must block and roll back
+    const board = new Board(1, 6);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 5 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);                                             // E-W connector
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0,  true, 0, 0, PipeShape.Straight, 2, null, 'item'); // grants 2
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);                                             // placed using grant
+    board.grid[0][4] = new Tile(PipeShape.Straight, 90);                                             // placed using grant
+    board.grid[0][5] = new Tile(PipeShape.Sink,     0,  true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: -2 }];
+
+    // Replacing Straight(1) with Straight(R=0, N-S) breaks the E-W path to the chamber
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 0);
+    expect(result).toBe(false);
+    // Board and inventory must be fully rolled back
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.grid[0][1].rotation).toBe(90);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-2);
+  });
+
   it('clears lastError on success', () => {
     const board = makeSimpleBoard();
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);

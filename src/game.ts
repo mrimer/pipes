@@ -453,9 +453,11 @@ export class Game {
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
       }
-    } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty && tile.shape !== this.selectedShape) {
+    } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty &&
+               (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
       // Replace the existing tile with the selected inventory shape (single atomic action).
-      // Same-shape tiles fall through to the rotate branch below for consistency.
+      // Also covers the same shape with a different orientation, which can disconnect a
+      // granting container and must go through the container-grant constraint check.
       if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
       } else if (this.board.lastError) {
@@ -723,9 +725,10 @@ export class Game {
             if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
               this._afterTilePlaced(this.selectedShape, filledBefore);
             }
-          } else if (tile && tile.shape !== this.selectedShape) {
+          } else if (tile && (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
             // Replace the existing tile with the selected inventory shape.
-            // Same-shape tiles fall through to the rotate branch below for consistency.
+            // Also covers the same shape with a different orientation, which can disconnect a
+            // granting container and must go through the container-grant constraint check.
             if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
               this._afterTilePlaced(this.selectedShape, filledBefore);
             } else if (board.lastError) {
