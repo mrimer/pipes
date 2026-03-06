@@ -329,6 +329,7 @@ export class Board {
    * @returns true if the placement succeeded.
    */
   placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): boolean {
+    this.lastError = null;
     const tile = this.getTile(pos);
     if (!tile || tile.shape !== PipeShape.Empty) return false;
 
@@ -336,7 +337,10 @@ export class Board {
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
 
     // Gold spaces only accept gold pipes; regular pipes may not go on gold spaces
-    if (isGoldSpace && !isGoldPipe) return false;
+    if (isGoldSpace && !isGoldPipe) {
+      this.lastError = 'Only gold pipes may be placed on a gold space.';
+      return false;
+    }
 
     const idx = this.inventory.findIndex((it) => it.shape === shape);
     const baseCount = idx !== -1 ? this.inventory[idx].count : 0;
@@ -389,7 +393,10 @@ export class Board {
     // Gold-space / gold-pipe constraint for the incoming shape
     const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
-    if (isGoldSpace && !isGoldPipe) return false;
+    if (isGoldSpace && !isGoldPipe) {
+      this.lastError = 'Only gold pipes may be placed on a gold space.';
+      return false;
+    }
 
     // Save inventory snapshot so we can roll back cleanly on failure
     const savedInventory = this.inventory.map((item) => ({ ...item }));
