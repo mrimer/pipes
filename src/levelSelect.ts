@@ -3,7 +3,7 @@
 import { CHAPTERS } from './levels';
 import { ChapterDef } from './types';
 
-/** Optional metadata for an active (non-official) campaign shown on the main menu. */
+/** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
   name: string;
   author: string;
@@ -21,7 +21,7 @@ export interface ActiveCampaignInfo {
  * @param onRulesClick - Callback invoked when the player clicks the "Game Rules" button.
  * @param onCampaignEditorClick - Callback invoked when the player clicks the "Campaign Editor" button.
  * @param onUnlockAllClick - Callback invoked when the dev cheat "Unlock All" button is clicked.
- * @param activeCampaign - When set, the non-official campaign currently activated for play.
+ * @param activeCampaign - The campaign currently active for play (official or user campaign).
  * @param campaignChapters - When set, the chapters to render (from the active campaign).
  */
 export function renderLevelList(
