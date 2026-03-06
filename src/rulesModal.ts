@@ -7,6 +7,7 @@ import {
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
   CONTAINER_COLOR, GRANITE_FILL_COLOR, GRANITE_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
+  HEATER_COLOR, ICE_COLOR,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -104,6 +105,16 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: shapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
     name: 'Gold Pipe',
     description: 'Behaves like a normal pipe but may only be placed on gold spaces.',
+  },
+  {
+    iconHtml: colorSwatch(HEATER_COLOR),
+    name: 'Chamber — Heater',
+    description: 'Raises the water temperature by the shown amount (°) when connected. Higher temperature reduces ice block costs.',
+  },
+  {
+    iconHtml: colorSwatch(ICE_COLOR),
+    name: 'Chamber — Ice',
+    description: 'Reduces water capacity by cost × max(0, threshold° − current temp°). Costs nothing when temperature meets or exceeds the threshold.',
   },
 ];
 

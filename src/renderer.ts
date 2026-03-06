@@ -21,6 +21,8 @@ import {
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
   REMOVABLE_BG_COLOR,
+  HEATER_COLOR, HEATER_WATER_COLOR,
+  ICE_COLOR, ICE_WATER_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -98,6 +100,10 @@ export function drawPipe(
       color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
     } else if (chamberContent === 'item') {
       color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+    } else if (chamberContent === 'heater') {
+      color = isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
+    } else if (chamberContent === 'ice') {
+      color = isWater ? ICE_WATER_COLOR : ICE_COLOR;
     } else {
       color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
     }
@@ -224,6 +230,21 @@ export function drawPipe(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(chamberLabel, 0, 0);
+    } else if (chamberContent === 'heater') {
+      // Show positive temperature bonus in heater color
+      ctx.fillStyle = isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
+      ctx.font = 'bold 13px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`+${tile.temperature}°`, 0, 0);
+    } else if (chamberContent === 'ice') {
+      // Show cost and threshold temperature in ice color
+      ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`-${dirtCost}`, 0, -7);
+      ctx.fillText(`${tile.temperature}°`, 0, 7);
     }
     // Connection stubs
     ctx.strokeStyle = color;

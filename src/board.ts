@@ -109,7 +109,7 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.dirtCost ?? 0, itemShape, itemCount, customConnections, chamberContent);
+          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.dirtCost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -211,6 +211,7 @@ export class Board {
               tile.itemCount,
               tile.customConnections !== null ? new Set(tile.customConnections) : null,
               tile.chamberContent,
+              tile.temperature,
             ),
         ),
       ),
@@ -447,11 +448,37 @@ export class Board {
   }
 
   /**
+   * Compute the effective source temperature based on the live fill state.
+   * This is the source tile's base temperature plus any connected Heater bonuses.
+   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
+   */
+  getCurrentTemperature(filled?: Set<string>): number {
+    const filledSet = filled ?? this.getFilledPositions();
+    return this._computeTemperatureFromFilled(filledSet);
+  }
+
+  /** Internal helper: compute temperature from a pre-computed fill set. */
+  private _computeTemperatureFromFilled(filled: Set<string>): number {
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    let temp = sourceTile.temperature;
+    for (const key of filled) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'heater') {
+        temp += tile.temperature;
+      }
+    }
+    return temp;
+  }
+
+  /**
    * Compute current water remaining in the source tank based on the live fill state.
    * Water gained from connected Tank tiles offsets the cost of regular pipe tiles.
+   * Ice tiles reduce capacity by dirtCost × max(0, ice.temperature − currentTemperature).
    */
   getCurrentWater(): number {
     const filled = this.getFilledPositions();
+    const currentTemp = this._computeTemperatureFromFilled(filled);
     let pipeCost = 0;
     let tankGain = 0;
 
@@ -464,6 +491,10 @@ export class Board {
       } else if (tile.shape === PipeShape.Chamber) {
         if (tile.chamberContent === 'tank') tankGain += tile.capacity;
         else if (tile.chamberContent === 'dirt') pipeCost += tile.dirtCost;
+        else if (tile.chamberContent === 'ice') {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          pipeCost += tile.dirtCost * deltaTemp;
+        }
       }
     }
     return this.sourceCapacity - pipeCost + tankGain;
