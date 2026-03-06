@@ -154,7 +154,7 @@ export class CampaignEditor {
     return b;
   }
 
-  private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text'): HTMLElement {
+  private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
     const lbl = document.createElement('label');
@@ -165,7 +165,8 @@ export class CampaignEditor {
     inp.value = value;
     inp.style.cssText =
       'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+      'border:1px solid #4a90d9;border-radius:4px;' +
+      (inputWidth ? `width:${inputWidth};` : 'flex:1;');
     inp.addEventListener('input', () => onInput(inp.value));
     wrap.appendChild(lbl);
     wrap.appendChild(inp);
@@ -849,14 +850,14 @@ export class CampaignEditor {
     if (p === PipeShape.Source || (p === PipeShape.Chamber && this._editorParams.chamberContent === 'tank')) {
       panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
         this._editorParams.capacity = parseInt(v) || 0;
-      }, 'number'));
+      }, 'number', '60px'));
     }
 
     // Source: temperature
     if (p === PipeShape.Source) {
       panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
         this._editorParams.temperature = parseInt(v) || 0;
-      }, 'number'));
+      }, 'number', '60px'));
     }
 
     // Chamber: content type
@@ -892,20 +893,20 @@ export class CampaignEditor {
       if (cc === 'dirt') {
         panel.appendChild(this._labeledInput('Cost', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
-        }, 'number'));
+        }, 'number', '60px'));
       }
       if (cc === 'heater') {
         panel.appendChild(this._labeledInput('Temp +', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
-        }, 'number'));
+        }, 'number', '60px'));
       }
       if (cc === 'ice') {
         panel.appendChild(this._labeledInput('Cost/Δ', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
-        }, 'number'));
+        }, 'number', '60px'));
         panel.appendChild(this._labeledInput('Thresh°', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
-        }, 'number'));
+        }, 'number', '60px'));
       }
       if (cc === 'item') {
         // Item shape selector
@@ -932,7 +933,7 @@ export class CampaignEditor {
         panel.appendChild(itemSelWrap);
         panel.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
           this._editorParams.itemCount = parseInt(v) || 1;
-        }, 'number'));
+        }, 'number', '60px'));
       }
     }
 
