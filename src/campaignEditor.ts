@@ -62,6 +62,7 @@ export class CampaignEditor {
   private _editorHover: { row: number; col: number } | null = null;
   private _editorHistory: EditorSnapshot[] = [];
   private _editorHistoryIdx = -1;
+  private _goldSectionExpanded = false;
   /** Drag state: set when the user is dragging a tile across the grid. */
   private _dragState: {
     startPos: { row: number; col: number };
@@ -770,13 +771,16 @@ export class CampaignEditor {
     { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
     { palette: PipeShape.Source,   label: '💧 Source' },
     { palette: PipeShape.Sink,     label: '🏁 Sink' },
-    { palette: PipeShape.Straight, label: '━ Straight (fixed)' },
-    { palette: PipeShape.Elbow,    label: '┗ Elbow (fixed)' },
-    { palette: PipeShape.Tee,      label: '┣ Tee (fixed)' },
-    { palette: PipeShape.Cross,    label: '╋ Cross (fixed)' },
+    { palette: PipeShape.Straight, label: '━ Straight' },
+    { palette: PipeShape.Elbow,    label: '┗ Elbow' },
+    { palette: PipeShape.Tee,      label: '┣ Tee' },
+    { palette: PipeShape.Cross,    label: '╋ Cross' },
     { palette: PipeShape.Chamber,  label: '■ Chamber' },
     { palette: PipeShape.Granite,  label: '▪ Granite' },
-    { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
+  ];
+
+  private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+    { palette: PipeShape.GoldSpace,    label: '✦ Gold Space' },
     { palette: PipeShape.GoldStraight, label: '━ Gold Straight' },
     { palette: PipeShape.GoldElbow,    label: '┗ Gold Elbow' },
     { palette: PipeShape.GoldTee,      label: '┣ Gold Tee' },
@@ -795,23 +799,26 @@ export class CampaignEditor {
     title.textContent = 'TILE PALETTE';
     panel.appendChild(title);
 
-    for (const item of this._PALETTE_ITEMS) {
+    const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
+    // Auto-expand the gold section if a gold item is currently selected
+    if (isGoldSelected) this._goldSectionExpanded = true;
+
+    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = item.label;
       btn.dataset['palette'] = String(item.palette);
       btn.style.cssText =
         'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+        (indent ? 'margin-left:12px;' : '') +
         'border:1px solid ' + (this._editorPalette === item.palette ? '#f0c040' : '#2a3a5e') + ';' +
         'background:' + (this._editorPalette === item.palette ? '#2a3a1a' : '#0d1a30') + ';' +
         'color:' + (this._editorPalette === item.palette ? '#f0c040' : '#eee') + ';';
 
       btn.addEventListener('click', () => {
         this._editorPalette = item.palette;
-        // Re-render the palette to update button states
         const newPanel = this._buildPalette();
         panel.replaceWith(newPanel);
-        // Update param panel
         const paramPanel = document.getElementById('editor-param-panel');
         if (paramPanel) {
           const newParam = this._buildParamPanel();
@@ -820,7 +827,31 @@ export class CampaignEditor {
         }
         this._renderEditorCanvas();
       });
-      panel.appendChild(btn);
+      return btn;
+    };
+
+    for (const item of this._PALETTE_ITEMS) {
+      panel.appendChild(makeItemBtn(item));
+    }
+
+    // Gold collapsible section
+    const goldToggle = document.createElement('button');
+    goldToggle.type = 'button';
+    goldToggle.textContent = (this._goldSectionExpanded ? '▾' : '▸') + ' Gold';
+    goldToggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      'border:1px solid #b8860b;background:#1a1400;color:#ffd700;font-weight:bold;margin-top:2px;';
+    goldToggle.addEventListener('click', () => {
+      this._goldSectionExpanded = !this._goldSectionExpanded;
+      const newPanel = this._buildPalette();
+      panel.replaceWith(newPanel);
+    });
+    panel.appendChild(goldToggle);
+
+    if (this._goldSectionExpanded) {
+      for (const item of this._GOLD_PALETTE_ITEMS) {
+        panel.appendChild(makeItemBtn(item, true));
+      }
     }
 
     return panel;
@@ -1174,7 +1205,8 @@ export class CampaignEditor {
       };
     } else if (this._editorHover) {
       if (this._editorPalette === 'erase') {
-        overlay = { pos: this._editorHover, def: null, alpha: 1 };
+        const isEmptyCell = (this._editGrid[this._editorHover.row]?.[this._editorHover.col] ?? null) === null;
+        overlay = { pos: this._editorHover, def: null, alpha: isEmptyCell ? 0.2 : 1 };
       } else {
         // Placement preview: transparent tile at hover
         overlay = { pos: this._editorHover, def: this._buildTileDef(this._editorPalette), alpha: 0.55 };
@@ -1452,8 +1484,16 @@ export class CampaignEditor {
   private _updateEditorUndoRedoButtons(): void {
     const undoBtn = document.getElementById('editor-undo-btn') as HTMLButtonElement | null;
     const redoBtn = document.getElementById('editor-redo-btn') as HTMLButtonElement | null;
-    if (undoBtn) undoBtn.disabled = this._editorHistoryIdx <= 0;
-    if (redoBtn) redoBtn.disabled = this._editorHistoryIdx >= this._editorHistory.length - 1;
+    if (undoBtn) {
+      undoBtn.disabled = this._editorHistoryIdx <= 0;
+      undoBtn.style.opacity = undoBtn.disabled ? '0.4' : '1';
+      undoBtn.style.cursor = undoBtn.disabled ? 'not-allowed' : 'pointer';
+    }
+    if (redoBtn) {
+      redoBtn.disabled = this._editorHistoryIdx >= this._editorHistory.length - 1;
+      redoBtn.style.opacity = redoBtn.disabled ? '0.4' : '1';
+      redoBtn.style.cursor = redoBtn.disabled ? 'not-allowed' : 'pointer';
+    }
   }
 
   // ─── Grid resize ──────────────────────────────────────────────────────────
