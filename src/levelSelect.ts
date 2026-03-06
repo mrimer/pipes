@@ -11,6 +11,7 @@ import { CHAPTERS } from './levels';
  * @param startLevel - Callback invoked when the player selects a level to play.
  * @param onResetClick - Callback invoked when the player clicks the reset-progress button.
  * @param onRulesClick - Callback invoked when the player clicks the "Game Rules" button.
+ * @param onUnlockAllClick - Callback invoked when the dev cheat "Unlock All" button is clicked.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -18,6 +19,7 @@ export function renderLevelList(
   startLevel: (levelId: number) => void,
   onResetClick: () => void,
   onRulesClick: () => void,
+  onUnlockAllClick: () => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -141,4 +143,13 @@ export function renderLevelList(
     'border:1px solid #e74c3c;border-radius:6px;cursor:pointer;width:100%;';
   resetBtn.addEventListener('click', onResetClick);
   levelListEl.appendChild(resetBtn);
+
+  // Dev cheat button: mark all levels completed and unlock all chapters/levels
+  const unlockAllBtn = document.createElement('button');
+  unlockAllBtn.textContent = '🛠️ [Dev] Unlock All';
+  unlockAllBtn.style.cssText =
+    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#f39c12;' +
+    'border:1px solid #f39c12;border-radius:6px;cursor:pointer;width:100%;';
+  unlockAllBtn.addEventListener('click', onUnlockAllClick);
+  levelListEl.appendChild(unlockAllBtn);
 }

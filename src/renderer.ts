@@ -240,11 +240,13 @@ export function drawPipe(
     } else if (chamberContent === 'ice') {
       // Show three lines: negative cost, "x", and the temperature threshold (deltaTemp reference)
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
-      ctx.font = 'bold 9px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.font = 'bold 14px Arial';
       ctx.fillText(`-${cost}`, 0, -9);
+      ctx.font = 'bold 9px Arial';
       ctx.fillText('x', 0, 0);
+      ctx.font = 'bold 14px Arial';
       ctx.fillText(String(tile.temperature), 0, 9);
     }
     // Connection stubs
