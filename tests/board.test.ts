@@ -1619,8 +1619,8 @@ describe('Level 6 (Cold Front)', () => {
     board.recordMove();
 
     expect(board.isSolved()).toBe(true);
-    // Budget: 10 − 3(Tees) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice 2,4) + 5+5+5(Tanks) = 15
-    expect(board.getCurrentWater()).toBe(15);
+    // Budget: 8 − 3(Tees) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice 2,4) + 5+5(Tanks) = 8
+    expect(board.getCurrentWater()).toBe(8);
   });
 
   it('ice tiles cost water when connected before the heater', () => {

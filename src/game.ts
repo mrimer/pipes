@@ -2,7 +2,7 @@ import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES } from './board';
 import { LEVELS, CHAPTERS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
-import { TILE_SIZE, renderBoard } from './renderer';
+import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels, markAllLevelsCompleted } from './persistence';
@@ -470,6 +470,11 @@ export class Game {
     // Display as (row, col) to match the GridPos convention used throughout the codebase.
     let tooltipText = `(${row}, ${col})`;
     const tile = this.board.grid[row][col];
+    // Show a human-readable tile name derived from its shape and chamber content.
+    const tileName = getTileDisplayName(tile);
+    if (tileName) {
+      tooltipText += ` ${tileName}`;
+    }
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
@@ -488,9 +493,7 @@ export class Game {
         } else {
           predictedCost = 0;
         }
-        if (predictedCost > 0) {
-          tooltipText += ` cost: ${predictedCost}`;
-        }
+        tooltipText += ` cost: ${predictedCost}`;
       }
     }
     this.tooltipEl.textContent = tooltipText;
