@@ -373,7 +373,7 @@ export class Game {
     this.waterDisplayEl.textContent = `💧 Water: ${w}`;
     this.waterDisplayEl.style.color = w <= 5 ? LOW_WATER_COLOR : WATER_COLOR;
 
-    if (this.currentChapterId >= 2) {
+    if (this.board.hasTempRelevantTiles()) {
       const t = this.board.getCurrentTemperature();
       this.tempDisplayEl.textContent = `🌡️ Temp: ${t}°`;
       this.tempDisplayEl.style.display = 'inline';

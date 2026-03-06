@@ -464,6 +464,27 @@ export class Board {
   }
 
   /**
+   * Returns true when the level has any temperature-relevant tiles: a heater
+   * chamber, an ice chamber, or a source with a non-zero base temperature.
+   * Used to decide whether to display the Temp stat in the UI.
+   */
+  hasTempRelevantTiles(): boolean {
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    if (sourceTile.temperature !== 0) return true;
+    for (const row of this.grid) {
+      for (const tile of row) {
+        if (
+          tile.shape === PipeShape.Chamber &&
+          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice')
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Compute the effective source temperature based on the live fill state.
    * This is the source tile's base temperature plus any connected Heater bonuses.
    * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
