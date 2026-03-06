@@ -56,6 +56,7 @@ function makeGame(): {
   winModalEl: HTMLElement;
   gameoverModalEl: HTMLElement;
   exitBtnEl: HTMLButtonElement;
+  winNextBtnEl: HTMLButtonElement;
 } {
   document.body.innerHTML = `
     <canvas id="game-canvas"></canvas>
@@ -71,7 +72,7 @@ function makeGame(): {
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>
     </div>
-    <div id="win-modal"><button id="win-menu-btn">Level Select</button></div>
+    <div id="win-modal"><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
 
@@ -108,7 +109,8 @@ function makeGame(): {
     exitBtnEl,
   );
 
-  return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl, exitBtnEl };
+  return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl, exitBtnEl,
+    winNextBtnEl: get('win-next-btn') as HTMLButtonElement };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -209,6 +211,23 @@ describe('Game – playtest mode button labels', () => {
     game.exitToMenu();
 
     expect(exitBtnEl.textContent).toBe('← Menu');
+  });
+
+  it('hides the "Next Level" button in the win modal when playtesting from the editor', () => {
+    const { game, winNextBtnEl } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+
+    expect(winNextBtnEl.style.display).toBe('none');
+  });
+
+  it('restores the "Next Level" button visibility when exitToMenu is called after playtesting', () => {
+    const { game, winNextBtnEl } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+    game.exitToMenu();
+
+    expect(winNextBtnEl.style.display).toBe('');
   });
 });
 
@@ -408,6 +427,22 @@ describe('Game – reset progress', () => {
     // The first level button should no longer have the 'completed' class
     const firstLevelBtn = levelListEl.querySelector('.level-btn');
     expect(firstLevelBtn?.classList.contains('completed')).toBe(false);
+  });
+});
+
+// ─── Tests: level-select chapter numbering ────────────────────────────────────
+
+describe('Game – level-select chapter numbering', () => {
+  it('numbers chapters by their array position (1-based), not by chapter.id', () => {
+    makeGame();
+    const levelListEl = document.getElementById('level-list')!;
+    // Collect all chapter header text (the <span> inside each chapter header button)
+    const chapterSpans = Array.from(
+      levelListEl.querySelectorAll('.chapter-header span:first-child'),
+    );
+    chapterSpans.forEach((span, index) => {
+      expect(span.textContent).toMatch(new RegExp(`^Chapter ${index + 1}:`));
+    });
   });
 });
 

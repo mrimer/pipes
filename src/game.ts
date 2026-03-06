@@ -43,6 +43,9 @@ export class Game {
   /** "← Menu" / "← Edit" exit button in the play-screen HUD. */
   private readonly exitBtnEl: HTMLButtonElement;
 
+  /** "Next Level" button in the win modal — hidden while playtesting in the editor. */
+  private readonly winNextBtnEl: HTMLButtonElement;
+
   /** "Level Select" / "Return to Editor" button in the win modal. */
   private readonly winMenuBtnEl: HTMLButtonElement;
 
@@ -146,6 +149,7 @@ export class Game {
     this.undoBtnEl = undoBtnEl;
     this.redoBtnEl = redoBtnEl;
     this.exitBtnEl = exitBtnEl;
+    this.winNextBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-next-btn')!;
     this.winMenuBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-menu-btn')!;
     this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
 
@@ -258,6 +262,8 @@ export class Game {
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
+    // Restore the "Next Level" button visibility in case it was hidden for playtesting.
+    this.winNextBtnEl.style.display = '';
     // Reset HUD exit button label in case it was changed for playtesting.
     this.exitBtnEl.textContent = '← Menu';
     this._renderLevelList();
@@ -922,6 +928,8 @@ export class Game {
     // Update modal menu buttons so they say "Return to Editor" instead of "Level Select".
     this.winMenuBtnEl.textContent = '↩ Return to Editor';
     this.gameoverMenuBtnEl.textContent = '↩ Return to Editor';
+    // Hide the "Next Level" button — it makes no sense when playtesting a single level.
+    this.winNextBtnEl.style.display = 'none';
     // Update HUD exit button so it says "Edit" instead of "Menu".
     this.exitBtnEl.textContent = '← Edit';
     this.startLevelDef(level);
