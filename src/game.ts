@@ -616,6 +616,7 @@ export class Game {
           // as connections (e.g. heaters on other branches) change the temperature.
           const currentTemp = this.board.getCurrentTemperature();
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          tooltipText += ` (${deltaTemp}° x ${tile.cost})`;
           predictedCost = tile.cost * deltaTemp;
         } else {
           predictedCost = 0;
