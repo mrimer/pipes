@@ -1527,8 +1527,8 @@ describe('Level 5 (Glacier Pass)', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90); // E-W
     board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90); // E-W
     expect(board.isSolved()).toBe(true);
-    // Budget: 15 − 1(0,1) − 5(Ice-A) − 1(0,3) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice-B) = 1
-    expect(board.getCurrentWater()).toBe(1);
+    // Budget: 13 − 1(0,1) − 5(Ice-A) − 1(0,3) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice-B) = -1
+    expect(board.getCurrentWater()).toBe(-1);
   });
 
   it('is solved via the bypass + tank route (4 Elbows + 1 Tee)', () => {
@@ -1539,8 +1539,8 @@ describe('Level 5 (Glacier Pass)', () => {
     board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.Elbow, 270); // W-N
     board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Elbow, 90);  // E-S
     expect(board.isSolved()).toBe(true);
-    // Budget: 15 − 5(pieces) − 1(Elbow 0,4) − 1(Straight 1,4) + 7(Tank) − 5(Ice-B) = 10
-    expect(board.getCurrentWater()).toBe(10);
+    // Budget: 13 − 5(pieces) − 1(Elbow 0,4) − 1(Straight 1,4) + 7(Tank) − 5(Ice-B) = 8
+    expect(board.getCurrentWater()).toBe(8);
   });
 });
 
