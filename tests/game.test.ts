@@ -225,6 +225,7 @@ type GameTestHooks = {
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _animations: { x: number; y: number; text: string; color: string }[];
   _handleKey(e: KeyboardEvent): void;
+  _handleCanvasRightClick(e: MouseEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
   _renderLevelList(): void;
 };
@@ -269,7 +270,33 @@ describe('Game – inventory selection kept when stock remains', () => {
   });
 });
 
-// ─── Tests: inventory bar updates on tile rotation ────────────────────────────
+// ─── Tests: deselect when container bonus is removed ──────────────────────────
+
+describe('Game – deselect when effective count drops to zero after reclaim', () => {
+  it('clears selectedShape when reclaiming a tile removes the last container-granted bonus', () => {
+    const { game } = makeGame();
+    game.startLevel(3); // Level 3: ItemContainer at (0,2) grants 1×GoldStraight when filled
+
+    const hooks = gameHooks(game);
+
+    // Place Straight at (0,1) so Source→Straight→ItemContainer path is filled,
+    // granting GoldStraight (effectiveCount: 0 base + 1 bonus = 1)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Select GoldStraight – it is now available via the container bonus
+    hooks.selectedShape = PipeShape.GoldStraight;
+
+    // Right-click at (0,1) to reclaim the Straight; this disconnects the container,
+    // so GoldStraight's effective count drops back to 0.
+    // TILE_SIZE=64: col 1 → clientX 96, row 0 → clientY 32.
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    // GoldStraight effective count is now 0 → selection must be cleared
+    expect(hooks.selectedShape).toBeNull();
+  });
+});
 
 describe('Game – inventory bar re-renders on tile rotation', () => {
   it('calls _renderInventoryBar when a non-empty tile is rotated via keyboard', () => {
