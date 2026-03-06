@@ -77,21 +77,6 @@ const LEGEND_ROWS: LegendRow[] = [
     description: 'Connects all four sides.',
   },
   {
-    iconHtml: colorSwatch(TANK_COLOR),
-    name: 'Chamber — Tank',
-    description: 'Contains extra water. Adds to your supply when water flows through it.',
-  },
-  {
-    iconHtml: colorSwatch(DIRT_COST_COLOR),
-    name: 'Chamber — Dirt',
-    description: 'Wastes water when filled. The number shows how much water is consumed.',
-  },
-  {
-    iconHtml: colorSwatch(CONTAINER_COLOR),
-    name: 'Chamber — Item',
-    description: 'Grants bonus pipe pieces from your inventory when water flows through it.',
-  },
-  {
     iconHtml: colorSwatch(GRANITE_FILL_COLOR, GRANITE_COLOR),
     name: 'Granite Block',
     description: 'Impassable obstacle — water cannot flow through and it cannot be moved.',
@@ -105,6 +90,21 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: shapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
     name: 'Gold Pipe',
     description: 'Behaves like a normal pipe and can be placed on gold spaces.',
+  },
+  {
+    iconHtml: colorSwatch(TANK_COLOR),
+    name: 'Chamber — Tank',
+    description: 'Contains extra water. Adds to your supply when connected to it.',
+  },
+  {
+    iconHtml: colorSwatch(DIRT_COST_COLOR),
+    name: 'Chamber — Dirt',
+    description: 'Wastes water when filled. The number shows how much water is consumed.',
+  },
+  {
+    iconHtml: colorSwatch(CONTAINER_COLOR),
+    name: 'Chamber — Item',
+    description: 'Grants bonus pipe pieces from your inventory when water flows through it.',
   },
   {
     iconHtml: colorSwatch(HEATER_COLOR),
@@ -154,7 +154,8 @@ export function createGameRulesModal(): HTMLElement {
     'Select a pipe piece from the inventory panel, then click an empty cell to place it. ' +
     'Scroll the mouse wheel (or right-click) to rotate the piece before placing. ' +
     'Water flows automatically once a complete path exists. ' +
-    'Some chambers add water, waste it, or grant extra pieces when reached.';
+    'Some chambers add water, waste it, or grant extra pieces when reached. ' +
+    'Removing pieces returns water and reverts connections to their original state.';
 
   // ── Legend header ──────────────────────────────────────────────────────────
   const legendHeader = document.createElement('h3');
