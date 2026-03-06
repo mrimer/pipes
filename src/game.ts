@@ -389,6 +389,7 @@ export class Game {
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe (no inventory item selected, or same shape as selected)
       this.board.rotateTile(pos);
+      this.board.applyTurnDelta();
       this.board.recordMove();
       this._spawnConnectionAnimations(filledBefore);
       this._renderInventoryBar();
@@ -409,6 +410,7 @@ export class Game {
     const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
 
     if (this.board.reclaimTile({ row, col })) {
+      this.board.applyTurnDelta();
       this._renderInventoryBar();
       this._updateWaterDisplay();
     } else if (this.board.lastError) {
@@ -469,18 +471,26 @@ export class Game {
     let tooltipText = `(${row}, ${col})`;
     const tile = this.board.grid[row][col];
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
-      let currentCost: number;
-      if (tile.chamberContent === 'dirt') {
-        currentCost = tile.cost;
-      } else if (tile.chamberContent === 'ice') {
-        const currentTemp = this.board.getCurrentTemperature();
-        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-        currentCost = tile.cost * deltaTemp;
-      } else {
-        currentCost = 0;
-      }
-      if (currentCost > 0) {
-        tooltipText += ` cost: ${currentCost}`;
+      // Only show a predicted cost for tiles that are NOT yet in the fill path.
+      // Once a tile is connected its cost is already reflected in the water display;
+      // re-showing it in the tooltip would be misleading.
+      const isConnected = this.board.getLockedWaterImpact({ row, col }) !== null;
+      if (!isConnected) {
+        let predictedCost: number;
+        if (tile.chamberContent === 'dirt') {
+          predictedCost = tile.cost;
+        } else if (tile.chamberContent === 'ice') {
+          // Predicted cost uses the current live temperature so the estimate updates
+          // as connections (e.g. heaters on other branches) change the temperature.
+          const currentTemp = this.board.getCurrentTemperature();
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          predictedCost = tile.cost * deltaTemp;
+        } else {
+          predictedCost = 0;
+        }
+        if (predictedCost > 0) {
+          tooltipText += ` cost: ${predictedCost}`;
+        }
       }
     }
     this.tooltipEl.textContent = tooltipText;
@@ -575,6 +585,7 @@ export class Game {
    */
   private _afterTilePlaced(placedShape: PipeShape, filledBefore: Set<string>): void {
     if (!this.board) return;
+    this.board.applyTurnDelta();
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
@@ -635,6 +646,7 @@ export class Game {
         } else {
           const filledBefore = board.getFilledPositions();
           board.rotateTile(focusPos);
+          board.applyTurnDelta();
           board.recordMove();
           this._spawnConnectionAnimations(filledBefore);
           this._renderInventoryBar();

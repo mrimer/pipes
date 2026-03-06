@@ -1526,22 +1526,141 @@ describe('Level 5 (Hot Springs)', () => {
     expect(iceTiles.length).toBeGreaterThan(0);
   });
 
-  it('temperature reaches 1 when heater is in the fill path', () => {
-    // Place three Tee (E-S-W) tiles to connect source → ice/tank branches → heater → elbow
+  it('temperature reaches 2 when heater is in the fill path', () => {
+    // Placing Tee E-S-W at (0,1) connects Source → Tee → Heater(1,1) → Tank(2,1).
+    // The Heater carries +2°, so currentTemperature becomes 0 + 2 = 2.
     const board = new Board(level.rows, level.cols, level);
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90); // E-S-W
-    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Tee, 90); // E-S-W
-    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Tee, 90); // E-S-W → reaches heater at (1,3)
-    expect(board.getCurrentTemperature()).toBe(1);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90); // E-S-W → reaches heater at (1,1)
+    expect(board.getCurrentTemperature()).toBe(2);
   });
 
   it('level is solved with correct tile placement', () => {
-    // Solution: Tee E-S-W at (0,1), (0,2), (0,3) — includes heater + tanks
+    // Solution: Tee E-S-W at (0,1), (0,2), (0,3) — heater connects on turn 1, ice tiles on turns 2+
     const board = new Board(level.rows, level.cols, level);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
     board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Tee, 90);
     board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Tee, 90);
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
+  });
+});
+
+// ─── New: Board.applyTurnDelta (incremental turn evaluation) ──────────────────
+
+describe('Board.applyTurnDelta (incremental turn evaluation)', () => {
+  /**
+   * Build a 3×4 board that lets us test incremental ice-cost locking:
+   *
+   *   (0,0) Source  – connects East AND South; cap=100, temp=0
+   *   (0,1) Empty   – player places Straight E-W here to connect Ice
+   *   (0,2) Chamber(ice, thresh=10, cost=2, E-W)
+   *   (0,3) Sink    – West-only (no random downstream connections)
+   *   (1,0) Empty   – player places Straight N-S here to connect Heater
+   *   (2,0) Chamber(heater, +20°, North-only)
+   *   all other cells: explicitly Empty
+   */
+  function makeIncrementalBoard(): Board {
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+
+    // Clear all cells to Empty first (Board without a level uses _buildGrid which
+    // fills unset cells with random pipe tiles that can accidentally join the fill path).
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0);
+    // (0,1) stays Empty – player fills this
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1,
+      new Set([Direction.East, Direction.West]), 'ice', 10);
+    // Sink with West-only connection so nothing else joins the fill path from its side.
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    // (1,0) stays Empty – player fills this
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.North]), 'heater', 20);
+
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+    return board;
+  }
+
+  it('ice cost locked at connection-time temperature is not changed by a later-connected heater', () => {
+    const board = makeIncrementalBoard();
+
+    // Turn 1: place Straight E-W at (0,1) → connects Ice(0,2) and Sink(0,3).
+    // currentTemp = 0 (Heater not yet in fill). Ice locked: cost = 2 × max(0, 10−0) = 20.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    expect(board.getCurrentWater()).toBe(79); // 100 − 1 (Straight) − 20 (Ice, temp=0)
+
+    // Turn 2: place Straight N-S at (1,0) → connects Heater(2,0).
+    // currentTemp becomes 20, but Ice(0,2) was already locked with cost=20.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Ice cost must remain 20 (locked in turn 1), not recalculated at temp=20.
+    expect(board.getCurrentWater()).toBe(78); // 79 − 1 (new Straight) + 0 (Heater, no water impact)
+  });
+
+  it('ice cost uses the heater temperature when heater was connected before the ice tile', () => {
+    // Heater is directly reachable from Source via South (no empty tile between them).
+    const board = new Board(2, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0);
+    // (0,1) stays Empty – player fills this
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1,
+      new Set([Direction.East, Direction.West]), 'ice', 10);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    // Heater at (1,0): directly reachable from Source.South without any player tile.
+    board.grid[1][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.North]), 'heater', 20);
+
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+    // After initHistory(): Source and Heater(1,0) are in initial fill → currentTemp=20 locked.
+
+    // Turn 1: place Straight E-W at (0,1) → connects Ice(0,2).
+    // currentTemp = 20 (Heater already locked). Ice: cost = 2 × max(0, 10−20) = 0.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    expect(board.getCurrentWater()).toBe(99); // 100 − 1 (Straight) − 0 (Ice neutralised by Heater)
+  });
+
+  it('undo restores the locked water state so ice cost reverts correctly', () => {
+    const board = makeIncrementalBoard();
+
+    // Turn 1: connect Ice (cost locked at 20, temp=0).
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(79);
+
+    // Turn 2: connect Heater.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(78);
+
+    // Undo turn 2 → Heater disconnected; locked state restored to after-turn-1 snapshot.
+    board.undoMove();
+    expect(board.getCurrentWater()).toBe(79);
+
+    // Undo turn 1 → Ice disconnected; back to initial state.
+    board.undoMove();
+    expect(board.getCurrentWater()).toBe(100);
   });
 });

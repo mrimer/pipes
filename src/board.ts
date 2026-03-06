@@ -30,7 +30,7 @@ export const GOLD_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
-type Snapshot = { grid: Tile[][]; inventory: InventoryItem[] };
+type Snapshot = { grid: Tile[][]; inventory: InventoryItem[]; lockedWaterImpact: Map<string, number> };
 
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
@@ -60,6 +60,17 @@ export class Board {
    * can display an appropriate error message.  Cleared on each new attempt.
    */
   lastError: string | null = null;
+
+  /**
+   * Per-tile locked water impact, keyed by "row,col".
+   * A negative value represents a water cost; a positive value represents a gain.
+   * Populated by {@link applyTurnDelta} after each player action and by
+   * {@link initHistory} for the initial board state.
+   * When this map is empty (before {@link initHistory} is called), {@link getCurrentWater}
+   * falls back to dynamic computation so that tests that bypass the turn
+   * mechanism continue to work unchanged.
+   */
+  private _lockedWaterImpact: Map<string, number> = new Map();
 
   /** Full move history for undo/redo support. history[0] is the initial state. */
   private _history: Snapshot[] = [];
@@ -127,9 +138,12 @@ export class Board {
   /**
    * Initialise the move history with the current board state as the starting point.
    * Must be called once after a level is fully set up (e.g. at the start of play).
-   * Calling this resets any existing history.
+   * Calling this resets any existing history and locks the initial water impact
+   * for all tiles that are already connected at game start.
    */
   initHistory(): void {
+    this._lockedWaterImpact = new Map();
+    this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
   }
@@ -216,6 +230,7 @@ export class Board {
         ),
       ),
       inventory: this.inventory.map((item) => ({ ...item })),
+      lockedWaterImpact: new Map(this._lockedWaterImpact),
     };
   }
 
@@ -229,6 +244,7 @@ export class Board {
     // InventoryItem only contains primitive fields (shape + count), so spread is a full copy –
     // consistent with the spread used in _captureSnapshot.
     this.inventory = snap.inventory.map((item) => ({ ...item }));
+    this._lockedWaterImpact = new Map(snap.lockedWaterImpact);
   }
 
   /**
@@ -473,11 +489,32 @@ export class Board {
 
   /**
    * Compute current water remaining in the source tank based on the live fill state.
-   * Water gained from connected Tank tiles offsets the cost of regular pipe tiles.
-   * Ice tiles reduce capacity by cost × max(0, ice.temperature − currentTemperature).
+   *
+   * When incremental turn tracking is active (i.e. {@link applyTurnDelta} has been
+   * called at least once, typically via {@link initHistory}), each tile's water
+   * impact is read from the locked-impact map so that ice-tile costs are frozen at
+   * the temperature that was in effect when the tile was first connected.
+   *
+   * When no turn tracking has been applied yet (e.g. in unit tests that build a
+   * board directly without going through the game loop), a fully dynamic
+   * computation is performed using the current temperature — identical to the
+   * pre-incremental behaviour — so that existing tests remain valid.
    */
   getCurrentWater(): number {
     const filled = this.getFilledPositions();
+
+    // ── Incremental path (normal gameplay) ──────────────────────────────────
+    // _lockedWaterImpact is non-empty once applyTurnDelta() has been called
+    // (at minimum the source tile is always present).
+    if (this._lockedWaterImpact.size > 0) {
+      let total = this.sourceCapacity;
+      for (const key of filled) {
+        total += this._lockedWaterImpact.get(key) ?? 0;
+      }
+      return total;
+    }
+
+    // ── Dynamic fallback (test/legacy path) ─────────────────────────────────
     const currentTemp = this._computeTemperatureFromFilled(filled);
     let pipeCost = 0;
     let tankGain = 0;
@@ -498,6 +535,71 @@ export class Board {
       }
     }
     return this.sourceCapacity - pipeCost + tankGain;
+  }
+
+  /**
+   * Evaluate and lock the water impact of each newly-connected tile based on
+   * the current board state.  Must be called after every player action that may
+   * change the fill path (place, rotate, reclaim).
+   *
+   * - Previously-evaluated tiles keep their locked impact unchanged, so an ice
+   *   tile's cost is never retroactively altered by a heater connected later.
+   * - Tiles removed from the fill path lose their lock; if they reconnect on a
+   *   future move they are re-evaluated at the temperature current at that time.
+   *
+   * Ice-tile costs are computed from the current source temperature (source base
+   * plus all heaters that are already in the fill set when this method runs),
+   * which is the "state of the board" at the moment the turn is applied.
+   */
+  applyTurnDelta(): void {
+    const filled = this.getFilledPositions();
+    const currentTemp = this._computeTemperatureFromFilled(filled);
+
+    // Remove locked impacts for tiles that are no longer connected.
+    for (const key of this._lockedWaterImpact.keys()) {
+      if (!filled.has(key)) {
+        this._lockedWaterImpact.delete(key);
+      }
+    }
+
+    // Lock the impact of each newly-connected tile.
+    for (const key of filled) {
+      if (this._lockedWaterImpact.has(key)) continue; // Already evaluated.
+
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (!tile) continue;
+
+      let impact = 0;
+      if (PIPE_SHAPES.has(tile.shape)) {
+        impact = -1;
+      } else if (tile.shape === PipeShape.Chamber) {
+        if (tile.chamberContent === 'tank') {
+          impact = tile.capacity;
+        } else if (tile.chamberContent === 'dirt') {
+          impact = -tile.cost;
+        } else if (tile.chamberContent === 'ice') {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          impact = -(tile.cost * deltaTemp);
+        }
+        // 'heater' and 'item': no direct water impact (impact stays 0).
+      }
+      // Source, Sink, Empty, Granite: no water impact (impact stays 0).
+
+      this._lockedWaterImpact.set(key, impact);
+    }
+  }
+
+  /**
+   * Return the locked water impact for the tile at the given position, or
+   * `null` if that tile has not yet been evaluated by {@link applyTurnDelta}.
+   * A negative return value represents a water cost; positive represents a gain.
+   * Used by the UI to display the actual locked cost of an ice tile in the tooltip.
+   */
+  getLockedWaterImpact(pos: GridPos): number | null {
+    const key = `${pos.row},${pos.col}`;
+    const val = this._lockedWaterImpact.get(key);
+    return val !== undefined ? val : null;
   }
 
   // ─── Grid validation ───────────────────────────────────────────────────────

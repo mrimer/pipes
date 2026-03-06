@@ -286,59 +286,65 @@ const LEVEL_5: LevelDef = {
   /**
    * Grid layout (rows×cols = 4×5):
    *   Row 0: Source(0,0,cap=10,East) | null(0,1) | null(0,2) | null(0,3) | Elbow(0,4,S-W)
-   *   Row 1: null | Ice(1,1,cost=5,thresh=1,N-S) | Ice(1,2,cost=5,thresh=1,N-S) | Heater(1,3,+1°,North) | Straight(1,4,N-S)
-   *   Row 2: null | Tank(2,1,+5,North) | Tank(2,2,+5,North) | null | Ice(2,4,cost=5,thresh=2,N-S)
+   *   Row 1: null | Heater(1,1,+2°,N-S) | Ice(1,2,cost=5,thresh=2,N-S) | Ice(1,3,cost=5,thresh=2,N-S) | Straight(1,4,N-S)
+   *   Row 2: null | Tank(2,1,+5,North) | Tank(2,2,+5,North) | Tank(2,3,+5,North) | Ice(2,4,cost=5,thresh=3,N-S)
    *   Row 3: null | null | null | null | Sink(3,4,North)
    *
    * Solution path: place Tee E-S-W at (0,1), (0,2), (0,3).
    *   Source(0,0) → Tee(0,1) → Tee(0,2) → Tee(0,3) → Elbow(0,4) → Straight(1,4) → Ice(2,4) → Sink(3,4)
-   *   Side branches: Tee(0,3) South → Heater(1,3); Tee(0,1) South → Ice(1,1) → Tank(2,1);
+   *   Side branches: Tee(0,1) South → Heater(1,1) → Tank(2,1)
    *                  Tee(0,2) South → Ice(1,2) → Tank(2,2)
+   *                  Tee(0,3) South → Ice(1,3) → Tank(2,3)
    *
-   * Temperature: source base = 0, heater adds 1 → effective temp = 1.
-   * Ice(1,1) thresh=1: deltaTemp = max(0, 1 − 1) = 0 → free (heater neutralises it).
-   * Ice(1,2) thresh=1: same → free.
-   * Ice(2,4) thresh=2: deltaTemp = max(0, 2 − 1) = 1 → cost = 5×1 = 5.
+   * Incremental evaluation (turn order matters):
+   *   Turn 1 – Tee(0,1): Heater(1,1) and Tank(2,1) are newly connected.
+   *            currentTemp = 0 + 2 = 2.  Heater impact = 0; Tank impact = +5.
+   *   Turn 2 – Tee(0,2): Ice(1,2) and Tank(2,2) are newly connected.
+   *            currentTemp = 2 (Heater already locked from turn 1).
+   *            Ice(1,2) thresh=2: deltaTemp = max(0, 2−2) = 0 → impact = 0 (free).
+   *            Tank(2,2) impact = +5.
+   *   Turn 3 – Tee(0,3): Ice(1,3), Tank(2,3), Elbow(0,4), Straight(1,4), Ice(2,4), Sink.
+   *            currentTemp = 2.
+   *            Ice(1,3) thresh=2: free.  Ice(2,4) thresh=3: deltaTemp=1 → cost=5×1=5.
    *
-   * Water budget: 10 (source)
-   *   − 3 (Tees at 0,1/0,2/0,3) − 1 (Elbow 0,4) − 1 (Straight 1,4) − 5 (Ice 2,4)
-   *   + 5 (Tank 2,1) + 5 (Tank 2,2) = 10 remaining.
+   * Water budget (incremental): 10 (source)
+   *   − 3 (Tees) − 1 (Elbow) − 1 (Straight 1,4) − 5 (Ice 2,4)
+   *   + 5 (Tank 2,1) + 5 (Tank 2,2) + 5 (Tank 2,3)
+   *   = 15 remaining.
    */
   grid: [
     // Row 0
     [
       { shape: PipeShape.Source, rotation: 0, capacity: 10, temperature: 0, connections: [Direction.East] }, // (0,0)
-      null,                                                                                                    // (0,1) player fills: Straight E-W
-      null,
-      null,                                                                                                    // (0,3) player fills: Straight E-W
-      { shape: PipeShape.Elbow, rotation: 180 },                                         // (0,4) S-W
+      null,                                                                                                    // (0,1) player fills: Tee E-S-W
+      null,                                                                                                    // (0,2) player fills: Tee E-S-W
+      null,                                                                                                    // (0,3) player fills: Tee E-S-W
+      { shape: PipeShape.Elbow, rotation: 180 },                                                              // (0,4) S-W
     ],
     // Row 1
     [
       null,
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (1,1)
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (1,2)
-      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 1, connections: [Direction.North] }, // (1,3)
-      { shape: PipeShape.Straight, rotation: 0 },                                        // (1,4) N-S
+      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 2, connections: [Direction.North, Direction.South] }, // (1,1)
+      { shape: PipeShape.Chamber, chamberContent: 'ice',    rotation: 0, cost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (1,2)
+      { shape: PipeShape.Chamber, chamberContent: 'ice',    rotation: 0, cost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (1,3)
+      { shape: PipeShape.Straight, rotation: 0 },                                                             // (1,4) N-S
     ],
     // Row 2
     [
       null,
-      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] },
-      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] },
-      null,
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (2,4)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] }, // (2,1)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] }, // (2,2)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] }, // (2,3)
+      { shape: PipeShape.Chamber, chamberContent: 'ice',  rotation: 0, cost: 5, temperature: 3, connections: [Direction.North, Direction.South] }, // (2,4)
     ],
     // Row 3
     [
       null, null, null, null,
-      { shape: PipeShape.Sink, rotation: 0, connections: [Direction.North] },            // (3,4)
+      { shape: PipeShape.Sink, rotation: 0, connections: [Direction.North] },                                 // (3,4)
     ],
   ],
   inventory: [
-    { shape: PipeShape.Straight, count: 3 },
-    { shape: PipeShape.Elbow,    count: 1 },
-    { shape: PipeShape.Tee,      count: 3 },
+    { shape: PipeShape.Tee, count: 3 },
   ],
 };
 
