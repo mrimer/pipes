@@ -49,7 +49,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: colorCircle(SINK_COLOR),
     name: 'Sink',
-    description: 'Water destination — fill this tile to win the level.',
+    description: 'Water destination — connect this tile with water remaining to win the level.',
   },
   {
     iconHtml: colorSwatch(EMPTY_COLOR),

@@ -755,15 +755,32 @@ describe('Game – _checkWinLose: fail takes precedence', () => {
     expect(winModalEl.style.display).toBe('none');
   });
 
-  it('results in Won when water is zero and sink is reached', () => {
+  it('results in GameOver (not Won) when water is zero and sink is reached', () => {
     const { game, winModalEl, gameoverModalEl } = makeGame();
     game.startLevel(1);
 
     const boardAccess = game as unknown as { board: Board; gameState: GameState };
 
-    // Water exactly 0 but sink reached → should be a win (not fail)
+    // Water exactly 0 and sink reached → still a loss; water must be > 0 to win
     jest.spyOn(boardAccess.board, 'isSolved').mockReturnValue(true);
     jest.spyOn(boardAccess.board, 'getCurrentWater').mockReturnValue(0);
+
+    (game as unknown as { _checkWinLose(): void })._checkWinLose();
+
+    expect(boardAccess.gameState).toBe(GameState.GameOver);
+    expect(gameoverModalEl.style.display).toBe('flex');
+    expect(winModalEl.style.display).toBe('none');
+  });
+
+  it('results in Won when water is positive and sink is reached', () => {
+    const { game, winModalEl, gameoverModalEl } = makeGame();
+    game.startLevel(1);
+
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+
+    // Water > 0 and sink reached → win
+    jest.spyOn(boardAccess.board, 'isSolved').mockReturnValue(true);
+    jest.spyOn(boardAccess.board, 'getCurrentWater').mockReturnValue(1);
 
     (game as unknown as { _checkWinLose(): void })._checkWinLose();
 
