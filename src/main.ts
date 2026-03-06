@@ -18,6 +18,7 @@ const gameoverModalEl = getEl('gameover-modal');
 const gameoverMsgEl  = getEl('gameover-msg');
 const undoBtnEl      = getEl<HTMLButtonElement>('undo-btn');
 const redoBtnEl      = getEl<HTMLButtonElement>('redo-btn');
+const exitBtnEl      = getEl<HTMLButtonElement>('exit-btn');
 
 const game = new Game(
   canvas,
@@ -32,6 +33,7 @@ const game = new Game(
   gameoverMsgEl,
   undoBtnEl,
   redoBtnEl,
+  exitBtnEl,
 );
 
 // Win modal buttons
@@ -49,5 +51,5 @@ undoBtnEl.addEventListener('click', () => game.performUndo());
 redoBtnEl.addEventListener('click', () => game.performRedo());
 
 // Exit to menu button on play screen
-getEl('exit-btn').addEventListener('click', () => game.exitToMenu());
+exitBtnEl.addEventListener('click', () => game.exitToMenu());
 
