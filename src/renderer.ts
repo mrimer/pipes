@@ -69,8 +69,8 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
   }
 }
 
-/** Draw a single pipe tile at canvas position (x, y). */
-export function drawPipe(
+/** Draw a single tile at canvas position (x, y). */
+export function drawTile(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -235,7 +235,8 @@ export function drawPipe(
         ctx.beginPath();
         ctx.rect(-bw, -bh, bw * 2, bh * 2);
         ctx.clip();
-        const scale = bw / half;
+        // 2px buffer between item shape and chamber walls
+        const scale = (bw - 2) / half;
         ctx.scale(scale, scale);
         ctx.strokeStyle = itemColor;
         ctx.lineWidth = LINE_WIDTH;
@@ -478,7 +479,7 @@ export function renderBoard(
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
 
-      drawPipe(ctx, x, y, tile, isWater, currentWater);
+      drawTile(ctx, x, y, tile, isWater, currentWater);
     }
   }
 
@@ -497,7 +498,7 @@ export function renderBoard(
         const py = hoverRow * TILE_SIZE;
         ctx.save();
         ctx.globalAlpha = 0.5;
-        drawPipe(ctx, px, py, previewTile, false, currentWater);
+        drawTile(ctx, px, py, previewTile, false, currentWater);
         ctx.restore();
       }
     }
