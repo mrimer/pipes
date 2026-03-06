@@ -104,7 +104,8 @@ function chamberColor(content: string): string {
 
 // ─── Helper: generate a unique ID ─────────────────────────────────────────────
 
-function generateId(): string {
+/** Generate a unique campaign ID. */
+function generateCampaignId(): string {
   return `cmp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
@@ -638,9 +639,11 @@ export class CampaignEditor {
       }));
 
       // Save
-      toolbar.appendChild(this._btn('💾 Save', '#27ae60', '#fff', () => {
+      const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
         this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
-      }));
+      });
+      saveBtn.id = 'editor-save-btn';
+      toolbar.appendChild(saveBtn);
     }
 
     this._el.appendChild(toolbar);
@@ -1579,9 +1582,9 @@ export class CampaignEditor {
     }
     this._saveCampaigns();
 
-    // Visual confirmation
-    const saveBtn = this._el.querySelector('button') as HTMLButtonElement | null;
-    if (saveBtn && saveBtn.textContent?.includes('Save')) {
+    // Visual confirmation on the Save button
+    const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
+    if (saveBtn) {
       const orig = saveBtn.textContent;
       saveBtn.textContent = '✅ Saved!';
       setTimeout(() => { saveBtn.textContent = orig; }, 1500);
@@ -1595,7 +1598,7 @@ export class CampaignEditor {
     if (!name?.trim()) return;
     const author = prompt('Author name:') ?? '';
     const campaign: CampaignDef = {
-      id: generateId(),
+      id: generateCampaignId(),
       name: name.trim(),
       author: author.trim(),
       chapters: [],
@@ -1676,10 +1679,13 @@ export class CampaignEditor {
             return;
           }
           // Ensure we don't clobber the official campaign
-          if (data.id === 'official') data.id = generateId();
-          // Check for duplicate ID
+          if (data.id === 'official') {
+            data.id = generateCampaignId();
+            alert(`Note: this file has the reserved "official" ID. A new unique ID has been assigned to the imported campaign.`);
+          }
+          // Check for duplicate ID and reassign silently
           if (this._campaigns.some((c) => c.id === data.id)) {
-            data.id = generateId(); // assign new ID on conflict
+            data.id = generateCampaignId();
           }
           this._campaigns.push(data);
           this._saveCampaigns();
