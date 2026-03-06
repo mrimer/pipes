@@ -62,6 +62,7 @@ export type ConnectionSet = Set<Direction>;
 export enum GameScreen {
   LevelSelect = 'LEVEL_SELECT',
   Play = 'PLAY',
+  CampaignEditor = 'CAMPAIGN_EDITOR',
 }
 
 /** State of an active game level. */
@@ -121,4 +122,16 @@ export interface ChapterDef {
   id: number;
   name: string;
   levels: LevelDef[];
+}
+
+/**
+ * A campaign groups a set of chapters and their levels under a shared name.
+ * Campaigns can be created, imported, and exported in the Campaign Editor.
+ */
+export interface CampaignDef {
+  /** Unique identifier used to key persistent progress tracking. */
+  id: string;
+  name: string;
+  author: string;
+  chapters: ChapterDef[];
 }

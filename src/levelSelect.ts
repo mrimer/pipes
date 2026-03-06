@@ -11,6 +11,7 @@ import { CHAPTERS } from './levels';
  * @param startLevel - Callback invoked when the player selects a level to play.
  * @param onResetClick - Callback invoked when the player clicks the reset-progress button.
  * @param onRulesClick - Callback invoked when the player clicks the "Game Rules" button.
+ * @param onCampaignEditorClick - Callback invoked when the player clicks the "Campaign Editor" button.
  * @param onUnlockAllClick - Callback invoked when the dev cheat "Unlock All" button is clicked.
  */
 export function renderLevelList(
@@ -19,6 +20,7 @@ export function renderLevelList(
   startLevel: (levelId: number) => void,
   onResetClick: () => void,
   onRulesClick: () => void,
+  onCampaignEditorClick: () => void,
   onUnlockAllClick: () => void,
 ): void {
   levelListEl.innerHTML = '';
@@ -125,6 +127,15 @@ export function renderLevelList(
     chapterBox.appendChild(levelsContainer);
     levelListEl.appendChild(chapterBox);
   }
+
+  // Campaign Editor button at the top of the controls
+  const campaignEditorBtn = document.createElement('button');
+  campaignEditorBtn.textContent = '🗺️ Campaign Editor';
+  campaignEditorBtn.style.cssText =
+    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#16213e;color:#f0c040;' +
+    'border:1px solid #f0c040;border-radius:6px;cursor:pointer;width:100%;';
+  campaignEditorBtn.addEventListener('click', onCampaignEditorClick);
+  levelListEl.appendChild(campaignEditorBtn);
 
   // Game Rules button above the reset button
   const rulesBtn = document.createElement('button');
