@@ -541,10 +541,10 @@ export class Game {
    *
    * - Regular pipe tiles (Straight, Elbow, Tee, Cross and gold variants): "-1" (red)
    * - Chamber-tank tiles: "+capacity" (green / gray / red)
-   * - Chamber-dirt tiles: "-cost" (red / gray / green)
+   * - Chamber-dirt tiles: "+cost" (red) when cost > 0, "-0" when cost = 0
    * - Chamber-item tiles: "+itemCount" (green / gray / red)
    * - Chamber-heater tiles: "+temperature°" (green)
-   * - Chamber-ice tiles: "-(cost × deltaTemp)" (red)
+   * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
     if (!this.board) return;
@@ -575,8 +575,8 @@ export class Game {
           color = animColor(val);
         } else if (tile.chamberContent === 'dirt') {
           const val = -tile.cost;
-          text = val >= 0 ? `+${val}` : `${val}`;
-          color = animColor(val);
+          text = val > 0 ? `+${val}` : val < 0 ? `${val}` : '-0';
+          color = val > 0 ? animColor(val) : ANIM_NEGATIVE_COLOR;
         } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
           const val = tile.itemCount;
           text = val >= 0 ? `+${val}` : `${val}`;
@@ -587,7 +587,7 @@ export class Game {
         } else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -(tile.cost * deltaTemp);
-          text = val >= 0 ? `+${val}` : `${val}`;
+          text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
         }
       }
