@@ -457,7 +457,24 @@ export class Game {
       return;
     }
     // Display as (row, col) to match the GridPos convention used throughout the codebase.
-    this.tooltipEl.textContent = `(${row}, ${col})`;
+    let tooltipText = `(${row}, ${col})`;
+    const tile = this.board.grid[row][col];
+    if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
+      let currentCost: number;
+      if (tile.chamberContent === 'dirt') {
+        currentCost = tile.cost;
+      } else if (tile.chamberContent === 'ice') {
+        const currentTemp = this.board.getCurrentTemperature();
+        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+        currentCost = tile.cost * deltaTemp;
+      } else {
+        currentCost = 0;
+      }
+      if (currentCost > 0) {
+        tooltipText += ` cost: ${currentCost}`;
+      }
+    }
+    this.tooltipEl.textContent = tooltipText;
     this.tooltipEl.style.display = 'block';
     this.tooltipEl.style.left = `${clientX + 12}px`;
     this.tooltipEl.style.top  = `${clientY + 12}px`;
@@ -485,15 +502,16 @@ export class Game {
    *
    * - Regular pipe tiles (Straight, Elbow, Tee, Cross and gold variants): "-1" (red)
    * - Chamber-tank tiles: "+capacity" (green / gray / red)
-   * - Chamber-dirt tiles: "-dirtCost" (red / gray / green)
+   * - Chamber-dirt tiles: "-cost" (red / gray / green)
    * - Chamber-item tiles: "+itemCount" (green / gray / red)
    * - Chamber-heater tiles: "+temperature°" (green)
-   * - Chamber-ice tiles: "-dirtCost×Δ" (red)
+   * - Chamber-ice tiles: "-(cost × deltaTemp)" (red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
     if (!this.board) return;
     const filledAfter = this.board.getFilledPositions();
     const now = performance.now();
+    const currentTemp = this.board.getCurrentTemperature(filledAfter);
 
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue; // was already filled – skip
@@ -517,7 +535,7 @@ export class Game {
           text = val >= 0 ? `+${val}` : `${val}`;
           color = animColor(val);
         } else if (tile.chamberContent === 'dirt') {
-          const val = -tile.dirtCost;
+          const val = -tile.cost;
           text = val >= 0 ? `+${val}` : `${val}`;
           color = animColor(val);
         } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
@@ -528,7 +546,9 @@ export class Game {
           text = `+${tile.temperature}°`;
           color = animColor(tile.temperature);
         } else if (tile.chamberContent === 'ice') {
-          text = `-${tile.dirtCost}×Δ`;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = -(tile.cost * deltaTemp);
+          text = val >= 0 ? `+${val}` : `${val}`;
           color = ANIM_NEGATIVE_COLOR;
         }
       }

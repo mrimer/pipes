@@ -84,7 +84,7 @@ export interface TileDef {
   /** Water capacity (Source and Chamber-tank tiles only). */
   capacity?: number;
   /** Water cost for Chamber-dirt and Chamber-ice tiles – water wasted when water flows through this tile. */
-  dirtCost?: number;
+  cost?: number;
   /** Shape of the inventory item stored inside a Chamber-item tile. */
   itemShape?: PipeShape;
   /** Number of inventory items granted by a Chamber-item tile (defaults to 1). */

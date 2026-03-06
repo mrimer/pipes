@@ -109,7 +109,7 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.dirtCost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0);
+          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -206,7 +206,7 @@ export class Board {
               tile.rotation,
               tile.isFixed,
               tile.capacity,
-              tile.dirtCost,
+              tile.cost,
               tile.itemShape,
               tile.itemCount,
               tile.customConnections !== null ? new Set(tile.customConnections) : null,
@@ -474,7 +474,7 @@ export class Board {
   /**
    * Compute current water remaining in the source tank based on the live fill state.
    * Water gained from connected Tank tiles offsets the cost of regular pipe tiles.
-   * Ice tiles reduce capacity by dirtCost × max(0, ice.temperature − currentTemperature).
+   * Ice tiles reduce capacity by cost × max(0, ice.temperature − currentTemperature).
    */
   getCurrentWater(): number {
     const filled = this.getFilledPositions();
@@ -490,10 +490,10 @@ export class Board {
         pipeCost++;
       } else if (tile.shape === PipeShape.Chamber) {
         if (tile.chamberContent === 'tank') tankGain += tile.capacity;
-        else if (tile.chamberContent === 'dirt') pipeCost += tile.dirtCost;
+        else if (tile.chamberContent === 'dirt') pipeCost += tile.cost;
         else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          pipeCost += tile.dirtCost * deltaTemp;
+          pipeCost += tile.cost * deltaTemp;
         }
       }
     }

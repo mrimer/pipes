@@ -87,7 +87,7 @@ const LEVEL_2: LevelDef = {
     [
       { shape: PipeShape.Source,    rotation: 0,   capacity: 12, connections: [Direction.East, Direction.South] }, // (0,0)
       null,                                                                         // (0,1) player fills: Straight E-W
-      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, dirtCost: 2, connections: [Direction.East, Direction.West] },  // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, cost: 2, connections: [Direction.East, Direction.West] },  // (0,2)
       null,                                                                         // (0,3) player fills: Straight E-W
       { shape: PipeShape.Elbow,     rotation: 180 },                // (0,4) W-S
       null,
@@ -113,7 +113,7 @@ const LEVEL_2: LevelDef = {
       null, null,
       { shape: PipeShape.Granite },                              // (3,2) granite obstacle
       null,
-      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, dirtCost: 3, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },   // (3,4)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, cost: 3, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },   // (3,4)
       null,
     ],
     // Row 4
@@ -259,7 +259,7 @@ const LEVEL_4: LevelDef = {
     // Row 4
     [
       null, null, null, null,
-      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, dirtCost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },       // (4,4)
+      { shape: PipeShape.Chamber, chamberContent: 'dirt', rotation: 0, cost: 2, connections: [Direction.North, Direction.East, Direction.South, Direction.West] },       // (4,4)
       null,
     ],
     // Row 5
@@ -284,21 +284,25 @@ const LEVEL_5: LevelDef = {
   rows: 4,
   cols: 5,
   /**
-   * Solution path:
-   *   Source(0,0) → [player: Straight E-W at (0,1)] → Heater(0,2, temp=+10)
-   *     → [player: Straight E-W at (0,3)] → Elbow(0,4, S-W)
-   *     → Straight(1,4, N-S) → Ice(2,4, thresh=15, cost=2)
-   *     → [player: Straight N-S at (3,4)... wait, need Sink]
-   *     → Sink(3,4)
+   * Grid layout (rows×cols = 4×5):
+   *   Row 0: Source(0,0,cap=10,East) | null(0,1) | null(0,2) | null(0,3) | Elbow(0,4,S-W)
+   *   Row 1: null | Ice(1,1,cost=5,thresh=1,N-S) | Ice(1,2,cost=5,thresh=1,N-S) | Heater(1,3,+1°,North) | Straight(1,4,N-S)
+   *   Row 2: null | Tank(2,1,+5,North) | Tank(2,2,+5,North) | null | Ice(2,4,cost=5,thresh=2,N-S)
+   *   Row 3: null | null | null | null | Sink(3,4,North)
    *
-   * Temperature: source base = 5, heater adds 10 → effective temp = 15.
-   * Ice at thresh=15: deltaTemp = max(0, 15 − 15) = 0 → zero capacity cost.
+   * Solution path: place Tee E-S-W at (0,1), (0,2), (0,3).
+   *   Source(0,0) → Tee(0,1) → Tee(0,2) → Tee(0,3) → Elbow(0,4) → Straight(1,4) → Ice(2,4) → Sink(3,4)
+   *   Side branches: Tee(0,3) South → Heater(1,3); Tee(0,1) South → Ice(1,1) → Tank(2,1);
+   *                  Tee(0,2) South → Ice(1,2) → Tank(2,2)
    *
-   * Water budget: 20 (source)
-   *   − 1 (Straight 0,1) − 1 (Straight 0,3) − 1 (Elbow 0,4)
-   *   − 1 (Straight 1,4) − 0 (Ice 2,4, thresh met) − 1 (Straight 3,4... see below)
-   * Player places 3 Straight tiles.
-   * Note: with source temp only (5°), ice would cost 2×(15−5)=20 — unbeatable.
+   * Temperature: source base = 0, heater adds 1 → effective temp = 1.
+   * Ice(1,1) thresh=1: deltaTemp = max(0, 1 − 1) = 0 → free (heater neutralises it).
+   * Ice(1,2) thresh=1: same → free.
+   * Ice(2,4) thresh=2: deltaTemp = max(0, 2 − 1) = 1 → cost = 5×1 = 5.
+   *
+   * Water budget: 10 (source)
+   *   − 3 (Tees at 0,1/0,2/0,3) − 1 (Elbow 0,4) − 1 (Straight 1,4) − 5 (Ice 2,4)
+   *   + 5 (Tank 2,1) + 5 (Tank 2,2) = 10 remaining.
    */
   grid: [
     // Row 0
@@ -312,9 +316,9 @@ const LEVEL_5: LevelDef = {
     // Row 1
     [
       null,
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (2,4)
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (2,4)
-      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 1, connections: [Direction.North] }, // (0,2)
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (1,1)
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (1,2)
+      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 1, connections: [Direction.North] }, // (1,3)
       { shape: PipeShape.Straight, rotation: 0 },                                        // (1,4) N-S
     ],
     // Row 2
@@ -323,7 +327,7 @@ const LEVEL_5: LevelDef = {
       { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] },
       { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] },
       null,
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (2,4)
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (2,4)
     ],
     // Row 3
     [

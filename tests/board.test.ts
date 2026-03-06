@@ -341,12 +341,12 @@ describe('Chamber tile (dirt content)', () => {
     }
   });
 
-  it('carries its dirtCost value', () => {
+  it('carries its cost value', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'dirt');
-    expect(tile.dirtCost).toBe(5);
+    expect(tile.cost).toBe(5);
   });
 
-  it('deducts dirtCost from water when in the fill path', () => {
+  it('deducts cost from water when in the fill path', () => {
     // Source → Chamber(dirt, cost=4) → Sink
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
@@ -739,7 +739,7 @@ describe('Chamber tile', () => {
     expect(board.getCurrentWater()).toBe(17);
   });
 
-  it('dirt content subtracts dirtCost from getCurrentWater', () => {
+  it('dirt content subtracts cost from getCurrentWater', () => {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
@@ -1440,9 +1440,9 @@ describe('Board.getCurrentTemperature', () => {
 // ─── New: Chamber tile (ice content) ─────────────────────────────────────────
 
 describe('Chamber tile (ice content)', () => {
-  it('carries its dirtCost and temperature threshold', () => {
+  it('carries its cost and temperature threshold', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'ice', 15);
-    expect(tile.dirtCost).toBe(3);
+    expect(tile.cost).toBe(3);
     expect(tile.temperature).toBe(15);
   });
 
@@ -1504,10 +1504,10 @@ describe('Level 5 (Hot Springs)', () => {
     expect(level.grid.length).toBe(level.rows);
   });
 
-  it('source has base temperature 5', () => {
+  it('source has base temperature 0', () => {
     const board = new Board(level.rows, level.cols, level);
     const src = board.grid[board.source.row][board.source.col];
-    expect(src.temperature).toBe(5);
+    expect(src.temperature).toBe(0);
   });
 
   it('contains a Heater chamber tile', () => {
@@ -1526,18 +1526,21 @@ describe('Level 5 (Hot Springs)', () => {
     expect(iceTiles.length).toBeGreaterThan(0);
   });
 
-  it('temperature reaches 15 when heater is in the fill path', () => {
-    // Place the two Straight tiles needed to connect source → heater → rest
+  it('temperature reaches 1 when heater is in the fill path', () => {
+    // Place three Tee (E-S-W) tiles to connect source → ice/tank branches → heater → elbow
     const board = new Board(level.rows, level.cols, level);
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90); // E-W
-    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90); // E-W
-    expect(board.getCurrentTemperature()).toBe(15);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90); // E-S-W
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Tee, 90); // E-S-W
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Tee, 90); // E-S-W → reaches heater at (1,3)
+    expect(board.getCurrentTemperature()).toBe(1);
   });
 
-  it('ice costs nothing when temperature reaches threshold', () => {
+  it('level is solved with correct tile placement', () => {
+    // Solution: Tee E-S-W at (0,1), (0,2), (0,3) — includes heater + tanks
     const board = new Board(level.rows, level.cols, level);
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Tee, 90);
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Tee, 90);
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
   });
