@@ -84,6 +84,30 @@ export class CampaignEditor {
     this._showCampaignList();
   }
 
+  /**
+   * Show the campaign editor, restoring the screen that was active when hide() was called.
+   * Use this after playtesting to return the user to the level they were editing.
+   */
+  showAndRestore(): void {
+    this._el.style.display = 'flex';
+    switch (this._screen) {
+      case 'levelEditor': {
+        const campaign = this._getActiveCampaign();
+        const readOnly = campaign?.id === 'official';
+        this._showLevelEditor(readOnly);
+        break;
+      }
+      case 'chapter':
+        this._showChapterDetail();
+        break;
+      case 'campaign':
+        this._showCampaignDetail();
+        break;
+      default:
+        this._showCampaignList();
+    }
+  }
+
   /** Hide the campaign editor. */
   hide(): void {
     this._el.style.display = 'none';
@@ -500,6 +524,37 @@ export class CampaignEditor {
           this._showChapterDetail();
         }
       }));
+
+      if (campaign.chapters.length > 1) {
+        const sel = document.createElement('select');
+        sel.style.cssText =
+          'background:#16213e;color:#aaa;border:1px solid #4a90d9;' +
+          'border-radius:6px;padding:6px 8px;font-size:0.85rem;cursor:pointer;';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '↪ Move to…';
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        sel.appendChild(placeholder);
+        campaign.chapters.forEach((ch, ci) => {
+          if (ci !== chapterIdx) {
+            const opt = document.createElement('option');
+            opt.value = String(ci);
+            opt.textContent = `Ch ${ci + 1}: ${ch.name}`;
+            sel.appendChild(opt);
+          }
+        });
+        sel.addEventListener('change', () => {
+          const targetIdx = parseInt(sel.value, 10);
+          if (isNaN(targetIdx)) return;
+          const [movedLevel] = chapter.levels.splice(levelIdx, 1);
+          if (movedLevel === undefined) return;
+          campaign.chapters[targetIdx].levels.push(movedLevel);
+          this._saveCampaigns();
+          this._showChapterDetail();
+        });
+        btns.appendChild(sel);
+      }
     }
 
     row.appendChild(btns);
