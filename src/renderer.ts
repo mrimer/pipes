@@ -231,6 +231,10 @@ export function drawPipe(
         else if (itemShape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
         else if (itemShape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
         ctx.save();
+        // Clip to the inner box so the pipe image never bleeds onto the connection stubs
+        ctx.beginPath();
+        ctx.rect(-bw, -bh, bw * 2, bh * 2);
+        ctx.clip();
         const scale = bw / half;
         ctx.scale(scale, scale);
         ctx.strokeStyle = itemColor;
@@ -251,13 +255,17 @@ export function drawPipe(
         }
         ctx.restore();
       }
-      // Draw quantity number centered with 3x larger font
+      // Draw quantity number centered, white with a 1px black outline
       if (itemCount > 1) {
-        ctx.fillStyle = itemColor;
+        const countLabel = String(itemCount);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = 'bold 30px Arial';
-        ctx.fillText(String(itemCount), 0, 0);
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 1;
+        ctx.strokeText(countLabel, 0, 0);
+        ctx.fillStyle = 'white';
+        ctx.fillText(countLabel, 0, 0);
       }
     } else if (chamberContent === 'heater') {
       // Show positive temperature bonus in heater color
