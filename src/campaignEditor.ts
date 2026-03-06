@@ -713,7 +713,6 @@ export class CampaignEditor {
 
   private readonly _PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
     { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
-    { palette: PipeShape.Empty,    label: '░ Player Cell' },
     { palette: PipeShape.Source,   label: '💧 Source' },
     { palette: PipeShape.Sink,     label: '🏁 Sink' },
     { palette: PipeShape.Straight, label: '━ Straight (fixed)' },
@@ -786,7 +785,7 @@ export class CampaignEditor {
     panel.appendChild(title);
 
     const p = this._editorPalette;
-    if (p === 'erase' || p === PipeShape.Empty || p === PipeShape.Granite || p === PipeShape.GoldSpace) {
+    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.GoldSpace) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
       none.textContent = 'No parameters';
@@ -794,31 +793,34 @@ export class CampaignEditor {
       return panel;
     }
 
-    // Rotation (for pipes and most tiles)
-    const rotWrap = document.createElement('div');
-    rotWrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
-    const rotLbl = document.createElement('span');
-    rotLbl.style.cssText = 'font-size:0.78rem;color:#aaa;width:56px;';
-    rotLbl.textContent = 'Rotation:';
-    rotWrap.appendChild(rotLbl);
-    for (const rot of [0, 90, 180, 270] as Rotation[]) {
-      const rb = document.createElement('button');
-      rb.type = 'button';
-      rb.textContent = `${rot}°`;
-      rb.style.cssText =
-        'padding:3px 7px;font-size:0.78rem;border-radius:3px;cursor:pointer;' +
-        'border:1px solid ' + (this._editorParams.rotation === rot ? '#f0c040' : '#555') + ';' +
-        'background:' + (this._editorParams.rotation === rot ? '#2a3a1a' : '#0d1a30') + ';' +
-        'color:' + (this._editorParams.rotation === rot ? '#f0c040' : '#aaa') + ';';
-      rb.addEventListener('click', () => {
-        this._editorParams.rotation = rot;
-        const newPanel = this._buildParamPanel();
-        newPanel.id = 'editor-param-panel';
-        panel.replaceWith(newPanel);
-      });
-      rotWrap.appendChild(rb);
+    // Rotation (for pipe tiles only; Source, Sink, and Chamber use explicit connections instead)
+    const noRotation = p === PipeShape.Source || p === PipeShape.Sink || p === PipeShape.Chamber;
+    if (!noRotation) {
+      const rotWrap = document.createElement('div');
+      rotWrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
+      const rotLbl = document.createElement('span');
+      rotLbl.style.cssText = 'font-size:0.78rem;color:#aaa;width:56px;';
+      rotLbl.textContent = 'Rotation:';
+      rotWrap.appendChild(rotLbl);
+      for (const rot of [0, 90, 180, 270] as Rotation[]) {
+        const rb = document.createElement('button');
+        rb.type = 'button';
+        rb.textContent = `${rot}°`;
+        rb.style.cssText =
+          'padding:3px 7px;font-size:0.78rem;border-radius:3px;cursor:pointer;' +
+          'border:1px solid ' + (this._editorParams.rotation === rot ? '#f0c040' : '#555') + ';' +
+          'background:' + (this._editorParams.rotation === rot ? '#2a3a1a' : '#0d1a30') + ';' +
+          'color:' + (this._editorParams.rotation === rot ? '#f0c040' : '#aaa') + ';';
+        rb.addEventListener('click', () => {
+          this._editorParams.rotation = rot;
+          const newPanel = this._buildParamPanel();
+          newPanel.id = 'editor-param-panel';
+          panel.replaceWith(newPanel);
+        });
+        rotWrap.appendChild(rb);
+      }
+      panel.appendChild(rotWrap);
     }
-    panel.appendChild(rotWrap);
 
     // Source/Chamber: capacity
     if (p === PipeShape.Source || (p === PipeShape.Chamber && this._editorParams.chamberContent === 'tank')) {
@@ -1148,7 +1150,9 @@ export class CampaignEditor {
     if (palette === 'erase') return { shape: PipeShape.Empty };
 
     const p = this._editorParams;
-    const def: TileDef = { shape: palette as PipeShape, rotation: p.rotation };
+    // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
+    const noRotation = palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Chamber;
+    const def: TileDef = noRotation ? { shape: palette as PipeShape } : { shape: palette as PipeShape, rotation: p.rotation };
 
     // Connections
     const connDirs: Direction[] = [];
@@ -1172,8 +1176,6 @@ export class CampaignEditor {
       if (p.chamberContent === 'heater') def.temperature = p.temperature;
       if (p.chamberContent === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
       if (p.chamberContent === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
-    } else if (palette === PipeShape.Empty) {
-      // Player-fillable: no special params
     }
 
     return def;
