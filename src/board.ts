@@ -30,7 +30,7 @@ export const GOLD_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
-type Snapshot = { grid: Tile[][]; inventory: InventoryItem[]; lockedWaterImpact: Map<string, number> };
+type Snapshot = { grid: Tile[][]; inventory: InventoryItem[]; lockedWaterImpact: Map<string, number>; frozen: number };
 
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
@@ -71,6 +71,14 @@ export class Board {
    * mechanism continue to work unchanged.
    */
   private _lockedWaterImpact: Map<string, number> = new Map();
+
+  /**
+   * Total water units that have been frozen by ice blocks during play.
+   * Incremented by {@link applyTurnDelta} each time a newly-connected ice tile
+   * subtracts water units.  Restored by undo/redo via the snapshot mechanism.
+   * Not used in game logic; intended for display purposes.
+   */
+  frozen: number = 0;
 
   /** Full move history for undo/redo support. history[0] is the initial state. */
   private _history: Snapshot[] = [];
@@ -143,6 +151,7 @@ export class Board {
    */
   initHistory(): void {
     this._lockedWaterImpact = new Map();
+    this.frozen = 0;
     this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
@@ -231,6 +240,7 @@ export class Board {
       ),
       inventory: this.inventory.map((item) => ({ ...item })),
       lockedWaterImpact: new Map(this._lockedWaterImpact),
+      frozen: this.frozen,
     };
   }
 
@@ -245,6 +255,7 @@ export class Board {
     // consistent with the spread used in _captureSnapshot.
     this.inventory = snap.inventory.map((item) => ({ ...item }));
     this._lockedWaterImpact = new Map(snap.lockedWaterImpact);
+    this.frozen = snap.frozen;
   }
 
   /**
@@ -614,6 +625,7 @@ export class Board {
         } else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           impact = -(tile.cost * deltaTemp);
+          this.frozen += tile.cost * deltaTemp;
         }
         // 'heater' and 'item': no direct water impact (impact stays 0).
       }

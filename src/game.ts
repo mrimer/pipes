@@ -102,6 +102,9 @@ export class Game {
   /** Element showing the current source temperature (shown for Chapter 2+ levels). */
   private readonly tempDisplayEl: HTMLElement;
 
+  /** Element showing the total water frozen by ice blocks (shown when frozen > 0). */
+  private readonly frozenDisplayEl: HTMLElement;
+
   /**
    * The non-official campaign currently activated for play, or null when playing
    * the built-in official campaign.
@@ -168,6 +171,12 @@ export class Game {
     this.tempDisplayEl.style.cssText =
       'display:none;font-size:1.1rem;font-weight:bold;color:#74b9ff;';
     this.waterDisplayEl.insertAdjacentElement('afterend', this.tempDisplayEl);
+
+    // Create the frozen display element (inserted into the HUD after the temp display)
+    this.frozenDisplayEl = document.createElement('span');
+    this.frozenDisplayEl.style.cssText =
+      'display:none;font-size:1.1rem;font-weight:bold;color:#a8d8ea;';
+    this.tempDisplayEl.insertAdjacentElement('afterend', this.frozenDisplayEl);
 
     // Create the error-flash element for brief action-blocked messages
     this.errorFlashEl = document.createElement('div');
@@ -391,6 +400,14 @@ export class Game {
       this.tempDisplayEl.style.display = 'inline';
     } else {
       this.tempDisplayEl.style.display = 'none';
+    }
+
+    const f = this.board.frozen;
+    if (f > 0) {
+      this.frozenDisplayEl.textContent = `❄️ Frozen: ${f}`;
+      this.frozenDisplayEl.style.display = 'inline';
+    } else {
+      this.frozenDisplayEl.style.display = 'none';
     }
   }
 
