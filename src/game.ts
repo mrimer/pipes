@@ -481,6 +481,8 @@ export class Game {
       // Place pipe from inventory onto an empty cell
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
+      } else if (this.board.lastError) {
+        this._showErrorFlash(this.board.lastError);
       }
     } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty &&
                (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
@@ -577,6 +579,10 @@ export class Game {
     // Display as (row, col) to match the GridPos convention used throughout the codebase.
     let tooltipText = `(${row}, ${col})`;
     const tile = this.board.grid[row][col];
+    // Indicate a gold space regardless of the tile currently on top of it.
+    if (this.board.goldSpaces.has(`${row},${col}`)) {
+      tooltipText += ' (gold space)';
+    }
     // Show a human-readable tile name derived from its shape and chamber content.
     const tileName = getTileDisplayName(tile);
     if (tileName) {

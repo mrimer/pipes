@@ -855,6 +855,33 @@ describe('Gold pipes and gold spaces', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 
+  it('sets lastError when placing a regular pipe on a gold space', () => {
+    const board = makeGoldSpaceBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(board.lastError).toBe('Only gold pipes may be placed on a gold space.');
+  });
+
+  it('clears lastError on successful placement', () => {
+    const board = makeGoldSpaceBoard();
+    // Trigger an error first
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(board.lastError).not.toBeNull();
+    // Now place a valid gold pipe
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    expect(board.lastError).toBeNull();
+  });
+
+  it('sets lastError in replaceInventoryTile when replacing with a non-gold pipe on a gold space', () => {
+    const board = makeGoldSpaceBoard();
+    // Place a gold pipe first so we have something to replace
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    board.inventory.push({ shape: PipeShape.Straight, count: 1 });
+    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(board.lastError).toBe('Only gold pipes may be placed on a gold space.');
+    // Tile should remain unchanged
+    expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
+  });
+
   it('allows gold pipe placement on a regular empty cell', () => {
     const board = new Board(1, 3);
     board.inventory = [{ shape: PipeShape.GoldStraight, count: 1 }];
