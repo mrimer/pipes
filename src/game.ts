@@ -388,6 +388,7 @@ export class Game {
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe (no inventory item selected, or same shape as selected)
       this.board.rotateTile(pos);
+      this.board.applyTurnDelta();
       this.board.recordMove();
       this._spawnConnectionAnimations(filledBefore);
       this._renderInventoryBar();
@@ -408,6 +409,7 @@ export class Game {
     const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
 
     if (this.board.reclaimTile({ row, col })) {
+      this.board.applyTurnDelta();
       this._renderInventoryBar();
       this._updateWaterDisplay();
     } else if (this.board.lastError) {
@@ -472,9 +474,16 @@ export class Game {
       if (tile.chamberContent === 'dirt') {
         currentCost = tile.cost;
       } else if (tile.chamberContent === 'ice') {
-        const currentTemp = this.board.getCurrentTemperature();
-        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-        currentCost = tile.cost * deltaTemp;
+        // Show the locked cost when the tile is already in the fill path; otherwise
+        // compute dynamically from the current temperature (tile not yet connected).
+        const locked = this.board.getLockedWaterImpact({ row, col });
+        if (locked !== null) {
+          currentCost = -locked; // locked impact is negative for costs
+        } else {
+          const currentTemp = this.board.getCurrentTemperature();
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          currentCost = tile.cost * deltaTemp;
+        }
       } else {
         currentCost = 0;
       }
@@ -574,6 +583,7 @@ export class Game {
    */
   private _afterTilePlaced(placedShape: PipeShape, filledBefore: Set<string>): void {
     if (!this.board) return;
+    this.board.applyTurnDelta();
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
@@ -634,6 +644,7 @@ export class Game {
         } else {
           const filledBefore = board.getFilledPositions();
           board.rotateTile(focusPos);
+          board.applyTurnDelta();
           board.recordMove();
           this._spawnConnectionAnimations(filledBefore);
           this._renderInventoryBar();
