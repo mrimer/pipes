@@ -20,6 +20,14 @@ interface LegendRow {
   description: string;
 }
 
+/** A single row in the controls reference table. */
+interface ControlRow {
+  /** Short label for the key/input (e.g. "Left Click"). */
+  input: string;
+  /** What the control does. */
+  action: string;
+}
+
 /** Return a small colored square as an inline HTML string. */
 function colorSwatch(fill: string, border = fill): string {
   return (
@@ -38,6 +46,19 @@ function colorCircle(fill: string): string {
     `</svg>`
   );
 }
+
+/** Controls reference table rows. */
+const CONTROL_ROWS: ControlRow[] = [
+  { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
+  { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory.' },
+  { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
+  { input: 'Arrow Keys',         action: 'Move the keyboard focus cursor across the grid.' },
+  { input: 'Enter / Space',      action: 'Place or replace a pipe at the focused cell; rotate if nothing is selected.' },
+  { input: 'Tab',                action: 'Rotate the selected pipe piece clockwise.' },
+  { input: 'R',                  action: 'Retry the current level from scratch.' },
+  { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
+  { input: 'Escape',             action: 'Return to the level-select screen.' },
+];
 
 /** Legend rows covering every tile type players will encounter. */
 const LEGEND_ROWS: LegendRow[] = [
@@ -152,10 +173,37 @@ export function createGameRulesModal(): HTMLElement {
   playLoop.style.cssText = 'font-size:0.9rem;color:#aaa;line-height:1.5;';
   playLoop.textContent =
     'Select a pipe piece from the inventory panel, then click an empty cell to place it. ' +
-    'Scroll the mouse wheel (or right-click) to rotate the piece before placing. ' +
+    'Scroll the mouse wheel to rotate the piece before placing. ' +
     'Water flows automatically once a complete path exists. ' +
     'Some chambers add water, waste it, or grant extra pieces when reached. ' +
     'Removing pieces returns water and reverts connections to their original state.';
+
+  // ── Controls header ────────────────────────────────────────────────────────
+  const controlsHeader = document.createElement('h3');
+  controlsHeader.style.cssText = 'font-size:1rem;color:#7ed321;margin-bottom:4px;';
+  controlsHeader.textContent = 'Controls';
+
+  // ── Controls table ─────────────────────────────────────────────────────────
+  const controlsTable = document.createElement('table');
+  controlsTable.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.88rem;';
+
+  for (const row of CONTROL_ROWS) {
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'border-bottom:1px solid #2a3a5e;';
+
+    const tdInput = document.createElement('td');
+    tdInput.style.cssText =
+      'padding:6px 12px 6px 0;white-space:nowrap;color:#eee;font-weight:bold;vertical-align:middle;';
+    tdInput.textContent = row.input;
+
+    const tdAction = document.createElement('td');
+    tdAction.style.cssText = 'padding:6px 0;color:#aaa;vertical-align:middle;';
+    tdAction.textContent = row.action;
+
+    tr.appendChild(tdInput);
+    tr.appendChild(tdAction);
+    controlsTable.appendChild(tr);
+  }
 
   // ── Legend header ──────────────────────────────────────────────────────────
   const legendHeader = document.createElement('h3');
@@ -210,6 +258,8 @@ export function createGameRulesModal(): HTMLElement {
   box.appendChild(title);
   box.appendChild(summary);
   box.appendChild(playLoop);
+  box.appendChild(controlsHeader);
+  box.appendChild(controlsTable);
   box.appendChild(legendHeader);
   box.appendChild(table);
   box.appendChild(closeBtn);
