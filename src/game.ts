@@ -814,6 +814,21 @@ export class Game {
     if (this.currentLevel) this.startLevel(this.currentLevel.id);
   }
 
+  /** Advance to the next level in the campaign/chapter sequence. */
+  nextLevel(): void {
+    if (!this.currentLevel) return;
+    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    // Collect all levels in order
+    const allLevels = chapters.flatMap((ch) => ch.levels);
+    const idx = allLevels.findIndex((l) => l.id === this.currentLevel!.id);
+    if (idx !== -1 && idx + 1 < allLevels.length) {
+      this.startLevel(allLevels[idx + 1].id);
+    } else {
+      // No next level – go back to the level-select menu
+      this.exitToMenu();
+    }
+  }
+
   /**
    * Undo the last (winning) move from the win modal and resume playing the level.
    * Dismisses the win modal and restores the board to the state before the winning move.
