@@ -113,7 +113,7 @@ export function renderLevelList(
       ? ` (${completedInChapter}/${totalInChapter}${starIcon})`
       : '';
     const chapterTitle = document.createElement('span');
-    chapterTitle.textContent = `Chapter ${chapter.id}: ${chapter.name}${lockIcon}${progressText}`;
+    chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
 
     // Expand/collapse chevron
     const chevron = document.createElement('span');
