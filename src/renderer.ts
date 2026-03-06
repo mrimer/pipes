@@ -78,7 +78,7 @@ export function drawPipe(
   isWater: boolean,
   currentWater: number,
 ): void {
-  const { shape, rotation, isFixed, capacity, cost, itemShape } = tile;
+  const { shape, rotation, isFixed, capacity, cost, itemShape, itemCount } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
@@ -226,10 +226,17 @@ export function drawPipe(
       ctx.fillStyle = isGoldItem
         ? (isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR)
         : (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR);
-      ctx.font = isGoldItem ? 'bold 11px Arial' : 'bold 13px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(chamberLabel, 0, 0);
+      if (itemCount > 1) {
+        ctx.font = isGoldItem ? 'bold 10px Arial' : 'bold 11px Arial';
+        ctx.fillText(chamberLabel, 0, -7);
+        ctx.font = 'bold 10px Arial';
+        ctx.fillText(String(itemCount), 0, 7);
+      } else {
+        ctx.font = isGoldItem ? 'bold 11px Arial' : 'bold 13px Arial';
+        ctx.fillText(chamberLabel, 0, 0);
+      }
     } else if (chamberContent === 'heater') {
       // Show positive temperature bonus in heater color
       ctx.fillStyle = isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
