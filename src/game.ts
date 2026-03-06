@@ -13,7 +13,7 @@ import {
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR } from './tileAnimation';
-import { CampaignEditor } from './campaignEditor';
+import { CampaignEditor, OFFICIAL_CAMPAIGN } from './campaignEditor';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -321,20 +321,18 @@ export class Game {
   // ─── Level-select rendering ───────────────────────────────────────────────
 
   private _renderLevelList(): void {
-    let activeCampaignInfo;
-    let campaignChapters;
-    if (this._activeCampaign) {
-      const pct = computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress);
-      activeCampaignInfo = {
-        name: this._activeCampaign.name,
-        author: this._activeCampaign.author,
-        completionPct: pct,
-      };
-      campaignChapters = this._activeCampaign.chapters;
-    }
+    const displayCampaign = this._activeCampaign ?? OFFICIAL_CAMPAIGN;
+    const displayProgress = this._activeCampaign ? this._activeCampaignProgress : this.completedLevels;
+    const pct = computeCampaignCompletionPct(displayCampaign, displayProgress);
+    const activeCampaignInfo = {
+      name: displayCampaign.name,
+      author: displayCampaign.author,
+      completionPct: pct,
+    };
+    const campaignChapters = this._activeCampaign?.chapters;
     renderLevelList(
       this.levelListEl,
-      this._activeCampaign ? this._activeCampaignProgress : this.completedLevels,
+      displayProgress,
       (id) => this.startLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
       () => { this.rulesModalEl.style.display = 'flex'; },
