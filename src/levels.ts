@@ -348,10 +348,84 @@ const LEVEL_5: LevelDef = {
   ],
 };
 
-export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5];
+/** Locked until level 5 is completed. */
+const LEVEL_6: LevelDef = {
+  id: 6,
+  name: 'Cold Front',
+  rows: 4,
+  cols: 5,
+  /**
+   * Grid layout (rows×cols = 4×5):
+   *   Row 0: Source(0,0,cap=10,East) | null(0,1) | null(0,2) | null(0,3) | Elbow(0,4,S-W)
+   *   Row 1: null | Ice(1,1,cost=5,thresh=2,N-S) | Ice(1,2,cost=5,thresh=2,N-S) | Heater(1,3,+2°,N-S) | Straight(1,4,N-S)
+   *   Row 2: null | Tank(2,1,+5,North) | Tank(2,2,+5,North) | Tank(2,3,+5,North) | Ice(2,4,cost=5,thresh=3,N-S)
+   *   Row 3: null | null | null | null | Sink(3,4,North)
+   *
+   * Like Level 5, but with the Heater swapped to position (1,3) and Ice at (1,1).
+   * The ice tiles at (1,1) and (1,2) have threshold=2, so they are free only when the
+   * heater has already been connected (raising temp to 2).  The puzzle forces the player
+   * to connect the heater first before connecting the ice-blocked branches.
+   *
+   * Intended solution (incremental – order matters):
+   *   Turn 1 – Straight E-W at (0,1): extends source path east.
+   *   Turn 2 – Straight E-W at (0,2): continues path east.
+   *   Turn 3 – Elbow S-W at (0,3): connects Heater(1,3) and Tank(2,3).
+   *            currentTemp = 0 + 2 = 2.  Tank(2,3) impact = +5.
+   *   Turn 4 – Replace Straight(0,2) with Tee E-S-W: connects Ice(1,2) and Tank(2,2).
+   *            currentTemp = 2 → Ice(1,2) thresh=2: deltaTemp=0 → free.  Tank(2,2) impact = +5.
+   *   Turn 5 – Replace Straight(0,1) with Tee E-S-W: connects Ice(1,1) and Tank(2,1).
+   *            currentTemp = 2 → Ice(1,1) thresh=2: free.  Tank(2,1) impact = +5.
+   *   Turn 6 – Replace Elbow(0,3) with Tee E-S-W: opens East arm to Elbow(0,4).
+   *            Elbow(0,4), Straight(1,4), Ice(2,4), Sink newly connected.
+   *            currentTemp = 2 → Ice(2,4) thresh=3: deltaTemp=1 → cost=5×1=5.
+   *
+   * Water budget (incremental): 10 (source)
+   *   − 3 (Tees) − 1 (Elbow 0,4) − 1 (Straight 1,4) − 5 (Ice 2,4)
+   *   + 5 (Tank 2,1) + 5 (Tank 2,2) + 5 (Tank 2,3)
+   *   = 15 remaining.
+   */
+  grid: [
+    // Row 0
+    [
+      { shape: PipeShape.Source, rotation: 0, capacity: 10, temperature: 0, connections: [Direction.East] }, // (0,0)
+      null,                                                                                                    // (0,1) player fills
+      null,                                                                                                    // (0,2) player fills
+      null,                                                                                                    // (0,3) player fills
+      { shape: PipeShape.Elbow, rotation: 180 },                                                              // (0,4) S-W
+    ],
+    // Row 1
+    [
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'ice',    rotation: 0, cost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (1,1)
+      { shape: PipeShape.Chamber, chamberContent: 'ice',    rotation: 0, cost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (1,2)
+      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 2, connections: [Direction.North, Direction.South] },          // (1,3)
+      { shape: PipeShape.Straight, rotation: 0 },                                                             // (1,4) N-S
+    ],
+    // Row 2
+    [
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] }, // (2,1)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] }, // (2,2)
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] }, // (2,3)
+      { shape: PipeShape.Chamber, chamberContent: 'ice',  rotation: 0, cost: 5, temperature: 3, connections: [Direction.North, Direction.South] }, // (2,4)
+    ],
+    // Row 3
+    [
+      null, null, null, null,
+      { shape: PipeShape.Sink, rotation: 0, connections: [Direction.North] },                                 // (3,4)
+    ],
+  ],
+  inventory: [
+    { shape: PipeShape.Tee,      count: 3 },
+    { shape: PipeShape.Straight, count: 3 },
+    { shape: PipeShape.Elbow,    count: 1 },
+  ],
+};
+
+export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6];
 
 /** All game chapters, each containing an ordered set of levels. */
 export const CHAPTERS: ChapterDef[] = [
   { id: 1, name: 'Intro', levels: [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4] },
-  { id: 2, name: 'Icy', levels: [LEVEL_5] },
+  { id: 2, name: 'Icy', levels: [LEVEL_5, LEVEL_6] },
 ];

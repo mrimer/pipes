@@ -1545,6 +1545,113 @@ describe('Level 5 (Hot Springs)', () => {
   });
 });
 
+// ─── New: Level 6 (Cold Front) ────────────────────────────────────────────────
+
+describe('Level 6 (Cold Front)', () => {
+  const level = LEVELS[5];
+
+  it('has a valid grid', () => {
+    expect(level.grid.length).toBe(level.rows);
+  });
+
+  it('source has base temperature 0', () => {
+    const board = new Board(level.rows, level.cols, level);
+    const src = board.grid[board.source.row][board.source.col];
+    expect(src.temperature).toBe(0);
+  });
+
+  it('contains a Heater chamber tile at (1,3)', () => {
+    const board = new Board(level.rows, level.cols, level);
+    const tile = board.grid[1][3];
+    expect(tile.shape).toBe(PipeShape.Chamber);
+    expect(tile.chamberContent).toBe('heater');
+  });
+
+  it('contains Ice chamber tiles at (1,1) and (1,2)', () => {
+    const board = new Board(level.rows, level.cols, level);
+    expect(board.grid[1][1].chamberContent).toBe('ice');
+    expect(board.grid[1][2].chamberContent).toBe('ice');
+  });
+
+  it('temperature reaches 2 after connecting the heater via an elbow', () => {
+    // Place Straight E-W at (0,1), Straight E-W at (0,2), Elbow S-W at (0,3).
+    // The Elbow connects south to Heater(1,3), raising temp to 2.
+    const board = new Board(level.rows, level.cols, level);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Elbow, 180); // S-W
+    expect(board.getCurrentTemperature()).toBe(2);
+  });
+
+  it('level is solved with the heater-first incremental solution', () => {
+    // Use initHistory so that applyTurnDelta locks ice costs at connection-time temperature.
+    const board = new Board(level.rows, level.cols, level);
+    board.initHistory();
+
+    // Step 1: extend path east toward the heater.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Step 2: continue path east.
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Step 3: Elbow S-W at (0,3) → Heater(1,3) connects; temp becomes 2.
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Elbow, 180);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Step 4: replace Straight(0,2) with Tee E-S-W → Ice(1,2) free (temp=2, thresh=2).
+    board.replaceInventoryTile({ row: 0, col: 2 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Step 5: replace Straight(0,1) with Tee E-S-W → Ice(1,1) free (temp=2, thresh=2).
+    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Step 6: replace Elbow(0,3) with Tee E-S-W → opens East arm; Ice(2,4) costs 5 (thresh=3).
+    board.replaceInventoryTile({ row: 0, col: 3 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    expect(board.isSolved()).toBe(true);
+    // Budget: 10 − 3(Tees) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice 2,4) + 5+5+5(Tanks) = 15
+    expect(board.getCurrentWater()).toBe(15);
+  });
+
+  it('ice tiles cost water when connected before the heater', () => {
+    // Without the heater connected first, Ice(1,1) at thresh=2 costs 5×2=10 extra water.
+    const board = new Board(level.rows, level.cols, level);
+    board.initHistory();
+
+    // Place Tee E-S-W at (0,1) first – connects Ice(1,1) while temp=0.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    const waterAfterIce = board.getCurrentWater();
+
+    // Place Tee E-S-W at (0,2) – Ice(1,2) also at temp=0, thresh=2 → expensive.
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Place Tee E-S-W at (0,3) – now Heater connects (but too late for ice at 1,1 and 1,2).
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Ice(1,1) was locked at temp=0: cost = 5 × max(0, 2−0) = 10.
+    // Ice(1,2) was locked at temp=0 (heater not yet connected): cost = 10.
+    // That is 20 water wasted vs 0 in the optimal solution — verify water is lower.
+    expect(board.getCurrentWater()).toBeLessThan(waterAfterIce);
+  });
+});
+
 // ─── New: Board.applyTurnDelta (incremental turn evaluation) ──────────────────
 
 describe('Board.applyTurnDelta (incremental turn evaluation)', () => {
