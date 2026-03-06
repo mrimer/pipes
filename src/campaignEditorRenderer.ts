@@ -135,6 +135,7 @@ export function renderEditorCanvas(
       ctx.save();
       if (overlay.def === null) {
         // Erase indicator: red overlay with X
+        ctx.globalAlpha = overlay.alpha;
         ctx.fillStyle = 'rgba(255,64,64,0.45)';
         ctx.fillRect(x, y, CELL, CELL);
         ctx.strokeStyle = '#ff4040';
@@ -295,10 +296,6 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
     }
     ctx.restore();
-    // Fixed label
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = 'bold 9px Arial';
-    ctx.fillText('FIX', cx, cy + 22);
   }
 
   ctx.restore();
