@@ -35,6 +35,12 @@ export class Game {
   /** Redo button in the play-screen HUD. */
   private readonly redoBtnEl: HTMLButtonElement;
 
+  /** "Level Select" / "Return to Editor" button in the win modal. */
+  private readonly winMenuBtnEl: HTMLButtonElement;
+
+  /** "Level Select" / "Return to Editor" button in the gameover modal. */
+  private readonly gameoverMenuBtnEl: HTMLButtonElement;
+
   private screen: GameScreen = GameScreen.LevelSelect;
   private gameState: GameState = GameState.Playing;
   private board: Board | null = null;
@@ -121,6 +127,8 @@ export class Game {
     this.gameoverMsgEl = gameoverMsgEl;
     this.undoBtnEl = undoBtnEl;
     this.redoBtnEl = redoBtnEl;
+    this.winMenuBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-menu-btn')!;
+    this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
 
     // Load persisted completions
     this.completedLevels = loadCompletedLevels();
@@ -221,6 +229,9 @@ export class Game {
     // screen when returning from a completed or failed level.
     this.winModalEl.style.display = 'none';
     this.gameoverModalEl.style.display = 'none';
+    // Reset modal menu button labels in case they were changed for playtesting.
+    this.winMenuBtnEl.textContent = 'Level Select';
+    this.gameoverMenuBtnEl.textContent = 'Level Select';
     this._renderLevelList();
   }
 
@@ -781,8 +792,11 @@ export class Game {
     this.campaignEditor.hide();
     this._playtestExitCallback = () => {
       this.levelSelectEl.style.display = 'none';
-      this.campaignEditor.show();
+      this.campaignEditor.showAndRestore();
     };
+    // Update modal menu buttons so they say "Return to Editor" instead of "Level Select".
+    this.winMenuBtnEl.textContent = '↩ Return to Editor';
+    this.gameoverMenuBtnEl.textContent = '↩ Return to Editor';
     this.startLevelDef(level);
   }
 

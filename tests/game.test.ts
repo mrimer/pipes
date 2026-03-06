@@ -68,8 +68,8 @@ function makeGame(): {
       <button id="undo-btn"></button>
       <button id="redo-btn"></button>
     </div>
-    <div id="win-modal"></div>
-    <div id="gameover-modal"><p id="gameover-msg"></p></div>
+    <div id="win-modal"><button id="win-menu-btn">Level Select</button></div>
+    <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
 
   const get = (id: string) => document.getElementById(id) as HTMLElement;
