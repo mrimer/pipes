@@ -939,3 +939,63 @@ describe('Game – _positionModalBelowCanvas', () => {
     expect(modal.style.paddingTop).toBe('');
   });
 });
+
+// ─── Tests: auto-select reclaimed tile when no shape is selected ──────────────
+
+describe('Game – auto-select reclaimed tile when no shape is selected', () => {
+  it('selects the reclaimed shape when no inventory shape was selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a Straight (E-W, rotation=90) at (0,1), then deselect it
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks.selectedShape = null;
+
+    // Right-click at (0,1): TILE_SIZE=64 → col 1 → clientX 96, row 0 → clientY 32
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    expect(hooks.selectedShape).toBe(PipeShape.Straight);
+  });
+
+  it('sets pendingRotation to the reclaimed tile\'s rotation', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a Straight (E-W, rotation=90) at (0,1), then deselect
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks.selectedShape = null;
+
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    expect(hooks.pendingRotation).toBe(90);
+  });
+
+  it('does not change selectedShape when a shape is already selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a Straight at (0,1), keep Elbow selected
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Now select Elbow instead
+    hooks.selectedShape = PipeShape.Elbow;
+
+    // Right-click at (0,1) to reclaim the Straight
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    // Should still be Elbow, not Straight
+    expect(hooks.selectedShape).toBe(PipeShape.Elbow);
+  });
+});
