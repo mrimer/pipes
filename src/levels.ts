@@ -336,5 +336,5 @@ export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5];
 /** All game chapters, each containing an ordered set of levels. */
 export const CHAPTERS: ChapterDef[] = [
   { id: 1, name: 'Intro', levels: [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4] },
-  { id: 2, name: 'Rising Waters', levels: [LEVEL_5] },
+  { id: 2, name: 'Icy', levels: [LEVEL_5] },
 ];
