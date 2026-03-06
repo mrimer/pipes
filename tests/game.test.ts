@@ -491,7 +491,9 @@ describe('Game – pending rotation', () => {
 // ─── Tests: undoLastMove ──────────────────────────────────────────────────────
 
 import { Board } from '../src/board';
+import { Tile } from '../src/tile';
 import { GameState } from '../src/types';
+import { renderInventoryBar } from '../src/inventoryRenderer';
 
 describe('Game – undoLastMove', () => {
   it('undoLastMove() hides the gameover modal and resumes playing when a snapshot exists', () => {
@@ -756,5 +758,140 @@ describe('Game – _checkWinLose: fail takes precedence', () => {
 
     expect(boardAccess.gameState).toBe(GameState.GameOver);
     expect(gameoverModalEl.style.display).toBe('flex');
+  });
+});
+
+// ─── Tests: renderInventoryBar – bonus shapes absent from board.inventory ────
+
+describe('renderInventoryBar – bonus shapes not in inventory', () => {
+  it('displays a bonus shape from a connected Chamber-item tile even when absent from board.inventory', () => {
+    // Board: Source(0) → Chamber(item: grants 2 Elbows)(1) → Sink(2)
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 10;
+    board.inventory = []; // no pre-declared inventory items
+
+    const container = document.createElement('div');
+    renderInventoryBar(container, board, null, () => {});
+
+    const items = container.querySelectorAll<HTMLElement>('.inv-item');
+    expect(items.length).toBe(1);
+    expect(items[0].dataset['shape']).toBe(PipeShape.Elbow);
+    expect(items[0].querySelector('.inv-count')?.textContent).toBe('×2');
+  });
+
+  it('does not duplicate a shape that is already listed in board.inventory', () => {
+    // Board: Source(0) → Chamber(item: grants 1 Straight)(1) → Sink(2)
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }]; // already declared
+
+    const container = document.createElement('div');
+    renderInventoryBar(container, board, null, () => {});
+
+    // Only one Straight row – bonus merged into the existing entry (1 base + 1 bonus = ×2)
+    const straightItems = container.querySelectorAll<HTMLElement>('[data-shape="STRAIGHT"]');
+    expect(straightItems.length).toBe(1);
+    expect(straightItems[0].querySelector('.inv-count')?.textContent).toBe('×2');
+  });
+
+  it('shows no extra entry when the Chamber-item tile is not in the fill path', () => {
+    // Board: Source(0) → Sink(1) → Empty(2) → Chamber(3)
+    // The Empty tile has no connections, so Chamber is unreachable.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Sink,    0, true);
+    board.grid[0][2] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item');
+    board.sourceCapacity = 10;
+    board.inventory = [];
+
+    const container = document.createElement('div');
+    renderInventoryBar(container, board, null, () => {});
+
+    // Chamber is disconnected → no bonus → nothing shown
+    expect(container.querySelectorAll('.inv-item').length).toBe(0);
+  });
+});
+
+// ─── Tests: _positionModalBelowCanvas ────────────────────────────────────────
+
+describe('Game – _positionModalBelowCanvas', () => {
+  /** Call the private helper directly. */
+  function positionModal(game: Game, modalEl: HTMLElement): void {
+    (game as unknown as { _positionModalBelowCanvas(el: HTMLElement): void })
+      ._positionModalBelowCanvas(modalEl);
+  }
+
+  /** Build a minimal DOMRect stub with the given bottom and height. */
+  function mockCanvasRect(bottom: number, height: number): DOMRect {
+    return { bottom, height, top: bottom - height, left: 0, right: 0, width: 0, x: 0, y: bottom - height, toJSON: () => ({}) } as DOMRect;
+  }
+
+  it('positions the modal below the canvas when there is enough vertical space', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    // Canvas bottom at 100 px; viewport height 800 px → 700 px of space below
+    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(100, 100));
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+
+    const modal = document.createElement('div');
+    modal.style.display = 'flex';
+    positionModal(game, modal);
+
+    expect(modal.style.alignItems).toBe('flex-start');
+    // paddingTop should equal canvasBottom (100) + MARGIN (16) = '116px'
+    expect(modal.style.paddingTop).toBe('116px');
+  });
+
+  it('keeps the default centred layout when there is not enough space below the canvas', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    // Canvas bottom at 700 px; viewport height 800 px → only 100 px of space below (< 236)
+    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(700, 700));
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+
+    const modal = document.createElement('div');
+    modal.style.display = 'flex';
+    positionModal(game, modal);
+
+    // Not enough room → styles are reset to empty strings (browser uses CSS default)
+    expect(modal.style.alignItems).toBe('');
+    expect(modal.style.paddingTop).toBe('');
+  });
+
+  it('resets stale positioning styles before re-evaluating', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    // First call: plenty of space → sets alignItems / paddingTop
+    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(50, 50));
+    Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
+
+    const modal = document.createElement('div');
+    modal.style.display = 'flex';
+    positionModal(game, modal);
+    expect(modal.style.alignItems).toBe('flex-start');
+
+    // Second call: no space → previous styles must be cleared
+    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(780, 780));
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+
+    positionModal(game, modal);
+    expect(modal.style.alignItems).toBe('');
+    expect(modal.style.paddingTop).toBe('');
   });
 });

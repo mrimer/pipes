@@ -407,6 +407,32 @@ export class Game {
 
   // ─── Win / game-over handling ─────────────────────────────────────────────
 
+  /**
+   * Position a modal overlay so its inner box appears just below the game
+   * canvas when there is enough vertical space on screen.  Falls back to the
+   * default centred layout when the canvas sits too low in the viewport.
+   * Must be called *after* `display` has been set to `'flex'`.
+   */
+  private _positionModalBelowCanvas(modalEl: HTMLElement): void {
+    // Reset any styles left over from a previous showing.
+    modalEl.style.alignItems = '';
+    modalEl.style.paddingTop = '';
+
+    const canvasRect = this.canvas.getBoundingClientRect();
+    const viewportH  = window.innerHeight;
+    const spaceBelow = viewportH - canvasRect.bottom;
+
+    // Conservative upper-bound on the modal-box height.
+    // Approximate breakdown: h2 (~40 px) + p (~60 px) + button row (~50 px) + padding/gaps (~70 px).
+    const MODAL_APPROX_HEIGHT = 220;
+    const MARGIN = 16;
+
+    if (spaceBelow >= MODAL_APPROX_HEIGHT + MARGIN) {
+      modalEl.style.alignItems = 'flex-start';
+      modalEl.style.paddingTop = `${canvasRect.bottom + MARGIN}px`;
+    }
+  }
+
   private _checkWinLose(): void {
     if (!this.board || this.gameState !== GameState.Playing) return;
 
@@ -415,6 +441,7 @@ export class Game {
       this.gameState = GameState.GameOver;
       this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
       this.gameoverModalEl.style.display = 'flex';
+      this._positionModalBelowCanvas(this.gameoverModalEl);
       return;
     }
 
@@ -422,6 +449,7 @@ export class Game {
       this.gameState = GameState.Won;
       this._markLevelCompleted(this.currentLevel!.id);
       this.winModalEl.style.display = 'flex';
+      this._positionModalBelowCanvas(this.winModalEl);
       return;
     }
 
@@ -429,6 +457,7 @@ export class Game {
       this.gameState = GameState.GameOver;
       this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
       this.gameoverModalEl.style.display = 'flex';
+      this._positionModalBelowCanvas(this.gameoverModalEl);
     }
   }
 
