@@ -86,6 +86,7 @@ export function renderLevelList(
 
     const completedInChapter = chapter.levels.filter((l) => completedLevels.has(l.id)).length;
     const totalInChapter = chapter.levels.length;
+    const allLevelsCompleted = totalInChapter > 0 && completedInChapter === totalInChapter;
 
     // ── Chapter container ──────────────────────────────────────────────────
     const chapterBox = document.createElement('div');
@@ -107,8 +108,9 @@ export function renderLevelList(
       'text-align:left;';
 
     const lockIcon = chapterLocked ? ' 🔒' : '';
+    const starIcon = allLevelsCompleted ? ' ⭐' : '';
     const progressText = totalInChapter > 0
-      ? ` (${completedInChapter}/${totalInChapter})`
+      ? ` (${completedInChapter}/${totalInChapter}${starIcon})`
       : '';
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${chapter.id}: ${chapter.name}${lockIcon}${progressText}`;
@@ -117,8 +119,8 @@ export function renderLevelList(
     const chevron = document.createElement('span');
     chevron.style.cssText = 'font-size:0.8rem;transition:transform 0.2s;';
 
-    // Default: expand if not locked
-    let expanded = !chapterLocked;
+    // Default: expand if not locked and not all levels completed
+    let expanded = !chapterLocked && !allLevelsCompleted;
     chevron.textContent = expanded ? '▲' : '▼';
 
     chapterHeader.appendChild(chapterTitle);
