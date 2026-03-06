@@ -515,9 +515,18 @@ export class Game {
     const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
     const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
 
+    const tileBeforeReclaim = this.board.grid[row]?.[col];
+    const reclaimedShape = tileBeforeReclaim?.shape;
+    const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
+    const hadNoSelection = this.selectedShape === null;
+
     if (this.board.reclaimTile({ row, col })) {
       this.board.applyTurnDelta();
       this._deselectIfDepleted();
+      if (hadNoSelection && reclaimedShape !== undefined) {
+        this.selectedShape = reclaimedShape;
+        this.pendingRotation = reclaimedRotation;
+      }
       this._renderInventoryBar();
       this._updateWaterDisplay();
     } else if (this.board.lastError) {
