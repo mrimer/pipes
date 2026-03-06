@@ -288,6 +288,21 @@ export function drawPipe(
   ctx.restore();
 }
 
+/** Return a human-readable name for an inventory item shape (used inside item-container tooltips). */
+function _itemShapeDisplayName(shape: PipeShape | null): string {
+  switch (shape) {
+    case PipeShape.Straight:     return 'Straight';
+    case PipeShape.Elbow:        return 'Elbow';
+    case PipeShape.Tee:          return 'Tee';
+    case PipeShape.Cross:        return 'Cross';
+    case PipeShape.GoldStraight: return 'Gold Straight';
+    case PipeShape.GoldElbow:    return 'Gold Elbow';
+    case PipeShape.GoldTee:      return 'Gold Tee';
+    case PipeShape.GoldCross:    return 'Gold Cross';
+    default:                     return 'Item';
+  }
+}
+
 /**
  * Returns a human-readable display name for a tile derived from its shape and
  * chamber content.  Returns an empty string for tiles with no meaningful label
@@ -308,12 +323,15 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Granite:      return 'Granite';
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
-        case 'tank':  return 'Tank';
-        case 'dirt':  return 'Dirt block';
-        case 'item':  return 'Item container';
-        case 'heater': return 'Heater';
-        case 'ice':   return 'Ice';
-        default:      return 'Chamber';
+        case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity}` : 'Tank';
+        case 'dirt':   return 'Dirt block';
+        case 'item': {
+          const itemName = _itemShapeDisplayName(tile.itemShape);
+          return tile.itemCount > 1 ? `${tile.itemCount}× ${itemName}` : itemName;
+        }
+        case 'heater': return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
+        case 'ice':    return 'Ice';
+        default:       return 'Chamber';
       }
     default: return '';
   }
