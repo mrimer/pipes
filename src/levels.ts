@@ -303,21 +303,27 @@ const LEVEL_5: LevelDef = {
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source, rotation: 0, capacity: 20, temperature: 5, connections: [Direction.East] }, // (0,0)
+      { shape: PipeShape.Source, rotation: 0, capacity: 10, temperature: 0, connections: [Direction.East] }, // (0,0)
       null,                                                                                                    // (0,1) player fills: Straight E-W
-      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 10, connections: [Direction.East, Direction.West] }, // (0,2)
+      null,
       null,                                                                                                    // (0,3) player fills: Straight E-W
       { shape: PipeShape.Elbow, rotation: 180 },                                         // (0,4) S-W
     ],
     // Row 1
     [
-      null, null, null, null,
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (2,4)
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (2,4)
+      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 1, connections: [Direction.North] }, // (0,2)
       { shape: PipeShape.Straight, rotation: 0 },                                        // (1,4) N-S
     ],
     // Row 2
     [
-      null, null, null, null,
-      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 2, temperature: 15, connections: [Direction.North, Direction.South] }, // (2,4)
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] },
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 5, connections: [Direction.North] },
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 5, temperature: 2, connections: [Direction.North, Direction.South] }, // (2,4)
     ],
     // Row 3
     [
@@ -326,8 +332,9 @@ const LEVEL_5: LevelDef = {
     ],
   ],
   inventory: [
-    { shape: PipeShape.Straight, count: 2 },
+    { shape: PipeShape.Straight, count: 3 },
     { shape: PipeShape.Elbow,    count: 1 },
+    { shape: PipeShape.Tee,      count: 3 },
   ],
 };
 
