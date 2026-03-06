@@ -5,7 +5,7 @@ import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
-import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels } from './persistence';
+import { loadCompletedLevels, markLevelCompleted, clearCompletedLevels, markAllLevelsCompleted } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR } from './tileAnimation';
 
@@ -264,6 +264,7 @@ export class Game {
       (id) => this.startLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
       () => { this.rulesModalEl.style.display = 'flex'; },
+      () => { this._unlockAll(); },
     );
   }
 
@@ -743,6 +744,12 @@ export class Game {
   /** Clear all level-completion progress and refresh the level list. */
   private _resetProgress(): void {
     clearCompletedLevels(this.completedLevels);
+    this._renderLevelList();
+  }
+
+  /** Dev cheat: mark all levels completed and refresh the level list. */
+  private _unlockAll(): void {
+    markAllLevelsCompleted(this.completedLevels, LEVELS.map((l) => l.id));
     this._renderLevelList();
   }
 }

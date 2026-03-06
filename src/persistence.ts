@@ -35,3 +35,15 @@ export function clearCompletedLevels(completedLevels: Set<number>): void {
     // ignore storage errors
   }
 }
+
+/** Mark every level in allLevelIds as completed and persist the full set. */
+export function markAllLevelsCompleted(completedLevels: Set<number>, allLevelIds: number[]): void {
+  for (const id of allLevelIds) {
+    completedLevels.add(id);
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...completedLevels]));
+  } catch {
+    // ignore storage errors
+  }
+}
