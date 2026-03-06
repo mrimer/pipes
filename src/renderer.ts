@@ -78,7 +78,7 @@ export function drawPipe(
   isWater: boolean,
   currentWater: number,
 ): void {
-  const { shape, rotation, isFixed, capacity, dirtCost, itemShape } = tile;
+  const { shape, rotation, isFixed, capacity, cost, itemShape } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
@@ -217,7 +217,7 @@ export function drawPipe(
       ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`-${dirtCost}`, 0, 0);
+      ctx.fillText(`-${cost}`, 0, 0);
     } else if (chamberContent === 'item') {
       // Show item shape abbreviation in container-like color
       const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
@@ -238,13 +238,12 @@ export function drawPipe(
       ctx.textBaseline = 'middle';
       ctx.fillText(`+${tile.temperature}°`, 0, 0);
     } else if (chamberContent === 'ice') {
-      // Show cost and threshold temperature in ice color
+      // Show the product value (cost × temperature threshold) in ice color
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
-      ctx.font = 'bold 11px Arial';
+      ctx.font = 'bold 14px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`-${dirtCost}`, 0, -7);
-      ctx.fillText(`${tile.temperature}°`, 0, 7);
+      ctx.fillText(`-${cost * tile.temperature}`, 0, 0);
     }
     // Connection stubs
     ctx.strokeStyle = color;

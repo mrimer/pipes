@@ -113,12 +113,12 @@ describe('Tile', () => {
     expect(chamber.capacity).toBe(12);
   });
 
-  it('stores dirtCost and defaults to 0', () => {
+  it('stores cost and defaults to 0', () => {
     const plain = new Tile(PipeShape.Straight, 0);
-    expect(plain.dirtCost).toBe(0);
+    expect(plain.cost).toBe(0);
 
     const chamber = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'dirt');
-    expect(chamber.dirtCost).toBe(3);
+    expect(chamber.cost).toBe(3);
   });
 
   it('stores itemShape and itemCount, defaulting to null and 1', () => {

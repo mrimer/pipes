@@ -70,7 +70,7 @@ export class Tile {
   /** Water capacity for Source and Chamber-tank tiles. */
   capacity: number;
   /** Water cost for Chamber-dirt and Chamber-ice tiles – deducted from the source when water flows through. */
-  dirtCost: number;
+  cost: number;
   /** Inventory item shape granted when a Chamber-item tile is in the fill path. */
   itemShape: PipeShape | null;
   /** Number of inventory items granted by this Chamber-item tile. */
@@ -89,7 +89,7 @@ export class Tile {
   /**
    * Temperature value. For Source tiles: base temperature of the water supply.
    * For Chamber-heater tiles: temperature bonus added to the source when connected.
-   * For Chamber-ice tiles: the threshold temperature (water costs dirtCost × max(0, temperature − currentTemp) when connected).
+   * For Chamber-ice tiles: the threshold temperature (water costs cost × max(0, temperature − currentTemp) when connected).
    * Defaults to 0.
    */
   temperature: number;
@@ -99,19 +99,19 @@ export class Tile {
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
    * @param capacity - Water capacity (Source / Chamber-tank tiles only).
-   * @param dirtCost - Water cost (Chamber-dirt and Chamber-ice tiles).
+   * @param cost - Water cost (Chamber-dirt and Chamber-ice tiles).
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
    * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', or 'ice').
    * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), or Ice (threshold).
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, dirtCost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
     this.capacity = capacity;
-    this.dirtCost = dirtCost;
+    this.cost = cost;
     this.itemShape = itemShape;
     this.itemCount = itemCount;
     this.customConnections = customConnections;
