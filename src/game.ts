@@ -282,7 +282,7 @@ export class Game {
     this.board = new Board(level.rows, level.cols, level);
     this.board.initHistory();
     this.gameState = GameState.Playing;
-    this.focusPos = { row: 0, col: 0 };
+    this.focusPos = { ...this.board.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
 
@@ -911,7 +911,7 @@ export class Game {
     this.board = new Board(level.rows, level.cols, level);
     this.board.initHistory();
     this.gameState = GameState.Playing;
-    this.focusPos = { row: 0, col: 0 };
+    this.focusPos = { ...this.board.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
 

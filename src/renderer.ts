@@ -376,20 +376,22 @@ export function getTileDisplayName(tile: Tile): string {
 }
 
 /**
- * Returns true when a tile can be replaced by the given selected shape.
- * A tile is replaceable when it is a non-fixed regular or gold pipe and the
- * gold-space constraint is satisfied.
+ * Returns true when a tile can be replaced by the given selected shape and
+ * rotation.  A tile is replaceable when it is a non-fixed regular or gold pipe,
+ * the gold-space constraint is satisfied, and the result would actually differ
+ * from the current tile (different shape or different rotation).
  */
 function isReplaceableByShape(
   tile: Tile,
   selectedShape: PipeShape,
+  pendingRotation: number,
   selectedIsGold: boolean,
   isGoldCell: boolean,
 ): boolean {
   return (
     !tile.isFixed &&
     (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) &&
-    tile.shape !== selectedShape &&
+    (tile.shape !== selectedShape || tile.rotation !== pendingRotation) &&
     (!isGoldCell || selectedIsGold)
   );
 }
@@ -434,7 +436,7 @@ export function renderBoard(
       // the tile must be a player-placed (non-fixed) regular or gold pipe, and satisfy
       // the gold-space constraint.
       const isReplaceTarget = selectedShape !== null &&
-        isReplaceableByShape(tile, selectedShape, selectedIsGold, isGoldCell);
+        isReplaceableByShape(tile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
 
       // Tile background
       if (tile.shape === PipeShape.Empty) {
@@ -491,7 +493,7 @@ export function renderBoard(
       const hoverTile = board.grid[hoverRow][hoverCol];
       const isGoldCell = board.goldSpaces.has(`${hoverRow},${hoverCol}`);
       const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
-      const canReplace = isReplaceableByShape(hoverTile, selectedShape, selectedIsGold, isGoldCell);
+      const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
       if (canPlace || canReplace) {
         const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
         const px = hoverCol * TILE_SIZE;
