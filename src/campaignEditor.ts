@@ -13,7 +13,7 @@ import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Ro
 import { CHAPTERS } from './levels';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct } from './persistence';
 import { TILE_SIZE } from './renderer';
-import { Board } from './board';
+import { Board, PIPE_SHAPES } from './board';
 import {
   EditorPalette,
   TileParams,
@@ -23,7 +23,7 @@ import {
   generateCampaignId,
   generateLevelId,
 } from './campaignEditorTypes';
-import { renderEditorCanvas } from './campaignEditorRenderer';
+import { renderEditorCanvas, HoverOverlay, DragState } from './campaignEditorRenderer';
 
 // ─── The built-in "Official" campaign ────────────────────────────────────────
 
@@ -62,6 +62,15 @@ export class CampaignEditor {
   private _editorHover: { row: number; col: number } | null = null;
   private _editorHistory: EditorSnapshot[] = [];
   private _editorHistoryIdx = -1;
+  /** Drag state: set when the user is dragging a tile across the grid. */
+  private _dragState: {
+    startPos: { row: number; col: number };
+    tile: TileDef;
+    currentPos: { row: number; col: number };
+    moved: boolean;
+  } | null = null;
+  /** Bound window mouseup handler for drag completion; stored so it can be removed. */
+  private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
@@ -82,6 +91,13 @@ export class CampaignEditor {
       'display:none;position:fixed;inset:0;background:#0d1520;overflow:auto;z-index:200;' +
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
     document.body.appendChild(this._el);
+
+    // Global keyboard handler for undo/redo shortcuts (active only in level editor screen)
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (this._screen !== 'levelEditor' || this._el.style.display === 'none') return;
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
+    });
   }
 
   /** Show the campaign editor (campaign list screen). */
@@ -705,10 +721,25 @@ export class CampaignEditor {
     if (ctx) this._editorCtx = ctx;
 
     if (!readOnly) {
-      canvas.addEventListener('click',       (e) => this._onEditorCanvasClick(e));
-      canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); this._onEditorCanvasRightClick(e); });
+      canvas.addEventListener('mousedown',   (e) => this._onEditorMouseDown(e));
       canvas.addEventListener('mousemove',   (e) => this._onEditorCanvasMouseMove(e));
-      canvas.addEventListener('mouseleave',  () => { this._editorHover = null; this._renderEditorCanvas(); });
+      canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); this._onEditorCanvasRightClick(e); });
+      canvas.addEventListener('mouseleave',  () => {
+        this._editorHover = null;
+        // Cancel drag when mouse leaves the canvas
+        if (this._dragState) {
+          this._dragState = null;
+        }
+        this._renderEditorCanvas();
+      });
+      canvas.addEventListener('wheel', (e) => this._onEditorCanvasWheel(e), { passive: false });
+      // Listen on window so mouseup is captured even when released outside the canvas.
+      // Remove any previous handler to avoid duplicates when the level editor is re-opened.
+      if (this._windowMouseUpHandler) {
+        window.removeEventListener('mouseup', this._windowMouseUpHandler);
+      }
+      this._windowMouseUpHandler = (e: MouseEvent) => this._onEditorMouseUp(e);
+      window.addEventListener('mouseup', this._windowMouseUpHandler);
     }
 
     midCol.appendChild(canvas);
@@ -754,6 +785,7 @@ export class CampaignEditor {
 
   private _buildPalette(): HTMLElement {
     const panel = document.createElement('div');
+    panel.id = 'editor-palette-panel';
     panel.style.cssText =
       'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
       'display:flex;flex-direction:column;gap:4px;';
@@ -1129,19 +1161,88 @@ export class CampaignEditor {
   private _renderEditorCanvas(): void {
     const ctx = this._editorCtx;
     if (!ctx) return;
-    renderEditorCanvas(ctx, this._editGrid, this._editRows, this._editCols, this._editorHover);
+
+    let overlay: HoverOverlay | null = null;
+    let drag: DragState | null = null;
+
+    if (this._dragState) {
+      // Show the dragged tile at its current position
+      drag = {
+        fromPos: this._dragState.startPos,
+        toPos: this._dragState.currentPos,
+        tile: this._dragState.tile,
+      };
+    } else if (this._editorHover) {
+      if (this._editorPalette === 'erase') {
+        overlay = { pos: this._editorHover, def: null, alpha: 1 };
+      } else {
+        // Placement preview: transparent tile at hover
+        overlay = { pos: this._editorHover, def: this._buildTileDef(this._editorPalette), alpha: 0.55 };
+      }
+    }
+
+    renderEditorCanvas(ctx, this._editGrid, this._editRows, this._editCols, overlay, drag);
   }
 
   // ─── Editor canvas mouse events ────────────────────────────────────────────
 
-  private _onEditorCanvasClick(e: MouseEvent): void {
+  private _onEditorMouseDown(e: MouseEvent): void {
+    if (e.button !== 0) return; // left button only
     const pos = this._canvasPos(e);
     if (!pos) return;
-    this._recordEditorSnapshot();
-    if (this._editorPalette === 'erase') {
-      this._editGrid[pos.row][pos.col] = null;
+
+    const existingTile = this._editGrid[pos.row][pos.col];
+
+    if (existingTile !== null && this._editorPalette !== 'erase') {
+      // Start a drag: track the tile but don't modify the grid yet
+      this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+      this._renderEditorCanvas();
     } else {
-      this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
+      // Paint / erase immediately
+      this._recordEditorSnapshot();
+      if (this._editorPalette === 'erase') {
+        this._editGrid[pos.row][pos.col] = null;
+      } else {
+        this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
+      }
+      this._renderEditorCanvas();
+    }
+  }
+
+  private _onEditorMouseUp(e: MouseEvent): void {
+    if (e.button !== 0) return; // left button only
+    if (!this._dragState) return;
+
+    const { startPos, tile, currentPos, moved } = this._dragState;
+    this._dragState = null;
+
+    if (moved) {
+      // Commit the drag: move tile from startPos to currentPos
+      this._recordEditorSnapshot();
+      this._editGrid[startPos.row][startPos.col] = null;
+      this._editGrid[currentPos.row][currentPos.col] = tile;
+    } else {
+      // It was a click on a non-empty tile (no movement occurred)
+      if (e.ctrlKey) {
+        // Ctrl+click: force-overwrite with current palette selection
+        this._recordEditorSnapshot();
+        if (this._editorPalette === 'erase') {
+          this._editGrid[startPos.row][startPos.col] = null;
+        } else {
+          this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
+        }
+      } else if (
+        this._editorPalette !== 'erase' &&
+        PIPE_SHAPES.has(this._editorPalette as PipeShape) &&
+        PIPE_SHAPES.has(tile.shape)
+      ) {
+        // Both palette and tile are pipe shapes: auto-replace
+        this._recordEditorSnapshot();
+        this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
+      } else {
+        // Select the clicked tile in the palette and populate Tile Params
+        this._selectTileFromDef(tile);
+      }
     }
     this._renderEditorCanvas();
   }
@@ -1157,7 +1258,103 @@ export class CampaignEditor {
   private _onEditorCanvasMouseMove(e: MouseEvent): void {
     const pos = this._canvasPos(e);
     this._editorHover = pos;
+
+    if (this._dragState && pos) {
+      const { startPos, currentPos } = this._dragState;
+      const atCurrent = pos.row === currentPos.row && pos.col === currentPos.col;
+      if (!atCurrent) {
+        if (pos.row === startPos.row && pos.col === startPos.col) {
+          // Moved back to start: cancel the move
+          this._dragState.currentPos = pos;
+          this._dragState.moved = false;
+        } else if (this._editGrid[pos.row][pos.col] === null) {
+          // Empty cell: move tile here
+          this._dragState.currentPos = pos;
+          this._dragState.moved = true;
+        }
+        // Non-empty cell (other than start): tile stays at currentPos
+      }
+    }
+
     this._renderEditorCanvas();
+  }
+
+  // ─── Mouse wheel: rotate tile or connections ──────────────────────────────
+
+  private _onEditorCanvasWheel(e: WheelEvent): void {
+    e.preventDefault();
+    const clockwise = e.deltaY > 0;
+    const p = this._editorPalette;
+    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Empty) return;
+
+    if (
+      p === PipeShape.Source || p === PipeShape.Sink || p === PipeShape.Chamber
+    ) {
+      // Rotate the connection set for tiles with optional connections
+      const c = this._editorParams.connections;
+      if (clockwise) {
+        this._editorParams.connections = { N: c.W, E: c.N, S: c.E, W: c.S };
+      } else {
+        this._editorParams.connections = { N: c.E, E: c.S, S: c.W, W: c.N };
+      }
+    } else {
+      // Rotate the tile shape
+      const cur = this._editorParams.rotation;
+      if (clockwise) {
+        this._editorParams.rotation = ((cur + 90) % 360) as Rotation;
+      } else {
+        this._editorParams.rotation = ((cur + 270) % 360) as Rotation;
+      }
+    }
+
+    this._refreshPaletteUI();
+    this._renderEditorCanvas();
+  }
+
+  // ─── Select a tile in the palette from a TileDef ──────────────────────────
+
+  /** Populate _editorPalette and _editorParams from a TileDef, then refresh the UI panels. */
+  private _selectTileFromDef(def: TileDef): void {
+    this._editorPalette = def.shape === PipeShape.Empty ? 'erase' : def.shape;
+    this._populateParamsFromDef(def);
+    this._refreshPaletteUI();
+  }
+
+  /** Set _editorParams to match all relevant fields from a TileDef. */
+  private _populateParamsFromDef(def: TileDef): void {
+    this._editorParams = { ...DEFAULT_PARAMS };
+    if (def.rotation !== undefined) this._editorParams.rotation = def.rotation;
+    if (def.capacity !== undefined) this._editorParams.capacity = def.capacity;
+    if (def.cost !== undefined) this._editorParams.cost = def.cost;
+    if (def.temperature !== undefined) this._editorParams.temperature = def.temperature;
+    if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
+    if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
+    if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
+    if (def.connections) {
+      this._editorParams.connections = {
+        N: def.connections.includes(Direction.North),
+        E: def.connections.includes(Direction.East),
+        S: def.connections.includes(Direction.South),
+        W: def.connections.includes(Direction.West),
+      };
+    } else {
+      // No explicit connections: default to all open (for Source/Sink/Chamber)
+      this._editorParams.connections = { N: true, E: true, S: true, W: true };
+    }
+  }
+
+  /** Rebuild and replace the palette and param panels in the DOM. */
+  private _refreshPaletteUI(): void {
+    const palettePanel = document.getElementById('editor-palette-panel');
+    if (palettePanel) {
+      palettePanel.replaceWith(this._buildPalette());
+    }
+    const paramPanel = document.getElementById('editor-param-panel');
+    if (paramPanel) {
+      const newParam = this._buildParamPanel();
+      newParam.id = 'editor-param-panel';
+      paramPanel.replaceWith(newParam);
+    }
   }
 
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {

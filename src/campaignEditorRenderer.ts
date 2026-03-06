@@ -9,23 +9,49 @@ import { TILE_SIZE } from './renderer';
 import { Tile } from './tile';
 import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
 
+// ─── Overlay types ─────────────────────────────────────────────────────────────
+
+/**
+ * An overlay drawn on top of the grid at a specific cell.
+ * Used for placement preview (transparent tile at hover) or erase indicator.
+ */
+export interface HoverOverlay {
+  pos: { row: number; col: number };
+  /** Tile to draw at pos. null = erase indicator (red overlay). */
+  def: TileDef | null;
+  /** Drawing opacity 0..1 (e.g. 0.55 for placement preview, 1.0 for erase). */
+  alpha: number;
+}
+
+/**
+ * Visual state for a tile being dragged across the grid.
+ * The tile is rendered at toPos and the cell at fromPos is rendered as empty.
+ */
+export interface DragState {
+  fromPos: { row: number; col: number };
+  toPos: { row: number; col: number };
+  tile: TileDef;
+}
+
 // ─── Public entry point ────────────────────────────────────────────────────────
 
 /**
  * Render the full editor canvas.
  *
- * @param ctx    2D context to draw on.
- * @param grid   The current tile grid (null = player-fillable empty cell).
- * @param rows   Number of grid rows.
- * @param cols   Number of grid columns.
- * @param hover  Cell under the mouse cursor, or null when the cursor is outside.
+ * @param ctx     2D context to draw on.
+ * @param grid    The current tile grid (null = player-fillable empty cell).
+ * @param rows    Number of grid rows.
+ * @param cols    Number of grid columns.
+ * @param overlay Optional tile preview or erase indicator drawn at the hover cell.
+ * @param drag    Optional drag state: renders the tile at toPos and hides it at fromPos.
  */
 export function renderEditorCanvas(
   ctx: CanvasRenderingContext2D,
   grid: (TileDef | null)[][],
   rows: number,
   cols: number,
-  hover: { row: number; col: number } | null,
+  overlay?: HoverOverlay | null,
+  drag?: DragState | null,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -34,7 +60,9 @@ export function renderEditorCanvas(
     for (let c = 0; c < cols; c++) {
       const x = c * CELL;
       const y = r * CELL;
-      const def = grid[r]?.[c] ?? null;
+      // During a drag, render the source cell as empty
+      const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
+      const def = isDragSource ? null : (grid[r]?.[c] ?? null);
 
       // Cell background
       if (def === null) {
@@ -63,17 +91,6 @@ export function renderEditorCanvas(
     }
   }
 
-  // Hover highlight
-  if (hover) {
-    const { row, col } = hover;
-    ctx.fillStyle = 'rgba(240,192,64,0.18)';
-    ctx.fillRect(col * CELL, row * CELL, CELL, CELL);
-    ctx.strokeStyle = '#f0c040';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.strokeRect(col * CELL + 1, row * CELL + 1, CELL - 2, CELL - 2);
-  }
-
   // Grid lines overlay
   ctx.strokeStyle = 'rgba(74,144,217,0.15)';
   ctx.lineWidth = 1;
@@ -89,6 +106,60 @@ export function renderEditorCanvas(
     ctx.moveTo(c * CELL, 0);
     ctx.lineTo(c * CELL, rows * CELL);
     ctx.stroke();
+  }
+
+  // Drag tile drawn at destination (opaque with a slight glow border)
+  if (drag) {
+    const { row, col } = drag.toPos;
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      const x = col * CELL;
+      const y = row * CELL;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      drawEditorTile(ctx, x, y, drag.tile);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#f0c040';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      ctx.restore();
+    }
+  }
+
+  // Placement preview / erase indicator overlay
+  if (overlay) {
+    const { row, col } = overlay.pos;
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      const x = col * CELL;
+      const y = row * CELL;
+      ctx.save();
+      if (overlay.def === null) {
+        // Erase indicator: red overlay with X
+        ctx.fillStyle = 'rgba(255,64,64,0.45)';
+        ctx.fillRect(x, y, CELL, CELL);
+        ctx.strokeStyle = '#ff4040';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        ctx.strokeStyle = 'rgba(255,64,64,0.8)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + 8, y + 8);
+        ctx.lineTo(x + CELL - 8, y + CELL - 8);
+        ctx.moveTo(x + CELL - 8, y + 8);
+        ctx.lineTo(x + 8, y + CELL - 8);
+        ctx.stroke();
+      } else {
+        ctx.globalAlpha = overlay.alpha;
+        drawEditorTile(ctx, x, y, overlay.def);
+        ctx.globalAlpha = Math.min(1, overlay.alpha + 0.3);
+        ctx.strokeStyle = '#f0c040';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      }
+      ctx.restore();
+    }
   }
 }
 
