@@ -1626,6 +1626,86 @@ describe('Board.getCurrentWater (ice mechanics)', () => {
   });
 });
 
+// ─── New: Board.frozen tracking ───────────────────────────────────────────────
+
+describe('Board.frozen tracking', () => {
+  function makeIceBoard(sourceTemp: number, heaterTemp: number, iceThresh: number, iceCost: number) {
+    // Layout: Source(0,0) → Heater(0,1) → Ice(0,2) → Sink(0,3)
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, null, null, sourceTemp);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', heaterTemp);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, iceCost, null, 1, null, 'ice', iceThresh);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 100;
+    return board;
+  }
+
+  it('starts at 0 before initHistory', () => {
+    const board = makeIceBoard(5, 0, 15, 2);
+    expect(board.frozen).toBe(0);
+  });
+
+  it('is 0 when ice costs nothing (temp meets threshold)', () => {
+    // sourceTemp=5, heaterTemp=10 → effective temp=15; iceThresh=15 → deltaTemp=0 → no water frozen
+    const board = makeIceBoard(5, 10, 15, 2);
+    board.initHistory();
+    expect(board.frozen).toBe(0);
+  });
+
+  it('accumulates frozen water when ice costs are incurred at initHistory', () => {
+    // sourceTemp=5, heaterTemp=0 → effective temp=5; iceThresh=15 → deltaTemp=10 → frozen=2×10=20
+    const board = makeIceBoard(5, 0, 15, 2);
+    board.initHistory();
+    expect(board.frozen).toBe(20);
+  });
+
+  it('is reset to 0 then recomputed when initHistory is called again', () => {
+    const board = makeIceBoard(5, 0, 15, 2);
+    board.initHistory();
+    expect(board.frozen).toBe(20);
+    // initHistory resets frozen to 0 then re-runs applyTurnDelta which recomputes it.
+    board.initHistory();
+    expect(board.frozen).toBe(20);
+  });
+
+  it('is restored by undo to its prior value', () => {
+    // Board: Source(0,0) → [Empty(0,1) - player places here] → Ice(0,2, thresh=5, cost=3) → Straight(0,3, fixed) → Sink(0,4)
+    // At initHistory, path is broken (Empty at 0,1), so ice is not connected; frozen=0.
+    // After placing Straight(0,1), ice connects with temp=0, thresh=5 → frozen += 3×5 = 15.
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, null, null, 0);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'ice', 5);
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90, true); // E-W fixed pipe
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 100;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Initially the ice tile is not connected (Empty at 0,1 breaks the path)
+    expect(board.frozen).toBe(0);
+
+    // Place E-W Straight at (0,1) to complete the path through the ice tile
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    // Ice(0,2): temp=0, thresh=5 → deltaTemp=5 → frozen += 3×5 = 15
+    expect(board.frozen).toBe(15);
+
+    // Undo: frozen should be restored to 0
+    board.undoMove();
+    expect(board.frozen).toBe(0);
+
+    // Redo: frozen should be restored to 15
+    board.redoMove();
+    expect(board.frozen).toBe(15);
+  });
+});
+
 // ─── New: Level 5 (Glacier Pass) ─────────────────────────────────────────────
 
 describe('Level 5 (Glacier Pass)', () => {
