@@ -1006,7 +1006,7 @@ export class CampaignEditor {
       connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
       const connLbl = document.createElement('div');
       connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-      connLbl.textContent = 'Connections (default=all):';
+      connLbl.textContent = 'Connections';
       connWrap.appendChild(connLbl);
       const cbRow = document.createElement('div');
       cbRow.style.cssText = 'display:flex;gap:8px;';
