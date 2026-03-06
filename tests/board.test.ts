@@ -1871,3 +1871,57 @@ describe('getTileDisplayName', () => {
     expect(getTileDisplayName(tile)).toBe('Ice');
   });
 });
+
+// ─── Board.hasTempRelevantTiles ───────────────────────────────────────────────
+
+describe('Board.hasTempRelevantTiles', () => {
+  function makeSimpleBoard(): Board {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    return board;
+  }
+
+  it('returns false when there are no heaters, ice, or non-zero source temperature', () => {
+    const board = makeSimpleBoard();
+    expect(board.hasTempRelevantTiles()).toBe(false);
+  });
+
+  it('returns true when the source has a non-zero base temperature', () => {
+    const board = makeSimpleBoard();
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, null, null, 5);
+    expect(board.hasTempRelevantTiles()).toBe(true);
+  });
+
+  it('returns true when there is a heater chamber in the grid', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 10);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.hasTempRelevantTiles()).toBe(true);
+  });
+
+  it('returns true when there is an ice chamber in the grid', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'ice', 15);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.hasTempRelevantTiles()).toBe(true);
+  });
+
+  it('returns false when chambers are present but none are heater or ice', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1, null, 'tank');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.hasTempRelevantTiles()).toBe(false);
+  });
+});
