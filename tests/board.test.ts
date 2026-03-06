@@ -1495,10 +1495,59 @@ describe('Board.getCurrentWater (ice mechanics)', () => {
   });
 });
 
-// ─── New: Level 5 (Hot Springs) ───────────────────────────────────────────────
+// ─── New: Level 5 (Glacier Pass) ─────────────────────────────────────────────
 
-describe('Level 5 (Hot Springs)', () => {
+describe('Level 5 (Glacier Pass)', () => {
   const level = LEVELS[4];
+
+  it('has a valid grid', () => {
+    expect(level.grid.length).toBe(level.rows);
+    expect(level.id).toBe(5);
+    expect(level.name).toBe('Glacier Pass');
+  });
+
+  it('contains two Ice chamber tiles (Ice-A at 0,2 and Ice-B at 2,4)', () => {
+    const board = new Board(level.rows, level.cols, level);
+    expect(board.grid[0][2].chamberContent).toBe('ice');
+    expect(board.grid[0][2].cost).toBe(5);
+    expect(board.grid[0][2].temperature).toBe(1);
+    expect(board.grid[2][4].chamberContent).toBe('ice');
+    expect(board.grid[2][4].cost).toBe(5);
+    expect(board.grid[2][4].temperature).toBe(1);
+  });
+
+  it('contains a Tank chamber tile at (2,2) with capacity 7', () => {
+    const board = new Board(level.rows, level.cols, level);
+    expect(board.grid[2][2].chamberContent).toBe('tank');
+    expect(board.grid[2][2].capacity).toBe(7);
+  });
+
+  it('is solved via the direct route (through Ice-A, using 2 Straights)', () => {
+    const board = new Board(level.rows, level.cols, level);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90); // E-W
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90); // E-W
+    expect(board.isSolved()).toBe(true);
+    // Budget: 15 − 1(0,1) − 5(Ice-A) − 1(0,3) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice-B) = 1
+    expect(board.getCurrentWater()).toBe(1);
+  });
+
+  it('is solved via the bypass + tank route (4 Elbows + 1 Tee)', () => {
+    const board = new Board(level.rows, level.cols, level);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 180); // W-S
+    board.placeInventoryTile({ row: 1, col: 1 }, PipeShape.Elbow, 0);   // N-E
+    board.placeInventoryTile({ row: 1, col: 2 }, PipeShape.Tee, 90);    // E-S-W → Tank(2,2)
+    board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.Elbow, 270); // W-N
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Elbow, 90);  // E-S
+    expect(board.isSolved()).toBe(true);
+    // Budget: 15 − 5(pieces) − 1(Elbow 0,4) − 1(Straight 1,4) + 7(Tank) − 5(Ice-B) = 10
+    expect(board.getCurrentWater()).toBe(10);
+  });
+});
+
+// ─── New: Level 6 (Hot Springs) ───────────────────────────────────────────────
+
+describe('Level 6 (Hot Springs)', () => {
+  const level = LEVELS[5];
 
   it('has a valid grid', () => {
     expect(level.grid.length).toBe(level.rows);
@@ -1545,10 +1594,10 @@ describe('Level 5 (Hot Springs)', () => {
   });
 });
 
-// ─── New: Level 6 (Cold Front) ────────────────────────────────────────────────
+// ─── New: Level 7 (Cold Front) ────────────────────────────────────────────────
 
-describe('Level 6 (Cold Front)', () => {
-  const level = LEVELS[5];
+describe('Level 7 (Cold Front)', () => {
+  const level = LEVELS[6];
 
   it('has a valid grid', () => {
     expect(level.grid.length).toBe(level.rows);
@@ -1769,5 +1818,56 @@ describe('Board.applyTurnDelta (incremental turn evaluation)', () => {
     // Undo turn 1 → Ice disconnected; back to initial state.
     board.undoMove();
     expect(board.getCurrentWater()).toBe(100);
+  });
+});
+
+// ─── New: getTileDisplayName ──────────────────────────────────────────────────
+
+import { getTileDisplayName } from '../src/renderer';
+
+describe('getTileDisplayName', () => {
+  it('returns "Tank +7" for a tank chamber with capacity 7', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 7, 0, null, 1, null, 'tank');
+    expect(getTileDisplayName(tile)).toBe('Tank +7');
+  });
+
+  it('returns "Tank" for a tank chamber with capacity 0', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank');
+    expect(getTileDisplayName(tile)).toBe('Tank');
+  });
+
+  it('returns "Heater +2°" for a heater chamber with temperature 2', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 2);
+    expect(getTileDisplayName(tile)).toBe('Heater +2°');
+  });
+
+  it('returns "Heater" for a heater chamber with temperature 0', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 0);
+    expect(getTileDisplayName(tile)).toBe('Heater');
+  });
+
+  it('returns "Gold Straight" for an item container holding 1 GoldStraight', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldStraight, 1, null, 'item');
+    expect(getTileDisplayName(tile)).toBe('Gold Straight');
+  });
+
+  it('returns "2× Gold Straight" for an item container holding 2 GoldStraight', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldStraight, 2, null, 'item');
+    expect(getTileDisplayName(tile)).toBe('2× Gold Straight');
+  });
+
+  it('returns "Straight" for an item container holding a plain Straight', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    expect(getTileDisplayName(tile)).toBe('Straight');
+  });
+
+  it('returns "Dirt block" for a dirt chamber', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'dirt');
+    expect(getTileDisplayName(tile)).toBe('Dirt block');
+  });
+
+  it('returns "Ice" for an ice chamber', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'ice', 1);
+    expect(getTileDisplayName(tile)).toBe('Ice');
   });
 });

@@ -104,7 +104,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: shapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
     name: 'Gold Pipe',
-    description: 'Behaves like a normal pipe but may only be placed on gold spaces.',
+    description: 'Behaves like a normal pipe and can be placed on gold spaces.',
   },
   {
     iconHtml: colorSwatch(HEATER_COLOR),

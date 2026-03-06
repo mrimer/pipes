@@ -280,6 +280,70 @@ const LEVEL_4: LevelDef = {
 /** Locked until level 4 is completed. */
 const LEVEL_5: LevelDef = {
   id: 5,
+  name: 'Glacier Pass',
+  rows: 4,
+  cols: 5,
+  /**
+   * Grid layout (rows×cols = 4×5):
+   *   Row 0: Source(0,0,cap=15,East) | null(0,1) | Ice-A(0,2,E-W,cost=5,thresh=1) | null(0,3) | Elbow(0,4,S-W)
+   *   Row 1: null | null | null | null | Straight(1,4,N-S)
+   *   Row 2: null | null | Tank(2,2,+7,North) | null | Ice-B(2,4,N-S,cost=5,thresh=1)
+   *   Row 3: null | null | null | null | Sink(3,4,North)
+   *
+   * Ice-A(0,2) lies on the direct east-west path from Source to Elbow(0,4).
+   * The player may route through it (spending 5 water) or bypass it by looping
+   * south through row 1, picking up Tank(2,2) via a Tee branch along the way.
+   *
+   * Ice-B(2,4) sits on the only path to Sink(3,4) and must be connected.
+   *
+   * Bypass + Tank route (around Ice-A, 4 Elbows + 1 Tee):
+   *   (0,1) Elbow(W-S) → (1,1) Elbow(N-E) → (1,2) Tee(E-S-W)→Tank(2,2)
+   *   → (1,3) Elbow(W-N) → (0,3) Elbow(E-S) → Elbow(0,4) → Straight(1,4) → Ice-B(2,4) → Sink(3,4)
+   *
+   * Water budget – direct route (through Ice-A, 2 Straights):
+   *   15 − 1(0,1) − 5(Ice-A) − 1(0,3) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice-B) = 1 remaining.
+   *
+   * Water budget – bypass + tank route (5 pieces):
+   *   15 − 5(pieces) − 1(Elbow 0,4) − 1(Straight 1,4) + 7(Tank) − 5(Ice-B) = 10 remaining.
+   */
+  grid: [
+    // Row 0
+    [
+      { shape: PipeShape.Source, rotation: 0, capacity: 15, connections: [Direction.East] },                                      // (0,0)
+      null,                                                                                                                         // (0,1) player fills
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.East, Direction.West] }, // (0,2) Ice-A
+      null,                                                                                                                         // (0,3) player fills
+      { shape: PipeShape.Elbow, rotation: 180 },                                                                                   // (0,4) S-W
+    ],
+    // Row 1
+    [
+      null, null, null, null,
+      { shape: PipeShape.Straight, rotation: 0 },                                                                                  // (1,4) N-S
+    ],
+    // Row 2
+    [
+      null,
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'tank', rotation: 0, capacity: 7, connections: [Direction.North] },             // (2,2) Tank
+      null,
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.North, Direction.South] }, // (2,4) Ice-B
+    ],
+    // Row 3
+    [
+      null, null, null, null,
+      { shape: PipeShape.Sink, rotation: 0, connections: [Direction.North] },                                                      // (3,4)
+    ],
+  ],
+  inventory: [
+    { shape: PipeShape.Straight, count: 2 },
+    { shape: PipeShape.Elbow,    count: 4 },
+    { shape: PipeShape.Tee,      count: 1 },
+  ],
+};
+
+/** Locked until level 5 is completed. */
+const LEVEL_6: LevelDef = {
+  id: 6,
   name: 'Hot Springs',
   rows: 4,
   cols: 5,
@@ -348,9 +412,9 @@ const LEVEL_5: LevelDef = {
   ],
 };
 
-/** Locked until level 5 is completed. */
-const LEVEL_6: LevelDef = {
-  id: 6,
+/** Locked until level 6 is completed. */
+const LEVEL_7: LevelDef = {
+  id: 7,
   name: 'Cold Front',
   rows: 4,
   cols: 5,
@@ -361,7 +425,7 @@ const LEVEL_6: LevelDef = {
    *   Row 2: null | Tank(2,1,+5,North) | Tank(2,2,+5,North) | null | Ice(2,4,cost=5,thresh=3,N-S)
    *   Row 3: null | null | null | null | Sink(3,4,North)
    *
-   * Like Level 5, but with the Heater swapped to position (1,3) and Ice at (1,1).
+   * Like Level 6, but with the Heater swapped to position (1,3) and Ice at (1,1).
    * The ice tiles at (1,1) and (1,2) have threshold=2, so they are free only when the
    * heater has already been connected (raising temp to 2).  The puzzle forces the player
    * to connect the heater first before connecting the ice-blocked branches.
@@ -422,10 +486,10 @@ const LEVEL_6: LevelDef = {
   ],
 };
 
-export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6];
+export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7];
 
 /** All game chapters, each containing an ordered set of levels. */
 export const CHAPTERS: ChapterDef[] = [
   { id: 1, name: 'Intro', levels: [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4] },
-  { id: 2, name: 'Icy', levels: [LEVEL_5, LEVEL_6] },
+  { id: 2, name: 'Icy', levels: [LEVEL_5, LEVEL_6, LEVEL_7] },
 ];
