@@ -11,7 +11,7 @@
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation } from './types';
 import { CHAPTERS } from './levels';
-import { loadImportedCampaigns, saveImportedCampaigns } from './persistence';
+import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct } from './persistence';
 import { TILE_SIZE } from './renderer';
 import { Board } from './board';
 import {
@@ -65,10 +65,16 @@ export class CampaignEditor {
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
+  private readonly _onPlayCampaign: (campaign: CampaignDef) => void;
 
-  constructor(onClose: () => void, onPlaytest: (level: LevelDef) => void) {
+  constructor(
+    onClose: () => void,
+    onPlaytest: (level: LevelDef) => void,
+    onPlayCampaign: (campaign: CampaignDef) => void,
+  ) {
     this._onClose = onClose;
     this._onPlaytest = onPlaytest;
+    this._onPlayCampaign = onPlayCampaign;
     this._campaigns = loadImportedCampaigns();
 
     this._el = document.createElement('div');
@@ -223,7 +229,16 @@ export class CampaignEditor {
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:4px;';
     const levelCount = campaign.chapters.reduce((n, ch) => n + ch.levels.length, 0);
-    meta.textContent = `By ${campaign.author}  ·  ${campaign.chapters.length} chapter(s)  ·  ${levelCount} level(s)`;
+
+    // Compute play completion percentage for non-official campaigns
+    let progressText = '';
+    if (!isOfficial && levelCount > 0) {
+      const progress = loadCampaignProgress(campaign.id);
+      const pct = computeCampaignCompletionPct(campaign, progress);
+      progressText = `  ·  ${pct}% complete`;
+    }
+
+    meta.textContent = `By ${campaign.author}  ·  ${campaign.chapters.length} chapter(s)  ·  ${levelCount} level(s)${progressText}`;
     info.appendChild(name);
     info.appendChild(meta);
     row.appendChild(info);
@@ -232,6 +247,10 @@ export class CampaignEditor {
     btns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
 
     if (!isOfficial) {
+      btns.appendChild(this._btn('▶ Play', '#16213e', '#7ed321', () => {
+        this.hide();
+        this._onPlayCampaign(campaign);
+      }));
       btns.appendChild(this._btn('✏️ Edit', '#16213e', '#f0c040', () => {
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();

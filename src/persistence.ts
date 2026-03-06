@@ -115,3 +115,48 @@ export function clearCampaignProgress(campaignId: string, progress: Set<number>)
     // ignore storage errors
   }
 }
+
+/**
+ * Compute the completion percentage (0–100) for a campaign.
+ * Returns 0 if the campaign has no levels.
+ */
+export function computeCampaignCompletionPct(campaign: import('./types').CampaignDef, progress: Set<number>): number {
+  const total = campaign.chapters.reduce((n, ch) => n + ch.levels.length, 0);
+  if (total === 0) return 0;
+  const done = campaign.chapters.reduce(
+    (n, ch) => n + ch.levels.filter((l) => progress.has(l.id)).length,
+    0,
+  );
+  return Math.round((done / total) * 100);
+}
+
+// ─── Active campaign ──────────────────────────────────────────────────────────
+
+const ACTIVE_CAMPAIGN_KEY = 'pipes_active_campaign';
+
+/** Load the ID of the campaign currently activated for play, or null for the official campaign. */
+export function loadActiveCampaignId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_CAMPAIGN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the ID of the campaign to activate for play. */
+export function saveActiveCampaignId(campaignId: string): void {
+  try {
+    localStorage.setItem(ACTIVE_CAMPAIGN_KEY, campaignId);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Clear the active campaign (reverts to playing the official campaign). */
+export function clearActiveCampaignId(): void {
+  try {
+    localStorage.removeItem(ACTIVE_CAMPAIGN_KEY);
+  } catch {
+    // ignore storage errors
+  }
+}
