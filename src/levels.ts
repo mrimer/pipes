@@ -285,14 +285,14 @@ const LEVEL_5: LevelDef = {
   cols: 5,
   /**
    * Grid layout (rows×cols = 4×5):
-   *   Row 0: Source(0,0,cap=15,East) | null(0,1) | Ice-A(0,2,E-W,cost=5,thresh=1) | null(0,3) | Elbow(0,4,S-W)
+   *   Row 0: Source(0,0,cap=13,East) | null(0,1) | Ice-A(0,2,E-W,cost=5,thresh=1) | null(0,3) | Elbow(0,4,S-W)
    *   Row 1: null | null | null | null | Straight(1,4,N-S)
    *   Row 2: null | null | Tank(2,2,+7,North) | null | Ice-B(2,4,N-S,cost=5,thresh=1)
    *   Row 3: null | null | null | null | Sink(3,4,North)
    *
    * Ice-A(0,2) lies on the direct east-west path from Source to Elbow(0,4).
-   * The player may route through it (spending 5 water) or bypass it by looping
-   * south through row 1, picking up Tank(2,2) via a Tee branch along the way.
+   * The player must bypass it by looping
+   * south through row 1, picking up Tank(2,2) via a Tee branch along the way (direct route is not viable).
    *
    * Ice-B(2,4) sits on the only path to Sink(3,4) and must be connected.
    *
@@ -301,15 +301,15 @@ const LEVEL_5: LevelDef = {
    *   → (1,3) Elbow(W-N) → (0,3) Elbow(E-S) → Elbow(0,4) → Straight(1,4) → Ice-B(2,4) → Sink(3,4)
    *
    * Water budget – direct route (through Ice-A, 2 Straights):
-   *   15 − 1(0,1) − 5(Ice-A) − 1(0,3) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice-B) = 1 remaining.
+   *   13 − 1(0,1) − 5(Ice-A) − 1(0,3) − 1(Elbow 0,4) − 1(Straight 1,4) − 5(Ice-B) = -1 (not viable).
    *
    * Water budget – bypass + tank route (5 pieces):
-   *   15 − 5(pieces) − 1(Elbow 0,4) − 1(Straight 1,4) + 7(Tank) − 5(Ice-B) = 10 remaining.
+   *   13 − 5(pieces) − 1(Elbow 0,4) − 1(Straight 1,4) + 7(Tank) − 5(Ice-B) = 8 remaining.
    */
   grid: [
     // Row 0
     [
-      { shape: PipeShape.Source, rotation: 0, capacity: 15, connections: [Direction.East] },                                      // (0,0)
+      { shape: PipeShape.Source, rotation: 0, capacity: 13, connections: [Direction.East] },                                      // (0,0)
       null,                                                                                                                         // (0,1) player fills
       { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, cost: 5, temperature: 1, connections: [Direction.East, Direction.West] }, // (0,2) Ice-A
       null,                                                                                                                         // (0,3) player fills
