@@ -281,11 +281,11 @@ export function drawTile(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = 'bold 14px Arial';
-      ctx.fillText(`-${cost}`, 0, -9);
+      ctx.fillText(`-${tile.temperature}°`, 0, -9);
       ctx.font = 'bold 9px Arial';
       ctx.fillText('x', 0, 0);
       ctx.font = 'bold 14px Arial';
-      ctx.fillText(String(tile.temperature), 0, 9);
+      ctx.fillText(String(cost), 0, 9);
     }
     // Connection stubs
     ctx.strokeStyle = color;
