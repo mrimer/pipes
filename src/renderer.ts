@@ -288,6 +288,25 @@ export function drawPipe(
   ctx.restore();
 }
 
+/**
+ * Returns true when a tile can be replaced by the given selected shape.
+ * A tile is replaceable when it is a non-fixed regular or gold pipe and the
+ * gold-space constraint is satisfied.
+ */
+function isReplaceableByShape(
+  tile: Tile,
+  selectedShape: PipeShape,
+  selectedIsGold: boolean,
+  isGoldCell: boolean,
+): boolean {
+  return (
+    !tile.isFixed &&
+    (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) &&
+    tile.shape !== selectedShape &&
+    (!isGoldCell || selectedIsGold)
+  );
+}
+
 /** Render the full game board onto the canvas. */
 export function renderBoard(
   ctx: CanvasRenderingContext2D,
@@ -324,6 +343,12 @@ export function renderBoard(
         tile.shape === PipeShape.Empty &&
         (!isGoldCell || selectedIsGold);
 
+      // A non-empty cell is a valid replacement target when the selected shape can replace it:
+      // the tile must be a player-placed (non-fixed) regular or gold pipe, and satisfy
+      // the gold-space constraint.
+      const isReplaceTarget = selectedShape !== null &&
+        isReplaceableByShape(tile, selectedShape, selectedIsGold, isGoldCell);
+
       // Tile background
       if (tile.shape === PipeShape.Empty) {
         if (isGoldCell) {
@@ -351,6 +376,13 @@ export function renderBoard(
           (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
         ctx.fillStyle = isRemovable ? REMOVABLE_BG_COLOR : TILE_BG;
         ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        // Overlay a target highlight when this tile is a valid replacement target
+        if (isReplaceTarget) {
+          ctx.fillStyle = EMPTY_TARGET_COLOR;
+          ctx.globalAlpha = 0.35;
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+          ctx.globalAlpha = 1;
+        }
       }
 
       // Focus highlight
@@ -371,7 +403,9 @@ export function renderBoard(
     if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
       const hoverTile = board.grid[hoverRow][hoverCol];
       const isGoldCell = board.goldSpaces.has(`${hoverRow},${hoverCol}`);
-      if (hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold)) {
+      const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
+      const canReplace = isReplaceableByShape(hoverTile, selectedShape, selectedIsGold, isGoldCell);
+      if (canPlace || canReplace) {
         const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
         const px = hoverCol * TILE_SIZE;
         const py = hoverRow * TILE_SIZE;

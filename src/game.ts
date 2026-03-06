@@ -470,6 +470,10 @@ export class Game {
     // Display as (row, col) to match the GridPos convention used throughout the codebase.
     let tooltipText = `(${row}, ${col})`;
     const tile = this.board.grid[row][col];
+    // Show the tile's display name when one is set.
+    if (tile.name) {
+      tooltipText += ` ${tile.name}`;
+    }
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
@@ -488,9 +492,7 @@ export class Game {
         } else {
           predictedCost = 0;
         }
-        if (predictedCost > 0) {
-          tooltipText += ` cost: ${predictedCost}`;
-        }
+        tooltipText += ` cost: ${predictedCost}`;
       }
     }
     this.tooltipEl.textContent = tooltipText;

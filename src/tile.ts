@@ -93,6 +93,8 @@ export class Tile {
    * Defaults to 0.
    */
   temperature: number;
+  /** Optional display name shown in the hover tooltip. */
+  name: string;
 
   /**
    * @param shape - The pipe shape of this tile.
@@ -105,8 +107,9 @@ export class Tile {
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
    * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', or 'ice').
    * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), or Ice (threshold).
+   * @param name - Optional display name shown in the hover tooltip.
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, name = '') {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
@@ -117,6 +120,7 @@ export class Tile {
     this.customConnections = customConnections;
     this.chamberContent = chamberContent;
     this.temperature = temperature;
+    this.name = name;
   }
 
   /** Rotate the tile 90° clockwise. */
