@@ -55,7 +55,7 @@ export class CampaignEditor {
   private _editCols = 6;
   private _editGrid: (TileDef | null)[][] = [];
   private _editInventory: InventoryItem[] = [];
-  private _editorPalette: EditorPalette = 'erase';
+  private _editorPalette: EditorPalette = PipeShape.Source;
   private _editorParams: TileParams = { ...DEFAULT_PARAMS };
   private _editorCanvas: HTMLCanvasElement | null = null;
   private _editorCtx: CanvasRenderingContext2D | null = null;
@@ -610,7 +610,7 @@ export class CampaignEditor {
     this._editCols = level.cols;
     this._editGrid = JSON.parse(JSON.stringify(level.grid)) as (TileDef | null)[][];
     this._editInventory = JSON.parse(JSON.stringify(level.inventory)) as InventoryItem[];
-    this._editorPalette = 'erase';
+    this._editorPalette = PipeShape.Source;
     this._editorParams = { ...DEFAULT_PARAMS };
     this._editorHistory = [];
     this._editorHistoryIdx = -1;
@@ -768,7 +768,6 @@ export class CampaignEditor {
   // ─── Palette panel ────────────────────────────────────────────────────────
 
   private readonly _PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
     { palette: PipeShape.Source,   label: '💧 Source' },
     { palette: PipeShape.Sink,     label: '🏁 Sink' },
     { palette: PipeShape.Straight, label: '━ Straight' },
@@ -777,6 +776,7 @@ export class CampaignEditor {
     { palette: PipeShape.Cross,    label: '╋ Cross' },
     { palette: PipeShape.Chamber,  label: '■ Chamber' },
     { palette: PipeShape.Granite,  label: '▪ Granite' },
+    { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
