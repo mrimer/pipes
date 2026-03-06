@@ -1350,3 +1350,195 @@ describe('Source / Sink optional connections', () => {
     expect(sink.connections.has(Direction.South)).toBe(false);
   });
 });
+
+// ─── New: Chamber tile (heater content) ─────────────────────────────────────
+
+describe('Chamber tile (heater content)', () => {
+  it('carries its temperature value', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 10);
+    expect(tile.temperature).toBe(10);
+  });
+
+  it('connects on all four sides by default', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 8);
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.West)).toBe(true);
+  });
+
+  it('is not reclaimable', () => {
+    const board = new Board(1, 3);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 0, null, 1, null, 'heater', 5);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+
+  it('does not affect water capacity directly', () => {
+    // Source → Chamber(heater) → Sink – heater adds no water capacity
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, null, null, 0);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true,  0, 0, null, 1, null, 'heater', 10);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 15;
+    expect(board.getCurrentWater()).toBe(15);
+  });
+});
+
+// ─── New: Board.getCurrentTemperature ────────────────────────────────────────
+
+describe('Board.getCurrentTemperature', () => {
+  it('returns source base temperature when no heaters are connected', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, null, null, 5);
+    board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    expect(board.getCurrentTemperature()).toBe(5);
+  });
+
+  it('defaults to 0 temperature when source has no temperature set', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    expect(board.getCurrentTemperature()).toBe(0);
+  });
+
+  it('adds heater temperature to source base when heater is in the fill path', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, null, null, 5);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 10);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.getCurrentTemperature()).toBe(15);
+  });
+
+  it('accumulates temperature from multiple heaters in the fill path', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, null, null, 2);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 8);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.getCurrentTemperature()).toBe(15);
+  });
+
+  it('does not count heaters disconnected from the fill path', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    // Heater at (0,1) is not connected (N-S straight blocks E-W flow)
+    board.grid[0][0] = new Tile(PipeShape.Source,   0, true, 0, 0, null, 1, null, null, 5);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 0);             // N-S only
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 0, null, 1, null, 'heater', 20);
+    expect(board.getCurrentTemperature()).toBe(5); // heater not reachable
+  });
+});
+
+// ─── New: Chamber tile (ice content) ─────────────────────────────────────────
+
+describe('Chamber tile (ice content)', () => {
+  it('carries its dirtCost and temperature threshold', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'ice', 15);
+    expect(tile.dirtCost).toBe(3);
+    expect(tile.temperature).toBe(15);
+  });
+
+  it('is not reclaimable', () => {
+    const board = new Board(1, 3);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 2, null, 1, null, 'ice', 10);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+});
+
+// ─── New: getCurrentWater with ice mechanics ──────────────────────────────────
+
+describe('Board.getCurrentWater (ice mechanics)', () => {
+  function makeIceBoard(sourceTemp: number, heaterTemp: number, iceThresh: number, iceCost: number) {
+    // Layout: Source(0,0, baseTemp=sourceTemp) → Heater(0,1, temp=heaterTemp)
+    //         → Ice(0,2, thresh=iceThresh, cost=iceCost) → Sink(0,3)
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, null, null, sourceTemp);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', heaterTemp);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, iceCost, null, 1, null, 'ice', iceThresh);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 100;
+    return board;
+  }
+
+  it('costs zero when source temperature equals ice threshold', () => {
+    // sourceTemp=5, heaterTemp=10 → effective temp=15; iceThresh=15 → deltaTemp=0 → cost=0
+    const board = makeIceBoard(5, 10, 15, 2);
+    expect(board.getCurrentWater()).toBe(100);
+  });
+
+  it('costs zero when source temperature exceeds ice threshold', () => {
+    // sourceTemp=5, heaterTemp=20 → effective temp=25; iceThresh=15 → deltaTemp=0 → cost=0
+    const board = makeIceBoard(5, 20, 15, 3);
+    expect(board.getCurrentWater()).toBe(100);
+  });
+
+  it('deducts cost × deltaTemp when source temperature is below ice threshold', () => {
+    // sourceTemp=5, heaterTemp=0 → effective temp=5; iceThresh=15 → deltaTemp=10 → cost=2×10=20
+    const board = makeIceBoard(5, 0, 15, 2);
+    expect(board.getCurrentWater()).toBe(80);
+  });
+
+  it('deducts nothing from ice cost when no heater connected (temp=0, thresh=0)', () => {
+    // sourceTemp=0, heaterTemp=0, iceThresh=0 → deltaTemp=0 → cost=0
+    const board = makeIceBoard(0, 0, 0, 5);
+    expect(board.getCurrentWater()).toBe(100);
+  });
+});
+
+// ─── New: Level 5 (Hot Springs) ───────────────────────────────────────────────
+
+describe('Level 5 (Hot Springs)', () => {
+  const level = LEVELS[4];
+
+  it('has a valid grid', () => {
+    expect(level.grid.length).toBe(level.rows);
+  });
+
+  it('source has base temperature 5', () => {
+    const board = new Board(level.rows, level.cols, level);
+    const src = board.grid[board.source.row][board.source.col];
+    expect(src.temperature).toBe(5);
+  });
+
+  it('contains a Heater chamber tile', () => {
+    const board = new Board(level.rows, level.cols, level);
+    const heaters = board.grid
+      .flat()
+      .filter((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'heater');
+    expect(heaters.length).toBeGreaterThan(0);
+  });
+
+  it('contains an Ice chamber tile', () => {
+    const board = new Board(level.rows, level.cols, level);
+    const iceTiles = board.grid
+      .flat()
+      .filter((t) => t.shape === PipeShape.Chamber && t.chamberContent === 'ice');
+    expect(iceTiles.length).toBeGreaterThan(0);
+  });
+
+  it('temperature reaches 15 when heater is in the fill path', () => {
+    // Place the two Straight tiles needed to connect source → heater → rest
+    const board = new Board(level.rows, level.cols, level);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90); // E-W
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90); // E-W
+    expect(board.getCurrentTemperature()).toBe(15);
+  });
+
+  it('ice costs nothing when temperature reaches threshold', () => {
+    const board = new Board(level.rows, level.cols, level);
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    expect(board.isSolved()).toBe(true);
+    expect(board.getCurrentWater()).toBeGreaterThan(0);
+  });
+});

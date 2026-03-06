@@ -44,7 +44,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice';
 
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
@@ -83,14 +83,20 @@ export interface TileDef {
   rotation?: Rotation;
   /** Water capacity (Source and Chamber-tank tiles only). */
   capacity?: number;
-  /** Water cost for Chamber-dirt tiles – water wasted when water flows through this tile. */
+  /** Water cost for Chamber-dirt and Chamber-ice tiles – water wasted when water flows through this tile. */
   dirtCost?: number;
   /** Shape of the inventory item stored inside a Chamber-item tile. */
   itemShape?: PipeShape;
   /** Number of inventory items granted by a Chamber-item tile (defaults to 1). */
   itemCount?: number;
-  /** Content type for Chamber tiles ('tank', 'dirt', or 'item'). */
+  /** Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', or 'ice'). */
   chamberContent?: ChamberContent;
+  /**
+   * Temperature value: the base temperature for Source tiles, the additive bonus for
+   * Chamber-heater tiles, and the threshold temperature for Chamber-ice tiles.
+   * Defaults to 0.
+   */
+  temperature?: number;
   /**
    * Explicit set of open connection directions for Source, Sink, and Chamber tiles.
    * When provided, overrides the default (all four sides).

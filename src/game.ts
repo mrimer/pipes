@@ -75,6 +75,12 @@ export class Game {
   /** Active floating animation labels shown over the canvas. */
   private _animations: TileAnimation[] = [];
 
+  /** Chapter ID of the level currently being played (0 if unknown). */
+  private currentChapterId = 0;
+
+  /** Element showing the current source temperature (shown for Chapter 2+ levels). */
+  private readonly tempDisplayEl: HTMLElement;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -115,6 +121,12 @@ export class Game {
       'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
       'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
     document.body.appendChild(this.tooltipEl);
+
+    // Create the temperature display element (inserted into the HUD next to water display)
+    this.tempDisplayEl = document.createElement('span');
+    this.tempDisplayEl.style.cssText =
+      'display:none;font-size:1.1rem;font-weight:bold;color:#74b9ff;';
+    this.waterDisplayEl.insertAdjacentElement('afterend', this.tempDisplayEl);
 
     // Create the error-flash element for brief action-blocked messages
     this.errorFlashEl = document.createElement('div');
@@ -230,6 +242,7 @@ export class Game {
     for (const chapter of CHAPTERS) {
       const idx = chapter.levels.findIndex((l) => l.id === levelId);
       if (idx !== -1) {
+        this.currentChapterId = chapter.id;
         const level = chapter.levels[idx];
         this.levelHeaderEl.textContent =
           `Chapter ${chapter.id}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
@@ -237,6 +250,7 @@ export class Game {
       }
     }
     // Fallback if level isn't in any chapter
+    this.currentChapterId = 0;
     const level = LEVELS.find((l) => l.id === levelId);
     this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}` : '';
   }
@@ -282,6 +296,14 @@ export class Game {
     const w = this.board.getCurrentWater();
     this.waterDisplayEl.textContent = `💧 Water: ${w}`;
     this.waterDisplayEl.style.color = w <= 5 ? LOW_WATER_COLOR : WATER_COLOR;
+
+    if (this.currentChapterId >= 2) {
+      const t = this.board.getCurrentTemperature();
+      this.tempDisplayEl.textContent = `🌡️ Temp: ${t}°`;
+      this.tempDisplayEl.style.display = 'inline';
+    } else {
+      this.tempDisplayEl.style.display = 'none';
+    }
   }
 
   // ─── Main render loop ──────────────────────────────────────────────────────
@@ -465,6 +487,8 @@ export class Game {
    * - Chamber-tank tiles: "+capacity" (green / gray / red)
    * - Chamber-dirt tiles: "-dirtCost" (red / gray / green)
    * - Chamber-item tiles: "+itemCount" (green / gray / red)
+   * - Chamber-heater tiles: "+temperature°" (green)
+   * - Chamber-ice tiles: "-dirtCost×Δ" (red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
     if (!this.board) return;
@@ -500,6 +524,12 @@ export class Game {
           const val = tile.itemCount;
           text = val >= 0 ? `+${val}` : `${val}`;
           color = animColor(val);
+        } else if (tile.chamberContent === 'heater') {
+          text = `+${tile.temperature}°`;
+          color = animColor(tile.temperature);
+        } else if (tile.chamberContent === 'ice') {
+          text = `-${tile.dirtCost}×Δ`;
+          color = ANIM_NEGATIVE_COLOR;
         }
       }
 

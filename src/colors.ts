@@ -36,3 +36,11 @@ export const GOLD_SPACE_SHIMMER_COLOR = 'rgba(255,215,0,';
 export const GOLD_SPACE_BORDER_COLOR = '#b8860b';
 /** Background color for player-placed tiles that can be removed (non-fixed pipes). */
 export const REMOVABLE_BG_COLOR      = '#1a3050';
+/** Heater chamber tile color (warm orange-red). */
+export const HEATER_COLOR            = '#e67e22';
+/** Heater chamber tile color when water is flowing through it. */
+export const HEATER_WATER_COLOR      = '#f39c12';
+/** Ice chamber tile color (icy blue). */
+export const ICE_COLOR               = '#74b9ff';
+/** Ice chamber tile color when water is flowing through it. */
+export const ICE_WATER_COLOR         = '#a8d8ff';

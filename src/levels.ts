@@ -277,10 +277,64 @@ const LEVEL_4: LevelDef = {
   ],
 };
 
-export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4];
+/** Locked until level 4 is completed. */
+const LEVEL_5: LevelDef = {
+  id: 5,
+  name: 'Hot Springs',
+  rows: 4,
+  cols: 5,
+  /**
+   * Solution path:
+   *   Source(0,0) → [player: Straight E-W at (0,1)] → Heater(0,2, temp=+10)
+   *     → [player: Straight E-W at (0,3)] → Elbow(0,4, S-W)
+   *     → Straight(1,4, N-S) → Ice(2,4, thresh=15, cost=2)
+   *     → [player: Straight N-S at (3,4)... wait, need Sink]
+   *     → Sink(3,4)
+   *
+   * Temperature: source base = 5, heater adds 10 → effective temp = 15.
+   * Ice at thresh=15: deltaTemp = max(0, 15 − 15) = 0 → zero capacity cost.
+   *
+   * Water budget: 20 (source)
+   *   − 1 (Straight 0,1) − 1 (Straight 0,3) − 1 (Elbow 0,4)
+   *   − 1 (Straight 1,4) − 0 (Ice 2,4, thresh met) − 1 (Straight 3,4... see below)
+   * Player places 3 Straight tiles.
+   * Note: with source temp only (5°), ice would cost 2×(15−5)=20 — unbeatable.
+   */
+  grid: [
+    // Row 0
+    [
+      { shape: PipeShape.Source, rotation: 0, capacity: 20, temperature: 5, connections: [Direction.East] }, // (0,0)
+      null,                                                                                                    // (0,1) player fills: Straight E-W
+      { shape: PipeShape.Chamber, chamberContent: 'heater', rotation: 0, temperature: 10, connections: [Direction.East, Direction.West] }, // (0,2)
+      null,                                                                                                    // (0,3) player fills: Straight E-W
+      { shape: PipeShape.Elbow, rotation: 180 },                                         // (0,4) S-W
+    ],
+    // Row 1
+    [
+      null, null, null, null,
+      { shape: PipeShape.Straight, rotation: 0 },                                        // (1,4) N-S
+    ],
+    // Row 2
+    [
+      null, null, null, null,
+      { shape: PipeShape.Chamber, chamberContent: 'ice', rotation: 0, dirtCost: 2, temperature: 15, connections: [Direction.North, Direction.South] }, // (2,4)
+    ],
+    // Row 3
+    [
+      null, null, null, null,
+      { shape: PipeShape.Sink, rotation: 0, connections: [Direction.North] },            // (3,4)
+    ],
+  ],
+  inventory: [
+    { shape: PipeShape.Straight, count: 2 },
+    { shape: PipeShape.Elbow,    count: 1 },
+  ],
+};
+
+export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5];
 
 /** All game chapters, each containing an ordered set of levels. */
 export const CHAPTERS: ChapterDef[] = [
   { id: 1, name: 'Intro', levels: [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4] },
-  { id: 2, name: 'Rising Waters', levels: [] },
+  { id: 2, name: 'Rising Waters', levels: [LEVEL_5] },
 ];
