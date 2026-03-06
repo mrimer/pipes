@@ -289,6 +289,37 @@ export function drawPipe(
 }
 
 /**
+ * Returns a human-readable display name for a tile derived from its shape and
+ * chamber content.  Returns an empty string for tiles with no meaningful label
+ * (Empty, GoldSpace).
+ */
+export function getTileDisplayName(tile: Tile): string {
+  switch (tile.shape) {
+    case PipeShape.Straight:
+    case PipeShape.GoldStraight: return 'Straight';
+    case PipeShape.Elbow:
+    case PipeShape.GoldElbow:    return 'Elbow';
+    case PipeShape.Tee:
+    case PipeShape.GoldTee:      return 'Tee';
+    case PipeShape.Cross:
+    case PipeShape.GoldCross:    return 'Cross';
+    case PipeShape.Source:       return 'Source';
+    case PipeShape.Sink:         return 'Sink';
+    case PipeShape.Granite:      return 'Granite';
+    case PipeShape.Chamber:
+      switch (tile.chamberContent) {
+        case 'tank':  return 'Tank';
+        case 'dirt':  return 'Dirt block';
+        case 'item':  return 'Item container';
+        case 'heater': return 'Heater';
+        case 'ice':   return 'Ice';
+        default:      return 'Chamber';
+      }
+    default: return '';
+  }
+}
+
+/**
  * Returns true when a tile can be replaced by the given selected shape.
  * A tile is replaceable when it is a non-fixed regular or gold pipe and the
  * gold-space constraint is satisfied.
