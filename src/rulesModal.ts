@@ -145,7 +145,7 @@ export function createGameRulesModal(): HTMLElement {
   summary.style.cssText = 'font-size:0.95rem;color:#ccc;line-height:1.5;';
   summary.textContent =
     'Connect pipes from the Source to the Sink before the water runs out. ' +
-    'Each pipe you place costs one unit of water — plan your route wisely!';
+    'Each pipe you connect costs one unit of water — plan your route wisely!';
 
   // ── Play loop ──────────────────────────────────────────────────────────────
   const playLoop = document.createElement('p');
