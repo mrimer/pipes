@@ -250,9 +250,13 @@ type GameTestHooks = {
   resetConfirmModalEl: HTMLElement;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _animations: { x: number; y: number; text: string; color: string }[];
+  _playtestExitCallback: (() => void) | null;
+  _activeCampaignProgress: Set<number>;
   _handleKey(e: KeyboardEvent): void;
   _handleCanvasRightClick(e: MouseEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
+  _handleInventoryClick(shape: PipeShape, count: number): void;
+  _markLevelCompleted(levelId: number): void;
   _renderLevelList(): void;
   _playtestLevel(level: LevelDef): void;
 };
@@ -997,5 +1001,109 @@ describe('Game – auto-select reclaimed tile when no shape is selected', () => 
 
     // Should still be Elbow, not Straight
     expect(hooks.selectedShape).toBe(PipeShape.Elbow);
+  });
+});
+
+// ─── Tests: clicking already-selected inventory item keeps it selected ─────────
+
+describe('Game – inventory click on already-selected item', () => {
+  it('keeps selectedShape when clicking the already-selected item', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._handleInventoryClick(PipeShape.Straight, 4);
+
+    expect(hooks.selectedShape).toBe(PipeShape.Straight);
+  });
+
+  it('changes selectedShape when clicking a different item', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._handleInventoryClick(PipeShape.Elbow, 2);
+
+    expect(hooks.selectedShape).toBe(PipeShape.Elbow);
+  });
+});
+
+// ─── Tests: 'R' key resets the level ─────────────────────────────────────────
+
+describe('Game – R key resets the level', () => {
+  it('restarts the level when R is pressed during play', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a tile to dirty the board state
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const startLevelSpy = jest.spyOn(game, 'startLevel');
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
+
+    expect(startLevelSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('also resets when lowercase r is pressed', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const startLevelSpy = jest.spyOn(game, 'startLevel');
+    gameHooks(game)._handleKey(new KeyboardEvent('keydown', { key: 'r' }));
+
+    expect(startLevelSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+// ─── Tests: Escape key returns to level select ────────────────────────────────
+
+describe('Game – Escape key returns to level select', () => {
+  it('calls exitToMenu when Escape is pressed during play', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const exitSpy = jest.spyOn(game, 'exitToMenu');
+    gameHooks(game)._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(exitSpy).toHaveBeenCalled();
+  });
+});
+
+// ─── Tests: playtesting does not persist level-completion progress ─────────────
+
+describe('Game – playtesting does not persist progress', () => {
+  it('does not add the level to completedLevels when winning during a playtest', () => {
+    const { game } = makeGame();
+    const hooks = gameHooks(game);
+
+    // Enter playtest mode (sets _playtestExitCallback)
+    hooks._playtestLevel(LEVELS[0]);
+    expect(hooks._playtestExitCallback).not.toBeNull();
+
+    const levelId = LEVELS[0].id;
+    hooks.completedLevels.delete(levelId); // reset any data loaded from shared localStorage
+    hooks._markLevelCompleted(levelId);
+
+    expect(hooks.completedLevels.has(levelId)).toBe(false);
+  });
+
+  it('adds the level to completedLevels when winning during normal play', () => {
+    const { game } = makeGame();
+    const hooks = gameHooks(game);
+
+    game.startLevel(LEVELS[0].id);
+    // Not in playtest mode
+    expect(hooks._playtestExitCallback).toBeNull();
+
+    const levelId = LEVELS[0].id;
+    hooks.completedLevels.delete(levelId); // reset any data loaded from shared localStorage
+    hooks._markLevelCompleted(levelId);
+
+    expect(hooks.completedLevels.has(levelId)).toBe(true);
   });
 });

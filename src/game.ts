@@ -365,10 +365,9 @@ export class Game {
   private _handleInventoryClick(shape: PipeShape, count: number): void {
     if (this.gameState !== GameState.Playing) return;
     if (count === 0) return;
-    this.selectedShape = this.selectedShape === shape ? null : shape;
-    if (this.selectedShape !== null) {
-      this.pendingRotation = this.lastPlacedRotations.get(shape) ?? 0;
-    }
+    if (this.selectedShape === shape) return; // already selected – no toggle
+    this.selectedShape = shape;
+    this.pendingRotation = this.lastPlacedRotations.get(shape) ?? 0;
     this._renderInventoryBar();
   }
 
@@ -799,8 +798,11 @@ export class Game {
         }
         break;
       case 'Escape':
-        this.selectedShape = null;
-        this._renderInventoryBar();
+        this.exitToMenu();
+        break;
+      case 'r':
+      case 'R':
+        if (this.gameState === GameState.Playing) this.retryLevel();
         break;
     }
   }
@@ -954,6 +956,7 @@ export class Game {
   // ─── Persistence helpers ──────────────────────────────────────────────────
 
   private _markLevelCompleted(levelId: number): void {
+    if (this._playtestExitCallback) return; // don't persist progress during playtesting
     if (this._activeCampaign) {
       markCampaignLevelCompleted(this._activeCampaign.id, levelId, this._activeCampaignProgress);
     } else {
