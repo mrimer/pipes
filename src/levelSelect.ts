@@ -8,7 +8,6 @@ export interface ActiveCampaignInfo {
   name: string;
   author: string;
   completionPct: number;
-  onDeactivate: () => void;
 }
 
 /**
@@ -47,20 +46,9 @@ export function renderLevelList(
       'background:#16213e;border:2px solid #f0c040;border-radius:8px;' +
       'padding:14px 16px;display:flex;flex-direction:column;gap:8px;';
 
-    const titleRow = document.createElement('div');
-    titleRow.style.cssText = 'display:flex;align-items:center;gap:10px;';
     const titleEl = document.createElement('div');
-    titleEl.style.cssText = 'font-size:1.05rem;font-weight:bold;color:#f0c040;flex:1;';
+    titleEl.style.cssText = 'font-size:1.05rem;font-weight:bold;color:#f0c040;';
     titleEl.textContent = `🎯 ${activeCampaign.name}`;
-    const deactivateBtn = document.createElement('button');
-    deactivateBtn.type = 'button';
-    deactivateBtn.textContent = '✕ Stop Playing';
-    deactivateBtn.style.cssText =
-      'padding:4px 10px;font-size:0.8rem;background:#2a2a4a;color:#aaa;' +
-      'border:1px solid #555;border-radius:4px;cursor:pointer;';
-    deactivateBtn.addEventListener('click', activeCampaign.onDeactivate);
-    titleRow.appendChild(titleEl);
-    titleRow.appendChild(deactivateBtn);
 
     const metaEl = document.createElement('div');
     metaEl.style.cssText = 'font-size:0.8rem;color:#aaa;';
@@ -82,7 +70,7 @@ export function renderLevelList(
     progressRow.appendChild(progressLabel);
     progressRow.appendChild(progressBar);
 
-    header.appendChild(titleRow);
+    header.appendChild(titleEl);
     header.appendChild(metaEl);
     header.appendChild(progressRow);
     levelListEl.appendChild(header);

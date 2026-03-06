@@ -329,7 +329,6 @@ export class Game {
         name: this._activeCampaign.name,
         author: this._activeCampaign.author,
         completionPct: pct,
-        onDeactivate: () => this._deactivateCampaign(),
       };
       campaignChapters = this._activeCampaign.chapters;
     }
@@ -926,8 +925,14 @@ export class Game {
 
   // ─── Active campaign management ───────────────────────────────────────────
 
-  /** Activate a non-official campaign for play on the main menu. */
+  /** Activate a campaign for play on the main menu.
+   * Passing the official campaign (id === 'official') deactivates any active non-official campaign
+   * and returns to the built-in level set. */
   private _activateCampaign(campaign: CampaignDef): void {
+    if (campaign.id === 'official') {
+      this._deactivateCampaign();
+      return;
+    }
     this._activeCampaign = campaign;
     this._activeCampaignProgress = loadCampaignProgress(campaign.id);
     saveActiveCampaignId(campaign.id);
@@ -939,7 +944,7 @@ export class Game {
     this._activeCampaign = null;
     this._activeCampaignProgress = new Set();
     clearActiveCampaignId();
-    this._renderLevelList();
+    this._showLevelSelect();
   }
 
   /**

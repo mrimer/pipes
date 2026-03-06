@@ -256,7 +256,11 @@ export class CampaignEditor {
         this._showCampaignDetail();
       }));
     } else {
-      btns.appendChild(this._btn('👁 View', '#16213e', '#7ed321', () => {
+      btns.appendChild(this._btn('▶ Play', '#16213e', '#7ed321', () => {
+        this.hide();
+        this._onPlayCampaign(campaign);
+      }));
+      btns.appendChild(this._btn('👁 View', '#16213e', '#aaa', () => {
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
       }));
