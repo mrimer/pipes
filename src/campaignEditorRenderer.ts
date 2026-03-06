@@ -187,7 +187,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.fillStyle = bgColor;
   ctx.fillRect(x, y, CELL, CELL);
 
-  // Draw the tile as a Tile object using existing drawPipe infrastructure
+  // Draw the tile as a Tile object using existing drawTile infrastructure
   // We construct a temporary Tile to render it
   const rot = (def.rotation ?? 0) as Rotation;
   const customConns = def.connections ? new Set(def.connections) : null;
