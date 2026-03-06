@@ -1233,6 +1233,48 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(true);
   });
 
+  it('allows regular pipe to replace gold pipe on a gold space (replaceInventoryTile)', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,      0, true);
+    board.grid[0][1] = new Tile(PipeShape.GoldStraight, 90);  // gold pipe on gold space
+    board.grid[0][2] = new Tile(PipeShape.Sink,        0, true);
+    board.goldSpaces.add('0,1');
+    board.inventory = [
+      { shape: PipeShape.GoldStraight, count: 0 },
+      { shape: PipeShape.Straight,     count: 1 },
+    ];
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    // Gold pipe returned to inventory
+    expect(board.inventory.find((i) => i.shape === PipeShape.GoldStraight)!.count).toBe(1);
+    // Regular pipe consumed from inventory
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(0);
+  });
+
+  it('allows gold pipe to replace regular pipe on a gold space (replaceInventoryTile)', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0, true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);  // regular pipe on gold space
+    board.grid[0][2] = new Tile(PipeShape.Sink,     0, true);
+    board.goldSpaces.add('0,1');
+    board.inventory = [
+      { shape: PipeShape.Straight,     count: 0 },
+      { shape: PipeShape.GoldStraight, count: 1 },
+    ];
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
+    // Regular pipe returned to inventory
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
+    // Gold pipe consumed from inventory
+    expect(board.inventory.find((i) => i.shape === PipeShape.GoldStraight)!.count).toBe(0);
+  });
+
   it('sets lastError and rolls back when post-replacement constraint check fails', () => {
     // Source → Straight(1, connector) → Chamber(2, grants 2 Straights) → Straight(3) → Straight(4) → Sink(5)
     // inventory = [{Straight, count: -2}] — both Straights at (3) and (4) placed using grants,

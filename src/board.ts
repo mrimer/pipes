@@ -368,7 +368,9 @@ export class Board {
    *    (non-fixed, not Empty, not Source / Sink / Chamber / Granite).
    *  - The new shape must have a positive effective inventory count after the old
    *    tile has been returned.
-   *  - Gold spaces only accept gold pipes; gold pipes may be placed on any empty cell.
+   *  - Pipes and gold pipes may freely replace each other; the gold-space
+   *    constraint (gold spaces only accept gold pipes) applies only to fresh
+   *    placement on empty cells ({@link placeInventoryTile}).
    *
    * @returns true on success; false on failure (lastError is set when relevant).
    */
@@ -384,11 +386,6 @@ export class Board {
       tile.shape === PipeShape.Chamber ||
       tile.shape === PipeShape.Granite
     ) return false;
-
-    // Gold-space / gold-pipe constraint for the incoming shape
-    const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
-    const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
-    if (isGoldSpace && !isGoldPipe) return false;
 
     // Save inventory snapshot so we can roll back cleanly on failure
     const savedInventory = this.inventory.map((item) => ({ ...item }));
