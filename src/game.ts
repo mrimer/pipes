@@ -486,6 +486,7 @@ export class Game {
 
     if (this.board.reclaimTile({ row, col })) {
       this.board.applyTurnDelta();
+      this._deselectIfDepleted();
       this._renderInventoryBar();
       this._updateWaterDisplay();
     } else if (this.board.lastError) {
@@ -657,6 +658,21 @@ export class Game {
   }
 
   /**
+   * Clears the current selection if the selected shape's effective count
+   * (base inventory + container bonuses) has dropped below 1.
+   * Call this after any board mutation that may reduce available quantities.
+   */
+  private _deselectIfDepleted(): void {
+    if (!this.board || this.selectedShape === null) return;
+    const inv = this.board.inventory.find((it) => it.shape === this.selectedShape);
+    const bonuses = this.board.getContainerBonuses();
+    const effectiveCount = (inv?.count ?? 0) + (bonuses.get(this.selectedShape) ?? 0);
+    if (effectiveCount < 1) {
+      this.selectedShape = null;
+    }
+  }
+
+  /**
    * Post-placement bookkeeping shared by both place and replace actions.
    * Records the move, updates last-used rotation, deselects the shape when
    * inventory is exhausted, and refreshes all affected UI elements.
@@ -667,12 +683,7 @@ export class Game {
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
-    const inv = this.board.inventory.find((it) => it.shape === placedShape);
-    const bonuses = this.board.getContainerBonuses();
-    const effectiveCount = (inv?.count ?? 0) + (bonuses.get(placedShape) ?? 0);
-    if (effectiveCount <= 0) {
-      this.selectedShape = null;
-    }
+    this._deselectIfDepleted();
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
@@ -765,6 +776,7 @@ export class Game {
     this.gameState = GameState.Playing;
     this.winModalEl.style.display = 'none';
     this._spawnConnectionAnimations(filledBefore);
+    this._deselectIfDepleted();
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
@@ -782,6 +794,7 @@ export class Game {
     this.gameState = GameState.Playing;
     this.gameoverModalEl.style.display = 'none';
     this._spawnConnectionAnimations(filledBefore);
+    this._deselectIfDepleted();
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
@@ -794,6 +807,7 @@ export class Game {
     const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
     this._spawnConnectionAnimations(filledBefore);
+    this._deselectIfDepleted();
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
