@@ -850,14 +850,14 @@ export class CampaignEditor {
     if (p === PipeShape.Source || (p === PipeShape.Chamber && this._editorParams.chamberContent === 'tank')) {
       panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
         this._editorParams.capacity = parseInt(v) || 0;
-      }, 'number', '60px'));
+      }, 'number', '90px'));
     }
 
     // Source: temperature
     if (p === PipeShape.Source) {
       panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
         this._editorParams.temperature = parseInt(v) || 0;
-      }, 'number', '60px'));
+      }, 'number', '90px'));
     }
 
     // Chamber: content type
@@ -893,20 +893,20 @@ export class CampaignEditor {
       if (cc === 'dirt') {
         panel.appendChild(this._labeledInput('Cost', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
-        }, 'number', '60px'));
+        }, 'number', '90px'));
       }
       if (cc === 'heater') {
         panel.appendChild(this._labeledInput('Temp +', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
-        }, 'number', '60px'));
+        }, 'number', '90px'));
       }
       if (cc === 'ice') {
-        panel.appendChild(this._labeledInput('Cost/Δ', String(this._editorParams.cost), (v) => {
+        panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
-        }, 'number', '60px'));
-        panel.appendChild(this._labeledInput('Thresh°', String(this._editorParams.temperature), (v) => {
+        }, 'number', '90px'));
+        panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
-        }, 'number', '60px'));
+        }, 'number', '90px'));
       }
       if (cc === 'item') {
         // Item shape selector
@@ -933,7 +933,7 @@ export class CampaignEditor {
         panel.appendChild(itemSelWrap);
         panel.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
           this._editorParams.itemCount = parseInt(v) || 1;
-        }, 'number', '60px'));
+        }, 'number', '90px'));
       }
     }
 
