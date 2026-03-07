@@ -38,12 +38,13 @@ export interface DragState {
 /**
  * Render the full editor canvas.
  *
- * @param ctx     2D context to draw on.
- * @param grid    The current tile grid (null = player-fillable empty cell).
- * @param rows    Number of grid rows.
- * @param cols    Number of grid columns.
- * @param overlay Optional tile preview or erase indicator drawn at the hover cell.
- * @param drag    Optional drag state: renders the tile at toPos and hides it at fromPos.
+ * @param ctx           2D context to draw on.
+ * @param grid          The current tile grid (null = player-fillable empty cell).
+ * @param rows          Number of grid rows.
+ * @param cols          Number of grid columns.
+ * @param overlay       Optional tile preview or erase indicator drawn at the hover cell.
+ * @param drag          Optional drag state: renders the tile at toPos and hides it at fromPos.
+ * @param linkedTilePos Optional position of the tile currently linked for live param editing.
  */
 export function renderEditorCanvas(
   ctx: CanvasRenderingContext2D,
@@ -52,6 +53,7 @@ export function renderEditorCanvas(
   cols: number,
   overlay?: HoverOverlay | null,
   drag?: DragState | null,
+  linkedTilePos?: { row: number; col: number } | null,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -159,6 +161,22 @@ export function renderEditorCanvas(
         ctx.setLineDash([]);
         ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
       }
+      ctx.restore();
+    }
+  }
+
+  // Linked-tile selection highlight (dashed cyan border)
+  if (linkedTilePos) {
+    const { row, col } = linkedTilePos;
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      const x = col * CELL;
+      const y = row * CELL;
+      ctx.save();
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3);
+      ctx.setLineDash([]);
       ctx.restore();
     }
   }
