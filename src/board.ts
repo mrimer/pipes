@@ -155,7 +155,7 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 1);
+          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -600,7 +600,7 @@ export class Board {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
       if (tile?.shape === PipeShape.Source) {
-        pressure += tile.pressure - 1;
+        pressure += tile.pressure;
       } else if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
         pressure += tile.pressure;
       }
@@ -643,9 +643,8 @@ export class Board {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
       if (tile?.shape === PipeShape.Source) {
-        // The source pressure base is 1; tile.pressure - 1 gives any bonus above the base.
         // The source is always connected first, so it always counts for any ice tile.
-        pressure += tile.pressure - 1;
+        pressure += tile.pressure;
       } else if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
         const pumpTurn = this._connectionTurn.get(key) ?? Infinity;
         if (pumpTurn <= iceConnectedTurn) {
@@ -703,7 +702,7 @@ export class Board {
           pipeCost += tile.cost * deltaTemp;
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          pipeCost += Math.ceil(tile.cost / currentPressure) * deltaTemp;
+          pipeCost += (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
         }
       }
     }
@@ -749,8 +748,21 @@ export class Board {
     }
 
     // Remove locked impacts for tiles that are no longer connected.
+    // For ice/weak-ice tiles that are being disconnected, subtract their contribution
+    // from the frozen counter since they are no longer in the fill path.
     for (const key of this._lockedWaterImpact.keys()) {
       if (!filled.has(key)) {
+        const impact = this._lockedWaterImpact.get(key)!;
+        const [r, c] = key.split(',').map(Number);
+        const tile = this.grid[r]?.[c];
+        if (
+          tile?.shape === PipeShape.Chamber &&
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice') &&
+          impact < 0
+        ) {
+          // impact is negative (a cost); subtract it back out of frozen.
+          this.frozen += impact;
+        }
         this._lockedWaterImpact.delete(key);
         this._connectionTurn.delete(key);
       }
@@ -785,7 +797,7 @@ export class Board {
           newImpact = -(tile.cost * deltaTemp);
         } else {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
-          const effectiveCost = Math.ceil(tile.cost / effectivePressure);
+          const effectiveCost = effectivePressure >= 1 ? Math.ceil(tile.cost / effectivePressure) : tile.cost;
           newImpact = -(effectiveCost * deltaTemp);
         }
 
@@ -822,7 +834,7 @@ export class Board {
           this.frozen += tile.cost * deltaTemp;
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const effectiveCost = Math.ceil(tile.cost / currentPressure);
+          const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
           impact = -(effectiveCost * deltaTemp);
           this.frozen += effectiveCost * deltaTemp;
         }

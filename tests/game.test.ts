@@ -462,31 +462,59 @@ describe('Game – pending rotation', () => {
     expect(gameHooks(game).pendingRotation).toBe(0);
   });
 
-  it('Tab key advances pendingRotation by 90° when a shape is selected', () => {
+  it('W key advances pendingRotation clockwise by 90° when a shape is selected', () => {
     const { game } = makeGame();
     game.startLevel(1);
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Straight;
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(90);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(180);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(270);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
-  it('Tab key does nothing when no shape is selected', () => {
+  it('Q key advances pendingRotation counter-clockwise by 90° when a shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    expect(hooks.pendingRotation).toBe(270);
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    expect(hooks.pendingRotation).toBe(180);
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    expect(hooks.pendingRotation).toBe(90);
+
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
+  it('W key does nothing when no shape is selected', () => {
     const { game } = makeGame();
     game.startLevel(1);
     const hooks = gameHooks(game);
     hooks.selectedShape = null;
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Tab' }));
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
+  it('Q key does nothing when no shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.selectedShape = null;
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
@@ -1328,5 +1356,52 @@ describe('Game – disconnection animations after reclaimTile', () => {
 
     // No animation since the pipe was not in the fill path
     expect(hooks._animations.filter((a) => a.text === '+1').length).toBe(0);
+  });
+});
+
+// ─── Tests: Ctrl-Z / Ctrl-Y undo/redo keyboard shortcuts ─────────────────────
+
+describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
+  it('Ctrl-Z calls performUndo during gameplay', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+
+    // Place a tile so there is something to undo
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const undoSpy = jest.spyOn(game, 'performUndo');
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+
+    expect(undoSpy).toHaveBeenCalled();
+  });
+
+  it('Ctrl-Y calls performRedo during gameplay', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a tile, undo it, then redo via Ctrl-Y
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    game.performUndo();
+
+    const redoSpy = jest.spyOn(game, 'performRedo');
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }));
+
+    expect(redoSpy).toHaveBeenCalled();
+  });
+
+  it('Ctrl-Z does nothing when not on the play screen', () => {
+    const { game } = makeGame();
+    // game starts on level-select screen
+    const hooks = gameHooks(game);
+    const undoSpy = jest.spyOn(game, 'performUndo');
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    expect(undoSpy).not.toHaveBeenCalled();
   });
 });

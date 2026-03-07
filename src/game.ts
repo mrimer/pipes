@@ -624,6 +624,14 @@ export class Game {
     if (e.key === 'Shift' && !this.shiftHeld) {
       this.shiftHeld = true;
     }
+    if (e.ctrlKey && e.key === 'z' && this.screen === GameScreen.Play) {
+      e.preventDefault();
+      if (this.gameState === GameState.Playing) this.performUndo();
+    }
+    if (e.ctrlKey && e.key === 'y' && this.screen === GameScreen.Play) {
+      e.preventDefault();
+      if (this.gameState === GameState.Playing) this.performRedo();
+    }
   }
 
   private _handleDocKeyUp(e: KeyboardEvent): void {
@@ -676,7 +684,7 @@ export class Game {
           const currentTemp = this.board.getCurrentTemperature();
           const currentPressure = this.board.getCurrentPressure();
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const effectiveCost = Math.ceil(tile.cost / currentPressure);
+          const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
           tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}⌉=${effectiveCost})`;
           predictedCost = effectiveCost * deltaTemp;
         } else {
@@ -769,7 +777,7 @@ export class Game {
           color = animColor(tile.pressure);
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = -(Math.ceil(tile.cost / currentPressure) * deltaTemp);
+          const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
         }
@@ -842,7 +850,7 @@ export class Game {
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = Math.ceil(tile.cost / currentPressure) * deltaTemp;
+          const val = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
           text = val > 0 ? `+${val}` : `+0`;
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
         }
@@ -942,7 +950,16 @@ export class Game {
           this._checkWinLose();
         }
         break;
-      case 'Tab':
+      case 'q':
+      case 'Q':
+        e.preventDefault();
+        if (this.gameState !== GameState.Playing) break;
+        if (this.selectedShape !== null) {
+          this.pendingRotation = (((this.pendingRotation - 90) + 360) % 360) as Rotation;
+        }
+        break;
+      case 'w':
+      case 'W':
         e.preventDefault();
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {

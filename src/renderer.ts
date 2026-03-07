@@ -316,7 +316,7 @@ export function drawTile(
         : Math.max(0, tile.temperature - currentTemp);
       const weakIceCost = shiftHeld
         ? cost
-        : Math.max(1, Math.ceil(cost / currentPressure));
+        : Math.max(1, currentPressure >= 1 ? Math.ceil(cost / currentPressure) : cost);
       ctx.fillStyle = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
