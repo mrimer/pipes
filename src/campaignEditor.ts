@@ -963,7 +963,7 @@ export class CampaignEditor {
           this._editorParams.temperature = parseInt(v) || 0;
         }, 'number', '90px'));
       }
-      if (cc === 'ice') {
+      if (cc === 'ice' || cc === 'weak_ice') {
         panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
         }, 'number', '90px'));
@@ -974,14 +974,6 @@ export class CampaignEditor {
       if (cc === 'pump') {
         panel.appendChild(this._labeledInput('Pressure +', String(this._editorParams.pressure), (v) => {
           this._editorParams.pressure = parseInt(v) || 1;
-        }, 'number', '90px'));
-      }
-      if (cc === 'weak_ice') {
-        panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = parseInt(v) || 0;
-        }, 'number', '90px'));
-        panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
-          this._editorParams.temperature = parseInt(v) || 0;
         }, 'number', '90px'));
       }
       if (cc === 'item') {

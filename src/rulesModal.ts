@@ -57,7 +57,7 @@ const CONTROL_ROWS: ControlRow[] = [
   { input: 'Enter / Space',      action: 'Place or replace a pipe at the focused cell; rotate if nothing is selected.' },
   { input: 'Tab',                action: 'Rotate the selected pipe piece clockwise.' },
   { input: 'R',                  action: 'Retry the current level from scratch.' },
-  { input: 'Shift (hold)',       action: 'Show adjusted ice/weak-ice tile values: temperature adjusted by current Temp, and weak ice cost divided by current Pressure.' },
+  { input: 'Shift (hold)',       action: 'Show adjusted ice/weak-ice tile values: temperature adjusted by current Temp, and Weak Ice cost divided by current Pressure.' },
   { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
   { input: 'Escape',             action: 'Return to the level-select screen.' },
 ];
