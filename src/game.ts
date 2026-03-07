@@ -1253,6 +1253,7 @@ export class Game {
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();
     this._updateWaterDisplay();
+    this._updateNoteHintBoxes(level);
     this._updateUndoRedoButtons();
     this.canvas.focus();
   }
