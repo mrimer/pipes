@@ -7,10 +7,27 @@ import { PipeShape, TileDef, InventoryItem, Rotation } from './types';
 
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
+/** All chamber content types. */
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice';
+
+/** A palette entry that represents a Chamber tile with a specific content type. */
+export type ChamberPalette = `chamber:${ChamberContent}`;
+
 /** Which palette item is currently active in the level editor. */
 export type EditorPalette =
   | 'erase'
-  | PipeShape;
+  | PipeShape
+  | ChamberPalette;
+
+/** Returns true if the palette entry is a chamber content type. */
+export function isChamberPalette(p: EditorPalette): p is ChamberPalette {
+  return typeof p === 'string' && p.startsWith('chamber:');
+}
+
+/** Extracts the ChamberContent from a ChamberPalette entry. */
+export function chamberPaletteContent(p: ChamberPalette): ChamberContent {
+  return p.slice('chamber:'.length) as ChamberContent;
+}
 
 // ─── Tile parameter state ────────────────────────────────────────────────────
 
@@ -21,7 +38,7 @@ export interface TileParams {
   cost: number;
   temperature: number;
   pressure: number;
-  chamberContent: 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice';
+  chamberContent: ChamberContent;
   itemShape: PipeShape;
   itemCount: number;
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };

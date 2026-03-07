@@ -16,12 +16,15 @@ import { TILE_SIZE } from './renderer';
 import { Board, PIPE_SHAPES } from './board';
 import {
   EditorPalette,
+  ChamberPalette,
   TileParams,
   DEFAULT_PARAMS,
   EditorSnapshot,
   ValidationResult,
   generateCampaignId,
   generateLevelId,
+  isChamberPalette,
+  chamberPaletteContent,
 } from './campaignEditorTypes';
 import { renderEditorCanvas, HoverOverlay, DragState } from './campaignEditorRenderer';
 
@@ -63,6 +66,7 @@ export class CampaignEditor {
   private _editorHistory: EditorSnapshot[] = [];
   private _editorHistoryIdx = -1;
   private _goldSectionExpanded = false;
+  private _chamberSectionExpanded = false;
   /** Drag state: set when the user is dragging a tile across the grid. */
   private _dragState: {
     startPos: { row: number; col: number };
@@ -615,6 +619,8 @@ export class CampaignEditor {
     this._editorHistory = [];
     this._editorHistoryIdx = -1;
     this._editorHover = null;
+    this._goldSectionExpanded = false;
+    this._chamberSectionExpanded = false;
     this._recordEditorSnapshot();
     this._showLevelEditor(readOnly);
   }
@@ -774,9 +780,18 @@ export class CampaignEditor {
     { palette: PipeShape.Elbow,    label: '┗ Elbow' },
     { palette: PipeShape.Tee,      label: '┣ Tee' },
     { palette: PipeShape.Cross,    label: '╋ Cross' },
-    { palette: PipeShape.Chamber,  label: '■ Chamber' },
     { palette: PipeShape.Granite,  label: '▪ Granite' },
     { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
+  ];
+
+  private readonly _CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> = [
+    { palette: 'chamber:tank',     label: '💧 Tank' },
+    { palette: 'chamber:dirt',     label: '🟫 Dirt' },
+    { palette: 'chamber:item',     label: '🎁 Item' },
+    { palette: 'chamber:heater',   label: '🔥 Heater' },
+    { palette: 'chamber:ice',      label: '❄ Ice' },
+    { palette: 'chamber:pump',     label: '⬆ Pump' },
+    { palette: 'chamber:weak_ice', label: '🧊 Weak Ice' },
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -802,6 +817,8 @@ export class CampaignEditor {
     const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
     // Auto-expand the gold section if a gold item is currently selected
     if (isGoldSelected) this._goldSectionExpanded = true;
+    // Auto-expand the chamber section if a chamber item is currently selected
+    if (isChamberPalette(this._editorPalette)) this._chamberSectionExpanded = true;
 
     const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
@@ -817,6 +834,9 @@ export class CampaignEditor {
 
       btn.addEventListener('click', () => {
         this._editorPalette = item.palette;
+        if (isChamberPalette(item.palette)) {
+          this._editorParams.chamberContent = chamberPaletteContent(item.palette);
+        }
         const newPanel = this._buildPalette();
         panel.replaceWith(newPanel);
         const paramPanel = document.getElementById('editor-param-panel');
@@ -832,6 +852,26 @@ export class CampaignEditor {
 
     for (const item of this._PALETTE_ITEMS) {
       panel.appendChild(makeItemBtn(item));
+    }
+
+    // Chamber collapsible section
+    const chamberToggle = document.createElement('button');
+    chamberToggle.type = 'button';
+    chamberToggle.textContent = (this._chamberSectionExpanded ? '▾' : '▸') + ' Chamber';
+    chamberToggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      'border:1px solid #74b9ff;background:#0a1520;color:#74b9ff;font-weight:bold;margin-top:2px;';
+    chamberToggle.addEventListener('click', () => {
+      this._chamberSectionExpanded = !this._chamberSectionExpanded;
+      const newPanel = this._buildPalette();
+      panel.replaceWith(newPanel);
+    });
+    panel.appendChild(chamberToggle);
+
+    if (this._chamberSectionExpanded) {
+      for (const item of this._CHAMBER_PALETTE_ITEMS) {
+        panel.appendChild(makeItemBtn(item, true));
+      }
     }
 
     // Gold collapsible section
@@ -872,6 +912,7 @@ export class CampaignEditor {
     panel.appendChild(title);
 
     const p = this._editorPalette;
+    const isChm = isChamberPalette(p);
     if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.GoldSpace) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
@@ -881,7 +922,7 @@ export class CampaignEditor {
     }
 
     // Rotation (for pipe tiles only; Source, Sink, and Chamber use explicit connections instead)
-    const noRotation = p === PipeShape.Source || p === PipeShape.Sink || p === PipeShape.Chamber;
+    const noRotation = p === PipeShape.Source || p === PipeShape.Sink || isChm;
     if (!noRotation) {
       const rotWrap = document.createElement('div');
       rotWrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
@@ -909,8 +950,9 @@ export class CampaignEditor {
       panel.appendChild(rotWrap);
     }
 
-    // Source/Chamber: capacity
-    if (p === PipeShape.Source || (p === PipeShape.Chamber && this._editorParams.chamberContent === 'tank')) {
+    // Source/Chamber(tank): capacity
+    const cc = isChm ? chamberPaletteContent(p as ChamberPalette) : null;
+    if (p === PipeShape.Source || cc === 'tank') {
       panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
         this._editorParams.capacity = parseInt(v) || 0;
       }, 'number', '90px'));
@@ -923,36 +965,8 @@ export class CampaignEditor {
       }, 'number', '90px'));
     }
 
-    // Chamber: content type
-    if (p === PipeShape.Chamber) {
-      const sel = document.createElement('select');
-      sel.style.cssText =
-        'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-        'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice']) {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt.charAt(0).toUpperCase() + opt.slice(1);
-        if (this._editorParams.chamberContent === opt) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener('change', () => {
-        this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
-        const newPanel = this._buildParamPanel();
-        newPanel.id = 'editor-param-panel';
-        panel.replaceWith(newPanel);
-      });
-      const selWrap = document.createElement('div');
-      selWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const selLbl = document.createElement('span');
-      selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-      selLbl.textContent = 'Content:';
-      selWrap.appendChild(selLbl);
-      selWrap.appendChild(sel);
-      panel.appendChild(selWrap);
-
-      // Chamber content-specific params
-      const cc = this._editorParams.chamberContent;
+    // Chamber content-specific params (content type is determined by the palette selection)
+    if (isChm) {
       if (cc === 'dirt') {
         panel.appendChild(this._labeledInput('Cost', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
@@ -1006,7 +1020,7 @@ export class CampaignEditor {
     }
 
     // Connections (Source, Sink, Chamber)
-    if (p === PipeShape.Source || p === PipeShape.Sink || p === PipeShape.Chamber) {
+    if (p === PipeShape.Source || p === PipeShape.Sink || isChm) {
       const connWrap = document.createElement('div');
       connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
       const connLbl = document.createElement('div');
@@ -1325,7 +1339,7 @@ export class CampaignEditor {
     if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Empty) return;
 
     if (
-      p === PipeShape.Source || p === PipeShape.Sink || p === PipeShape.Chamber
+      p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)
     ) {
       // Rotate the connection set for tiles with optional connections
       const c = this._editorParams.connections;
@@ -1352,7 +1366,14 @@ export class CampaignEditor {
 
   /** Populate _editorPalette and _editorParams from a TileDef, then refresh the UI panels. */
   private _selectTileFromDef(def: TileDef): void {
-    this._editorPalette = def.shape === PipeShape.Empty ? 'erase' : def.shape;
+    if (def.shape === PipeShape.Empty) {
+      this._editorPalette = 'erase';
+    } else if (def.shape === PipeShape.Chamber) {
+      const cc = def.chamberContent ?? 'tank';
+      this._editorPalette = `chamber:${cc}` as ChamberPalette;
+    } else {
+      this._editorPalette = def.shape;
+    }
     this._populateParamsFromDef(def);
     this._refreshPaletteUI();
   }
@@ -1408,10 +1429,12 @@ export class CampaignEditor {
   private _buildTileDef(palette: EditorPalette): TileDef {
     if (palette === 'erase') return { shape: PipeShape.Empty };
 
+    const isChm = isChamberPalette(palette);
+    const effectiveShape = isChm ? PipeShape.Chamber : (palette as PipeShape);
     const p = this._editorParams;
     // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
-    const noRotation = palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Chamber;
-    const def: TileDef = noRotation ? { shape: palette as PipeShape } : { shape: palette as PipeShape, rotation: p.rotation };
+    const noRotation = effectiveShape === PipeShape.Source || effectiveShape === PipeShape.Sink || effectiveShape === PipeShape.Chamber;
+    const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
 
     // Connections
     const connDirs: Direction[] = [];
@@ -1420,23 +1443,24 @@ export class CampaignEditor {
     if (p.connections.S) connDirs.push(Direction.South);
     if (p.connections.W) connDirs.push(Direction.West);
     // Only set explicit connections for Source/Sink/Chamber (not all-4-default)
-    const needsConn = (palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Chamber);
+    const needsConn = (effectiveShape === PipeShape.Source || effectiveShape === PipeShape.Sink || effectiveShape === PipeShape.Chamber);
     if (needsConn && connDirs.length < 4) {
       def.connections = connDirs;
     }
 
-    if (palette === PipeShape.Source) {
+    if (effectiveShape === PipeShape.Source) {
       def.capacity = p.capacity;
       if (p.temperature !== 0) def.temperature = p.temperature;
-    } else if (palette === PipeShape.Chamber) {
-      def.chamberContent = p.chamberContent;
-      if (p.chamberContent === 'tank') def.capacity = p.capacity;
-      if (p.chamberContent === 'dirt') def.cost = p.cost;
-      if (p.chamberContent === 'heater') def.temperature = p.temperature;
-      if (p.chamberContent === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (p.chamberContent === 'pump') def.pressure = p.pressure;
-      if (p.chamberContent === 'weak_ice') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (p.chamberContent === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
+    } else if (isChm) {
+      const cc = chamberPaletteContent(palette as ChamberPalette);
+      def.chamberContent = cc;
+      if (cc === 'tank') def.capacity = p.capacity;
+      if (cc === 'dirt') def.cost = p.cost;
+      if (cc === 'heater') def.temperature = p.temperature;
+      if (cc === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
+      if (cc === 'pump') def.pressure = p.pressure;
+      if (cc === 'weak_ice') { def.cost = p.cost; def.temperature = p.temperature; }
+      if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
     }
 
     return def;
