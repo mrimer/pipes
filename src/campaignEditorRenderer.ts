@@ -202,6 +202,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     customConns,
     def.chamberContent ?? null,
     def.temperature ?? 0,
+    def.pressure ?? 1,
   );
 
   drawTileOnEditor(ctx, x, y, tile);

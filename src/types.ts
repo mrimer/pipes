@@ -44,7 +44,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice';
 
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
@@ -94,10 +94,15 @@ export interface TileDef {
   chamberContent?: ChamberContent;
   /**
    * Temperature value: the base temperature for Source tiles, the additive bonus for
-   * Chamber-heater tiles, and the threshold temperature for Chamber-ice tiles.
+   * Chamber-heater tiles, and the threshold temperature for Chamber-ice and Chamber-weak_ice tiles.
    * Defaults to 0.
    */
   temperature?: number;
+  /**
+   * Pressure value: the additive bonus for Chamber-pump tiles.
+   * Defaults to 1.
+   */
+  pressure?: number;
   /**
    * Explicit set of open connection directions for Source, Sink, and Chamber tiles.
    * When provided, overrides the default (all four sides).

@@ -73,6 +73,9 @@ export class Game {
   /** Whether the Ctrl key is currently held. */
   private ctrlHeld = false;
 
+  /** Whether the Shift key is currently held (used for adjusted ice/weak-ice display). */
+  private shiftHeld = false;
+
   /** Tooltip element for displaying grid coordinates under Ctrl. */
   private readonly tooltipEl: HTMLElement;
 
@@ -104,6 +107,9 @@ export class Game {
 
   /** Element showing the total water frozen by ice blocks (shown when frozen > 0). */
   private readonly frozenDisplayEl: HTMLElement;
+
+  /** Element showing the current game Pressure (shown when pressure-relevant tiles are present). */
+  private readonly pressureDisplayEl: HTMLElement;
 
   /**
    * The non-official campaign currently activated for play, or null when playing
@@ -177,6 +183,12 @@ export class Game {
     this.frozenDisplayEl.style.cssText =
       'display:none;font-size:1.1rem;font-weight:bold;color:#a8d8ea;';
     this.tempDisplayEl.insertAdjacentElement('afterend', this.frozenDisplayEl);
+
+    // Create the pressure display element (inserted into the HUD after the frozen display)
+    this.pressureDisplayEl = document.createElement('span');
+    this.pressureDisplayEl.style.cssText =
+      'display:none;font-size:1.1rem;font-weight:bold;color:#a8e063;';
+    this.frozenDisplayEl.insertAdjacentElement('afterend', this.pressureDisplayEl);
 
     // Create the error-flash element for brief action-blocked messages
     this.errorFlashEl = document.createElement('div');
@@ -409,6 +421,14 @@ export class Game {
     } else {
       this.frozenDisplayEl.style.display = 'none';
     }
+
+    if (this.board.hasPressureRelevantTiles()) {
+      const p = this.board.getCurrentPressure();
+      this.pressureDisplayEl.textContent = `🔧 Pressure: ${p}`;
+      this.pressureDisplayEl.style.display = 'inline';
+    } else {
+      this.pressureDisplayEl.style.display = 'none';
+    }
   }
 
   // ─── Main render loop ──────────────────────────────────────────────────────
@@ -423,6 +443,8 @@ export class Game {
 
   private _renderBoard(): void {
     if (!this.board) return;
+    const currentTemp = this.board.getCurrentTemperature();
+    const currentPressure = this.board.getCurrentPressure();
     renderBoard(
       this.ctx,
       this.canvas,
@@ -431,6 +453,9 @@ export class Game {
       this.selectedShape,
       this.pendingRotation,
       this.mouseCanvasPos,
+      this.shiftHeld,
+      currentTemp,
+      currentPressure,
     );
   }
 
@@ -590,12 +615,18 @@ export class Game {
         );
       }
     }
+    if (e.key === 'Shift' && !this.shiftHeld) {
+      this.shiftHeld = true;
+    }
   }
 
   private _handleDocKeyUp(e: KeyboardEvent): void {
     if (e.key === 'Control') {
       this.ctrlHeld = false;
       this._hideTooltip();
+    }
+    if (e.key === 'Shift') {
+      this.shiftHeld = false;
     }
   }
 
@@ -635,6 +666,13 @@ export class Game {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           tooltipText += ` (${deltaTemp}° x ${tile.cost})`;
           predictedCost = tile.cost * deltaTemp;
+        } else if (tile.chamberContent === 'weak_ice') {
+          const currentTemp = this.board.getCurrentTemperature();
+          const currentPressure = this.board.getCurrentPressure();
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const effectiveCost = Math.ceil(tile.cost / currentPressure);
+          tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}⌉=${effectiveCost})`;
+          predictedCost = effectiveCost * deltaTemp;
         } else {
           predictedCost = 0;
         }
@@ -673,12 +711,15 @@ export class Game {
    * - Chamber-item tiles: "+itemCount" (green / gray / red)
    * - Chamber-heater tiles: "+temperature°" (green)
    * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
+   * - Chamber-pump tiles: "+pressureP" (green)
+   * - Chamber-weak_ice tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
     if (!this.board) return;
     const filledAfter = this.board.getFilledPositions();
     const now = performance.now();
     const currentTemp = this.board.getCurrentTemperature(filledAfter);
+    const currentPressure = this.board.getCurrentPressure(filledAfter);
 
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue; // was already filled – skip
@@ -715,6 +756,14 @@ export class Game {
         } else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -(tile.cost * deltaTemp);
+          text = val < 0 ? `${val}` : '-0';
+          color = ANIM_NEGATIVE_COLOR;
+        } else if (tile.chamberContent === 'pump') {
+          text = `+${tile.pressure}P`;
+          color = animColor(tile.pressure);
+        } else if (tile.chamberContent === 'weak_ice') {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = -(Math.ceil(tile.cost / currentPressure) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
         }

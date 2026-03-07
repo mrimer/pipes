@@ -128,7 +128,7 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0);
+          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 1);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -235,6 +235,7 @@ export class Board {
               tile.customConnections !== null ? new Set(tile.customConnections) : null,
               tile.chamberContent,
               tile.temperature,
+              tile.pressure,
             ),
         ),
       ),
@@ -488,7 +489,7 @@ export class Board {
 
   /**
    * Returns true when the level has any temperature-relevant tiles: a heater
-   * chamber, an ice chamber, or a source with a non-zero base temperature.
+   * chamber, an ice chamber, a weak-ice chamber, or a source with a non-zero base temperature.
    * Used to decide whether to display the Temp stat in the UI.
    */
   hasTempRelevantTiles(): boolean {
@@ -498,7 +499,25 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice')
+          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice')
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns true when the level has any pressure-relevant tiles: a pump chamber
+   * or a weak-ice chamber.  Used to decide whether to display the Pressure stat in the UI.
+   */
+  hasPressureRelevantTiles(): boolean {
+    for (const row of this.grid) {
+      for (const tile of row) {
+        if (
+          tile.shape === PipeShape.Chamber &&
+          (tile.chamberContent === 'pump' || tile.chamberContent === 'weak_ice')
         ) {
           return true;
         }
@@ -532,6 +551,29 @@ export class Board {
   }
 
   /**
+   * Compute the effective game Pressure based on the live fill state.
+   * The base value is 1; each connected Pump chamber adds its pressure bonus.
+   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
+   */
+  getCurrentPressure(filled?: Set<string>): number {
+    const filledSet = filled ?? this.getFilledPositions();
+    return this._computePressureFromFilled(filledSet);
+  }
+
+  /** Internal helper: compute pressure from a pre-computed fill set. */
+  private _computePressureFromFilled(filled: Set<string>): number {
+    let pressure = 1;
+    for (const key of filled) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
+        pressure += tile.pressure;
+      }
+    }
+    return pressure;
+  }
+
+  /**
    * Compute current water remaining in the source tank based on the live fill state.
    *
    * When incremental turn tracking is active (i.e. {@link applyTurnDelta} has been
@@ -560,6 +602,7 @@ export class Board {
 
     // ── Dynamic fallback (test/legacy path) ─────────────────────────────────
     const currentTemp = this._computeTemperatureFromFilled(filled);
+    const currentPressure = this._computePressureFromFilled(filled);
     let pipeCost = 0;
     let tankGain = 0;
 
@@ -575,6 +618,9 @@ export class Board {
         else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           pipeCost += tile.cost * deltaTemp;
+        } else if (tile.chamberContent === 'weak_ice') {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          pipeCost += Math.ceil(tile.cost / currentPressure) * deltaTemp;
         }
       }
     }
@@ -598,6 +644,7 @@ export class Board {
   applyTurnDelta(): void {
     const filled = this.getFilledPositions();
     const currentTemp = this._computeTemperatureFromFilled(filled);
+    const currentPressure = this._computePressureFromFilled(filled);
 
     // Remove locked impacts for tiles that are no longer connected.
     for (const key of this._lockedWaterImpact.keys()) {
@@ -626,8 +673,13 @@ export class Board {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           impact = -(tile.cost * deltaTemp);
           this.frozen += tile.cost * deltaTemp;
+        } else if (tile.chamberContent === 'weak_ice') {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const effectiveCost = Math.ceil(tile.cost / currentPressure);
+          impact = -(effectiveCost * deltaTemp);
+          this.frozen += effectiveCost * deltaTemp;
         }
-        // 'heater' and 'item': no direct water impact (impact stays 0).
+        // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }
       // Source, Sink, Empty, Granite: no water impact (impact stays 0).
 

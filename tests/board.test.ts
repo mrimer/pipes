@@ -2136,3 +2136,135 @@ describe('Board.hasTempRelevantTiles', () => {
     expect(board.hasTempRelevantTiles()).toBe(false);
   });
 });
+
+// ─── Chamber tile (pump content) ──────────────────────────────────────────────
+
+describe('Chamber tile (pump content)', () => {
+  function makeBoard(pumpPressure = 1): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.sourceCapacity = 10;
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, pumpPressure);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    return board;
+  }
+
+  it('getCurrentPressure returns 1 when no pumps are connected', () => {
+    const board = makeBoard(1);
+    // Source → Pump(+1) → Sink is all connected
+    // But test with no pump - just ensure default is 1
+    const emptyBoard = new Board(1, 2);
+    emptyBoard.source = { row: 0, col: 0 };
+    emptyBoard.sink   = { row: 0, col: 1 };
+    emptyBoard.grid[0][0] = new Tile(PipeShape.Source, 0, true, 5);
+    emptyBoard.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    expect(emptyBoard.getCurrentPressure()).toBe(1);
+  });
+
+  it('getCurrentPressure increases by pump pressure when pump is connected', () => {
+    const board = makeBoard(2);
+    expect(board.getCurrentPressure()).toBe(3); // base 1 + pump 2
+  });
+
+  it('pump does not affect water count', () => {
+    const board = makeBoard(3);
+    // Source(10) → Pump(no cost) → Sink: no water consumed by pump
+    expect(board.getCurrentWater()).toBe(10);
+  });
+
+  it('hasPressureRelevantTiles returns true when a pump chamber is present', () => {
+    const board = makeBoard(1);
+    expect(board.hasPressureRelevantTiles()).toBe(true);
+  });
+
+  it('hasPressureRelevantTiles returns false when no pump or weak_ice is present', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 5);
+    board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    expect(board.hasPressureRelevantTiles()).toBe(false);
+  });
+
+  it('applyTurnDelta: pump has no water impact', () => {
+    const board = makeBoard(1);
+    board.initHistory();
+    expect(board.getLockedWaterImpact({ row: 0, col: 1 })).toBe(0);
+  });
+});
+
+// ─── Chamber tile (weak_ice content) ─────────────────────────────────────────
+
+describe('Chamber tile (weak_ice content)', () => {
+  /**
+   * Build a board: Source(cap) → WeakIce(cost, temp) → Sink
+   * optionally followed by a Pump(pumpPressure) when pressure > 1.
+   */
+  function makeBoard(cap: number, iceCost: number, iceTemp: number, sourceTemp = 0, pumpPressure = 0): Board {
+    const hasPump = pumpPressure > 0;
+    const cols = hasPump ? 4 : 3;
+    const board = new Board(1, cols);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: cols - 1 };
+    board.sourceCapacity = cap;
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, cap, 0, null, 1, null, null, sourceTemp);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, iceCost, null, 1, null, 'weak_ice', iceTemp);
+    if (hasPump) {
+      board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, pumpPressure);
+    }
+    board.grid[0][cols - 1] = new Tile(PipeShape.Sink, 0, true);
+    return board;
+  }
+
+  it('hasTempRelevantTiles returns true for weak_ice', () => {
+    const board = makeBoard(10, 2, 5);
+    expect(board.hasTempRelevantTiles()).toBe(true);
+  });
+
+  it('hasPressureRelevantTiles returns true for weak_ice', () => {
+    const board = makeBoard(10, 2, 5);
+    expect(board.hasPressureRelevantTiles()).toBe(true);
+  });
+
+  it('costs cost × deltaTemp when pressure = 1 (same as ice)', () => {
+    // sourceTemp=0, iceTemp=3, cost=2: delta=3, effective = ceil(2/1)*3 = 6
+    const board = makeBoard(20, 2, 3, 0);
+    expect(board.getCurrentWater()).toBe(14);
+  });
+
+  it('divides cost by pressure (rounded up) when pressure > 1', () => {
+    // sourceTemp=0, iceTemp=3, cost=3, pump pressure=2: pressure=1+2=3, delta=3, effective = ceil(3/3)*3 = 1*3 = 3
+    const board = makeBoard(20, 3, 3, 0, 2);
+    expect(board.getCurrentWater()).toBe(17); // 20 - 3 = 17
+  });
+
+  it('cost is at least 1 per degree even when pressure is very high', () => {
+    // sourceTemp=0, iceTemp=5, cost=1, pump pressure=100: ceil(1/101)*5 = 1*5 = 5
+    const board = makeBoard(20, 1, 5, 0, 100);
+    expect(board.getCurrentWater()).toBe(15); // ceil(1/101)=1, 1*5=5, 20-5=15
+  });
+
+  it('costs nothing when temperature meets threshold', () => {
+    // sourceTemp=10, iceTemp=5: delta=0
+    const board = makeBoard(20, 3, 5, 10);
+    expect(board.getCurrentWater()).toBe(20);
+  });
+
+  it('applyTurnDelta locks weak_ice cost at connection time', () => {
+    // pressure=1, cost=4, temp=5, sourceTemp=0: delta=5, locked = ceil(4/1)*5 = 4*5 = 20
+    const board = makeBoard(30, 4, 5, 0);
+    board.initHistory();
+    const impact = board.getLockedWaterImpact({ row: 0, col: 1 });
+    expect(impact).toBe(-20);
+  });
+
+  it('applyTurnDelta uses pressure from connected pumps when locking', () => {
+    // pressure=1+2=3, cost=3, temp=5, sourceTemp=0: delta=5, locked = ceil(3/3)*5 = 1*5 = 5
+    const board = makeBoard(30, 3, 5, 0, 2);
+    board.initHistory();
+    const impact = board.getLockedWaterImpact({ row: 0, col: 1 });
+    expect(impact).toBe(-5);
+  });
+});
