@@ -56,3 +56,7 @@ export const WEAK_ICE_WATER_COLOR    = '#d0ecff';
 export const SANDSTONE_COLOR         = '#c2a26e';
 /** Sandstone chamber tile color when water is flowing through it. */
 export const SANDSTONE_WATER_COLOR   = '#d4b882';
+/** Sandstone chamber tile color when hardness exceeds current pressure (darker brown). */
+export const SANDSTONE_HARD_COLOR       = '#7a5230';
+/** Sandstone chamber tile color when hardness exceeds current pressure, with water (darker brown). */
+export const SANDSTONE_HARD_WATER_COLOR = '#9a6b40';
