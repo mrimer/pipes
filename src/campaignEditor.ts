@@ -1701,11 +1701,38 @@ export class CampaignEditor {
       const level = this._buildCurrentLevelDef();
       const board = new Board(level.rows, level.cols, level);
       board.initHistory();
+
+      // Check for sandstone tiles in the initial fill path with invalid deltaDamage.
+      const initialFilled = board.getFilledPositions();
+      const initialPressure = board.getCurrentPressure(initialFilled);
+      for (const key of initialFilled) {
+        const [r, c] = key.split(',').map(Number);
+        const tile = board.grid[r]?.[c];
+        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
+          const deltaDamage = initialPressure - tile.hardness;
+          if (deltaDamage <= 0) {
+            msgs.push(
+              `❌ Sandstone at (${r},${c}) is immediately connected but its hardness (${tile.hardness}) ` +
+              `≥ initial pressure (${initialPressure}) — the level starts in a failure state.`,
+            );
+            ok = false;
+          }
+        }
+      }
+
+      // Check if the initial state already has zero or negative water (immediate game over).
+      if (ok && board.getCurrentWater() <= 0) {
+        msgs.push('❌ Level starts with zero or negative water – adjust the source capacity or tile costs.');
+        ok = false;
+      }
+
       // If source is directly connected to sink (pre-solved), warn
-      if (board.isSolved()) {
-        msgs.push('⚠️ Level is already solved without placing any tiles.');
-      } else {
-        msgs.push('✅ Level structure looks valid.');
+      if (ok) {
+        if (board.isSolved()) {
+          msgs.push('⚠️ Level is already solved without placing any tiles.');
+        } else {
+          msgs.push('✅ Level structure looks valid.');
+        }
       }
     } catch {
       msgs.push('❌ Level structure error – check tile configurations.');

@@ -758,7 +758,10 @@ export class Board {
         } else if (tile.chamberContent === 'sandstone') {
           const deltaDamage = currentPressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          pipeCost += (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
+          // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
+          pipeCost += deltaDamage >= 1
+            ? Math.ceil(tile.cost / deltaDamage) * deltaTemp
+            : this.sourceCapacity + 1;
         }
       }
     }
@@ -854,8 +857,17 @@ export class Board {
         } else if (tile.chamberContent === 'sandstone') {
           const deltaDamage = effectivePressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
-          const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost;
-          newImpact = -(effectiveCost * deltaTemp);
+          if (deltaDamage >= 1) {
+            newImpact = -(Math.ceil(tile.cost / deltaDamage) * deltaTemp);
+          } else {
+            // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
+            // Skip the frozen counter – this impact has no ice-accounting meaning.
+            const failureImpact = -(this.sourceCapacity + 1);
+            if (failureImpact !== oldImpact) {
+              this._lockedWaterImpact.set(key, failureImpact);
+            }
+            continue;
+          }
         } else {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           const effectiveCost = effectivePressure >= 1 ? Math.ceil(tile.cost / effectivePressure) : tile.cost;
@@ -901,9 +913,14 @@ export class Board {
         } else if (tile.chamberContent === 'sandstone') {
           const deltaDamage = currentPressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost;
-          impact = -(effectiveCost * deltaTemp);
-          this.frozen += effectiveCost * deltaTemp;
+          // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
+          if (deltaDamage >= 1) {
+            const effectiveCost = Math.ceil(tile.cost / deltaDamage);
+            impact = -(effectiveCost * deltaTemp);
+            this.frozen += effectiveCost * deltaTemp;
+          } else {
+            impact = -(this.sourceCapacity + 1);
+          }
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }

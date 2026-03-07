@@ -679,7 +679,7 @@ export class Game {
       // re-showing it in the tooltip would be misleading.
       const isConnected = this.board.getLockedWaterImpact({ row, col }) !== null;
       if (!isConnected) {
-        let predictedCost: number;
+        let predictedCost: number | null = null;
         if (tile.chamberContent === 'dirt') {
           predictedCost = tile.cost;
         } else if (tile.chamberContent === 'ice') {
@@ -700,14 +700,20 @@ export class Game {
           const currentTemp = this.board.getCurrentTemperature();
           const currentPressure = this.board.getCurrentPressure();
           const deltaDamage = currentPressure - tile.hardness;
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost;
-          tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${deltaDamage}⌉=${effectiveCost})`;
-          predictedCost = effectiveCost * deltaTemp;
+          if (deltaDamage <= 0) {
+            tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}, Hardness: ${tile.hardness})`;
+          } else {
+            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+            const effectiveCost = Math.ceil(tile.cost / deltaDamage);
+            tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${deltaDamage}⌉=${effectiveCost})`;
+            predictedCost = effectiveCost * deltaTemp;
+          }
         } else {
           predictedCost = 0;
         }
-        tooltipText += ` cost: ${predictedCost}`;
+        if (predictedCost !== null) {
+          tooltipText += ` cost: ${predictedCost}`;
+        }
       }
     }
     this.tooltipEl.textContent = tooltipText;

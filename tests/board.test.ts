@@ -2640,89 +2640,115 @@ describe('Chamber tile (sandstone content)', () => {
     expect(b.lastError).toBeNull();
   });
 
+  it('applyTurnDelta sets failure impact (−(sourceCapacity+1)) when sandstone deltaDamage ≤ 0', () => {
+    // Sandstone(hardness=2) is pre-connected from start with pressure=1, deltaDamage=-1.
+    // The impact should be −(sourceCapacity+1) to guarantee getCurrentWater() ≤ 0.
+    // frozen should NOT be updated for the invalid state.
+    const board = makeBoard(20, 4, 5, 2); // hardness=2
+    board.initHistory();
+    const impact = board.getLockedWaterImpact({ row: 0, col: 1 });
+    expect(impact).toBe(-(20 + 1)); // -(sourceCapacity+1) = -21
+    expect(board.getCurrentWater()).toBeLessThanOrEqual(0);
+    expect(board.frozen).toBe(0); // failure path must not pollute the frozen counter
+  });
+
   /**
-   * Two-path board for pump-disconnect tests:
-   *   Row 0: Source(0,0)→Sandstone(0,1)→Sink(0,2)     (fixed path)
-   *   Col 0: Source(0,0)→(1,0)[player pipe]→Pump(2,0) (pump path, separate)
-   * Source has customConnections [East, South] to reach both paths.
+   * Board for pump-disconnect tests.  The pump connector at (1,0) is player-placed,
+   * so the pump is NOT in the initial fill path.  The sandstone at (0,2) is also NOT
+   * initially connected (empty cell at (0,1) blocks the path at initHistory time).
+   *
+   *   (0,0) Source [East+South]  →  (0,1) [player E-W pipe]  →  (0,2) Sandstone  →  (0,3) Sink
+   *                ↓
+   *   (1,0) [player N-S pipe]
+   *                ↓
+   *   (2,0) Pump [North, bonus=pumpBonus]
+   *
+   * The player MUST connect the pump before connecting the sandstone whenever
+   * hardness ≥ 1, so that pressure is sufficient at sandstone-connection time.
    */
-  function makeTwoPathBoard(hardness: number, pumpPressureBonus: number): Board {
-    const b = new Board(3, 3);
+  function makePumpBeforeSandstoneBoard(hardness: number, pumpPressureBonus: number): Board {
+    const b = new Board(3, 4);
     b.source = { row: 0, col: 0 };
-    b.sink   = { row: 0, col: 2 };
+    b.sink   = { row: 0, col: 3 };
     b.sourceCapacity = 100;
-    // Source: connects East and South
+    // Source: connects East (sandstone path) and South (pump path)
     b.grid[0][0] = new Tile(PipeShape.Source, 0, true, 100, 0, null, 1, new Set([Direction.East, Direction.South]));
-    // Sandstone on main path
-    b.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, new Set([Direction.East, Direction.West]), 'sandstone', 5, 0, hardness);
+    // Empty cell – player will place an E-W pipe here to connect sandstone
+    b.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    // Sandstone (fixed, pre-placed but disconnected at start)
+    b.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, new Set([Direction.East, Direction.West]), 'sandstone', 5, 0, hardness);
     // Sink
-    b.grid[0][2] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
-    // Empty cell for player pipe (pump connector)
+    b.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    // Empty cell – player will place an N-S pipe here to connect the pump
     b.grid[1][0] = new Tile(PipeShape.Empty, 0);
-    // Pump at bottom of column 0
+    // Pump (fixed, pre-placed but disconnected at start)
     b.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, pumpPressureBonus);
     // Unused cells
     b.grid[1][1] = new Tile(PipeShape.Empty, 0);
     b.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    b.grid[1][3] = new Tile(PipeShape.Empty, 0);
     b.grid[2][1] = new Tile(PipeShape.Empty, 0);
     b.grid[2][2] = new Tile(PipeShape.Empty, 0);
+    b.grid[2][3] = new Tile(PipeShape.Empty, 0);
     b.inventory = [{ shape: PipeShape.Straight, count: 2 }];
     b.initHistory();
     return b;
   }
 
   it('reclaimTile fails when pump removal would drop sandstone deltaDamage to 0', () => {
-    // hardness=1, pumpPressureBonus=1 → pressure=2, deltaDamage=1 (OK when connected)
-    // After pump disconnect: pressure=1, deltaDamage=0 → blocked
-    const b = makeTwoPathBoard(1, 1);
+    // hardness=1, pumpPressureBonus=1:
+    //   Connect pump first → pressure=1+1=2, deltaDamage=2-1=1 → sandstone valid to connect.
+    //   After pump disconnect: pressure=1, deltaDamage=0 → must be blocked.
+    const b = makePumpBeforeSandstoneBoard(1, 1);
 
-    // Place N-S straight at (1,0) to connect Source(south)→Pump(2,0)
+    // Step 1: Connect pump via N-S pipe at (1,0)
     b.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
     b.applyTurnDelta();
     b.recordMove();
-    // Verify sandstone is connected and its impact is locked with deltaDamage=2-1=1
-    // deltaTemp=5, effectiveCost=ceil(3/1)=3, impact=-15
-    expect(b.getLockedWaterImpact({ row: 0, col: 1 })).toBe(-15);
 
-    // Reclaim the pump connector → pump disconnects but sandstone stays connected
-    // pressure would drop to 1, deltaDamage=0 → must be blocked
+    // Step 2: Connect sandstone via E-W pipe at (0,1) — deltaDamage=2-1=1 > 0, valid
+    const placed = b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(placed).toBe(true);
+    b.applyTurnDelta();
+    b.recordMove();
+    // Sandstone locked at deltaDamage=1: impact = -(ceil(3/1)*5) = -15
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-15);
+
+    // Step 3: Try to reclaim pump connector → pressure drops to 1, deltaDamage=0 → blocked
     const result = b.reclaimTile({ row: 1, col: 0 });
     expect(result).toBe(false);
     expect(b.lastError).toMatch(/Cannot disconnect.*Sandstone|Pressure.*Sandstone/);
-    expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 1 }]);
-    // Pipe should still be in place
+    expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 2 }]);
     expect(b.grid[1][0].shape).toBe(PipeShape.Straight);
   });
 
   it('reclaimTile succeeds and sandstone cost is re-evaluated when deltaDamage stays > 0', () => {
-    // hardness=0, pumpBonus=3: after pump disconnect, pressure=1, deltaDamage=1 > 0 → allowed.
-    // In the two-path board, sandstone is connected from the start (via East path at initHistory time),
-    // so its cost is locked at pressure=1 (pump not yet connected).  Placing and then reclaiming
-    // the pump connector should succeed (deltaDamage stays 1 > 0 throughout) and sandstone impact
-    // remains -15 both before and after the pump connection (locked at initial connection pressure).
-    const b = makeTwoPathBoard(0, 3);
+    // hardness=0, pumpPressureBonus=3:
+    //   After pump disconnect: pressure=1, deltaDamage=1-0=1 > 0 → reclaim allowed.
+    //   Sandstone was locked at deltaDamage=4 (impact=-5); re-evaluated to deltaDamage=1 (impact=-15).
+    const b = makePumpBeforeSandstoneBoard(0, 3);
 
-    // Sandstone is already connected at initHistory time with pressure=1, deltaDamage=1.
-    // impact = ceil(3/1)*5 = -15
-    expect(b.getLockedWaterImpact({ row: 0, col: 1 })).toBe(-15);
-
-    // Place N-S straight at (1,0) – pump connects but sandstone was locked before pump
+    // Step 1: Connect pump via N-S pipe at (1,0) → pressure=1+3=4
     b.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
     b.applyTurnDelta();
     b.recordMove();
-    // Sandstone cost unchanged (locked at initial turn, pump connected after): still -15
-    expect(b.getLockedWaterImpact({ row: 0, col: 1 })).toBe(-15);
 
-    // Reclaim pump connector → pump disconnects, sandstone stays connected
-    // deltaDamage drops from (1-0)=1 to (1-0)=1 (same, since hardness=0) → allowed
+    // Step 2: Connect sandstone via E-W pipe at (0,1) — pressure=4, deltaDamage=4-0=4
+    b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    // Sandstone locked at deltaDamage=4: impact = -(ceil(3/4)*5) = -(1*5) = -5
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-5);
+
+    // Step 3: Reclaim pump connector → pressure drops to 1, deltaDamage=1 > 0 → allowed
     const result = b.reclaimTile({ row: 1, col: 0 });
     expect(result).toBe(true);
     expect(b.lastError).toBeNull();
 
     b.applyTurnDelta();
     b.recordMove();
-    // Re-evaluated (pump connected after sandstone → not counted): pressure=1, deltaDamage=1
-    // impact = ceil(3/1)*5 = -15 (unchanged)
-    expect(b.getLockedWaterImpact({ row: 0, col: 1 })).toBe(-15);
+    // Re-evaluated with effective pressure=1 (pump not in fill path, connected after sandstone):
+    // deltaDamage=1, impact = -(ceil(3/1)*5) = -15
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-15);
   });
 });
