@@ -1053,10 +1053,14 @@ export class CampaignEditor {
       sel.style.cssText =
         'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+      const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
+        tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
+        ice: 'Ice', pump: 'Pump', weak_ice: 'Weak Ice', sandstone: 'Sandstone', star: 'Star',
+      };
       for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', 'sandstone', 'star']) {
         const o = document.createElement('option');
         o.value = opt;
-        o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt === 'sandstone' ? 'Sandstone' : opt.charAt(0).toUpperCase() + opt.slice(1);
+        o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
         if (this._editorParams.chamberContent === opt) o.selected = true;
         sel.appendChild(o);
       }

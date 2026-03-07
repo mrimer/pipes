@@ -619,7 +619,7 @@ export class Board {
   }
 
   /**
-   * Count how many Star chamber tiles are currently in the water fill path.
+   * Count how many star chamber tiles are currently in the water fill path.
    * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
    * @returns The number of connected star chambers.
    */
