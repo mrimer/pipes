@@ -1575,6 +1575,12 @@ export class CampaignEditor {
   }
 
   private _editorUndo(): void {
+    // If a linked tile has unsaved edits, record the current state first so that
+    // a subsequent redo can return to those modified parameters.
+    if (this._linkedTileDirty) {
+      this._recordEditorSnapshot();
+      this._linkedTileDirty = false;
+    }
     if (this._editorHistoryIdx <= 0) return;
     this._editorHistoryIdx--;
     this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
