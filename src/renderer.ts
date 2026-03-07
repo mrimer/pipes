@@ -116,7 +116,7 @@ export function drawTile(
     } else if (chamberContent === 'weak_ice') {
       color = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
     } else if (chamberContent === 'sandstone') {
-      const isHard = tile.hardness > currentPressure;
+      const isHard = tile.hardness >= currentPressure;
       color = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
@@ -338,7 +338,7 @@ export function drawTile(
       // deltaDamage = Pressure − Hardness is used as the cost divisor.
       // When shift is held, show the raw (unadjusted) values.
       // When hardness > pressure, use darker color and show the hardness value with "H".
-      const isHard = tile.hardness > currentPressure;
+      const isHard = tile.hardness >= currentPressure;
       const sandstoneColor = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
