@@ -544,14 +544,17 @@ export class Game {
       }
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe (no inventory item selected, or same shape as selected)
-      this.board.rotateTile(pos);
-      this.board.applyTurnDelta();
-      this.board.recordMove();
-      this._spawnConnectionAnimations(filledBefore);
-      this._renderInventoryBar();
-      this._updateWaterDisplay();
-      this._updateUndoRedoButtons();
-      this._checkWinLose();
+      if (this.board.rotateTile(pos)) {
+        this.board.applyTurnDelta();
+        this.board.recordMove();
+        this._spawnConnectionAnimations(filledBefore);
+        this._renderInventoryBar();
+        this._updateWaterDisplay();
+        this._updateUndoRedoButtons();
+        this._checkWinLose();
+      } else if (this.board.lastError) {
+        this._showErrorFlash(this.board.lastError);
+      }
     }
   }
 
@@ -687,6 +690,14 @@ export class Game {
           const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
           tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}⌉=${effectiveCost})`;
           predictedCost = effectiveCost * deltaTemp;
+        } else if (tile.chamberContent === 'sandstone') {
+          const currentTemp = this.board.getCurrentTemperature();
+          const currentPressure = this.board.getCurrentPressure();
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost;
+          tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${deltaDamage}⌉=${effectiveCost})`;
+          predictedCost = effectiveCost * deltaTemp;
         } else {
           predictedCost = 0;
         }
@@ -727,6 +738,7 @@ export class Game {
    * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
    * - Chamber-pump tiles: "+pressureP" (green)
    * - Chamber-weak_ice tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
+   * - Chamber-sandstone tiles: "-(⌈cost/deltaDamage⌉ × deltaTemp)" or "-0" (always red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
     if (!this.board) return;
@@ -778,6 +790,12 @@ export class Game {
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
+          text = val < 0 ? `${val}` : '-0';
+          color = ANIM_NEGATIVE_COLOR;
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
         }
@@ -851,6 +869,12 @@ export class Game {
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
+          text = val > 0 ? `+${val}` : `+0`;
+          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
           text = val > 0 ? `+${val}` : `+0`;
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
         }
@@ -940,14 +964,17 @@ export class Game {
           }
         } else {
           const filledBefore = board.getFilledPositions();
-          board.rotateTile(focusPos);
-          board.applyTurnDelta();
-          board.recordMove();
-          this._spawnConnectionAnimations(filledBefore);
-          this._renderInventoryBar();
-          this._updateWaterDisplay();
-          this._updateUndoRedoButtons();
-          this._checkWinLose();
+          if (board.rotateTile(focusPos)) {
+            board.applyTurnDelta();
+            board.recordMove();
+            this._spawnConnectionAnimations(filledBefore);
+            this._renderInventoryBar();
+            this._updateWaterDisplay();
+            this._updateUndoRedoButtons();
+            this._checkWinLose();
+          } else if (board.lastError) {
+            this._showErrorFlash(board.lastError);
+          }
         }
         break;
       case 'q':

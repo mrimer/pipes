@@ -44,7 +44,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice' | 'sandstone';
 
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
@@ -103,6 +103,12 @@ export interface TileDef {
    * Defaults to 1.
    */
   pressure?: number;
+  /**
+   * Hardness value for Chamber-sandstone tiles.
+   * deltaDamage = Pressure − Hardness; used as the cost divisor instead of Pressure.
+   * Defaults to 0.
+   */
+  hardness?: number;
   /**
    * Explicit set of open connection directions for Source, Sink, and Chamber tiles.
    * When provided, overrides the default (all four sides).

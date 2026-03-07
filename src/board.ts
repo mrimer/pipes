@@ -155,7 +155,7 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0);
+          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -265,6 +265,7 @@ export class Board {
               tile.chamberContent,
               tile.temperature,
               tile.pressure,
+              tile.hardness,
             ),
         ),
       ),
@@ -401,6 +402,23 @@ export class Board {
       this.inventory.push({ shape, count: -1 });
     }
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
+
+    // Validate that no newly-connected sandstone tile has deltaDamage <= 0.
+    const filled = this.getFilledPositions();
+    const sandstoneError = this._checkSandstoneConstraints(filled);
+    if (sandstoneError) {
+      // Roll back placement.
+      this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+      if (idx !== -1) {
+        this.inventory[idx].count++;
+      } else {
+        const pushIdx = this.inventory.findIndex((it) => it.shape === shape && it.count < 0);
+        if (pushIdx !== -1) this.inventory.splice(pushIdx, 1);
+      }
+      this.lastError = sandstoneError;
+      return false;
+    }
+
     return true;
   }
 
@@ -496,6 +514,16 @@ export class Board {
       }
     }
 
+    // Validate that no newly-connected sandstone tile has deltaDamage <= 0.
+    const filledAfterReplace = this.getFilledPositions();
+    const sandstoneError = this._checkSandstoneConstraints(filledAfterReplace);
+    if (sandstoneError) {
+      this.lastError = sandstoneError;
+      this.inventory = savedInventory;
+      this.grid[pos.row][pos.col] = tile;
+      return false;
+    }
+
     return true;
   }
 
@@ -532,7 +560,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice')
+          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')
         ) {
           return true;
         }
@@ -550,7 +578,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'pump' || tile.chamberContent === 'weak_ice')
+          (tile.chamberContent === 'pump' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')
         ) {
           return true;
         }
@@ -703,6 +731,10 @@ export class Board {
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           pipeCost += (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          pipeCost += (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
         }
       }
     }
@@ -757,7 +789,7 @@ export class Board {
         const tile = this.grid[r]?.[c];
         if (
           tile?.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice') &&
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone') &&
           impact < 0
         ) {
           // impact is negative (a cost); subtract it back out of frozen.
@@ -783,7 +815,7 @@ export class Board {
         const [r, c] = key.split(',').map(Number);
         const tile = this.grid[r]?.[c];
         if (!tile || tile.shape !== PipeShape.Chamber) continue;
-        if (tile.chamberContent !== 'ice' && tile.chamberContent !== 'weak_ice') continue;
+        if (tile.chamberContent !== 'ice' && tile.chamberContent !== 'weak_ice' && tile.chamberContent !== 'sandstone') continue;
 
         const iceConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
         const effectiveTemp = this._computeTemperatureForIce(filled, iceConnectedTurn);
@@ -795,6 +827,11 @@ export class Board {
         if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           newImpact = -(tile.cost * deltaTemp);
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = effectivePressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
+          const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost;
+          newImpact = -(effectiveCost * deltaTemp);
         } else {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           const effectiveCost = effectivePressure >= 1 ? Math.ceil(tile.cost / effectivePressure) : tile.cost;
@@ -837,6 +874,12 @@ export class Board {
           const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
           impact = -(effectiveCost * deltaTemp);
           this.frozen += effectiveCost * deltaTemp;
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost;
+          impact = -(effectiveCost * deltaTemp);
+          this.frozen += effectiveCost * deltaTemp;
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }
@@ -857,6 +900,28 @@ export class Board {
     const key = `${pos.row},${pos.col}`;
     const val = this._lockedWaterImpact.get(key);
     return val !== undefined ? val : null;
+  }
+
+  /**
+   * Check whether any newly-connected sandstone tile (not yet in the locked
+   * impact map) violates the deltaDamage > 0 constraint.
+   * @param filled - Current fill set (after the board mutation).
+   * @returns An error message string if a violation is found, or `null` if valid.
+   */
+  private _checkSandstoneConstraints(filled: Set<string>): string | null {
+    const currentPressure = this._computePressureFromFilled(filled);
+    for (const key of filled) {
+      if (this._lockedWaterImpact.has(key)) continue; // Already connected – was checked when first connected.
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
+        const deltaDamage = currentPressure - tile.hardness;
+        if (deltaDamage <= 0) {
+          return `Pressure must exceed Sandstone hardness to connect. (Pressure: ${currentPressure}, Hardness: ${tile.hardness})`;
+        }
+      }
+    }
+    return null;
   }
 
   // ─── Grid validation ───────────────────────────────────────────────────────
@@ -971,10 +1036,28 @@ export class Board {
 
   /**
    * Rotate the tile at the given position 90° clockwise.
+   * Returns false (and sets {@link lastError}) if the rotation would newly connect
+   * a sandstone tile whose deltaDamage ≤ 0; the rotation is reversed in that case.
    * @param pos - Grid coordinate.
+   * @returns true if the rotation succeeded; false if it was blocked by a sandstone constraint.
    */
-  rotateTile(pos: GridPos): void {
-    this.getTile(pos)?.rotate();
+  rotateTile(pos: GridPos): boolean {
+    this.lastError = null;
+    const tile = this.getTile(pos);
+    if (!tile) return false;
+    tile.rotate();
+
+    // Validate that no newly-connected sandstone tile has deltaDamage <= 0.
+    const filled = this.getFilledPositions();
+    const sandstoneError = this._checkSandstoneConstraints(filled);
+    if (sandstoneError) {
+      // Reverse the rotation (3 clockwise = 1 counter-clockwise).
+      tile.rotate(); tile.rotate(); tile.rotate();
+      this.lastError = sandstoneError;
+      return false;
+    }
+
+    return true;
   }
 
   /**
