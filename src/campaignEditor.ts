@@ -55,6 +55,8 @@ export class CampaignEditor {
 
   // ── Level editor state ────────────────────────────────────────────────────
   private _editLevelName = 'New Level';
+  private _editLevelNote = '';
+  private _editLevelHint = '';
   private _editRows = 6;
   private _editCols = 6;
   private _editGrid: (TileDef | null)[][] = [];
@@ -620,6 +622,8 @@ export class CampaignEditor {
 
   private _openLevelEditor(level: LevelDef, readOnly: boolean): void {
     this._editLevelName = level.name;
+    this._editLevelNote = level.note ?? '';
+    this._editLevelHint = level.hint ?? '';
     this._editRows = level.rows;
     this._editCols = level.cols;
     this._editGrid = JSON.parse(JSON.stringify(level.grid)) as (TileDef | null)[][];
@@ -762,6 +766,58 @@ export class CampaignEditor {
     }
 
     midCol.appendChild(canvas);
+
+    // Note and hint text fields below the canvas
+    if (!readOnly) {
+      const textareaStyle =
+        'padding:6px 10px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+        'border:1px solid #4a90d9;border-radius:4px;resize:vertical;min-height:52px;font-family:inherit;';
+
+      const noteWrap = document.createElement('div');
+      noteWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      const noteLbl = document.createElement('label');
+      noteLbl.textContent = 'Note (shown beneath the grid while playing):';
+      noteLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
+      const noteInp = document.createElement('textarea');
+      noteInp.value = this._editLevelNote;
+      noteInp.placeholder = 'Optional – displayed in a box below the puzzle grid.';
+      noteInp.style.cssText = textareaStyle;
+      noteInp.addEventListener('input', () => { this._editLevelNote = noteInp.value; });
+      noteWrap.appendChild(noteLbl);
+      noteWrap.appendChild(noteInp);
+      midCol.appendChild(noteWrap);
+
+      const hintWrap = document.createElement('div');
+      hintWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      const hintLbl = document.createElement('label');
+      hintLbl.textContent = 'Hint (collapsible box while playing):';
+      hintLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
+      const hintInp = document.createElement('textarea');
+      hintInp.value = this._editLevelHint;
+      hintInp.placeholder = 'Optional – hidden until the player clicks "Show Hint".';
+      hintInp.style.cssText = textareaStyle + 'border-color:#f0c040;';
+      hintInp.addEventListener('input', () => { this._editLevelHint = hintInp.value; });
+      hintWrap.appendChild(hintLbl);
+      hintWrap.appendChild(hintInp);
+      midCol.appendChild(hintWrap);
+    } else {
+      if (this._editLevelNote) {
+        const noteEl = document.createElement('div');
+        noteEl.style.cssText =
+          'background:#16213e;border:1px solid #4a90d9;border-radius:6px;' +
+          'padding:10px 14px;font-size:0.85rem;color:#eee;';
+        noteEl.textContent = `📝 ${this._editLevelNote}`;
+        midCol.appendChild(noteEl);
+      }
+      if (this._editLevelHint) {
+        const hintEl = document.createElement('div');
+        hintEl.style.cssText =
+          'background:#16213e;border:1px solid #f0c040;border-radius:6px;' +
+          'padding:10px 14px;font-size:0.85rem;color:#eee;';
+        hintEl.textContent = `💡 ${this._editLevelHint}`;
+        midCol.appendChild(hintEl);
+      }
+    }
 
     // ── Right column: inventory editor ─────────────────────────────────────
     const rightCol = document.createElement('div');
@@ -1750,7 +1806,7 @@ export class CampaignEditor {
     const chapter = campaign?.chapters[this._activeChapterIdx];
     const existingId = chapter?.levels[this._activeLevelIdx]?.id ?? generateLevelId();
 
-    return {
+    const def: LevelDef = {
       id: existingId,
       name: this._editLevelName,
       rows: this._editRows,
@@ -1758,6 +1814,9 @@ export class CampaignEditor {
       grid: JSON.parse(JSON.stringify(this._editGrid)) as (TileDef | null)[][],
       inventory: JSON.parse(JSON.stringify(this._editInventory)) as InventoryItem[],
     };
+    if (this._editLevelNote.trim()) def.note = this._editLevelNote.trim();
+    if (this._editLevelHint.trim()) def.hint = this._editLevelHint.trim();
+    return def;
   }
 
   // ─── Save level ────────────────────────────────────────────────────────────

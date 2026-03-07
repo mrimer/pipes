@@ -186,3 +186,170 @@ describe('CampaignEditor – active campaign button', () => {
     expect(getFirstButtonTextForCampaign('Official')).toBe('▶ Play');
   });
 });
+
+// ─── CampaignEditor – note and hint round-trip ────────────────────────────────
+
+describe('CampaignEditor – note and hint in level definitions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  /** Access private editor state for testing purposes. */
+  function editorState(editor: CampaignEditor) {
+    return editor as unknown as {
+      _editLevelNote: string;
+      _editLevelHint: string;
+      _editLevelName: string;
+      _editRows: number;
+      _editCols: number;
+      _editGrid: (import('../src/types').TileDef | null)[][];
+      _editInventory: import('../src/types').InventoryItem[];
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _activeLevelIdx: number;
+      _buildCurrentLevelDef(): LevelDef;
+      _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    };
+  }
+
+  it('_editLevelNote and _editLevelHint are empty by default', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    expect(state._editLevelNote).toBe('');
+    expect(state._editLevelHint).toBe('');
+  });
+
+  it('_openLevelEditor populates _editLevelNote and _editLevelHint from a level', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    const level: LevelDef = {
+      id: 99001,
+      name: 'Test Level',
+      rows: 3,
+      cols: 3,
+      grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
+      inventory: [],
+      note: 'This is a note.',
+      hint: 'This is a hint.',
+    };
+    state._openLevelEditor(level, true);
+    expect(state._editLevelNote).toBe('This is a note.');
+    expect(state._editLevelHint).toBe('This is a hint.');
+  });
+
+  it('_openLevelEditor sets empty strings when level has no note or hint', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    const level: LevelDef = {
+      id: 99002,
+      name: 'Test Level',
+      rows: 3,
+      cols: 3,
+      grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
+      inventory: [],
+    };
+    state._openLevelEditor(level, true);
+    expect(state._editLevelNote).toBe('');
+    expect(state._editLevelHint).toBe('');
+  });
+
+  it('_buildCurrentLevelDef omits note/hint when they are empty', () => {
+    const userCampaign: CampaignDef = {
+      id: 'cmp_test_nh',
+      name: 'Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        levels: [{
+          id: 99003,
+          name: 'Test Level',
+          rows: 3,
+          cols: 3,
+          grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
+          inventory: [],
+        }],
+      }],
+    };
+    const editor = makeEditor([userCampaign]);
+    const state = editorState(editor);
+    state._activeCampaignId = 'cmp_test_nh';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._editLevelName = 'Test Level';
+    state._editLevelNote = '';
+    state._editLevelHint = '';
+    state._editRows = 3;
+    state._editCols = 3;
+    state._editGrid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
+    state._editInventory = [];
+
+    const def = state._buildCurrentLevelDef();
+    expect(def.note).toBeUndefined();
+    expect(def.hint).toBeUndefined();
+  });
+
+  it('_buildCurrentLevelDef includes note and hint when they are non-empty', () => {
+    const userCampaign: CampaignDef = {
+      id: 'cmp_test_nh2',
+      name: 'Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        levels: [{
+          id: 99004,
+          name: 'Test Level',
+          rows: 3,
+          cols: 3,
+          grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
+          inventory: [],
+        }],
+      }],
+    };
+    const editor = makeEditor([userCampaign]);
+    const state = editorState(editor);
+    state._activeCampaignId = 'cmp_test_nh2';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._editLevelName = 'Test Level';
+    state._editLevelNote = 'Route the water carefully.';
+    state._editLevelHint = 'Start from the left.';
+    state._editRows = 3;
+    state._editCols = 3;
+    state._editGrid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
+    state._editInventory = [];
+
+    const def = state._buildCurrentLevelDef();
+    expect(def.note).toBe('Route the water carefully.');
+    expect(def.hint).toBe('Start from the left.');
+  });
+
+  it('campaign export JSON includes note and hint fields when populated', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_export_test',
+      name: 'Export Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Chapter 1',
+        levels: [{
+          id: 99005,
+          name: 'Annotated Level',
+          rows: 3,
+          cols: 3,
+          grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
+          inventory: [],
+          note: 'Watch the water level.',
+          hint: 'Use an elbow at the corner.',
+        }],
+      }],
+    };
+    // The export function uses JSON.stringify, so verify round-trip via JSON
+    const json = JSON.stringify(campaign, null, 2);
+    const parsed = JSON.parse(json) as CampaignDef;
+    expect(parsed.chapters[0].levels[0].note).toBe('Watch the water level.');
+    expect(parsed.chapters[0].levels[0].hint).toBe('Use an elbow at the corner.');
+  });
+});

@@ -1405,3 +1405,92 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
     expect(undoSpy).not.toHaveBeenCalled();
   });
 });
+
+// ─── Tests: note and hint boxes ───────────────────────────────────────────────
+
+describe('Game – note and hint boxes', () => {
+  /** Returns the internal DOM elements for note/hint from the game instance. */
+  function getBoxEls(game: Game) {
+    return (game as unknown as {
+      noteBoxEl: HTMLElement;
+      hintBoxEl: HTMLElement;
+      hintTextEl: HTMLElement;
+      hintToggleBtnEl: HTMLButtonElement;
+    });
+  }
+
+  it('note box is hidden when the level has no note', () => {
+    const { game } = makeGame();
+    game.startLevel(1);   // official level 1 has no note
+    const { noteBoxEl } = getBoxEls(game);
+    expect(noteBoxEl.style.display).toBe('none');
+  });
+
+  it('hint box is hidden when the level has no hint', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const { hintBoxEl } = getBoxEls(game);
+    expect(hintBoxEl.style.display).toBe('none');
+  });
+
+  it('note box is shown and populated when the level has a note', () => {
+    const { game } = makeGame();
+    // Inject a note into level 1
+    const level = LEVELS.find((l) => l.id === 1)!;
+    const origNote = level.note;
+    level.note = 'Connect the pipes!';
+    game.startLevel(1);
+    const { noteBoxEl } = getBoxEls(game);
+    expect(noteBoxEl.style.display).toBe('block');
+    expect(noteBoxEl.textContent).toBe('Connect the pipes!');
+    level.note = origNote; // restore
+  });
+
+  it('hint box is shown (collapsed) when the level has a hint', () => {
+    const { game } = makeGame();
+    const level = LEVELS.find((l) => l.id === 1)!;
+    const origHint = level.hint;
+    level.hint = 'Try placing a straight pipe first.';
+    game.startLevel(1);
+    const { hintBoxEl, hintTextEl, hintToggleBtnEl } = getBoxEls(game);
+    expect(hintBoxEl.style.display).toBe('block');
+    expect(hintTextEl.style.display).toBe('none');   // collapsed by default
+    expect(hintToggleBtnEl.textContent).toBe('💡 Show Hint');
+    level.hint = origHint; // restore
+  });
+
+  it('clicking the hint toggle reveals the hint text', () => {
+    const { game } = makeGame();
+    const level = LEVELS.find((l) => l.id === 1)!;
+    const origHint = level.hint;
+    level.hint = 'A secret tip.';
+    game.startLevel(1);
+    const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
+    // Hint is collapsed; click to expand
+    hintToggleBtnEl.click();
+    expect(hintTextEl.style.display).toBe('block');
+    expect(hintToggleBtnEl.textContent).toBe('💡 Hide Hint');
+    // Click again to collapse
+    hintToggleBtnEl.click();
+    expect(hintTextEl.style.display).toBe('none');
+    expect(hintToggleBtnEl.textContent).toBe('💡 Show Hint');
+    level.hint = origHint; // restore
+  });
+
+  it('hint always starts collapsed when restarting a level', () => {
+    const { game } = makeGame();
+    const level = LEVELS.find((l) => l.id === 1)!;
+    const origHint = level.hint;
+    level.hint = 'A secret tip.';
+    game.startLevel(1);
+    const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
+    // Expand the hint
+    hintToggleBtnEl.click();
+    expect(hintTextEl.style.display).toBe('block');
+    // Restart the level
+    game.startLevel(1);
+    expect(hintTextEl.style.display).toBe('none');
+    expect(hintToggleBtnEl.textContent).toBe('💡 Show Hint');
+    level.hint = origHint; // restore
+  });
+});
