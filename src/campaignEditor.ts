@@ -1383,8 +1383,13 @@ export class CampaignEditor {
       this._recordEditorSnapshot();
       if (this._editorPalette === 'erase') {
         this._editGrid[pos.row][pos.col] = null;
+        // Clear the link if the erased tile was linked
+        this._clearLinkAt(pos);
       } else {
         this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
+        // Automatically link the newly placed tile for live param editing
+        this._linkedTilePos = pos;
+        this._linkedTileDirty = false;
       }
       this._renderEditorCanvas();
     }
@@ -1402,6 +1407,9 @@ export class CampaignEditor {
       this._recordEditorSnapshot();
       this._editGrid[startPos.row][startPos.col] = null;
       this._editGrid[currentPos.row][currentPos.col] = tile;
+      // Link the moved tile at its new position
+      this._linkedTilePos = currentPos;
+      this._linkedTileDirty = false;
     } else {
       // It was a click on a non-empty tile (no movement occurred)
       if (e.ctrlKey) {
@@ -1409,8 +1417,13 @@ export class CampaignEditor {
         this._recordEditorSnapshot();
         if (this._editorPalette === 'erase') {
           this._editGrid[startPos.row][startPos.col] = null;
+          // Clear the link if the erased tile was linked
+          this._clearLinkAt(startPos);
         } else {
           this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
+          // Automatically link the overwritten tile
+          this._linkedTilePos = startPos;
+          this._linkedTileDirty = false;
         }
       } else if (
         this._editorPalette !== 'erase' &&
@@ -1420,6 +1433,9 @@ export class CampaignEditor {
         // Both palette and tile are pipe shapes: auto-replace
         this._recordEditorSnapshot();
         this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
+        // Automatically link the replaced tile
+        this._linkedTilePos = startPos;
+        this._linkedTileDirty = false;
       } else {
         // Select the clicked tile in the palette and populate Tile Params
         this._selectTileFromDef(tile, startPos);
@@ -1433,6 +1449,8 @@ export class CampaignEditor {
     if (!pos) return;
     this._recordEditorSnapshot();
     this._editGrid[pos.row][pos.col] = null;
+    // Clear the link if the erased tile was linked
+    this._clearLinkAt(pos);
     this._renderEditorCanvas();
   }
 
@@ -1547,6 +1565,16 @@ export class CampaignEditor {
       const newParam = this._buildParamPanel();
       newParam.id = 'editor-param-panel';
       paramPanel.replaceWith(newParam);
+    }
+  }
+
+  /** Clear the link if the currently linked tile is at the given position. */
+  private _clearLinkAt(pos: { row: number; col: number }): void {
+    if (this._linkedTilePos &&
+        this._linkedTilePos.row === pos.row &&
+        this._linkedTilePos.col === pos.col) {
+      this._linkedTilePos = null;
+      this._linkedTileDirty = false;
     }
   }
 
