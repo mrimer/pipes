@@ -468,3 +468,154 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     expect(state._editorParams.pressure).toBe(0);
   });
 });
+
+// ─── CampaignEditor – canvas display size and mouse-position calibration ──────
+
+describe('CampaignEditor – canvas display size and _canvasPos calibration', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  /** Build a minimal LevelDef for the given grid dimensions. */
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99900,
+      name: 'Canvas Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  /** Create an editor with an active campaign containing one level. */
+  function makeEditorWithCanvas(level: LevelDef) {
+    const camp: CampaignDef = {
+      id: 'cmp_canvas_test',
+      name: 'Canvas Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Chapter 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as {
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _activeLevelIdx: number;
+      _editorCanvas: HTMLCanvasElement | null;
+      _editRows: number;
+      _editCols: number;
+      _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+      _resizeGrid(rows: number, cols: number): void;
+      _canvasPos(e: MouseEvent): { row: number; col: number } | null;
+    };
+    state._activeCampaignId = 'cmp_canvas_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    return state;
+  }
+
+  /** Create a synthetic MouseEvent at the given client coordinates. */
+  function mouseAt(clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent('mousemove', { clientX, clientY });
+  }
+
+  it('canvas CSS size equals intrinsic size for small grids (no scaling needed)', () => {
+    // 4×4 grid → intrinsic 256×256 px, within 512 px limit → scale = 1
+    const state = makeEditorWithCanvas(makeLevel(4, 4));
+    const canvas = state._editorCanvas!;
+    expect(canvas).not.toBeNull();
+    expect(canvas.style.width).toBe('256px');
+    expect(canvas.style.height).toBe('256px');
+  });
+
+  it('canvas CSS size is capped at MAX_EDITOR_CANVAS_PX for large grids', () => {
+    // 10×10 grid → intrinsic 640×640 px → scale = 512/640 = 0.8 → CSS 512×512 px
+    const state = makeEditorWithCanvas(makeLevel(10, 10));
+    const canvas = state._editorCanvas!;
+    expect(canvas).not.toBeNull();
+    expect(canvas.style.width).toBe('512px');
+    expect(canvas.style.height).toBe('512px');
+  });
+
+  it('canvas CSS size updates after _resizeGrid to a large grid', () => {
+    const state = makeEditorWithCanvas(makeLevel(4, 4));
+    expect(state._editorCanvas!.style.width).toBe('256px');
+    // Grow to 10×10
+    state._resizeGrid(10, 10);
+    expect(state._editorCanvas!.style.width).toBe('512px');
+    expect(state._editorCanvas!.style.height).toBe('512px');
+  });
+
+  it('canvas CSS size updates after _resizeGrid back to a small grid', () => {
+    const state = makeEditorWithCanvas(makeLevel(10, 10));
+    expect(state._editorCanvas!.style.width).toBe('512px');
+    // Shrink back to 4×4
+    state._resizeGrid(4, 4);
+    expect(state._editorCanvas!.style.width).toBe('256px');
+    expect(state._editorCanvas!.style.height).toBe('256px');
+  });
+
+  it('_canvasPos maps mouse coords using actual displayed tile size (CSS-scaled canvas)', () => {
+    // 10×10 grid, intrinsic canvas 640×640, CSS-scaled to 512×512 px.
+    // Displayed tile size = 512 / 10 = 51.2 px.
+    const state = makeEditorWithCanvas(makeLevel(10, 10));
+    const canvas = state._editorCanvas!;
+
+    // Simulate getBoundingClientRect reflecting the CSS display size (512×512).
+    canvas.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 512, bottom: 512,
+      width: 512, height: 512,
+      x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+
+    // Column 5 starts at 5 * 51.2 = 256 px; its centre is at ~281.6 px.
+    // With the fixed formula (rect.width * col / editCols) this is tile col=5.
+    const pos = state._canvasPos(mouseAt(281, 281));
+    expect(pos).not.toBeNull();
+    expect(pos!.col).toBe(5);
+    expect(pos!.row).toBe(5);
+  });
+
+  it('_canvasPos returns null for mouse coordinates outside the canvas', () => {
+    const state = makeEditorWithCanvas(makeLevel(4, 4));
+    const canvas = state._editorCanvas!;
+
+    canvas.getBoundingClientRect = () => ({
+      left: 10, top: 10, right: 266, bottom: 266,
+      width: 256, height: 256,
+      x: 10, y: 10,
+      toJSON: () => ({}),
+    });
+
+    // Mouse to the left of the canvas
+    expect(state._canvasPos(mouseAt(5, 50))).toBeNull();
+    // Mouse below the canvas
+    expect(state._canvasPos(mouseAt(50, 280))).toBeNull();
+  });
+});

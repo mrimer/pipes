@@ -13,6 +13,9 @@ import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Ro
 import { CHAPTERS } from './levels';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from './persistence';
 import { TILE_SIZE } from './renderer';
+
+/** Maximum CSS display size (px) for the editor canvas on either axis. */
+const MAX_EDITOR_CANVAS_PX = 512;
 import { Board, PIPE_SHAPES } from './board';
 import {
   EditorPalette,
@@ -740,6 +743,7 @@ export class CampaignEditor {
       'border:3px solid #4a90d9;border-radius:4px;cursor:' + (readOnly ? 'default' : 'crosshair') + ';' +
       'display:block;';
     this._editorCanvas = canvas;
+    this._updateCanvasDisplaySize();
     const ctx = canvas.getContext('2d');
     if (ctx) this._editorCtx = ctx;
 
@@ -1607,10 +1611,20 @@ export class CampaignEditor {
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
     if (!this._editorCanvas) return null;
     const rect = this._editorCanvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
+    const col = Math.floor((e.clientX - rect.left) * this._editCols / rect.width);
+    const row = Math.floor((e.clientY - rect.top)  * this._editRows / rect.height);
     if (row < 0 || row >= this._editRows || col < 0 || col >= this._editCols) return null;
     return { row, col };
+  }
+
+  /** Set the canvas CSS display size so the grid fits within MAX_EDITOR_CANVAS_PX. */
+  private _updateCanvasDisplaySize(): void {
+    if (!this._editorCanvas) return;
+    const intrinsicW = this._editCols * TILE_SIZE;
+    const intrinsicH = this._editRows * TILE_SIZE;
+    const scale = Math.min(1.0, MAX_EDITOR_CANVAS_PX / Math.max(intrinsicW, intrinsicH));
+    this._editorCanvas.style.width  = Math.round(intrinsicW * scale) + 'px';
+    this._editorCanvas.style.height = Math.round(intrinsicH * scale) + 'px';
   }
 
   /** Build a TileDef from the current palette and params. */
@@ -1708,6 +1722,7 @@ export class CampaignEditor {
       this._editorCanvas.width  = this._editCols * TILE_SIZE;
       this._editorCanvas.height = this._editRows * TILE_SIZE;
     }
+    this._updateCanvasDisplaySize();
     // Refresh inventory panel
     const invPanel = document.getElementById('editor-inventory-panel');
     if (invPanel) invPanel.replaceWith(this._buildInventoryEditor());
@@ -1748,6 +1763,7 @@ export class CampaignEditor {
       this._editorCanvas.width  = newCols * TILE_SIZE;
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
+    this._updateCanvasDisplaySize();
     this._renderEditorCanvas();
   }
 
