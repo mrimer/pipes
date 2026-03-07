@@ -2467,6 +2467,18 @@ describe('Chamber tile (pump content)', () => {
     expect(board.hasPressureRelevantTiles()).toBe(false);
   });
 
+  it('hasPressureRelevantTiles returns true when source has pressure > 0 (no pump tiles)', () => {
+    // A Source tile with pressure=1 should cause hasPressureRelevantTiles() to return true
+    // so the pressure stat is displayed correctly at level start.
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 5, 0, null, 1, null, null, 0, 1); // pressure=1
+    board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    expect(board.hasPressureRelevantTiles()).toBe(true);
+    expect(board.getCurrentPressure()).toBe(1);
+  });
+
   it('applyTurnDelta: pump has no water impact', () => {
     const board = makeBoard(1);
     board.initHistory();

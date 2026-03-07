@@ -594,10 +594,15 @@ export class Board {
   }
 
   /**
-   * Returns true when the level has any pressure-relevant tiles: a pump chamber
-   * or a weak-ice chamber.  Used to decide whether to display the Pressure stat in the UI.
+   * Returns true when the level has any pressure-relevant tiles: a source tile
+   * with non-zero base pressure, a pump chamber, a weak-ice chamber, or a
+   * sandstone chamber.  Used to decide whether to display the Pressure stat in the UI.
    */
   hasPressureRelevantTiles(): boolean {
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    if (sourceTile.pressure > 0) {
+      return true;
+    }
     for (const row of this.grid) {
       for (const tile of row) {
         if (
