@@ -132,6 +132,31 @@ export interface LevelDef {
   hint?: string;
 }
 
+/** Possible types of ambient decorative element drawn under grid tiles. */
+export type AmbientDecorationType = 'pebbles' | 'flower' | 'grass';
+
+/**
+ * One ambient background decoration, placed on a grid cell and rendered under
+ * tile elements so it is visible only on empty (unoccupied) cells.
+ * Decorations are generated once each time a level is activated.
+ */
+export interface AmbientDecoration {
+  /** Grid row of this decoration. */
+  row: number;
+  /** Grid column of this decoration. */
+  col: number;
+  /** The kind of decoration. */
+  type: AmbientDecorationType;
+  /** Sub-tile centre X as a fraction of TILE_SIZE (0–1). */
+  offsetX: number;
+  /** Sub-tile centre Y as a fraction of TILE_SIZE (0–1). */
+  offsetY: number;
+  /** Overall rotation in degrees (0–360). */
+  rotation: number;
+  /** Integer variant index driving colour / shape choices (0–2). */
+  variant: number;
+}
+
 /** A chapter groups a set of levels under a shared name. */
 export interface ChapterDef {
   id: number;
