@@ -85,6 +85,11 @@ export class Game {
   /** Timer ID for auto-hiding the error flash message. */
   private _errorFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Set of "row,col" keys for sandstone tiles currently highlighted due to a validation error. */
+  private _sandstoneHighlightKeys: Set<string> = new Set();
+  /** Timer ID for clearing the sandstone highlight. */
+  private _sandstoneHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** Modal overlay for confirming a progress reset. */
   private readonly resetConfirmModalEl: HTMLElement;
 
@@ -457,6 +462,7 @@ export class Game {
       this.shiftHeld,
       currentTemp,
       currentPressure,
+      this._sandstoneHighlightKeys,
     );
   }
 
@@ -530,7 +536,7 @@ export class Game {
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
       } else if (this.board.lastError) {
-        this._showErrorFlash(this.board.lastError);
+        this._handleBoardError();
       }
     } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty &&
                (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
@@ -540,7 +546,7 @@ export class Game {
       if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
       } else if (this.board.lastError) {
-        this._showErrorFlash(this.board.lastError);
+        this._handleBoardError();
       }
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe (no inventory item selected, or same shape as selected)
@@ -553,7 +559,7 @@ export class Game {
         this._updateUndoRedoButtons();
         this._checkWinLose();
       } else if (this.board.lastError) {
-        this._showErrorFlash(this.board.lastError);
+        this._handleBoardError();
       }
     }
   }
@@ -588,7 +594,7 @@ export class Game {
       this._updateWaterDisplay();
       this._updateUndoRedoButtons();
     } else if (this.board.lastError) {
-      this._showErrorFlash(this.board.lastError);
+      this._handleBoardError();
     }
   }
 
@@ -723,6 +729,31 @@ export class Game {
       this.errorFlashEl.style.display = 'none';
       this._errorFlashTimer = null;
     }, 2000);
+  }
+
+  /**
+   * Highlight the given tile positions with a pulsing red overlay for ~2 seconds.
+   * Used to visually identify sandstone tiles that are blocking a move.
+   */
+  private _startSandstoneHighlight(positions: GridPos[]): void {
+    this._sandstoneHighlightKeys = new Set(positions.map((p) => `${p.row},${p.col}`));
+    if (this._sandstoneHighlightTimer !== null) clearTimeout(this._sandstoneHighlightTimer);
+    this._sandstoneHighlightTimer = setTimeout(() => {
+      this._sandstoneHighlightKeys = new Set();
+      this._sandstoneHighlightTimer = null;
+    }, 2000);
+  }
+
+  /**
+   * Show the board's lastError as a flash message and, if lastErrorTilePositions is set,
+   * temporarily highlight those tiles.  Call this whenever a board operation fails.
+   */
+  private _handleBoardError(): void {
+    if (!this.board?.lastError) return;
+    this._showErrorFlash(this.board.lastError);
+    if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
+      this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+    }
   }
 
   /**
@@ -959,7 +990,7 @@ export class Game {
             if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
               this._afterTilePlaced(this.selectedShape, filledBefore);
             } else if (board.lastError) {
-              this._showErrorFlash(board.lastError);
+              this._handleBoardError();
             }
           }
         } else {
@@ -973,7 +1004,7 @@ export class Game {
             this._updateUndoRedoButtons();
             this._checkWinLose();
           } else if (board.lastError) {
-            this._showErrorFlash(board.lastError);
+            this._handleBoardError();
           }
         }
         break;

@@ -474,6 +474,7 @@ export function renderBoard(
   shiftHeld = false,
   currentTemp = 0,
   currentPressure = 1,
+  highlightedPositions: Set<string> = new Set(),
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -546,6 +547,16 @@ export function renderBoard(
       // Focus highlight
       if (isFocused) {
         ctx.strokeStyle = FOCUS_COLOR;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      }
+
+      // Sandstone error highlight (pulsing red overlay)
+      if (highlightedPositions.has(`${r},${c}`)) {
+        const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
+        ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
+        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        ctx.strokeStyle = '#ff2020';
         ctx.lineWidth = 3;
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
