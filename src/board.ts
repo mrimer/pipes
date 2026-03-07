@@ -637,7 +637,7 @@ export class Board {
 
   /**
    * Compute the effective game Pressure based on the live fill state.
-   * The base value is 1; each connected Pump chamber adds its pressure bonus.
+   * The base value is the source tile's pressure; each connected Pump chamber adds its bonus.
    * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
    */
   getCurrentPressure(filled?: Set<string>): number {
@@ -647,13 +647,12 @@ export class Board {
 
   /** Internal helper: compute pressure from a pre-computed fill set. */
   private _computePressureFromFilled(filled: Set<string>): number {
-    let pressure = 1;
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    let pressure = sourceTile.pressure;
     for (const key of filled) {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Source) {
-        pressure += tile.pressure;
-      } else if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
         pressure += tile.pressure;
       }
     }
@@ -690,14 +689,13 @@ export class Board {
    * Used symmetrically with {@link _computeTemperatureForIce} during re-evaluation.
    */
   private _computePressureForIce(filled: Set<string>, iceConnectedTurn: number): number {
-    let pressure = 1;
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    // The source is always connected first, so its pressure always counts for any ice tile.
+    let pressure = sourceTile.pressure;
     for (const key of filled) {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Source) {
-        // The source is always connected first, so it always counts for any ice tile.
-        pressure += tile.pressure;
-      } else if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
         const pumpTurn = this._connectionTurn.get(key) ?? Infinity;
         if (pumpTurn <= iceConnectedTurn) {
           pressure += tile.pressure;
