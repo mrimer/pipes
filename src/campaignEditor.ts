@@ -929,10 +929,10 @@ export class CampaignEditor {
       sel.style.cssText =
         'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice']) {
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice']) {
         const o = document.createElement('option');
         o.value = opt;
-        o.textContent = opt.charAt(0).toUpperCase() + opt.slice(1);
+        o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt.charAt(0).toUpperCase() + opt.slice(1);
         if (this._editorParams.chamberContent === opt) o.selected = true;
         sel.appendChild(o);
       }
@@ -964,6 +964,19 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'ice') {
+        panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
+          this._editorParams.cost = parseInt(v) || 0;
+        }, 'number', '90px'));
+        panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
+          this._editorParams.temperature = parseInt(v) || 0;
+        }, 'number', '90px'));
+      }
+      if (cc === 'pump') {
+        panel.appendChild(this._labeledInput('Pressure +', String(this._editorParams.pressure), (v) => {
+          this._editorParams.pressure = parseInt(v) || 1;
+        }, 'number', '90px'));
+      }
+      if (cc === 'weak_ice') {
         panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
         }, 'number', '90px'));
@@ -1359,6 +1372,7 @@ export class CampaignEditor {
     if (def.capacity !== undefined) this._editorParams.capacity = def.capacity;
     if (def.cost !== undefined) this._editorParams.cost = def.cost;
     if (def.temperature !== undefined) this._editorParams.temperature = def.temperature;
+    if (def.pressure !== undefined) this._editorParams.pressure = def.pressure;
     if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
     if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
     if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
@@ -1428,6 +1442,8 @@ export class CampaignEditor {
       if (p.chamberContent === 'dirt') def.cost = p.cost;
       if (p.chamberContent === 'heater') def.temperature = p.temperature;
       if (p.chamberContent === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
+      if (p.chamberContent === 'pump') def.pressure = p.pressure;
+      if (p.chamberContent === 'weak_ice') { def.cost = p.cost; def.temperature = p.temperature; }
       if (p.chamberContent === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
     }
 

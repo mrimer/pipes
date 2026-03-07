@@ -20,7 +20,8 @@ export interface TileParams {
   capacity: number;
   cost: number;
   temperature: number;
-  chamberContent: 'tank' | 'dirt' | 'item' | 'heater' | 'ice';
+  pressure: number;
+  chamberContent: 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice';
   itemShape: PipeShape;
   itemCount: number;
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };
@@ -31,6 +32,7 @@ export const DEFAULT_PARAMS: TileParams = {
   capacity: 6,
   cost: 1,
   temperature: 0,
+  pressure: 1,
   chamberContent: 'tank',
   itemShape: PipeShape.Straight,
   itemCount: 1,
@@ -72,12 +74,14 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
 
 export function chamberColor(content: string): string {
   switch (content) {
-    case 'tank':   return '#74b9ff';
-    case 'dirt':   return '#a29bfe';
-    case 'item':   return '#ffd700';
-    case 'heater': return '#e17055';
-    case 'ice':    return '#00cec9';
-    default:       return '#b2bec3';
+    case 'tank':     return '#74b9ff';
+    case 'dirt':     return '#a29bfe';
+    case 'item':     return '#ffd700';
+    case 'heater':   return '#e17055';
+    case 'ice':      return '#00cec9';
+    case 'pump':     return '#a8e063';
+    case 'weak_ice': return '#b0d8f8';
+    default:         return '#b2bec3';
   }
 }
 

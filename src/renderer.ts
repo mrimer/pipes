@@ -23,6 +23,8 @@ import {
   REMOVABLE_BG_COLOR,
   HEATER_COLOR, HEATER_WATER_COLOR,
   ICE_COLOR, ICE_WATER_COLOR,
+  PUMP_COLOR, PUMP_WATER_COLOR,
+  WEAK_ICE_COLOR, WEAK_ICE_WATER_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -77,6 +79,9 @@ export function drawTile(
   tile: Tile,
   isWater: boolean,
   currentWater: number,
+  shiftHeld = false,
+  currentTemp = 0,
+  currentPressure = 1,
 ): void {
   const { shape, rotation, isFixed, capacity, cost, itemShape, itemCount } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -104,6 +109,10 @@ export function drawTile(
       color = isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
     } else if (chamberContent === 'ice') {
       color = isWater ? ICE_WATER_COLOR : ICE_COLOR;
+    } else if (chamberContent === 'pump') {
+      color = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
+    } else if (chamberContent === 'weak_ice') {
+      color = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
     } else {
       color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
     }
@@ -277,15 +286,44 @@ export function drawTile(
       ctx.fillText(`+${tile.temperature}°`, 0, 0);
     } else if (chamberContent === 'ice') {
       // Show three lines: negative cost, "x", and the temperature threshold (deltaTemp reference)
+      // When shift is held, adjust the threshold display by current temperature (capped at 0).
+      const iceThreshold = shiftHeld
+        ? Math.max(0, tile.temperature - currentTemp)
+        : tile.temperature;
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = 'bold 14px Arial';
-      ctx.fillText(`-${tile.temperature}°`, 0, -9);
+      ctx.fillText(`-${iceThreshold}°`, 0, -9);
       ctx.font = 'bold 9px Arial';
       ctx.fillText('x', 0, 0);
       ctx.font = 'bold 14px Arial';
       ctx.fillText(String(cost), 0, 9);
+    } else if (chamberContent === 'pump') {
+      // Show the pressure bonus amount
+      ctx.fillStyle = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
+      ctx.font = 'bold 13px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`+${tile.pressure}P`, 0, 0);
+    } else if (chamberContent === 'weak_ice') {
+      // Show three lines: negative adjusted cost, "x", and the temperature threshold.
+      // When shift is held, show values adjusted by current Pressure and Temperature.
+      const weakIceThreshold = shiftHeld
+        ? Math.max(0, tile.temperature - currentTemp)
+        : tile.temperature;
+      const weakIceCost = shiftHeld
+        ? Math.max(1, Math.ceil(cost / currentPressure))
+        : cost;
+      ctx.fillStyle = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(`-${weakIceThreshold}°`, 0, -9);
+      ctx.font = 'bold 9px Arial';
+      ctx.fillText('x', 0, 0);
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(String(weakIceCost), 0, 9);
     }
     // Connection stubs
     ctx.strokeStyle = color;
@@ -369,6 +407,8 @@ export function getTileDisplayName(tile: Tile): string {
         }
         case 'heater': return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
         case 'ice':    return 'Ice';
+        case 'pump':   return `Pump +${tile.pressure}P`;
+        case 'weak_ice': return 'Weak Ice';
         default:       return 'Chamber';
       }
     default: return '';
@@ -405,6 +445,9 @@ export function renderBoard(
   selectedShape: PipeShape | null,
   pendingRotation: number,
   mouseCanvasPos: { x: number; y: number } | null,
+  shiftHeld = false,
+  currentTemp = 0,
+  currentPressure = 1,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -481,7 +524,7 @@ export function renderBoard(
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure);
     }
   }
 

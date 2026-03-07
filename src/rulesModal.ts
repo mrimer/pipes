@@ -8,6 +8,7 @@ import {
   CONTAINER_COLOR, GRANITE_FILL_COLOR, GRANITE_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
+  PUMP_COLOR, WEAK_ICE_COLOR,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -56,6 +57,7 @@ const CONTROL_ROWS: ControlRow[] = [
   { input: 'Enter / Space',      action: 'Place or replace a pipe at the focused cell; rotate if nothing is selected.' },
   { input: 'Tab',                action: 'Rotate the selected pipe piece clockwise.' },
   { input: 'R',                  action: 'Retry the current level from scratch.' },
+  { input: 'Shift (hold)',       action: 'Show adjusted ice/weak-ice tile values: temperature adjusted by current Temp, and weak ice cost divided by current Pressure.' },
   { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
   { input: 'Escape',             action: 'Return to the level-select screen.' },
 ];
@@ -136,6 +138,16 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: colorSwatch(ICE_COLOR),
     name: 'Chamber — Ice',
     description: 'Reduces water capacity by cost × max(0, threshold° − current temp°). Costs nothing when temperature meets or exceeds the threshold.',
+  },
+  {
+    iconHtml: colorSwatch(PUMP_COLOR),
+    name: 'Chamber — Pump',
+    description: 'Increases the game Pressure variable by the shown amount (+P) when connected. Higher Pressure reduces the cost of Weak Ice blocks.',
+  },
+  {
+    iconHtml: colorSwatch(WEAK_ICE_COLOR),
+    name: 'Chamber — Weak Ice',
+    description: 'Like Ice, but its effective cost is ⌈cost÷Pressure⌉ × max(0, threshold° − current temp°). Higher Pressure lowers the cost.',
   },
 ];
 

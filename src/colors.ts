@@ -44,3 +44,11 @@ export const HEATER_WATER_COLOR      = '#f39c12';
 export const ICE_COLOR               = '#d0eaff';
 /** Ice chamber tile color when water is flowing through it. */
 export const ICE_WATER_COLOR         = '#e8f5ff';
+/** Pump chamber tile color (warm yellow-green). */
+export const PUMP_COLOR              = '#a8e063';
+/** Pump chamber tile color when water is flowing through it. */
+export const PUMP_WATER_COLOR        = '#c6f07a';
+/** Weak Ice chamber tile color (soft pale cyan). */
+export const WEAK_ICE_COLOR          = '#b0d8f8';
+/** Weak Ice chamber tile color when water is flowing through it. */
+export const WEAK_ICE_WATER_COLOR    = '#d0ecff';
