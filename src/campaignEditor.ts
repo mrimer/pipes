@@ -76,6 +76,10 @@ export class CampaignEditor {
   } | null = null;
   /** Bound window mouseup handler for drag completion; stored so it can be removed. */
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
+  /** Grid position of the tile currently linked for live param editing, or null if no link active. */
+  private _linkedTilePos: { row: number; col: number } | null = null;
+  /** True once the first param change in the current linked session has been committed. */
+  private _linkedTileDirty = false;
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
@@ -621,6 +625,8 @@ export class CampaignEditor {
     this._editorHover = null;
     this._goldSectionExpanded = false;
     this._chamberSectionExpanded = false;
+    this._linkedTilePos = null;
+    this._linkedTileDirty = false;
     this._recordEditorSnapshot();
     this._showLevelEditor(readOnly);
   }
@@ -834,6 +840,8 @@ export class CampaignEditor {
 
       btn.addEventListener('click', () => {
         this._editorPalette = item.palette;
+        this._linkedTilePos = null;
+        this._linkedTileDirty = false;
         if (isChamberPalette(item.palette)) {
           this._editorParams.chamberContent = chamberPaletteContent(item.palette);
         }
@@ -941,6 +949,7 @@ export class CampaignEditor {
           'color:' + (this._editorParams.rotation === rot ? '#f0c040' : '#aaa') + ';';
         rb.addEventListener('click', () => {
           this._editorParams.rotation = rot;
+          this._applyParamsToLinkedTile();
           const newPanel = this._buildParamPanel();
           newPanel.id = 'editor-param-panel';
           panel.replaceWith(newPanel);
@@ -955,6 +964,7 @@ export class CampaignEditor {
     if (p === PipeShape.Source || cc === 'tank') {
       panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
         this._editorParams.capacity = parseInt(v) || 0;
+        this._applyParamsToLinkedTile();
       }, 'number', '90px'));
     }
 
@@ -962,9 +972,11 @@ export class CampaignEditor {
     if (p === PipeShape.Source) {
       panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
         this._editorParams.temperature = parseInt(v) || 0;
+        this._applyParamsToLinkedTile();
       }, 'number', '90px'));
       panel.appendChild(this._labeledInput('Base Pressure', String(this._editorParams.pressure), (v) => {
         this._editorParams.pressure = parseInt(v) || 1;
+        this._applyParamsToLinkedTile();
       }, 'number', '90px'));
     }
 
@@ -986,6 +998,7 @@ export class CampaignEditor {
         if (sel.value === 'ice' || sel.value === 'weak_ice') {
           if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
         }
+        this._applyParamsToLinkedTile();
         const newPanel = this._buildParamPanel();
         newPanel.id = 'editor-param-panel';
         panel.replaceWith(newPanel);
@@ -1006,24 +1019,29 @@ export class CampaignEditor {
       if (cc === 'dirt') {
         panel.appendChild(this._labeledInput('Cost', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
       if (cc === 'heater') {
         panel.appendChild(this._labeledInput('Temp +', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
       if (cc === 'ice' || cc === 'weak_ice') {
         panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
         }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
       if (cc === 'pump') {
         panel.appendChild(this._labeledInput('Pressure +', String(this._editorParams.pressure), (v) => {
           this._editorParams.pressure = parseInt(v) || 1;
+          this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
       if (cc === 'item') {
@@ -1040,7 +1058,10 @@ export class CampaignEditor {
           if (this._editorParams.itemShape === shp) o.selected = true;
           itemSel.appendChild(o);
         }
-        itemSel.addEventListener('change', () => { this._editorParams.itemShape = itemSel.value as PipeShape; });
+        itemSel.addEventListener('change', () => {
+          this._editorParams.itemShape = itemSel.value as PipeShape;
+          this._applyParamsToLinkedTile();
+        });
         const itemSelWrap = document.createElement('div');
         itemSelWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
         const itemLbl = document.createElement('span');
@@ -1051,6 +1072,7 @@ export class CampaignEditor {
         panel.appendChild(itemSelWrap);
         panel.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
           this._editorParams.itemCount = parseInt(v) || 1;
+          this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
     }
@@ -1070,7 +1092,10 @@ export class CampaignEditor {
         cb.type = 'checkbox';
         cb.checked = this._editorParams.connections[dir];
         cb.id = `editor-conn-${dir}`;
-        cb.addEventListener('change', () => { this._editorParams.connections[dir] = cb.checked; });
+        cb.addEventListener('change', () => {
+          this._editorParams.connections[dir] = cb.checked;
+          this._applyParamsToLinkedTile();
+        });
         const cbLbl = document.createElement('label');
         cbLbl.htmlFor = cb.id;
         cbLbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:0.8rem;';
@@ -1268,7 +1293,7 @@ export class CampaignEditor {
       }
     }
 
-    renderEditorCanvas(ctx, this._editGrid, this._editRows, this._editCols, overlay, drag);
+    renderEditorCanvas(ctx, this._editGrid, this._editRows, this._editCols, overlay, drag, this._linkedTilePos);
   }
 
   // ─── Editor canvas mouse events ────────────────────────────────────────────
@@ -1328,7 +1353,7 @@ export class CampaignEditor {
         this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
       } else {
         // Select the clicked tile in the palette and populate Tile Params
-        this._selectTileFromDef(tile);
+        this._selectTileFromDef(tile, startPos);
       }
     }
     this._renderEditorCanvas();
@@ -1394,6 +1419,7 @@ export class CampaignEditor {
       }
     }
 
+    this._applyParamsToLinkedTile();
     this._refreshPaletteUI();
     this._renderEditorCanvas();
   }
@@ -1401,7 +1427,7 @@ export class CampaignEditor {
   // ─── Select a tile in the palette from a TileDef ──────────────────────────
 
   /** Populate _editorPalette and _editorParams from a TileDef, then refresh the UI panels. */
-  private _selectTileFromDef(def: TileDef): void {
+  private _selectTileFromDef(def: TileDef, pos?: { row: number; col: number }): void {
     if (def.shape === PipeShape.Empty) {
       this._editorPalette = 'erase';
     } else if (def.shape === PipeShape.Chamber) {
@@ -1410,6 +1436,8 @@ export class CampaignEditor {
     } else {
       this._editorPalette = def.shape;
     }
+    this._linkedTilePos = pos ?? null;
+    this._linkedTileDirty = false;
     this._populateParamsFromDef(def);
     this._refreshPaletteUI();
   }
@@ -1450,6 +1478,32 @@ export class CampaignEditor {
       newParam.id = 'editor-param-panel';
       paramPanel.replaceWith(newParam);
     }
+  }
+
+  /**
+   * If a tile is currently linked for live param editing, update it in the grid
+   * with the current palette and params.
+   *
+   * A single undo snapshot is recorded on the first param change in a linked session;
+   * subsequent changes in the same session overwrite the tile without additional snapshots.
+   * This means all live edits to the linked tile undo as one step, which avoids flooding
+   * the undo history when the user types into a number input.
+   */
+  private _applyParamsToLinkedTile(): void {
+    if (!this._linkedTilePos) return;
+    const { row, col } = this._linkedTilePos;
+    // Guard against the linked position becoming out-of-bounds (e.g. after a grid resize).
+    if (row < 0 || row >= this._editRows || col < 0 || col >= this._editCols) {
+      this._linkedTilePos = null;
+      this._linkedTileDirty = false;
+      return;
+    }
+    if (!this._linkedTileDirty) {
+      this._recordEditorSnapshot();
+      this._linkedTileDirty = true;
+    }
+    this._editGrid[row][col] = this._buildTileDef(this._editorPalette);
+    this._renderEditorCanvas();
   }
 
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
@@ -1524,6 +1578,8 @@ export class CampaignEditor {
     if (this._editorHistoryIdx <= 0) return;
     this._editorHistoryIdx--;
     this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
+    this._linkedTilePos = null;
+    this._linkedTileDirty = false;
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
   }
@@ -1532,6 +1588,8 @@ export class CampaignEditor {
     if (this._editorHistoryIdx >= this._editorHistory.length - 1) return;
     this._editorHistoryIdx++;
     this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
+    this._linkedTilePos = null;
+    this._linkedTileDirty = false;
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
   }
