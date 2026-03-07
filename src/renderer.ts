@@ -26,6 +26,7 @@ import {
   PUMP_COLOR, PUMP_WATER_COLOR,
   WEAK_ICE_COLOR, WEAK_ICE_WATER_COLOR,
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
+  SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -116,7 +117,10 @@ export function drawTile(
     } else if (chamberContent === 'weak_ice') {
       color = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
     } else if (chamberContent === 'sandstone') {
-      color = isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR;
+      const isHard = tile.hardness >= currentPressure;
+      color = isHard
+        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
     } else {
       color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
     }
@@ -343,10 +347,21 @@ export function drawTile(
         ctx.fillText(String(weakIceCost), 0, 9);
       }
     } else if (chamberContent === 'sandstone') {
-      ctx.fillStyle = isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR;
+      // When hardness >= pressure, use darker color and show the hardness value with "H".
+      // When connected, show the locked effective cost value.
+      // Otherwise show three lines: negative adjusted cost, "x", and the temperature threshold.
+      const isHard = tile.hardness >= currentPressure;
+      const sandstoneColor = isHard
+        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+      ctx.fillStyle = sandstoneColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      if (lockedCost !== null) {
+      if (isHard) {
+        // Alternative display: show hardness value and "H" to indicate hardness exceeds pressure
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`${tile.hardness}H`, 0, 0);
+      } else if (lockedCost !== null) {
         // Connected: show the single locked effective cost value
         ctx.font = 'bold 14px Arial';
         ctx.fillText(String(lockedCost), 0, 0);
