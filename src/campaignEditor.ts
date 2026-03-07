@@ -916,10 +916,13 @@ export class CampaignEditor {
       }, 'number', '90px'));
     }
 
-    // Source: temperature
+    // Source: temperature and pressure
     if (p === PipeShape.Source) {
       panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
         this._editorParams.temperature = parseInt(v) || 0;
+      }, 'number', '90px'));
+      panel.appendChild(this._labeledInput('Base Pressure', String(this._editorParams.pressure), (v) => {
+        this._editorParams.pressure = parseInt(v) || 1;
       }, 'number', '90px'));
     }
 
@@ -938,6 +941,9 @@ export class CampaignEditor {
       }
       sel.addEventListener('change', () => {
         this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
+        if (sel.value === 'ice' || sel.value === 'weak_ice') {
+          if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
+        }
         const newPanel = this._buildParamPanel();
         newPanel.id = 'editor-param-panel';
         panel.replaceWith(newPanel);
@@ -1428,6 +1434,7 @@ export class CampaignEditor {
     if (palette === PipeShape.Source) {
       def.capacity = p.capacity;
       if (p.temperature !== 0) def.temperature = p.temperature;
+      if (p.pressure !== 1) def.pressure = p.pressure;
     } else if (palette === PipeShape.Chamber) {
       def.chamberContent = p.chamberContent;
       if (p.chamberContent === 'tank') def.capacity = p.capacity;
