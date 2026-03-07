@@ -998,6 +998,7 @@ export class CampaignEditor {
       selWrap.appendChild(selLbl);
       selWrap.appendChild(sel);
       panel.appendChild(selWrap);
+    }
 
     if (isChm) {
       // Chamber content-specific params (content type is determined by the palette selection)
