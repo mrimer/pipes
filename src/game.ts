@@ -13,7 +13,7 @@ import {
   computeCampaignCompletionPct,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
-import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from './tileAnimation';
+import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './tileAnimation';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from './campaignEditor';
 
 /**
@@ -104,6 +104,9 @@ export class Game {
 
   /** Active floating animation labels shown over the canvas. */
   private _animations: TileAnimation[] = [];
+
+  /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
+  private _pendingSparkleShapes: Set<PipeShape> = new Set();
 
   /** Chapter ID of the level currently being played (0 if unknown). */
   private currentChapterId = 0;
@@ -457,6 +460,17 @@ export class Game {
       this.selectedShape,
       (shape, count) => this._handleInventoryClick(shape, count),
     );
+    if (this._pendingSparkleShapes.size > 0) {
+      for (const shape of this._pendingSparkleShapes) {
+        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
+        if (el) {
+          el.classList.remove('sparkle');
+          void el.offsetWidth; // force reflow to restart the CSS animation
+          el.classList.add('sparkle');
+        }
+      }
+      this._pendingSparkleShapes.clear();
+    }
   }
 
   private _handleInventoryClick(shape: PipeShape, count: number): void {
@@ -881,7 +895,8 @@ export class Game {
         } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
           const val = tile.itemCount;
           text = val >= 0 ? `+${val}` : `${val}`;
-          color = animColor(val);
+          color = ANIM_ITEM_COLOR;
+          this._pendingSparkleShapes.add(tile.itemShape);
         } else if (tile.chamberContent === 'heater') {
           text = `+${tile.temperature}°`;
           color = animColor(tile.temperature);

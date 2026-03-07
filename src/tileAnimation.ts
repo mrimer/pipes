@@ -31,6 +31,9 @@ export const ANIM_NEGATIVE_COLOR = '#f44336';
 /** Colour for zero-value animation labels. */
 export const ANIM_ZERO_COLOR = '#9e9e9e';
 
+/** Colour for item-grant animation labels (gold, to distinguish from generic positive). */
+export const ANIM_ITEM_COLOR = '#ffd700';
+
 /**
  * Choose the animation label colour based on a numeric value.
  * Positive → green, negative → red, zero → gray.

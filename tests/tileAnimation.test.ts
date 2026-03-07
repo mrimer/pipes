@@ -7,6 +7,7 @@ import {
   ANIM_POSITIVE_COLOR,
   ANIM_NEGATIVE_COLOR,
   ANIM_ZERO_COLOR,
+  ANIM_ITEM_COLOR,
   ANIM_RISE_PX,
 } from '../src/tileAnimation';
 
@@ -25,6 +26,20 @@ describe('animColor', () => {
 
   it('returns gray for zero', () => {
     expect(animColor(0)).toBe(ANIM_ZERO_COLOR);
+  });
+});
+
+// ─── ANIM_ITEM_COLOR ──────────────────────────────────────────────────────────
+
+describe('ANIM_ITEM_COLOR', () => {
+  it('is a distinct gold color, different from green and red', () => {
+    expect(ANIM_ITEM_COLOR).not.toBe(ANIM_POSITIVE_COLOR);
+    expect(ANIM_ITEM_COLOR).not.toBe(ANIM_NEGATIVE_COLOR);
+    expect(ANIM_ITEM_COLOR).not.toBe(ANIM_ZERO_COLOR);
+  });
+
+  it('starts with # and is a valid hex color', () => {
+    expect(ANIM_ITEM_COLOR).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 });
 

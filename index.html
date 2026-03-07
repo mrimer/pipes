@@ -149,6 +149,13 @@
     .inv-item.gold:hover:not(.depleted) { border-color: #ffd700; background: #2a2000; }
     .inv-item.gold.selected { border-color: #f0c040; background: #2a2000; }
 
+    @keyframes inv-sparkle {
+      0%   { outline: 3px solid rgba(255,215,0,0);   box-shadow: 0 0  0px 0px rgba(255,215,0,0);   }
+      30%  { outline: 3px solid rgba(255,215,0,0.9); box-shadow: 0 0 10px 5px rgba(255,215,0,0.7); }
+      100% { outline: 3px solid rgba(255,215,0,0);   box-shadow: 0 0  0px 0px rgba(255,215,0,0);   }
+    }
+    .inv-item.sparkle { animation: inv-sparkle 0.9s ease-out forwards; }
+
     .inv-shape { font-size: 0.85rem; }
     .inv-count { font-size: 0.9rem; color: #7ed321; font-weight: bold; }
 
