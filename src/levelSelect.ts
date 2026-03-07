@@ -2,6 +2,7 @@
 
 import { CHAPTERS } from './levels';
 import { ChapterDef } from './types';
+import { renderMinimap } from './minimap';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -164,7 +165,15 @@ export function renderLevelList(
       if (!isLocked) {
         btn.addEventListener('click', () => startLevel(level.id));
       }
-      levelsContainer.appendChild(btn);
+
+      // Wrap level button and its minimap in a flex row
+      const levelRow = document.createElement('div');
+      levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      const minimap = renderMinimap(level);
+      minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;';
+      levelRow.appendChild(minimap);
+      levelRow.appendChild(btn);
+      levelsContainer.appendChild(levelRow);
     }
 
     if (totalInChapter === 0 && !chapterLocked) {
