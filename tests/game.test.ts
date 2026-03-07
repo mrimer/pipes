@@ -1233,3 +1233,100 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     expect(hooks.tooltipEl.style.display).toBe('block');
   });
 });
+
+// ─── Tests: reclaimTile records move for undo/redo ────────────────────────────
+
+describe('Game – reclaimTile records a move in the undo history', () => {
+  it('canUndo() returns true after right-clicking to reclaim a tile', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a Straight (E-W) at (0,1) so it can be reclaimed
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Clear the undo history snapshot from placement, then verify reclaim adds one
+    const boardAccess = game as unknown as { board: Board };
+    const historyLenAfterPlace = (boardAccess.board as unknown as { _history: unknown[] })._history.length;
+
+    // Right-click at (0,1): TILE_SIZE=64 → col 1 clientX=96, row 0 clientY=32
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    const historyLenAfterReclaim = (boardAccess.board as unknown as { _history: unknown[] })._history.length;
+    expect(historyLenAfterReclaim).toBe(historyLenAfterPlace + 1);
+    expect(boardAccess.board.canUndo()).toBe(true);
+  });
+
+  it('undo after reclaim restores the reclaimed tile back to the grid', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    // Place a Straight (E-W) at (0,1)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+
+    // Reclaim it via right-click
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Empty);
+
+    // Undo the reclaim → tile should be back
+    boardAccess.board.undoMove();
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+});
+
+// ─── Tests: disconnection animations after reclaimTile ────────────────────────
+
+describe('Game – disconnection animations after reclaimTile', () => {
+  it('spawns a "+1" animation when a connected regular pipe is reclaimed', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place Straight (E-W) at (0,1) – it connects to Source at (0,0)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Clear animations from placement
+    hooks._animations.length = 0;
+
+    // Reclaim it via right-click
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
+    expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
+  });
+
+  it('spawns no disconnection animation when reclaiming an unconnected pipe', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    // Manually place a Straight at (2,1) – not reachable from source
+    const { Tile } = jest.requireActual('../src/tile') as typeof import('../src/tile');
+    boardAccess.board.grid[2][1] = new Tile(PipeShape.Straight, 90);
+    // Add it back to inventory so reclaimTile constraint passes
+    boardAccess.board.inventory.push({ shape: PipeShape.Straight, count: 1 });
+    boardAccess.board.initHistory();
+
+    hooks._animations.length = 0;
+
+    // Right-click at (row=2, col=1): clientX = col*TILE_SIZE+32 = 1*64+32=96, clientY = row*TILE_SIZE+32 = 2*64+32=160
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 160 }));
+
+    // No animation since the pipe was not in the fill path
+    expect(hooks._animations.filter((a) => a.text === '+1').length).toBe(0);
+  });
+});

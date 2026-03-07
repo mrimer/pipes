@@ -1,4 +1,5 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES } from './board';
+import { Tile } from './tile';
 import { LEVELS, CHAPTERS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
@@ -12,7 +13,7 @@ import {
   computeCampaignCompletionPct,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
-import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR } from './tileAnimation';
+import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from './tileAnimation';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from './campaignEditor';
 
 /**
@@ -569,8 +570,12 @@ export class Game {
     const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
     const hadNoSelection = this.selectedShape === null;
 
+    const filledBefore = this.board.getFilledPositions();
+
     if (this.board.reclaimTile({ row, col })) {
       this.board.applyTurnDelta();
+      this.board.recordMove();
+      this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, row, col);
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
         this.selectedShape = reclaimedShape;
@@ -578,6 +583,7 @@ export class Game {
       }
       this._renderInventoryBar();
       this._updateWaterDisplay();
+      this._updateUndoRedoButtons();
     } else if (this.board.lastError) {
       this._showErrorFlash(this.board.lastError);
     }
@@ -776,7 +782,80 @@ export class Game {
   }
 
   /**
-   * Clears the current selection if the selected shape's effective count
+   * Spawn floating animation labels for tiles that have just **lost** their fill
+   * (present in `filledBefore`, absent after reclaim).  The label shows the
+   * reversal of each disconnected tile's water contribution.
+   *
+   * `reclaimedTile` / `reclaimedRow` / `reclaimedCol` are supplied separately
+   * because the reclaimed grid cell has already been replaced with an Empty tile
+   * by the time this method is called.
+   */
+  private _spawnDisconnectionAnimations(
+    filledBefore: Set<string>,
+    reclaimedTile: Tile | undefined,
+    reclaimedRow: number,
+    reclaimedCol: number,
+  ): void {
+    if (!this.board) return;
+    const filledAfter = this.board.getFilledPositions();
+    const now = performance.now();
+    const currentTemp = this.board.getCurrentTemperature(filledAfter);
+    const currentPressure = this.board.getCurrentPressure(filledAfter);
+
+    for (const key of filledBefore) {
+      if (filledAfter.has(key)) continue; // still filled – skip
+      const [r, c] = key.split(',').map(Number);
+
+      // The reclaimed cell is now Empty in the grid; use the captured tile data.
+      const tile = (r === reclaimedRow && c === reclaimedCol)
+        ? reclaimedTile
+        : this.board.grid[r]?.[c];
+      if (!tile) continue;
+
+      // Lower-right quadrant of this tile (matches connection animation position)
+      const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
+      const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
+
+      let text: string | null = null;
+      let color: string = ANIM_POSITIVE_COLOR;
+
+      if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
+        // Each pipe costs 1 water when connected; removal returns it.
+        text = '+1';
+        color = ANIM_POSITIVE_COLOR;
+      } else if (tile.shape === PipeShape.Chamber) {
+        if (tile.chamberContent === 'tank') {
+          // Tank added capacity; losing it costs capacity (val is always ≤ 0).
+          const val = -tile.capacity;
+          text = `${val}`;
+          color = animColor(val);
+        } else if (tile.chamberContent === 'dirt') {
+          // Dirt cost water; removal returns that water.
+          const val = tile.cost;
+          text = val > 0 ? `+${val}` : val < 0 ? `${val}` : '+0';
+          color = animColor(val);
+        } else if (tile.chamberContent === 'ice') {
+          // Ice froze water (negative impact); removal unfreezes it.
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = tile.cost * deltaTemp;
+          text = val > 0 ? `+${val}` : `+0`;
+          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        } else if (tile.chamberContent === 'weak_ice') {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = Math.ceil(tile.cost / currentPressure) * deltaTemp;
+          text = val > 0 ? `+${val}` : `+0`;
+          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        }
+        // heater, pump, item: no direct water impact – no animation label
+      }
+
+      if (text !== null) {
+        this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
+      }
+    }
+  }
+
+  /**
    * (base inventory + container bonuses) has dropped below 1.
    * Call this after any board mutation that may reduce available quantities.
    */
