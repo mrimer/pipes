@@ -286,10 +286,11 @@ export function drawTile(
       ctx.fillText(`+${tile.temperature}°`, 0, 0);
     } else if (chamberContent === 'ice') {
       // Show three lines: negative cost, "x", and the temperature threshold (deltaTemp reference)
-      // When shift is held, adjust the threshold display by current temperature (capped at 0).
+      // By default, adjust the threshold display by current temperature (capped at 0).
+      // When shift is held, show the raw (unadjusted) threshold value.
       const iceThreshold = shiftHeld
-        ? Math.max(0, tile.temperature - currentTemp)
-        : tile.temperature;
+        ? tile.temperature
+        : Math.max(0, tile.temperature - currentTemp);
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -308,13 +309,14 @@ export function drawTile(
       ctx.fillText(`+${tile.pressure}P`, 0, 0);
     } else if (chamberContent === 'weak_ice') {
       // Show three lines: negative adjusted cost, "x", and the temperature threshold.
-      // When shift is held, show values adjusted by current Pressure and Temperature.
+      // By default, show values adjusted by current Pressure and Temperature.
+      // When shift is held, show the raw (unadjusted) values.
       const weakIceThreshold = shiftHeld
-        ? Math.max(0, tile.temperature - currentTemp)
-        : tile.temperature;
+        ? tile.temperature
+        : Math.max(0, tile.temperature - currentTemp);
       const weakIceCost = shiftHeld
-        ? Math.max(1, Math.ceil(cost / currentPressure))
-        : cost;
+        ? cost
+        : Math.max(1, Math.ceil(cost / currentPressure));
       ctx.fillStyle = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
