@@ -99,7 +99,7 @@ export interface TileDef {
    */
   temperature?: number;
   /**
-   * Pressure value: for Source tiles, the base/starting pressure (defaults to 1).
+   * Pressure value: for Source tiles, the base/starting pressure (defaults to 0).
    * For Chamber-pump tiles, the additive bonus added when the pump is connected.
    */
   pressure?: number;

@@ -122,7 +122,7 @@ export class Tile {
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
    * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', or 'sandstone').
    * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/WeakIce/Sandstone (threshold).
-   * @param pressure - Pressure value: base pressure for Source tiles (defaults to 1 via _initFromLevel); additive bonus for Pump tiles. Defaults to 0.
+   * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
    */
   constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0) {
