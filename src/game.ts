@@ -740,9 +740,14 @@ export class Game {
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
-      // re-showing it in the tooltip would be misleading.
-      const isConnected = this.board.getLockedWaterImpact({ row, col }) !== null;
-      if (!isConnected) {
+      // for ice/weak_ice/sandstone show the locked-in effective cost value.
+      const lockedImpact = this.board.getLockedWaterImpact({ row, col });
+      const isConnected = lockedImpact !== null;
+      if (isConnected &&
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')) {
+        // Show the locked effective cost that was frozen when the tile was connected
+        tooltipText += ` cost: ${Math.abs(lockedImpact)}`;
+      } else if (!isConnected) {
         let predictedCost: number | null = null;
         if (tile.chamberContent === 'dirt') {
           predictedCost = tile.cost;
