@@ -84,6 +84,7 @@ export function drawTile(
   shiftHeld = false,
   currentTemp = 0,
   currentPressure = 1,
+  lockedCost: number | null = null,
 ): void {
   const { shape, rotation, isFixed, capacity, cost, itemShape, itemCount } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -292,21 +293,27 @@ export function drawTile(
       ctx.textBaseline = 'middle';
       ctx.fillText(`+${tile.temperature}°`, 0, 0);
     } else if (chamberContent === 'ice') {
-      // Show three lines: negative cost, "x", and the temperature threshold (deltaTemp reference)
-      // By default, adjust the threshold display by current temperature (capped at 0).
-      // When shift is held, show the raw (unadjusted) threshold value.
-      const iceThreshold = shiftHeld
-        ? tile.temperature
-        : Math.max(0, tile.temperature - currentTemp);
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(`-${iceThreshold}°`, 0, -9);
-      ctx.font = 'bold 9px Arial';
-      ctx.fillText('x', 0, 0);
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(String(cost), 0, 9);
+      if (lockedCost !== null) {
+        // Connected: show the single locked effective cost value
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(String(lockedCost), 0, 0);
+      } else {
+        // Unconnected: show three lines: negative cost, "x", and the temperature threshold.
+        // By default, adjust the threshold display by current temperature (capped at 0).
+        // When shift is held, show the raw (unadjusted) threshold value.
+        const iceThreshold = shiftHeld
+          ? tile.temperature
+          : Math.max(0, tile.temperature - currentTemp);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`-${iceThreshold}°`, 0, -9);
+        ctx.font = 'bold 9px Arial';
+        ctx.fillText('x', 0, 0);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(String(cost), 0, 9);
+      }
     } else if (chamberContent === 'pump') {
       // Show the pressure bonus amount
       ctx.fillStyle = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
@@ -315,24 +322,30 @@ export function drawTile(
       ctx.textBaseline = 'middle';
       ctx.fillText(`+${tile.pressure}P`, 0, 0);
     } else if (chamberContent === 'weak_ice') {
-      // Show three lines: negative adjusted cost, "x", and the temperature threshold.
-      // By default, show values adjusted by current Pressure and Temperature.
-      // When shift is held, show the raw (unadjusted) values.
-      const weakIceThreshold = shiftHeld
-        ? tile.temperature
-        : Math.max(0, tile.temperature - currentTemp);
-      const weakIceCost = shiftHeld
-        ? cost
-        : Math.max(1, currentPressure >= 1 ? Math.ceil(cost / currentPressure) : cost);
       ctx.fillStyle = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(`-${weakIceThreshold}°`, 0, -9);
-      ctx.font = 'bold 9px Arial';
-      ctx.fillText('x', 0, 0);
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(String(weakIceCost), 0, 9);
+      if (lockedCost !== null) {
+        // Connected: show the single locked effective cost value
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(String(lockedCost), 0, 0);
+      } else {
+        // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
+        // By default, show values adjusted by current Pressure and Temperature.
+        // When shift is held, show the raw (unadjusted) values.
+        const weakIceThreshold = shiftHeld
+          ? tile.temperature
+          : Math.max(0, tile.temperature - currentTemp);
+        const weakIceCost = shiftHeld
+          ? cost
+          : Math.max(1, currentPressure >= 1 ? Math.ceil(cost / currentPressure) : cost);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`-${weakIceThreshold}°`, 0, -9);
+        ctx.font = 'bold 9px Arial';
+        ctx.fillText('x', 0, 0);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(String(weakIceCost), 0, 9);
+      }
     } else if (chamberContent === 'sandstone') {
       // Show three lines: negative adjusted cost, "x", and the temperature threshold.
       // deltaDamage = Pressure − Hardness is used as the cost divisor.
@@ -576,7 +589,18 @@ export function renderBoard(
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure);
+      // For connected ice/weak_ice/sandstone tiles, pass the locked effective cost so
+      // the tile can display the single locked-in value instead of the live formula.
+      let lockedCost: number | null = null;
+      if (isWater && tile.shape === PipeShape.Chamber &&
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')) {
+        const impact = board.getLockedWaterImpact({ row: r, col: c });
+        if (impact !== null) {
+          lockedCost = Math.abs(impact);
+        }
+      }
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost);
     }
   }
 

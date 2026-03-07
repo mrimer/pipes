@@ -8,7 +8,8 @@
 
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress, saveActiveCampaignId, clearActiveCampaignId } from '../src/persistence';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from '../src/campaignEditor';
-import { CampaignDef, LevelDef } from '../src/types';
+import { CampaignDef, LevelDef, PipeShape } from '../src/types';
+import { TileParams } from '../src/campaignEditorTypes';
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 
@@ -351,5 +352,119 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     const parsed = JSON.parse(json) as CampaignDef;
     expect(parsed.chapters[0].levels[0].note).toBe('Watch the water level.');
     expect(parsed.chapters[0].levels[0].hint).toBe('Use an elbow at the corner.');
+  });
+});
+
+// ─── CampaignEditor – Source tile parameter validation ────────────────────────
+
+describe('CampaignEditor – Source tile parameter validation', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  /** Access private editor state for testing purposes. */
+  function editorState(editor: CampaignEditor) {
+    return editor as unknown as {
+      _editorParams: TileParams;
+      _editorPalette: PipeShape | string;
+      _buildParamPanel(): HTMLElement;
+    };
+  }
+
+  /** Find the <input> element whose sibling <label> has the given text. */
+  function findInputByLabel(panel: HTMLElement, labelText: string): HTMLInputElement | null {
+    const labels = Array.from(panel.querySelectorAll('label'));
+    for (const lbl of labels) {
+      if (lbl.textContent === labelText) {
+        const wrap = lbl.parentElement;
+        return (wrap?.querySelector('input') as HTMLInputElement) ?? null;
+      }
+    }
+    return null;
+  }
+
+  /** Simulate an input event on a number field with the given string value. */
+  function fireInput(input: HTMLInputElement, value: string): void {
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+  }
+
+  it('Source pressure can be set to 0 without reverting to 1', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = PipeShape.Source;
+    state._editorParams.pressure = 1;
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const input = findInputByLabel(panel, 'Base Pressure');
+    expect(input).not.toBeNull();
+    fireInput(input!, '0');
+    expect(state._editorParams.pressure).toBe(0);
+  });
+
+  it('Source pressure negative values are clamped to 0', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = PipeShape.Source;
+    state._editorParams.pressure = 5;
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const input = findInputByLabel(panel, 'Base Pressure');
+    expect(input).not.toBeNull();
+    fireInput(input!, '-3');
+    expect(state._editorParams.pressure).toBe(0);
+  });
+
+  it('Source capacity negative values are clamped to 0', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = PipeShape.Source;
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const input = findInputByLabel(panel, 'Capacity');
+    expect(input).not.toBeNull();
+    fireInput(input!, '-3');
+    expect(state._editorParams.capacity).toBe(0);
+  });
+
+  it('Source temperature negative values are clamped to 0', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = PipeShape.Source;
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const input = findInputByLabel(panel, 'Base Temp');
+    expect(input).not.toBeNull();
+    fireInput(input!, '-10');
+    expect(state._editorParams.temperature).toBe(0);
+  });
+
+  it('Pump chamber pressure can be set to 0 without reverting to 1', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = 'chamber:pump';
+    state._editorParams.chamberContent = 'pump';
+    state._editorParams.pressure = 1;
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const input = findInputByLabel(panel, 'Pressure +');
+    expect(input).not.toBeNull();
+    fireInput(input!, '0');
+    expect(state._editorParams.pressure).toBe(0);
+  });
+
+  it('Pump chamber pressure negative values are clamped to 0', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = 'chamber:pump';
+    state._editorParams.chamberContent = 'pump';
+    state._editorParams.pressure = 2;
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const input = findInputByLabel(panel, 'Pressure +');
+    expect(input).not.toBeNull();
+    fireInput(input!, '-5');
+    expect(state._editorParams.pressure).toBe(0);
   });
 });
