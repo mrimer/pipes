@@ -1704,6 +1704,55 @@ describe('Board.frozen tracking', () => {
     board.redoMove();
     expect(board.frozen).toBe(15);
   });
+
+  it('decrements frozen when a connected ice tile is disconnected', () => {
+    // Board: Source(0,0) → Straight(0,1, player) → Ice(0,2) → Sink(0,3)
+    // After initHistory, Ice is connected: cost=3, thresh=5 → deltaTemp=5 → frozen=15.
+    // After reclaiming Straight(0,1), Ice disconnects → frozen should drop back to 0.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 100, 0, null, 1, null, null, 0);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90, false); // player-placed pipe
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 3, null, 1, null, 'ice', 5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,     0, true);
+    board.sourceCapacity = 100;
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+    board.initHistory();
+
+    expect(board.frozen).toBe(15);
+
+    // Reclaim the straight pipe at (0,1) to break the path
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    board.recordMove();
+
+    expect(board.frozen).toBe(0);
+  });
+
+  it('decrements frozen when a connected weak_ice tile is disconnected', () => {
+    // Board: Source(0,0) → Straight(0,1, player) → WeakIce(0,2) → Sink(0,3)
+    // pressure=1, cost=4, thresh=5 → effectiveCost=ceil(4/1)=4, deltaTemp=5 → frozen=20.
+    // After reclaiming Straight(0,1), WeakIce disconnects → frozen should drop back to 0.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0, true, 100, 0, null, 1, null, null, 0);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 4, null, 1, null, 'weak_ice', 5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,     0, true);
+    board.sourceCapacity = 100;
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+    board.initHistory();
+
+    expect(board.frozen).toBe(20);
+
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    board.recordMove();
+
+    expect(board.frozen).toBe(0);
+  });
 });
 
 // ─── New: Level 5 (Glacier Pass) ─────────────────────────────────────────────
