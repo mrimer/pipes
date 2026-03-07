@@ -1026,7 +1026,7 @@ export class CampaignEditor {
     const cc = isChm ? chamberPaletteContent(p as ChamberPalette) : null;
     if (p === PipeShape.Source || cc === 'tank') {
       panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
-        this._editorParams.capacity = parseInt(v) || 0;
+        this._editorParams.capacity = Math.max(0, parseInt(v) || 0);
         this._applyParamsToLinkedTile();
       }, 'number', '90px'));
     }
@@ -1034,11 +1034,11 @@ export class CampaignEditor {
     // Source: temperature and pressure
     if (p === PipeShape.Source) {
       panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
-        this._editorParams.temperature = parseInt(v) || 0;
+        this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
         this._applyParamsToLinkedTile();
       }, 'number', '90px'));
       panel.appendChild(this._labeledInput('Base Pressure', String(this._editorParams.pressure), (v) => {
-        this._editorParams.pressure = parseInt(v) || 1;
+        this._editorParams.pressure = Math.max(0, parseInt(v) || 0);
         this._applyParamsToLinkedTile();
       }, 'number', '90px'));
     }
@@ -1109,7 +1109,7 @@ export class CampaignEditor {
       }
       if (cc === 'pump') {
         panel.appendChild(this._labeledInput('Pressure +', String(this._editorParams.pressure), (v) => {
-          this._editorParams.pressure = parseInt(v) || 1;
+          this._editorParams.pressure = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
