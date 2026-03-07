@@ -958,15 +958,50 @@ export class CampaignEditor {
       }, 'number', '90px'));
     }
 
-    // Source: temperature
+    // Source: temperature and pressure
     if (p === PipeShape.Source) {
       panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
         this._editorParams.temperature = parseInt(v) || 0;
       }, 'number', '90px'));
+      panel.appendChild(this._labeledInput('Base Pressure', String(this._editorParams.pressure), (v) => {
+        this._editorParams.pressure = parseInt(v) || 1;
+      }, 'number', '90px'));
     }
 
-    // Chamber content-specific params (content type is determined by the palette selection)
+    // Chamber: content type
+    if (p === PipeShape.Chamber) {
+      const sel = document.createElement('select');
+      sel.style.cssText =
+        'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+        'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice']) {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt.charAt(0).toUpperCase() + opt.slice(1);
+        if (this._editorParams.chamberContent === opt) o.selected = true;
+        sel.appendChild(o);
+      }
+      sel.addEventListener('change', () => {
+        this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
+        if (sel.value === 'ice' || sel.value === 'weak_ice') {
+          if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
+        }
+        const newPanel = this._buildParamPanel();
+        newPanel.id = 'editor-param-panel';
+        panel.replaceWith(newPanel);
+      });
+      const selWrap = document.createElement('div');
+      selWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      const selLbl = document.createElement('span');
+      selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
+      selLbl.textContent = 'Content:';
+      selWrap.appendChild(selLbl);
+      selWrap.appendChild(sel);
+      panel.appendChild(selWrap);
+
     if (isChm) {
+      // Chamber content-specific params (content type is determined by the palette selection)
+      const cc = chamberPaletteContent(p as ChamberPalette);
       if (cc === 'dirt') {
         panel.appendChild(this._labeledInput('Cost', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
@@ -1451,6 +1486,7 @@ export class CampaignEditor {
     if (effectiveShape === PipeShape.Source) {
       def.capacity = p.capacity;
       if (p.temperature !== 0) def.temperature = p.temperature;
+      if (p.pressure !== 1) def.pressure = p.pressure;
     } else if (isChm) {
       const cc = chamberPaletteContent(palette as ChamberPalette);
       def.chamberContent = cc;

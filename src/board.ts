@@ -566,7 +566,9 @@ export class Board {
     for (const key of filled) {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
+      if (tile?.shape === PipeShape.Source) {
+        pressure += tile.pressure - 1;
+      } else if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
         pressure += tile.pressure;
       }
     }
