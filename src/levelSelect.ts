@@ -11,6 +11,23 @@ export interface ActiveCampaignInfo {
   completionPct: number;
 }
 
+/** Compute the total stars available and collected across a set of levels. */
+function chapterStarTotals(
+  levels: import('./types').LevelDef[],
+  levelStars: Record<number, number>,
+): { total: number; collected: number } {
+  let total = 0;
+  let collected = 0;
+  for (const level of levels) {
+    const t = level.starCount ?? 0;
+    total += t;
+    if (t > 0) {
+      collected += Math.min(levelStars[level.id] ?? 0, t);
+    }
+  }
+  return { total, collected };
+}
+
 /**
  * Populate the level-list element with chapters (expandable/collapsible) and
  * their nested level buttons.
@@ -24,6 +41,7 @@ export interface ActiveCampaignInfo {
  * @param onUnlockAllClick - Callback invoked when the dev cheat "Unlock All" button is clicked.
  * @param activeCampaign - The campaign currently active for play (official or user campaign).
  * @param campaignChapters - When set, the chapters to render (from the active campaign).
+ * @param levelStars - Map of level ID → stars collected for the current campaign.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -35,6 +53,7 @@ export function renderLevelList(
   onUnlockAllClick: () => void,
   activeCampaign?: ActiveCampaignInfo,
   campaignChapters?: ChapterDef[],
+  levelStars: Record<number, number> = {},
 ): void {
   levelListEl.innerHTML = '';
 
@@ -74,6 +93,20 @@ export function renderLevelList(
     header.appendChild(titleEl);
     header.appendChild(metaEl);
     header.appendChild(progressRow);
+
+    // When the campaign is 100% complete, show aggregate star tally (if any stars exist)
+    if (activeCampaign.completionPct >= 100) {
+      const allLevels = chapters.flatMap((ch) => ch.levels);
+      const { total: campaignStarTotal, collected: campaignStarCollected } =
+        chapterStarTotals(allLevels, levelStars);
+      if (campaignStarTotal > 0) {
+        const starRow = document.createElement('div');
+        starRow.style.cssText = 'font-size:0.9rem;color:#f0c040;font-weight:bold;';
+        starRow.textContent = `⭐ ${campaignStarCollected}/${campaignStarTotal}`;
+        header.appendChild(starRow);
+      }
+    }
+
     levelListEl.appendChild(header);
   }
 
@@ -88,6 +121,10 @@ export function renderLevelList(
     const completedInChapter = chapter.levels.filter((l) => completedLevels.has(l.id)).length;
     const totalInChapter = chapter.levels.length;
     const allLevelsCompleted = totalInChapter > 0 && completedInChapter === totalInChapter;
+
+    // Compute star totals for this chapter
+    const { total: chapterStarTotal, collected: chapterStarCollected } =
+      chapterStarTotals(chapter.levels, levelStars);
 
     // ── Chapter container ──────────────────────────────────────────────────
     const chapterBox = document.createElement('div');
@@ -109,9 +146,12 @@ export function renderLevelList(
       'text-align:left;';
 
     const lockIcon = chapterLocked ? ' 🔒' : '';
-    const starIcon = allLevelsCompleted ? ' ⭐' : '';
+    const doneIcon = allLevelsCompleted ? ' ✅' : '';
+    // When chapter is fully complete and has stars, append a ⭐ X/Y tally
+    const chapterStarText = (allLevelsCompleted && chapterStarTotal > 0)
+      ? `  ⭐ ${chapterStarCollected}/${chapterStarTotal}` : '';
     const progressText = totalInChapter > 0
-      ? ` (${completedInChapter}/${totalInChapter}${starIcon})`
+      ? ` (${completedInChapter}/${totalInChapter}${doneIcon})${chapterStarText}`
       : '';
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
@@ -159,7 +199,12 @@ export function renderLevelList(
       if (isCompleted) btn.classList.add('completed');
 
       const icon = isLocked ? '🔒' : isCompleted ? '✅' : '▶';
-      btn.textContent = `${icon} Level ${li + 1}: ${level.name}`;
+      const levelStarTotal = level.starCount ?? 0;
+      const levelStarCollected = levelStarTotal > 0
+        ? Math.min(levelStars[level.id] ?? 0, levelStarTotal) : 0;
+      const levelStarText = levelStarTotal > 0
+        ? `  ⭐ ${levelStarCollected}/${levelStarTotal}` : '';
+      btn.textContent = `${icon} Level ${li + 1}: ${level.name}${levelStarText}`;
       btn.disabled = isLocked;
 
       if (!isLocked) {

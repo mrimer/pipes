@@ -60,3 +60,7 @@ export const SANDSTONE_WATER_COLOR   = '#d4b882';
 export const SANDSTONE_HARD_COLOR       = '#7a5230';
 /** Sandstone chamber tile color when hardness exceeds current pressure, with water (darker brown). */
 export const SANDSTONE_HARD_WATER_COLOR = '#9a6b40';
+/** Star chamber tile color (bright gold). */
+export const STAR_COLOR       = '#f0c040';
+/** Star chamber tile color when water is flowing through it. */
+export const STAR_WATER_COLOR = '#ffe880';

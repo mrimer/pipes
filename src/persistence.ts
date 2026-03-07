@@ -160,3 +160,45 @@ export function clearActiveCampaignId(): void {
     // ignore storage errors
   }
 }
+
+// ─── Star progress ────────────────────────────────────────────────────────────
+
+const LEVEL_STARS_KEY = 'pipes_level_stars';
+
+function levelStarsStorageKey(campaignId?: string): string {
+  return campaignId ? `pipes_campaign_stars_${campaignId}` : LEVEL_STARS_KEY;
+}
+
+/** Load the map of level IDs → stars collected from localStorage. */
+export function loadLevelStars(campaignId?: string): Record<number, number> {
+  try {
+    const raw = localStorage.getItem(levelStarsStorageKey(campaignId));
+    if (raw) {
+      return JSON.parse(raw) as Record<number, number>;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return {};
+}
+
+/** Save the star count collected for a specific level to localStorage. */
+export function saveLevelStar(levelId: number, count: number, campaignId?: string): void {
+  try {
+    const key = levelStarsStorageKey(campaignId);
+    const stars = loadLevelStars(campaignId);
+    stars[levelId] = count;
+    localStorage.setItem(key, JSON.stringify(stars));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Clear all star progress (for a campaign or the official campaign). */
+export function clearLevelStars(campaignId?: string): void {
+  try {
+    localStorage.removeItem(levelStarsStorageKey(campaignId));
+  } catch {
+    // ignore storage errors
+  }
+}

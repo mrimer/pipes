@@ -44,7 +44,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice' | 'sandstone';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice' | 'sandstone' | 'star';
 
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
@@ -130,6 +130,11 @@ export interface LevelDef {
   note?: string;
   /** Optional hint shown as a collapsible box beneath the grid while playing. */
   hint?: string;
+  /**
+   * Cached number of Star chamber tiles present in the level grid.
+   * Set automatically when the level is saved in the campaign editor.
+   */
+  starCount?: number;
 }
 
 /** Possible types of ambient decorative element drawn under grid tiles. */

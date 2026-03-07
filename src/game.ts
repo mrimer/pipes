@@ -11,6 +11,7 @@ import {
   loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
   loadActiveCampaignId, saveActiveCampaignId, clearActiveCampaignId,
   computeCampaignCompletionPct,
+  loadLevelStars, saveLevelStar, clearLevelStars,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './tileAnimation';
@@ -46,6 +47,9 @@ export class Game {
 
   /** "Next Level" button in the win modal — hidden while playtesting in the editor. */
   private readonly winNextBtnEl: HTMLButtonElement;
+
+  /** Star count display element in the win modal. */
+  private readonly winStarsEl: HTMLElement | null;
 
   /** "Level Select" / "Return to Editor" button in the win modal. */
   private readonly winMenuBtnEl: HTMLButtonElement;
@@ -180,6 +184,7 @@ export class Game {
     this.redoBtnEl = redoBtnEl;
     this.exitBtnEl = exitBtnEl;
     this.winNextBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-next-btn')!;
+    this.winStarsEl = winModalEl.querySelector<HTMLElement>('#win-stars');
     this.winMenuBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-menu-btn')!;
     this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
 
@@ -437,6 +442,7 @@ export class Game {
       completionPct: pct,
     };
     const campaignChapters = this._activeCampaign?.chapters;
+    const levelStars = loadLevelStars(this._activeCampaign?.id);
     renderLevelList(
       this.levelListEl,
       displayProgress,
@@ -447,6 +453,7 @@ export class Game {
       () => { this._unlockAll(); },
       activeCampaignInfo,
       campaignChapters,
+      levelStars,
     );
   }
 
@@ -586,7 +593,18 @@ export class Game {
 
     if (this.board.isSolved()) {
       this.gameState = GameState.Won;
+      const starsCollected = this.board.getStarsCollected();
       this._markLevelCompleted(this.currentLevel!.id);
+      this._saveStars(this.currentLevel!.id, starsCollected);
+      // Show star count on win modal when at least one star was connected
+      if (this.winStarsEl) {
+        if (starsCollected > 0) {
+          this.winStarsEl.textContent = `⭐ × ${starsCollected}`;
+          this.winStarsEl.style.display = 'block';
+        } else {
+          this.winStarsEl.style.display = 'none';
+        }
+      }
       this.winModalEl.style.display = 'flex';
       this._positionModalBelowCanvas(this.winModalEl);
       return;
@@ -1299,12 +1317,20 @@ export class Game {
     }
   }
 
+  /** Save the number of stars collected for a level (no-op during playtesting). */
+  private _saveStars(levelId: number, count: number): void {
+    if (this._playtestExitCallback) return; // don't persist progress during playtesting
+    saveLevelStar(levelId, count, this._activeCampaign?.id);
+  }
+
   /** Clear all level-completion progress and refresh the level list. */
   private _resetProgress(): void {
     if (this._activeCampaign) {
       clearCampaignProgress(this._activeCampaign.id, this._activeCampaignProgress);
+      clearLevelStars(this._activeCampaign.id);
     } else {
       clearCompletedLevels(this.completedLevels);
+      clearLevelStars();
     }
     this._renderLevelList();
   }

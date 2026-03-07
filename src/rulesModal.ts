@@ -9,6 +9,7 @@ import {
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, WEAK_ICE_COLOR, SANDSTONE_COLOR,
+  STAR_COLOR,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -156,6 +157,11 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: colorSwatch(SANDSTONE_COLOR),
     name: 'Chamber — Sandstone',
     description: 'Like Weak Ice, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness.',
+  },
+  {
+    iconHtml: colorSwatch(STAR_COLOR),
+    name: 'Chamber — Star',
+    description: 'A bonus collectible. Connect it to the water path before winning to count it as a collected star for the level. Stars are tracked per-level and shown on the level select screen.',
   },
 ];
 
