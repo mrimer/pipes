@@ -30,7 +30,19 @@ export const GOLD_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
-type Snapshot = { grid: Tile[][]; inventory: InventoryItem[]; lockedWaterImpact: Map<string, number>; frozen: number };
+type Snapshot = {
+  grid: Tile[][];
+  inventory: InventoryItem[];
+  lockedWaterImpact: Map<string, number>;
+  frozen: number;
+  /** The turn number at the moment this snapshot was captured. */
+  turnNumber: number;
+  /**
+   * The turn number on which each tile was first connected, keyed by "row,col".
+   * Used to re-evaluate ice/weak-ice costs when beneficial tiles (heaters, pumps) disconnect.
+   */
+  connectionTurn: Map<string, number>;
+};
 
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
@@ -71,6 +83,21 @@ export class Board {
    * mechanism continue to work unchanged.
    */
   private _lockedWaterImpact: Map<string, number> = new Map();
+
+  /**
+   * The turn number of the most recent {@link applyTurnDelta} call.
+   * Starts at 0 and is incremented to 1 by the first {@link applyTurnDelta} call
+   * inside {@link initHistory}.
+   */
+  private _turnNumber: number = 0;
+
+  /**
+   * The turn number on which each tile was first added to the fill path,
+   * keyed by "row,col".  Used when a beneficial tile (heater, pump) disconnects:
+   * ice/weak-ice tiles still connected are re-evaluated using only the
+   * heaters/pumps that were connected on or before each ice tile's own connection turn.
+   */
+  private _connectionTurn: Map<string, number> = new Map();
 
   /**
    * Total water units that have been frozen by ice blocks during play.
@@ -152,6 +179,8 @@ export class Board {
   initHistory(): void {
     this._lockedWaterImpact = new Map();
     this.frozen = 0;
+    this._turnNumber = 0;
+    this._connectionTurn = new Map();
     this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
@@ -242,6 +271,8 @@ export class Board {
       inventory: this.inventory.map((item) => ({ ...item })),
       lockedWaterImpact: new Map(this._lockedWaterImpact),
       frozen: this.frozen,
+      turnNumber: this._turnNumber,
+      connectionTurn: new Map(this._connectionTurn),
     };
   }
 
@@ -257,6 +288,8 @@ export class Board {
     this.inventory = snap.inventory.map((item) => ({ ...item }));
     this._lockedWaterImpact = new Map(snap.lockedWaterImpact);
     this.frozen = snap.frozen;
+    this._turnNumber = snap.turnNumber;
+    this._connectionTurn = new Map(snap.connectionTurn);
   }
 
   /**
@@ -576,6 +609,54 @@ export class Board {
   }
 
   /**
+   * Compute the effective source temperature for a specific ice tile, counting
+   * only heaters whose connection turn is ≤ {@link iceConnectedTurn}.
+   *
+   * This is used during re-evaluation when a heater disconnects: the ice tile
+   * must not receive benefit from heaters that connected after it did.
+   */
+  private _computeTemperatureForIce(filled: Set<string>, iceConnectedTurn: number): number {
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    let temp = sourceTile.temperature;
+    for (const key of filled) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'heater') {
+        const heaterTurn = this._connectionTurn.get(key) ?? Infinity;
+        if (heaterTurn <= iceConnectedTurn) {
+          temp += tile.temperature;
+        }
+      }
+    }
+    return temp;
+  }
+
+  /**
+   * Compute the effective pressure for a specific ice tile, counting only pumps
+   * (and the source) whose connection turn is ≤ {@link iceConnectedTurn}.
+   *
+   * Used symmetrically with {@link _computeTemperatureForIce} during re-evaluation.
+   */
+  private _computePressureForIce(filled: Set<string>, iceConnectedTurn: number): number {
+    let pressure = 1;
+    for (const key of filled) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Source) {
+        // The source pressure base is 1; tile.pressure - 1 gives any bonus above the base.
+        // The source is always connected first, so it always counts for any ice tile.
+        pressure += tile.pressure - 1;
+      } else if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
+        const pumpTurn = this._connectionTurn.get(key) ?? Infinity;
+        if (pumpTurn <= iceConnectedTurn) {
+          pressure += tile.pressure;
+        }
+      }
+    }
+    return pressure;
+  }
+
+  /**
    * Compute current water remaining in the source tank based on the live fill state.
    *
    * When incremental turn tracking is active (i.e. {@link applyTurnDelta} has been
@@ -636,6 +717,11 @@ export class Board {
    *
    * - Previously-evaluated tiles keep their locked impact unchanged, so an ice
    *   tile's cost is never retroactively altered by a heater connected later.
+   * - When a beneficial tile (heater or pump) is removed from the fill path,
+   *   any still-connected ice/weak-ice tiles are re-evaluated.  Re-evaluation
+   *   only considers heaters/pumps whose own connection turn is ≤ the ice tile's
+   *   original connection turn, so no ice tile ever gains a retroactive benefit
+   *   from a heater that connected after it.
    * - Tiles removed from the fill path lose their lock; if they reconnect on a
    *   future move they are re-evaluated at the temperature current at that time.
    *
@@ -645,17 +731,76 @@ export class Board {
    */
   applyTurnDelta(): void {
     const filled = this.getFilledPositions();
-    const currentTemp = this._computeTemperatureFromFilled(filled);
-    const currentPressure = this._computePressureFromFilled(filled);
+
+    // ── Detect whether any heater or pump has been disconnected this turn ────
+    let beneficialDisconnected = false;
+    for (const key of this._lockedWaterImpact.keys()) {
+      if (!filled.has(key)) {
+        const [r, c] = key.split(',').map(Number);
+        const tile = this.grid[r]?.[c];
+        if (
+          tile?.shape === PipeShape.Chamber &&
+          (tile.chamberContent === 'heater' || tile.chamberContent === 'pump')
+        ) {
+          beneficialDisconnected = true;
+          break;
+        }
+      }
+    }
 
     // Remove locked impacts for tiles that are no longer connected.
     for (const key of this._lockedWaterImpact.keys()) {
       if (!filled.has(key)) {
         this._lockedWaterImpact.delete(key);
+        this._connectionTurn.delete(key);
       }
     }
 
-    // Lock the impact of each newly-connected tile.
+    // Advance the turn counter.
+    this._turnNumber++;
+
+    // ── Re-evaluate still-connected ice/weak-ice when a beneficial tile left ─
+    // When a heater or pump disconnects, any ice/weak-ice tile whose locked cost
+    // was partially or fully neutralised by that tile may now be under-charged.
+    // Re-compute using only heaters/pumps that were connected on or before each
+    // ice tile's own original connection turn.
+    if (beneficialDisconnected) {
+      for (const key of filled) {
+        if (!this._lockedWaterImpact.has(key)) continue; // Newly connecting – handled below.
+
+        const [r, c] = key.split(',').map(Number);
+        const tile = this.grid[r]?.[c];
+        if (!tile || tile.shape !== PipeShape.Chamber) continue;
+        if (tile.chamberContent !== 'ice' && tile.chamberContent !== 'weak_ice') continue;
+
+        const iceConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
+        const effectiveTemp = this._computeTemperatureForIce(filled, iceConnectedTurn);
+        const effectivePressure = this._computePressureForIce(filled, iceConnectedTurn);
+
+        const oldImpact = this._lockedWaterImpact.get(key)!;
+        let newImpact: number;
+
+        if (tile.chamberContent === 'ice') {
+          const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
+          newImpact = -(tile.cost * deltaTemp);
+        } else {
+          const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
+          const effectiveCost = Math.ceil(tile.cost / effectivePressure);
+          newImpact = -(effectiveCost * deltaTemp);
+        }
+
+        if (newImpact !== oldImpact) {
+          // Adjust the frozen-water display counter by the change in cost.
+          this.frozen += oldImpact - newImpact;
+          this._lockedWaterImpact.set(key, newImpact);
+        }
+      }
+    }
+
+    // ── Lock the impact of each newly-connected tile ─────────────────────────
+    const currentTemp = this._computeTemperatureFromFilled(filled);
+    const currentPressure = this._computePressureFromFilled(filled);
+
     for (const key of filled) {
       if (this._lockedWaterImpact.has(key)) continue; // Already evaluated.
 
@@ -686,6 +831,7 @@ export class Board {
       // Source, Sink, Empty, Granite: no water impact (impact stays 0).
 
       this._lockedWaterImpact.set(key, impact);
+      this._connectionTurn.set(key, this._turnNumber);
     }
   }
 

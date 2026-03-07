@@ -2032,7 +2032,226 @@ describe('Board.applyTurnDelta (incremental turn evaluation)', () => {
   });
 });
 
-// ─── New: getTileDisplayName ──────────────────────────────────────────────────
+// ─── New: applyTurnDelta – re-evaluation when heater/pump disconnects ──────────
+
+describe('Board.applyTurnDelta (re-evaluation on heater/pump disconnect)', () => {
+  /**
+   * Board layout (3 rows × 4 cols):
+   *   (0,0) Source  – East AND South; cap=100, temp=0
+   *   (0,1) Empty   – player places E-W Straight to connect Ice
+   *   (0,2) Chamber(ice, thresh=10, cost=2, E-W)
+   *   (0,3) Sink    – West-only
+   *   (1,0) Empty   – player places N-S Straight to connect Heater
+   *   (2,0) Chamber(heater, +20°, North-only)
+   */
+  function makeBoard(): Board {
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, new Set([Direction.East, Direction.West]), 'ice', 10);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'heater', 20);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    board.initHistory();
+    return board;
+  }
+
+  it('ice cost is re-evaluated upward when the heater that reduced its cost disconnects', () => {
+    const board = makeBoard();
+
+    // Turn 1: connect Heater(2,0) – temp rises to 20.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect Ice(0,2) – temp is 20, deltaTemp = max(0,10-20)=0, cost=0.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Ice locked at cost 0 (heater fully offsets threshold).
+    // 100 − 1 (Straight 1,0) − 1 (Straight 0,1) − 0 (Ice) = 98
+    expect(board.getCurrentWater()).toBe(98);
+
+    // Turn 3: reclaim the N-S Straight at (1,0) → Heater disconnects.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Ice(0,2) is still connected; heater is gone, so it must be re-evaluated.
+    // Re-evaluation: heater connectionTurn (no longer present) is not counted.
+    // effectiveTemp = 0; deltaTemp = max(0,10-0)=10; impact = -(2×10) = -20.
+    // 100 − 1 (Straight 0,1) − 20 (Ice re-evaluated) = 79
+    expect(board.getCurrentWater()).toBe(79);
+  });
+
+  it('re-evaluation only counts heaters connected at or before the ice connection turn', () => {
+    // Same layout but heater connects AFTER ice does.
+    // When heater disconnects later, ice should use only the heaters connected on or before ice's turn.
+    const board = makeBoard();
+
+    // Turn 1: connect Ice(0,2) first – temp is 0, cost = 2×10 = 20.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(79); // 100 − 1 − 20 = 79
+
+    // Turn 2: connect Heater – heater's connectionTurn > ice's connectionTurn.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+    // Ice impact stays locked at -20 (heater connected after ice, no retroactive benefit).
+    expect(board.getCurrentWater()).toBe(78); // 79 − 1 = 78
+
+    // Turn 3: reclaim Straight(1,0) → Heater disconnects.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Re-evaluation: heater connectionTurn > ice connectionTurn → not counted.
+    // effectiveTemp = 0; impact stays -(2×10) = -20.
+    // 100 − 1 (Straight 0,1) − 20 (Ice unchanged) = 79
+    expect(board.getCurrentWater()).toBe(79);
+  });
+
+  it('frozen counter is updated when ice cost increases on heater disconnect', () => {
+    const board = makeBoard();
+
+    // Turn 1: connect Heater.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect Ice – cost 0 (heater fully offsets threshold).
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    // Ice impact = 0 → frozen += 0; frozen still 0.
+    expect(board.frozen).toBe(0);
+
+    // Turn 3: reclaim Heater → Ice re-evaluated; cost becomes 2×10=20.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    // frozen += oldImpact − newImpact = (0) − (−20) = 20
+    expect(board.frozen).toBe(20);
+  });
+
+  it('re-evaluation and frozen counter are correctly restored by undo', () => {
+    const board = makeBoard();
+
+    // Turn 1: connect Heater.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect Ice – cost 0.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(98);
+    expect(board.frozen).toBe(0);
+
+    // Turn 3: disconnect Heater → Ice re-evaluated to cost 20.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(79);
+    expect(board.frozen).toBe(20);
+
+    // Undo turn 3 → Heater reconnects; ice cost back to 0.
+    board.undoMove();
+    expect(board.getCurrentWater()).toBe(98);
+    expect(board.frozen).toBe(0);
+
+    // Redo turn 3 → ice cost back to 20.
+    board.redoMove();
+    expect(board.getCurrentWater()).toBe(79);
+    expect(board.frozen).toBe(20);
+  });
+
+  it('disconnecting a heater that never affected ice leaves ice cost unchanged', () => {
+    // Heater connects AFTER ice AND its temp is irrelevant (threshold already met).
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    // Source temp=15 → already at ice threshold → ice costs 0 regardless of heater.
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 0, 0, null, 1, new Set([Direction.East, Direction.South]), null, 15);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, new Set([Direction.East, Direction.West]), 'ice', 10);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'heater', 5);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    board.initHistory();
+
+    // Turn 1: connect Ice (temp=15 ≥ thresh=10 → cost=0).
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(99); // 100 − 1 = 99
+
+    // Turn 2: connect Heater.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 3: disconnect Heater → ice re-evaluated but temp=15 still ≥ thresh=10 → cost stays 0.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(99);
+    expect(board.frozen).toBe(0);
+  });
+});
+
+// ─── New: applyTurnDelta – weak_ice re-evaluation when pump disconnects ────────
+
+describe('Board.applyTurnDelta (re-evaluation on pump disconnect)', () => {
+  it('weak_ice cost is re-evaluated upward when pump disconnects', () => {
+    // Pump at (2,0) is fixed but reachable only via a player-placed N-S Straight at (1,0).
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, new Set([Direction.East, Direction.West]), 'weak_ice', 5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,   0, true, 0, 0, null, 1, new Set([Direction.West]));
+    // Pump at (2,0): fixed, reachable via player-placed pipe at (1,0), pressure bonus +3.
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 3);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    board.initHistory();
+
+    // Turn 1: connect Pump(2,0) via player-placed N-S Straight at (1,0).
+    // pressure becomes 1+3=4.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect WeakIce(0,2) via E-W Straight at (0,1).
+    // effectiveCost = ceil(4/4)=1; deltaTemp=max(0,5-0)=5; impact = -(1×5) = -5.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    // 100 − 1 (N-S Straight) − 1 (E-W Straight) − 5 (WeakIce) = 93
+    expect(board.getCurrentWater()).toBe(93);
+
+    // Turn 3: reclaim Straight(1,0) → Pump disconnects.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // WeakIce re-evaluated: pump gone, pressure=1, effectiveCost=ceil(4/1)=4, deltaTemp=5; impact=-(4×5)=-20.
+    // 100 − 1 (E-W Straight) − 20 (WeakIce re-evaluated) = 79
+    expect(board.getCurrentWater()).toBe(79);
+  });
+});
+
+
 
 import { getTileDisplayName } from '../src/renderer';
 
