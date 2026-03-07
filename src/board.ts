@@ -619,7 +619,24 @@ export class Board {
   }
 
   /**
-   * Returns true when the level has any temperature-relevant tiles: a heater
+   * Count how many Star chamber tiles are currently in the water fill path.
+   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
+   * @returns The number of connected star chambers.
+   */
+  getStarsCollected(filled?: Set<string>): number {
+    const filledSet = filled ?? this.getFilledPositions();
+    let count = 0;
+    for (const key of filledSet) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'star') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
    * chamber, an ice chamber, a weak-ice chamber, or a source with a non-zero base temperature.
    * Used to decide whether to display the Temp stat in the UI.
    */

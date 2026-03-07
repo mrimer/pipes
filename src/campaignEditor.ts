@@ -1053,7 +1053,7 @@ export class CampaignEditor {
       sel.style.cssText =
         'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', 'sandstone']) {
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', 'sandstone', 'star']) {
         const o = document.createElement('option');
         o.value = opt;
         o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt === 'sandstone' ? 'Sandstone' : opt.charAt(0).toUpperCase() + opt.slice(1);
@@ -1850,6 +1850,16 @@ export class CampaignEditor {
     const chapter = campaign?.chapters[this._activeChapterIdx];
     const existingId = chapter?.levels[this._activeLevelIdx]?.id ?? generateLevelId();
 
+    // Count star chambers in the grid and cache in starCount
+    let starCount = 0;
+    for (const row of this._editGrid) {
+      for (const cell of row) {
+        if (cell?.shape === PipeShape.Chamber && cell.chamberContent === 'star') {
+          starCount++;
+        }
+      }
+    }
+
     const def: LevelDef = {
       id: existingId,
       name: this._editLevelName,
@@ -1860,6 +1870,7 @@ export class CampaignEditor {
     };
     if (this._editLevelNote.trim()) def.note = this._editLevelNote.trim();
     if (this._editLevelHint.trim()) def.hint = this._editLevelHint.trim();
+    if (starCount > 0) def.starCount = starCount;
     return def;
   }
 

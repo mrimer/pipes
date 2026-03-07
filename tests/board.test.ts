@@ -2843,3 +2843,58 @@ describe('Board ambientDecorations', () => {
     }
   });
 });
+
+// ─── getStarsCollected ────────────────────────────────────────────────────────
+
+describe('Board.getStarsCollected', () => {
+  it('returns 0 when no star chambers are in the fill path', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.getStarsCollected()).toBe(0);
+  });
+
+  it('counts a star chamber in the fill path', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'star');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.getStarsCollected()).toBe(1);
+  });
+
+  it('counts multiple star chambers in the fill path', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'star');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'star');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.getStarsCollected()).toBe(2);
+  });
+
+  it('does not count a star chamber not in the fill path', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    // Straight N-S at (0,1) blocks E-W fill → star at (0,2) not reached
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 0);           // N-S only
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'star');
+    expect(board.getStarsCollected()).toBe(0);
+  });
+
+  it('accepts a pre-computed filled set to avoid double flood-fill', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'star');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    const filled = board.getFilledPositions();
+    expect(board.getStarsCollected(filled)).toBe(1);
+  });
+});

@@ -27,6 +27,7 @@ import {
   WEAK_ICE_COLOR, WEAK_ICE_WATER_COLOR,
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
+  STAR_COLOR, STAR_WATER_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -383,6 +384,19 @@ export function drawTile(
         ctx.font = 'bold 14px Arial';
         ctx.fillText(String(sandstoneCost), 0, 9);
       }
+    } else if (chamberContent === 'star') {
+      // Draw a 5-pointed star
+      ctx.fillStyle = isWater ? STAR_WATER_COLOR : STAR_COLOR;
+      const outerR = half * 0.45;
+      const innerR = outerR * 0.42;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI / 5) * i - Math.PI / 2;
+        const r = i % 2 === 0 ? outerR : innerR;
+        ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
+      }
+      ctx.closePath();
+      ctx.fill();
     }
     // Connection stubs
     ctx.strokeStyle = color;
