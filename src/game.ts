@@ -117,6 +117,18 @@ export class Game {
   /** Element showing the current game Pressure (shown when pressure-relevant tiles are present). */
   private readonly pressureDisplayEl: HTMLElement;
 
+  /** Box shown beneath the grid with level notes (when the level has a note). */
+  private readonly noteBoxEl: HTMLElement;
+
+  /** Collapsible box shown beneath the grid with the level hint (when the level has a hint). */
+  private readonly hintBoxEl: HTMLElement;
+
+  /** Inner text element of the hint box, toggled by the Show/Hide Hint button. */
+  private readonly hintTextEl: HTMLElement;
+
+  /** Toggle button for showing/hiding the hint text. */
+  private readonly hintToggleBtnEl: HTMLButtonElement;
+
   /**
    * The non-official campaign currently activated for play, or null when playing
    * the built-in official campaign.
@@ -195,6 +207,36 @@ export class Game {
     this.pressureDisplayEl.style.cssText =
       'display:none;font-size:1.1rem;font-weight:bold;color:#a8e063;';
     this.frozenDisplayEl.insertAdjacentElement('afterend', this.pressureDisplayEl);
+
+    // Create the note box (appended to the play screen, shown beneath the grid)
+    this.noteBoxEl = document.createElement('div');
+    this.noteBoxEl.style.cssText =
+      'display:none;background:#16213e;border:1px solid #4a90d9;border-radius:6px;' +
+      'padding:12px 16px;font-size:0.9rem;color:#eee;max-width:600px;width:100%;box-sizing:border-box;';
+    playScreenEl.appendChild(this.noteBoxEl);
+
+    // Create the hint box (appended to the play screen after the note box, collapsible)
+    this.hintBoxEl = document.createElement('div');
+    this.hintBoxEl.style.cssText =
+      'display:none;border:1px solid #f0c040;border-radius:6px;' +
+      'max-width:600px;width:100%;box-sizing:border-box;overflow:hidden;';
+    this.hintToggleBtnEl = document.createElement('button');
+    this.hintToggleBtnEl.type = 'button';
+    this.hintToggleBtnEl.textContent = '💡 Show Hint';
+    this.hintToggleBtnEl.style.cssText =
+      'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
+      'border:none;cursor:pointer;text-align:left;font-family:inherit;';
+    this.hintTextEl = document.createElement('div');
+    this.hintTextEl.style.cssText =
+      'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
+    this.hintToggleBtnEl.addEventListener('click', () => {
+      const isHidden = this.hintTextEl.style.display === 'none';
+      this.hintTextEl.style.display = isHidden ? 'block' : 'none';
+      this.hintToggleBtnEl.textContent = isHidden ? '💡 Hide Hint' : '💡 Show Hint';
+    });
+    this.hintBoxEl.appendChild(this.hintToggleBtnEl);
+    this.hintBoxEl.appendChild(this.hintTextEl);
+    playScreenEl.appendChild(this.hintBoxEl);
 
     // Create the error-flash element for brief action-blocked messages
     this.errorFlashEl = document.createElement('div');
@@ -332,6 +374,7 @@ export class Game {
     this._renderInventoryBar();
     this._updateWaterDisplay();
     this._updateUndoRedoButtons();
+    this._updateNoteHintBoxes(level);
     this.canvas.focus();
   }
 
@@ -356,6 +399,27 @@ export class Game {
     this.currentChapterId = 0;
     const level = LEVELS.find((l) => l.id === levelId);
     this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}` : '';
+  }
+
+  /** Show or hide the note and hint boxes based on the current level's metadata. */
+  private _updateNoteHintBoxes(level: LevelDef): void {
+    // Note box
+    if (level.note) {
+      this.noteBoxEl.textContent = level.note;
+      this.noteBoxEl.style.display = 'block';
+    } else {
+      this.noteBoxEl.style.display = 'none';
+    }
+
+    // Hint box – always starts collapsed when a new level loads
+    if (level.hint) {
+      this.hintTextEl.textContent = level.hint;
+      this.hintTextEl.style.display = 'none';
+      this.hintToggleBtnEl.textContent = '💡 Show Hint';
+      this.hintBoxEl.style.display = 'block';
+    } else {
+      this.hintBoxEl.style.display = 'none';
+    }
   }
 
   // ─── Level-select rendering ───────────────────────────────────────────────

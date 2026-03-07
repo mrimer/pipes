@@ -126,6 +126,10 @@ export interface LevelDef {
   grid: (TileDef | null)[][];
   /** Starting inventory of pipe pieces available for the player to place. */
   inventory: InventoryItem[];
+  /** Optional notes displayed in a box beneath the grid while playing. */
+  note?: string;
+  /** Optional hint shown as a collapsible box beneath the grid while playing. */
+  hint?: string;
 }
 
 /** A chapter groups a set of levels under a shared name. */
