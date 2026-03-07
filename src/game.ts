@@ -561,7 +561,7 @@ export class Game {
   private _handleCanvasMouseMove(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    if (this.ctrlHeld) {
+    if (this.ctrlHeld && this.gameState === GameState.Playing) {
       this._showTooltip(e.clientX, e.clientY);
     }
   }
@@ -582,7 +582,7 @@ export class Game {
   private _handleDocKeyDown(e: KeyboardEvent): void {
     if (e.key === 'Control' && !this.ctrlHeld) {
       this.ctrlHeld = true;
-      if (this.mouseCanvasPos) {
+      if (this.gameState === GameState.Playing && this.mouseCanvasPos) {
         const rect = this.canvas.getBoundingClientRect();
         this._showTooltip(
           this.mouseCanvasPos.x + rect.left,

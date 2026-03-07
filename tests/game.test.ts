@@ -271,13 +271,20 @@ type GameTestHooks = {
   _animations: { x: number; y: number; text: string; color: string }[];
   _playtestExitCallback: (() => void) | null;
   _activeCampaignProgress: Set<number>;
+  ctrlHeld: boolean;
+  mouseCanvasPos: { x: number; y: number } | null;
+  tooltipEl: HTMLElement;
   _handleKey(e: KeyboardEvent): void;
   _handleCanvasRightClick(e: MouseEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
+  _handleCanvasMouseMove(e: MouseEvent): void;
+  _handleDocKeyDown(e: KeyboardEvent): void;
+  _handleDocKeyUp(e: KeyboardEvent): void;
   _handleInventoryClick(shape: PipeShape, count: number): void;
   _markLevelCompleted(levelId: number): void;
   _renderLevelList(): void;
   _playtestLevel(level: LevelDef): void;
+  gameState: string;
 };
 
 function gameHooks(g: Game): GameTestHooks {
@@ -1140,5 +1147,89 @@ describe('Game – playtesting does not persist progress', () => {
     hooks._markLevelCompleted(levelId);
 
     expect(hooks.completedLevels.has(levelId)).toBe(true);
+  });
+});
+
+// ─── Tests: Ctrl tooltip suppressed during win/fail modals ───────────────────
+
+describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
+  it('shows tooltip on Ctrl keydown when gameState is Playing', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Simulate mouse position on canvas
+    hooks.mouseCanvasPos = { x: 50, y: 50 };
+
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
+
+    expect(hooks.ctrlHeld).toBe(true);
+    expect(hooks.tooltipEl.style.display).toBe('block');
+  });
+
+  it('does not show tooltip on Ctrl keydown when gameState is Won', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.gameState = GameState.Won;
+    hooks.mouseCanvasPos = { x: 50, y: 50 };
+
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
+
+    expect(hooks.ctrlHeld).toBe(true);
+    expect(hooks.tooltipEl.style.display).not.toBe('block');
+  });
+
+  it('does not show tooltip on Ctrl keydown when gameState is GameOver', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.gameState = GameState.GameOver;
+    hooks.mouseCanvasPos = { x: 50, y: 50 };
+
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
+
+    expect(hooks.ctrlHeld).toBe(true);
+    expect(hooks.tooltipEl.style.display).not.toBe('block');
+  });
+
+  it('does not show tooltip on mouse move when gameState is Won and Ctrl is held', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.gameState = GameState.Won;
+    hooks.ctrlHeld = true;
+
+    hooks._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+
+    expect(hooks.tooltipEl.style.display).not.toBe('block');
+  });
+
+  it('does not show tooltip on mouse move when gameState is GameOver and Ctrl is held', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.gameState = GameState.GameOver;
+    hooks.ctrlHeld = true;
+
+    hooks._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+
+    expect(hooks.tooltipEl.style.display).not.toBe('block');
+  });
+
+  it('shows tooltip on mouse move when gameState is Playing and Ctrl is held', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    hooks.ctrlHeld = true;
+
+    hooks._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+
+    expect(hooks.tooltipEl.style.display).toBe('block');
   });
 });
