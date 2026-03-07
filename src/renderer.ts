@@ -297,9 +297,9 @@ export function drawTile(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       if (lockedCost !== null) {
-        // Connected: show the single locked effective cost value
+        // Connected: show the single locked effective (negative) cost value
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(lockedCost), 0, 0);
+        ctx.fillText(String(-lockedCost), 0, 0);
       } else {
         // Unconnected: show three lines: negative cost, "x", and the temperature threshold.
         // By default, adjust the threshold display by current temperature (capped at 0).
@@ -326,9 +326,9 @@ export function drawTile(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       if (lockedCost !== null) {
-        // Connected: show the single locked effective cost value
+        // Connected: show the single locked effective (negative) cost value
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(lockedCost), 0, 0);
+        ctx.fillText(String(-lockedCost), 0, 0);
       } else {
         // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
         // By default, show values adjusted by current Pressure and Temperature.
@@ -362,9 +362,9 @@ export function drawTile(
         ctx.font = 'bold 14px Arial';
         ctx.fillText(`${tile.hardness}H`, 0, 0);
       } else if (lockedCost !== null) {
-        // Connected: show the single locked effective cost value
+        // Connected: show the single locked effective (negative) cost value
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(lockedCost), 0, 0);
+        ctx.fillText(String(-lockedCost), 0, 0);
       } else {
         // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
         // deltaDamage = Pressure − Hardness is used as the cost divisor.
