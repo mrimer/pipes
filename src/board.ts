@@ -675,8 +675,9 @@ export class Board {
           this.frozen += tile.cost * deltaTemp;
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          impact = -(Math.ceil(tile.cost / currentPressure) * deltaTemp);
-          this.frozen += Math.ceil(tile.cost / currentPressure) * deltaTemp;
+          const effectiveCost = Math.ceil(tile.cost / currentPressure);
+          impact = -(effectiveCost * deltaTemp);
+          this.frozen += effectiveCost * deltaTemp;
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }
