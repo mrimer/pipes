@@ -26,6 +26,7 @@ const MOCK_CTX = {
   stroke:     jest.fn(),
   fill:       jest.fn(),
   arc:        jest.fn(),
+  ellipse:    jest.fn(),
   translate:  jest.fn(),
   rotate:     jest.fn(),
   save:       jest.fn(),

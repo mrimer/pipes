@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import { Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
 
 /** Neighbour offsets keyed by direction. */
 const NEIGHBOUR_DELTA: Record<Direction, GridPos> = {
@@ -66,6 +66,19 @@ export class Board {
    * Populated from the level definition; never changes during play.
    */
   goldSpaces: Set<string>;
+
+  /**
+   * Ambient background decorations (pebbles, flowers, grass tufts) generated
+   * once each time a level is activated.  Rendered under all tile elements so
+   * they are visible only on empty (unoccupied) cells.
+   */
+  readonly ambientDecorations: readonly AmbientDecoration[];
+
+  /**
+   * Pre-built O(1) lookup map for {@link ambientDecorations}, keyed by "row,col".
+   * Cached here so the renderer does not reconstruct it on every frame.
+   */
+  readonly ambientDecorationMap: ReadonlyMap<string, AmbientDecoration>;
 
   /**
    * Set to a human-readable reason after any failed reclaim attempt, so callers
@@ -136,9 +149,14 @@ export class Board {
     if (level) {
       this.grid = this._emptyGrid();
       this._initFromLevel(level);
+      this.ambientDecorations = this._generateAmbientDecorations();
     } else {
       this.grid = this._buildGrid();
+      this.ambientDecorations = [];
     }
+    this.ambientDecorationMap = new Map(
+      this.ambientDecorations.map((dec) => [`${dec.row},${dec.col}`, dec]),
+    );
   }
 
   // ─── Level initialisation ──────────────────────────────────────────────────
@@ -173,6 +191,34 @@ export class Board {
     }
 
     this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
+  }
+
+  /**
+   * Generate a set of ambient background decorations spread across the grid.
+   * Called once after the grid is fully initialised.  Each cell has an
+   * independent ~30 % chance of receiving one decoration.
+   */
+  private _generateAmbientDecorations(): AmbientDecoration[] {
+    const DECORATION_DENSITY = 0.30;
+    const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass'];
+    const decorations: AmbientDecoration[] = [];
+
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (Math.random() >= DECORATION_DENSITY) continue;
+        decorations.push({
+          row: r,
+          col: c,
+          type: TYPES[Math.floor(Math.random() * TYPES.length)],
+          // Keep decorations away from cell edges for a natural look
+          offsetX: 0.15 + Math.random() * 0.70,
+          offsetY: 0.15 + Math.random() * 0.70,
+          rotation: Math.random() * 360,
+          variant: Math.floor(Math.random() * 3),
+        });
+      }
+    }
+    return decorations;
   }
 
   // ─── Undo / redo support ───────────────────────────────────────────────────
