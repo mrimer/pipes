@@ -347,10 +347,9 @@ export function drawTile(
         ctx.fillText(String(weakIceCost), 0, 9);
       }
     } else if (chamberContent === 'sandstone') {
-      // Show three lines: negative adjusted cost, "x", and the temperature threshold.
-      // deltaDamage = Pressure − Hardness is used as the cost divisor.
-      // When shift is held, show the raw (unadjusted) values.
-      // When hardness > pressure, use darker color and show the hardness value with "H".
+      // When hardness >= pressure, use darker color and show the hardness value with "H".
+      // When connected, show the locked effective cost value.
+      // Otherwise show three lines: negative adjusted cost, "x", and the temperature threshold.
       const isHard = tile.hardness >= currentPressure;
       const sandstoneColor = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
@@ -362,7 +361,14 @@ export function drawTile(
         // Alternative display: show hardness value and "H" to indicate hardness exceeds pressure
         ctx.font = 'bold 14px Arial';
         ctx.fillText(`${tile.hardness}H`, 0, 0);
+      } else if (lockedCost !== null) {
+        // Connected: show the single locked effective cost value
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(String(lockedCost), 0, 0);
       } else {
+        // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
+        // deltaDamage = Pressure − Hardness is used as the cost divisor.
+        // When shift is held, show the raw (unadjusted) values.
         const sandstoneThreshold = shiftHeld
           ? tile.temperature
           : Math.max(0, tile.temperature - currentTemp);
