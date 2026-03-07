@@ -165,14 +165,14 @@ export function renderEditorCanvas(
     }
   }
 
-  // Linked-tile selection highlight (dashed cyan border)
+  // Linked-tile selection highlight (dashed yellow border)
   if (linkedTilePos) {
     const { row, col } = linkedTilePos;
     if (row >= 0 && row < rows && col >= 0 && col < cols) {
       const x = col * CELL;
       const y = row * CELL;
       ctx.save();
-      ctx.strokeStyle = '#00e5ff';
+      ctx.strokeStyle = '#ffe500';
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3);
