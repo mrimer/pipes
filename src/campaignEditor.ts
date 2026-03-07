@@ -27,6 +27,7 @@ import {
   chamberPaletteContent,
 } from './campaignEditorTypes';
 import { renderEditorCanvas, HoverOverlay, DragState } from './campaignEditorRenderer';
+import { renderMinimap } from './minimap';
 
 // ─── The built-in "Official" campaign ────────────────────────────────────────
 
@@ -522,11 +523,10 @@ export class CampaignEditor {
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
     name.textContent = `Level ${levelIdx + 1}: ${level.name}`;
-    const meta = document.createElement('div');
-    meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:3px;';
-    meta.textContent = `${level.rows} × ${level.cols} grid`;
+    const minimap = renderMinimap(level);
+    minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;';
     info.appendChild(name);
-    info.appendChild(meta);
+    info.appendChild(minimap);
     row.appendChild(info);
 
     const btns = document.createElement('div');
