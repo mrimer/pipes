@@ -70,4 +70,19 @@ describe('createGameRulesModal', () => {
 
     expect(modal.style.display).toBe('none');
   });
+
+  it('lists Q and W for rotation and does not list Tab', () => {
+    createGameRulesModal();
+    const cells = Array.from(document.body.querySelectorAll('td')).map(td => td.textContent ?? '');
+    expect(cells).toContain('Q');
+    expect(cells).toContain('W');
+    expect(cells).not.toContain('Tab');
+  });
+
+  it('lists Ctrl+Z and Ctrl+Y for undo and redo', () => {
+    createGameRulesModal();
+    const cells = Array.from(document.body.querySelectorAll('td')).map(td => td.textContent ?? '');
+    expect(cells).toContain('Ctrl+Z');
+    expect(cells).toContain('Ctrl+Y');
+  });
 });
