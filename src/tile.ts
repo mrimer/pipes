@@ -80,7 +80,9 @@ export class Tile {
    * 'tank' adds water capacity, 'dirt' wastes water, 'item' grants inventory items,
    * 'heater' raises the source temperature, 'ice' reduces capacity by cost×deltaTemp,
    * 'pump' increases the game Pressure variable, 'weak_ice' reduces capacity like ice
-   * but divides cost by Pressure (rounded up) before multiplying by tempDelta.
+   * but divides cost by Pressure (rounded up) before multiplying by tempDelta,
+   * 'sandstone' reduces capacity like weak_ice but uses deltaDamage (Pressure−Hardness)
+   * as the divisor; connecting is blocked when deltaDamage ≤ 0.
    */
   chamberContent: ChamberContent | null;
   /**
@@ -103,6 +105,13 @@ export class Tile {
   pressure: number;
 
   /**
+   * Hardness value. For Chamber-sandstone tiles: subtracted from Pressure to compute deltaDamage.
+   * deltaDamage = Pressure − Hardness. Used as the cost divisor instead of Pressure.
+   * Defaults to 0.
+   */
+  hardness: number;
+
+  /**
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
@@ -111,11 +120,12 @@ export class Tile {
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
-   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', or 'weak_ice').
-   * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/WeakIce (threshold).
+   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', or 'sandstone').
+   * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/WeakIce/Sandstone (threshold).
    * @param pressure - Pressure value for Pump tiles (additive bonus to game Pressure). Defaults to 0.
+   * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
@@ -127,6 +137,7 @@ export class Tile {
     this.chamberContent = chamberContent;
     this.temperature = temperature;
     this.pressure = pressure;
+    this.hardness = hardness;
   }
 
   /** Rotate the tile 90° clockwise. */

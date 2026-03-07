@@ -8,7 +8,7 @@ import {
   CONTAINER_COLOR, GRANITE_FILL_COLOR, GRANITE_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
-  PUMP_COLOR, WEAK_ICE_COLOR,
+  PUMP_COLOR, WEAK_ICE_COLOR, SANDSTONE_COLOR,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -60,7 +60,7 @@ const CONTROL_ROWS: ControlRow[] = [
   { input: 'R',                  action: 'Retry the current level from scratch.' },
   { input: 'Ctrl+Z',             action: 'Undo the last move.' },
   { input: 'Ctrl+Y',             action: 'Redo the last undone move.' },
-  { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/weak-ice tile values: raw temperature threshold and unmodified Weak Ice cost.' },
+  { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/weak-ice/sandstone tile values: raw temperature threshold and unmodified cost.' },
   { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
   { input: 'Escape',             action: 'Return to the level-select screen.' },
 ];
@@ -151,6 +151,11 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: colorSwatch(WEAK_ICE_COLOR),
     name: 'Chamber — Weak Ice',
     description: 'Like Ice, but its effective cost is ⌈cost÷Pressure⌉ × max(0, threshold° − current temp°). Higher Pressure lowers the cost.',
+  },
+  {
+    iconHtml: colorSwatch(SANDSTONE_COLOR),
+    name: 'Chamber — Sandstone',
+    description: 'Like Weak Ice, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness.',
   },
 ];
 

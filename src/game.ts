@@ -85,6 +85,11 @@ export class Game {
   /** Timer ID for auto-hiding the error flash message. */
   private _errorFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Set of "row,col" keys for sandstone tiles currently highlighted due to a validation error. */
+  private _sandstoneHighlightKeys: Set<string> = new Set();
+  /** Timer ID for clearing the sandstone highlight. */
+  private _sandstoneHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** Modal overlay for confirming a progress reset. */
   private readonly resetConfirmModalEl: HTMLElement;
 
@@ -457,6 +462,7 @@ export class Game {
       this.shiftHeld,
       currentTemp,
       currentPressure,
+      this._sandstoneHighlightKeys,
     );
   }
 
@@ -530,7 +536,7 @@ export class Game {
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
       } else if (this.board.lastError) {
-        this._showErrorFlash(this.board.lastError);
+        this._handleBoardError();
       }
     } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty &&
                (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
@@ -540,18 +546,21 @@ export class Game {
       if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
       } else if (this.board.lastError) {
-        this._showErrorFlash(this.board.lastError);
+        this._handleBoardError();
       }
     } else if (tile.shape !== PipeShape.Empty) {
       // Rotate existing pipe (no inventory item selected, or same shape as selected)
-      this.board.rotateTile(pos);
-      this.board.applyTurnDelta();
-      this.board.recordMove();
-      this._spawnConnectionAnimations(filledBefore);
-      this._renderInventoryBar();
-      this._updateWaterDisplay();
-      this._updateUndoRedoButtons();
-      this._checkWinLose();
+      if (this.board.rotateTile(pos)) {
+        this.board.applyTurnDelta();
+        this.board.recordMove();
+        this._spawnConnectionAnimations(filledBefore);
+        this._renderInventoryBar();
+        this._updateWaterDisplay();
+        this._updateUndoRedoButtons();
+        this._checkWinLose();
+      } else if (this.board.lastError) {
+        this._handleBoardError();
+      }
     }
   }
 
@@ -585,7 +594,7 @@ export class Game {
       this._updateWaterDisplay();
       this._updateUndoRedoButtons();
     } else if (this.board.lastError) {
-      this._showErrorFlash(this.board.lastError);
+      this._handleBoardError();
     }
   }
 
@@ -670,7 +679,7 @@ export class Game {
       // re-showing it in the tooltip would be misleading.
       const isConnected = this.board.getLockedWaterImpact({ row, col }) !== null;
       if (!isConnected) {
-        let predictedCost: number;
+        let predictedCost: number | null = null;
         if (tile.chamberContent === 'dirt') {
           predictedCost = tile.cost;
         } else if (tile.chamberContent === 'ice') {
@@ -687,10 +696,24 @@ export class Game {
           const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
           tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}⌉=${effectiveCost})`;
           predictedCost = effectiveCost * deltaTemp;
+        } else if (tile.chamberContent === 'sandstone') {
+          const currentTemp = this.board.getCurrentTemperature();
+          const currentPressure = this.board.getCurrentPressure();
+          const deltaDamage = currentPressure - tile.hardness;
+          if (deltaDamage <= 0) {
+            tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}, Hardness: ${tile.hardness})`;
+          } else {
+            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+            const effectiveCost = Math.ceil(tile.cost / deltaDamage);
+            tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${deltaDamage}⌉=${effectiveCost})`;
+            predictedCost = effectiveCost * deltaTemp;
+          }
         } else {
           predictedCost = 0;
         }
-        tooltipText += ` cost: ${predictedCost}`;
+        if (predictedCost !== null) {
+          tooltipText += ` cost: ${predictedCost}`;
+        }
       }
     }
     this.tooltipEl.textContent = tooltipText;
@@ -715,6 +738,31 @@ export class Game {
   }
 
   /**
+   * Highlight the given tile positions with a pulsing red overlay for ~2 seconds.
+   * Used to visually identify sandstone tiles that are blocking a move.
+   */
+  private _startSandstoneHighlight(positions: GridPos[]): void {
+    this._sandstoneHighlightKeys = new Set(positions.map((p) => `${p.row},${p.col}`));
+    if (this._sandstoneHighlightTimer !== null) clearTimeout(this._sandstoneHighlightTimer);
+    this._sandstoneHighlightTimer = setTimeout(() => {
+      this._sandstoneHighlightKeys = new Set();
+      this._sandstoneHighlightTimer = null;
+    }, 2000);
+  }
+
+  /**
+   * Show the board's lastError as a flash message and, if lastErrorTilePositions is set,
+   * temporarily highlight those tiles.  Call this whenever a board operation fails.
+   */
+  private _handleBoardError(): void {
+    if (!this.board?.lastError) return;
+    this._showErrorFlash(this.board.lastError);
+    if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
+      this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+    }
+  }
+
+  /**
    * Spawn floating animation labels for all tiles that became newly connected to
    * the fill path since `filledBefore` was captured.  Called after every player
    * action that may change the fill state (place, replace, rotate, undo, redo).
@@ -727,6 +775,7 @@ export class Game {
    * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
    * - Chamber-pump tiles: "+pressureP" (green)
    * - Chamber-weak_ice tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
+   * - Chamber-sandstone tiles: "-(⌈cost/deltaDamage⌉ × deltaTemp)" or "-0" (always red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
     if (!this.board) return;
@@ -778,6 +827,12 @@ export class Game {
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
+          text = val < 0 ? `${val}` : '-0';
+          color = ANIM_NEGATIVE_COLOR;
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
         }
@@ -851,6 +906,12 @@ export class Game {
         } else if (tile.chamberContent === 'weak_ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
+          text = val > 0 ? `+${val}` : `+0`;
+          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        } else if (tile.chamberContent === 'sandstone') {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const val = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
           text = val > 0 ? `+${val}` : `+0`;
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
         }
@@ -935,19 +996,22 @@ export class Game {
             if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
               this._afterTilePlaced(this.selectedShape, filledBefore);
             } else if (board.lastError) {
-              this._showErrorFlash(board.lastError);
+              this._handleBoardError();
             }
           }
         } else {
           const filledBefore = board.getFilledPositions();
-          board.rotateTile(focusPos);
-          board.applyTurnDelta();
-          board.recordMove();
-          this._spawnConnectionAnimations(filledBefore);
-          this._renderInventoryBar();
-          this._updateWaterDisplay();
-          this._updateUndoRedoButtons();
-          this._checkWinLose();
+          if (board.rotateTile(focusPos)) {
+            board.applyTurnDelta();
+            board.recordMove();
+            this._spawnConnectionAnimations(filledBefore);
+            this._renderInventoryBar();
+            this._updateWaterDisplay();
+            this._updateUndoRedoButtons();
+            this._checkWinLose();
+          } else if (board.lastError) {
+            this._handleBoardError();
+          }
         }
         break;
       case 'q':

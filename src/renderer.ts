@@ -25,6 +25,7 @@ import {
   ICE_COLOR, ICE_WATER_COLOR,
   PUMP_COLOR, PUMP_WATER_COLOR,
   WEAK_ICE_COLOR, WEAK_ICE_WATER_COLOR,
+  SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -113,6 +114,8 @@ export function drawTile(
       color = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
     } else if (chamberContent === 'weak_ice') {
       color = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
+    } else if (chamberContent === 'sandstone') {
+      color = isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR;
     } else {
       color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
     }
@@ -326,6 +329,26 @@ export function drawTile(
       ctx.fillText('x', 0, 0);
       ctx.font = 'bold 14px Arial';
       ctx.fillText(String(weakIceCost), 0, 9);
+    } else if (chamberContent === 'sandstone') {
+      // Show three lines: negative adjusted cost, "x", and the temperature threshold.
+      // deltaDamage = Pressure − Hardness is used as the cost divisor.
+      // When shift is held, show the raw (unadjusted) values.
+      const sandstoneThreshold = shiftHeld
+        ? tile.temperature
+        : Math.max(0, tile.temperature - currentTemp);
+      const deltaDamage = currentPressure - tile.hardness;
+      const sandstoneCost = shiftHeld
+        ? cost
+        : Math.max(1, deltaDamage >= 1 ? Math.ceil(cost / deltaDamage) : cost);
+      ctx.fillStyle = isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(`-${sandstoneThreshold}°`, 0, -9);
+      ctx.font = 'bold 9px Arial';
+      ctx.fillText('x', 0, 0);
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(String(sandstoneCost), 0, 9);
     }
     // Connection stubs
     ctx.strokeStyle = color;
@@ -411,6 +434,7 @@ export function getTileDisplayName(tile: Tile): string {
         case 'ice':    return 'Ice';
         case 'pump':   return `Pump +${tile.pressure}P`;
         case 'weak_ice': return 'Weak Ice';
+        case 'sandstone': return 'Sandstone';
         default:       return 'Chamber';
       }
     default: return '';
@@ -450,6 +474,7 @@ export function renderBoard(
   shiftHeld = false,
   currentTemp = 0,
   currentPressure = 1,
+  highlightedPositions: Set<string> = new Set(),
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -522,6 +547,16 @@ export function renderBoard(
       // Focus highlight
       if (isFocused) {
         ctx.strokeStyle = FOCUS_COLOR;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      }
+
+      // Sandstone error highlight (pulsing red overlay)
+      if (highlightedPositions.has(`${r},${c}`)) {
+        const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
+        ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
+        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        ctx.strokeStyle = '#ff2020';
         ctx.lineWidth = 3;
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }

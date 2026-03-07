@@ -804,6 +804,7 @@ export class CampaignEditor {
     { palette: 'chamber:ice',      label: '❄ Ice' },
     { palette: 'chamber:pump',     label: '⬆ Pump' },
     { palette: 'chamber:weak_ice', label: '🧊 Weak Ice' },
+    { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -992,16 +993,16 @@ export class CampaignEditor {
       sel.style.cssText =
         'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice']) {
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', 'sandstone']) {
         const o = document.createElement('option');
         o.value = opt;
-        o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt.charAt(0).toUpperCase() + opt.slice(1);
+        o.textContent = opt === 'weak_ice' ? 'Weak Ice' : opt === 'sandstone' ? 'Sandstone' : opt.charAt(0).toUpperCase() + opt.slice(1);
         if (this._editorParams.chamberContent === opt) o.selected = true;
         sel.appendChild(o);
       }
       sel.addEventListener('change', () => {
         this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
-        if (sel.value === 'ice' || sel.value === 'weak_ice') {
+        if (sel.value === 'ice' || sel.value === 'weak_ice' || sel.value === 'sandstone') {
           if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
         }
         this._applyParamsToLinkedTile();
@@ -1034,13 +1035,19 @@ export class CampaignEditor {
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
-      if (cc === 'ice' || cc === 'weak_ice') {
+      if (cc === 'ice' || cc === 'weak_ice' || cc === 'sandstone') {
         panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
+      }
+      if (cc === 'sandstone') {
+        panel.appendChild(this._labeledInput('Hardness', String(this._editorParams.hardness), (v) => {
+          this._editorParams.hardness = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
@@ -1456,6 +1463,7 @@ export class CampaignEditor {
     if (def.cost !== undefined) this._editorParams.cost = def.cost;
     if (def.temperature !== undefined) this._editorParams.temperature = def.temperature;
     if (def.pressure !== undefined) this._editorParams.pressure = def.pressure;
+    if (def.hardness !== undefined) this._editorParams.hardness = def.hardness;
     if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
     if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
     if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
@@ -1557,6 +1565,7 @@ export class CampaignEditor {
       if (cc === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'pump') def.pressure = p.pressure;
       if (cc === 'weak_ice') { def.cost = p.cost; def.temperature = p.temperature; }
+      if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; }
       if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
     }
 
@@ -1692,11 +1701,38 @@ export class CampaignEditor {
       const level = this._buildCurrentLevelDef();
       const board = new Board(level.rows, level.cols, level);
       board.initHistory();
+
+      // Check for sandstone tiles in the initial fill path with invalid deltaDamage.
+      const initialFilled = board.getFilledPositions();
+      const initialPressure = board.getCurrentPressure(initialFilled);
+      for (const key of initialFilled) {
+        const [r, c] = key.split(',').map(Number);
+        const tile = board.grid[r]?.[c];
+        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
+          const deltaDamage = initialPressure - tile.hardness;
+          if (deltaDamage <= 0) {
+            msgs.push(
+              `❌ Sandstone at (${r},${c}) is immediately connected but its hardness (${tile.hardness}) ` +
+              `≥ initial pressure (${initialPressure}) — the level starts in a failure state.`,
+            );
+            ok = false;
+          }
+        }
+      }
+
+      // Check if the initial state already has zero or negative water (immediate game over).
+      if (ok && board.getCurrentWater() <= 0) {
+        msgs.push('❌ Level starts with zero or negative water – adjust the source capacity or tile costs.');
+        ok = false;
+      }
+
       // If source is directly connected to sink (pre-solved), warn
-      if (board.isSolved()) {
-        msgs.push('⚠️ Level is already solved without placing any tiles.');
-      } else {
-        msgs.push('✅ Level structure looks valid.');
+      if (ok) {
+        if (board.isSolved()) {
+          msgs.push('⚠️ Level is already solved without placing any tiles.');
+        } else {
+          msgs.push('✅ Level structure looks valid.');
+        }
       }
     } catch {
       msgs.push('❌ Level structure error – check tile configurations.');
