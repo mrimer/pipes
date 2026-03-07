@@ -11,7 +11,7 @@
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation } from './types';
 import { CHAPTERS } from './levels';
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct } from './persistence';
+import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from './persistence';
 import { TILE_SIZE } from './renderer';
 import { Board, PIPE_SHAPES } from './board';
 import {
@@ -243,6 +243,8 @@ export class CampaignEditor {
 
   private _buildCampaignRow(campaign: CampaignDef): HTMLElement {
     const isOfficial = campaign.id === 'official';
+    const activeCampaignId = loadActiveCampaignId();
+    const isActive = isOfficial ? activeCampaignId === null : activeCampaignId === campaign.id;
     const row = document.createElement('div');
     row.style.cssText =
       'background:#16213e;border:2px solid #4a90d9;border-radius:8px;' +
@@ -273,20 +275,24 @@ export class CampaignEditor {
     const btns = document.createElement('div');
     btns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
 
-    if (!isOfficial) {
-      btns.appendChild(this._btn('▶ Play', '#16213e', '#7ed321', () => {
-        this.hide();
-        this._onPlayCampaign(campaign);
-      }));
-      btns.appendChild(this._btn('✏️ Edit', '#16213e', '#f0c040', () => {
-        this._activeCampaignId = campaign.id;
-        this._showCampaignDetail();
-      }));
+    // Play or Active button (shared for both official and user campaigns)
+    if (isActive) {
+      const activeBtn = this._btn('Active', '#16213e', '#888', () => {}, 'cursor:default;');
+      activeBtn.disabled = true;
+      btns.appendChild(activeBtn);
     } else {
       btns.appendChild(this._btn('▶ Play', '#16213e', '#7ed321', () => {
         this.hide();
         this._onPlayCampaign(campaign);
       }));
+    }
+
+    if (!isOfficial) {
+      btns.appendChild(this._btn('✏️ Edit', '#16213e', '#f0c040', () => {
+        this._activeCampaignId = campaign.id;
+        this._showCampaignDetail();
+      }));
+    } else {
       btns.appendChild(this._btn('👁 View', '#16213e', '#aaa', () => {
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
