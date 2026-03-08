@@ -429,7 +429,12 @@ export class CampaignEditor {
     name.textContent = `Chapter ${chapterIdx + 1}: ${chapter.name}`;
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:3px;';
-    meta.textContent = `${chapter.levels.length} level(s)`;
+    const totalStars = chapter.levels.reduce((s, l) => s + (l.starCount ?? 0), 0);
+    const challengeCount = chapter.levels.filter(l => l.challenge).length;
+    const metaParts = [`${chapter.levels.length} level(s)`];
+    if (totalStars > 0) metaParts.push(`⭐\u202f×\u202f${totalStars}`);
+    if (challengeCount > 0) metaParts.push(`💀\u202f×\u202f${challengeCount}`);
+    meta.textContent = metaParts.join('  ');
     info.appendChild(name);
     info.appendChild(meta);
     row.appendChild(info);
