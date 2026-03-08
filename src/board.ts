@@ -1208,6 +1208,7 @@ export class Board {
     this.lastErrorTilePositions = null;
     const tile = this.getTile(pos);
     if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    // Normalise to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return true;
     for (let i = 0; i < normalizedSteps; i++) {
