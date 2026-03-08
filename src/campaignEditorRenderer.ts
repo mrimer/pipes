@@ -5,9 +5,10 @@
  */
 
 import { PipeShape, TileDef, Direction, Rotation } from './types';
-import { TILE_SIZE } from './renderer';
+import { TILE_SIZE, drawSpinArrow } from './renderer';
 import { Tile } from './tile';
 import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
+import { SPIN_PIPE_SHAPES } from './board';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
 
@@ -293,23 +294,24 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     else if (cc === 'item') ctx.fillText(`${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
     drawConnectionLines(ctx, x, y, tile);
   } else {
-    // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants)
+    // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants)
     const isGold = [PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross].includes(shape);
-    ctx.fillStyle = isGold ? '#b8860b' : '#1a2a4e';
+    const isSpin = SPIN_PIPE_SHAPES.has(shape);
+    ctx.fillStyle = isSpin ? '#192640' : (isGold ? '#b8860b' : '#1a2a4e');
     ctx.fillRect(x, y, CELL, CELL);
     // Draw pipe lines
-    ctx.strokeStyle = isGold ? '#ffd700' : '#4a90d9';
+    ctx.strokeStyle = isSpin ? '#7090c0' : (isGold ? '#ffd700' : '#4a90d9');
     ctx.lineWidth = 8;
     ctx.lineCap = 'round';
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((tile.rotation * Math.PI) / 180);
     const h = CELL / 2;
-    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight) {
+    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow) {
+    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee) {
+    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
     } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross) {
@@ -317,6 +319,14 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
     }
     ctx.restore();
+
+    // CW rotation arrow overlay for spinnable pipes
+    if (isSpin) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      drawSpinArrow(ctx);
+      ctx.restore();
+    }
   }
 
   ctx.restore();

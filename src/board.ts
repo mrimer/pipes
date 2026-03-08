@@ -19,6 +19,9 @@ export const PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.GoldElbow,
   PipeShape.GoldTee,
   PipeShape.GoldCross,
+  PipeShape.SpinStraight,
+  PipeShape.SpinElbow,
+  PipeShape.SpinTee,
 ]);
 
 /** Gold pipe shapes – may only be placed on gold spaces. */
@@ -27,6 +30,13 @@ export const GOLD_PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.GoldElbow,
   PipeShape.GoldTee,
   PipeShape.GoldCross,
+]);
+
+/** Spinnable pipe shapes – pre-placed by the editor; player can rotate but not remove them. */
+export const SPIN_PIPE_SHAPES = new Set<PipeShape>([
+  PipeShape.SpinStraight,
+  PipeShape.SpinElbow,
+  PipeShape.SpinTee,
 ]);
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
@@ -180,7 +190,10 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
-          this.grid[r][c] = new Tile(def.shape, rot, true, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0);
+          // Spinnable pipes are not fixed so the player can rotate them, but they
+          // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
+          const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
+          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -382,7 +395,8 @@ export class Board {
       tile.shape === PipeShape.Source        ||
       tile.shape === PipeShape.Sink          ||
       tile.shape === PipeShape.Chamber       ||
-      tile.shape === PipeShape.Granite
+      tile.shape === PipeShape.Granite       ||
+      SPIN_PIPE_SHAPES.has(tile.shape)
     ) return false;
 
     // ── Container-grant constraint check ─────────────────────────────────────
@@ -520,7 +534,8 @@ export class Board {
       tile.shape === PipeShape.Source  ||
       tile.shape === PipeShape.Sink    ||
       tile.shape === PipeShape.Chamber ||
-      tile.shape === PipeShape.Granite
+      tile.shape === PipeShape.Granite ||
+      SPIN_PIPE_SHAPES.has(tile.shape)
     ) return false;
 
     // Gold-space / gold-pipe constraint for the incoming shape
