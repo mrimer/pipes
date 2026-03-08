@@ -239,6 +239,27 @@
     .modal-btn.secondary { background: #2a2a4a; color: #aaa; border: 1px solid #555; }
 
     .modal-actions { display: flex; gap: 12px; justify-content: center; }
+
+    @keyframes modal-sparkle-gold {
+      0%   { box-shadow: 0 0  0px  0px rgba(255,215,0,0),   0 0  0px  0px rgba(255,215,0,0);   border-color: #ffd700; }
+      15%  { box-shadow: 0 0 22px  9px rgba(255,215,0,0.85),0 0 44px 18px rgba(255,215,0,0.4); border-color: #ffe866; }
+      30%  { box-shadow: 0 0  8px  3px rgba(255,215,0,0.3), 0 0 16px  6px rgba(255,215,0,0.1); border-color: #c9a200; }
+      55%  { box-shadow: 0 0 28px 12px rgba(255,215,0,0.9), 0 0 56px 22px rgba(255,215,0,0.5); border-color: #ffe866; }
+      75%  { box-shadow: 0 0  9px  3px rgba(255,215,0,0.3), 0 0 18px  6px rgba(255,215,0,0.1); border-color: #c9a200; }
+      88%  { box-shadow: 0 0 18px  7px rgba(255,215,0,0.65),0 0 36px 14px rgba(255,215,0,0.3); border-color: #ffd700; }
+      100% { box-shadow: 0 0  0px  0px rgba(255,215,0,0),   0 0  0px  0px rgba(255,215,0,0);   border-color: #ffd700; }
+    }
+    @keyframes modal-sparkle-red {
+      0%   { box-shadow: 0 0  0px  0px rgba(255,60,60,0),   0 0  0px  0px rgba(255,60,60,0);   border-color: #ff3c3c; }
+      15%  { box-shadow: 0 0 22px  9px rgba(255,60,60,0.85),0 0 44px 18px rgba(255,60,60,0.4); border-color: #ff6666; }
+      30%  { box-shadow: 0 0  8px  3px rgba(255,60,60,0.3), 0 0 16px  6px rgba(255,60,60,0.1); border-color: #cc2020; }
+      55%  { box-shadow: 0 0 28px 12px rgba(255,60,60,0.9), 0 0 56px 22px rgba(255,60,60,0.5); border-color: #ff6666; }
+      75%  { box-shadow: 0 0  9px  3px rgba(255,60,60,0.3), 0 0 18px  6px rgba(255,60,60,0.1); border-color: #cc2020; }
+      88%  { box-shadow: 0 0 18px  7px rgba(255,60,60,0.65),0 0 36px 14px rgba(255,60,60,0.3); border-color: #ff3c3c; }
+      100% { box-shadow: 0 0  0px  0px rgba(255,60,60,0),   0 0  0px  0px rgba(255,60,60,0);   border-color: #ff3c3c; }
+    }
+    .modal-box.sparkle-gold { animation: modal-sparkle-gold 1.5s ease-in-out infinite; border-color: #ffd700; }
+    .modal-box.sparkle-red  { animation: modal-sparkle-red  1.5s ease-in-out infinite; border-color: #ff3c3c; }
   </style>
 </head>
 <body>

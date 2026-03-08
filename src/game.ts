@@ -16,6 +16,7 @@ import {
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './tileAnimation';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from './campaignEditor';
+import { spawnConfetti, clearConfetti } from './confetti';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -349,6 +350,9 @@ export class Game {
     // screen when returning from a completed or failed level.
     this.winModalEl.style.display = 'none';
     this.gameoverModalEl.style.display = 'none';
+    this._clearModalSparkle(this.winModalEl);
+    this._clearModalSparkle(this.gameoverModalEl);
+    clearConfetti();
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
@@ -391,6 +395,9 @@ export class Game {
     this.playScreenEl.style.display  = 'flex';
     this.winModalEl.style.display      = 'none';
     this.gameoverModalEl.style.display = 'none';
+    this._clearModalSparkle(this.winModalEl);
+    this._clearModalSparkle(this.gameoverModalEl);
+    clearConfetti();
 
     this._updateLevelHeader(levelId);
     this._renderInventoryBar();
@@ -648,6 +655,21 @@ export class Game {
     }
   }
 
+  /** Add a sparkle CSS animation to the .modal-box inside the given modal overlay. */
+  private _triggerModalSparkle(modalEl: HTMLElement, colorClass: 'sparkle-gold' | 'sparkle-red'): void {
+    const box = modalEl.querySelector<HTMLElement>('.modal-box');
+    if (!box) return;
+    box.classList.remove('sparkle-gold', 'sparkle-red');
+    void box.offsetWidth; // force reflow so removing+re-adding restarts the animation
+    box.classList.add(colorClass);
+  }
+
+  /** Remove sparkle CSS animation classes from the .modal-box inside the given modal overlay. */
+  private _clearModalSparkle(modalEl: HTMLElement): void {
+    const box = modalEl.querySelector<HTMLElement>('.modal-box');
+    if (box) box.classList.remove('sparkle-gold', 'sparkle-red');
+  }
+
   private _checkWinLose(): void {
     if (!this.board || this.gameState !== GameState.Playing) return;
 
@@ -657,6 +679,7 @@ export class Game {
       this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
       this.gameoverModalEl.style.display = 'flex';
       this._positionModalBelowCanvas(this.gameoverModalEl);
+      this._triggerModalSparkle(this.gameoverModalEl, 'sparkle-red');
       return;
     }
 
@@ -676,6 +699,8 @@ export class Game {
       }
       this.winModalEl.style.display = 'flex';
       this._positionModalBelowCanvas(this.winModalEl);
+      this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
+      spawnConfetti();
       return;
     }
   }
@@ -1460,6 +1485,8 @@ export class Game {
     this.board.undoMove();
     this.gameState = GameState.Playing;
     this.winModalEl.style.display = 'none';
+    this._clearModalSparkle(this.winModalEl);
+    clearConfetti();
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
     this._renderInventoryBar();
@@ -1478,6 +1505,7 @@ export class Game {
     this.board.undoMove();
     this.gameState = GameState.Playing;
     this.gameoverModalEl.style.display = 'none';
+    this._clearModalSparkle(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
     this._renderInventoryBar();
@@ -1572,6 +1600,9 @@ export class Game {
     this.playScreenEl.style.display  = 'flex';
     this.winModalEl.style.display      = 'none';
     this.gameoverModalEl.style.display = 'none';
+    this._clearModalSparkle(this.winModalEl);
+    this._clearModalSparkle(this.gameoverModalEl);
+    clearConfetti();
 
     // Show level name in the header (no chapter context for ad-hoc levels)
     this.currentChapterId = 0;
