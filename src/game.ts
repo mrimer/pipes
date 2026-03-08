@@ -404,7 +404,7 @@ export class Game {
     if (initialError) {
       this._showErrorFlash(initialError);
       if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
-        this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+        this._startErrorHighlight(this.board.lastErrorTilePositions);
       }
     }
   }
@@ -1096,9 +1096,9 @@ export class Game {
 
   /**
    * Highlight the given tile positions with a pulsing red overlay for ~2 seconds.
-   * Used to visually identify sandstone tiles that are blocking a move.
+   * Used to visually identify tiles that are blocking a move.
    */
-  private _startSandstoneHighlight(positions: GridPos[]): void {
+  private _startErrorHighlight(positions: GridPos[]): void {
     this._sandstoneHighlightKeys = new Set(positions.map((p) => `${p.row},${p.col}`));
     if (this._sandstoneHighlightTimer !== null) clearTimeout(this._sandstoneHighlightTimer);
     this._sandstoneHighlightTimer = setTimeout(() => {
@@ -1115,7 +1115,7 @@ export class Game {
     if (!this.board?.lastError) return;
     this._showErrorFlash(this.board.lastError);
     if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
-      this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+      this._startErrorHighlight(this.board.lastErrorTilePositions);
     }
   }
 
@@ -1563,7 +1563,7 @@ export class Game {
     if (initialError) {
       this._showErrorFlash(initialError);
       if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
-        this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+        this._startErrorHighlight(this.board.lastErrorTilePositions);
       }
     }
   }
