@@ -22,6 +22,8 @@ import {
   GRANITE_FILL_COLOR,
   GOLD_SPACE_BASE_COLOR,
   GOLD_PIPE_COLOR,
+  CONTAINER_COLOR,
+  SPIN_PIPE_COLOR,
   BG_COLOR,
 } from './colors';
 
@@ -43,6 +45,10 @@ function tileColor(tile: TileDef | null): string {
     case PipeShape.Tee:
     case PipeShape.Cross:
       return PIPE_COLOR;
+    case PipeShape.SpinStraight:
+    case PipeShape.SpinElbow:
+    case PipeShape.SpinTee:
+      return SPIN_PIPE_COLOR;
     case PipeShape.Source:
       return SOURCE_COLOR;
     case PipeShape.Sink:
@@ -51,7 +57,7 @@ function tileColor(tile: TileDef | null): string {
       switch (tile.chamberContent) {
         case 'tank':     return TANK_COLOR;
         case 'dirt':     return DIRT_COLOR;
-        case 'item':     return PIPE_COLOR;
+        case 'item':     return CONTAINER_COLOR;
         case 'heater':   return HEATER_COLOR;
         case 'ice':      return ICE_COLOR;
         case 'pump':     return PUMP_COLOR;
