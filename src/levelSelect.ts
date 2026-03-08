@@ -124,9 +124,21 @@ export function renderLevelList(
       ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
     const chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
 
-    const completedInChapter = chapter.levels.filter((l) => completedLevels.has(l.id)).length;
+    const { completedInChapter, nonChallengeInChapter, nonChallengeCompleted } =
+      chapter.levels.reduce(
+        (acc, l) => {
+          const done = completedLevels.has(l.id);
+          if (done) acc.completedInChapter++;
+          if (!l.challenge) {
+            acc.nonChallengeInChapter++;
+            if (done) acc.nonChallengeCompleted++;
+          }
+          return acc;
+        },
+        { completedInChapter: 0, nonChallengeInChapter: 0, nonChallengeCompleted: 0 },
+      );
     const totalInChapter = chapter.levels.length;
-    const allLevelsCompleted = totalInChapter > 0 && completedInChapter === totalInChapter;
+    const allLevelsCompleted = nonChallengeInChapter > 0 && nonChallengeCompleted >= nonChallengeInChapter;
 
     // Compute star totals for this chapter
     const { total: chapterStarTotal, collected: chapterStarCollected } =
@@ -156,8 +168,8 @@ export function renderLevelList(
     // When chapter is fully complete and has stars, append a ⭐ X/Y tally
     const chapterStarText = (allLevelsCompleted && chapterStarTotal > 0)
       ? `  ⭐ ${chapterStarCollected}/${chapterStarTotal}` : '';
-    const progressText = totalInChapter > 0
-      ? ` (${completedInChapter}/${totalInChapter}${doneIcon})${chapterStarText}`
+    const progressText = nonChallengeInChapter > 0
+      ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterStarText}`
       : '';
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
