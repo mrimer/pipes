@@ -96,6 +96,13 @@ export class CampaignEditor {
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   /** True while a paint-drag is active (repeatable palette, dragging over empty cells). */
   private _paintDragActive = false;
+  /** True while a right-button erase-drag is active. */
+  private _rightEraseDragActive = false;
+  /**
+   * True when the right-drag gesture already handled removal, so the subsequent
+   * contextmenu event (if it fires) should be suppressed.
+   */
+  private _suppressNextContextMenu = false;
   /** Grid position of the tile currently linked for live param editing, or null if no link active. */
   private _linkedTilePos: { row: number; col: number } | null = null;
   /** True once the first param change in the current linked session has been committed. */
@@ -768,7 +775,14 @@ export class CampaignEditor {
     if (!readOnly) {
       canvas.addEventListener('mousedown',   (e) => this._onEditorMouseDown(e));
       canvas.addEventListener('mousemove',   (e) => this._onEditorCanvasMouseMove(e));
-      canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); this._onEditorCanvasRightClick(e); });
+      canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (this._suppressNextContextMenu) {
+          this._suppressNextContextMenu = false;
+          return;
+        }
+        this._onEditorCanvasRightClick(e);
+      });
       canvas.addEventListener('mouseleave',  () => {
         this._editorHover = null;
         // Cancel any active drag when the mouse leaves the canvas.
@@ -777,6 +791,10 @@ export class CampaignEditor {
         }
         if (this._paintDragActive) {
           this._paintDragActive = false;
+          this._recordEditorSnapshot();
+        }
+        if (this._rightEraseDragActive) {
+          this._rightEraseDragActive = false;
           this._recordEditorSnapshot();
         }
         this._renderEditorCanvas();
@@ -1475,6 +1493,19 @@ export class CampaignEditor {
   }
 
   private _onEditorMouseDown(e: MouseEvent): void {
+    if (e.button === 2) {
+      const pos = this._canvasPos(e);
+      if (!pos) return;
+      // Start a right-button erase-drag: erase the first cell immediately.
+      this._rightEraseDragActive = true;
+      this._suppressNextContextMenu = false;
+      if (this._editGrid[pos.row][pos.col] !== null) {
+        this._editGrid[pos.row][pos.col] = null;
+        this._clearLinkAt(pos);
+        this._renderEditorCanvas();
+      }
+      return;
+    }
     if (e.button !== 0) return; // left button only
     const pos = this._canvasPos(e);
     if (!pos) return;
@@ -1511,6 +1542,15 @@ export class CampaignEditor {
   }
 
   private _onEditorMouseUp(e: MouseEvent): void {
+    if (e.button === 2) {
+      if (!this._rightEraseDragActive) return;
+      // End right-erase-drag: record the undo snapshot now (PR #101 pattern).
+      this._rightEraseDragActive = false;
+      this._suppressNextContextMenu = true;
+      this._recordEditorSnapshot();
+      this._renderEditorCanvas();
+      return;
+    }
     if (e.button !== 0) return; // left button only
 
     // End paint-drag session.
@@ -1586,6 +1626,12 @@ export class CampaignEditor {
       // Paint each new empty cell the cursor enters during a paint-drag.
       if (this._editGrid[pos.row][pos.col] === null) {
         this._paintEditorCell(pos);
+      }
+    } else if (this._rightEraseDragActive && pos) {
+      // Erase each non-empty cell the cursor enters during a right-erase-drag.
+      if (this._editGrid[pos.row][pos.col] !== null) {
+        this._editGrid[pos.row][pos.col] = null;
+        this._clearLinkAt(pos);
       }
     } else if (this._dragState && pos) {
       const { startPos, currentPos } = this._dragState;
