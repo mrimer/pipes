@@ -11,7 +11,7 @@
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation } from './types';
 import { CHAPTERS } from './levels';
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from './persistence';
+import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from './persistence';
 import { TILE_SIZE } from './renderer';
 
 /** Maximum CSS display size (px) for the editor canvas on either axis. */
@@ -2057,7 +2057,7 @@ export class CampaignEditor {
       const reader = new FileReader();
       reader.onload = () => {
         try {
-          const data = JSON.parse(reader.result as string) as CampaignDef;
+          const data = migrateCampaign(JSON.parse(reader.result as string) as CampaignDef);
           if (!data.id || !data.name || !Array.isArray(data.chapters)) {
             alert('Invalid campaign file format.');
             return;

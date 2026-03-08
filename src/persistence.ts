@@ -54,12 +54,36 @@ export function markAllLevelsCompleted(completedLevels: Set<number>, allLevelIds
 
 const CAMPAIGNS_STORAGE_KEY = 'pipes_campaigns';
 
+/**
+ * Migrate a campaign loaded from storage or an imported file, applying any
+ * backwards-compatibility fixes needed after renames in the data model.
+ *
+ * Currently handles:
+ *   - chamberContent 'weak_ice' → 'snow'  (renamed in the v2026-03 refactor)
+ */
+export function migrateCampaign(campaign: CampaignDef): CampaignDef {
+  for (const chapter of campaign.chapters) {
+    for (const level of chapter.levels) {
+      for (const row of level.grid) {
+        for (let i = 0; i < row.length; i++) {
+          const tile = row[i];
+          if (tile && (tile.chamberContent as unknown as string) === 'weak_ice') {
+            (tile.chamberContent as unknown as string) = 'snow';
+          }
+        }
+      }
+    }
+  }
+  return campaign;
+}
+
 /** Load user-created and imported campaigns from localStorage. */
 export function loadImportedCampaigns(): CampaignDef[] {
   try {
     const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw) as CampaignDef[];
+      const campaigns = JSON.parse(raw) as CampaignDef[];
+      return campaigns.map(migrateCampaign);
     }
   } catch {
     // ignore parse errors

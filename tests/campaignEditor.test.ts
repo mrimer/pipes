@@ -6,7 +6,7 @@
  * Tests for the CampaignEditor and related persistence helpers.
  */
 
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress, saveActiveCampaignId, clearActiveCampaignId } from '../src/persistence';
+import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress, saveActiveCampaignId, clearActiveCampaignId, migrateCampaign } from '../src/persistence';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from '../src/campaignEditor';
 import { CampaignDef, LevelDef, PipeShape } from '../src/types';
 import { TileParams } from '../src/campaignEditorTypes';
@@ -65,6 +65,95 @@ describe('Campaign persistence', () => {
     expect(p1.has(10)).toBe(true);
     expect(p2.has(10)).toBe(false);
     expect(loadCampaignProgress('cmp_b').has(10)).toBe(false);
+  });
+});
+
+// ─── migrateCampaign – backwards compatibility: weak_ice → snow ───────────────
+
+describe('migrateCampaign', () => {
+  /** Build a minimal campaign with one tile whose chamberContent is set to the given string. */
+  function campaignWithContent(content: string): CampaignDef {
+    return {
+      id: 'cmp_migrate_test',
+      name: 'Migrate Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        levels: [{
+          id: 1,
+          name: 'Level 1',
+          rows: 1,
+          cols: 2,
+          grid: [
+            [
+              { shape: PipeShape.Chamber, chamberContent: content as never },
+              null,
+            ],
+          ],
+          inventory: [],
+        }],
+      }],
+    };
+  }
+
+  it('converts chamberContent weak_ice → snow', () => {
+    const campaign = campaignWithContent('weak_ice');
+    const migrated = migrateCampaign(campaign);
+    expect(migrated.chapters[0].levels[0].grid[0][0]?.chamberContent).toBe('snow');
+  });
+
+  it('leaves other chamberContent values unchanged', () => {
+    for (const content of ['ice', 'tank', 'dirt', 'heater', 'pump', 'sandstone', 'star', 'snow']) {
+      const campaign = campaignWithContent(content);
+      const migrated = migrateCampaign(campaign);
+      expect(migrated.chapters[0].levels[0].grid[0][0]?.chamberContent).toBe(content);
+    }
+  });
+
+  it('handles null grid cells without error', () => {
+    const campaign = campaignWithContent('snow');
+    campaign.chapters[0].levels[0].grid[0][1] = null;
+    expect(() => migrateCampaign(campaign)).not.toThrow();
+  });
+
+  it('returns the same campaign object (mutates in place)', () => {
+    const campaign = campaignWithContent('weak_ice');
+    const result = migrateCampaign(campaign);
+    expect(result).toBe(campaign);
+  });
+});
+
+// ─── loadImportedCampaigns – applies weak_ice → snow migration ───────────────
+
+describe('loadImportedCampaigns – weak_ice migration', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('migrates weak_ice tiles in campaigns loaded from localStorage', () => {
+    // Write old-format data directly to localStorage (bypassing saveImportedCampaigns)
+    const oldCampaign = {
+      id: 'cmp_old',
+      name: 'Old Campaign',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        levels: [{
+          id: 1,
+          name: 'Level 1',
+          rows: 1,
+          cols: 1,
+          grid: [[{ shape: 'CHAMBER', chamberContent: 'weak_ice', cost: 3, temperature: 5 }]],
+          inventory: [],
+        }],
+      }],
+    };
+    localStorage.setItem('pipes_campaigns', JSON.stringify([oldCampaign]));
+
+    const loaded = loadImportedCampaigns();
+    expect(loaded[0].chapters[0].levels[0].grid[0][0]?.chamberContent).toBe('snow');
   });
 });
 
