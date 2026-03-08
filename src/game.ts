@@ -69,6 +69,12 @@ export class Game {
   /** Rotation that will be applied when the pending inventory item is placed. */
   private pendingRotation: Rotation = 0;
 
+  /**
+   * When no inventory item is selected, the number of accumulated 90°-CW rotation steps
+   * being previewed on the hovered tile (0 = no preview active).
+   */
+  private hoverRotationDelta: number = 0;
+
   /** Last-used placement rotation per pipe shape, so the same orientation is reused next time. */
   private readonly lastPlacedRotations = new Map<PipeShape, Rotation>();
 
@@ -319,7 +325,7 @@ export class Game {
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
-    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); });
+    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); this.hoverRotationDelta = 0; });
     // Capture mouseup on window so a release outside the canvas still ends the drag.
     // Game is a singleton for the lifetime of the page, so this listener is never removed
     // (same pattern as the document keydown/keyup listeners below).
@@ -375,6 +381,7 @@ export class Game {
     this.focusPos = { ...this.board.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
+    this.hoverRotationDelta = 0;
 
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
@@ -598,6 +605,7 @@ export class Game {
       currentTemp,
       currentPressure,
       this._sandstoneHighlightKeys,
+      this.hoverRotationDelta,
     );
   }
 
@@ -823,8 +831,15 @@ export class Game {
         this._handleBoardError();
       }
     } else if (tile.shape !== PipeShape.Empty) {
-      // Rotate existing pipe (no inventory item selected, or same shape as selected)
-      if (this.board.rotateTile(pos)) {
+      // Rotate existing pipe (no inventory item selected, or same shape as selected).
+      // If the user has previewed multiple rotations via Q/W/wheel, apply all of them
+      // as a single game turn; otherwise fall back to a standard single 90° rotation.
+      const delta = this.hoverRotationDelta;
+      this.hoverRotationDelta = 0;
+      const rotated = delta > 0
+        ? this.board.rotateTileBy(pos, delta)
+        : this.board.rotateTile(pos);
+      if (rotated) {
         this.board.applyTurnDelta();
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
@@ -857,7 +872,14 @@ export class Game {
 
   private _handleCanvasMouseMove(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
+    const prevCol = this.mouseCanvasPos ? Math.floor(this.mouseCanvasPos.x / TILE_SIZE) : -1;
+    const prevRow = this.mouseCanvasPos ? Math.floor(this.mouseCanvasPos.y / TILE_SIZE) : -1;
     this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const newCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+    const newRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+    if (newRow !== prevRow || newCol !== prevCol) {
+      this.hoverRotationDelta = 0;
+    }
     if (this.ctrlHeld && this.gameState === GameState.Playing) {
       this._showTooltip(e.clientX, e.clientY);
     }
@@ -907,13 +929,27 @@ export class Game {
   private _handleCanvasWheel(e: WheelEvent): void {
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
-    if (this.selectedShape === null) return;
-    e.preventDefault();
-    // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
-    if (e.deltaY > 0) {
-      this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
-    } else {
-      this.pendingRotation = ((this.pendingRotation + 270) % 360) as Rotation;
+    if (this.selectedShape !== null) {
+      e.preventDefault();
+      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
+      if (e.deltaY > 0) {
+        this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
+      } else {
+        this.pendingRotation = ((this.pendingRotation + 270) % 360) as Rotation;
+      }
+    } else if (this.mouseCanvasPos && this.board) {
+      const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+      const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      const hTile = this.board.getTile({ row: hRow, col: hCol });
+      if (hTile && !hTile.isFixed && hTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hTile.shape)) {
+        e.preventDefault();
+        // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
+        if (e.deltaY > 0) {
+          this.hoverRotationDelta = ((this.hoverRotationDelta + 1) % 4);
+        } else {
+          this.hoverRotationDelta = (((this.hoverRotationDelta - 1) + 4) % 4);
+        }
+      }
     }
   }
 
@@ -1324,6 +1360,13 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           this.pendingRotation = (((this.pendingRotation - 90) + 360) % 360) as Rotation;
+        } else if (this.mouseCanvasPos && this.board) {
+          const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+          const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+          const hTile = this.board.getTile({ row: hRow, col: hCol });
+          if (hTile && !hTile.isFixed && hTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hTile.shape)) {
+            this.hoverRotationDelta = (((this.hoverRotationDelta - 1) + 4) % 4);
+          }
         }
         break;
       case 'w':
@@ -1332,6 +1375,13 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
+        } else if (this.mouseCanvasPos && this.board) {
+          const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+          const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+          const hTile = this.board.getTile({ row: hRow, col: hCol });
+          if (hTile && !hTile.isFixed && hTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hTile.shape)) {
+            this.hoverRotationDelta = ((this.hoverRotationDelta + 1) % 4);
+          }
         }
         break;
       case 'Escape':
@@ -1478,6 +1528,7 @@ export class Game {
     this.focusPos = { ...this.board.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
+    this.hoverRotationDelta = 0;
 
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;

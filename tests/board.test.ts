@@ -81,6 +81,56 @@ describe('Board.rotateTile', () => {
   });
 });
 
+describe('Board.rotateTileBy', () => {
+  it('rotates a tile by 1 step (90°)', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(90);
+  });
+
+  it('rotates a tile by 2 steps (180°) in one operation', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 2)).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(180);
+  });
+
+  it('rotates a tile by 3 steps (270°) in one operation', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 3)).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(270);
+  });
+
+  it('0 steps is a no-op and returns true', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 0)).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+
+  it('4 steps is a full rotation and returns true unchanged', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 90);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 4)).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(90);
+  });
+
+  it('returns false for a fixed tile', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0, true /* isFixed */);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(false);
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+
+  it('returns false for an empty tile', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Empty, 0);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(false);
+  });
+});
+
 // ─── New: level loading ──────────────────────────────────────────────────────
 
 describe('Board (level mode)', () => {

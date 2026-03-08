@@ -697,6 +697,7 @@ export function renderBoard(
   currentTemp = 0,
   currentPressure = 1,
   highlightedPositions: Set<string> = new Set(),
+  hoverRotationDelta = 0,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -812,6 +813,30 @@ export function renderBoard(
       const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
       if (canPlace || canReplace) {
         const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
+        const px = hoverCol * TILE_SIZE;
+        const py = hoverRow * TILE_SIZE;
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        drawTile(ctx, px, py, previewTile, false, currentWater);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Draw semi-transparent preview when a rotation is being previewed on an existing tile
+  // (no inventory item selected, user pressed Q/W or scrolled the wheel).
+  if (selectedShape === null && hoverRotationDelta > 0 && mouseCanvasPos) {
+    const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
+    const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
+    if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
+      const hoverTile = board.grid[hoverRow][hoverCol];
+      if (!hoverTile.isFixed && hoverTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hoverTile.shape)) {
+        const previewRotation = ((hoverTile.rotation + hoverRotationDelta * 90) % 360) as 0 | 90 | 180 | 270;
+        const previewTile = new Tile(
+          hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,
+          hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
+          hoverTile.temperature, hoverTile.pressure, hoverTile.hardness,
+        );
         const px = hoverCol * TILE_SIZE;
         const py = hoverRow * TILE_SIZE;
         ctx.save();

@@ -1198,6 +1198,36 @@ export class Board {
   }
 
   /**
+   * Rotates the tile at `pos` clockwise by `steps × 90°` as a single game operation.
+   * The sandstone constraint is validated only against the final rotation, so the
+   * entire multi-step rotation either succeeds or is fully reverted.
+   * Returns false if the tile is fixed/empty or if the final state violates constraints.
+   */
+  rotateTileBy(pos: GridPos, steps: number): boolean {
+    this.lastError = null;
+    this.lastErrorTilePositions = null;
+    const tile = this.getTile(pos);
+    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    const normalizedSteps = ((steps % 4) + 4) % 4;
+    if (normalizedSteps === 0) return true;
+    for (let i = 0; i < normalizedSteps; i++) {
+      tile.rotate();
+    }
+    // Validate the final state.
+    const filled = this.getFilledPositions();
+    const sandstoneError = this._checkSandstoneConstraints(filled);
+    if (sandstoneError) {
+      // Revert by rotating the remaining steps to complete a full 360°.
+      for (let i = 0; i < 4 - normalizedSteps; i++) {
+        tile.rotate();
+      }
+      this.lastError = sandstoneError;
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Check whether two adjacent tiles are mutually connected along the shared edge.
    * @param fromPos - The position of the first tile.
    * @param dir - The direction from the first tile toward the second.
