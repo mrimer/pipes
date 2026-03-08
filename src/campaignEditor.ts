@@ -739,7 +739,7 @@ export class CampaignEditor {
     const toolbar = this._buildToolbar(
       readOnly ? `👁 View Level: ${this._editLevelName}` : `✏️ Level Editor`,
       () => {
-        if (!readOnly && this._editorUnsavedChanges) {
+        if (!readOnly && this._editorUnsavedChanges && this._editorHistoryIdx > 0) {
           this._showUnsavedModal(
             () => {
               this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
@@ -1523,6 +1523,7 @@ export class CampaignEditor {
       } else {
         this._editInventory.push({ shape: shp, count: 1 });
       }
+      this._recordEditorSnapshot();
       const newPanel = this._buildInventoryEditor();
       panel.replaceWith(newPanel);
     }));
@@ -1549,6 +1550,7 @@ export class CampaignEditor {
     countInp.style.cssText = 'width:44px;padding:2px 4px;background:#16213e;color:#eee;border:1px solid #4a90d9;border-radius:3px;font-size:0.8rem;';
     countInp.addEventListener('change', () => {
       this._editInventory[idx].count = Math.max(0, parseInt(countInp.value) || 0);
+      this._recordEditorSnapshot();
     });
     row.appendChild(countInp);
 
@@ -1560,6 +1562,7 @@ export class CampaignEditor {
       'border:1px solid #e74c3c;border-radius:3px;cursor:pointer;';
     delBtn.addEventListener('click', () => {
       this._editInventory.splice(idx, 1);
+      this._recordEditorSnapshot();
       const panel = document.getElementById('editor-inventory-panel');
       if (panel) panel.replaceWith(this._buildInventoryEditor());
     });
@@ -2117,7 +2120,6 @@ export class CampaignEditor {
    * snapshot so it can be undone.
    */
   private _slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void {
-    this._recordEditorSnapshot();
     const newGrid: (TileDef | null)[][] = Array.from(
       { length: this._editRows },
       () => Array(this._editCols).fill(null) as null[],
@@ -2142,6 +2144,7 @@ export class CampaignEditor {
     // Clear link since positions have shifted.
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
+    this._recordEditorSnapshot();
     this._renderEditorCanvas();
   }
 
