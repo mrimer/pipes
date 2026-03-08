@@ -164,3 +164,45 @@ describe('Tile', () => {
     expect(chamber.connections.size).toBe(4);
   });
 });
+
+describe('Tile.clone', () => {
+  it('produces a distinct object with the same field values', () => {
+    const customConns = new Set([Direction.North, Direction.East]);
+    const orig = new Tile(PipeShape.Chamber, 90, true, 5, 3, PipeShape.Straight, 2, customConns, 'tank', 10, 20, 15);
+    const copy = orig.clone();
+    expect(copy).not.toBe(orig);
+    expect(copy.shape).toBe(orig.shape);
+    expect(copy.rotation).toBe(orig.rotation);
+    expect(copy.isFixed).toBe(orig.isFixed);
+    expect(copy.capacity).toBe(orig.capacity);
+    expect(copy.cost).toBe(orig.cost);
+    expect(copy.itemShape).toBe(orig.itemShape);
+    expect(copy.itemCount).toBe(orig.itemCount);
+    expect(copy.chamberContent).toBe(orig.chamberContent);
+    expect(copy.temperature).toBe(orig.temperature);
+    expect(copy.pressure).toBe(orig.pressure);
+    expect(copy.hardness).toBe(orig.hardness);
+  });
+
+  it('deep-copies customConnections so mutations do not affect the original', () => {
+    const customConns = new Set([Direction.North]);
+    const orig = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, customConns, 'tank');
+    const copy = orig.clone();
+    copy.customConnections!.add(Direction.South);
+    expect(orig.customConnections!.has(Direction.South)).toBe(false);
+  });
+
+  it('preserves null customConnections', () => {
+    const orig = new Tile(PipeShape.Straight, 0);
+    const copy = orig.clone();
+    expect(copy.customConnections).toBeNull();
+  });
+
+  it('cloned tile can be rotated independently without affecting the original', () => {
+    const orig = new Tile(PipeShape.Elbow, 0);
+    const copy = orig.clone();
+    copy.rotate();
+    expect(orig.rotation).toBe(0);
+    expect(copy.rotation).toBe(90);
+  });
+});
