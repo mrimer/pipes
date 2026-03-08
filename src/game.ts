@@ -194,6 +194,12 @@ export class Game {
   /** Modal overlay shown when the player is about to enter a challenge level. */
   private readonly _challengeModalEl: HTMLElement;
 
+  /** Paragraph inside the challenge modal describing skip behaviour (hidden for direct selection). */
+  private readonly _challengeMsgEl: HTMLElement;
+
+  /** "Skip Level" button inside the challenge modal (hidden for direct selection). */
+  private readonly _challengeSkipBtnEl: HTMLButtonElement;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -367,6 +373,7 @@ export class Game {
     const challengeMsg = document.createElement('p');
     challengeMsg.style.cssText = 'font-size:0.95rem;color:#aaa;';
     challengeMsg.textContent = 'This is an optional challenge level. You may skip it without affecting your progress.';
+    this._challengeMsgEl = challengeMsg;
     const challengeActions = document.createElement('div');
     challengeActions.className = 'modal-actions';
     const challengePlayBtn = document.createElement('button');
@@ -379,6 +386,7 @@ export class Game {
     challengeSkipBtn.className = 'modal-btn secondary';
     challengeSkipBtn.type = 'button';
     challengeSkipBtn.addEventListener('click', () => this.skipChallengeLevel());
+    this._challengeSkipBtnEl = challengeSkipBtn;
     challengeActions.appendChild(challengePlayBtn);
     challengeActions.appendChild(challengeSkipBtn);
     challengeBox.appendChild(challengeTitle);
@@ -763,8 +771,13 @@ export class Game {
     this._triggerModalSparkle(this._newChapterModalEl, 'sparkle-blue');
   }
 
-  /** Show the challenge-level warning modal. */
-  private _showChallengeLevelModal(): void {
+  /** Show the challenge-level warning modal.
+   * @param canSkip When true, show the skip button and skip description (sequential flow).
+   *                When false, hide them (player directly selected this level).
+   */
+  private _showChallengeLevelModal(canSkip: boolean): void {
+    this._challengeMsgEl.style.display    = canSkip ? '' : 'none';
+    this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
     this._challengeModalEl.style.display = 'flex';
     this._triggerModalSparkle(this._challengeModalEl, 'sparkle-red');
   }
@@ -1588,7 +1601,7 @@ export class Game {
       const chapterIdx = chapters.indexOf(nextChapter);
       this._showNewChapterModal(chapterIdx, nextChapter);
     } else if (nextLevelDef.challenge) {
-      this._showChallengeLevelModal();
+      this._showChallengeLevelModal(/* canSkip */ true);
     } else {
       this._pendingLevelId = null;
       this.startLevel(nextLevelDef.id);
@@ -1606,7 +1619,7 @@ export class Game {
     const level = allLevels.find((l) => l.id === levelId);
     if (level?.challenge) {
       this._pendingLevelId = levelId;
-      this._showChallengeLevelModal();
+      this._showChallengeLevelModal(/* canSkip */ false);
     } else {
       this.startLevel(levelId);
     }
@@ -1626,7 +1639,7 @@ export class Game {
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === this._pendingLevelId);
     if (level?.challenge) {
-      this._showChallengeLevelModal();
+      this._showChallengeLevelModal(/* canSkip */ true);
     } else {
       const id = this._pendingLevelId;
       this._pendingLevelId = null;
