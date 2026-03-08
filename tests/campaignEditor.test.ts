@@ -200,7 +200,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
   function editorState(editor: CampaignEditor) {
     return editor as unknown as {
       _editLevelNote: string;
-      _editLevelHint: string;
+      _editLevelHints: string[];
       _editLevelChallenge: boolean;
       _editLevelName: string;
       _editRows: number;
@@ -215,14 +215,14 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     };
   }
 
-  it('_editLevelNote and _editLevelHint are empty by default', () => {
+  it('_editLevelNote and _editLevelHints are empty by default', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     expect(state._editLevelNote).toBe('');
-    expect(state._editLevelHint).toBe('');
+    expect(state._editLevelHints).toEqual(['']);
   });
 
-  it('_openLevelEditor populates _editLevelNote and _editLevelHint from a level', () => {
+  it('_openLevelEditor populates _editLevelNote and _editLevelHints from a level', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     const level: LevelDef = {
@@ -233,14 +233,30 @@ describe('CampaignEditor – note and hint in level definitions', () => {
       grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
       inventory: [],
       note: 'This is a note.',
-      hint: 'This is a hint.',
+      hints: ['This is a hint.'],
     };
     state._openLevelEditor(level, true);
     expect(state._editLevelNote).toBe('This is a note.');
-    expect(state._editLevelHint).toBe('This is a hint.');
+    expect(state._editLevelHints).toEqual(['This is a hint.']);
   });
 
-  it('_openLevelEditor sets empty strings when level has no note or hint', () => {
+  it('_openLevelEditor falls back to legacy hint field for backward compat', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    const level: LevelDef = {
+      id: 99001,
+      name: 'Test Level',
+      rows: 3,
+      cols: 3,
+      grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
+      inventory: [],
+      hint: 'Legacy hint.',
+    };
+    state._openLevelEditor(level, true);
+    expect(state._editLevelHints).toEqual(['Legacy hint.']);
+  });
+
+  it('_openLevelEditor sets empty array when level has no note or hint', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     const level: LevelDef = {
@@ -253,10 +269,10 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     };
     state._openLevelEditor(level, true);
     expect(state._editLevelNote).toBe('');
-    expect(state._editLevelHint).toBe('');
+    expect(state._editLevelHints).toEqual(['']);
   });
 
-  it('_buildCurrentLevelDef omits note/hint when they are empty', () => {
+  it('_buildCurrentLevelDef omits note/hints when they are empty', () => {
     const userCampaign: CampaignDef = {
       id: 'cmp_test_nh',
       name: 'Test',
@@ -281,7 +297,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     state._activeLevelIdx = 0;
     state._editLevelName = 'Test Level';
     state._editLevelNote = '';
-    state._editLevelHint = '';
+    state._editLevelHints = [''];
     state._editRows = 3;
     state._editCols = 3;
     state._editGrid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
@@ -289,10 +305,10 @@ describe('CampaignEditor – note and hint in level definitions', () => {
 
     const def = state._buildCurrentLevelDef();
     expect(def.note).toBeUndefined();
-    expect(def.hint).toBeUndefined();
+    expect(def.hints).toBeUndefined();
   });
 
-  it('_buildCurrentLevelDef includes note and hint when they are non-empty', () => {
+  it('_buildCurrentLevelDef includes note and hints when they are non-empty', () => {
     const userCampaign: CampaignDef = {
       id: 'cmp_test_nh2',
       name: 'Test',
@@ -317,7 +333,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     state._activeLevelIdx = 0;
     state._editLevelName = 'Test Level';
     state._editLevelNote = 'Route the water carefully.';
-    state._editLevelHint = 'Start from the left.';
+    state._editLevelHints = ['Start from the left.', 'Try an elbow piece.'];
     state._editRows = 3;
     state._editCols = 3;
     state._editGrid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
@@ -325,10 +341,10 @@ describe('CampaignEditor – note and hint in level definitions', () => {
 
     const def = state._buildCurrentLevelDef();
     expect(def.note).toBe('Route the water carefully.');
-    expect(def.hint).toBe('Start from the left.');
+    expect(def.hints).toEqual(['Start from the left.', 'Try an elbow piece.']);
   });
 
-  it('campaign export JSON includes note and hint fields when populated', () => {
+  it('campaign export JSON includes note and hints fields when populated', () => {
     const campaign: CampaignDef = {
       id: 'cmp_export_test',
       name: 'Export Test',
@@ -344,7 +360,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
           grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
           inventory: [],
           note: 'Watch the water level.',
-          hint: 'Use an elbow at the corner.',
+          hints: ['Use an elbow at the corner.', 'Place it at row 2.'],
         }],
       }],
     };
@@ -352,7 +368,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     const json = JSON.stringify(campaign, null, 2);
     const parsed = JSON.parse(json) as CampaignDef;
     expect(parsed.chapters[0].levels[0].note).toBe('Watch the water level.');
-    expect(parsed.chapters[0].levels[0].hint).toBe('Use an elbow at the corner.');
+    expect(parsed.chapters[0].levels[0].hints).toEqual(['Use an elbow at the corner.', 'Place it at row 2.']);
   });
 });
 
@@ -370,7 +386,7 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
       _editLevelChallenge: boolean;
       _editLevelName: string;
       _editLevelNote: string;
-      _editLevelHint: string;
+      _editLevelHints: string[];
       _editRows: number;
       _editCols: number;
       _editGrid: (import('../src/types').TileDef | null)[][];
@@ -444,7 +460,7 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
     state._activeLevelIdx = 0;
     state._editLevelName = 'Level';
     state._editLevelNote = '';
-    state._editLevelHint = '';
+    state._editLevelHints = [''];
     state._editLevelChallenge = false;
     state._editRows = 2;
     state._editCols = 2;
@@ -480,7 +496,7 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
     state._activeLevelIdx = 0;
     state._editLevelName = 'Level';
     state._editLevelNote = '';
-    state._editLevelHint = '';
+    state._editLevelHints = [''];
     state._editLevelChallenge = true;
     state._editRows = 2;
     state._editCols = 2;

@@ -127,14 +127,8 @@ export class Game {
   /** Box shown beneath the grid with level notes (when the level has a note). */
   private readonly noteBoxEl: HTMLElement;
 
-  /** Collapsible box shown beneath the grid with the level hint (when the level has a hint). */
+  /** Collapsible box shown beneath the grid with the level hints (when the level has hints). */
   private readonly hintBoxEl: HTMLElement;
-
-  /** Inner text element of the hint box, toggled by the Show/Hide Hint button. */
-  private readonly hintTextEl: HTMLElement;
-
-  /** Toggle button for showing/hiding the hint text. */
-  private readonly hintToggleBtnEl: HTMLButtonElement;
 
   /**
    * The non-official campaign currently activated for play, or null when playing
@@ -228,22 +222,6 @@ export class Game {
     this.hintBoxEl.style.cssText =
       'display:none;border:1px solid #f0c040;border-radius:6px;' +
       'max-width:600px;width:100%;box-sizing:border-box;overflow:hidden;';
-    this.hintToggleBtnEl = document.createElement('button');
-    this.hintToggleBtnEl.type = 'button';
-    this.hintToggleBtnEl.textContent = '💡 Show Hint';
-    this.hintToggleBtnEl.style.cssText =
-      'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
-      'border:none;cursor:pointer;text-align:left;font-family:inherit;';
-    this.hintTextEl = document.createElement('div');
-    this.hintTextEl.style.cssText =
-      'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
-    this.hintToggleBtnEl.addEventListener('click', () => {
-      const isHidden = this.hintTextEl.style.display === 'none';
-      this.hintTextEl.style.display = isHidden ? 'block' : 'none';
-      this.hintToggleBtnEl.textContent = isHidden ? '💡 Hide Hint' : '💡 Show Hint';
-    });
-    this.hintBoxEl.appendChild(this.hintToggleBtnEl);
-    this.hintBoxEl.appendChild(this.hintTextEl);
     playScreenEl.appendChild(this.hintBoxEl);
 
     // Create the error-flash element for brief action-blocked messages
@@ -419,15 +397,55 @@ export class Game {
       this.noteBoxEl.style.display = 'none';
     }
 
-    // Hint box – always starts collapsed when a new level loads
-    if (level.hint) {
-      this.hintTextEl.textContent = level.hint;
-      this.hintTextEl.style.display = 'none';
-      this.hintToggleBtnEl.textContent = '💡 Show Hint';
-      this.hintBoxEl.style.display = 'block';
-    } else {
+    // Hint box – always starts collapsed when a new level loads.
+    // Supports multiple hints nested sequentially: Hint 2 is revealed inside Hint 1, etc.
+    const hints = level.hints?.length
+      ? level.hints
+      : (level.hint ? [level.hint] : []);
+
+    this.hintBoxEl.innerHTML = '';
+    if (hints.length === 0) {
       this.hintBoxEl.style.display = 'none';
+      return;
     }
+
+    this.hintBoxEl.style.display = 'block';
+
+    // Build nested hint elements. Each hint has a toggle button and a content div.
+    // Hints after the first are nested inside the previous hint's content div.
+    const btnStyle =
+      'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
+      'border:none;cursor:pointer;text-align:left;font-family:inherit;';
+    const textStyle =
+      'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
+
+    let containerEl: HTMLElement = this.hintBoxEl;
+
+    hints.forEach((hint, idx) => {
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.textContent = idx === 0 ? '💡 Show Hint' : '💡 Show Next Hint';
+      toggleBtn.style.cssText = btnStyle;
+
+      const textEl = document.createElement('div');
+      textEl.style.cssText = textStyle;
+      textEl.textContent = hint;
+
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = textEl.style.display === 'none';
+        textEl.style.display = isHidden ? 'block' : 'none';
+        if (idx === 0) {
+          toggleBtn.textContent = isHidden ? '💡 Hide Hint' : '💡 Show Hint';
+        } else {
+          toggleBtn.textContent = isHidden ? '💡 Hide Next Hint' : '💡 Show Next Hint';
+        }
+      });
+
+      containerEl.appendChild(toggleBtn);
+      containerEl.appendChild(textEl);
+      // Next hint is nested inside this hint's text element
+      containerEl = textEl;
+    });
   }
 
   // ─── Level-select rendering ───────────────────────────────────────────────
@@ -772,11 +790,11 @@ export class Game {
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
-      // for ice/weak_ice/sandstone show the locked-in effective cost value.
+      // for ice/snow/sandstone show the locked-in effective cost value.
       const lockedImpact = this.board.getLockedWaterImpact({ row, col });
       const isConnected = lockedImpact !== null;
       if (isConnected &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')) {
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')) {
         // Show the locked effective cost that was frozen when the tile was connected
         tooltipText += ` cost: ${Math.abs(lockedImpact)}`;
       } else if (!isConnected) {
@@ -790,7 +808,7 @@ export class Game {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           tooltipText += ` (${deltaTemp}° x ${tile.cost})`;
           predictedCost = tile.cost * deltaTemp;
-        } else if (tile.chamberContent === 'weak_ice') {
+        } else if (tile.chamberContent === 'snow') {
           const currentTemp = this.board.getCurrentTemperature();
           const currentPressure = this.board.getCurrentPressure();
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
@@ -875,7 +893,7 @@ export class Game {
    * - Chamber-heater tiles: "+temperature°" (green)
    * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
    * - Chamber-pump tiles: "+pressureP" (green)
-   * - Chamber-weak_ice tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
+   * - Chamber-snow tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
    * - Chamber-sandstone tiles: "-(⌈cost/deltaDamage⌉ × deltaTemp)" or "-0" (always red)
    */
   private _spawnConnectionAnimations(filledBefore: Set<string>): void {
@@ -926,7 +944,7 @@ export class Game {
         } else if (tile.chamberContent === 'pump') {
           text = `+${tile.pressure}P`;
           color = animColor(tile.pressure);
-        } else if (tile.chamberContent === 'weak_ice') {
+        } else if (tile.chamberContent === 'snow') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
@@ -1005,7 +1023,7 @@ export class Game {
           const val = tile.cost * deltaTemp;
           text = val > 0 ? `+${val}` : `+0`;
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-        } else if (tile.chamberContent === 'weak_ice') {
+        } else if (tile.chamberContent === 'snow') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
           text = val > 0 ? `+${val}` : `+0`;

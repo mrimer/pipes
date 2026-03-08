@@ -647,7 +647,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')
+          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')
         ) {
           return true;
         }
@@ -658,7 +658,7 @@ export class Board {
 
   /**
    * Returns true when the level has any pressure-relevant tiles: a source tile
-   * with non-zero base pressure, a pump chamber, a weak-ice chamber, or a
+   * with non-zero base pressure, a pump chamber, a snow chamber, or a
    * sandstone chamber.  Used to decide whether to display the Pressure stat in the UI.
    */
   hasPressureRelevantTiles(): boolean {
@@ -670,7 +670,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'pump' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')
+          (tile.chamberContent === 'pump' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')
         ) {
           return true;
         }
@@ -818,7 +818,7 @@ export class Board {
         else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           pipeCost += tile.cost * deltaTemp;
-        } else if (tile.chamberContent === 'weak_ice') {
+        } else if (tile.chamberContent === 'snow') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           pipeCost += (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
         } else if (tile.chamberContent === 'sandstone') {
@@ -882,7 +882,7 @@ export class Board {
         const tile = this.grid[r]?.[c];
         if (
           tile?.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone') &&
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone') &&
           impact < 0
         ) {
           // impact is negative (a cost); subtract it back out of frozen.
@@ -896,8 +896,8 @@ export class Board {
     // Advance the turn counter.
     this._turnNumber++;
 
-    // ── Re-evaluate still-connected ice/weak-ice when a beneficial tile left ─
-    // When a heater or pump disconnects, any ice/weak-ice tile whose locked cost
+    // ── Re-evaluate still-connected ice/snow when a beneficial tile left ─
+    // When a heater or pump disconnects, any ice/snow tile whose locked cost
     // was partially or fully neutralised by that tile may now be under-charged.
     // Re-compute using only heaters/pumps that were connected on or before each
     // ice tile's own original connection turn.
@@ -908,7 +908,7 @@ export class Board {
         const [r, c] = key.split(',').map(Number);
         const tile = this.grid[r]?.[c];
         if (!tile || tile.shape !== PipeShape.Chamber) continue;
-        if (tile.chamberContent !== 'ice' && tile.chamberContent !== 'weak_ice' && tile.chamberContent !== 'sandstone') continue;
+        if (tile.chamberContent !== 'ice' && tile.chamberContent !== 'snow' && tile.chamberContent !== 'sandstone') continue;
 
         const iceConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
         const effectiveTemp = this._computeTemperatureForIce(filled, iceConnectedTurn);
@@ -971,7 +971,7 @@ export class Board {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           impact = -(tile.cost * deltaTemp);
           this.frozen += tile.cost * deltaTemp;
-        } else if (tile.chamberContent === 'weak_ice') {
+        } else if (tile.chamberContent === 'snow') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
           impact = -(effectiveCost * deltaTemp);

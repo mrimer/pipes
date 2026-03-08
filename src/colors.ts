@@ -48,10 +48,10 @@ export const ICE_WATER_COLOR         = '#e8f5ff';
 export const PUMP_COLOR              = '#a8e063';
 /** Pump chamber tile color when water is flowing through it. */
 export const PUMP_WATER_COLOR        = '#c6f07a';
-/** Weak Ice chamber tile color (soft pale cyan). */
-export const WEAK_ICE_COLOR          = '#b0d8f8';
-/** Weak Ice chamber tile color when water is flowing through it. */
-export const WEAK_ICE_WATER_COLOR    = '#d0ecff';
+/** Snow chamber tile color (soft pale cyan). */
+export const SNOW_COLOR               = '#b0d8f8';
+/** Snow chamber tile color when water is flowing through it. */
+export const SNOW_WATER_COLOR         = '#d0ecff';
 /** Sandstone chamber tile color (warm sandy tan). */
 export const SANDSTONE_COLOR         = '#c2a26e';
 /** Sandstone chamber tile color when water is flowing through it. */

@@ -8,7 +8,7 @@ import { PipeShape, TileDef, InventoryItem, Rotation } from './types';
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
 /** All chamber content types. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice' | 'sandstone' | 'star';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star';
 
 /** A palette entry that represents a Chamber tile with a specific content type. */
 export type ChamberPalette = `chamber:${ChamberContent}`;
@@ -99,7 +99,7 @@ export function chamberColor(content: string): string {
     case 'heater':   return '#e17055';
     case 'ice':      return '#00cec9';
     case 'pump':     return '#a8e063';
-    case 'weak_ice': return '#b0d8f8';
+    case 'snow':     return '#b0d8f8';
     case 'sandstone': return '#c2a26e';
     case 'star':      return '#f0c040';
     default:         return '#b2bec3';

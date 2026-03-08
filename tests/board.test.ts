@@ -1730,7 +1730,7 @@ describe('Board.frozen tracking', () => {
     expect(board.frozen).toBe(0);
   });
 
-  it('decrements frozen when a connected weak_ice tile is disconnected', () => {
+  it('decrements frozen when a connected snow tile is disconnected', () => {
     // Board: Source(0,0) → Straight(0,1, player) → WeakIce(0,2) → Sink(0,3)
     // source pressure=1, cost=4, thresh=5 → effectiveCost=ceil(4/1)=4, deltaTemp=5 → frozen=20.
     // After reclaiming Straight(0,1), WeakIce disconnects → frozen should drop back to 0.
@@ -1739,7 +1739,7 @@ describe('Board.frozen tracking', () => {
     board.sink   = { row: 0, col: 3 };
     board.grid[0][0] = new Tile(PipeShape.Source,   0, true, 100, 0, null, 1, null, null, 0, 1);
     board.grid[0][1] = new Tile(PipeShape.Straight, 90, false);
-    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 4, null, 1, null, 'weak_ice', 5);
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 4, null, 1, null, 'snow', 5);
     board.grid[0][3] = new Tile(PipeShape.Sink,     0, true);
     board.sourceCapacity = 100;
     board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
@@ -2257,10 +2257,10 @@ describe('Board.applyTurnDelta (re-evaluation on heater/pump disconnect)', () =>
   });
 });
 
-// ─── New: applyTurnDelta – weak_ice re-evaluation when pump disconnects ────────
+// ─── New: applyTurnDelta – snow re-evaluation when pump disconnects ────────
 
 describe('Board.applyTurnDelta (re-evaluation on pump disconnect)', () => {
-  it('weak_ice cost is re-evaluated upward when pump disconnects', () => {
+  it('snow cost is re-evaluated upward when pump disconnects', () => {
     // Pump at (2,0) is fixed but reachable only via a player-placed N-S Straight at (1,0).
     const board = new Board(3, 4);
     board.source = { row: 0, col: 0 };
@@ -2268,7 +2268,7 @@ describe('Board.applyTurnDelta (re-evaluation on pump disconnect)', () => {
     board.sourceCapacity = 100;
     for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
     board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0, 1);
-    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, new Set([Direction.East, Direction.West]), 'weak_ice', 5);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, new Set([Direction.East, Direction.West]), 'snow', 5);
     board.grid[0][3] = new Tile(PipeShape.Sink,   0, true, 0, 0, null, 1, new Set([Direction.West]));
     // Pump at (2,0): fixed, reachable via player-placed pipe at (1,0), pressure bonus +3.
     board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 3);
@@ -2458,7 +2458,7 @@ describe('Chamber tile (pump content)', () => {
     expect(board.hasPressureRelevantTiles()).toBe(true);
   });
 
-  it('hasPressureRelevantTiles returns false when no pump or weak_ice is present', () => {
+  it('hasPressureRelevantTiles returns false when no pump or snow is present', () => {
     const board = new Board(1, 2);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 1 };
@@ -2486,9 +2486,9 @@ describe('Chamber tile (pump content)', () => {
   });
 });
 
-// ─── Chamber tile (weak_ice content) ─────────────────────────────────────────
+// ─── Chamber tile (snow content) ─────────────────────────────────────────
 
-describe('Chamber tile (weak_ice content)', () => {
+describe('Chamber tile (snow content)', () => {
   /**
    * Build a board: Source(cap) → WeakIce(cost, temp) → Sink
    * optionally followed by a Pump(pumpPressure) when pressure > 1.
@@ -2501,7 +2501,7 @@ describe('Chamber tile (weak_ice content)', () => {
     board.sink   = { row: 0, col: cols - 1 };
     board.sourceCapacity = cap;
     board.grid[0][0] = new Tile(PipeShape.Source,  0, true, cap, 0, null, 1, null, null, sourceTemp, 1);
-    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, iceCost, null, 1, null, 'weak_ice', iceTemp);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, iceCost, null, 1, null, 'snow', iceTemp);
     if (hasPump) {
       board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, pumpPressure);
     }
@@ -2509,12 +2509,12 @@ describe('Chamber tile (weak_ice content)', () => {
     return board;
   }
 
-  it('hasTempRelevantTiles returns true for weak_ice', () => {
+  it('hasTempRelevantTiles returns true for snow', () => {
     const board = makeBoard(10, 2, 5);
     expect(board.hasTempRelevantTiles()).toBe(true);
   });
 
-  it('hasPressureRelevantTiles returns true for weak_ice', () => {
+  it('hasPressureRelevantTiles returns true for snow', () => {
     const board = makeBoard(10, 2, 5);
     expect(board.hasPressureRelevantTiles()).toBe(true);
   });
@@ -2543,7 +2543,7 @@ describe('Chamber tile (weak_ice content)', () => {
     expect(board.getCurrentWater()).toBe(20);
   });
 
-  it('applyTurnDelta locks weak_ice cost at connection time', () => {
+  it('applyTurnDelta locks snow cost at connection time', () => {
     // source pressure=1, cost=4, temp=5, sourceTemp=0: delta=5, locked = ceil(4/1)*5 = 4*5 = 20
     const board = makeBoard(30, 4, 5, 0);
     board.initHistory();
@@ -2593,7 +2593,7 @@ describe('Chamber tile (sandstone content)', () => {
     expect(makeBoard(10, 2, 5).hasPressureRelevantTiles()).toBe(true);
   });
 
-  it('costs ceil(cost/deltaDamage)*deltaTemp with hardness=0 (same as weak_ice when pressure=1)', () => {
+  it('costs ceil(cost/deltaDamage)*deltaTemp with hardness=0 (same as snow when pressure=1)', () => {
     // hardness=0, source pressure=1, deltaDamage=1-0=1, cost=2, iceTemp=3, sourceTemp=0: deltaTemp=3, effective=ceil(2/1)*3=6
     expect(makeBoard(20, 2, 3, 0).getCurrentWater()).toBe(14);
   });
