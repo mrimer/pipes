@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES } from './board';
+import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction } from './types';
 import {
@@ -60,6 +60,9 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
   else if (shape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
   else if (shape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
   else if (shape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
+  else if (shape === PipeShape.SpinStraight) drawShape = PipeShape.Straight;
+  else if (shape === PipeShape.SpinElbow) drawShape = PipeShape.Elbow;
+  else if (shape === PipeShape.SpinTee) drawShape = PipeShape.Tee;
   switch (drawShape) {
     case PipeShape.Straight:
       return `<svg ${base}>${line(H, 0, H, S)}</svg>`;
@@ -72,6 +75,65 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
     default:
       return '';
   }
+}
+
+/**
+ * Draw a white CW curved arrow with a black outline, centred at the canvas
+ * origin.  Used to indicate that a spinnable pipe can be rotated clockwise.
+ * The caller is responsible for translating the context to the desired centre.
+ */
+export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
+  const r = 11;
+  // Arc spans ~270° clockwise: start at 150°, end at 60° (going CW = increasing angle).
+  const startAngle = (150 * Math.PI) / 180;
+  const endAngle   = startAngle + (270 * Math.PI) / 180;
+  // Tip of the arrowhead: the point on the circle at endAngle (mod 2π = 60°).
+  const tipAngle = endAngle % (Math.PI * 2);
+  const tipX = r * Math.cos(tipAngle);
+  const tipY = r * Math.sin(tipAngle);
+  // Tangent direction at tipAngle going CW (increasing angle in canvas coords).
+  const tdx = -Math.sin(tipAngle);
+  const tdy =  Math.cos(tipAngle);
+  // Arrowhead dimensions.
+  const headLen = 5;
+  const headHalf = 3;
+  const baseX = tipX - tdx * headLen;
+  const baseY = tipY - tdy * headLen;
+  const p1x = baseX + tdy * headHalf;
+  const p1y = baseY - tdx * headHalf;
+  const p2x = baseX - tdy * headHalf;
+  const p2y = baseY + tdx * headHalf;
+
+  // Draw black outline layer.
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'black';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, startAngle, endAngle, false);
+  ctx.stroke();
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(p1x, p1y);
+  ctx.lineTo(p2x, p2y);
+  ctx.closePath();
+  ctx.fill();
+
+  // Draw white arrow on top.
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, startAngle, endAngle, false);
+  ctx.stroke();
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(p1x, p1y);
+  ctx.lineTo(p2x, p2y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 /** Draw a single tile at canvas position (x, y). */
@@ -129,6 +191,8 @@ export function drawTile(
     color = GRANITE_COLOR;
   } else if (GOLD_PIPE_SHAPES.has(shape)) {
     color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+  } else if (SPIN_PIPE_SHAPES.has(shape)) {
+    color = isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR;
   } else {
     color = isFixed
       ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
@@ -145,18 +209,18 @@ export function drawTile(
     ctx.beginPath();
     ctx.arc(0, 0, 4, 0, Math.PI * 2);
     ctx.fill();
-  } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight) {
+  } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
     ctx.stroke();
-  } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow) {
+  } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, 0);
     ctx.lineTo(half, 0);
     ctx.stroke();
-  } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee) {
+  } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
@@ -435,6 +499,14 @@ export function drawTile(
   }
 
   ctx.restore();
+
+  // CW rotation arrow overlay for spinnable pipes
+  if (SPIN_PIPE_SHAPES.has(shape)) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawSpinArrow(ctx);
+    ctx.restore();
+  }
 }
 
 /** Return a human-readable name for an inventory item shape (used inside item-container tooltips). */
@@ -467,6 +539,9 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.GoldTee:      return 'Tee';
     case PipeShape.Cross:
     case PipeShape.GoldCross:    return 'Cross';
+    case PipeShape.SpinStraight: return 'Spin Straight';
+    case PipeShape.SpinElbow:    return 'Spin Elbow';
+    case PipeShape.SpinTee:      return 'Spin Tee';
     case PipeShape.Source:       return 'Source';
     case PipeShape.Sink:         return 'Sink';
     case PipeShape.Granite:      return 'Granite';
@@ -504,6 +579,7 @@ function isReplaceableByShape(
 ): boolean {
   return (
     !tile.isFixed &&
+    !SPIN_PIPE_SHAPES.has(tile.shape) &&
     (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) &&
     (tile.shape !== selectedShape || tile.rotation !== pendingRotation) &&
     (!isGoldCell || selectedIsGold)

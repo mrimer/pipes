@@ -41,6 +41,12 @@ export enum PipeShape {
   GoldTee = 'GOLD_TEE',
   /** Gold cross junction – behaves like Cross but may only be placed on gold spaces */
   GoldCross = 'GOLD_CROSS',
+  /** Spinnable straight pipe – pre-placed; player can rotate it CW but cannot remove it */
+  SpinStraight = 'SPIN_STRAIGHT',
+  /** Spinnable elbow pipe – pre-placed; player can rotate it CW but cannot remove it */
+  SpinElbow = 'SPIN_ELBOW',
+  /** Spinnable T-junction – pre-placed; player can rotate it CW but cannot remove it */
+  SpinTee = 'SPIN_TEE',
 }
 
 /** The type of content housed inside a Chamber tile. */

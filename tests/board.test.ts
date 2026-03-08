@@ -1,4 +1,4 @@
-import { Board } from '../src/board';
+import { Board, SPIN_PIPE_SHAPES } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from '../src/levels';
@@ -2896,5 +2896,182 @@ describe('Board.getStarsCollected', () => {
     board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
     const filled = board.getFilledPositions();
     expect(board.getStarsCollected(filled)).toBe(1);
+  });
+});
+
+// ─── Spinnable pipe shapes ────────────────────────────────────────────────────
+
+describe('SPIN_PIPE_SHAPES set', () => {
+  it('contains SpinStraight, SpinElbow, SpinTee', () => {
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.SpinStraight)).toBe(true);
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.SpinElbow)).toBe(true);
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.SpinTee)).toBe(true);
+  });
+
+  it('does not contain regular or gold pipe shapes', () => {
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.Straight)).toBe(false);
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.Elbow)).toBe(false);
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.GoldStraight)).toBe(false);
+    expect(SPIN_PIPE_SHAPES.has(PipeShape.Cross)).toBe(false);
+  });
+});
+
+describe('Spinnable pipe connections', () => {
+  it('SpinStraight at 0° connects North and South', () => {
+    const tile = new Tile(PipeShape.SpinStraight, 0);
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(false);
+    expect(tile.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('SpinStraight at 90° connects East and West', () => {
+    const tile = new Tile(PipeShape.SpinStraight, 90);
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.West)).toBe(true);
+    expect(tile.connections.has(Direction.North)).toBe(false);
+    expect(tile.connections.has(Direction.South)).toBe(false);
+  });
+
+  it('SpinElbow at 0° connects North and East', () => {
+    const tile = new Tile(PipeShape.SpinElbow, 0);
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(false);
+    expect(tile.connections.has(Direction.West)).toBe(false);
+  });
+
+  it('SpinTee at 0° connects North, East, and South', () => {
+    const tile = new Tile(PipeShape.SpinTee, 0);
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.West)).toBe(false);
+  });
+});
+
+describe('Spinnable pipes: isFixed and rotation', () => {
+  it('SpinStraight loaded from level definition is NOT fixed', () => {
+    const level = {
+      id: 9001, name: 'Test', rows: 1, cols: 3,
+      grid: [
+        [{ shape: PipeShape.Source, capacity: 5 } as const],
+        [{ shape: PipeShape.SpinStraight, rotation: 0 as const }],
+        [{ shape: PipeShape.Sink }],
+      ],
+      inventory: [],
+    };
+    const board = new Board(1, 3, level);
+    expect(board.grid[0][1].isFixed).toBe(false);
+  });
+
+  it('Source loaded from level definition remains fixed', () => {
+    const level = {
+      id: 9002, name: 'Test', rows: 1, cols: 2,
+      grid: [
+        [{ shape: PipeShape.Source, capacity: 5 } as const],
+        [{ shape: PipeShape.Sink }],
+      ],
+      inventory: [],
+    };
+    const board = new Board(1, 2, level);
+    expect(board.grid[0][0].isFixed).toBe(true);
+  });
+
+  it('SpinStraight can be rotated by rotateTile', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
+    expect(board.rotateTile({ row: 1, col: 1 })).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(90);
+  });
+
+  it('SpinStraight rotation cycles through all four angles', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
+    board.rotateTile({ row: 1, col: 1 });
+    expect(board.grid[1][1].rotation).toBe(90);
+    board.rotateTile({ row: 1, col: 1 });
+    expect(board.grid[1][1].rotation).toBe(180);
+    board.rotateTile({ row: 1, col: 1 });
+    expect(board.grid[1][1].rotation).toBe(270);
+    board.rotateTile({ row: 1, col: 1 });
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+});
+
+describe('Spinnable pipes: cannot be reclaimed or replaced', () => {
+  it('reclaimTile returns false for a SpinStraight tile', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
+    expect(board.reclaimTile({ row: 1, col: 1 })).toBe(false);
+  });
+
+  it('reclaimTile returns false for SpinElbow and SpinTee', () => {
+    const board = new Board(3, 3);
+    board.grid[0][1] = new Tile(PipeShape.SpinElbow, 0, false);
+    board.grid[0][2] = new Tile(PipeShape.SpinTee, 0, false);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 2 })).toBe(false);
+  });
+
+  it('replaceInventoryTile returns false when target is SpinStraight', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    expect(board.replaceInventoryTile({ row: 1, col: 1 }, PipeShape.Straight)).toBe(false);
+  });
+});
+
+describe('Spinnable pipes: water consumption', () => {
+  it('SpinStraight in the fill path costs one water unit', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,      90, true);
+    board.grid[0][1] = new Tile(PipeShape.SpinStraight, 90, false); // E-W
+    board.grid[0][2] = new Tile(PipeShape.Sink,        90, true);
+    board.sourceCapacity = 10;
+    expect(board.getCurrentWater()).toBe(9);
+  });
+
+  it('SpinTee in the fill path costs one water unit', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    // SpinTee at 90° has base [N,E,S] rotated 90° → [E,S,W], which connects E and W.
+    board.grid[0][1] = new Tile(PipeShape.SpinTee, 90, false);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 10;
+    expect(board.getCurrentWater()).toBe(9);
+  });
+});
+
+describe('Spinnable pipe rotation: connection directions', () => {
+  it('SpinTee at 90° connects East, South, and West', () => {
+    // Base connections [N,E,S] rotated 90° CW → [E,S,W]
+    const tile = new Tile(PipeShape.SpinTee, 90);
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.West)).toBe(true);
+    expect(tile.connections.has(Direction.North)).toBe(false);
+  });
+
+  it('SpinTee at 180° connects South, West, and North', () => {
+    // Base connections [N,E,S] rotated 180° CW → [S,W,N]
+    const tile = new Tile(PipeShape.SpinTee, 180);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.West)).toBe(true);
+    expect(tile.connections.has(Direction.North)).toBe(true);
+    expect(tile.connections.has(Direction.East)).toBe(false);
+  });
+
+  it('SpinElbow at 90° connects East and South', () => {
+    // Base connections [N,E] rotated 90° CW → [E,S]
+    const tile = new Tile(PipeShape.SpinElbow, 90);
+    expect(tile.connections.has(Direction.East)).toBe(true);
+    expect(tile.connections.has(Direction.South)).toBe(true);
+    expect(tile.connections.has(Direction.North)).toBe(false);
+    expect(tile.connections.has(Direction.West)).toBe(false);
   });
 });

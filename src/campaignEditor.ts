@@ -41,6 +41,7 @@ const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.GoldSpace, PipeShape.Granite,
+  PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
 ]);
 
 // ─── The built-in "Official" campaign ────────────────────────────────────────
@@ -85,6 +86,7 @@ export class CampaignEditor {
   private _editorHistoryIdx = -1;
   private _goldSectionExpanded = false;
   private _chamberSectionExpanded = false;
+  private _pipesSectionExpanded = false;
   /** Drag state: set when the user is dragging a tile across the grid. */
   private _dragState: {
     startPos: { row: number; col: number };
@@ -960,12 +962,18 @@ export class CampaignEditor {
   private readonly _PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
     { palette: PipeShape.Source,   label: '💧 Source' },
     { palette: PipeShape.Sink,     label: '🏁 Sink' },
-    { palette: PipeShape.Straight, label: '━ Straight' },
-    { palette: PipeShape.Elbow,    label: '┗ Elbow' },
-    { palette: PipeShape.Tee,      label: '┣ Tee' },
-    { palette: PipeShape.Cross,    label: '╋ Cross' },
     { palette: PipeShape.Granite,  label: '▪ Granite' },
     { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
+  ];
+
+  private readonly _PIPES_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+    { palette: PipeShape.Straight,     label: '━ Straight' },
+    { palette: PipeShape.Elbow,        label: '┗ Elbow' },
+    { palette: PipeShape.Tee,          label: '┣ Tee' },
+    { palette: PipeShape.Cross,        label: '╋ Cross' },
+    { palette: PipeShape.SpinStraight, label: '↻ Spin Straight' },
+    { palette: PipeShape.SpinElbow,    label: '↻ Spin Elbow' },
+    { palette: PipeShape.SpinTee,      label: '↻ Spin Tee' },
   ];
 
   private readonly _CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> = [
@@ -1005,6 +1013,8 @@ export class CampaignEditor {
     if (isGoldSelected) this._goldSectionExpanded = true;
     // Auto-expand the chamber section if a chamber item is currently selected
     if (isChamberPalette(this._editorPalette)) this._chamberSectionExpanded = true;
+    // Auto-expand the pipes section if a pipe item is currently selected
+    if (this._PIPES_PALETTE_ITEMS.some(i => i.palette === this._editorPalette)) this._pipesSectionExpanded = true;
 
     const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
@@ -1040,6 +1050,26 @@ export class CampaignEditor {
 
     for (const item of this._PALETTE_ITEMS) {
       panel.appendChild(makeItemBtn(item));
+    }
+
+    // Pipes collapsible section (standard pipes + spinnable pipes)
+    const pipesToggle = document.createElement('button');
+    pipesToggle.type = 'button';
+    pipesToggle.textContent = (this._pipesSectionExpanded ? '▾' : '▸') + ' Pipes';
+    pipesToggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      'border:1px solid #4a90d9;background:#0a1520;color:#4a90d9;font-weight:bold;margin-top:2px;';
+    pipesToggle.addEventListener('click', () => {
+      this._pipesSectionExpanded = !this._pipesSectionExpanded;
+      const newPanel = this._buildPalette();
+      panel.replaceWith(newPanel);
+    });
+    panel.appendChild(pipesToggle);
+
+    if (this._pipesSectionExpanded) {
+      for (const item of this._PIPES_PALETTE_ITEMS) {
+        panel.appendChild(makeItemBtn(item, true));
+      }
     }
 
     // Chamber collapsible section

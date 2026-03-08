@@ -89,6 +89,9 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.GoldElbow]:    '#f39c12',
   [PipeShape.GoldTee]:      '#f39c12',
   [PipeShape.GoldCross]:    '#f39c12',
+  [PipeShape.SpinStraight]: '#5a7fbf',
+  [PipeShape.SpinElbow]:    '#5a7fbf',
+  [PipeShape.SpinTee]:      '#5a7fbf',
 };
 
 export function chamberColor(content: string): string {

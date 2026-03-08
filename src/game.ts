@@ -1,4 +1,4 @@
-import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES } from './board';
+import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { LEVELS, CHAPTERS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation } from './types';
@@ -789,7 +789,20 @@ export class Game {
 
     const filledBefore = this.board.getFilledPositions();
 
-    if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
+    if (SPIN_PIPE_SHAPES.has(tile.shape)) {
+      // Spinnable pipes are always rotated on click (cannot be replaced or removed).
+      if (this.board.rotateTile(pos)) {
+        this.board.applyTurnDelta();
+        this.board.recordMove();
+        this._spawnConnectionAnimations(filledBefore);
+        this._renderInventoryBar();
+        this._updateWaterDisplay();
+        this._updateUndoRedoButtons();
+        this._checkWinLose();
+      } else if (this.board.lastError) {
+        this._handleBoardError();
+      }
+    } else if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
       // Place pipe from inventory onto an empty cell
       if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore);
