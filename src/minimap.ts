@@ -18,7 +18,7 @@ import {
   HEATER_COLOR,
   ICE_COLOR,
   PUMP_COLOR,
-  WEAK_ICE_COLOR,
+  SNOW_COLOR,
   CHAMBER_COLOR,
   GRANITE_FILL_COLOR,
   GOLD_SPACE_BASE_COLOR,
@@ -56,7 +56,7 @@ function tileColor(tile: TileDef | null): string {
         case 'heater':   return HEATER_COLOR;
         case 'ice':      return ICE_COLOR;
         case 'pump':     return PUMP_COLOR;
-        case 'weak_ice': return WEAK_ICE_COLOR;
+        case 'snow':     return SNOW_COLOR;
         default:         return CHAMBER_COLOR;
       }
     case PipeShape.Granite:

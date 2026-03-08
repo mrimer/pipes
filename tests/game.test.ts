@@ -1412,12 +1412,16 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
 describe('Game – note and hint boxes', () => {
   /** Returns the internal DOM elements for note/hint from the game instance. */
   function getBoxEls(game: Game) {
-    return (game as unknown as {
+    const { noteBoxEl, hintBoxEl } = game as unknown as {
       noteBoxEl: HTMLElement;
       hintBoxEl: HTMLElement;
-      hintTextEl: HTMLElement;
-      hintToggleBtnEl: HTMLButtonElement;
-    });
+    };
+    // The hint toggle button and text are built dynamically inside hintBoxEl when
+    // a level with hints is loaded. The first child is the toggle button and the
+    // second child is the hint text div.
+    const hintToggleBtnEl = hintBoxEl.children[0] as HTMLButtonElement | undefined;
+    const hintTextEl = hintBoxEl.children[1] as HTMLElement | undefined;
+    return { noteBoxEl, hintBoxEl, hintTextEl, hintToggleBtnEl };
   }
 
   it('note box is hidden when the level has no note', () => {
@@ -1450,48 +1454,49 @@ describe('Game – note and hint boxes', () => {
   it('hint box is shown (collapsed) when the level has a hint', () => {
     const { game } = makeGame();
     const level = LEVELS.find((l) => l.id === 1)!;
-    const origHint = level.hint;
-    level.hint = 'Try placing a straight pipe first.';
+    const origHints = level.hints;
+    level.hints = ['Try placing a straight pipe first.'];
     game.startLevel(1);
     const { hintBoxEl, hintTextEl, hintToggleBtnEl } = getBoxEls(game);
     expect(hintBoxEl.style.display).toBe('block');
-    expect(hintTextEl.style.display).toBe('none');   // collapsed by default
-    expect(hintToggleBtnEl.textContent).toBe('💡 Show Hint');
-    level.hint = origHint; // restore
+    expect(hintTextEl!.style.display).toBe('none');   // collapsed by default
+    expect(hintToggleBtnEl!.textContent).toBe('💡 Show Hint');
+    level.hints = origHints; // restore
   });
 
   it('clicking the hint toggle reveals the hint text', () => {
     const { game } = makeGame();
     const level = LEVELS.find((l) => l.id === 1)!;
-    const origHint = level.hint;
-    level.hint = 'A secret tip.';
+    const origHints = level.hints;
+    level.hints = ['A secret tip.'];
     game.startLevel(1);
     const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
     // Hint is collapsed; click to expand
-    hintToggleBtnEl.click();
-    expect(hintTextEl.style.display).toBe('block');
-    expect(hintToggleBtnEl.textContent).toBe('💡 Hide Hint');
+    hintToggleBtnEl!.click();
+    expect(hintTextEl!.style.display).toBe('block');
+    expect(hintToggleBtnEl!.textContent).toBe('💡 Hide Hint');
     // Click again to collapse
-    hintToggleBtnEl.click();
-    expect(hintTextEl.style.display).toBe('none');
-    expect(hintToggleBtnEl.textContent).toBe('💡 Show Hint');
-    level.hint = origHint; // restore
+    hintToggleBtnEl!.click();
+    expect(hintTextEl!.style.display).toBe('none');
+    expect(hintToggleBtnEl!.textContent).toBe('💡 Show Hint');
+    level.hints = origHints; // restore
   });
 
   it('hint always starts collapsed when restarting a level', () => {
     const { game } = makeGame();
     const level = LEVELS.find((l) => l.id === 1)!;
-    const origHint = level.hint;
-    level.hint = 'A secret tip.';
+    const origHints = level.hints;
+    level.hints = ['A secret tip.'];
     game.startLevel(1);
     const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
     // Expand the hint
-    hintToggleBtnEl.click();
-    expect(hintTextEl.style.display).toBe('block');
-    // Restart the level
+    hintToggleBtnEl!.click();
+    expect(hintTextEl!.style.display).toBe('block');
+    // Restart the level – elements are rebuilt so re-query
     game.startLevel(1);
-    expect(hintTextEl.style.display).toBe('none');
-    expect(hintToggleBtnEl.textContent).toBe('💡 Show Hint');
-    level.hint = origHint; // restore
+    const { hintTextEl: hintTextEl2, hintToggleBtnEl: hintToggleBtnEl2 } = getBoxEls(game);
+    expect(hintTextEl2!.style.display).toBe('none');
+    expect(hintToggleBtnEl2!.textContent).toBe('💡 Show Hint');
+    level.hints = origHints; // restore
   });
 });

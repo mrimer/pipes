@@ -289,7 +289,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     else if (cc === 'heater') ctx.fillText(`+${tile.temperature}°`, cx, cy + 8);
     else if (cc === 'ice') ctx.fillText(`${tile.cost}/° x ${tile.temperature}°`, cx, cy + 8);
     else if (cc === 'pump') ctx.fillText(`+${tile.pressure}P`, cx, cy + 8);
-    else if (cc === 'weak_ice') ctx.fillText(`${tile.cost}/° x ${tile.temperature}°`, cx, cy + 8);
+    else if (cc === 'snow') ctx.fillText(`${tile.cost}/° x ${tile.temperature}°`, cx, cy + 8);
     else if (cc === 'item') ctx.fillText(`${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
     drawConnectionLines(ctx, x, y, tile);
   } else {

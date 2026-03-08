@@ -24,7 +24,7 @@ import {
   HEATER_COLOR, HEATER_WATER_COLOR,
   ICE_COLOR, ICE_WATER_COLOR,
   PUMP_COLOR, PUMP_WATER_COLOR,
-  WEAK_ICE_COLOR, WEAK_ICE_WATER_COLOR,
+  SNOW_COLOR, SNOW_WATER_COLOR,
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
   STAR_COLOR, STAR_WATER_COLOR,
@@ -115,8 +115,8 @@ export function drawTile(
       color = isWater ? ICE_WATER_COLOR : ICE_COLOR;
     } else if (chamberContent === 'pump') {
       color = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
-    } else if (chamberContent === 'weak_ice') {
-      color = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
+    } else if (chamberContent === 'snow') {
+      color = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
     } else if (chamberContent === 'sandstone') {
       const isHard = tile.hardness >= currentPressure;
       color = isHard
@@ -322,8 +322,8 @@ export function drawTile(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`+${tile.pressure}P`, 0, 0);
-    } else if (chamberContent === 'weak_ice') {
-      ctx.fillStyle = isWater ? WEAK_ICE_WATER_COLOR : WEAK_ICE_COLOR;
+    } else if (chamberContent === 'snow') {
+      ctx.fillStyle = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       if (lockedCost !== null) {
@@ -334,18 +334,18 @@ export function drawTile(
         // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
         // By default, show values adjusted by current Pressure and Temperature.
         // When shift is held, show the raw (unadjusted) values.
-        const weakIceThreshold = shiftHeld
+        const snowThreshold = shiftHeld
           ? tile.temperature
           : Math.max(0, tile.temperature - currentTemp);
-        const weakIceCost = shiftHeld
+        const snowCost = shiftHeld
           ? cost
           : Math.max(1, currentPressure >= 1 ? Math.ceil(cost / currentPressure) : cost);
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(`-${weakIceThreshold}°`, 0, -9);
+        ctx.fillText(`-${snowThreshold}°`, 0, -9);
         ctx.font = 'bold 9px Arial';
         ctx.fillText('x', 0, 0);
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(weakIceCost), 0, 9);
+        ctx.fillText(String(snowCost), 0, 9);
       }
     } else if (chamberContent === 'sandstone') {
       // When hardness >= pressure, use darker color and show the hardness value with "H".
@@ -481,7 +481,7 @@ export function getTileDisplayName(tile: Tile): string {
         case 'heater': return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
         case 'ice':    return 'Ice';
         case 'pump':   return `Pump +${tile.pressure}P`;
-        case 'weak_ice': return 'Weak Ice';
+        case 'snow':    return 'Snow';
         case 'sandstone': return 'Sandstone';
         default:       return 'Chamber';
       }
@@ -710,11 +710,11 @@ export function renderBoard(
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
 
-      // For connected ice/weak_ice/sandstone tiles, pass the locked effective cost so
+      // For connected ice/snow/sandstone tiles, pass the locked effective cost so
       // the tile can display the single locked-in value instead of the live formula.
       let lockedCost: number | null = null;
       if (isWater && tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'weak_ice' || tile.chamberContent === 'sandstone')) {
+          (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')) {
         const impact = board.getLockedWaterImpact({ row: r, col: c });
         if (impact !== null) {
           lockedCost = Math.abs(impact);

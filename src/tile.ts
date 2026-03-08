@@ -79,9 +79,9 @@ export class Tile {
    * Content type for Chamber tiles – determines the chamber's behavior.
    * 'tank' adds water capacity, 'dirt' wastes water, 'item' grants inventory items,
    * 'heater' raises the source temperature, 'ice' reduces capacity by cost×deltaTemp,
-   * 'pump' increases the game Pressure variable, 'weak_ice' reduces capacity like ice
+   * 'pump' increases the game Pressure variable, 'snow' reduces capacity like ice
    * but divides cost by Pressure (rounded up) before multiplying by tempDelta,
-   * 'sandstone' reduces capacity like weak_ice but uses deltaDamage (Pressure−Hardness)
+   * 'sandstone' reduces capacity like snow but uses deltaDamage (Pressure−Hardness)
    * as the divisor; connecting is blocked when deltaDamage ≤ 0.
    */
   chamberContent: ChamberContent | null;
@@ -93,7 +93,7 @@ export class Tile {
   /**
    * Temperature value. For Source tiles: base temperature of the water supply.
    * For Chamber-heater tiles: temperature bonus added to the source when connected.
-   * For Chamber-ice and Chamber-weak_ice tiles: the threshold temperature (water costs when connected).
+   * For Chamber-ice and Chamber-snow tiles: the threshold temperature (water costs when connected).
    * Defaults to 0.
    */
   temperature: number;
@@ -120,8 +120,8 @@ export class Tile {
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
-   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', or 'sandstone').
-   * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/WeakIce/Sandstone (threshold).
+   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', or 'sandstone').
+   * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/Snow/Sandstone (threshold).
    * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
    */

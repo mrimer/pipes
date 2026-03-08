@@ -8,7 +8,7 @@ import {
   CONTAINER_COLOR, GRANITE_FILL_COLOR, GRANITE_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
-  PUMP_COLOR, WEAK_ICE_COLOR, SANDSTONE_COLOR,
+  PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
   STAR_COLOR,
 } from './colors';
 
@@ -146,17 +146,17 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: colorSwatch(PUMP_COLOR),
     name: 'Chamber — Pump',
-    description: 'Increases the game Pressure variable by the shown amount (+P) when connected. Higher Pressure reduces the cost of Weak Ice blocks.',
+    description: 'Increases the game Pressure variable by the shown amount (+P) when connected. Higher Pressure reduces the cost of Snow blocks.',
   },
   {
-    iconHtml: colorSwatch(WEAK_ICE_COLOR),
-    name: 'Chamber — Weak Ice',
+    iconHtml: colorSwatch(SNOW_COLOR),
+    name: 'Chamber — Snow',
     description: 'Like Ice, but its effective cost is ⌈cost÷Pressure⌉ × max(0, threshold° − current temp°). Higher Pressure lowers the cost.',
   },
   {
     iconHtml: colorSwatch(SANDSTONE_COLOR),
     name: 'Chamber — Sandstone',
-    description: 'Like Weak Ice, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness.',
+    description: 'Like Snow, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness.',
   },
   {
     iconHtml: colorSwatch(STAR_COLOR),

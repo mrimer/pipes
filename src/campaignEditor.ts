@@ -59,7 +59,7 @@ export class CampaignEditor {
   // ── Level editor state ────────────────────────────────────────────────────
   private _editLevelName = 'New Level';
   private _editLevelNote = '';
-  private _editLevelHint = '';
+  private _editLevelHints: string[] = [''];
   private _editLevelChallenge = false;
   private _editRows = 6;
   private _editCols = 6;
@@ -627,7 +627,9 @@ export class CampaignEditor {
   private _openLevelEditor(level: LevelDef, readOnly: boolean): void {
     this._editLevelName = level.name;
     this._editLevelNote = level.note ?? '';
-    this._editLevelHint = level.hint ?? '';
+    this._editLevelHints = level.hints?.length
+      ? [...level.hints]
+      : (level.hint ? [level.hint] : ['']);
     this._editLevelChallenge = level.challenge ?? false;
     this._editRows = level.rows;
     this._editCols = level.cols;
@@ -794,17 +796,59 @@ export class CampaignEditor {
       midCol.appendChild(noteWrap);
 
       const hintWrap = document.createElement('div');
-      hintWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      hintWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
       const hintLbl = document.createElement('label');
-      hintLbl.textContent = 'Hint (collapsible box while playing):';
+      hintLbl.textContent = 'Hints (collapsible, revealed in sequence while playing):';
       hintLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
-      const hintInp = document.createElement('textarea');
-      hintInp.value = this._editLevelHint;
-      hintInp.placeholder = 'Optional – hidden until the player clicks "Show Hint".';
-      hintInp.style.cssText = textareaStyle + 'border-color:#f0c040;';
-      hintInp.addEventListener('input', () => { this._editLevelHint = hintInp.value; });
       hintWrap.appendChild(hintLbl);
-      hintWrap.appendChild(hintInp);
+
+      const hintListEl = document.createElement('div');
+      hintListEl.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+
+      const rebuildHintList = (): void => {
+        hintListEl.innerHTML = '';
+        this._editLevelHints.forEach((hint, idx) => {
+          const rowEl = document.createElement('div');
+          rowEl.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
+          const inp = document.createElement('textarea');
+          inp.value = hint;
+          inp.placeholder = idx === 0
+            ? 'Hint 1 – hidden until the player clicks "Show Hint".'
+            : `Hint ${idx + 1} – revealed after expanding the previous hint.`;
+          inp.style.cssText = textareaStyle + 'border-color:#f0c040;flex:1;';
+          inp.addEventListener('input', () => { this._editLevelHints[idx] = inp.value; });
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.textContent = '✕';
+          removeBtn.title = 'Remove this hint';
+          removeBtn.style.cssText =
+            'padding:4px 7px;font-size:0.8rem;background:#2c1a00;color:#f0c040;' +
+            'border:1px solid #f0c040;border-radius:4px;cursor:pointer;flex-shrink:0;';
+          removeBtn.addEventListener('click', () => {
+            this._editLevelHints.splice(idx, 1);
+            if (this._editLevelHints.length === 0) this._editLevelHints = [''];
+            rebuildHintList();
+          });
+          rowEl.appendChild(inp);
+          rowEl.appendChild(removeBtn);
+          hintListEl.appendChild(rowEl);
+        });
+      };
+
+      rebuildHintList();
+      hintWrap.appendChild(hintListEl);
+
+      const addHintBtn = document.createElement('button');
+      addHintBtn.type = 'button';
+      addHintBtn.textContent = '+ Add Hint';
+      addHintBtn.style.cssText =
+        'align-self:flex-start;padding:4px 10px;font-size:0.8rem;background:#1a1400;color:#f0c040;' +
+        'border:1px solid #f0c040;border-radius:4px;cursor:pointer;';
+      addHintBtn.addEventListener('click', () => {
+        this._editLevelHints.push('');
+        rebuildHintList();
+      });
+      hintWrap.appendChild(addHintBtn);
       midCol.appendChild(hintWrap);
 
       // Challenge level checkbox
@@ -831,12 +875,13 @@ export class CampaignEditor {
         noteEl.textContent = `📝 ${this._editLevelNote}`;
         midCol.appendChild(noteEl);
       }
-      if (this._editLevelHint) {
+      const activeHints = this._editLevelHints.filter(h => h.trim());
+      if (activeHints.length > 0) {
         const hintEl = document.createElement('div');
         hintEl.style.cssText =
           'background:#16213e;border:1px solid #f0c040;border-radius:6px;' +
           'padding:10px 14px;font-size:0.85rem;color:#eee;';
-        hintEl.textContent = `💡 ${this._editLevelHint}`;
+        hintEl.textContent = `💡 ${activeHints.join(' → ')}`;
         midCol.appendChild(hintEl);
       }
       if (this._editLevelChallenge) {
@@ -887,10 +932,11 @@ export class CampaignEditor {
     { palette: 'chamber:dirt',     label: '🟫 Dirt' },
     { palette: 'chamber:item',     label: '🎁 Item' },
     { palette: 'chamber:heater',   label: '🔥 Heater' },
-    { palette: 'chamber:ice',      label: '❄ Ice' },
+    { palette: 'chamber:ice',      label: '🧊 Ice' },
     { palette: 'chamber:pump',     label: '⬆ Pump' },
-    { palette: 'chamber:weak_ice', label: '🧊 Weak Ice' },
+    { palette: 'chamber:snow',      label: '❄ Snow' },
     { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
+    { palette: 'chamber:star',      label: '⭐ Star' },
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -1081,9 +1127,9 @@ export class CampaignEditor {
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
       const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
         tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
-        ice: 'Ice', pump: 'Pump', weak_ice: 'Weak Ice', sandstone: 'Sandstone', star: 'Star',
+        ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star',
       };
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'weak_ice', 'sandstone', 'star']) {
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star']) {
         const o = document.createElement('option');
         o.value = opt;
         o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
@@ -1092,7 +1138,7 @@ export class CampaignEditor {
       }
       sel.addEventListener('change', () => {
         this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
-        if (sel.value === 'ice' || sel.value === 'weak_ice' || sel.value === 'sandstone') {
+        if (sel.value === 'ice' || sel.value === 'snow' || sel.value === 'sandstone') {
           if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
         }
         this._applyParamsToLinkedTile();
@@ -1125,7 +1171,7 @@ export class CampaignEditor {
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
-      if (cc === 'ice' || cc === 'weak_ice' || cc === 'sandstone') {
+      if (cc === 'ice' || cc === 'snow' || cc === 'sandstone') {
         panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
@@ -1692,7 +1738,7 @@ export class CampaignEditor {
       if (cc === 'heater') def.temperature = p.temperature;
       if (cc === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'pump') def.pressure = p.pressure;
-      if (cc === 'weak_ice') { def.cost = p.cost; def.temperature = p.temperature; }
+      if (cc === 'snow') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; }
       if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
     }
@@ -1899,7 +1945,8 @@ export class CampaignEditor {
       inventory: JSON.parse(JSON.stringify(this._editInventory)) as InventoryItem[],
     };
     if (this._editLevelNote.trim()) def.note = this._editLevelNote.trim();
-    if (this._editLevelHint.trim()) def.hint = this._editLevelHint.trim();
+    const activeHints = this._editLevelHints.map(h => h.trim()).filter(h => h.length > 0);
+    if (activeHints.length > 0) def.hints = activeHints;
     if (starCount > 0) def.starCount = starCount;
     if (this._editLevelChallenge) def.challenge = true;
     return def;

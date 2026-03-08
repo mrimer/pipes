@@ -44,7 +44,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'weak_ice' | 'sandstone' | 'star';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star';
 
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
@@ -94,7 +94,7 @@ export interface TileDef {
   chamberContent?: ChamberContent;
   /**
    * Temperature value: the base temperature for Source tiles, the additive bonus for
-   * Chamber-heater tiles, and the threshold temperature for Chamber-ice and Chamber-weak_ice tiles.
+   * Chamber-heater tiles, and the threshold temperature for Chamber-ice and Chamber-snow tiles.
    * Defaults to 0.
    */
   temperature?: number;
@@ -128,8 +128,19 @@ export interface LevelDef {
   inventory: InventoryItem[];
   /** Optional notes displayed in a box beneath the grid while playing. */
   note?: string;
-  /** Optional hint shown as a collapsible box beneath the grid while playing. */
+  /**
+   * Optional hints shown as collapsible boxes beneath the grid while playing.
+   * The first hint is revealed when the player clicks "Show Hint"; each
+   * subsequent hint is nested inside the previous one and revealed in sequence.
+   * @deprecated Use `hints` instead. Kept for backward compatibility with saved campaigns.
+   */
   hint?: string;
+  /**
+   * Optional ordered list of hints. The first is revealed when the player
+   * clicks "Show Hint", and each subsequent hint is nested inside the previous
+   * one so they are revealed in sequence.
+   */
+  hints?: string[];
   /**
    * Cached number of Star chamber tiles present in the level grid.
    * Set automatically when the level is saved in the campaign editor.
