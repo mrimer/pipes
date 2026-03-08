@@ -270,6 +270,8 @@ type GameTestHooks = {
   resetConfirmModalEl: HTMLElement;
   _newChapterModalEl: HTMLElement;
   _challengeModalEl: HTMLElement;
+  _challengeMsgEl: HTMLElement;
+  _challengeSkipBtnEl: HTMLButtonElement;
   _pendingLevelId: number | null;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _animations: { x: number; y: number; text: string; color: string }[];
@@ -1787,5 +1789,30 @@ describe('Game – challenge-level modal', () => {
     const hooks = gameHooks(game);
     expect(hooks._challengeModalEl.style.display).toBe('none');
     expect(hooks._pendingLevelId).toBeNull();
+  });
+
+  it('hides the skip button and description when opened via requestLevel() (direct selection)', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+
+    game.requestLevel(9002);
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeSkipBtnEl.style.display).toBe('none');
+    expect(hooks._challengeMsgEl.style.display).toBe('none');
+  });
+
+  it('shows the skip button and description when opened via nextLevel() (sequential flow)', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+    game.startLevel(9001);
+
+    game.nextLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeSkipBtnEl.style.display).not.toBe('none');
+    expect(hooks._challengeMsgEl.style.display).not.toBe('none');
   });
 });
