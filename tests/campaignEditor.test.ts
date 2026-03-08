@@ -1000,3 +1000,189 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
   });
 });
+
+// ─── CampaignEditor – right-drag erase undo snapshot timing ──────────────────
+
+describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type EditorEraseState = {
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _editRows: number;
+    _editCols: number;
+    _editGrid: (import('../src/types').TileDef | null)[][];
+    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _rightEraseDragActive: boolean;
+    _suppressNextContextMenu: boolean;
+    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistoryIdx: number;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    _onEditorMouseDown(e: MouseEvent): void;
+    _onEditorCanvasMouseMove(e: MouseEvent): void;
+    _onEditorMouseUp(e: MouseEvent): void;
+    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
+  };
+
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99911,
+      name: 'Erase Drag Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  function makeEraseEditor(level: LevelDef): EditorEraseState {
+    const camp: CampaignDef = {
+      id: 'cmp_erase_test',
+      name: 'Erase Drag Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as EditorEraseState;
+    state._activeCampaignId = 'cmp_erase_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function rightMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 2, bubbles: true });
+  }
+
+  function leftMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, bubbles: true });
+  }
+
+  /** Seed the grid with straight-pipe tiles at the given cell positions. */
+  function placeTiles(state: EditorEraseState, cells: { row: number; col: number }[]): void {
+    for (const { row, col } of cells) {
+      state._editGrid[row][col] = { shape: PipeShape.Straight, rotation: 0 };
+    }
+  }
+
+  it('does not record a new snapshot during right-erase mousedown', () => {
+    const state = makeEraseEditor(makeLevel(4, 4));
+    placeTiles(state, [{ row: 0, col: 0 }]);
+    const historyLenBefore = state._editorHistory.length;
+
+    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
+
+    // Snapshot count must NOT have increased yet – drag is still in progress.
+    expect(state._editorHistory.length).toBe(historyLenBefore);
+    expect(state._rightEraseDragActive).toBe(true);
+    // But the cell should already be erased.
+    expect(state._editGrid[0][0]).toBeNull();
+  });
+
+  it('records a snapshot only on right mouseup after a right-drag-erase', () => {
+    const state = makeEraseEditor(makeLevel(4, 4));
+    placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
+    const historyLenBefore = state._editorHistory.length;
+
+    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
+
+    // Exactly one new snapshot should have been added, and drag is finished.
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    expect(state._rightEraseDragActive).toBe(false);
+  });
+
+  it('erased cells are absent in the new snapshot, pre-drag state is the previous one', () => {
+    const state = makeEraseEditor(makeLevel(4, 4));
+    placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
+    // Snapshot the pre-drag state.
+    const preDragSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
+
+    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));   // col 0
+    state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // col 1
+    state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
+
+    // The new snapshot records the post-erase state.
+    const postEraseSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(postEraseSnapshot.grid[0][0]).toBeNull();
+    expect(postEraseSnapshot.grid[0][1]).toBeNull();
+
+    // The previous history entry is still the pre-erase state.
+    const prevSnapshot = state._editorHistory[state._editorHistoryIdx - 1];
+    expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
+  });
+
+  it('sets _suppressNextContextMenu after right mouseup to prevent double-erase', () => {
+    const state = makeEraseEditor(makeLevel(4, 4));
+    placeTiles(state, [{ row: 0, col: 0 }]);
+
+    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));
+    expect(state._suppressNextContextMenu).toBe(false);
+    state._onEditorMouseUp(rightMouseEvent('mouseup', 32, 32));
+    expect(state._suppressNextContextMenu).toBe(true);
+  });
+
+  it('right-drag does not erase cells that are already empty', () => {
+    const state = makeEraseEditor(makeLevel(4, 4));
+    // Only place a tile at col 0; col 1 stays empty.
+    placeTiles(state, [{ row: 0, col: 0 }]);
+
+    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));
+    // Move to an already-empty cell – should not cause errors.
+    state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
+
+    expect(state._editGrid[0][0]).toBeNull(); // erased
+    expect(state._editGrid[0][1]).toBeNull(); // was already null
+  });
+
+  it('left-button paint-drag still works normally alongside right-drag state', () => {
+    const state = makeEraseEditor(makeLevel(4, 4));
+    const historyLenBefore = state._editorHistory.length;
+
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._onEditorCanvasMouseMove(leftMouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
+
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    expect(state._editGrid[0][0]).not.toBeNull();
+    expect(state._editGrid[0][1]).not.toBeNull();
+    expect(state._rightEraseDragActive).toBe(false);
+  });
+});

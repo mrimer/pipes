@@ -87,6 +87,18 @@ export class Game {
    */
   private _suppressNextClick = false;
 
+  /** True while the right mouse button is held on the canvas (drag-erase). */
+  private _isRightDragging = false;
+
+  /** Grid position of the tile the right-drag gesture is currently over. */
+  private _rightDragLastTile: GridPos | null = null;
+
+  /**
+   * True when the right-drag gesture already handled removal, so the subsequent
+   * contextmenu event (if it fires) should be suppressed.
+   */
+  private _suppressNextContextMenu = false;
+
   /** Whether the Ctrl key is currently held. */
   private ctrlHeld = false;
 
@@ -307,7 +319,7 @@ export class Game {
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
-    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._hideTooltip(); });
+    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); });
     // Capture mouseup on window so a release outside the canvas still ends the drag.
     // Game is a singleton for the lifetime of the page, so this listener is never removed
     // (same pattern as the document keydown/keyup listeners below).
@@ -649,6 +661,18 @@ export class Game {
   // ─── Input handlers ────────────────────────────────────────────────────────
 
   private _handleCanvasMouseDown(e: MouseEvent): void {
+    if (e.button === 2) {
+      if (this.screen !== GameScreen.Play) return;
+      if (this.gameState !== GameState.Playing) return;
+      if (!this.board) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+      const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
+      this._isRightDragging = true;
+      this._rightDragLastTile = { row, col };
+      this._suppressNextContextMenu = false;
+      return;
+    }
     if (e.button !== 0) return;
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
@@ -663,6 +687,17 @@ export class Game {
   }
 
   private _handleCanvasMouseUp(e: MouseEvent): void {
+    if (e.button === 2) {
+      if (!this._isRightDragging) return;
+      // Remove the tile at the final (current) position and suppress the contextmenu event.
+      if (this._rightDragLastTile && this.board &&
+          this.gameState === GameState.Playing && this.screen === GameScreen.Play) {
+        this._reclaimTileAt(this._rightDragLastTile);
+      }
+      this._suppressNextContextMenu = true;
+      this._cancelRightDrag();
+      return;
+    }
     if (e.button !== 0) return;
     if (!this._isDragging) return;
 
@@ -694,10 +729,44 @@ export class Game {
     this._cancelDrag();
   }
 
-  /** Resets drag-paint state without placing anything at the current position. */
+  /** Resets left-drag-paint state. */
   private _cancelDrag(): void {
     this._isDragging = false;
     this._dragLastTile = null;
+  }
+
+  /** Resets right-drag-erase state. */
+  private _cancelRightDrag(): void {
+    this._isRightDragging = false;
+    this._rightDragLastTile = null;
+  }
+
+  /**
+   * Reclaims (removes) the tile at pos, records the move, and updates UI.
+   * Shared by both single right-click and right-drag-erase.
+   */
+  private _reclaimTileAt(pos: GridPos): void {
+    if (!this.board) return;
+    const tileBeforeReclaim = this.board.grid[pos.row]?.[pos.col];
+    const reclaimedShape = tileBeforeReclaim?.shape;
+    const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
+    const hadNoSelection = this.selectedShape === null;
+    const filledBefore = this.board.getFilledPositions();
+    if (this.board.reclaimTile(pos)) {
+      this.board.applyTurnDelta();
+      this.board.recordMove();
+      this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, pos.row, pos.col);
+      this._deselectIfDepleted();
+      if (hadNoSelection && reclaimedShape !== undefined) {
+        this.selectedShape = reclaimedShape;
+        this.pendingRotation = reclaimedRotation;
+      }
+      this._renderInventoryBar();
+      this._updateWaterDisplay();
+      this._updateUndoRedoButtons();
+    } else if (this.board.lastError) {
+      this._handleBoardError();
+    }
   }
 
   private _handleCanvasClick(e: MouseEvent): void {
@@ -755,6 +824,11 @@ export class Game {
 
   private _handleCanvasRightClick(e: MouseEvent): void {
     e.preventDefault();
+    // Suppress if the right-drag gesture already handled the removal.
+    if (this._suppressNextContextMenu) {
+      this._suppressNextContextMenu = false;
+      return;
+    }
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
     if (!this.board) return;
@@ -762,29 +836,7 @@ export class Game {
     const rect = this.canvas.getBoundingClientRect();
     const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
     const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
-
-    const tileBeforeReclaim = this.board.grid[row]?.[col];
-    const reclaimedShape = tileBeforeReclaim?.shape;
-    const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
-    const hadNoSelection = this.selectedShape === null;
-
-    const filledBefore = this.board.getFilledPositions();
-
-    if (this.board.reclaimTile({ row, col })) {
-      this.board.applyTurnDelta();
-      this.board.recordMove();
-      this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, row, col);
-      this._deselectIfDepleted();
-      if (hadNoSelection && reclaimedShape !== undefined) {
-        this.selectedShape = reclaimedShape;
-        this.pendingRotation = reclaimedRotation;
-      }
-      this._renderInventoryBar();
-      this._updateWaterDisplay();
-      this._updateUndoRedoButtons();
-    } else if (this.board.lastError) {
-      this._handleBoardError();
-    }
+    this._reclaimTileAt({ row, col });
   }
 
   private _handleCanvasMouseMove(e: MouseEvent): void {
@@ -819,6 +871,19 @@ export class Game {
           }
         }
         this._dragLastTile = { row, col };
+      }
+    }
+
+    // Drag-erase: reclaim the OLD tile each time the cursor enters a new grid cell.
+    if (this._isRightDragging && this.board && this.screen === GameScreen.Play &&
+        this.gameState === GameState.Playing) {
+      const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+      const row = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      const last = this._rightDragLastTile;
+      if (last && (row !== last.row || col !== last.col)) {
+        // Moved to a new tile: reclaim the tile we just left.
+        this._reclaimTileAt(last);
+        this._rightDragLastTile = { row, col };
       }
     }
   }
