@@ -238,7 +238,10 @@ export function renderLevelList(
       const levelRow = document.createElement('div');
       levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
       const minimap = renderMinimap(level);
-      minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;';
+      minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;' + (!isLocked ? 'cursor:pointer;' : '');
+      if (!isLocked) {
+        minimap.addEventListener('click', () => startLevel(level.id));
+      }
       levelRow.appendChild(minimap);
       levelRow.appendChild(btn);
       levelsContainer.appendChild(levelRow);
