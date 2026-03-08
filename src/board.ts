@@ -430,9 +430,12 @@ export class Board {
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       const filledAfter = this.getFilledPositions();
       const sandstoneError = this._checkSandstoneConstraints(filledAfter);
+      const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filledAfter);
+      const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filledAfter);
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
-      if (sandstoneError) {
-        this.lastError = sandstoneError;
+      const constraintError = sandstoneError ?? heaterError ?? pumpError;
+      if (constraintError) {
+        this.lastError = constraintError;
         return false;
       }
     }
@@ -486,10 +489,14 @@ export class Board {
     }
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
 
-    // Validate that no newly-connected sandstone tile has deltaDamage <= 0.
+    // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
+    // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
     const sandstoneError = this._checkSandstoneConstraints(filled);
-    if (sandstoneError) {
+    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
+    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
+    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    if (constraintError) {
       // Roll back placement.
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       if (idx !== -1) {
@@ -498,7 +505,7 @@ export class Board {
         const pushIdx = this.inventory.findIndex((it) => it.shape === shape && it.count < 0);
         if (pushIdx !== -1) this.inventory.splice(pushIdx, 1);
       }
-      this.lastError = sandstoneError;
+      this.lastError = constraintError;
       return false;
     }
 
@@ -599,11 +606,15 @@ export class Board {
       }
     }
 
-    // Validate that no newly-connected sandstone tile has deltaDamage <= 0.
+    // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
+    // and that temperature/pressure don't go below 0.
     const filledAfterReplace = this.getFilledPositions();
     const sandstoneError = this._checkSandstoneConstraints(filledAfterReplace);
-    if (sandstoneError) {
-      this.lastError = sandstoneError;
+    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filledAfterReplace);
+    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filledAfterReplace);
+    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    if (constraintError) {
+      this.lastError = constraintError;
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile;
       return false;
@@ -1058,6 +1069,75 @@ export class Board {
     return null;
   }
 
+  /**
+   * Check whether the current temperature (based on the fill set) is below 0.
+   * A negative-temperature Heater (Cooler) that would bring the temperature below 0
+   * must not be connected.  Similarly, disconnecting a positive Heater when the
+   * resulting temperature would be negative is also invalid.
+   * Sets {@link lastErrorTilePositions} to the offending Cooler tile(s).
+   * @param filled - Current fill set (after the board mutation).
+   * @returns An error message string if a violation is found, or `null` if valid.
+   */
+  private _checkHeaterConstraints(filled: Set<string>): string | null {
+    const currentTemp = this._computeTemperatureFromFilled(filled);
+    if (currentTemp < 0) {
+      const violating: GridPos[] = [];
+      for (const key of filled) {
+        const [r, c] = key.split(',').map(Number);
+        const tile = this.grid[r]?.[c];
+        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'heater' && tile.temperature < 0) {
+          violating.push({ row: r, col: c });
+        }
+      }
+      if (violating.length > 0) {
+        this.lastErrorTilePositions = violating;
+      }
+      return `Connecting this Cooler would reduce temperature below 0. (Temperature: ${currentTemp})`;
+    }
+    return null;
+  }
+
+  /**
+   * Check whether the current pressure (based on the fill set) is below 0.
+   * A negative-pressure Pump (Vacuum) that would bring the pressure below 0
+   * must not be connected.  Similarly, disconnecting a positive Pump when the
+   * resulting pressure would be negative is also invalid.
+   * Sets {@link lastErrorTilePositions} to the offending Vacuum tile(s).
+   * @param filled - Current fill set (after the board mutation).
+   * @returns An error message string if a violation is found, or `null` if valid.
+   */
+  private _checkPumpConstraints(filled: Set<string>): string | null {
+    const currentPressure = this._computePressureFromFilled(filled);
+    if (currentPressure < 0) {
+      const violating: GridPos[] = [];
+      for (const key of filled) {
+        const [r, c] = key.split(',').map(Number);
+        const tile = this.grid[r]?.[c];
+        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump' && tile.pressure < 0) {
+          violating.push({ row: r, col: c });
+        }
+      }
+      if (violating.length > 0) {
+        this.lastErrorTilePositions = violating;
+      }
+      return `Connecting this Vacuum would reduce pressure below 0. (Pressure: ${currentPressure})`;
+    }
+    return null;
+  }
+
+  /**
+   * Check for invalid temperature or pressure state caused by pre-connected
+   * Heater/Pump tiles with negative values at level start.
+   * Call this after {@link initHistory} to detect design-time errors.
+   * @returns An error message string if a violation exists, or `null` if valid.
+   */
+  checkInitialStateErrors(): string | null {
+    const filled = this.getFilledPositions();
+    const heaterError = this._checkHeaterConstraints(filled);
+    if (heaterError) return heaterError;
+    return this._checkPumpConstraints(filled);
+  }
+
   // ─── Grid validation ───────────────────────────────────────────────────────
 
   /**
@@ -1172,10 +1252,11 @@ export class Board {
    * Rotate the tile at the given position 90° clockwise.
    * Returns false (and sets {@link lastError} / {@link lastErrorTilePositions}) if the
    * rotation would result in any connected sandstone tile having deltaDamage ≤ 0 (either
-   * by newly connecting a sandstone tile, or by disconnecting a pump and dropping pressure).
+   * by newly connecting a sandstone tile, or by disconnecting a pump and dropping pressure),
+   * or if temperature/pressure would drop below 0.
    * The rotation is reversed in that case.
    * @param pos - Grid coordinate.
-   * @returns true if the rotation succeeded; false if it was blocked by a sandstone constraint.
+   * @returns true if the rotation succeeded; false if it was blocked by a constraint.
    */
   rotateTile(pos: GridPos): boolean {
     this.lastError = null;
@@ -1184,13 +1265,17 @@ export class Board {
     if (!tile) return false;
     tile.rotate();
 
-    // Validate that no newly-connected sandstone tile has deltaDamage <= 0.
+    // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
+    // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
     const sandstoneError = this._checkSandstoneConstraints(filled);
-    if (sandstoneError) {
+    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
+    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
+    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    if (constraintError) {
       // Reverse the rotation (3 clockwise = 1 counter-clockwise).
       tile.rotate(); tile.rotate(); tile.rotate();
-      this.lastError = sandstoneError;
+      this.lastError = constraintError;
       return false;
     }
 
@@ -1217,12 +1302,15 @@ export class Board {
     // Validate the final state.
     const filled = this.getFilledPositions();
     const sandstoneError = this._checkSandstoneConstraints(filled);
-    if (sandstoneError) {
+    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
+    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
+    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    if (constraintError) {
       // Revert by rotating the remaining steps to complete a full 360°.
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
-      this.lastError = sandstoneError;
+      this.lastError = constraintError;
       return false;
     }
     return true;

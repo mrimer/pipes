@@ -40,6 +40,10 @@ export const REMOVABLE_BG_COLOR      = '#1a3050';
 export const HEATER_COLOR            = '#e67e22';
 /** Heater chamber tile color when water is flowing through it. */
 export const HEATER_WATER_COLOR      = '#f39c12';
+/** Cooler chamber tile color (blue-purple hue, for negative-temperature heaters). */
+export const COOLER_COLOR            = '#7b5ea7';
+/** Cooler chamber tile color when water is flowing through it. */
+export const COOLER_WATER_COLOR      = '#a07ec8';
 /** Ice chamber tile color (near-white icy tint). */
 export const ICE_COLOR               = '#d0eaff';
 /** Ice chamber tile color when water is flowing through it. */
@@ -48,6 +52,10 @@ export const ICE_WATER_COLOR         = '#e8f5ff';
 export const PUMP_COLOR              = '#a8e063';
 /** Pump chamber tile color when water is flowing through it. */
 export const PUMP_WATER_COLOR        = '#c6f07a';
+/** Vacuum chamber tile color (purple-red hue, for negative-pressure pumps). */
+export const VACUUM_COLOR            = '#c2185b';
+/** Vacuum chamber tile color when water is flowing through it. */
+export const VACUUM_WATER_COLOR      = '#e94b8a';
 /** Snow chamber tile color (soft pale cyan). */
 export const SNOW_COLOR               = '#b0d8f8';
 /** Snow chamber tile color when water is flowing through it. */
