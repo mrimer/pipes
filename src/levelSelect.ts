@@ -113,10 +113,11 @@ export function renderLevelList(
   for (let ci = 0; ci < chapters.length; ci++) {
     const chapter = chapters[ci];
 
-    // A chapter is locked if a previous chapter exists and not all its levels are done.
+    // A chapter is locked if a previous chapter exists and not all its *non-challenge* levels are done.
+    // Challenge levels are optional and do not need to be completed to unlock the next chapter.
     const prevChapter = ci > 0 ? chapters[ci - 1] : null;
     const chapterLocked = prevChapter !== null &&
-      prevChapter.levels.some((l) => !completedLevels.has(l.id));
+      prevChapter.levels.some((l) => !l.challenge && !completedLevels.has(l.id));
 
     const completedInChapter = chapter.levels.filter((l) => completedLevels.has(l.id)).length;
     const totalInChapter = chapter.levels.length;
@@ -189,9 +190,13 @@ export function renderLevelList(
       const level = chapter.levels[li];
       const isCompleted = completedLevels.has(level.id);
 
-      // Within a chapter, a level is locked if the previous level is not yet done.
-      const prevLevel = li > 0 ? chapter.levels[li - 1] : null;
-      const isLocked = chapterLocked || (prevLevel !== null && !completedLevels.has(prevLevel.id));
+      // Within a chapter, a level is locked if the previous non-challenge level is not yet done.
+      // Challenge levels are skipped in the chain so that non-challenge levels after a challenge
+      // level are not blocked by it.
+      const prevNonChallenge = li > 0
+        ? (chapter.levels.slice(0, li).reverse().find((l) => !l.challenge) ?? null)
+        : null;
+      const isLocked = chapterLocked || (prevNonChallenge !== null && !completedLevels.has(prevNonChallenge.id));
 
       const btn = document.createElement('button');
       btn.classList.add('level-btn');
@@ -199,12 +204,13 @@ export function renderLevelList(
       if (isCompleted) btn.classList.add('completed');
 
       const icon = isLocked ? '🔒' : isCompleted ? '✅' : '▶';
+      const challengeIcon = level.challenge ? ' 💀' : '';
       const levelStarTotal = level.starCount ?? 0;
       const levelStarCollected = levelStarTotal > 0
         ? Math.min(levelStars[level.id] ?? 0, levelStarTotal) : 0;
       const levelStarText = levelStarTotal > 0
         ? `  ⭐ ${levelStarCollected}/${levelStarTotal}` : '';
-      btn.textContent = `${icon} Level ${li + 1}: ${level.name}${levelStarText}`;
+      btn.textContent = `${icon} Level ${li + 1}: ${level.name}${challengeIcon}${levelStarText}`;
       btn.disabled = isLocked;
 
       if (!isLocked) {

@@ -60,6 +60,7 @@ export class CampaignEditor {
   private _editLevelName = 'New Level';
   private _editLevelNote = '';
   private _editLevelHint = '';
+  private _editLevelChallenge = false;
   private _editRows = 6;
   private _editCols = 6;
   private _editGrid: (TileDef | null)[][] = [];
@@ -627,6 +628,7 @@ export class CampaignEditor {
     this._editLevelName = level.name;
     this._editLevelNote = level.note ?? '';
     this._editLevelHint = level.hint ?? '';
+    this._editLevelChallenge = level.challenge ?? false;
     this._editRows = level.rows;
     this._editCols = level.cols;
     this._editGrid = JSON.parse(JSON.stringify(level.grid)) as (TileDef | null)[][];
@@ -804,6 +806,22 @@ export class CampaignEditor {
       hintWrap.appendChild(hintLbl);
       hintWrap.appendChild(hintInp);
       midCol.appendChild(hintWrap);
+
+      // Challenge level checkbox
+      const challengeWrap = document.createElement('div');
+      challengeWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      const challengeChk = document.createElement('input');
+      challengeChk.type = 'checkbox';
+      challengeChk.id = 'editor-challenge-chk';
+      challengeChk.checked = this._editLevelChallenge;
+      challengeChk.addEventListener('change', () => { this._editLevelChallenge = challengeChk.checked; });
+      const challengeLbl = document.createElement('label');
+      challengeLbl.htmlFor = 'editor-challenge-chk';
+      challengeLbl.textContent = '💀 Challenge level (optional – not required to unlock next chapter)';
+      challengeLbl.style.cssText = 'font-size:0.8rem;color:#aaa;cursor:pointer;';
+      challengeWrap.appendChild(challengeChk);
+      challengeWrap.appendChild(challengeLbl);
+      midCol.appendChild(challengeWrap);
     } else {
       if (this._editLevelNote) {
         const noteEl = document.createElement('div');
@@ -820,6 +838,14 @@ export class CampaignEditor {
           'padding:10px 14px;font-size:0.85rem;color:#eee;';
         hintEl.textContent = `💡 ${this._editLevelHint}`;
         midCol.appendChild(hintEl);
+      }
+      if (this._editLevelChallenge) {
+        const challengeEl = document.createElement('div');
+        challengeEl.style.cssText =
+          'background:#16213e;border:1px solid #e74c3c;border-radius:6px;' +
+          'padding:10px 14px;font-size:0.85rem;color:#eee;';
+        challengeEl.textContent = '💀 Challenge level';
+        midCol.appendChild(challengeEl);
       }
     }
 
@@ -1875,6 +1901,7 @@ export class CampaignEditor {
     if (this._editLevelNote.trim()) def.note = this._editLevelNote.trim();
     if (this._editLevelHint.trim()) def.hint = this._editLevelHint.trim();
     if (starCount > 0) def.starCount = starCount;
+    if (this._editLevelChallenge) def.challenge = true;
     return def;
   }
 
