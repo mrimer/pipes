@@ -1657,7 +1657,7 @@ export class CampaignEditor {
     if (effectiveShape === PipeShape.Source) {
       def.capacity = p.capacity;
       if (p.temperature !== 0) def.temperature = p.temperature;
-      if (p.pressure !== 1) def.pressure = p.pressure;
+      if (p.pressure !== 0) def.pressure = p.pressure;
     } else if (isChm) {
       const cc = chamberPaletteContent(palette as ChamberPalette);
       def.chamberContent = cc;
