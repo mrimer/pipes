@@ -68,7 +68,7 @@ describe('loadLevelStars / saveLevelStar / clearLevelStars', () => {
 // ─── Level-select star display ────────────────────────────────────────────────
 
 /** Minimal level for testing. */
-function makeLevel(id: number, starCount?: number): LevelDef {
+function makeLevel(id: number, starCount?: number, challenge?: boolean): LevelDef {
   return {
     id,
     name: `Level ${id}`,
@@ -82,6 +82,7 @@ function makeLevel(id: number, starCount?: number): LevelDef {
     ],
     inventory: [],
     starCount,
+    challenge,
   };
 }
 
@@ -211,5 +212,130 @@ describe('renderLevelList star display', () => {
     const header = container.firstChild as HTMLElement;
     // completionPct < 100 → no star row should be added
     expect(header?.textContent).not.toMatch(/⭐.*\d+\/\d+/);
+  });
+});
+
+// ─── Challenge level display and chapter-locking ──────────────────────────────
+
+describe('renderLevelList – challenge levels', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  it('shows 💀 icon on the button for a challenge level', () => {
+    const level = makeLevel(1, undefined, true);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const btn = container.querySelector('.level-btn');
+    expect(btn?.textContent).toContain('💀');
+  });
+
+  it('does NOT show 💀 icon on a regular (non-challenge) level', () => {
+    const level = makeLevel(1);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const btn = container.querySelector('.level-btn');
+    expect(btn?.textContent).not.toContain('💀');
+  });
+
+  it('unlocks next chapter when all non-challenge levels of previous chapter are done', () => {
+    // Chapter 1 has a regular level (id=1) and a challenge level (id=2).
+    // Completing only the regular level should unlock chapter 2.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2, undefined, true)],
+    };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
+    const chapters = [ch1, ch2];
+
+    // Only the non-challenge level (1) is completed; challenge level (2) is not.
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterHeaders = container.querySelectorAll('.chapter-header');
+    // Chapter 2 header must NOT have the 'locked' class.
+    expect(chapterHeaders[1]?.classList.contains('locked')).toBe(false);
+  });
+
+  it('keeps next chapter locked when a non-challenge level in the previous chapter is incomplete', () => {
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2)],
+    };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
+    const chapters = [ch1, ch2];
+
+    // Only level 1 is completed; level 2 (also non-challenge) is not.
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterHeaders = container.querySelectorAll('.chapter-header');
+    expect(chapterHeaders[1]?.classList.contains('locked')).toBe(true);
+  });
+
+  it('does not lock a non-challenge level behind an incomplete challenge level', () => {
+    // Levels: [L1 (regular, completed), L2 (challenge, not done), L3 (regular)]
+    // L3 should be accessible even though L2 is not done.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3)],
+    };
+    const chapters = [ch1];
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const levelBtns = container.querySelectorAll('.level-btn');
+    // L3 is the 3rd button (index 2)
+    expect(levelBtns[2]?.classList.contains('locked')).toBe(false);
+  });
+
+  it('locks a non-challenge level when the previous non-challenge level is incomplete', () => {
+    // Levels: [L1 (regular, not done), L2 (challenge), L3 (regular)]
+    // L3 should be locked because L1 (the previous non-challenge level) is not done.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3)],
+    };
+    const chapters = [ch1];
+    const completed = new Set<number>();
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const levelBtns = container.querySelectorAll('.level-btn');
+    // L3 (index 2) must be locked because L1 is not completed.
+    expect(levelBtns[2]?.classList.contains('locked')).toBe(true);
   });
 });

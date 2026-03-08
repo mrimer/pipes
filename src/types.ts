@@ -135,6 +135,12 @@ export interface LevelDef {
    * Set automatically when the level is saved in the campaign editor.
    */
   starCount?: number;
+  /**
+   * When true, this is an optional bonus/challenge level.
+   * Challenge levels are shown with a skull icon in the level list and
+   * do NOT need to be completed in order to unlock the next chapter.
+   */
+  challenge?: boolean;
 }
 
 /** Possible types of ambient decorative element drawn under grid tiles. */

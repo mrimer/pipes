@@ -201,6 +201,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     return editor as unknown as {
       _editLevelNote: string;
       _editLevelHint: string;
+      _editLevelChallenge: boolean;
       _editLevelName: string;
       _editRows: number;
       _editCols: number;
@@ -352,6 +353,142 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     const parsed = JSON.parse(json) as CampaignDef;
     expect(parsed.chapters[0].levels[0].note).toBe('Watch the water level.');
     expect(parsed.chapters[0].levels[0].hint).toBe('Use an elbow at the corner.');
+  });
+});
+
+// ─── CampaignEditor – challenge flag round-trip ───────────────────────────────
+
+describe('CampaignEditor – challenge flag in level definitions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  /** Reuse the editorState helper from the note/hint suite. */
+  function editorState(editor: CampaignEditor) {
+    return editor as unknown as {
+      _editLevelChallenge: boolean;
+      _editLevelName: string;
+      _editLevelNote: string;
+      _editLevelHint: string;
+      _editRows: number;
+      _editCols: number;
+      _editGrid: (import('../src/types').TileDef | null)[][];
+      _editInventory: import('../src/types').InventoryItem[];
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _activeLevelIdx: number;
+      _buildCurrentLevelDef(): LevelDef;
+      _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    };
+  }
+
+  it('_editLevelChallenge defaults to false', () => {
+    const editor = makeEditor();
+    expect(editorState(editor)._editLevelChallenge).toBe(false);
+  });
+
+  it('_openLevelEditor reads challenge=true from level', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    const level: LevelDef = {
+      id: 99010,
+      name: 'Hard Level',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+      challenge: true,
+    };
+    state._openLevelEditor(level, true);
+    expect(state._editLevelChallenge).toBe(true);
+  });
+
+  it('_openLevelEditor sets false when level has no challenge flag', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    const level: LevelDef = {
+      id: 99011,
+      name: 'Normal Level',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+    };
+    state._openLevelEditor(level, true);
+    expect(state._editLevelChallenge).toBe(false);
+  });
+
+  it('_buildCurrentLevelDef omits challenge when false', () => {
+    const userCampaign: CampaignDef = {
+      id: 'cmp_chal1',
+      name: 'Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        levels: [{
+          id: 99012,
+          name: 'Level',
+          rows: 2,
+          cols: 2,
+          grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+          inventory: [],
+        }],
+      }],
+    };
+    const editor = makeEditor([userCampaign]);
+    const state = editorState(editor);
+    state._activeCampaignId = 'cmp_chal1';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._editLevelName = 'Level';
+    state._editLevelNote = '';
+    state._editLevelHint = '';
+    state._editLevelChallenge = false;
+    state._editRows = 2;
+    state._editCols = 2;
+    state._editGrid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
+    state._editInventory = [];
+
+    const def = state._buildCurrentLevelDef();
+    expect(def.challenge).toBeUndefined();
+  });
+
+  it('_buildCurrentLevelDef sets challenge=true when flag is true', () => {
+    const userCampaign: CampaignDef = {
+      id: 'cmp_chal2',
+      name: 'Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        levels: [{
+          id: 99013,
+          name: 'Level',
+          rows: 2,
+          cols: 2,
+          grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+          inventory: [],
+        }],
+      }],
+    };
+    const editor = makeEditor([userCampaign]);
+    const state = editorState(editor);
+    state._activeCampaignId = 'cmp_chal2';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._editLevelName = 'Level';
+    state._editLevelNote = '';
+    state._editLevelHint = '';
+    state._editLevelChallenge = true;
+    state._editRows = 2;
+    state._editCols = 2;
+    state._editGrid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
+    state._editInventory = [];
+
+    const def = state._buildCurrentLevelDef();
+    expect(def.challenge).toBe(true);
   });
 });
 
