@@ -109,6 +109,8 @@ export class CampaignEditor {
   private _linkedTilePos: { row: number; col: number } | null = null;
   /** True once the first param change in the current linked session has been committed. */
   private _linkedTileDirty = false;
+  /** True when the level editor has unsaved changes (any snapshot recorded after initial open). */
+  private _editorUnsavedChanges = false;
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
@@ -206,6 +208,50 @@ export class CampaignEditor {
       `border:1px solid ${color};border-radius:6px;cursor:pointer;${extraStyle}`;
     b.addEventListener('click', onClick);
     return b;
+  }
+
+  /**
+   * Show a modal dialog asking the user to Save or Discard unsaved level changes.
+   * Appended to `_el`; removed when either button is clicked.
+   */
+  private _showUnsavedModal(onSave: () => void, onDiscard: () => void): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+      'justify-content:center;z-index:300;';
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
+      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:420px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:1rem;color:#eee;line-height:1.5;';
+    msg.textContent = 'You have unsaved changes. Would you like to save before leaving?';
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+    const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
+      overlay.remove();
+      onSave();
+    });
+    const discardBtn = this._btn('🗑 Discard', '#c0392b', '#fff', () => {
+      overlay.remove();
+      onDiscard();
+    });
+    const cancelBtn = this._btn('Cancel', '#2a2a4a', '#aaa', () => {
+      overlay.remove();
+    });
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(discardBtn);
+    btnRow.appendChild(saveBtn);
+    dialog.appendChild(msg);
+    dialog.appendChild(btnRow);
+    overlay.appendChild(dialog);
+    this._el.appendChild(overlay);
   }
 
   private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
@@ -676,6 +722,7 @@ export class CampaignEditor {
     this._chamberSectionExpanded = false;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
+    this._editorUnsavedChanges = false;
     this._recordEditorSnapshot();
     this._showLevelEditor(readOnly);
   }
@@ -691,7 +738,19 @@ export class CampaignEditor {
 
     const toolbar = this._buildToolbar(
       readOnly ? `👁 View Level: ${this._editLevelName}` : `✏️ Level Editor`,
-      () => this._showChapterDetail(),
+      () => {
+        if (!readOnly && this._editorUnsavedChanges) {
+          this._showUnsavedModal(
+            () => {
+              this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
+              this._showChapterDetail();
+            },
+            () => this._showChapterDetail(),
+          );
+        } else {
+          this._showChapterDetail();
+        }
+      },
     );
 
     if (!readOnly) {
@@ -712,6 +771,11 @@ export class CampaignEditor {
 
       // Playtest
       toolbar.appendChild(this._btn('▶ Playtest', '#16213e', '#f0c040', () => {
+        const result = this._validateLevel();
+        if (!result.ok) {
+          alert(`❌ Validation\n\n${result.messages.join('\n')}`);
+          return;
+        }
         const level = this._buildCurrentLevelDef();
         this._onPlaytest(level);
       }));
@@ -1374,6 +1438,44 @@ export class CampaignEditor {
       this._resizeGrid(newR, newC);
     }));
 
+    // ── Slide buttons (N/E/S/W compass layout) ──
+    const slideTitle = document.createElement('div');
+    slideTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
+    slideTitle.textContent = 'Slide tiles:';
+    panel.appendChild(slideTitle);
+
+    const compass = document.createElement('div');
+    compass.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;justify-self:start;';
+
+    const arrowBtnStyle =
+      'width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center;' +
+      'background:#0d1a30;color:#7ed321;border:1px solid #4a90d9;border-radius:4px;cursor:pointer;padding:0;';
+
+    const makeArrow = (icon: string, dir: 'N' | 'E' | 'S' | 'W'): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = icon;
+      b.title = `Slide all tiles ${dir === 'N' ? 'North (up)' : dir === 'E' ? 'East (right)' : dir === 'S' ? 'South (down)' : 'West (left)'}`;
+      b.style.cssText = arrowBtnStyle;
+      b.addEventListener('click', () => this._slideGrid(dir));
+      return b;
+    };
+
+    // Row 1: [empty] [↑] [empty]
+    compass.appendChild(document.createElement('span')); // placeholder
+    compass.appendChild(makeArrow('↑', 'N'));
+    compass.appendChild(document.createElement('span')); // placeholder
+    // Row 2: [←] [empty] [→]
+    compass.appendChild(makeArrow('←', 'W'));
+    compass.appendChild(document.createElement('span')); // center placeholder
+    compass.appendChild(makeArrow('→', 'E'));
+    // Row 3: [empty] [↓] [empty]
+    compass.appendChild(document.createElement('span')); // placeholder
+    compass.appendChild(makeArrow('↓', 'S'));
+    compass.appendChild(document.createElement('span')); // placeholder
+
+    panel.appendChild(compass);
+
     return panel;
   }
 
@@ -1527,8 +1629,11 @@ export class CampaignEditor {
    */
   private _paintEditorCell(pos: { row: number; col: number }): void {
     this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
-    this._linkedTilePos = pos;
-    this._linkedTileDirty = false;
+    // Only link tiles that have parameters beyond rotation (Source, Sink, Chamber).
+    if (this._paletteHasNonRotationParams(this._editorPalette)) {
+      this._linkedTilePos = pos;
+      this._linkedTileDirty = false;
+    }
   }
 
   private _onEditorMouseDown(e: MouseEvent): void {
@@ -1572,9 +1677,12 @@ export class CampaignEditor {
         this._clearLinkAt(pos);
       } else {
         this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
-        // Automatically link the newly placed tile for live param editing
-        this._linkedTilePos = pos;
-        this._linkedTileDirty = false;
+        // Only link the newly placed tile for live param editing if it has
+        // parameters beyond rotation (Source, Sink, Chamber).
+        if (this._paletteHasNonRotationParams(this._editorPalette)) {
+          this._linkedTilePos = pos;
+          this._linkedTileDirty = false;
+        }
       }
       this._renderEditorCanvas();
     }
@@ -1610,9 +1718,11 @@ export class CampaignEditor {
       this._recordEditorSnapshot();
       this._editGrid[startPos.row][startPos.col] = null;
       this._editGrid[currentPos.row][currentPos.col] = tile;
-      // Link the moved tile at its new position
-      this._linkedTilePos = currentPos;
-      this._linkedTileDirty = false;
+      // Only link the moved tile if it has parameters beyond rotation.
+      if (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink || tile.shape === PipeShape.Chamber) {
+        this._linkedTilePos = currentPos;
+        this._linkedTileDirty = false;
+      }
     } else {
       // It was a click on a non-empty tile (no movement occurred)
       if (e.ctrlKey) {
@@ -1624,9 +1734,11 @@ export class CampaignEditor {
           this._clearLinkAt(startPos);
         } else {
           this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
-          // Automatically link the overwritten tile
-          this._linkedTilePos = startPos;
-          this._linkedTileDirty = false;
+          // Only link the overwritten tile if it has parameters beyond rotation.
+          if (this._paletteHasNonRotationParams(this._editorPalette)) {
+            this._linkedTilePos = startPos;
+            this._linkedTileDirty = false;
+          }
         }
       } else if (
         this._editorPalette !== 'erase' &&
@@ -1636,9 +1748,11 @@ export class CampaignEditor {
         // Both palette and tile are pipe shapes: auto-replace
         this._recordEditorSnapshot();
         this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
-        // Automatically link the replaced tile
-        this._linkedTilePos = startPos;
-        this._linkedTileDirty = false;
+        // Only link if the new tile has parameters beyond rotation.
+        if (this._paletteHasNonRotationParams(this._editorPalette)) {
+          this._linkedTilePos = startPos;
+          this._linkedTileDirty = false;
+        }
       } else {
         // Select the clicked tile in the palette and populate Tile Params
         this._selectTileFromDef(tile, startPos);
@@ -1737,10 +1851,26 @@ export class CampaignEditor {
     } else {
       this._editorPalette = def.shape;
     }
-    this._linkedTilePos = pos ?? null;
+    // Only link the tile for live param editing if it has parameters beyond rotation.
+    if (pos !== undefined && this._paletteHasNonRotationParams(this._editorPalette)) {
+      this._linkedTilePos = pos;
+    } else {
+      // Plain/gold/spin pipe clicked (or no position): clear any existing link.
+      this._linkedTilePos = null;
+    }
     this._linkedTileDirty = false;
     this._populateParamsFromDef(def);
     this._refreshPaletteUI();
+  }
+
+  /**
+   * Returns true when the given palette entry has editable parameters beyond
+   * rotation alone.  Tiles with only rotation (plain pipes, gold pipes, spin
+   * pipes) should not be auto-linked for live param editing; linking is
+   * reserved for Source, Sink, and Chamber tiles that expose richer settings.
+   */
+  private _paletteHasNonRotationParams(palette: EditorPalette): boolean {
+    return palette === PipeShape.Source || palette === PipeShape.Sink || isChamberPalette(palette);
   }
 
   /** Set _editorParams to match all relevant fields from a TileDef. */
@@ -1894,6 +2024,8 @@ export class CampaignEditor {
     }
     this._editorHistory.push(snapshot);
     this._editorHistoryIdx = this._editorHistory.length - 1;
+    // Mark unsaved changes on any snapshot recorded after the initial open snapshot.
+    if (this._editorHistoryIdx > 0) this._editorUnsavedChanges = true;
     this._updateEditorUndoRedoButtons();
   }
 
@@ -1974,6 +2106,42 @@ export class CampaignEditor {
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
     this._updateCanvasDisplaySize();
+    this._renderEditorCanvas();
+  }
+
+  // ─── Grid slide (N/E/S/W) ─────────────────────────────────────────────────
+
+  /**
+   * Slide all tiles one cell in the given direction.  Tiles that would fall off
+   * the edge of the grid are discarded.  The operation is recorded as an undo
+   * snapshot so it can be undone.
+   */
+  private _slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void {
+    this._recordEditorSnapshot();
+    const newGrid: (TileDef | null)[][] = Array.from(
+      { length: this._editRows },
+      () => Array(this._editCols).fill(null) as null[],
+    );
+    for (let r = 0; r < this._editRows; r++) {
+      for (let c = 0; c < this._editCols; c++) {
+        const tile = this._editGrid[r]?.[c] ?? null;
+        if (tile === null) continue;
+        let nr = r;
+        let nc = c;
+        if (dir === 'N') nr = r - 1;
+        else if (dir === 'S') nr = r + 1;
+        else if (dir === 'W') nc = c - 1;
+        else nc = c + 1; // E
+        if (nr >= 0 && nr < this._editRows && nc >= 0 && nc < this._editCols) {
+          newGrid[nr][nc] = tile;
+        }
+        // Tiles that go out of bounds are simply dropped.
+      }
+    }
+    this._editGrid = newGrid;
+    // Clear link since positions have shifted.
+    this._linkedTilePos = null;
+    this._linkedTileDirty = false;
     this._renderEditorCanvas();
   }
 
@@ -2099,6 +2267,7 @@ export class CampaignEditor {
       chapter.levels.push(newLevel);
     }
     this._saveCampaigns();
+    this._editorUnsavedChanges = false;
 
     // Visual confirmation on the Save button
     const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
