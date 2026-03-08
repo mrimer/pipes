@@ -335,25 +335,7 @@ export class Board {
   /** Capture a deep copy of the current grid and inventory. */
   private _captureSnapshot(): Snapshot {
     return {
-      grid: this.grid.map((row) =>
-        row.map(
-          (tile) =>
-            new Tile(
-              tile.shape,
-              tile.rotation,
-              tile.isFixed,
-              tile.capacity,
-              tile.cost,
-              tile.itemShape,
-              tile.itemCount,
-              tile.customConnections !== null ? new Set(tile.customConnections) : null,
-              tile.chamberContent,
-              tile.temperature,
-              tile.pressure,
-              tile.hardness,
-            ),
-        ),
-      ),
+      grid: this.grid.map((row) => row.map((tile) => tile.clone())),
       inventory: this.inventory.map((item) => ({ ...item })),
       lockedWaterImpact: new Map(this._lockedWaterImpact),
       frozen: this.frozen,
@@ -366,7 +348,9 @@ export class Board {
   private _restoreSnapshot(snap: Snapshot): void {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        this.grid[r][c] = snap.grid[r][c];
+        // Deep-copy each Tile so that subsequent in-place mutations (e.g. rotate())
+        // on the live grid cannot corrupt the stored snapshot.
+        this.grid[r][c] = snap.grid[r][c].clone();
       }
     }
     // InventoryItem only contains primitive fields (shape + count), so spread is a full copy –

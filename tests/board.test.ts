@@ -1210,6 +1210,37 @@ describe('Board.initHistory / canUndo / undoMove / canRedo / redoMove', () => {
     expect(board.canUndo()).toBe(true);   // can still undo
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
+
+  it('second undo after two rotation-induced fail states restores the original tile rotation', () => {
+    // Regression test: _restoreSnapshot previously shared Tile object references with the
+    // snapshot, so a rotate() call after the first undo would mutate the stored snapshot.
+    // The second undo therefore appeared to have no effect because it "restored" the
+    // already-mutated snapshot, leaving the tile in the post-rotation state.
+    const board = new Board(2, 2);
+    board.grid[0][0] = new Tile(PipeShape.Elbow, 0);
+
+    board.initHistory();  // snap0: tile at rotation 0
+
+    // First rotation → rotation 90
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();   // snap1: tile at rotation 90
+    expect(board.grid[0][0].rotation).toBe(90);
+
+    // First undo → restore snap0
+    board.undoMove();
+    expect(board.grid[0][0].rotation).toBe(0);
+
+    // Second rotation → rotation 90 again (same as snap1)
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();   // reuses snap1 or pushes new snap; index at 1
+    expect(board.grid[0][0].rotation).toBe(90);
+
+    // Second undo → must restore snap0 (rotation 0), not the corrupted snapshot
+    board.undoMove();
+    expect(board.grid[0][0].rotation).toBe(0);
+    expect(board.canUndo()).toBe(false);
+    expect(board.canRedo()).toBe(true);
+  });
 });
 
 // ─── New: replaceInventoryTile ────────────────────────────────────────────────

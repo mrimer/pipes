@@ -143,6 +143,24 @@ export class Tile {
     this.hardness = hardness;
   }
 
+  /** Return a deep copy of this tile. */
+  clone(): Tile {
+    return new Tile(
+      this.shape,
+      this.rotation,
+      this.isFixed,
+      this.capacity,
+      this.cost,
+      this.itemShape,
+      this.itemCount,
+      this.customConnections !== null ? new Set(this.customConnections) : null,
+      this.chamberContent,
+      this.temperature,
+      this.pressure,
+      this.hardness,
+    );
+  }
+
   /** Rotate the tile 90° clockwise. */
   rotate(): void {
     if (this.isFixed) return;
