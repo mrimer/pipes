@@ -1416,9 +1416,23 @@ export class Game {
 
   // ─── Public API called by main.ts button handlers ─────────────────────────
 
-  /** Retry the current level from scratch. */
+  /**
+   * Retry the current level from scratch.
+   * Preserves the undo history so the player can undo back to the state that
+   * was in play before the restart (if there is any previous history).
+   */
   retryLevel(): void {
-    if (this.currentLevel) this.startLevel(this.currentLevel.id);
+    if (!this.currentLevel) return;
+    const prevBoard = this.board;
+    this.startLevel(this.currentLevel.id);
+    // Graft the pre-restart history onto the new board so Undo can revert to
+    // the state the player was in before restarting.
+    // Guard against the edge case where startLevel() returned early (level not
+    // found) and this.board was not replaced with a new Board instance.
+    if (prevBoard && this.board && this.board !== prevBoard) {
+      this.board.graftPreRestartHistory(prevBoard);
+      this._updateUndoRedoButtons();
+    }
   }
 
   /** Advance to the next level in the campaign/chapter sequence. */

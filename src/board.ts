@@ -301,6 +301,25 @@ export class Board {
   }
 
   /**
+   * Import the pre-restart history from a previous board instance so that
+   * pressing Undo after a restart can recover the state the player was in
+   * before the restart.
+   *
+   * Prepends the played portion of `prevBoard`'s history (snapshots 0 through
+   * `prevBoard._historyIndex`) before this board's own initial snapshot and
+   * advances `_historyIndex` accordingly.  Does nothing when `prevBoard` has
+   * no undo-able states (i.e. `prevBoard.canUndo()` is false).
+   *
+   * @param prevBoard - The board that was active before the restart.
+   */
+  graftPreRestartHistory(prevBoard: Board): void {
+    if (!prevBoard.canUndo()) return;
+    const prevSlice = prevBoard._history.slice(0, prevBoard._historyIndex + 1);
+    this._history = [...prevSlice, ...this._history];
+    this._historyIndex += prevSlice.length;
+  }
+
+  /**
    * Re-apply the next state in the history (i.e. redo the last undone move).
    * @returns true if redo was applied; false if there was no future state.
    */
