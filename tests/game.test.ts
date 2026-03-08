@@ -3,8 +3,8 @@
  */
 
 import { Game } from '../src/game';
-import { LevelDef, PipeShape } from '../src/types';
-import { LEVELS } from '../src/levels';
+import { LevelDef, PipeShape, CampaignDef } from '../src/types';
+import { LEVELS, CHAPTERS } from '../src/levels';
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
@@ -268,9 +268,13 @@ type GameTestHooks = {
   focusPos: { row: number; col: number };
   completedLevels: Set<number>;
   resetConfirmModalEl: HTMLElement;
+  _newChapterModalEl: HTMLElement;
+  _challengeModalEl: HTMLElement;
+  _pendingLevelId: number | null;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _animations: { x: number; y: number; text: string; color: string }[];
   _playtestExitCallback: (() => void) | null;
+  _activeCampaign: unknown;
   _activeCampaignProgress: Set<number>;
   ctrlHeld: boolean;
   mouseCanvasPos: { x: number; y: number } | null;
@@ -285,6 +289,7 @@ type GameTestHooks = {
   _markLevelCompleted(levelId: number): void;
   _renderLevelList(): void;
   _playtestLevel(level: LevelDef): void;
+  _activateCampaign(campaign: unknown): void;
   gameState: string;
 };
 
@@ -1582,5 +1587,205 @@ describe('Game – retryLevel preserves undo history', () => {
     expect(undoBtn.disabled).toBe(false);
     game.performUndo();
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+});
+
+// ─── Tests: new-chapter modal ─────────────────────────────────────────────────
+
+describe('Game – new-chapter modal', () => {
+  // LEVEL_2 is the last level in Chapter 1; LEVEL_3 is the first in Chapter 2.
+  const lastLevelOfChapter1 = CHAPTERS[0].levels[CHAPTERS[0].levels.length - 1];
+  const firstLevelOfChapter2 = CHAPTERS[1].levels[0];
+
+  it('shows the new-chapter modal (not the play screen) when nextLevel() crosses a chapter boundary', () => {
+    const { game, playScreenEl } = makeGame();
+    game.startLevel(lastLevelOfChapter1.id);
+
+    game.nextLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._newChapterModalEl.style.display).toBe('flex');
+    // pending level should be set but the play screen is still on the previous level
+    expect(hooks._pendingLevelId).toBe(firstLevelOfChapter2.id);
+    expect(playScreenEl.style.display).toBe('flex');
+  });
+
+  it('populates the new-chapter modal with the correct chapter number and name', () => {
+    const { game } = makeGame();
+    game.startLevel(lastLevelOfChapter1.id);
+
+    game.nextLevel();
+
+    const hooks = gameHooks(game);
+    const box = hooks._newChapterModalEl.querySelector<HTMLElement>('.modal-box')!;
+    expect(box.textContent).toContain('Chapter 2');
+    expect(box.textContent).toContain(CHAPTERS[1].name);
+  });
+
+  it('hides the new-chapter modal and starts the level when startChapterLevel() is called', () => {
+    const { game, playScreenEl } = makeGame();
+    game.startLevel(lastLevelOfChapter1.id);
+    game.nextLevel();
+
+    game.startChapterLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._newChapterModalEl.style.display).toBe('none');
+    expect(playScreenEl.style.display).toBe('flex');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id)
+      .toBe(firstLevelOfChapter2.id);
+  });
+
+  it('does NOT show the new-chapter modal when nextLevel() stays within the same chapter', () => {
+    const firstLevelOfChapter1 = CHAPTERS[0].levels[0];
+    const secondLevelOfChapter1 = CHAPTERS[0].levels[1];
+
+    const { game } = makeGame();
+    game.startLevel(firstLevelOfChapter1.id);
+
+    game.nextLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._newChapterModalEl.style.display).toBe('none');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id)
+      .toBe(secondLevelOfChapter1.id);
+  });
+
+  it('hides the new-chapter modal when exitToMenu is called', () => {
+    const { game } = makeGame();
+    game.startLevel(lastLevelOfChapter1.id);
+    game.nextLevel();
+
+    game.exitToMenu();
+
+    const hooks = gameHooks(game);
+    expect(hooks._newChapterModalEl.style.display).toBe('none');
+    expect(hooks._pendingLevelId).toBeNull();
+  });
+});
+
+// ─── Tests: challenge-level modal ────────────────────────────────────────────
+
+/** Build a minimal campaign with one regular level followed by one challenge level. */
+function makeChallengeTestCampaign(levelTemplate: LevelDef, challengeLevelTemplate: LevelDef): CampaignDef {
+  return {
+    id: 'test-challenge-campaign',
+    name: 'Test',
+    author: 'Test',
+    chapters: [
+      {
+        id: 1,
+        name: 'Test Chapter',
+        levels: [
+          { ...levelTemplate, id: 9001 },
+          { ...challengeLevelTemplate, id: 9002, challenge: true },
+          { ...levelTemplate, id: 9003 },
+        ],
+      },
+    ],
+  };
+}
+
+describe('Game – challenge-level modal', () => {
+  it('shows the challenge modal when requestLevel() is called with a challenge level', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+
+    game.requestLevel(9002);
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeModalEl.style.display).toBe('flex');
+    expect(hooks._pendingLevelId).toBe(9002);
+  });
+
+  it('does NOT show the challenge modal for a non-challenge level', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+
+    game.requestLevel(9001);
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9001);
+  });
+
+  it('shows the challenge modal when nextLevel() advances into a challenge level (same chapter)', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+    game.startLevel(9001);
+
+    game.nextLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeModalEl.style.display).toBe('flex');
+    expect(hooks._pendingLevelId).toBe(9002);
+  });
+
+  it('playChallengeLevel() hides the challenge modal and starts the level', () => {
+    const { game, playScreenEl } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+    game.requestLevel(9002);
+
+    game.playChallengeLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect(playScreenEl.style.display).toBe('flex');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
+  });
+
+  it('skipChallengeLevel() hides the challenge modal and advances to the level after the challenge', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+    game.startLevel(9001);
+    game.nextLevel(); // shows challenge modal for 9002
+
+    game.skipChallengeLevel();
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9003);
+  });
+
+  it('skipChallengeLevel() calls exitToMenu when there is no level after the challenge', () => {
+    const { game, levelSelectEl } = makeGame();
+    const campaignNoNext: CampaignDef = {
+      id: 'test-no-next',
+      name: 'Test',
+      author: 'Test',
+      chapters: [{
+        id: 1,
+        name: 'Chapter',
+        levels: [
+          { ...LEVELS[0], id: 9010 },
+          { ...LEVELS[1], id: 9011, challenge: true },
+        ],
+      }],
+    };
+    gameHooks(game)._activateCampaign(campaignNoNext);
+    game.startLevel(9010);
+    game.nextLevel(); // shows challenge modal for 9011
+
+    game.skipChallengeLevel();
+
+    expect(levelSelectEl.style.display).toBe('flex');
+  });
+
+  it('hides the challenge modal when exitToMenu is called', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+    game.requestLevel(9002);
+
+    game.exitToMenu();
+
+    const hooks = gameHooks(game);
+    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect(hooks._pendingLevelId).toBeNull();
   });
 });

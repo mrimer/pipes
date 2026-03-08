@@ -1,7 +1,7 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { LEVELS, CHAPTERS } from './levels';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
@@ -176,6 +176,24 @@ export class Game {
    */
   private _playtestExitCallback: (() => void) | null = null;
 
+  /**
+   * Level ID that is queued to start after the player dismisses an intermediate
+   * modal (new-chapter intro or challenge-level warning).
+   */
+  private _pendingLevelId: number | null = null;
+
+  /** Modal overlay shown when the player is about to enter the first level of a new chapter. */
+  private readonly _newChapterModalEl: HTMLElement;
+
+  /** Element inside the new-chapter modal that displays the chapter number. */
+  private readonly _newChapterNumberEl: HTMLElement;
+
+  /** Element inside the new-chapter modal that displays the chapter name. */
+  private readonly _newChapterNameEl: HTMLElement;
+
+  /** Modal overlay shown when the player is about to enter a challenge level. */
+  private readonly _challengeModalEl: HTMLElement;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -309,6 +327,66 @@ export class Game {
     // Create the game-rules modal (appends itself to document.body)
     this.rulesModalEl = createGameRulesModal();
 
+    // Create the new-chapter intro modal
+    this._newChapterModalEl = document.createElement('div');
+    this._newChapterModalEl.style.cssText =
+      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
+      'justify-content:center;align-items:center;z-index:100;';
+    const newChapterBox = document.createElement('div');
+    newChapterBox.className = 'modal-box';
+    const newChapterTitle = document.createElement('h2');
+    newChapterTitle.textContent = '✨ New Chapter';
+    this._newChapterNumberEl = document.createElement('p');
+    this._newChapterNumberEl.style.cssText = 'font-size:1.2rem;font-weight:bold;color:#74b9ff;';
+    this._newChapterNameEl = document.createElement('p');
+    this._newChapterNameEl.style.cssText = 'font-size:1.5rem;font-weight:bold;color:#eee;';
+    const newChapterActions = document.createElement('div');
+    newChapterActions.className = 'modal-actions';
+    const newChapterStartBtn = document.createElement('button');
+    newChapterStartBtn.textContent = 'Start Level';
+    newChapterStartBtn.className = 'modal-btn primary';
+    newChapterStartBtn.type = 'button';
+    newChapterStartBtn.addEventListener('click', () => this.startChapterLevel());
+    newChapterActions.appendChild(newChapterStartBtn);
+    newChapterBox.appendChild(newChapterTitle);
+    newChapterBox.appendChild(this._newChapterNumberEl);
+    newChapterBox.appendChild(this._newChapterNameEl);
+    newChapterBox.appendChild(newChapterActions);
+    this._newChapterModalEl.appendChild(newChapterBox);
+    document.body.appendChild(this._newChapterModalEl);
+
+    // Create the challenge-level warning modal
+    this._challengeModalEl = document.createElement('div');
+    this._challengeModalEl.style.cssText =
+      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
+      'justify-content:center;align-items:center;z-index:100;';
+    const challengeBox = document.createElement('div');
+    challengeBox.className = 'modal-box';
+    const challengeTitle = document.createElement('h2');
+    challengeTitle.textContent = '☠️ Challenge Level ☠️';
+    const challengeMsg = document.createElement('p');
+    challengeMsg.style.cssText = 'font-size:0.95rem;color:#aaa;';
+    challengeMsg.textContent = 'This is an optional challenge level. You may skip it without affecting your progress.';
+    const challengeActions = document.createElement('div');
+    challengeActions.className = 'modal-actions';
+    const challengePlayBtn = document.createElement('button');
+    challengePlayBtn.textContent = 'Play Level';
+    challengePlayBtn.className = 'modal-btn primary';
+    challengePlayBtn.type = 'button';
+    challengePlayBtn.addEventListener('click', () => this.playChallengeLevel());
+    const challengeSkipBtn = document.createElement('button');
+    challengeSkipBtn.textContent = 'Skip Level';
+    challengeSkipBtn.className = 'modal-btn secondary';
+    challengeSkipBtn.type = 'button';
+    challengeSkipBtn.addEventListener('click', () => this.skipChallengeLevel());
+    challengeActions.appendChild(challengePlayBtn);
+    challengeActions.appendChild(challengeSkipBtn);
+    challengeBox.appendChild(challengeTitle);
+    challengeBox.appendChild(challengeMsg);
+    challengeBox.appendChild(challengeActions);
+    this._challengeModalEl.appendChild(challengeBox);
+    document.body.appendChild(this._challengeModalEl);
+
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
       () => this._showLevelSelect(),         // onClose: return to level select
@@ -346,12 +424,17 @@ export class Game {
     this.screen = GameScreen.LevelSelect;
     this.levelSelectEl.style.display = 'flex';
     this.playScreenEl.style.display = 'none';
-    // Explicitly hide both modal overlays so they cannot cover the level-select
+    // Explicitly hide all modal overlays so they cannot cover the level-select
     // screen when returning from a completed or failed level.
     this.winModalEl.style.display = 'none';
     this.gameoverModalEl.style.display = 'none';
+    this._newChapterModalEl.style.display = 'none';
+    this._challengeModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
+    this._clearModalSparkle(this._newChapterModalEl);
+    this._clearModalSparkle(this._challengeModalEl);
+    this._pendingLevelId = null;
     clearConfetti();
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
@@ -393,8 +476,10 @@ export class Game {
     this.screen = GameScreen.Play;
     this.levelSelectEl.style.display = 'none';
     this.playScreenEl.style.display  = 'flex';
-    this.winModalEl.style.display      = 'none';
-    this.gameoverModalEl.style.display = 'none';
+    this.winModalEl.style.display         = 'none';
+    this.gameoverModalEl.style.display    = 'none';
+    this._newChapterModalEl.style.display = 'none';
+    this._challengeModalEl.style.display  = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
@@ -518,7 +603,7 @@ export class Game {
     renderLevelList(
       this.levelListEl,
       displayProgress,
-      (id) => this.startLevel(id),
+      (id) => this.requestLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
       () => { this.rulesModalEl.style.display = 'flex'; },
       () => { this._openCampaignEditor(); },
@@ -656,10 +741,10 @@ export class Game {
   }
 
   /** Add a sparkle CSS animation to the .modal-box inside the given modal overlay. */
-  private _triggerModalSparkle(modalEl: HTMLElement, colorClass: 'sparkle-gold' | 'sparkle-red'): void {
+  private _triggerModalSparkle(modalEl: HTMLElement, colorClass: 'sparkle-gold' | 'sparkle-red' | 'sparkle-blue'): void {
     const box = modalEl.querySelector<HTMLElement>('.modal-box');
     if (!box) return;
-    box.classList.remove('sparkle-gold', 'sparkle-red');
+    box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-blue');
     void box.offsetWidth; // force reflow so removing+re-adding restarts the animation
     box.classList.add(colorClass);
   }
@@ -667,7 +752,21 @@ export class Game {
   /** Remove sparkle CSS animation classes from the .modal-box inside the given modal overlay. */
   private _clearModalSparkle(modalEl: HTMLElement): void {
     const box = modalEl.querySelector<HTMLElement>('.modal-box');
-    if (box) box.classList.remove('sparkle-gold', 'sparkle-red');
+    if (box) box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-blue');
+  }
+
+  /** Show the new-chapter intro modal for the given chapter (by 0-based index). */
+  private _showNewChapterModal(chapterIdx: number, chapter: ChapterDef): void {
+    this._newChapterNumberEl.textContent = `Chapter ${chapterIdx + 1}`;
+    this._newChapterNameEl.textContent = chapter.name;
+    this._newChapterModalEl.style.display = 'flex';
+    this._triggerModalSparkle(this._newChapterModalEl, 'sparkle-blue');
+  }
+
+  /** Show the challenge-level warning modal. */
+  private _showChallengeLevelModal(): void {
+    this._challengeModalEl.style.display = 'flex';
+    this._triggerModalSparkle(this._challengeModalEl, 'sparkle-red');
   }
 
   private _checkWinLose(): void {
@@ -1467,10 +1566,104 @@ export class Game {
     // Collect all levels in order
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const idx = allLevels.findIndex((l) => l.id === this.currentLevel!.id);
+    if (idx === -1 || idx + 1 >= allLevels.length) {
+      // No next level – go back to the level-select menu
+      this.exitToMenu();
+      return;
+    }
+
+    const nextLevelDef = allLevels[idx + 1];
+    this._pendingLevelId = nextLevelDef.id;
+
+    // Detect if this transition crosses a chapter boundary into a new chapter's first level
+    const currentChapter = chapters.find((ch) => ch.levels.some((l) => l.id === this.currentLevel!.id));
+    const nextChapter = chapters.find((ch) => ch.levels.some((l) => l.id === nextLevelDef.id));
+
+    if (
+      currentChapter !== undefined &&
+      nextChapter !== undefined &&
+      currentChapter !== nextChapter &&
+      nextChapter.levels[0].id === nextLevelDef.id
+    ) {
+      const chapterIdx = chapters.indexOf(nextChapter);
+      this._showNewChapterModal(chapterIdx, nextChapter);
+    } else if (nextLevelDef.challenge) {
+      this._showChallengeLevelModal();
+    } else {
+      this._pendingLevelId = null;
+      this.startLevel(nextLevelDef.id);
+    }
+  }
+
+  /**
+   * Request to start a level by ID, potentially showing a challenge-level warning
+   * modal first (when the level is marked as a challenge).
+   * Use this instead of `startLevel()` when navigating from the level-select screen.
+   */
+  requestLevel(levelId: number): void {
+    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const allLevels = chapters.flatMap((ch) => ch.levels);
+    const level = allLevels.find((l) => l.id === levelId);
+    if (level?.challenge) {
+      this._pendingLevelId = levelId;
+      this._showChallengeLevelModal();
+    } else {
+      this.startLevel(levelId);
+    }
+  }
+
+  /**
+   * Called when the player confirms the new-chapter modal ("Start Level" button).
+   * Dismisses the chapter modal and either starts the pending level or shows the
+   * challenge-level modal when the pending level is a challenge.
+   */
+  startChapterLevel(): void {
+    this._newChapterModalEl.style.display = 'none';
+    this._clearModalSparkle(this._newChapterModalEl);
+    if (this._pendingLevelId === null) return;
+
+    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const allLevels = chapters.flatMap((ch) => ch.levels);
+    const level = allLevels.find((l) => l.id === this._pendingLevelId);
+    if (level?.challenge) {
+      this._showChallengeLevelModal();
+    } else {
+      const id = this._pendingLevelId;
+      this._pendingLevelId = null;
+      this.startLevel(id);
+    }
+  }
+
+  /**
+   * Called when the player chooses to play the challenge level ("Play Level" button).
+   * Dismisses the challenge modal and starts the pending level.
+   */
+  playChallengeLevel(): void {
+    this._challengeModalEl.style.display = 'none';
+    this._clearModalSparkle(this._challengeModalEl);
+    if (this._pendingLevelId === null) return;
+    const id = this._pendingLevelId;
+    this._pendingLevelId = null;
+    this.startLevel(id);
+  }
+
+  /**
+   * Called when the player chooses to skip the challenge level ("Skip Level" button).
+   * Dismisses the challenge modal and advances to the next level after the challenge.
+   */
+  skipChallengeLevel(): void {
+    this._challengeModalEl.style.display = 'none';
+    this._clearModalSparkle(this._challengeModalEl);
+    if (this._pendingLevelId === null) { this.exitToMenu(); return; }
+
+    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const allLevels = chapters.flatMap((ch) => ch.levels);
+    const idx = allLevels.findIndex((l) => l.id === this._pendingLevelId);
+    this._pendingLevelId = null;
+
     if (idx !== -1 && idx + 1 < allLevels.length) {
       this.startLevel(allLevels[idx + 1].id);
     } else {
-      // No next level – go back to the level-select menu
       this.exitToMenu();
     }
   }
@@ -1598,13 +1791,13 @@ export class Game {
     this.screen = GameScreen.Play;
     this.levelSelectEl.style.display = 'none';
     this.playScreenEl.style.display  = 'flex';
-    this.winModalEl.style.display      = 'none';
-    this.gameoverModalEl.style.display = 'none';
+    this.winModalEl.style.display         = 'none';
+    this.gameoverModalEl.style.display    = 'none';
+    this._newChapterModalEl.style.display = 'none';
+    this._challengeModalEl.style.display  = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
-
-    // Show level name in the header (no chapter context for ad-hoc levels)
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();
