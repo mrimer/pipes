@@ -120,9 +120,9 @@ export class Game {
   private _errorFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Set of "row,col" keys for sandstone tiles currently highlighted due to a validation error. */
-  private _sandstoneHighlightKeys: Set<string> = new Set();
+  private _errorHighlightKeys: Set<string> = new Set();
   /** Timer ID for clearing the sandstone highlight. */
-  private _sandstoneHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  private _errorHighlightTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Modal overlay for confirming a progress reset. */
   private readonly resetConfirmModalEl: HTMLElement;
@@ -613,7 +613,7 @@ export class Game {
       this.shiftHeld,
       currentTemp,
       currentPressure,
-      this._sandstoneHighlightKeys,
+      this._errorHighlightKeys,
       this.hoverRotationDelta,
     );
   }
@@ -1099,11 +1099,11 @@ export class Game {
    * Used to visually identify tiles that are blocking a move.
    */
   private _startErrorHighlight(positions: GridPos[]): void {
-    this._sandstoneHighlightKeys = new Set(positions.map((p) => `${p.row},${p.col}`));
-    if (this._sandstoneHighlightTimer !== null) clearTimeout(this._sandstoneHighlightTimer);
-    this._sandstoneHighlightTimer = setTimeout(() => {
-      this._sandstoneHighlightKeys = new Set();
-      this._sandstoneHighlightTimer = null;
+    this._errorHighlightKeys = new Set(positions.map((p) => `${p.row},${p.col}`));
+    if (this._errorHighlightTimer !== null) clearTimeout(this._errorHighlightTimer);
+    this._errorHighlightTimer = setTimeout(() => {
+      this._errorHighlightKeys = new Set();
+      this._errorHighlightTimer = null;
     }, 2000);
   }
 
