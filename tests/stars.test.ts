@@ -252,9 +252,57 @@ describe('renderLevelList – challenge levels', () => {
     expect(btn?.textContent).not.toContain('💀');
   });
 
+  it('unlocks next chapter when enough levels are completed, including a challenge level substituting for a non-challenge one', () => {
+    // Chapter 1 has 3 regular levels (1,2,3) and 1 challenge level (4).
+    // Required completions = 3 (the non-challenge count).
+    // Completing L1 + L2 + L4💀 satisfies the quota even though L3 is skipped.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2), makeLevel(3), makeLevel(4, undefined, true)],
+    };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(5)] };
+    const chapters = [ch1, ch2];
+
+    // L1, L2, and L4💀 completed; L3 not done.
+    const completed = new Set<number>([1, 2, 4]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterHeaders = container.querySelectorAll('.chapter-header');
+    // Chapter 2 must be unlocked: 3 completions >= 3 non-challenge count.
+    expect(chapterHeaders[1]?.classList.contains('locked')).toBe(false);
+  });
+
+  it('keeps next chapter locked when total completions are below the non-challenge count', () => {
+    // Chapter 1 has 3 regular levels and 1 challenge level. Quota = 3.
+    // Completing only 2 levels (1 regular + 1 challenge) is not enough.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2), makeLevel(3), makeLevel(4, undefined, true)],
+    };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(5)] };
+    const chapters = [ch1, ch2];
+
+    // Only L1 and L4💀 completed (2 total < 3 required).
+    const completed = new Set<number>([1, 4]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterHeaders = container.querySelectorAll('.chapter-header');
+    expect(chapterHeaders[1]?.classList.contains('locked')).toBe(true);
+  });
+
   it('unlocks next chapter when all non-challenge levels of previous chapter are done', () => {
     // Chapter 1 has a regular level (id=1) and a challenge level (id=2).
-    // Completing only the regular level should unlock chapter 2.
+    // Completing only the regular level should unlock chapter 2 (quota=1, completed=1).
     const ch1 = {
       id: 1, name: 'Ch1',
       levels: [makeLevel(1), makeLevel(2, undefined, true)],
@@ -284,7 +332,7 @@ describe('renderLevelList – challenge levels', () => {
     const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
     const chapters = [ch1, ch2];
 
-    // Only level 1 is completed; level 2 (also non-challenge) is not.
+    // Only level 1 is completed; level 2 (also non-challenge) is not (1 < 2 required).
     const completed = new Set<number>([1]);
 
     renderLevelList(

@@ -113,11 +113,16 @@ export function renderLevelList(
   for (let ci = 0; ci < chapters.length; ci++) {
     const chapter = chapters[ci];
 
-    // A chapter is locked if a previous chapter exists and not all its *non-challenge* levels are done.
-    // Challenge levels are optional and do not need to be completed to unlock the next chapter.
+    // A chapter is locked unless the previous chapter has enough completions.
+    // The required count equals the number of non-challenge levels in that chapter, but
+    // any completed level (challenge or not) counts toward the total.  This means players
+    // can substitute a challenge level for a non-challenge one to meet the quota.
     const prevChapter = ci > 0 ? chapters[ci - 1] : null;
-    const chapterLocked = prevChapter !== null &&
-      prevChapter.levels.some((l) => !l.challenge && !completedLevels.has(l.id));
+    const prevNonChallengeCount = prevChapter
+      ? prevChapter.levels.filter((l) => !l.challenge).length : 0;
+    const prevCompletedCount = prevChapter
+      ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
+    const chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
 
     const completedInChapter = chapter.levels.filter((l) => completedLevels.has(l.id)).length;
     const totalInChapter = chapter.levels.length;
