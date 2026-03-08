@@ -398,6 +398,15 @@ export class Game {
     this._updateUndoRedoButtons();
     this._updateNoteHintBoxes(level);
     this.canvas.focus();
+
+    // Check for invalid initial state (e.g. pre-connected negative heaters/pumps)
+    const initialError = this.board.checkInitialStateErrors();
+    if (initialError) {
+      this._showErrorFlash(initialError);
+      if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
+        this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+      }
+    }
   }
 
   /** Update the level-header element with the current chapter, level number and name. */
@@ -1119,9 +1128,9 @@ export class Game {
    * - Chamber-tank tiles: "+capacity" (green / gray / red)
    * - Chamber-dirt tiles: "+cost" (red) when cost > 0, "-0" when cost = 0
    * - Chamber-item tiles: "+itemCount" (green / gray / red)
-   * - Chamber-heater tiles: "+temperature°" (green)
+   * - Chamber-heater tiles: "+temperature°" (green) or "temperature°" (red) for negative
    * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
-   * - Chamber-pump tiles: "+pressureP" (green)
+   * - Chamber-pump tiles: "+pressureP" (green) or "pressureP" (red) for negative
    * - Chamber-snow tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
    * - Chamber-sandstone tiles: "-(⌈cost/deltaDamage⌉ × deltaTemp)" or "-0" (always red)
    */
@@ -1163,16 +1172,18 @@ export class Game {
           color = ANIM_ITEM_COLOR;
           this._pendingSparkleShapes.add(tile.itemShape);
         } else if (tile.chamberContent === 'heater') {
-          text = `+${tile.temperature}°`;
-          color = animColor(tile.temperature);
+          const tempVal = tile.temperature;
+          text = tempVal >= 0 ? `+${tempVal}°` : `${tempVal}°`;
+          color = animColor(tempVal);
         } else if (tile.chamberContent === 'ice') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -(tile.cost * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
         } else if (tile.chamberContent === 'pump') {
-          text = `+${tile.pressure}P`;
-          color = animColor(tile.pressure);
+          const pressVal = tile.pressure;
+          text = pressVal >= 0 ? `+${pressVal}P` : `${pressVal}P`;
+          color = animColor(pressVal);
         } else if (tile.chamberContent === 'snow') {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
@@ -1546,6 +1557,15 @@ export class Game {
     this._updateNoteHintBoxes(level);
     this._updateUndoRedoButtons();
     this.canvas.focus();
+
+    // Check for invalid initial state (e.g. pre-connected negative heaters/pumps)
+    const initialError = this.board.checkInitialStateErrors();
+    if (initialError) {
+      this._showErrorFlash(initialError);
+      if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
+        this._startSandstoneHighlight(this.board.lastErrorTilePositions);
+      }
+    }
   }
 
   // ─── Undo / redo button state ─────────────────────────────────────────────

@@ -3132,3 +3132,280 @@ describe('Spinnable pipe rotation: connection directions', () => {
     expect(tile.connections.has(Direction.West)).toBe(false);
   });
 });
+
+// ─── Negative-temp heater (Cooler) and negative-pressure pump (Vacuum) ────────
+
+describe('getTileDisplayName – Cooler and Vacuum', () => {
+  it('returns "Cooler -5°" for a heater chamber with temperature -5', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', -5);
+    expect(getTileDisplayName(tile)).toBe('Cooler -5°');
+  });
+
+  it('returns "Cooler -1°" for a heater chamber with temperature -1', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', -1);
+    expect(getTileDisplayName(tile)).toBe('Cooler -1°');
+  });
+
+  it('still returns "Heater +3°" for a positive-temperature heater', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 3);
+    expect(getTileDisplayName(tile)).toBe('Heater +3°');
+  });
+
+  it('returns "Vacuum -3P" for a pump chamber with pressure -3', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, -3);
+    expect(getTileDisplayName(tile)).toBe('Vacuum -3P');
+  });
+
+  it('returns "Vacuum -1P" for a pump chamber with pressure -1', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, -1);
+    expect(getTileDisplayName(tile)).toBe('Vacuum -1P');
+  });
+
+  it('still returns "Pump +5P" for a positive-pressure pump', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, 5);
+    expect(getTileDisplayName(tile)).toBe('Pump +5P');
+  });
+});
+
+// ─── Cooler (negative-temperature heater) constraint checks ───────────────────
+
+describe('Board heater constraint: negative temperature (Cooler)', () => {
+  /**
+   * Build a board:
+   *   Source(0,0, baseTemp=sourceTemp) → Cooler(0,1, temp=coolerTemp) → Sink(0,2)
+   * The cooler is fixed and already in the fill path (E-W connections).
+   */
+  function makeCoolerBoard(sourceTemp: number, coolerTemp: number): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, sourceTemp);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'heater', coolerTemp);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 10;
+    return board;
+  }
+
+  it('getCurrentTemperature returns negative value when cooler is connected', () => {
+    const board = makeCoolerBoard(5, -10);
+    expect(board.getCurrentTemperature()).toBe(-5); // 5 + (-10)
+  });
+
+  it('placeInventoryTile blocks move that would connect a Cooler reducing temp below 0', () => {
+    // Layout: Source(0,0,temp=5) → Empty(0,1) → Cooler(0,2,temp=-10,E-W) → Sink(0,3)
+    // Place Straight(E-W) at (0,1): connects source → cooler → sink. Temp = 5+(-10) = -5 → BLOCKED.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, 5);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'heater', -10);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.sourceCapacity = 10;
+
+    // Rotation 90 = East-West Straight
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result).toBe(false);
+    expect(board.lastError).toMatch(/temperature below 0/i);
+  });
+
+  it('placeInventoryTile allows move that connects a Cooler when temp stays >= 0', () => {
+    // Source temp=15, cooler temp=-5 → result temp=10 → ALLOWED
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, 15);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'heater', -5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.sourceCapacity = 10;
+
+    // Rotation 90 = East-West Straight
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result).toBe(true);
+    expect(board.lastError).toBeNull();
+    expect(board.getCurrentTemperature()).toBe(10);
+  });
+
+  it('reclaimTile blocks removal that would cause temp to drop below 0', () => {
+    // Layout: Source(0,0,temp=5) → Cooler(0,1,-10,E-W,fixed) → Straight(0,2,90°,player)
+    //         → Heater(0,3,+8,E-W,fixed) → Sink(0,4)
+    // Current temp = 5 + (-10) + 8 = 3 (>= 0, valid).
+    // Reclaim (0,2): heater at (0,3) disconnects, temp = 5 + (-10) = -5 < 0 → BLOCKED.
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, 5);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'heater', -10); // cooler (always in fill path)
+    board.grid[0][2] = new Tile(PipeShape.Straight, 90, false);  // player-placed E-W bridge
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'heater', 8);  // positive heater
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+    board.sourceCapacity = 10;
+
+    // Current temp = 5 + (-10) + 8 = 3 (>= 0, valid)
+    expect(board.getCurrentTemperature()).toBe(3);
+
+    // Remove (0,2): positive heater disconnects, temp = 5 + (-10) = -5 < 0 → BLOCKED
+    const result = board.reclaimTile({ row: 0, col: 2 });
+    expect(result).toBe(false);
+    expect(board.lastError).toMatch(/temperature below 0/i);
+  });
+
+  it('checkInitialStateErrors returns an error when pre-connected cooler causes temp < 0', () => {
+    const board = makeCoolerBoard(5, -10); // temp = 5 + (-10) = -5
+    board.initHistory();
+    const error = board.checkInitialStateErrors();
+    expect(error).not.toBeNull();
+    expect(error).toMatch(/temperature below 0/i);
+  });
+
+  it('checkInitialStateErrors returns null when initial temperature is valid', () => {
+    const board = makeCoolerBoard(15, -5); // temp = 15 + (-5) = 10 >= 0
+    board.initHistory();
+    const error = board.checkInitialStateErrors();
+    expect(error).toBeNull();
+  });
+
+  it('checkInitialStateErrors returns null when no cooler tiles are present', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 5, 0, null, 1, null, null, 5);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'heater', 10); // positive heater
+    board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
+    board.sourceCapacity = 5;
+    board.initHistory();
+    const error = board.checkInitialStateErrors();
+    expect(error).toBeNull();
+  });
+});
+
+// ─── Vacuum (negative-pressure pump) constraint checks ────────────────────────
+
+describe('Board pump constraint: negative pressure (Vacuum)', () => {
+  /**
+   * Build a board:
+   *   Source(0,0, basePressure=sourcePressure) → Vacuum(0,1, pressure=vacuumPressure) → Sink(0,2)
+   */
+  function makeVacuumBoard(sourcePressure: number, vacuumPressure: number): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, null, null, 0, sourcePressure);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'pump', 0, vacuumPressure);
+    board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
+    board.sourceCapacity = 10;
+    return board;
+  }
+
+  it('getCurrentPressure returns negative value when vacuum is connected', () => {
+    const board = makeVacuumBoard(5, -10);
+    expect(board.getCurrentPressure()).toBe(-5); // 5 + (-10)
+  });
+
+  it('placeInventoryTile blocks move that would connect a Vacuum reducing pressure below 0', () => {
+    // Layout: Source(0,0,pressure=3) → Empty(0,1) → Vacuum(0,2,-8,E-W) → Sink(0,3)
+    // Place Straight(E-W) at (0,1): pressure = 3+(-8) = -5 < 0 → BLOCKED.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, 0, 3);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'pump', 0, -8);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.sourceCapacity = 10;
+
+    // Rotation 90 = East-West Straight
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result).toBe(false);
+    expect(board.lastError).toMatch(/pressure below 0/i);
+  });
+
+  it('placeInventoryTile allows move that connects a Vacuum when pressure stays >= 0', () => {
+    // Source pressure=10, vacuum pressure=-5 → result pressure=5 → ALLOWED
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, 0, 10);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'pump', 0, -5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.sourceCapacity = 10;
+
+    // Rotation 90 = East-West Straight
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result).toBe(true);
+    expect(board.lastError).toBeNull();
+    expect(board.getCurrentPressure()).toBe(5);
+  });
+
+  it('reclaimTile blocks removal that would cause pressure to drop below 0', () => {
+    // Layout: Source(0,0,pressure=5) → Vacuum(0,1,-10,E-W,fixed) → Straight(0,2,90°,player)
+    //         → Pump(0,3,+8,E-W,fixed) → Sink(0,4)
+    // Current pressure = 5 + (-10) + 8 = 3 (>= 0, valid).
+    // Reclaim (0,2): pump at (0,3) disconnects, pressure = 5 + (-10) = -5 < 0 → BLOCKED.
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, null, null, 0, 5);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'pump', 0, -10); // vacuum (always in fill path)
+    board.grid[0][2] = new Tile(PipeShape.Straight, 90, false);  // player-placed E-W bridge
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'pump', 0, 8);  // positive pump
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+    board.sourceCapacity = 10;
+
+    // Current pressure = 5 + (-10) + 8 = 3 (>= 0, valid)
+    expect(board.getCurrentPressure()).toBe(3);
+
+    // Remove (0,2): positive pump disconnects, pressure = 5 + (-10) = -5 < 0 → BLOCKED
+    const result = board.reclaimTile({ row: 0, col: 2 });
+    expect(result).toBe(false);
+    expect(board.lastError).toMatch(/pressure below 0/i);
+  });
+
+  it('checkInitialStateErrors returns an error when pre-connected vacuum causes pressure < 0', () => {
+    const board = makeVacuumBoard(5, -10); // pressure = 5 + (-10) = -5
+    board.initHistory();
+    const error = board.checkInitialStateErrors();
+    expect(error).not.toBeNull();
+    expect(error).toMatch(/pressure below 0/i);
+  });
+
+  it('checkInitialStateErrors returns null when initial pressure is valid', () => {
+    const board = makeVacuumBoard(15, -5); // pressure = 15 + (-5) = 10 >= 0
+    board.initHistory();
+    const error = board.checkInitialStateErrors();
+    expect(error).toBeNull();
+  });
+
+  it('checkInitialStateErrors returns null when no vacuum tiles are present', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, null, null, 0, 5);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'pump', 0, 10); // positive pump
+    board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
+    board.sourceCapacity = 10;
+    board.initHistory();
+    const error = board.checkInitialStateErrors();
+    expect(error).toBeNull();
+  });
+});

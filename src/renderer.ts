@@ -22,8 +22,10 @@ import {
   LABEL_COLOR,
   REMOVABLE_BG_COLOR,
   HEATER_COLOR, HEATER_WATER_COLOR,
+  COOLER_COLOR, COOLER_WATER_COLOR,
   ICE_COLOR, ICE_WATER_COLOR,
   PUMP_COLOR, PUMP_WATER_COLOR,
+  VACUUM_COLOR, VACUUM_WATER_COLOR,
   SNOW_COLOR, SNOW_WATER_COLOR,
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
@@ -172,11 +174,15 @@ export function drawTile(
     } else if (chamberContent === 'item') {
       color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
     } else if (chamberContent === 'heater') {
-      color = isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
+      color = tile.temperature < 0
+        ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
+        : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
     } else if (chamberContent === 'ice') {
       color = isWater ? ICE_WATER_COLOR : ICE_COLOR;
     } else if (chamberContent === 'pump') {
-      color = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
+      color = tile.pressure < 0
+        ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
+        : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
     } else if (chamberContent === 'snow') {
       color = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
     } else if (chamberContent === 'sandstone') {
@@ -351,12 +357,16 @@ export function drawTile(
         ctx.fillText(countLabel, 0, 0);
       }
     } else if (chamberContent === 'heater') {
-      // Show positive temperature bonus in heater color
-      ctx.fillStyle = isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
+      // Show temperature bonus (no plus sign for negative values)
+      const isCooler = tile.temperature < 0;
+      ctx.fillStyle = isCooler
+        ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
+        : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
       ctx.font = 'bold 13px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`+${tile.temperature}°`, 0, 0);
+      const tempStr = tile.temperature >= 0 ? `+${tile.temperature}°` : `${tile.temperature}°`;
+      ctx.fillText(tempStr, 0, 0);
     } else if (chamberContent === 'ice') {
       ctx.fillStyle = isWater ? ICE_WATER_COLOR : ICE_COLOR;
       ctx.textAlign = 'center';
@@ -380,12 +390,16 @@ export function drawTile(
         ctx.fillText(String(cost), 0, 9);
       }
     } else if (chamberContent === 'pump') {
-      // Show the pressure bonus amount
-      ctx.fillStyle = isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
+      // Show pressure bonus (no plus sign for negative values)
+      const isVacuum = tile.pressure < 0;
+      ctx.fillStyle = isVacuum
+        ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
+        : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
       ctx.font = 'bold 13px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`+${tile.pressure}P`, 0, 0);
+      const pressStr = tile.pressure >= 0 ? `+${tile.pressure}P` : `${tile.pressure}P`;
+      ctx.fillText(pressStr, 0, 0);
     } else if (chamberContent === 'snow') {
       ctx.fillStyle = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
       ctx.textAlign = 'center';
@@ -553,9 +567,13 @@ export function getTileDisplayName(tile: Tile): string {
           const itemName = _itemShapeDisplayName(tile.itemShape);
           return tile.itemCount > 1 ? `${tile.itemCount}× ${itemName}` : itemName;
         }
-        case 'heater': return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
+        case 'heater':
+          if (tile.temperature < 0) return `Cooler ${tile.temperature}°`;
+          return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
         case 'ice':    return 'Ice';
-        case 'pump':   return `Pump +${tile.pressure}P`;
+        case 'pump':
+          if (tile.pressure < 0) return `Vacuum ${tile.pressure}P`;
+          return `Pump +${tile.pressure}P`;
         case 'snow':    return 'Snow';
         case 'sandstone': return 'Sandstone';
         default:       return 'Chamber';
