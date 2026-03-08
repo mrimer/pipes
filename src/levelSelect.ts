@@ -110,6 +110,7 @@ export function renderLevelList(
     levelListEl.appendChild(header);
   }
 
+  let foundLockedChapter = false;
   for (let ci = 0; ci < chapters.length; ci++) {
     const chapter = chapters[ci];
 
@@ -123,6 +124,12 @@ export function renderLevelList(
     const prevCompletedCount = prevChapter
       ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
     const chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+
+    // Only show one locked chapter; hide any chapters beyond the first locked one.
+    if (chapterLocked) {
+      if (foundLockedChapter) break;
+      foundLockedChapter = true;
+    }
 
     const { completedInChapter, nonChallengeInChapter, nonChallengeCompleted } =
       chapter.levels.reduce(
