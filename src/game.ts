@@ -832,6 +832,7 @@ export class Game {
         this.board.applyTurnDelta();
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
+        this._spawnDisconnectionAnimations(filledBefore);
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._updateUndoRedoButtons();
@@ -869,6 +870,7 @@ export class Game {
         this.board.applyTurnDelta();
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
+        this._spawnDisconnectionAnimations(filledBefore);
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._updateUndoRedoButtons();
@@ -1206,18 +1208,20 @@ export class Game {
 
   /**
    * Spawn floating animation labels for tiles that have just **lost** their fill
-   * (present in `filledBefore`, absent after reclaim).  The label shows the
+   * (present in `filledBefore`, absent after the action).  The label shows the
    * reversal of each disconnected tile's water contribution.
    *
-   * `reclaimedTile` / `reclaimedRow` / `reclaimedCol` are supplied separately
-   * because the reclaimed grid cell has already been replaced with an Empty tile
-   * by the time this method is called.
+   * When called after a tile reclaim, `reclaimedTile` / `reclaimedRow` /
+   * `reclaimedCol` must be supplied because the reclaimed grid cell has already
+   * been replaced with an Empty tile by the time this method is called.
+   * When called after a rotation (where all tiles remain on the grid), these
+   * parameters may be omitted.
    */
   private _spawnDisconnectionAnimations(
     filledBefore: Set<string>,
-    reclaimedTile: Tile | undefined,
-    reclaimedRow: number,
-    reclaimedCol: number,
+    reclaimedTile?: Tile,
+    reclaimedRow?: number,
+    reclaimedCol?: number,
   ): void {
     if (!this.board) return;
     const filledAfter = this.board.getFilledPositions();
@@ -1229,8 +1233,11 @@ export class Game {
       if (filledAfter.has(key)) continue; // still filled – skip
       const [r, c] = key.split(',').map(Number);
 
-      // The reclaimed cell is now Empty in the grid; use the captured tile data.
-      const tile = (r === reclaimedRow && c === reclaimedCol)
+      // When a tile was reclaimed its cell is now Empty in the grid; use the
+      // captured tile data instead.  For rotation moves all tiles remain on the
+      // grid so we always fall through to the grid lookup.
+      const tile = (reclaimedRow !== undefined && reclaimedCol !== undefined &&
+                    r === reclaimedRow && c === reclaimedCol)
         ? reclaimedTile
         : this.board.grid[r]?.[c];
       if (!tile) continue;
@@ -1365,6 +1372,7 @@ export class Game {
             board.applyTurnDelta();
             board.recordMove();
             this._spawnConnectionAnimations(filledBefore);
+            this._spawnDisconnectionAnimations(filledBefore);
             this._renderInventoryBar();
             this._updateWaterDisplay();
             this._updateUndoRedoButtons();
