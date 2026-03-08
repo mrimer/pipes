@@ -552,7 +552,8 @@ export class CampaignEditor {
     info.style.cssText = 'flex:1;';
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
-    name.textContent = `Level ${levelIdx + 1}: ${level.name}${level.challenge ? ' 💀' : ''}`;
+    const starSuffix = (level.starCount ?? 0) > 0 ? ` ⭐×${level.starCount}` : '';
+    name.textContent = `Level ${levelIdx + 1}: ${level.name}${level.challenge ? ' 💀' : ''}${starSuffix}`;
     const minimap = renderMinimap(level);
     minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;';
     info.appendChild(name);
