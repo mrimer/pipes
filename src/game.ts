@@ -413,7 +413,8 @@ export class Game {
   private _updateLevelHeader(levelId: number): void {
     // Search active campaign chapters first, then fall back to official chapters
     const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
-    for (const chapter of chapters) {
+    for (let ci = 0; ci < chapters.length; ci++) {
+      const chapter = chapters[ci];
       const idx = chapter.levels.findIndex((l) => l.id === levelId);
       if (idx !== -1) {
         this.currentChapterId = chapter.id;
@@ -421,8 +422,9 @@ export class Game {
         const campaignPrefix = this._activeCampaign
           ? `${this._activeCampaign.name}  ·  `
           : '';
+        const chapterNumber = ci + 1;
         this.levelHeaderEl.textContent =
-          `${campaignPrefix}Chapter ${chapter.id}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
+          `${campaignPrefix}Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
         return;
       }
     }

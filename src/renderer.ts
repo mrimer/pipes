@@ -624,7 +624,7 @@ const FLOWER_PETAL_COLORS = [
 const FLOWER_CENTER_COLOR = 'rgba(120,104,56,0.82)';
 
 /** Grass blade colour. */
-const GRASS_COLOR = 'rgba(42,65,36,0.82)';
+const GRASS_COLOR = 'rgba(72,115,58,0.90)';
 
 // ─── Ambient decoration drawing helpers ──────────────────────────────────────
 
@@ -632,10 +632,10 @@ const GRASS_COLOR = 'rgba(42,65,36,0.82)';
 function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
   const color = PEBBLE_COLORS[variant % PEBBLE_COLORS.length];
   const stones: Array<[number, number, number, number]> = [
-    [0, 0, 3.5, 2.5],
-    [5, -2.5, 2.8, 2.0],
+    [0, 0, 5.25, 3.75],
+    [7.5, -3.75, 4.2, 3.0],
   ];
-  if (variant < 2) stones.push([-4, 3, 2.2, 1.6]);
+  if (variant < 2) stones.push([-6, 4.5, 3.3, 2.4]);
   ctx.fillStyle = color;
   for (const [dx, dy, rx, ry] of stones) {
     ctx.beginPath();
@@ -672,7 +672,7 @@ function _drawGrass(ctx: CanvasRenderingContext2D, variant: number): void {
   for (let i = 0; i < blades; i++) {
     // Fan the blades symmetrically; vary length slightly for a natural look
     const spread = (blades > 1) ? ((i / (blades - 1)) - 0.5) * (Math.PI * 0.55) : 0;
-    const len = 5.5 + (i % 2) * 2;
+    const len = 8.25 + (i % 2) * 3;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(Math.sin(spread) * len, -Math.cos(spread) * len);
@@ -693,7 +693,9 @@ export function drawAmbientDecoration(
   const cy = dec.row * TILE_SIZE + dec.offsetY * TILE_SIZE;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate((dec.rotation * Math.PI) / 180);
+  if (dec.type !== 'grass') {
+    ctx.rotate((dec.rotation * Math.PI) / 180);
+  }
   switch (dec.type) {
     case 'pebbles': _drawPebbles(ctx, dec.variant); break;
     case 'flower':  _drawFlower(ctx, dec.variant);  break;
