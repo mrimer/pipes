@@ -534,6 +534,9 @@ export class Game {
     this.selectedShape = shape;
     this.pendingRotation = this.lastPlacedRotations.get(shape) ?? 0;
     this._renderInventoryBar();
+    // Return focus to the canvas so Q/W rotation keys work immediately after
+    // selecting an inventory piece without requiring a click on the board.
+    this.canvas.focus();
   }
 
   // ─── Water display ────────────────────────────────────────────────────────
