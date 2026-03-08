@@ -15,7 +15,6 @@ import {
   TANK_COLOR, TANK_WATER_COLOR,
   FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR,
   DIRT_WATER_COLOR, DIRT_COST_COLOR, DIRT_COLOR,
-  CONTAINER_COLOR, CONTAINER_WATER_COLOR,
   CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
@@ -172,7 +171,7 @@ export function drawTile(
     } else if (chamberContent === 'dirt') {
       color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
     } else if (chamberContent === 'item') {
-      color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+      color = isWater ? WATER_COLOR : PIPE_COLOR;
     } else if (chamberContent === 'heater') {
       color = tile.temperature < 0
         ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
@@ -308,10 +307,7 @@ export function drawTile(
       ctx.fillText(`-${cost}`, 0, 0);
     } else if (chamberContent === 'item') {
       // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
-      const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
-      const itemColor = isGoldItem
-        ? (isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR)
-        : (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR);
+      const itemColor = isWater ? WATER_COLOR : PIPE_COLOR;
       if (itemShape !== null) {
         let drawShape = itemShape;
         if (itemShape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
