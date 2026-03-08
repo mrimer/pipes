@@ -110,7 +110,7 @@ describe('Board.rotateTileBy', () => {
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
-  it('4 steps is a full rotation and returns true unchanged', () => {
+  it('4 steps is a full rotation: leaves rotation unchanged and returns true', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 90);
     expect(board.rotateTileBy({ row: 1, col: 1 }, 4)).toBe(true);
@@ -128,6 +128,13 @@ describe('Board.rotateTileBy', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Empty, 0);
     expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(false);
+  });
+
+  it('negative steps rotate counter-clockwise (-1 → 270°)', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, -1)).toBe(true);
+    expect(board.grid[1][1].rotation).toBe(270);
   });
 });
 

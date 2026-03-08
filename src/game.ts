@@ -753,6 +753,23 @@ export class Game {
   }
 
   /**
+   * Returns the tile currently under the mouse cursor if it is eligible for
+   * hover-rotation preview (non-fixed, non-empty, non-spin pipe), otherwise null.
+   * Also bumps hoverRotationDelta by `steps` (±1) when a valid tile is found.
+   */
+  private _tryAdjustHoverRotation(steps: 1 | -1): boolean {
+    if (!this.mouseCanvasPos || !this.board) return false;
+    const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+    const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+    const hTile = this.board.getTile({ row: hRow, col: hCol });
+    if (!hTile || hTile.isFixed || hTile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(hTile.shape)) {
+      return false;
+    }
+    this.hoverRotationDelta = ((this.hoverRotationDelta + steps + 4) % 4);
+    return true;
+  }
+
+  /**
    * Reclaims (removes) the tile at pos, records the move, and updates UI.
    * Shared by both single right-click and right-drag-erase.
    */
@@ -937,19 +954,11 @@ export class Game {
       } else {
         this.pendingRotation = ((this.pendingRotation + 270) % 360) as Rotation;
       }
-    } else if (this.mouseCanvasPos && this.board) {
-      const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-      const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-      const hTile = this.board.getTile({ row: hRow, col: hCol });
-      if (hTile && !hTile.isFixed && hTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hTile.shape)) {
-        e.preventDefault();
-        // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
-        if (e.deltaY > 0) {
-          this.hoverRotationDelta = ((this.hoverRotationDelta + 1) % 4);
-        } else {
-          this.hoverRotationDelta = (((this.hoverRotationDelta - 1) + 4) % 4);
-        }
-      }
+    } else {
+      // No inventory selected: preview rotation on hovered tile.
+      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
+      const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
+      if (changed) e.preventDefault();
     }
   }
 
@@ -1360,13 +1369,8 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           this.pendingRotation = (((this.pendingRotation - 90) + 360) % 360) as Rotation;
-        } else if (this.mouseCanvasPos && this.board) {
-          const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-          const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-          const hTile = this.board.getTile({ row: hRow, col: hCol });
-          if (hTile && !hTile.isFixed && hTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hTile.shape)) {
-            this.hoverRotationDelta = (((this.hoverRotationDelta - 1) + 4) % 4);
-          }
+        } else {
+          this._tryAdjustHoverRotation(-1);
         }
         break;
       case 'w':
@@ -1375,13 +1379,8 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
-        } else if (this.mouseCanvasPos && this.board) {
-          const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-          const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-          const hTile = this.board.getTile({ row: hRow, col: hCol });
-          if (hTile && !hTile.isFixed && hTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hTile.shape)) {
-            this.hoverRotationDelta = ((this.hoverRotationDelta + 1) % 4);
-          }
+        } else {
+          this._tryAdjustHoverRotation(1);
         }
         break;
       case 'Escape':
