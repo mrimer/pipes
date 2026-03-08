@@ -668,7 +668,7 @@ function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
 
 /** Draw a small tuft of grass blades centred at the current canvas origin. */
 function _drawGrass(ctx: CanvasRenderingContext2D, variant: number): void {
-  const blades = variant + 2; // 2–4 blades
+  const blades = variant + 3; // 3–5 blades
   ctx.strokeStyle = GRASS_COLOR;
   ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
