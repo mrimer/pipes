@@ -5,7 +5,7 @@ import { PipeShape } from './types';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
-  CONTAINER_COLOR, GRANITE_FILL_COLOR, GRANITE_COLOR,
+  GRANITE_FILL_COLOR, GRANITE_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
@@ -129,7 +129,7 @@ const LEGEND_ROWS: LegendRow[] = [
     description: 'Wastes water when filled. The number shows how much water is consumed.',
   },
   {
-    iconHtml: colorSwatch(CONTAINER_COLOR),
+    iconHtml: colorSwatch(PIPE_COLOR),
     name: 'Chamber — Item',
     description: 'Grants bonus pipe pieces from your inventory when water flows through it.',
   },

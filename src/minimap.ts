@@ -14,7 +14,6 @@ import {
   SINK_COLOR,
   TANK_COLOR,
   DIRT_COLOR,
-  CONTAINER_COLOR,
   HEATER_COLOR,
   ICE_COLOR,
   PUMP_COLOR,
@@ -52,7 +51,7 @@ function tileColor(tile: TileDef | null): string {
       switch (tile.chamberContent) {
         case 'tank':     return TANK_COLOR;
         case 'dirt':     return DIRT_COLOR;
-        case 'item':     return CONTAINER_COLOR;
+        case 'item':     return PIPE_COLOR;
         case 'heater':   return HEATER_COLOR;
         case 'ice':      return ICE_COLOR;
         case 'pump':     return PUMP_COLOR;
