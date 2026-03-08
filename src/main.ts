@@ -47,9 +47,10 @@ getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove())
 getEl('gameover-retry-btn').addEventListener('click', () => game.retryLevel());
 getEl('gameover-menu-btn').addEventListener('click',  () => game.exitToMenu());
 
-// HUD undo / redo buttons
+// HUD undo / redo / restart buttons
 undoBtnEl.addEventListener('click', () => game.performUndo());
 redoBtnEl.addEventListener('click', () => game.performRedo());
+getEl('restart-btn').addEventListener('click', () => game.retryLevel());
 
 // Exit to menu button on play screen
 exitBtnEl.addEventListener('click', () => game.exitToMenu());

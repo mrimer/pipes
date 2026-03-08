@@ -1500,3 +1500,87 @@ describe('Game – note and hint boxes', () => {
     level.hints = origHints; // restore
   });
 });
+
+// ─── Tests: retryLevel preserves undo history ─────────────────────────────────
+
+describe('Game – retryLevel preserves undo history', () => {
+  it('keeps the undo button enabled after retryLevel when moves were made', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
+
+    // Make a move so there is something to undo
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Sanity: undo button should be enabled after the move
+    expect(undoBtn.disabled).toBe(false);
+
+    // Restart the level via retryLevel()
+    game.retryLevel();
+
+    // The undo button should still be enabled (pre-restart history was preserved)
+    expect(undoBtn.disabled).toBe(false);
+  });
+
+  it('undo after retryLevel restores the board state that was in play before restart', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    // Place a Straight at (0,1) so the board differs from the initial state
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Capture the shape at (0,1) before restart (should be Straight)
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+
+    // Restart the level – board should revert to initial state
+    game.retryLevel();
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Empty);
+
+    // Undo should restore the pre-restart state where (0,1) was Straight
+    game.performUndo();
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+
+  it('undo button remains disabled after retryLevel when no moves were made', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
+
+    // No moves made – undo should be disabled both before and after retry
+    expect(undoBtn.disabled).toBe(true);
+    game.retryLevel();
+    expect(undoBtn.disabled).toBe(true);
+  });
+
+  it('R key triggers retryLevel and preserves undo history', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
+    const boardAccess = game as unknown as { board: Board };
+
+    // Place a tile so there is pre-restart history
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Press R to restart
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
+
+    // Undo button should be enabled and pressing it restores pre-restart state
+    expect(undoBtn.disabled).toBe(false);
+    game.performUndo();
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+});
