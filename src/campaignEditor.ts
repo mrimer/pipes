@@ -32,6 +32,17 @@ import {
 import { renderEditorCanvas, HoverOverlay, DragState } from './campaignEditorRenderer';
 import { renderMinimap } from './minimap';
 
+/**
+ * Palette values that support paint-drag: clicking and dragging across multiple
+ * empty cells places the tile on each one.  Includes all pipe shapes (regular and
+ * gold), gold spaces, and granite – tile types commonly laid in bulk.
+ */
+const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
+  PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
+  PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+  PipeShape.GoldSpace, PipeShape.Granite,
+]);
+
 // ─── The built-in "Official" campaign ────────────────────────────────────────
 
 /** The pre-loaded read-only campaign derived from the built-in levels. */
@@ -83,6 +94,13 @@ export class CampaignEditor {
   } | null = null;
   /** Bound window mouseup handler for drag completion; stored so it can be removed. */
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
+  /** True while a paint-drag is active (repeatable palette, dragging over empty cells). */
+  private _paintDragActive = false;
+  /**
+   * True once the undo snapshot has been recorded for the current paint-drag session,
+   * so subsequent cells in the same drag are part of the same undo entry.
+   */
+  private _paintDragSnapshotRecorded = false;
   /** Grid position of the tile currently linked for live param editing, or null if no link active. */
   private _linkedTilePos: { row: number; col: number } | null = null;
   /** True once the first param change in the current linked session has been committed. */
@@ -757,9 +775,13 @@ export class CampaignEditor {
       canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); this._onEditorCanvasRightClick(e); });
       canvas.addEventListener('mouseleave',  () => {
         this._editorHover = null;
-        // Cancel drag when mouse leaves the canvas
+        // Cancel any active drag when the mouse leaves the canvas.
         if (this._dragState) {
           this._dragState = null;
+        }
+        if (this._paintDragActive) {
+          this._paintDragActive = false;
+          this._paintDragSnapshotRecorded = false;
         }
         this._renderEditorCanvas();
       });
@@ -1447,12 +1469,35 @@ export class CampaignEditor {
 
   // ─── Editor canvas mouse events ────────────────────────────────────────────
 
+  /**
+   * Places the current palette tile on the given grid cell and records an undo
+   * snapshot the first time it is called within a paint-drag session.
+   */
+  private _paintEditorCell(pos: { row: number; col: number }): void {
+    if (!this._paintDragSnapshotRecorded) {
+      this._recordEditorSnapshot();
+      this._paintDragSnapshotRecorded = true;
+    }
+    this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
+    this._linkedTilePos = pos;
+    this._linkedTileDirty = false;
+  }
+
   private _onEditorMouseDown(e: MouseEvent): void {
     if (e.button !== 0) return; // left button only
     const pos = this._canvasPos(e);
     if (!pos) return;
 
     const existingTile = this._editGrid[pos.row][pos.col];
+
+    // Repeatable tile on an empty cell: start a paint-drag session.
+    if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._editorPalette)) {
+      this._paintDragActive = true;
+      this._paintDragSnapshotRecorded = false;
+      this._paintEditorCell(pos);
+      this._renderEditorCanvas();
+      return;
+    }
 
     if (existingTile !== null && this._editorPalette !== 'erase') {
       // Start a drag: track the tile but don't modify the grid yet
@@ -1477,6 +1522,15 @@ export class CampaignEditor {
 
   private _onEditorMouseUp(e: MouseEvent): void {
     if (e.button !== 0) return; // left button only
+
+    // End paint-drag session.
+    if (this._paintDragActive) {
+      this._paintDragActive = false;
+      this._paintDragSnapshotRecorded = false;
+      this._renderEditorCanvas();
+      return;
+    }
+
     if (!this._dragState) return;
 
     const { startPos, tile, currentPos, moved } = this._dragState;
@@ -1538,7 +1592,12 @@ export class CampaignEditor {
     const pos = this._canvasPos(e);
     this._editorHover = pos;
 
-    if (this._dragState && pos) {
+    if (this._paintDragActive && pos) {
+      // Paint each new empty cell the cursor enters during a paint-drag.
+      if (this._editGrid[pos.row][pos.col] === null) {
+        this._paintEditorCell(pos);
+      }
+    } else if (this._dragState && pos) {
       const { startPos, currentPos } = this._dragState;
       const atCurrent = pos.row === currentPos.row && pos.col === currentPos.col;
       if (!atCurrent) {

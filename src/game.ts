@@ -75,6 +75,18 @@ export class Game {
   /** Most-recent mouse position over the canvas in canvas-pixel coordinates. */
   private mouseCanvasPos: { x: number; y: number } | null = null;
 
+  /** True while the left mouse button is held on the canvas with a shape selected. */
+  private _isDragging = false;
+
+  /** Grid position of the tile the drag gesture is currently over. */
+  private _dragLastTile: GridPos | null = null;
+
+  /**
+   * True when the drag gesture moved to at least one new tile and already handled
+   * placement, so the subsequent click event (if it fires) should be suppressed.
+   */
+  private _suppressNextClick = false;
+
   /** Whether the Ctrl key is currently held. */
   private ctrlHeld = false;
 
@@ -291,10 +303,15 @@ export class Game {
       this._restoreActiveCampaign(savedCampaignId);
     }
 
+    canvas.addEventListener('mousedown',    (e) => this._handleCanvasMouseDown(e));
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
-    canvas.addEventListener('mouseleave',   ()  => this._hideTooltip());
+    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._hideTooltip(); });
+    // Capture mouseup on window so a release outside the canvas still ends the drag.
+    // Game is a singleton for the lifetime of the page, so this listener is never removed
+    // (same pattern as the document keydown/keyup listeners below).
+    window.addEventListener('mouseup',      (e) => this._handleCanvasMouseUp(e));
     canvas.addEventListener('keydown',      (e) => this._handleKey(e));
     canvas.addEventListener('wheel',        (e) => this._handleCanvasWheel(e), { passive: false });
     document.addEventListener('keydown',    (e) => this._handleDocKeyDown(e));
@@ -631,10 +648,68 @@ export class Game {
 
   // ─── Input handlers ────────────────────────────────────────────────────────
 
+  private _handleCanvasMouseDown(e: MouseEvent): void {
+    if (e.button !== 0) return;
+    if (this.screen !== GameScreen.Play) return;
+    if (this.gameState !== GameState.Playing) return;
+    if (this.selectedShape === null) return; // No shape selected; click/rotation handled separately
+
+    const rect = this.canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+    const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
+    this._isDragging = true;
+    this._dragLastTile = { row, col };
+    this._suppressNextClick = false;
+  }
+
+  private _handleCanvasMouseUp(e: MouseEvent): void {
+    if (e.button !== 0) return;
+    if (!this._isDragging) return;
+
+    // If the drag moved to at least one new tile the final hovered tile is still
+    // a "pending preview" – place it now and suppress the click event that follows.
+    if (this._dragLastTile && this.selectedShape !== null &&
+        this.board && this.gameState === GameState.Playing &&
+        this.screen === GameScreen.Play) {
+      const pos = this._dragLastTile;
+      const tile = this.board.getTile(pos);
+      if (tile) {
+        const filledBefore = this.board.getFilledPositions();
+        let placed = false;
+        if (tile.shape === PipeShape.Empty) {
+          placed = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
+        } else if (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation) {
+          placed = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
+        }
+        if (placed) {
+          this._afterTilePlaced(this.selectedShape, filledBefore);
+          this._suppressNextClick = true;
+        } else if (this.board.lastError) {
+          this._handleBoardError();
+          this._suppressNextClick = true;
+        }
+      }
+    }
+
+    this._cancelDrag();
+  }
+
+  /** Resets drag-paint state without placing anything at the current position. */
+  private _cancelDrag(): void {
+    this._isDragging = false;
+    this._dragLastTile = null;
+  }
+
   private _handleCanvasClick(e: MouseEvent): void {
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
     if (!this.board) return;
+
+    // The drag gesture already handled placement; swallow the click event.
+    if (this._suppressNextClick) {
+      this._suppressNextClick = false;
+      return;
+    }
 
     const rect = this.canvas.getBoundingClientRect();
     const col = Math.floor((e.clientX - rect.left)  / TILE_SIZE);
@@ -717,6 +792,34 @@ export class Game {
     this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     if (this.ctrlHeld && this.gameState === GameState.Playing) {
       this._showTooltip(e.clientX, e.clientY);
+    }
+
+    // Drag-paint: place at the OLD tile each time the cursor enters a new grid cell.
+    if (this._isDragging && this.selectedShape !== null &&
+        this.board && this.screen === GameScreen.Play &&
+        this.gameState === GameState.Playing) {
+      const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+      const row = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      const last = this._dragLastTile;
+      if (last && (row !== last.row || col !== last.col)) {
+        // Moved to a new tile: place at the tile we just left.
+        const oldTile = this.board.getTile(last);
+        if (oldTile) {
+          const filledBefore = this.board.getFilledPositions();
+          let placed = false;
+          if (oldTile.shape === PipeShape.Empty) {
+            placed = this.board.placeInventoryTile(last, this.selectedShape, this.pendingRotation);
+          } else if (oldTile.shape !== this.selectedShape || oldTile.rotation !== this.pendingRotation) {
+            placed = this.board.replaceInventoryTile(last, this.selectedShape, this.pendingRotation);
+          }
+          if (placed) {
+            this._afterTilePlaced(this.selectedShape, filledBefore);
+          } else if (this.board.lastError) {
+            this._handleBoardError();
+          }
+        }
+        this._dragLastTile = { row, col };
+      }
     }
   }
 
