@@ -50,7 +50,7 @@ export const DEFAULT_PARAMS: TileParams = {
   capacity: 6,
   cost: 1,
   temperature: 0,
-  pressure: 1,
+  pressure: 0,
   hardness: 0,
   chamberContent: 'tank',
   itemShape: PipeShape.Straight,
