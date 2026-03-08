@@ -96,11 +96,6 @@ export class CampaignEditor {
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   /** True while a paint-drag is active (repeatable palette, dragging over empty cells). */
   private _paintDragActive = false;
-  /**
-   * True once the undo snapshot has been recorded for the current paint-drag session,
-   * so subsequent cells in the same drag are part of the same undo entry.
-   */
-  private _paintDragSnapshotRecorded = false;
   /** Grid position of the tile currently linked for live param editing, or null if no link active. */
   private _linkedTilePos: { row: number; col: number } | null = null;
   /** True once the first param change in the current linked session has been committed. */
@@ -781,7 +776,7 @@ export class CampaignEditor {
         }
         if (this._paintDragActive) {
           this._paintDragActive = false;
-          this._paintDragSnapshotRecorded = false;
+          this._recordEditorSnapshot();
         }
         this._renderEditorCanvas();
       });
@@ -1470,14 +1465,9 @@ export class CampaignEditor {
   // ─── Editor canvas mouse events ────────────────────────────────────────────
 
   /**
-   * Places the current palette tile on the given grid cell and records an undo
-   * snapshot the first time it is called within a paint-drag session.
+   * Places the current palette tile on the given grid cell.
    */
   private _paintEditorCell(pos: { row: number; col: number }): void {
-    if (!this._paintDragSnapshotRecorded) {
-      this._recordEditorSnapshot();
-      this._paintDragSnapshotRecorded = true;
-    }
     this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
     this._linkedTilePos = pos;
     this._linkedTileDirty = false;
@@ -1493,7 +1483,6 @@ export class CampaignEditor {
     // Repeatable tile on an empty cell: start a paint-drag session.
     if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._editorPalette)) {
       this._paintDragActive = true;
-      this._paintDragSnapshotRecorded = false;
       this._paintEditorCell(pos);
       this._renderEditorCanvas();
       return;
@@ -1526,7 +1515,7 @@ export class CampaignEditor {
     // End paint-drag session.
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._paintDragSnapshotRecorded = false;
+      this._recordEditorSnapshot();
       this._renderEditorCanvas();
       return;
     }
