@@ -861,3 +861,142 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     expect(state._canvasPos(mouseAt(50, 280))).toBeNull();
   });
 });
+
+// ─── CampaignEditor – paint-drag undo snapshot timing ────────────────────────
+
+describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type EditorDragState = {
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _editRows: number;
+    _editCols: number;
+    _editGrid: (import('../src/types').TileDef | null)[][];
+    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _paintDragActive: boolean;
+    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistoryIdx: number;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    _onEditorMouseDown(e: MouseEvent): void;
+    _onEditorCanvasMouseMove(e: MouseEvent): void;
+    _onEditorMouseUp(e: MouseEvent): void;
+    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
+  };
+
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99910,
+      name: 'Drag Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  function makeDragEditor(level: LevelDef): EditorDragState {
+    const camp: CampaignDef = {
+      id: 'cmp_drag_test',
+      name: 'Drag Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as EditorDragState;
+    state._activeCampaignId = 'cmp_drag_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    // Set up a stable bounding rect so _canvasPos works
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function mouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, bubbles: true });
+  }
+
+  it('does not record a new snapshot during paint-drag mousedown', () => {
+    const state = makeDragEditor(makeLevel(4, 4));
+    // _openLevelEditor records the initial snapshot, so history has exactly 1 entry.
+    const historyLenBefore = state._editorHistory.length;
+
+    // Mousedown on empty cell with a repeatable palette tile starts a paint drag.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
+
+    // Snapshot count must NOT have increased yet – drag is still in progress.
+    expect(state._editorHistory.length).toBe(historyLenBefore);
+    expect(state._paintDragActive).toBe(true);
+  });
+
+  it('records a snapshot only on mouseup after a paint-drag', () => {
+    const state = makeDragEditor(makeLevel(4, 4));
+    const historyLenBefore = state._editorHistory.length;
+
+    state._editorPalette = PipeShape.Straight;
+    // Start drag
+    state._onEditorMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
+    // Extend drag to another cell
+    state._onEditorCanvasMouseMove(mouseEvent('mousemove', 96, 32)); // row 0, col 1
+    // Release mouse
+    state._onEditorMouseUp(mouseEvent('mouseup', 96, 32));
+
+    // Exactly one new snapshot should have been added, and drag is finished.
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    expect(state._paintDragActive).toBe(false);
+  });
+
+  it('painted cells are present in the new snapshot, pre-drag state is the previous one', () => {
+    const state = makeDragEditor(makeLevel(4, 4));
+    // Capture the initial (pre-drag) snapshot content.
+    const preDragSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
+
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(mouseEvent('mousedown', 32, 32));   // col 0
+    state._onEditorCanvasMouseMove(mouseEvent('mousemove', 96, 32)); // col 1
+    state._onEditorMouseUp(mouseEvent('mouseup', 96, 32));
+
+    // The new snapshot records the post-drag state (cells painted).
+    const postDragSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(postDragSnapshot.grid[0][0]).not.toBeNull();
+    expect(postDragSnapshot.grid[0][1]).not.toBeNull();
+
+    // The previous history entry is still the clean pre-drag state.
+    const prevSnapshot = state._editorHistory[state._editorHistoryIdx - 1];
+    expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
+  });
+});
