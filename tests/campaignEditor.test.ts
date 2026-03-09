@@ -461,6 +461,80 @@ describe('CampaignEditor – note and hint in level definitions', () => {
   });
 });
 
+// ─── gzip export / import ─────────────────────────────────────────────────────
+
+describe('CampaignEditor – gzip export/import', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    // Polyfill CompressionStream / DecompressionStream / TextEncoder / TextDecoder
+    // from Node.js built-ins because jsdom does not implement them.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+    const webStreams = require('node:stream/web') as any;
+    const g = globalThis as Record<string, unknown>;
+    if (!g.CompressionStream) g.CompressionStream = webStreams.CompressionStream;
+    if (!g.DecompressionStream) g.DecompressionStream = webStreams.DecompressionStream;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+    const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('node:util') as any;
+    if (!g.TextEncoder) g.TextEncoder = NodeTextEncoder;
+    if (!g.TextDecoder) g.TextDecoder = NodeTextDecoder;
+    // jsdom does not implement URL.createObjectURL / revokeObjectURL
+    if (typeof URL.createObjectURL === 'undefined') {
+      URL.createObjectURL = () => 'blob:mock';
+      URL.revokeObjectURL = () => undefined;
+    }
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('_exportCampaign downloads a .pipes.json.gz file', async () => {
+    let capturedAnchor: HTMLAnchorElement | null = null;
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      capturedAnchor = this;
+    });
+
+    const editor = makeEditor();
+    const campaign: CampaignDef = {
+      id: 'cmp_gz_export',
+      name: 'GZ Export Test',
+      author: 'Tester',
+      chapters: [],
+    };
+
+    await (editor as unknown as { _exportCampaign(c: CampaignDef): Promise<void> })._exportCampaign(campaign);
+
+    expect(capturedAnchor).not.toBeNull();
+    expect((capturedAnchor as unknown as HTMLAnchorElement).download).toBe('GZ_Export_Test.pipes.json.gz');
+  });
+
+  it('_importCampaign file input accepts .json and .gz files', () => {
+    // Track file inputs created during _importCampaign
+    const fileInputs: HTMLInputElement[] = [];
+    const origCreate = document.createElement.bind(document) as (tag: string) => HTMLElement;
+    jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === 'input') {
+        const input = el as HTMLInputElement;
+        // Intercept .click() so the file-chooser dialog doesn't open
+        Object.defineProperty(input, 'click', { value: () => undefined, writable: true });
+        fileInputs.push(input);
+      }
+      return el;
+    });
+
+    const editor = makeEditor();
+    fileInputs.length = 0; // discard inputs from constructor
+    (editor as unknown as { _importCampaign(): void })._importCampaign();
+
+    const fileInput = fileInputs.find((el) => el.type === 'file');
+    expect(fileInput).toBeDefined();
+    expect(fileInput!.accept).toContain('.gz');
+    expect(fileInput!.accept).toContain('.json');
+  });
+});
+
 // ─── CampaignEditor – challenge flag round-trip ───────────────────────────────
 
 describe('CampaignEditor – challenge flag in level definitions', () => {
