@@ -1628,6 +1628,20 @@ export class CampaignEditor {
   // ─── Editor canvas mouse events ────────────────────────────────────────────
 
   /**
+   * Returns true if a Source tile already exists anywhere on the grid except
+   * at `exceptPos` (if given).  Used to enforce the one-Source constraint.
+   */
+  private _hasSourceElsewhere(exceptPos?: { row: number; col: number }): boolean {
+    for (let r = 0; r < this._editRows; r++) {
+      for (let c = 0; c < this._editCols; c++) {
+        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
+        if (this._editGrid[r]?.[c]?.shape === PipeShape.Source) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Places the current palette tile on the given grid cell.
    */
   private _paintEditorCell(pos: { row: number; col: number }): void {
@@ -1672,6 +1686,11 @@ export class CampaignEditor {
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._renderEditorCanvas();
     } else {
+      // Guard: only one Source tile is allowed per level.
+      if (this._editorPalette === PipeShape.Source && this._hasSourceElsewhere()) {
+        alert('A Source tile already exists on the board. Only one Source is allowed per level.');
+        return;
+      }
       // Paint / erase immediately
       this._recordEditorSnapshot();
       if (this._editorPalette === 'erase') {
@@ -1729,6 +1748,11 @@ export class CampaignEditor {
     } else {
       // It was a click on a non-empty tile (no movement occurred)
       if (e.ctrlKey) {
+        // Guard: only one Source tile is allowed per level.
+        if (this._editorPalette === PipeShape.Source && this._hasSourceElsewhere(startPos)) {
+          alert('A Source tile already exists on the board. Only one Source is allowed per level.');
+          return;
+        }
         // Ctrl+click: force-overwrite with current palette selection
         this._recordEditorSnapshot();
         if (this._editorPalette === 'erase') {

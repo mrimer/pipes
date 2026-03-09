@@ -1186,3 +1186,152 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     expect(state._rightEraseDragActive).toBe(false);
   });
 });
+
+// ─── CampaignEditor – Source tile placement constraint ────────────────────────
+
+describe('CampaignEditor – Source tile placement constraint', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    jest.spyOn(window, 'alert').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  type EditorSourceState = {
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _editRows: number;
+    _editCols: number;
+    _editGrid: (import('../src/types').TileDef | null)[][];
+    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistoryIdx: number;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    _onEditorMouseDown(e: MouseEvent): void;
+    _onEditorMouseUp(e: MouseEvent): void;
+  };
+
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99912,
+      name: 'Source Constraint Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  function makeSourceEditor(level: LevelDef): EditorSourceState {
+    const camp: CampaignDef = {
+      id: 'cmp_source_test',
+      name: 'Source Constraint Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as EditorSourceState;
+    state._activeCampaignId = 'cmp_source_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function leftMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, bubbles: true });
+  }
+
+  function ctrlLeftMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, ctrlKey: true, bubbles: true });
+  }
+
+  it('allows placing the first Source tile on an empty board', () => {
+    const state = makeSourceEditor(makeLevel(4, 4));
+    state._editorPalette = PipeShape.Source;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+
+    expect(state._editGrid[0][0]).not.toBeNull();
+    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+    expect(window.alert).not.toHaveBeenCalled();
+  });
+
+  it('shows an alert and does not place a second Source tile', () => {
+    const state = makeSourceEditor(makeLevel(4, 4));
+
+    // Place first Source at (0,0)
+    state._editorPalette = PipeShape.Source;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+
+    // Attempt to place second Source at (0,1)
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32)); // row 0, col 1
+
+    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(state._editGrid[0][1]).toBeNull(); // second Source not placed
+  });
+
+  it('shows an alert when trying to overwrite a non-Source tile with Source via Ctrl+click', () => {
+    const state = makeSourceEditor(makeLevel(4, 4));
+
+    // Place a Straight tile at (0,0) and a Source at (1,0)
+    state._editGrid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    state._editGrid[1][0] = { shape: PipeShape.Source, rotation: 0 };
+
+    // Ctrl+click on (0,0) with Source palette: should be blocked
+    state._editorPalette = PipeShape.Source;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
+    state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
+
+    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Straight); // not overwritten
+  });
+
+  it('allows ctrl+click overwrite when the occupied tile is already the Source', () => {
+    const state = makeSourceEditor(makeLevel(4, 4));
+
+    // Place a Source at (0,0)
+    state._editGrid[0][0] = { shape: PipeShape.Source, rotation: 0 };
+
+    // Ctrl+click on (0,0) with Source palette: should be allowed (same position)
+    state._editorPalette = PipeShape.Source;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
+    state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
+
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+  });
+});
