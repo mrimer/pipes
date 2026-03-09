@@ -120,3 +120,41 @@ export function generateCampaignId(): string {
 export function generateLevelId(): number {
   return 10000 + Math.floor(Math.random() * 89999);
 }
+
+// ─── Gzip helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Decompress a gzip Blob and return the contained text.
+ * Uses the Web Streams `DecompressionStream` API.
+ */
+export async function ungzipBlob(blob: Blob): Promise<string> {
+  // Use blob.arrayBuffer() when available (Node.js, modern browsers);
+  // fall back to FileReader for environments that lack it (e.g. jsdom).
+  const buf: ArrayBuffer = 'arrayBuffer' in blob
+    ? await blob.arrayBuffer()
+    : await new Promise<ArrayBuffer>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as ArrayBuffer);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsArrayBuffer(blob);
+    });
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  await writer.write(new Uint8Array(buf));
+  await writer.close();
+  const chunks: Uint8Array[] = [];
+  const reader = ds.readable.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const totalLen = chunks.reduce((s, c) => s + c.length, 0);
+  const merged = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return new TextDecoder().decode(merged);
+}
