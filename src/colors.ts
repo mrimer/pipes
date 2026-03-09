@@ -16,6 +16,7 @@ export const FIXED_PIPE_WATER_COLOR  = '#3a9cb8';
 export const EMPTY_COLOR             = '#2a2a4a';
 export const EMPTY_TARGET_COLOR      = '#1e2a4a';
 export const LOW_WATER_COLOR         = '#e74c3c';
+export const MEDIUM_WATER_COLOR      = '#f0c040';
 export const LABEL_COLOR             = '#fff';
 export const DIRT_COLOR              = '#8d5524';
 export const DIRT_WATER_COLOR        = '#c4a265';

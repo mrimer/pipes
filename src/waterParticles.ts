@@ -143,7 +143,7 @@ export interface FlowDrop {
 }
 
 /** Maximum number of simultaneously live win-flow drops. */
-const FLOW_MAX_DROPS = 12;
+const FLOW_MAX_DROPS = 25;
 
 /**
  * Spawn a new win-flow drop at the source tile.
@@ -233,7 +233,7 @@ export function renderFlowDrops(
     ctx.fillStyle = color;
     ctx.fill();
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
 

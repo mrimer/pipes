@@ -2,7 +2,7 @@ import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board'
 import { Tile } from './tile';
 import { LEVELS, CHAPTERS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Rotation } from './types';
-import { WATER_COLOR, LOW_WATER_COLOR } from './colors';
+import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
@@ -22,7 +22,6 @@ import {
   spawnSourceSprayDrop, renderSourceSpray,
   spawnFlowDrop, renderFlowDrops,
 } from './waterParticles';
-import { SOURCE_WATER_COLOR, WATER_COLOR as FLOW_DROP_COLOR } from './colors';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -687,7 +686,11 @@ export class Game {
     if (!this.board) return;
     const w = this.board.getCurrentWater();
     this.waterDisplayEl.textContent = `💧 Water: ${w}`;
-    this.waterDisplayEl.style.color = w <= 5 ? LOW_WATER_COLOR : WATER_COLOR;
+    let waterColor: string;
+    if (w <= 0)      waterColor = LOW_WATER_COLOR;
+    else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
+    else             waterColor = WATER_COLOR;
+    this.waterDisplayEl.style.color = waterColor;
 
     if (this.board.hasTempRelevantTiles()) {
       const t = this.board.getCurrentTemperature();
@@ -737,19 +740,19 @@ export class Game {
     }
     const sx = this.board.source.col * TILE_SIZE + TILE_SIZE / 2;
     const sy = this.board.source.row * TILE_SIZE + TILE_SIZE / 2;
-    renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, SOURCE_WATER_COLOR);
+    renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
   }
 
   /** Spawn and render the win-flow drops (only active in the Won state). */
   private _tickWinFlow(): void {
     if (this.gameState !== GameState.Won || !this.board) return;
     const now = performance.now();
-    // Spawn a new drop roughly every 300 ms.
-    if (now - this._lastFlowSpawn >= 300) {
+    // Spawn a new drop roughly every 120 ms.
+    if (now - this._lastFlowSpawn >= 120) {
       spawnFlowDrop(this._flowDrops, this.board);
       this._lastFlowSpawn = now;
     }
-    renderFlowDrops(this.ctx, this._flowDrops, this.board, FLOW_DROP_COLOR);
+    renderFlowDrops(this.ctx, this._flowDrops, this.board, WATER_COLOR);
   }
 
   private _renderBoard(): void {
@@ -1693,6 +1696,7 @@ export class Game {
       nextChapter.levels[0].id === nextLevelDef.id
     ) {
       const chapterIdx = chapters.indexOf(nextChapter);
+      this.startLevel(nextLevelDef.id);
       this._showNewChapterModal(chapterIdx, nextChapter);
     } else if (nextLevelDef.challenge) {
       this._showChallengeLevelModal(/* canSkip */ true);
