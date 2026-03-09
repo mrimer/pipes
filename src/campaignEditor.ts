@@ -279,7 +279,7 @@ export class CampaignEditor {
     this._screen = 'list';
     this._el.innerHTML = '';
 
-    const toolbar = this._buildToolbar('🗺️ Campaign Editor', null);
+    const toolbar = this._buildToolbar('🗺️ Select Campaign', null);
 
     // Close button
     const closeBtn = this._btn('✕ Close', '#2a2a4a', '#aaa', () => {
@@ -341,7 +341,9 @@ export class CampaignEditor {
       progressText = `  ·  ${pct}% complete`;
     }
 
-    meta.textContent = `By ${campaign.author}  ·  ${campaign.chapters.length} chapter(s)  ·  ${levelCount} level(s)${progressText}`;
+    const chapterWord = campaign.chapters.length === 1 ? 'chapter' : 'chapters';
+    const levelWord = levelCount === 1 ? 'level' : 'levels';
+    meta.textContent = `By ${campaign.author}  ·  ${campaign.chapters.length} ${chapterWord}  ·  ${levelCount} ${levelWord}${progressText}`;
     info.appendChild(name);
     info.appendChild(meta);
     row.appendChild(info);
@@ -479,7 +481,7 @@ export class CampaignEditor {
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:3px;';
     const totalStars = chapter.levels.reduce((s, l) => s + (l.starCount ?? 0), 0);
     const challengeCount = chapter.levels.filter(l => l.challenge).length;
-    const metaParts = [`${chapter.levels.length} level(s)`];
+    const metaParts = [`${chapter.levels.length} ${chapter.levels.length === 1 ? 'level' : 'levels'}`];
     if (totalStars > 0) metaParts.push(`⭐\u202f×\u202f${totalStars}`);
     if (challengeCount > 0) metaParts.push(`💀\u202f×\u202f${challengeCount}`);
     meta.textContent = metaParts.join('  ');
