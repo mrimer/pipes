@@ -28,8 +28,6 @@ import {
   generateLevelId,
   isChamberPalette,
   chamberPaletteContent,
-  gzipString,
-  ungzipBlob,
 } from './campaignEditorTypes';
 import { renderEditorCanvas, HoverOverlay, DragState } from './campaignEditorRenderer';
 import { renderMinimap } from './minimap';
@@ -2368,60 +2366,30 @@ export class CampaignEditor {
 
   // ─── Import / Export ──────────────────────────────────────────────────────
 
-  /** Trigger a file download for the given Blob with the specified filename. */
-  private _triggerDownload(blob: Blob, filename: string): void {
+  /** Export a campaign by triggering a JSON file download. */
+  private _exportCampaign(campaign: CampaignDef): void {
+    const json = JSON.stringify(campaign, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
+    a.download = `${campaign.name.replace(/\s+/g, '_')}.pipes.json`;
     a.click();
-    // Defer cleanup to the next macrotask so Chrome can capture the blob URL
-    // before it is revoked (synchronous revocation silently cancels downloads).
-    setTimeout(() => {
-      a.remove();
-      URL.revokeObjectURL(url);
-    }, 0);
+    URL.revokeObjectURL(url);
   }
 
-  /** Export a campaign as a plain JSON file download. */
-  private _exportCampaignAsJson(campaign: CampaignDef): void {
-    const json = JSON.stringify(campaign, null, 2);
-    const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json`;
-    this._triggerDownload(new Blob([json], { type: 'application/json' }), filename);
-  }
-
-  /** Export a campaign by triggering a gzip-compressed JSON file download,
-   *  falling back to plain JSON if gzip is unavailable or fails. */
-  private _exportCampaign(campaign: CampaignDef): Promise<void> {
-    const json = JSON.stringify(campaign, null, 2);
-    const baseName = campaign.name.replace(/\s+/g, '_');
-
-    // Fall back immediately if the CompressionStream API is not available.
-    if (typeof CompressionStream === 'undefined') {
-      this._exportCampaignAsJson(campaign);
-      return Promise.resolve();
-    }
-
-    return gzipString(json).then((blob) => {
-      this._triggerDownload(blob, `${baseName}.pipes.json.gz`);
-    }).catch(() => {
-      this._exportCampaignAsJson(campaign);
-    });
-  }
-
-  /** Import a campaign from a JSON or gzip-compressed JSON (.gz) file. */
+  /** Import a campaign from a JSON file. */
   private _importCampaign(): void {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.gz,application/json,application/gzip';
+    input.accept = '.json,application/json';
     input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (!file) return;
-      const isGzip = file.name.endsWith('.gz');
-      const processText = (text: string) => {
+      const reader = new FileReader();
+      reader.onload = () => {
         try {
-          const data = migrateCampaign(JSON.parse(text) as CampaignDef);
+          const data = migrateCampaign(JSON.parse(reader.result as string) as CampaignDef);
           if (!data.id || !data.name || !Array.isArray(data.chapters)) {
             alert('Invalid campaign file format.');
             return;
@@ -2443,15 +2411,7 @@ export class CampaignEditor {
           alert('Failed to parse campaign file. Please check the format.');
         }
       };
-      if (isGzip) {
-        ungzipBlob(file).then(processText).catch(() => {
-          alert('Failed to decompress campaign file. The .gz file may be corrupted or invalid.');
-        });
-      } else {
-        const reader = new FileReader();
-        reader.onload = () => { processText(reader.result as string); };
-        reader.readAsText(file);
-      }
+      reader.readAsText(file);
     });
     input.click();
   }
