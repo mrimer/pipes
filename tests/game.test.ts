@@ -32,6 +32,12 @@ const MOCK_CTX = {
   save:       jest.fn(),
   restore:    jest.fn(),
   fillText:   jest.fn(),
+  strokeText: jest.fn(),
+  quadraticCurveTo: jest.fn(),
+  rect:       jest.fn(),
+  clip:       jest.fn(),
+  scale:      jest.fn(),
+  closePath:  jest.fn(),
 };
 
 // Stub out requestAnimationFrame so _loop() never fires.
