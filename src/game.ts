@@ -17,6 +17,12 @@ import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './tileAnimation';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './confetti';
+import {
+  SourceSprayDrop, FlowDrop,
+  spawnSourceSprayDrop, renderSourceSpray,
+  spawnFlowDrop, renderFlowDrops,
+} from './waterParticles';
+import { SOURCE_WATER_COLOR, WATER_COLOR as FLOW_DROP_COLOR } from './colors';
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -139,6 +145,18 @@ export class Game {
 
   /** Active floating animation labels shown over the canvas. */
   private _animations: TileAnimation[] = [];
+
+  /** Active source-spray water drops rendered over the source tile during play. */
+  private _sourceSprayDrops: SourceSprayDrop[] = [];
+
+  /** `performance.now()` of the last source spray drop spawn. */
+  private _lastSpraySpawn = 0;
+
+  /** Active win-flow water drops following connected pipes from source to sink. */
+  private _flowDrops: FlowDrop[] = [];
+
+  /** `performance.now()` of the last win-flow drop spawn. */
+  private _lastFlowSpawn = 0;
 
   /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
   private _pendingSparkleShapes: Set<PipeShape> = new Set();
@@ -444,6 +462,9 @@ export class Game {
     this._clearModalSparkle(this._challengeModalEl);
     this._pendingLevelId = null;
     clearConfetti();
+    // Clear particle arrays so stale drops don't persist on the level-select screen.
+    this._sourceSprayDrops = [];
+    this._flowDrops = [];
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
@@ -491,6 +512,9 @@ export class Game {
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
+    // Reset particle arrays so stale drops from a previous level don't carry over.
+    this._sourceSprayDrops = [];
+    this._flowDrops = [];
 
     this._updateLevelHeader(levelId);
     this._renderInventoryBar();
@@ -696,8 +720,36 @@ export class Game {
     if (this.screen === GameScreen.Play) {
       this._renderBoard();
       renderAnimations(this.ctx, this._animations);
+      this._tickSourceSpray();
+      this._tickWinFlow();
     }
     requestAnimationFrame(() => this._loop());
+  }
+
+  /** Spawn and render the source spray drops (runs every frame during play). */
+  private _tickSourceSpray(): void {
+    if (!this.board) return;
+    const now = performance.now();
+    // Spawn a new drop roughly every 150 ms (~6–7 per second).
+    if (now - this._lastSpraySpawn >= 150) {
+      spawnSourceSprayDrop(this._sourceSprayDrops);
+      this._lastSpraySpawn = now;
+    }
+    const sx = this.board.source.col * TILE_SIZE + TILE_SIZE / 2;
+    const sy = this.board.source.row * TILE_SIZE + TILE_SIZE / 2;
+    renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, SOURCE_WATER_COLOR);
+  }
+
+  /** Spawn and render the win-flow drops (only active in the Won state). */
+  private _tickWinFlow(): void {
+    if (this.gameState !== GameState.Won || !this.board) return;
+    const now = performance.now();
+    // Spawn a new drop roughly every 300 ms.
+    if (now - this._lastFlowSpawn >= 300) {
+      spawnFlowDrop(this._flowDrops, this.board);
+      this._lastFlowSpawn = now;
+    }
+    renderFlowDrops(this.ctx, this._flowDrops, this.board, FLOW_DROP_COLOR);
   }
 
   private _renderBoard(): void {
@@ -1735,6 +1787,8 @@ export class Game {
     this.winModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     clearConfetti();
+    // Clear win-flow drops since we're no longer in a won state.
+    this._flowDrops = [];
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
     this._renderInventoryBar();
@@ -1853,6 +1907,9 @@ export class Game {
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
+    // Reset particle arrays for the playtested level.
+    this._sourceSprayDrops = [];
+    this._flowDrops = [];
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();
