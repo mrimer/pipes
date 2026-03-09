@@ -181,7 +181,7 @@ export function renderLevelList(
     // When chapter is fully complete and has challenge levels, append a 💀 X/Y tally
     const chapterSkullText = (allLevelsCompleted && challengeInChapter > 0)
       ? `  💀 ${challengeCompleted}/${challengeInChapter}` : '';
-    const progressText = nonChallengeInChapter > 0
+    const progressText = (nonChallengeInChapter > 0 && !chapterLocked)
       ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterStarText}${chapterSkullText}`
       : '';
     const chapterTitle = document.createElement('span');
