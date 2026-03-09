@@ -1,7 +1,7 @@
 /** Color palette used across game rendering. */
 
-export const PIPE_COLOR              = '#4a90d9';
-export const WATER_COLOR             = '#7ed321';
+export const PIPE_COLOR              = '#7090a8';
+export const WATER_COLOR             = '#56c8e8';
 export const BG_COLOR                = '#1a1a2e';
 export const TILE_BG                 = '#16213e';
 export const FOCUS_COLOR             = '#f0c040';
@@ -11,8 +11,8 @@ export const SINK_COLOR              = '#8e44ad';
 export const SINK_WATER_COLOR        = '#9b59b6';
 export const TANK_COLOR              = '#2196f3';
 export const TANK_WATER_COLOR        = '#00bcd4';
-export const FIXED_PIPE_COLOR        = '#2980b9';
-export const FIXED_PIPE_WATER_COLOR  = '#5dade2';
+export const FIXED_PIPE_COLOR        = '#4a6878';
+export const FIXED_PIPE_WATER_COLOR  = '#3a9cb8';
 export const EMPTY_COLOR             = '#2a2a4a';
 export const EMPTY_TARGET_COLOR      = '#1e2a4a';
 export const LOW_WATER_COLOR         = '#e74c3c';
@@ -72,5 +72,5 @@ export const SANDSTONE_HARD_WATER_COLOR = '#9a6b40';
 export const STAR_COLOR       = '#f0c040';
 /** Star chamber tile color when water is flowing through it. */
 export const STAR_WATER_COLOR = '#ffe880';
-/** Spinner pipe tile color on minimap (darker blue to distinguish from regular pipes). */
-export const SPIN_PIPE_COLOR  = '#2c6099';
+/** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
+export const SPIN_PIPE_COLOR  = '#3a5868';
