@@ -366,6 +366,84 @@ describe('renderLevelList – challenge levels', () => {
     expect(levelBtns[2]?.classList.contains('locked')).toBe(false);
   });
 
+  it('shows 💀 X/Y in chapter header when chapter is complete and has challenge levels', () => {
+    // 1 regular level (id=1) + 2 challenge levels (id=2, id=3). All completed.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3, undefined, true)],
+    };
+    const chapters = [ch1];
+    const completed = new Set<number>([1, 2, 3]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterTitle = container.querySelector('.chapter-header span');
+    expect(chapterTitle?.textContent).toContain('💀');
+    expect(chapterTitle?.textContent).toContain('2/2');
+  });
+
+  it('shows 💀 0/N when chapter is complete but no challenge levels completed', () => {
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2, undefined, true)],
+    };
+    const chapters = [ch1];
+    // Only the regular level is completed → chapter is "done" (all non-challenge done)
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterTitle = container.querySelector('.chapter-header span');
+    expect(chapterTitle?.textContent).toContain('💀');
+    expect(chapterTitle?.textContent).toContain('0/1');
+  });
+
+  it('does not show 💀 in chapter header when chapter has no challenge levels', () => {
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2)],
+    };
+    const chapters = [ch1];
+    const completed = new Set<number>([1, 2]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterTitle = container.querySelector('.chapter-header span');
+    expect(chapterTitle?.textContent).not.toContain('💀');
+  });
+
+  it('does not show 💀 tally in chapter header when chapter is not yet fully complete', () => {
+    // Chapter has 2 regular levels + 1 challenge level; only 1 regular done.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2), makeLevel(3, undefined, true)],
+    };
+    const chapters = [ch1];
+    const completed = new Set<number>([1, 3]);  // L2 (regular) still incomplete
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters,
+    );
+
+    const chapterTitle = container.querySelector('.chapter-header span');
+    // Chapter not complete → no skull tally in header
+    expect(chapterTitle?.textContent).not.toMatch(/💀\s+\d+\/\d+/);
+  });
+
   it('locks a non-challenge level when the previous non-challenge level is incomplete', () => {
     // Levels: [L1 (regular, not done), L2 (challenge), L3 (regular)]
     // L3 should be locked because L1 (the previous non-challenge level) is not done.

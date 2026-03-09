@@ -131,7 +131,7 @@ export function renderLevelList(
       foundLockedChapter = true;
     }
 
-    const { completedInChapter, nonChallengeInChapter, nonChallengeCompleted } =
+    const { completedInChapter, nonChallengeInChapter, nonChallengeCompleted, challengeInChapter, challengeCompleted } =
       chapter.levels.reduce(
         (acc, l) => {
           const done = completedLevels.has(l.id);
@@ -139,10 +139,13 @@ export function renderLevelList(
           if (!l.challenge) {
             acc.nonChallengeInChapter++;
             if (done) acc.nonChallengeCompleted++;
+          } else {
+            acc.challengeInChapter++;
+            if (done) acc.challengeCompleted++;
           }
           return acc;
         },
-        { completedInChapter: 0, nonChallengeInChapter: 0, nonChallengeCompleted: 0 },
+        { completedInChapter: 0, nonChallengeInChapter: 0, nonChallengeCompleted: 0, challengeInChapter: 0, challengeCompleted: 0 },
       );
     const totalInChapter = chapter.levels.length;
     const allLevelsCompleted = nonChallengeInChapter > 0 && nonChallengeCompleted >= nonChallengeInChapter;
@@ -175,8 +178,11 @@ export function renderLevelList(
     // When chapter is fully complete and has stars, append a ⭐ X/Y tally
     const chapterStarText = (allLevelsCompleted && chapterStarTotal > 0)
       ? `  ⭐ ${chapterStarCollected}/${chapterStarTotal}` : '';
+    // When chapter is fully complete and has challenge levels, append a 💀 X/Y tally
+    const chapterSkullText = (allLevelsCompleted && challengeInChapter > 0)
+      ? `  💀 ${challengeCompleted}/${challengeInChapter}` : '';
     const progressText = nonChallengeInChapter > 0
-      ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterStarText}`
+      ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterStarText}${chapterSkullText}`
       : '';
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
