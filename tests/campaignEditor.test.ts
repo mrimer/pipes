@@ -562,6 +562,41 @@ describe('CampaignEditor – gzip export/import', () => {
     expect((capturedAnchor as unknown as HTMLAnchorElement).download).toBe('GZ_Fail_Test.pipes.json');
   });
 
+  it('_triggerDownload defers URL.revokeObjectURL to the next macrotask (Chrome compatibility)', () => {
+    // In Chrome, revoking a blob URL synchronously after a.click() silently
+    // cancels the download before the browser can capture it. The fix is to
+    // defer revokeObjectURL (and remove) via setTimeout so Chrome has a
+    // chance to initiate the download first.
+    jest.useFakeTimers();
+    const revokedUrls: string[] = [];
+    const origRevoke = URL.revokeObjectURL;
+    URL.revokeObjectURL = (url: string) => { revokedUrls.push(url); };
+
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const editor = makeEditor();
+    const campaign: CampaignDef = {
+      id: 'cmp_defer_revoke',
+      name: 'Defer Revoke Test',
+      author: 'Tester',
+      chapters: [],
+    };
+
+    try {
+      (editor as unknown as { _exportCampaignAsJson(c: CampaignDef): void })._exportCampaignAsJson(campaign);
+
+      // Immediately after the synchronous click: URL must NOT yet be revoked.
+      expect(revokedUrls).toHaveLength(0);
+
+      // After the deferred timer fires: URL should be revoked.
+      jest.runAllTimers();
+      expect(revokedUrls).toHaveLength(1);
+    } finally {
+      URL.revokeObjectURL = origRevoke;
+      jest.useRealTimers();
+    }
+  });
+
   it('_importCampaign file input accepts .json and .gz files', () => {
     // Track file inputs created during _importCampaign
     const fileInputs: HTMLInputElement[] = [];

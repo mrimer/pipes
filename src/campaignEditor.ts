@@ -2376,8 +2376,12 @@ export class CampaignEditor {
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Defer cleanup to the next macrotask so Chrome can capture the blob URL
+    // before it is revoked (synchronous revocation silently cancels downloads).
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 0);
   }
 
   /** Export a campaign as a plain JSON file download. */
