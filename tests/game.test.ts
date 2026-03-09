@@ -1785,7 +1785,7 @@ function makeChallengeTestCampaign(levelTemplate: LevelDef, challengeLevelTempla
 
 describe('Game – challenge-level modal', () => {
   it('shows the challenge modal when requestLevel() is called with a challenge level', () => {
-    const { game } = makeGame();
+    const { game, playScreenEl } = makeGame();
     const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
     gameHooks(game)._activateCampaign(campaign);
 
@@ -1794,6 +1794,9 @@ describe('Game – challenge-level modal', () => {
     const hooks = gameHooks(game);
     expect(hooks._challengeModalEl.style.display).toBe('flex');
     expect(hooks._pendingLevelId).toBe(9002);
+    // The level should be started (visible on screen) before the modal appears.
+    expect(playScreenEl.style.display).toBe('flex');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
   });
 
   it('does NOT show the challenge modal for a non-challenge level', () => {
@@ -1809,7 +1812,7 @@ describe('Game – challenge-level modal', () => {
   });
 
   it('shows the challenge modal when nextLevel() advances into a challenge level (same chapter)', () => {
-    const { game } = makeGame();
+    const { game, playScreenEl } = makeGame();
     const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
     gameHooks(game)._activateCampaign(campaign);
     game.startLevel(9001);
@@ -1819,6 +1822,9 @@ describe('Game – challenge-level modal', () => {
     const hooks = gameHooks(game);
     expect(hooks._challengeModalEl.style.display).toBe('flex');
     expect(hooks._pendingLevelId).toBe(9002);
+    // The challenge level should be started (visible on screen) before the modal appears.
+    expect(playScreenEl.style.display).toBe('flex');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
   });
 
   it('playChallengeLevel() hides the challenge modal and starts the level', () => {

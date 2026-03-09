@@ -109,14 +109,95 @@ function _oppositeDir(dir: Direction): Direction {
 }
 
 /**
- * Return all mutually-connected neighbour directions from `pos`, excluding the
- * direction the drop arrived from (to prevent back-tracking).
+ * Compute the set of "good" outgoing directions at each tile – directions that
+ * lead, without backtracking, to the sink.  Used to prevent win-flow drops from
+ * wandering into dead-end branches.
+ *
+ * Algorithm: backward BFS from the sink.  A direction `d` from tile T is "good"
+ * if the neighbour N reached by going in direction `d` has at least one good
+ * outgoing direction that does not return straight back to T.
  */
-function _forwardDirs(board: Board, pos: GridPos, fromDir: Direction | null): Direction[] {
+export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
+  const goodDirs = new Map<string, Set<Direction>>();
+
+  function getDirs(pos: GridPos): Set<Direction> {
+    const key = `${pos.row},${pos.col}`;
+    if (!goodDirs.has(key)) goodDirs.set(key, new Set());
+    return goodDirs.get(key)!;
+  }
+
+  const queue: GridPos[] = [];
+
+  // Seed: for each tile adjacent to the sink that is mutually connected to it,
+  // the direction from that tile towards the sink is "good".
+  for (const dir of Object.values(Direction)) {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const neighbor: GridPos = { row: board.sink.row + delta.row, col: board.sink.col + delta.col };
+    // Direction from neighbor to sink is the opposite of `dir`
+    const dirToSink = _oppositeDir(dir);
+    if (board.areMutuallyConnected(neighbor, dirToSink)) {
+      const set = getDirs(neighbor);
+      if (!set.has(dirToSink)) {
+        set.add(dirToSink);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  // BFS backwards: propagate "good" directions through mutual connections.
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDirs = getDirs(current);
+
+    for (const dirToNeighbor of Object.values(Direction)) {
+      if (!board.areMutuallyConnected(current, dirToNeighbor)) continue;
+
+      const delta = NEIGHBOUR_DELTA[dirToNeighbor];
+      const neighbor: GridPos = { row: current.row + delta.row, col: current.col + delta.col };
+
+      // Skip the sink itself – drops are removed on arrival, no need to track it.
+      if (neighbor.row === board.sink.row && neighbor.col === board.sink.col) continue;
+
+      // Direction from neighbor back to current.
+      const dirToCurrent = _oppositeDir(dirToNeighbor);
+
+      // Going from `neighbor` towards `current` is only useful if `current` has
+      // at least one good direction that does NOT immediately return to `neighbor`
+      // (which would be a pointless U-turn ending in `neighbor` again).
+      const hasUsefulExit = [...currentDirs].some((d) => d !== dirToNeighbor);
+      if (!hasUsefulExit) continue;
+
+      const neighborDirs = getDirs(neighbor);
+      if (!neighborDirs.has(dirToCurrent)) {
+        neighborDirs.add(dirToCurrent);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  return goodDirs;
+}
+
+/**
+ * Return all mutually-connected neighbour directions from `pos`, excluding the
+ * direction the drop arrived from (to prevent back-tracking), and (when
+ * `goodDirs` is provided) restricted to directions that are known to lead
+ * towards the sink without hitting a dead end.
+ */
+function _forwardDirs(
+  board: Board,
+  pos: GridPos,
+  fromDir: Direction | null,
+  goodDirs: Map<string, Set<Direction>> | null,
+): Direction[] {
   const dirs: Direction[] = [];
+  const key = `${pos.row},${pos.col}`;
+  const good = goodDirs !== null ? (goodDirs.get(key) ?? null) : null;
   for (const dir of Object.values(Direction)) {
     if (fromDir !== null && dir === _oppositeDir(fromDir)) continue;
-    if (board.areMutuallyConnected(pos, dir)) dirs.push(dir);
+    if (!board.areMutuallyConnected(pos, dir)) continue;
+    if (good !== null && !good.has(dir)) continue;
+    dirs.push(dir);
   }
   return dirs;
 }
@@ -149,12 +230,13 @@ const FLOW_MAX_DROPS = 25;
  * Spawn a new win-flow drop at the source tile.
  * Does nothing when the pool is full or the source has no connected neighbours.
  *
- * @param drops  Mutable array of active flow drops.
- * @param board  The solved game board.
+ * @param drops     Mutable array of active flow drops.
+ * @param board     The solved game board.
+ * @param goodDirs  Pre-computed good-direction set from {@link computeFlowGoodDirs}.
  */
-export function spawnFlowDrop(drops: FlowDrop[], board: Board): void {
+export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<string, Set<Direction>>): void {
   if (drops.length >= FLOW_MAX_DROPS) return;
-  const dirs = _forwardDirs(board, board.source, null);
+  const dirs = _forwardDirs(board, board.source, null, goodDirs);
   if (dirs.length === 0) return;
   const dir = dirs[Math.floor(Math.random() * dirs.length)];
   drops.push({
@@ -172,16 +254,18 @@ export function spawnFlowDrop(drops: FlowDrop[], board: Board): void {
  * Advance and render all win-flow drops, removing those that reach the sink or
  * a dead end.
  *
- * @param ctx    2D rendering context.
- * @param drops  Mutable array of active flow drops (modified in place).
- * @param board  The solved game board (used for connection lookups).
- * @param color  CSS colour string for the drops.
+ * @param ctx       2D rendering context.
+ * @param drops     Mutable array of active flow drops (modified in place).
+ * @param board     The solved game board (used for connection lookups).
+ * @param color     CSS colour string for the drops.
+ * @param goodDirs  Pre-computed good-direction set from {@link computeFlowGoodDirs}.
  */
 export function renderFlowDrops(
   ctx: CanvasRenderingContext2D,
   drops: FlowDrop[],
   board: Board,
   color: string,
+  goodDirs: Map<string, Set<Direction>>,
 ): void {
   let i = 0;
   while (i < drops.length) {
@@ -203,7 +287,7 @@ export function renderFlowDrops(
       }
 
       // Pick the next direction.
-      const nextDirs = _forwardDirs(board, { row: drop.row, col: drop.col }, drop.fromDir);
+      const nextDirs = _forwardDirs(board, { row: drop.row, col: drop.col }, drop.fromDir, goodDirs);
       if (nextDirs.length === 0) {
         drops.splice(i, 1);
         continue;

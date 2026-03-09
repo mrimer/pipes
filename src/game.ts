@@ -1,7 +1,7 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { LEVELS, CHAPTERS } from './levels';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Rotation } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
@@ -21,6 +21,7 @@ import {
   SourceSprayDrop, FlowDrop,
   spawnSourceSprayDrop, renderSourceSpray,
   spawnFlowDrop, renderFlowDrops,
+  computeFlowGoodDirs,
 } from './waterParticles';
 
 /**
@@ -153,6 +154,13 @@ export class Game {
 
   /** Active win-flow water drops following connected pipes from source to sink. */
   private _flowDrops: FlowDrop[] = [];
+
+  /**
+   * Pre-computed "good" directions at each tile for the win-flow animation –
+   * only directions that lead towards the sink without entering dead-end branches.
+   * Computed once when the board is solved; cleared when leaving the Won state.
+   */
+  private _flowGoodDirs: Map<string, Set<Direction>> | null = null;
 
   /** `performance.now()` of the last win-flow drop spawn. */
   private _lastFlowSpawn = 0;
@@ -464,6 +472,7 @@ export class Game {
     // Clear particle arrays so stale drops don't persist on the level-select screen.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
+    this._flowGoodDirs = null;
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
@@ -514,6 +523,7 @@ export class Game {
     // Reset particle arrays so stale drops from a previous level don't carry over.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
+    this._flowGoodDirs = null;
 
     this._updateLevelHeader(levelId);
     this._renderInventoryBar();
@@ -745,14 +755,14 @@ export class Game {
 
   /** Spawn and render the win-flow drops (only active in the Won state). */
   private _tickWinFlow(): void {
-    if (this.gameState !== GameState.Won || !this.board) return;
+    if (this.gameState !== GameState.Won || !this.board || !this._flowGoodDirs) return;
     const now = performance.now();
     // Spawn a new drop roughly every 120 ms.
     if (now - this._lastFlowSpawn >= 120) {
-      spawnFlowDrop(this._flowDrops, this.board);
+      spawnFlowDrop(this._flowDrops, this.board, this._flowGoodDirs);
       this._lastFlowSpawn = now;
     }
-    renderFlowDrops(this.ctx, this._flowDrops, this.board, WATER_COLOR);
+    renderFlowDrops(this.ctx, this._flowDrops, this.board, WATER_COLOR, this._flowGoodDirs);
   }
 
   private _renderBoard(): void {
@@ -852,6 +862,7 @@ export class Game {
 
     if (this.board.isSolved()) {
       this.gameState = GameState.Won;
+      this._flowGoodDirs = computeFlowGoodDirs(this.board);
       const starsCollected = this.board.getStarsCollected();
       this._markLevelCompleted(this.currentLevel!.id);
       this._saveStars(this.currentLevel!.id, starsCollected);
@@ -1699,6 +1710,7 @@ export class Game {
       this.startLevel(nextLevelDef.id);
       this._showNewChapterModal(chapterIdx, nextChapter);
     } else if (nextLevelDef.challenge) {
+      this.startLevel(nextLevelDef.id);
       this._showChallengeLevelModal(/* canSkip */ true);
     } else {
       this._pendingLevelId = null;
@@ -1717,6 +1729,7 @@ export class Game {
     const level = allLevels.find((l) => l.id === levelId);
     if (level?.challenge) {
       this._pendingLevelId = levelId;
+      this.startLevel(levelId);
       this._showChallengeLevelModal(/* canSkip */ false);
     } else {
       this.startLevel(levelId);
@@ -1793,6 +1806,7 @@ export class Game {
     clearConfetti();
     // Clear win-flow drops since we're no longer in a won state.
     this._flowDrops = [];
+    this._flowGoodDirs = null;
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
     this._renderInventoryBar();
@@ -1914,6 +1928,7 @@ export class Game {
     // Reset particle arrays for the playtested level.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
+    this._flowGoodDirs = null;
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();
