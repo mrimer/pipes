@@ -2368,19 +2368,41 @@ export class CampaignEditor {
 
   // ─── Import / Export ──────────────────────────────────────────────────────
 
-  /** Export a campaign by triggering a gzip-compressed JSON file download. */
+  /** Trigger a file download for the given Blob with the specified filename. */
+  private _triggerDownload(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /** Export a campaign as a plain JSON file download. */
+  private _exportCampaignAsJson(campaign: CampaignDef): void {
+    const json = JSON.stringify(campaign, null, 2);
+    const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json`;
+    this._triggerDownload(new Blob([json], { type: 'application/json' }), filename);
+  }
+
+  /** Export a campaign by triggering a gzip-compressed JSON file download,
+   *  falling back to plain JSON if gzip is unavailable or fails. */
   private _exportCampaign(campaign: CampaignDef): Promise<void> {
     const json = JSON.stringify(campaign, null, 2);
-    const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
+    const baseName = campaign.name.replace(/\s+/g, '_');
+
+    // Fall back immediately if the CompressionStream API is not available.
+    if (typeof CompressionStream === 'undefined') {
+      this._exportCampaignAsJson(campaign);
+      return Promise.resolve();
+    }
+
     return gzipString(json).then((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      this._triggerDownload(blob, `${baseName}.pipes.json.gz`);
     }).catch(() => {
-      alert('Failed to compress campaign file for export. Your browser may not support gzip compression.');
+      this._exportCampaignAsJson(campaign);
     });
   }
 
