@@ -279,6 +279,7 @@ type GameTestHooks = {
   _activeCampaign: unknown;
   _activeCampaignProgress: Set<number>;
   ctrlHeld: boolean;
+  shiftHeld: boolean;
   mouseCanvasPos: { x: number; y: number } | null;
   tooltipEl: HTMLElement;
   _handleKey(e: KeyboardEvent): void;
@@ -381,6 +382,100 @@ describe('Game – inventory bar re-renders on tile rotation', () => {
     expect(renderSpy).toHaveBeenCalled();
   });
 });
+
+// ─── Tests: Shift key cycles inventory selection ──────────────────────────────
+
+describe('Game – Shift key cycles to next available inventory item', () => {
+  function pressShift(hooks: GameTestHooks): void {
+    // Simulate a fresh keydown (shiftHeld starts false so the cycle fires).
+    hooks.shiftHeld = false;
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Shift' }));
+  }
+
+  it('selects the first available item when nothing is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1); // inventory: Straight×4, Elbow×1, Tee×1, Cross×1
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = null;
+
+    pressShift(hooks);
+
+    expect(hooks.selectedShape).toBe(PipeShape.Straight);
+  });
+
+  it('advances to the next available item', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+
+    pressShift(hooks);
+
+    expect(hooks.selectedShape).toBe(PipeShape.Elbow);
+  });
+
+  it('wraps around to the first item after the last', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Cross; // last item in level-1 inventory
+
+    pressShift(hooks);
+
+    expect(hooks.selectedShape).toBe(PipeShape.Straight); // back to first
+  });
+
+  it('skips items with effective count 0', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    // Exhaust Elbow by placing it (only ×1 available).
+    hooks.selectedShape = PipeShape.Elbow;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    // Elbow is now depleted; selection was auto-cleared.
+    expect(hooks.selectedShape).toBeNull();
+
+    // Start cycling from Straight (first item).
+    hooks.selectedShape = PipeShape.Straight;
+    pressShift(hooks); // should skip depleted Elbow and land on Tee
+    expect(hooks.selectedShape).toBe(PipeShape.Tee);
+  });
+
+  it('does nothing when no inventory items are available', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+
+    // Drain all inventory by placing pieces via board directly.
+    const board = hooks.board as unknown as { inventory: { shape: PipeShape; count: number }[] };
+    for (const item of board.inventory) item.count = 0;
+
+    hooks.selectedShape = null;
+    pressShift(hooks);
+
+    expect(hooks.selectedShape).toBeNull();
+  });
+
+  it('does nothing when game is not in Playing state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    hooks.gameState = 'Won'; // simulate won state
+    hooks.selectedShape = null;
+
+    pressShift(hooks);
+
+    expect(hooks.selectedShape).toBeNull();
+  });
+});
+
 
 // ─── Tests: reset progress ────────────────────────────────────────────────────
 

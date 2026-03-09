@@ -1125,6 +1125,9 @@ export class Game {
     }
     if (e.key === 'Shift' && !this.shiftHeld) {
       this.shiftHeld = true;
+      if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
+        this._selectNextAvailableInventory();
+      }
     }
     if (e.ctrlKey && e.key === 'z' && this.screen === GameScreen.Play) {
       e.preventDefault();
@@ -1442,6 +1445,45 @@ export class Game {
     if (effectiveCount < 1) {
       this.selectedShape = null;
     }
+  }
+
+  /**
+   * Cycle to the next available (effective count > 0) inventory item.
+   * Mirrors the ordering used by renderInventoryBar(): base inventory first,
+   * then bonus-only shapes from connected Chamber-item tiles.
+   * Wraps around; if no items are available the selection is unchanged.
+   */
+  private _selectNextAvailableInventory(): void {
+    if (!this.board) return;
+
+    const bonuses = this.board.getContainerBonuses();
+
+    // Build the ordered list of selectable shapes, exactly as rendered by the
+    // inventory bar, so the visual order and the cycling order agree.
+    const available: PipeShape[] = [];
+    const seen = new Set<PipeShape>();
+
+    for (const item of this.board.inventory) {
+      seen.add(item.shape);
+      const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
+      if (effectiveCount > 0) available.push(item.shape);
+    }
+
+    // Shapes that are only available via container bonuses (not in base inventory).
+    for (const [bonusShape, bonusCount] of bonuses) {
+      if (seen.has(bonusShape)) continue;
+      if (bonusCount > 0) available.push(bonusShape);
+    }
+
+    if (available.length === 0) return;
+
+    const currentIdx = this.selectedShape !== null ? available.indexOf(this.selectedShape) : -1;
+    const nextShape = available[(currentIdx + 1) % available.length];
+
+    this.selectedShape = nextShape;
+    this.pendingRotation = this.lastPlacedRotations.get(nextShape) ?? 0;
+    this._renderInventoryBar();
+    this.canvas.focus();
   }
 
   /**
