@@ -2,7 +2,7 @@ import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
 
 /** Neighbour offsets keyed by direction. */
-const NEIGHBOUR_DELTA: Record<Direction, GridPos> = {
+export const NEIGHBOUR_DELTA: Record<Direction, GridPos> = {
   [Direction.North]: { row: -1, col:  0 },
   [Direction.East]:  { row:  0, col:  1 },
   [Direction.South]: { row:  1, col:  0 },
