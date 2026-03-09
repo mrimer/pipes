@@ -690,13 +690,13 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     state._editorParams.pressure = 1;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
-    const input = findInputByLabel(panel, 'Pressure +');
+    const input = findInputByLabel(panel, 'Pressure');
     expect(input).not.toBeNull();
     fireInput(input!, '0');
     expect(state._editorParams.pressure).toBe(0);
   });
 
-  it('Pump chamber pressure negative values are clamped to 0', () => {
+  it('Pump chamber pressure supports negative values', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     state._editorPalette = 'chamber:pump';
@@ -704,10 +704,10 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     state._editorParams.pressure = 2;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
-    const input = findInputByLabel(panel, 'Pressure +');
+    const input = findInputByLabel(panel, 'Pressure');
     expect(input).not.toBeNull();
     fireInput(input!, '-5');
-    expect(state._editorParams.pressure).toBe(0);
+    expect(state._editorParams.pressure).toBe(-5);
   });
 });
 

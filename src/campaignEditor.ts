@@ -1050,9 +1050,9 @@ export class CampaignEditor {
     { palette: 'chamber:tank',     label: '💧 Tank' },
     { palette: 'chamber:dirt',     label: '🟫 Dirt' },
     { palette: 'chamber:item',     label: '🎁 Item' },
-    { palette: 'chamber:heater',   label: '🔥 Heater' },
+    { palette: 'chamber:heater',   label: '🔥 Heater / Cooler' },
     { palette: 'chamber:ice',      label: '🧊 Ice' },
-    { palette: 'chamber:pump',     label: '⬆ Pump' },
+    { palette: 'chamber:pump',     label: '⬆ Pump / Vacuum' },
     { palette: 'chamber:snow',      label: '❄ Snow' },
     { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
     { palette: 'chamber:star',      label: '⭐ Star' },
@@ -1307,7 +1307,7 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'heater') {
-        panel.appendChild(this._labeledInput('Temp +', String(this._editorParams.temperature), (v) => {
+        panel.appendChild(this._labeledInput('Temp', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
@@ -1329,8 +1329,8 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'pump') {
-        panel.appendChild(this._labeledInput('Pressure +', String(this._editorParams.pressure), (v) => {
-          this._editorParams.pressure = Math.max(0, parseInt(v) || 0);
+        panel.appendChild(this._labeledInput('Pressure', String(this._editorParams.pressure), (v) => {
+          this._editorParams.pressure = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
