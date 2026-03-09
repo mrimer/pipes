@@ -509,6 +509,59 @@ describe('CampaignEditor – gzip export/import', () => {
     expect((capturedAnchor as unknown as HTMLAnchorElement).download).toBe('GZ_Export_Test.pipes.json.gz');
   });
 
+  it('_exportCampaign falls back to .pipes.json when CompressionStream is unavailable', async () => {
+    let capturedAnchor: HTMLAnchorElement | null = null;
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      capturedAnchor = this;
+    });
+
+    // Simulate an environment without CompressionStream
+    const g = globalThis as Record<string, unknown>;
+    const origCS = g.CompressionStream;
+    delete g.CompressionStream;
+
+    try {
+      const editor = makeEditor();
+      const campaign: CampaignDef = {
+        id: 'cmp_json_fallback',
+        name: 'JSON Fallback Test',
+        author: 'Tester',
+        chapters: [],
+      };
+
+      await (editor as unknown as { _exportCampaign(c: CampaignDef): Promise<void> })._exportCampaign(campaign);
+
+      expect(capturedAnchor).not.toBeNull();
+      expect((capturedAnchor as unknown as HTMLAnchorElement).download).toBe('JSON_Fallback_Test.pipes.json');
+    } finally {
+      g.CompressionStream = origCS;
+    }
+  });
+
+  it('_exportCampaign falls back to .pipes.json when gzip compression fails', async () => {
+    let capturedAnchor: HTMLAnchorElement | null = null;
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      capturedAnchor = this;
+    });
+
+    // Make gzipString reject to simulate a compression failure
+    const campaignEditorTypes = await import('../src/campaignEditorTypes');
+    jest.spyOn(campaignEditorTypes, 'gzipString').mockRejectedValueOnce(new Error('compression error'));
+
+    const editor = makeEditor();
+    const campaign: CampaignDef = {
+      id: 'cmp_gz_fail',
+      name: 'GZ Fail Test',
+      author: 'Tester',
+      chapters: [],
+    };
+
+    await (editor as unknown as { _exportCampaign(c: CampaignDef): Promise<void> })._exportCampaign(campaign);
+
+    expect(capturedAnchor).not.toBeNull();
+    expect((capturedAnchor as unknown as HTMLAnchorElement).download).toBe('GZ_Fail_Test.pipes.json');
+  });
+
   it('_importCampaign file input accepts .json and .gz files', () => {
     // Track file inputs created during _importCampaign
     const fileInputs: HTMLInputElement[] = [];
