@@ -164,7 +164,7 @@ export function spawnFlowDrop(drops: FlowDrop[], board: Board): void {
     speed: 0.035 + Math.random() * 0.025,
     direction: dir,
     fromDir: null,
-    size: 3 + Math.random() * 2,
+    size: 6 + Math.random() * 4,
   });
 }
 
@@ -228,10 +228,13 @@ export function renderFlowDrops(
     ctx.translate(px, py);
     // Rotate so the long axis of the ellipse points in the direction of travel.
     ctx.rotate(angle + Math.PI / 2);
-    ctx.fillStyle = color;
     ctx.beginPath();
     ctx.ellipse(0, 0, drop.size * 0.55, drop.size, 0, 0, Math.PI * 2);
+    ctx.fillStyle = color;
     ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+    ctx.stroke();
     ctx.restore();
 
     i++;
