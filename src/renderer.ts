@@ -645,7 +645,7 @@ export function drawTile(
           ? tile.temperature
           : tile.temperature + currentTemp;
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(`+${deltaTemp}°`, 0, -9);
+        ctx.fillText(`${deltaTemp}°`, 0, -9);
         ctx.font = 'bold 9px Arial';
         ctx.fillText('x', 0, 0);
         ctx.font = 'bold 14px Arial';
@@ -752,7 +752,7 @@ export function getTileDisplayName(tile: Tile): string {
           return `Pump +${tile.pressure}P`;
         case 'snow':    return `Snow -${tile.temperature}° x ${tile.cost}`;
         case 'sandstone': return `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
-        case 'hot_plate': return `Hot Plate -${tile.cost} x ${tile.temperature}°`;
+        case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
         default:       return 'Chamber';
       }
     default: return '';
