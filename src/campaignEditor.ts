@@ -1315,7 +1315,7 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'ice' || cc === 'snow' || cc === 'sandstone') {
-        panel.appendChild(this._labeledInput('Mass/°', String(this._editorParams.cost), (v) => {
+        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
@@ -1341,7 +1341,7 @@ export class CampaignEditor {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
-        panel.appendChild(this._labeledInput('Boiling temp °', String(this._editorParams.temperature), (v) => {
+        panel.appendChild(this._labeledInput('Boiling °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
