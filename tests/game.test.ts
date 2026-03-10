@@ -278,6 +278,7 @@ type GameTestHooks = {
   _challengeModalEl: HTMLElement;
   _challengeMsgEl: HTMLElement;
   _challengeSkipBtnEl: HTMLButtonElement;
+  _exitConfirmModalEl: HTMLElement;
   _pendingLevelId: number | null;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _animations: { x: number; y: number; text: string; color: string }[];
@@ -1186,7 +1187,7 @@ describe('Game – auto-select reclaimed tile when no shape is selected', () => 
 // ─── Tests: clicking already-selected inventory item keeps it selected ─────────
 
 describe('Game – inventory click on already-selected item', () => {
-  it('keeps selectedShape when clicking the already-selected item', () => {
+  it('deselects selectedShape when clicking the already-selected item', () => {
     const { game } = makeGame();
     game.startLevel(1);
     const hooks = gameHooks(game);
@@ -1194,7 +1195,7 @@ describe('Game – inventory click on already-selected item', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks._handleInventoryClick(PipeShape.Straight, 4);
 
-    expect(hooks.selectedShape).toBe(PipeShape.Straight);
+    expect(hooks.selectedShape).toBeNull();
   });
 
   it('changes selectedShape when clicking a different item', () => {
@@ -1242,14 +1243,31 @@ describe('Game – R key resets the level', () => {
 // ─── Tests: Escape key returns to level select ────────────────────────────────
 
 describe('Game – Escape key returns to level select', () => {
-  it('calls exitToMenu when Escape is pressed during play', () => {
+  it('shows the exit-confirm modal when Escape is pressed during play instead of immediately exiting', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
     const exitSpy = jest.spyOn(game, 'exitToMenu');
-    gameHooks(game)._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    const hooks = gameHooks(game);
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
 
-    expect(exitSpy).toHaveBeenCalled();
+    // Esc during active play now shows the confirm modal; exitToMenu is NOT called immediately.
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
+  });
+
+  it('dismisses the exit-confirm modal on a second Esc press', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    // First Esc: show modal
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
+
+    // Second Esc: hide modal
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(hooks._exitConfirmModalEl.style.display).toBe('none');
   });
 });
 
