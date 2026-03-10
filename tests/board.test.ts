@@ -3440,3 +3440,181 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
     expect(error).toBeNull();
   });
 });
+
+
+// ─── Chamber tile (hot_plate content) ─────────────────────────────────────────
+
+describe('Chamber tile (hot_plate content)', () => {
+  /**
+   * Build a board using the dynamic fallback (no initHistory):
+   * Source(cap, temp=sourceTemp, pressure=1) → HotPlate(mass, temp) → Sink
+   * with the frozen counter pre-seeded to frozenAmt.
+   */
+  function makeDynamicBoard(cap: number, mass: number, temp: number, sourceTemp = 0, frozenAmt = 0): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.sourceCapacity = cap;
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, cap, 0, null, 1, null, null, sourceTemp, 1);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, mass, null, 1, null, 'hot_plate', temp);
+    board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
+    board.frozen = frozenAmt;
+    return board;
+  }
+
+  /**
+   * Build a board: Source → Ice → HotPlate → Sink with initHistory.
+   * Ice fills frozen first; hot_plate then consumes from that frozen.
+   */
+  function makeIcePlusHotPlateBoard(
+    cap: number, iceCost: number, iceTemp: number,
+    mass: number, hpTemp: number, sourceTemp = 0,
+  ): Board {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = cap;
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, cap, 0, null, 1, null, null, sourceTemp, 1);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, iceCost,  null, 1, null, 'ice',      iceTemp);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, mass,    null, 1, null, 'hot_plate', hpTemp);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true);
+    board.initHistory();
+    return board;
+  }
+
+  it('hasTempRelevantTiles returns true for hot_plate', () => {
+    const board = makeDynamicBoard(10, 2, 5);
+    expect(board.hasTempRelevantTiles()).toBe(true);
+  });
+
+  it('effectiveCost = mass × (temp + playerTemp), all from water when frozen=0', () => {
+    // mass=2, temp=3, sourceTemp=0: effectiveCost=2*(3+0)=6, frozen=0 → waterLoss=6
+    const board = makeDynamicBoard(10, 2, 3, 0, 0);
+    expect(board.getCurrentWater()).toBe(4); // 10 - 6 = 4
+  });
+
+  it('effectiveCost uses sourceTemp as part of playerTemp', () => {
+    // mass=2, temp=3, sourceTemp=2: effectiveCost=2*(3+2)=10, frozen=0
+    const board = makeDynamicBoard(15, 2, 3, 2, 0);
+    expect(board.getCurrentWater()).toBe(5); // 15 - 10 = 5
+  });
+
+  it('consumes from frozen first when frozen >= effectiveCost (dynamic fallback)', () => {
+    // mass=2, temp=3, frozen=6: effectiveCost=6, waterGain=6, waterLoss=0 → net gain=+6
+    const board = makeDynamicBoard(10, 2, 3, 0, 6);
+    expect(board.getCurrentWater()).toBe(16); // 10 + 6 = 16
+  });
+
+  it('partially consumes frozen when frozen < effectiveCost (dynamic fallback)', () => {
+    // mass=2, temp=3, frozen=4: effectiveCost=6, waterGain=4, waterLoss=2 → net=+2
+    const board = makeDynamicBoard(10, 2, 3, 0, 4);
+    expect(board.getCurrentWater()).toBe(12); // 10 + 2 = 12
+  });
+
+  it('applyTurnDelta locks hot_plate impact with zero frozen', () => {
+    // mass=2, temp=3, frozen=0: effectiveCost=6, impact=-6
+    const board = makeDynamicBoard(10, 2, 3, 0, 0);
+    board.initHistory();
+    const impact = board.getLockedWaterImpact({ row: 0, col: 1 });
+    expect(impact).toBe(-6);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 1 })).toBe(0);
+    expect(board.getCurrentWater()).toBe(4);
+  });
+
+  it('applyTurnDelta locks hot_plate impact when ice seeds frozen first', () => {
+    // Ice: cost=2, iceTemp=5, sourceTemp=0 → effectiveCost=2*5=10, impact=-10, frozen=10
+    // HotPlate: mass=1, hpTemp=3 → effectiveCost=1*(3+0)=3, waterGain=min(10,3)=3, waterLoss=0 → impact=+3, frozen=7
+    // water = 20 - 10 + 3 = 13
+    const board = makeIcePlusHotPlateBoard(20, 2, 5, 1, 3, 0);
+    expect(board.getCurrentWater()).toBe(13);
+    expect(board.frozen).toBe(7);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(3);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(3);
+  });
+
+  it('hot_plate disconnection restores frozen consumed at connection time', () => {
+    // Board: Source → [player Straight slot] → HotPlate → Sink
+    // After Straight placed: Straight costs 1 water, hot_plate costs 2 water (mass=1, temp=2, frozen=0)
+    // mass=1, hpTemp=2, sourceTemp=0: effectiveCost=2, frozen=0 → waterGain=0, waterLoss=2, impact=-2
+    // water = 20 - 1 (straight) - 2 (hot_plate) = 17
+    // After reclaim: hot_plate disconnects, frozen stays 0 (waterGain was 0)
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 20;
+    board.grid[0][0] = new Tile(PipeShape.Source,  90, true, 20, 0, null, 1, null, null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1,
+      null, 1, new Set([Direction.East, Direction.West]), 'hot_plate', 2);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 90, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    // Place Straight to connect hot_plate; effectiveCost=1*(2+0)=2, frozen=0 → impact=-2
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    expect(board.getCurrentWater()).toBe(17); // 20 - 1 (straight) - 2 (hot_plate) = 17
+    expect(board.frozen).toBe(0);
+
+    // Reclaim Straight → hot_plate disconnects, frozen restored (was 0, stays 0)
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    expect(board.frozen).toBe(0);
+    expect(board.getCurrentWater()).toBe(20);
+  });
+
+  it('hot_plate disconnection restores frozen when waterGain > 0 (via ice+hot_plate board)', () => {
+    // Build board with player-placed pipe to connect ice and hot_plate separately:
+    // Source → player-Straight → Ice(cost=3, thresh=5) → HotPlate(mass=1, hpTemp=2) → Sink
+    // Step 1: initHistory with empty (0,1) slot; nothing connected past source
+    // Step 2: place Straight at (0,1) → ice connects (effectiveCost=3*5=15, frozen=15)
+    //         then hot_plate connects (effectiveCost=1*(2+0)=2, waterGain=min(15,2)=2 → frozen=13, impact=+2)
+    // Step 3: reclaim Straight → ice disconnects (frozen-=15), hot_plate disconnects (frozen+=2)
+    //   Net frozen after step 3: 13 - 15 + 2 = 0
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.sourceCapacity = 50;
+    board.grid[0][0] = new Tile(PipeShape.Source,  90, true, 50, 0, null, 1, null, null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0); // player slot
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 3,
+      null, 1, new Set([Direction.East, Direction.West]), 'ice', 5);
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 0, 1,
+      null, 1, new Set([Direction.East, Direction.West]), 'hot_plate', 2);
+    board.grid[0][4] = new Tile(PipeShape.Sink, 90, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    // Place straight to connect ice and hot_plate
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    // ice: effectiveCost=3*5=15, impact=-15, frozen=15
+    // hot_plate: effectiveCost=1*(2+0)=2, waterGain=min(15,2)=2, frozen=13, impact=+2
+    expect(board.frozen).toBe(13);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 3 })).toBe(2);
+
+    // Reclaim straight – both ice and hot_plate disconnect
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    // ice disconnects: frozen -= 15 (frozen = 13 - 15 = -2... wait that's wrong)
+    // Let me recheck:
+    // At disconnect: ice had impact=-15, so frozen += impact = 13 + (-15) = -2 ... hmm
+    // Actually the disconnect code for ice: "frozen += impact" where impact=-15 → frozen=13+(-15)=-2 ?
+    // That can't be right...
+    // Wait, let me reconsider the order:
+    // When reclaim happens: both ice AND hot_plate disconnect at the same turn.
+    // The disconnect loop runs first:
+    //   - When ice disconnects: frozen += impact(-15) = 13 - 15 = -2... that seems wrong
+    //   But wait, the disconnect loop processes tiles that are being REMOVED from the fill path.
+    //   The loop is: for key in _lockedWaterImpact.keys(): if !filled.has(key): handle disconnect.
+    //   After reclaim, filled is recomputed for the new state (without the straight).
+    //   So both ice and hot_plate are removed from filled.
+    //   Processing order (insertion order from BFS when they connected):
+    //   ice is at (0,2), hot_plate is at (0,3).
+    //   ice processes first: frozen += ice_impact = 13 + (-15) = -2... 
+    //   hot_plate processes next: frozen += waterGain = -2 + 2 = 0
+    //   So frozen = 0 at end. OK that's consistent!
+    expect(board.frozen).toBe(0);
+    expect(board.getCurrentWater()).toBe(50);
+  });
+});

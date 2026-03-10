@@ -1238,13 +1238,19 @@ export class Game {
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
-      // for ice/snow/sandstone show the locked-in effective cost value.
+      // for ice/snow/sandstone/hot_plate show the locked-in effective cost value.
       const lockedImpact = this.board.getLockedWaterImpact({ row, col });
       const isConnected = lockedImpact !== null;
       if (isConnected &&
           (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')) {
         // Show the locked effective cost that was frozen when the tile was connected
         tooltipText += ` cost: ${Math.abs(lockedImpact)}`;
+      } else if (isConnected && tile.chamberContent === 'hot_plate') {
+        const lockedGain = this.board.getLockedHotPlateGain({ row, col });
+        if (lockedGain !== null) {
+          const loss = Math.max(0, lockedGain - lockedImpact);
+          tooltipText += ` (+${lockedGain} -${loss})`;
+        }
       } else if (!isConnected) {
         let predictedCost: number | null = null;
         if (tile.chamberContent === 'dirt') {
@@ -1275,10 +1281,18 @@ export class Game {
             tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${deltaDamage}⌉=${effectiveCost})`;
             predictedCost = effectiveCost * deltaTemp;
           }
+        } else if (tile.chamberContent === 'hot_plate') {
+          const currentTemp = this.board.getCurrentTemperature();
+          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+          const frozenAvailable = this.board.frozen;
+          const gain = Math.min(frozenAvailable, effectiveCost);
+          const loss = Math.max(0, effectiveCost - gain);
+          tooltipText += ` (mass:${tile.cost} × (${tile.temperature}+${currentTemp}°)=cost:${effectiveCost}; +${gain} -${loss})`;
+          predictedCost = 0; // Net effect already shown in tooltip text
         } else {
           predictedCost = 0;
         }
-        if (predictedCost !== null) {
+        if (predictedCost !== null && predictedCost !== 0) {
           tooltipText += ` cost: ${predictedCost}`;
         }
       }
@@ -1405,6 +1419,18 @@ export class Game {
           const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
           color = ANIM_NEGATIVE_COLOR;
+        } else if (tile.chamberContent === 'hot_plate') {
+          // Use the locked values computed by applyTurnDelta
+          const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
+          const lockedGain = this.board.getLockedHotPlateGain({ row: r, col: c });
+          if (lockedImpact !== null && lockedGain !== null) {
+            const loss = Math.max(0, lockedGain - lockedImpact);
+            const parts: string[] = [];
+            if (lockedGain > 0) parts.push(`+${lockedGain}`);
+            if (loss > 0) parts.push(`-${loss}`);
+            text = parts.length > 0 ? parts.join(' ') : '+0';
+            color = lockedImpact >= 0 ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
+          }
         }
       }
 
@@ -1489,6 +1515,18 @@ export class Game {
           const val = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
           text = val > 0 ? `+${val}` : `+0`;
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        } else if (tile.chamberContent === 'hot_plate') {
+          // When disconnecting, the hot plate's effects are reversed:
+          // gain (from frozen) is lost; water loss is recovered
+          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+          const waterGain = Math.min(this.board.frozen, effectiveCost);
+          const waterLoss = Math.max(0, effectiveCost - waterGain);
+          // Reverse: loss recovered (+waterLoss), gain forfeited (-waterGain)
+          const parts: string[] = [];
+          if (waterLoss > 0) parts.push(`+${waterLoss}`);
+          if (waterGain > 0) parts.push(`-${waterGain}`);
+          text = parts.length > 0 ? parts.join(' ') : '-0';
+          color = waterLoss > waterGain ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
         }
         // heater, pump, item: no direct water impact – no animation label
       }

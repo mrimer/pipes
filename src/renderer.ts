@@ -30,6 +30,7 @@ import {
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
   STAR_COLOR, STAR_WATER_COLOR,
+  HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
 } from './colors';
 
 const LINE_WIDTH = 10; // pipe stroke width in px
@@ -150,6 +151,7 @@ export function drawTile(
   currentTemp = 0,
   currentPressure = 1,
   lockedCost: number | null = null,
+  lockedGain: number | null = null,
 ): void {
   const { shape, rotation, isFixed, capacity, cost, itemShape, itemCount } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -193,6 +195,8 @@ export function drawTile(
       color = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+    } else if (chamberContent === 'hot_plate') {
+      color = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
     } else {
       color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
     }
@@ -587,6 +591,44 @@ export function drawTile(
       }
       ctx.closePath();
       ctx.fill();
+    } else if (chamberContent === 'hot_plate') {
+      // Draw a small flame icon in the top-right inside corner
+      const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
+      ctx.strokeStyle = hotColor;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      // Flame: a simple upward-pointing flame shape
+      const fx = bw - 8;
+      const fy = -bh + 9;
+      const fr = 5;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy + fr);
+      ctx.bezierCurveTo(fx - fr, fy, fx - fr * 0.5, fy - fr * 1.2, fx, fy - fr);
+      ctx.bezierCurveTo(fx + fr * 0.5, fy - fr * 1.2, fx + fr, fy, fx, fy + fr);
+      ctx.stroke();
+
+      ctx.fillStyle = hotColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (lockedGain !== null || lockedCost !== null) {
+        // Connected: show gain and/or loss
+        const gain = lockedGain ?? 0;
+        const loss = lockedCost ?? 0;
+        const parts: string[] = [];
+        if (gain > 0) parts.push(`+${gain}`);
+        if (loss > 0) parts.push(`-${loss}`);
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
+      } else {
+        // Unconnected: show boiling temp and mass
+        const boilingTemp = 100 + (shiftHeld ? tile.temperature : tile.temperature);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`+${boilingTemp}°`, 0, -9);
+        ctx.font = 'bold 9px Arial';
+        ctx.fillText('x', 0, 0);
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(String(cost), 0, 9);
+      }
     }
     // Connection stubs
     ctx.strokeStyle = color;
@@ -688,6 +730,7 @@ export function getTileDisplayName(tile: Tile): string {
           return `Pump +${tile.pressure}P`;
         case 'snow':    return 'Snow';
         case 'sandstone': return 'Sandstone';
+        case 'hot_plate': return `Hot plate +${100 + tile.temperature}°`;
         default:       return 'Chamber';
       }
     default: return '';
@@ -921,16 +964,27 @@ export function renderBoard(
 
       // For connected ice/snow/sandstone tiles, pass the locked effective cost so
       // the tile can display the single locked-in value instead of the live formula.
+      // For connected hot_plate tiles, pass both the locked gain (from frozen) and locked loss.
       let lockedCost: number | null = null;
-      if (isWater && tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')) {
-        const impact = board.getLockedWaterImpact({ row: r, col: c });
-        if (impact !== null) {
-          lockedCost = Math.abs(impact);
+      let lockedGain: number | null = null;
+      if (isWater && tile.shape === PipeShape.Chamber) {
+        if (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone') {
+          const impact = board.getLockedWaterImpact({ row: r, col: c });
+          if (impact !== null) {
+            lockedCost = Math.abs(impact);
+          }
+        } else if (tile.chamberContent === 'hot_plate') {
+          const impact = board.getLockedWaterImpact({ row: r, col: c });
+          const gain = board.getLockedHotPlateGain({ row: r, col: c });
+          if (impact !== null && gain !== null) {
+            const loss = Math.max(0, gain - impact);
+            lockedGain = gain;
+            lockedCost = loss;
+          }
         }
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
     }
   }
 
