@@ -1341,7 +1341,7 @@ export class CampaignEditor {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
-        panel.appendChild(this._labeledInput('Boiling temp', String(this._editorParams.temperature), (v) => {
+        panel.appendChild(this._labeledInput('Boiling temp °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));

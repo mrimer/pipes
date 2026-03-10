@@ -620,8 +620,9 @@ export function drawTile(
         ctx.font = 'bold 12px Arial';
         ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
       } else {
-        // Unconnected: show boiling temp and mass
-        const boilingTemp = 100 + (shiftHeld ? tile.temperature : tile.temperature);
+        // Unconnected: show boiling temp and mass.
+        // When shift is held, show the raw temp parameter; otherwise show 100+temp (the boiling point).
+        const boilingTemp = shiftHeld ? tile.temperature : 100 + tile.temperature;
         ctx.font = 'bold 14px Arial';
         ctx.fillText(`+${boilingTemp}°`, 0, -9);
         ctx.font = 'bold 9px Arial';
