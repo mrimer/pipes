@@ -300,10 +300,10 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       if (cc === 'tank') ctx.fillText(`cap:${tile.capacity}`, cx, cy + 8);
       else if (cc === 'dirt') ctx.fillText(`cost:${tile.cost}`, cx, cy + 8);
       else if (cc === 'heater') ctx.fillText(`${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + 8);
-      else if (cc === 'ice') ctx.fillText(`${tile.cost}/° x ${tile.temperature}°`, cx, cy + 8);
+      else if (cc === 'ice') ctx.fillText(`${tile.cost} x ${tile.temperature}°`, cx, cy + 8);
       else if (cc === 'pump') ctx.fillText(`${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + 8);
-      else if (cc === 'snow') ctx.fillText(`${tile.cost}/° x ${tile.temperature}°`, cx, cy + 8);
-      else if (cc === 'hot_plate') ctx.fillText(`mass:${tile.cost} +${100 + tile.temperature}°`, cx, cy + 8);
+      else if (cc === 'snow') ctx.fillText(`${tile.cost} x ${tile.temperature}°`, cx, cy + 8);
+      else if (cc === 'hot_plate') ctx.fillText(`${tile.cost} x ${tile.temperature}°`, cx, cy + 8);
       else if (cc === 'item') ctx.fillText(`${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
     }
     drawConnectionLines(ctx, x, y, tile);
