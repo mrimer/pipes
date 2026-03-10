@@ -65,7 +65,8 @@ export function renderAnimations(
       continue;
     }
     const progress = elapsed / anim.duration;
-    const alpha = 1 - progress;
+    // Remain fully visible for the first 50% of the duration, then fade out.
+    const alpha = progress < 0.5 ? 1 : (1 - progress) * 2;
     const yOffset = -ANIM_RISE_PX * progress;
 
     ctx.save();
@@ -73,9 +74,10 @@ export function renderAnimations(
     ctx.font = 'bold 30px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.strokeText(anim.text, anim.x, anim.y + yOffset);
     ctx.fillStyle = anim.color;
-    ctx.shadowColor = '#000';
-    ctx.shadowBlur = 4;
     ctx.fillText(anim.text, anim.x, anim.y + yOffset);
     ctx.restore();
 

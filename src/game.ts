@@ -225,6 +225,9 @@ export class Game {
   /** "Skip Level" button inside the challenge modal (hidden for direct selection). */
   private readonly _challengeSkipBtnEl: HTMLButtonElement;
 
+  /** Modal overlay shown when the player presses Esc to confirm abandoning the level. */
+  private readonly _exitConfirmModalEl: HTMLElement;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -420,6 +423,43 @@ export class Game {
     this._challengeModalEl.appendChild(challengeBox);
     document.body.appendChild(this._challengeModalEl);
 
+    // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
+    this._exitConfirmModalEl = document.createElement('div');
+    this._exitConfirmModalEl.style.cssText =
+      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
+      'justify-content:center;align-items:center;z-index:100;';
+    const exitConfirmBox = document.createElement('div');
+    exitConfirmBox.className = 'modal-box';
+    const exitConfirmTitle = document.createElement('h2');
+    exitConfirmTitle.textContent = '🚪 Abandon Level?';
+    const exitConfirmMsg = document.createElement('p');
+    exitConfirmMsg.textContent = 'Your progress on this level will be lost.';
+    const exitConfirmActions = document.createElement('div');
+    exitConfirmActions.className = 'modal-actions';
+    const exitConfirmExitBtn = document.createElement('button');
+    exitConfirmExitBtn.textContent = 'Exit Level';
+    exitConfirmExitBtn.className = 'modal-btn primary';
+    exitConfirmExitBtn.type = 'button';
+    exitConfirmExitBtn.addEventListener('click', () => {
+      this._exitConfirmModalEl.style.display = 'none';
+      this.exitToMenu();
+    });
+    const exitConfirmContinueBtn = document.createElement('button');
+    exitConfirmContinueBtn.textContent = 'Continue';
+    exitConfirmContinueBtn.className = 'modal-btn secondary';
+    exitConfirmContinueBtn.type = 'button';
+    exitConfirmContinueBtn.addEventListener('click', () => {
+      this._exitConfirmModalEl.style.display = 'none';
+      this.canvas.focus();
+    });
+    exitConfirmActions.appendChild(exitConfirmExitBtn);
+    exitConfirmActions.appendChild(exitConfirmContinueBtn);
+    exitConfirmBox.appendChild(exitConfirmTitle);
+    exitConfirmBox.appendChild(exitConfirmMsg);
+    exitConfirmBox.appendChild(exitConfirmActions);
+    this._exitConfirmModalEl.appendChild(exitConfirmBox);
+    document.body.appendChild(this._exitConfirmModalEl);
+
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
       () => this._showLevelSelect(),         // onClose: return to level select
@@ -437,7 +477,7 @@ export class Game {
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
     canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
-    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); this.hoverRotationDelta = 0; });
+    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); this.hoverRotationDelta = 0; this.mouseCanvasPos = null; });
     // Capture mouseup on window so a release outside the canvas still ends the drag.
     // Game is a singleton for the lifetime of the page, so this listener is never removed
     // (same pattern as the document keydown/keyup listeners below).
@@ -463,6 +503,7 @@ export class Game {
     this.gameoverModalEl.style.display = 'none';
     this._newChapterModalEl.style.display = 'none';
     this._challengeModalEl.style.display = 'none';
+    this._exitConfirmModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     this._clearModalSparkle(this._newChapterModalEl);
@@ -517,6 +558,7 @@ export class Game {
     this.gameoverModalEl.style.display    = 'none';
     this._newChapterModalEl.style.display = 'none';
     this._challengeModalEl.style.display  = 'none';
+    this._exitConfirmModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
@@ -681,7 +723,13 @@ export class Game {
   private _handleInventoryClick(shape: PipeShape, count: number): void {
     if (this.gameState !== GameState.Playing) return;
     if (count === 0) return;
-    if (this.selectedShape === shape) return; // already selected – no toggle
+    if (this.selectedShape === shape) {
+      // Clicking the already-selected item deselects it.
+      this.selectedShape = null;
+      this._renderInventoryBar();
+      this.canvas.focus();
+      return;
+    }
     this.selectedShape = shape;
     this.pendingRotation = this.lastPlacedRotations.get(shape) ?? 0;
     this._renderInventoryBar();
@@ -1100,7 +1148,19 @@ export class Game {
     const rect = this.canvas.getBoundingClientRect();
     const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
     const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
-    this._reclaimTileAt({ row, col });
+    const pos: GridPos = { row, col };
+    const tile = this.board.getTile(pos);
+
+    // Right-clicking an empty tile: clear any pending inventory selection.
+    if (tile && tile.shape === PipeShape.Empty) {
+      if (this.selectedShape !== null) {
+        this.selectedShape = null;
+        this._renderInventoryBar();
+      }
+      return;
+    }
+
+    this._reclaimTileAt(pos);
   }
 
   private _handleCanvasMouseMove(e: MouseEvent): void {
@@ -1688,7 +1748,17 @@ export class Game {
         }
         break;
       case 'Escape':
-        this.exitToMenu();
+        if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
+          // If the exit-confirm modal is already showing, dismiss it (toggle).
+          if (this._exitConfirmModalEl.style.display !== 'none') {
+            this._exitConfirmModalEl.style.display = 'none';
+            this.canvas.focus();
+          } else {
+            this._exitConfirmModalEl.style.display = 'flex';
+          }
+        } else {
+          this.exitToMenu();
+        }
         break;
       case 'r':
       case 'R':
@@ -1960,6 +2030,7 @@ export class Game {
     this.gameoverModalEl.style.display    = 'none';
     this._newChapterModalEl.style.display = 'none';
     this._challengeModalEl.style.display  = 'none';
+    this._exitConfirmModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();

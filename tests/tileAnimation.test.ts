@@ -50,13 +50,14 @@ const makeCtx = () => ({
   save:         jest.fn(),
   restore:      jest.fn(),
   fillText:     jest.fn(),
+  strokeText:   jest.fn(),
   globalAlpha:  1,
   font:         '',
   textAlign:    '',
   textBaseline: '',
   fillStyle:    '',
-  shadowColor:  '',
-  shadowBlur:   0,
+  strokeStyle:  '',
+  lineWidth:    0,
 } as unknown as CanvasRenderingContext2D);
 
 describe('renderAnimations', () => {
@@ -91,7 +92,8 @@ describe('renderAnimations', () => {
       { x: 64, y: 32, text: '+3', color: ANIM_POSITIVE_COLOR, startTime: now - half, duration: 900 },
     ];
     renderAnimations(ctx, anims);
-    // At 50% elapsed, alpha ≈ 0.5 and yOffset ≈ -(ANIM_RISE_PX * 0.5)
+    // At exactly 50% elapsed, the fade has just started so alpha is at its
+    // boundary value (1.0). The Y offset is already halfway up.
     const appliedAlpha = (ctx as unknown as { globalAlpha: number }).globalAlpha;
     // globalAlpha is set inside the mock – retrieve from fillText call context
     // The stub doesn't capture the intermediate state, but we can verify fillText was called
