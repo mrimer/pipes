@@ -1520,10 +1520,43 @@ describe('Board.replaceInventoryTile', () => {
     // Replacing Straight(1) with Straight(R=0, N-S) breaks the E-W path to the chamber
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 0);
     expect(result).toBe(false);
+    // A user-visible error must be set (grant invalidation)
+    expect(board.lastError).not.toBeNull();
     // Board and inventory must be fully rolled back
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.grid[0][1].rotation).toBe(90);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-2);
+  });
+
+  it('sets lastError when replacing would disconnect the container that grants the new shape', () => {
+    // Source → Straight(1,R=90,E-W) → Chamber(2, grants 1 Elbow) → Sink(3)
+    // inventory = [{Straight:0, Elbow:-1+grant1=0}]: player has used the granted Elbow somewhere else
+    // ... simpler: player has 0 base Elbows, 1 granted via connected container.
+    // They try to replace Straight(1) with Elbow: placing Elbow at (0,1) disconnects the chamber
+    // → Elbow grant drops to 0 → effectiveCount = 0 ≤ 0 → error.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);  // E-W connector; will be replaced
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0,  true, 0, 0, PipeShape.Elbow, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Sink,     0,  true);
+    board.sourceCapacity = 10;
+    // 0 Elbows in base inventory; 1 granted by container → effectiveCount = 1 (valid to select)
+    // 1 Straight placed (base 0 - 1 placed = count might need adjustment);
+    // For simplicity, Straight was placed using a grant or base of 1:
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }, { shape: PipeShape.Elbow, count: 0 }];
+
+    // Try to replace the E-W Straight with an Elbow (R=0, N-S connects N-S, not E-W)
+    // An Elbow at R=0 connects North and East, not West-East, so it breaks the E-W chain.
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 0);
+    expect(result).toBe(false);
+    // Must set a user-visible error (inventory grant invalidation)
+    expect(board.lastError).not.toBeNull();
+    // Board must be rolled back
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(0);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count).toBe(0);
   });
 
   it('clears lastError on success', () => {

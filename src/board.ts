@@ -594,9 +594,19 @@ export class Board {
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
 
     if (effectiveCount <= 0) {
-      // New shape not available – roll back step 1 and the provisional placement
+      // Check whether the new shape was available before the replacement (with the old tile
+      // in place).  If it was, the replacement itself is disconnecting the container that
+      // grants the new shape – report that as a user-visible error.
+      this.grid[pos.row][pos.col] = tile; // temporarily restore old tile for bonus check
+      const originalBonuses = this.getContainerBonuses();
+      const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
+      if (originalEffective > 0) {
+        this.lastError =
+          'Cannot replace: placing this pipe would disconnect a container that grants it. ' +
+          'Reconfigure the path first.';
+      }
       this.inventory = savedInventory;
-      this.grid[pos.row][pos.col] = tile;
+      // grid[pos.row][pos.col] is already restored to the old tile above
       return false;
     }
 

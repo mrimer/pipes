@@ -270,9 +270,9 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = '#fff';
     // Count how many lines we need to center them vertically
     const lines: string[] = ['SOURCE', `cap:${tile.capacity}`];
-    // Show temp/pressure params when non-default (pressure=1 is the default via TileDef ?? fallback)
+    // Show temp/pressure params; pressure always shown (even at default value of 1)
     if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
-    if (tile.pressure !== 1) lines.push(`${tile.pressure}P`);
+    lines.push(`${tile.pressure}P`);
     const lineHeight = 12;
     const totalH = (lines.length - 1) * lineHeight;
     let lineY = cy - totalH / 2;
