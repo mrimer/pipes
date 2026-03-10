@@ -72,7 +72,7 @@ export class Tile {
   readonly isFixed: boolean;
   /** Water capacity for Source and Chamber-tank tiles. */
   capacity: number;
-  /** Water cost for Chamber-dirt and Chamber-ice tiles – deducted from the source when water flows through. */
+  /** Water cost for Chamber-damage tiles – deducted from the source when water flows through. */
   cost: number;
   /** Inventory item shape granted when a Chamber-item tile is in the fill path. */
   itemShape: PipeShape | null;
@@ -99,7 +99,7 @@ export class Tile {
   /**
    * Temperature value. For Source tiles: base temperature of the water supply.
    * For Chamber-heater tiles: temperature bonus added to the source when connected.
-   * For Chamber-ice and Chamber-snow tiles: the threshold temperature (water costs when connected).
+   * For Chamber-ice/snow/sandstone/hot plate tiles: the temperature (impacts water cost when connected).
    * Defaults to 0.
    */
   temperature: number;
@@ -122,12 +122,12 @@ export class Tile {
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
    * @param capacity - Water capacity (Source / Chamber-tank tiles only).
-   * @param cost - Water cost (Chamber-dirt and Chamber-ice tiles).
+   * @param cost - Water cost (Chamber-dirt/ice/snow/sandstone/hot plate tiles).
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
-   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', or 'sandstone').
-   * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/Snow/Sandstone (threshold).
+   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', or 'hot plate').
+   * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/Snow/Sandstone/Hot Plate (cost factor).
    * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
    */
