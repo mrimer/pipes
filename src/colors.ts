@@ -73,5 +73,9 @@ export const SANDSTONE_HARD_WATER_COLOR = '#9a6b40';
 export const STAR_COLOR       = '#f0c040';
 /** Star chamber tile color when water is flowing through it. */
 export const STAR_WATER_COLOR = '#ffe880';
+/** Hot plate chamber tile color (warm orange-red). */
+export const HOT_PLATE_COLOR       = '#e44';
+/** Hot plate chamber tile color when water is flowing through it. */
+export const HOT_PLATE_WATER_COLOR = '#f86';
 /** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
 export const SPIN_PIPE_COLOR  = '#3a5868';

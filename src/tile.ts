@@ -86,6 +86,9 @@ export class Tile {
    * but divides cost by Pressure (rounded up) before multiplying by tempDelta,
    * 'sandstone' reduces capacity like snow but uses deltaDamage (Pressure−Hardness)
    * as the divisor; connecting is blocked when deltaDamage ≤ 0.
+   * 'hot_plate' has a unique application: effectiveCost = mass×(temp+playerTemp);
+   * first, the amount is taken from the frozen variable (adding back to water capacity),
+   * then any remaining cost is subtracted from water capacity.
    */
   chamberContent: ChamberContent | null;
   /**

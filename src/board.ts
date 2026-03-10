@@ -52,6 +52,11 @@ type Snapshot = {
    * Used to re-evaluate ice/weak-ice costs when beneficial tiles (heaters, pumps) disconnect.
    */
   connectionTurn: Map<string, number>;
+  /**
+   * Per hot_plate tile: the amount of frozen water consumed (waterGain) when that tile connected.
+   * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
+   */
+  hotPlateWaterGain: Map<string, number>;
 };
 
 /**
@@ -136,6 +141,12 @@ export class Board {
    * Not used in game logic; intended for display purposes.
    */
   frozen: number = 0;
+
+  /**
+   * Per hot_plate tile: the amount of frozen water consumed (waterGain) when that tile connected.
+   * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
+   */
+  private _hotPlateWaterGain: Map<string, number> = new Map();
 
   /** Full move history for undo/redo support. history[0] is the initial state. */
   private _history: Snapshot[] = [];
@@ -247,6 +258,7 @@ export class Board {
     this.frozen = 0;
     this._turnNumber = 0;
     this._connectionTurn = new Map();
+    this._hotPlateWaterGain = new Map();
     this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
@@ -341,6 +353,7 @@ export class Board {
       frozen: this.frozen,
       turnNumber: this._turnNumber,
       connectionTurn: new Map(this._connectionTurn),
+      hotPlateWaterGain: new Map(this._hotPlateWaterGain),
     };
   }
 
@@ -360,6 +373,7 @@ export class Board {
     this.frozen = snap.frozen;
     this._turnNumber = snap.turnNumber;
     this._connectionTurn = new Map(snap.connectionTurn);
+    this._hotPlateWaterGain = new Map(snap.hotPlateWaterGain);
   }
 
   /**
@@ -676,7 +690,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')
+          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone' || tile.chamberContent === 'hot_plate')
         ) {
           return true;
         }
@@ -857,6 +871,12 @@ export class Board {
           pipeCost += deltaDamage >= 1
             ? Math.ceil(tile.cost / deltaDamage) * deltaTemp
             : this.sourceCapacity + 1;
+        } else if (tile.chamberContent === 'hot_plate') {
+          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+          const waterGain = Math.min(this.frozen, effectiveCost);
+          const waterLoss = Math.max(0, effectiveCost - waterGain);
+          // Net effect: gain from frozen minus direct water loss
+          pipeCost += waterLoss - waterGain;
         }
       }
     }
@@ -904,18 +924,25 @@ export class Board {
     // Remove locked impacts for tiles that are no longer connected.
     // For ice/weak-ice tiles that are being disconnected, subtract their contribution
     // from the frozen counter since they are no longer in the fill path.
+    // For hot_plate tiles, restore the frozen water that was consumed when they connected.
     for (const key of this._lockedWaterImpact.keys()) {
       if (!filled.has(key)) {
         const impact = this._lockedWaterImpact.get(key)!;
         const [r, c] = key.split(',').map(Number);
         const tile = this.grid[r]?.[c];
-        if (
-          tile?.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone') &&
-          impact < 0
-        ) {
-          // impact is negative (a cost); subtract it back out of frozen.
-          this.frozen += impact;
+        if (tile?.shape === PipeShape.Chamber) {
+          if (
+            (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone') &&
+            impact < 0
+          ) {
+            // impact is negative (a cost); subtract it back out of frozen.
+            this.frozen += impact;
+          } else if (tile.chamberContent === 'hot_plate') {
+            // Restore the frozen water that was consumed when this hot_plate connected.
+            const waterGain = this._hotPlateWaterGain.get(key) ?? 0;
+            this.frozen += waterGain;
+            this._hotPlateWaterGain.delete(key);
+          }
         }
         this._lockedWaterImpact.delete(key);
         this._connectionTurn.delete(key);
@@ -1016,6 +1043,15 @@ export class Board {
           } else {
             impact = -(this.sourceCapacity + 1);
           }
+        } else if (tile.chamberContent === 'hot_plate') {
+          // effectiveCost = mass × (temp + playerTemp)
+          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+          // First consume from frozen, then from water
+          const waterGain = Math.min(this.frozen, effectiveCost);
+          const waterLoss = Math.max(0, effectiveCost - waterGain);
+          this.frozen -= waterGain;
+          impact = waterGain - waterLoss;
+          this._hotPlateWaterGain.set(key, waterGain);
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }
@@ -1035,6 +1071,17 @@ export class Board {
   getLockedWaterImpact(pos: GridPos): number | null {
     const key = `${pos.row},${pos.col}`;
     const val = this._lockedWaterImpact.get(key);
+    return val !== undefined ? val : null;
+  }
+
+  /**
+   * Return the locked frozen water consumed (waterGain) for a hot_plate tile at the given
+   * position, or `null` if that tile is not a connected hot_plate.
+   * Used by the UI to display the gain/loss breakdown for hot_plate tiles.
+   */
+  getLockedHotPlateGain(pos: GridPos): number | null {
+    const key = `${pos.row},${pos.col}`;
+    const val = this._hotPlateWaterGain.get(key);
     return val !== undefined ? val : null;
   }
 

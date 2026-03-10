@@ -1057,6 +1057,7 @@ export class CampaignEditor {
     { palette: 'chamber:snow',      label: '❄ Snow' },
     { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
     { palette: 'chamber:star',      label: '⭐ Star' },
+    { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -1269,9 +1270,9 @@ export class CampaignEditor {
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
       const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
         tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
-        ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star',
+        ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
       };
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star']) {
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate']) {
         const o = document.createElement('option');
         o.value = opt;
         o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
@@ -1280,7 +1281,7 @@ export class CampaignEditor {
       }
       sel.addEventListener('change', () => {
         this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
-        if (sel.value === 'ice' || sel.value === 'snow' || sel.value === 'sandstone') {
+        if (sel.value === 'ice' || sel.value === 'snow' || sel.value === 'sandstone' || sel.value === 'hot_plate') {
           if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
         }
         this._applyParamsToLinkedTile();
@@ -1302,7 +1303,7 @@ export class CampaignEditor {
       // Chamber content-specific params (content type is determined by the palette selection)
       const cc = chamberPaletteContent(p as ChamberPalette);
       if (cc === 'dirt') {
-        panel.appendChild(this._labeledInput('Cost', String(this._editorParams.cost), (v) => {
+        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
@@ -1314,7 +1315,7 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'ice' || cc === 'snow' || cc === 'sandstone') {
-        panel.appendChild(this._labeledInput('Cost/°', String(this._editorParams.cost), (v) => {
+        panel.appendChild(this._labeledInput('Mass/°', String(this._editorParams.cost), (v) => {
           this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
@@ -1332,6 +1333,16 @@ export class CampaignEditor {
       if (cc === 'pump') {
         panel.appendChild(this._labeledInput('Pressure', String(this._editorParams.pressure), (v) => {
           this._editorParams.pressure = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
+      }
+      if (cc === 'hot_plate') {
+        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
+          this._editorParams.cost = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
+        panel.appendChild(this._labeledInput('Boiling temp', String(this._editorParams.temperature), (v) => {
+          this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }

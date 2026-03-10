@@ -25,6 +25,7 @@ import {
   CONTAINER_COLOR,
   SPIN_PIPE_COLOR,
   BG_COLOR,
+  HOT_PLATE_COLOR,
 } from './colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
@@ -62,6 +63,7 @@ function tileColor(tile: TileDef | null): string {
         case 'ice':      return ICE_COLOR;
         case 'pump':     return PUMP_COLOR;
         case 'snow':     return SNOW_COLOR;
+        case 'hot_plate': return HOT_PLATE_COLOR;
         default:         return CHAMBER_COLOR;
       }
     case PipeShape.Granite:
