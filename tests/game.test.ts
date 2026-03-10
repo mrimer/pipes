@@ -1486,6 +1486,70 @@ describe('Game – disconnection animations after reclaimTile', () => {
   });
 });
 
+// ─── Tests: redo spawns tile impact animations ────────────────────────────────
+
+describe('Game – performRedo spawns tile impact animations', () => {
+  it('spawns a connection animation when a pipe placement is redone', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a Straight (E-W) at (0,1) → it connects to Source at (0,0)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Undo the placement
+    game.performUndo();
+    hooks._animations.length = 0;
+
+    // Redo – should respawn the connection animation ("-1" for the pipe)
+    game.performRedo();
+
+    const minusOneAnims = hooks._animations.filter((a) => a.text === '-1');
+    expect(minusOneAnims.length).toBeGreaterThanOrEqual(1);
+    expect(minusOneAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
+  });
+
+  it('spawns a disconnection animation when a pipe reclaim is redone', () => {
+    // Place TWO connected pipes, then reclaim the first (which disconnects both).
+    // After undo+redo of the reclaim, the second pipe (still in grid) should show "+1".
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place E-W Straight at (0,1) – connects to Source at (0,0)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Place E-W Straight at (0,2) – extends the chain; also newly connected
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 2 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Reclaim the first pipe at (0,1) via right-click – disconnects both (0,1) and (0,2)
+    // (0,1) centre: clientX=96, clientY=32
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    // Undo the reclaim (restores the pipe at (0,1), reconnects (0,1) and (0,2))
+    game.performUndo();
+    hooks._animations.length = 0;
+
+    // Redo the reclaim – (0,1) becomes empty again, (0,2) disconnects.
+    // _spawnDisconnectionAnimations should fire "+1" for (0,2) (still in grid).
+    game.performRedo();
+
+    // (0,2) is still in the grid and was disconnected → "+1" disconnection animation
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
+    expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
+  });
+});
+
 // ─── Tests: Ctrl-Z / Ctrl-Y undo/redo keyboard shortcuts ─────────────────────
 
 describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {

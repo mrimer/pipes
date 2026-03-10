@@ -2945,9 +2945,87 @@ describe('Chamber tile (sandstone content)', () => {
 
     b.applyTurnDelta();
     b.recordMove();
-    // Re-evaluated with effective pressure=1 (pump not in fill path, connected after sandstone):
+    // Re-evaluated with current pressure=1 (pump reclaimed, no longer in fill path):
     // deltaDamage=1, impact = -(ceil(3/1)*5) = -15
     expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-15);
+  });
+
+  it('reclaimTile succeeds and sandstone uses actual current pressure (not historically-limited) when another pump is still connected', () => {
+    // Layout (3 rows × 6 cols):
+    //   (0,0) Pump P2[E] → (0,1) player-pipe → (0,2) Source[W,E,S] → (0,3) player-pipe → (0,4) Sandstone[W,E] → (0,5) Sink[W]
+    //                                                     ↓
+    //                                            (1,2) player-pipe
+    //                                                     ↓
+    //                                            (2,2) Pump P1[N]
+    //
+    // Sequence:
+    //   Turn 1: connect P1 (pressure=1+5=6)
+    //   Turn 2: connect sandstone (deltaDamage=6-2=4, impact=-(ceil(4/4)*1)=-1)
+    //   Turn 3: connect P2 (pressure=1+5+4=10)
+    //   Reclaim P1 connector → current pressure=1+4=5, deltaDamage=5-2=3 > 0 → allowed
+    //
+    // Without fix: effectivePressure=1 (P2 connected at turn 3 > sandstone turn 2),
+    //   deltaDamage=-1 → invalid failure impact -(sourceCapacity+1)=-101
+    // With fix: reEvalPressure=5 (actual current), deltaDamage=3,
+    //   impact = -(ceil(4/3)*1) = -2
+    const b = new Board(3, 6);
+    b.source = { row: 0, col: 2 };
+    b.sink   = { row: 0, col: 5 };
+    b.sourceCapacity = 100;
+    // Pump P2 at (0,0): pressure=+4, connects East
+    b.grid[0][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.East]), 'pump', 0, 4);
+    // (0,1): Empty – player will place E-W Straight to connect P2
+    b.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    // Source at (0,2): connects West+East+South, pressure=1
+    b.grid[0][2] = new Tile(PipeShape.Source, 0, true, 100, 0, null, 1, new Set([Direction.West, Direction.East, Direction.South]), null, 0, 1);
+    // (0,3): Empty – player will place E-W Straight to connect sandstone
+    b.grid[0][3] = new Tile(PipeShape.Empty, 0);
+    // Sandstone at (0,4): hardness=2, cost=4, temperature=1
+    b.grid[0][4] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, new Set([Direction.West, Direction.East]), 'sandstone', 1, 0, 2);
+    // Sink at (0,5): connects West
+    b.grid[0][5] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    // (1,2): Empty – player will place N-S Straight to connect P1
+    b.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    // Pump P1 at (2,2): pressure=+5, connects North
+    b.grid[2][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 5);
+    // Fill remaining cells with Empty
+    for (const [r, c] of [[1,0],[1,1],[1,3],[1,4],[1,5],[2,0],[2,1],[2,3],[2,4],[2,5]]) {
+      b.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    }
+    b.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    b.initHistory();
+
+    // Turn 1: Place N-S Straight at (1,2) → P1 connects, pressure=1+5=6
+    b.placeInventoryTile({ row: 1, col: 2 }, PipeShape.Straight, 0);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(6);
+
+    // Turn 2: Place E-W Straight at (0,3) → sandstone connects, deltaDamage=6-2=4
+    b.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    // Sandstone locked at deltaDamage=4: impact = -(ceil(4/4)*1) = -1
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-1);
+
+    // Turn 3: Place E-W Straight at (0,1) → P2 connects, pressure=1+5+4=10
+    b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(10);
+
+    // Reclaim (1,2): P1 disconnects, current pressure drops to 1+4=5
+    // _checkSandstoneConstraints: currentPressure=5, deltaDamage=5-2=3 > 0 → allowed
+    const result = b.reclaimTile({ row: 1, col: 2 });
+    expect(result).toBe(true);
+    expect(b.lastError).toBeNull();
+
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(5);
+    // Re-evaluated with actual current pressure=5 (includes P2 still connected):
+    // deltaDamage=5-2=3, impact = -(ceil(4/3)*1) = -2
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-2);
   });
 });
 

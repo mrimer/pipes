@@ -1337,18 +1337,18 @@ export class Game {
           const currentPressure = this.board.getCurrentPressure();
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
-          tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}⌉=${effectiveCost})`;
+          tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}P⌉=${effectiveCost})`;
           predictedCost = effectiveCost * deltaTemp;
         } else if (tile.chamberContent === 'sandstone') {
           const currentTemp = this.board.getCurrentTemperature();
           const currentPressure = this.board.getCurrentPressure();
           const deltaDamage = currentPressure - tile.hardness;
           if (deltaDamage <= 0) {
-            tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}, Hardness: ${tile.hardness})`;
+            tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
           } else {
             const deltaTemp = Math.max(0, tile.temperature - currentTemp);
             const effectiveCost = Math.ceil(tile.cost / deltaDamage);
-            tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${deltaDamage}⌉=${effectiveCost})`;
+            tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}P-${tile.hardness}⌉=${effectiveCost})`;
             predictedCost = effectiveCost * deltaTemp;
           }
         } else if (tile.chamberContent === 'hot_plate') {
@@ -1955,6 +1955,7 @@ export class Game {
     const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
     this._spawnConnectionAnimations(filledBefore);
+    this._spawnDisconnectionAnimations(filledBefore);
     this._deselectIfDepleted();
     this._renderInventoryBar();
     this._updateWaterDisplay();
