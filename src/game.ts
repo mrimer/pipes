@@ -965,7 +965,16 @@ export class Game {
       // Remove the tile at the final (current) position and suppress the contextmenu event.
       if (this._rightDragLastTile && this.board &&
           this.gameState === GameState.Playing && this.screen === GameScreen.Play) {
-        this._reclaimTileAt(this._rightDragLastTile);
+        const tile = this.board.getTile(this._rightDragLastTile);
+        if (tile && tile.shape === PipeShape.Empty) {
+          // Right-clicking an empty tile: clear any pending inventory selection.
+          if (this.selectedShape !== null) {
+            this.selectedShape = null;
+            this._renderInventoryBar();
+          }
+        } else {
+          this._reclaimTileAt(this._rightDragLastTile);
+        }
       }
       this._suppressNextContextMenu = true;
       this._cancelRightDrag();
@@ -1344,11 +1353,8 @@ export class Game {
         } else if (tile.chamberContent === 'hot_plate') {
           const currentTemp = this.board.getCurrentTemperature();
           const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          const frozenAvailable = this.board.frozen;
-          const gain = Math.min(frozenAvailable, effectiveCost);
-          const loss = Math.max(0, effectiveCost - gain);
-          tooltipText += ` (mass:${tile.cost} × (${tile.temperature}+${currentTemp}°)=cost:${effectiveCost}; +${gain} -${loss})`;
-          predictedCost = 0; // Net effect already shown in tooltip text
+          tooltipText += ` (${tile.temperature}+${currentTemp}° x ${tile.cost})`;
+          predictedCost = effectiveCost;
         } else {
           predictedCost = 0;
         }
