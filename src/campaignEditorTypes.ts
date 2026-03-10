@@ -4,6 +4,7 @@
  */
 
 import { PipeShape, TileDef, InventoryItem, Rotation } from './types';
+import { DIRT_COLOR, ICE_COLOR } from './colors';
 
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
@@ -97,10 +98,10 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
 export function chamberColor(content: string): string {
   switch (content) {
     case 'tank':     return '#74b9ff';
-    case 'dirt':     return '#a29bfe';
+    case 'dirt':     return DIRT_COLOR;
     case 'item':     return '#ffd700';
     case 'heater':   return '#e17055';
-    case 'ice':      return '#00cec9';
+    case 'ice':      return ICE_COLOR;
     case 'pump':     return '#a8e063';
     case 'snow':     return '#b0d8f8';
     case 'sandstone': return '#c2a26e';
