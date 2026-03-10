@@ -957,7 +957,14 @@ export class Board {
     // was partially or fully neutralised by that tile may now be under-charged.
     // Re-compute using only heaters/pumps that were connected on or before each
     // ice tile's own original connection turn.
+    // For sandstone, always use the actual current pressure so that the
+    // re-evaluation is consistent with the _checkSandstoneConstraints validity
+    // check (which also uses the full current pressure).  Using a historically-
+    // limited pressure for sandstone could produce deltaDamage ≤ 0 even when
+    // the current pressure is still above the hardness threshold, leading to an
+    // invalid overly-high failure impact.
     if (beneficialDisconnected) {
+      const reEvalPressure = this._computePressureFromFilled(filled);
       for (const key of filled) {
         if (!this._lockedWaterImpact.has(key)) continue; // Newly connecting – handled below.
 
@@ -977,7 +984,12 @@ export class Board {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           newImpact = -(tile.cost * deltaTemp);
         } else if (tile.chamberContent === 'sandstone') {
-          const deltaDamage = effectivePressure - tile.hardness;
+          // Use the actual current pressure (reEvalPressure) so the re-evaluation
+          // matches the validity check in _checkSandstoneConstraints.  A pump
+          // that connected after this sandstone tile may still be contributing
+          // pressure; excluding it via effectivePressure could incorrectly push
+          // deltaDamage below 0 even though the disconnect was allowed.
+          const deltaDamage = reEvalPressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           if (deltaDamage >= 1) {
             newImpact = -(Math.ceil(tile.cost / deltaDamage) * deltaTemp);

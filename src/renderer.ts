@@ -290,6 +290,10 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
+    // Clip to tile bounds so that connection stubs end exactly at the tile edge.
+    ctx.beginPath();
+    ctx.rect(-half, -half, half * 2, half * 2);
+    ctx.clip();
     const bw = half * 0.7 + 2;
     const bh = half * 0.7 + 2;
     ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
