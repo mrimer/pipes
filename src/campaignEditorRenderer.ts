@@ -9,7 +9,7 @@ import { TILE_SIZE, drawSpinArrow } from './renderer';
 import { Tile } from './tile';
 import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
 import { SPIN_PIPE_SHAPES } from './board';
-import { COOLER_COLOR, VACUUM_COLOR } from './colors';
+import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR } from './colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
 
@@ -265,17 +265,27 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillText('GOLD', cx, cy - 7);
     ctx.fillText('SPACE', cx, cy + 7);
   } else if (shape === PipeShape.Source) {
-    ctx.fillStyle = '#27ae60';
+    ctx.fillStyle = SOURCE_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
-    ctx.fillText('SRC', cx, cy - 8);
-    ctx.font = '10px Arial';
-    ctx.fillText(`cap:${tile.capacity}`, cx, cy + 8);
-    if (tile.temperature > 0) ctx.fillText(`${tile.temperature}°`, cx, cy + 20);
+    // Count how many lines we need to center them vertically
+    const lines: string[] = ['SOURCE', `cap:${tile.capacity}`];
+    // Show temp/pressure params when non-default (pressure=1 is the default via TileDef ?? fallback)
+    if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
+    if (tile.pressure !== 1) lines.push(`${tile.pressure}P`);
+    const lineHeight = 12;
+    const totalH = (lines.length - 1) * lineHeight;
+    let lineY = cy - totalH / 2;
+    ctx.font = 'bold 11px Arial';
+    for (const line of lines) {
+      ctx.fillText(line, cx, lineY);
+      ctx.font = '10px Arial';
+      lineY += lineHeight;
+    }
     // Draw connection lines
     drawConnectionLines(ctx, x, y, tile);
   } else if (shape === PipeShape.Sink) {
-    ctx.fillStyle = '#2980b9';
+    ctx.fillStyle = SINK_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
     ctx.fillText('SINK', cx, cy);
@@ -291,19 +301,23 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       ctx.font = '9px Arial';
       ctx.fillText('SANDSTONE', cx, cy - 10);
       ctx.font = '10px Arial';
-      ctx.fillText(`${tile.cost}/° x ${tile.temperature}°`, cx, cy + 2);
+      ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 2);
       ctx.fillText(`H:${tile.hardness}`, cx, cy + 13);
     } else {
-      const displayLabel = isNegHeater ? 'COOLER' : isNegPump ? 'VACUUM' : cc.toUpperCase();
+      let displayLabel: string;
+      if (isNegHeater) displayLabel = 'COOLER';
+      else if (isNegPump) displayLabel = 'VACUUM';
+      else if (cc === 'hot_plate') displayLabel = 'HOT PLATE';
+      else displayLabel = cc.toUpperCase();
       ctx.fillText(displayLabel, cx, cy - 6);
       ctx.font = '10px Arial';
       if (cc === 'tank') ctx.fillText(`cap:${tile.capacity}`, cx, cy + 8);
       else if (cc === 'dirt') ctx.fillText(`cost:${tile.cost}`, cx, cy + 8);
       else if (cc === 'heater') ctx.fillText(`${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + 8);
-      else if (cc === 'ice') ctx.fillText(`${tile.cost} x ${tile.temperature}°`, cx, cy + 8);
+      else if (cc === 'ice') ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
       else if (cc === 'pump') ctx.fillText(`${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + 8);
-      else if (cc === 'snow') ctx.fillText(`${tile.cost} x ${tile.temperature}°`, cx, cy + 8);
-      else if (cc === 'hot_plate') ctx.fillText(`${tile.cost} x ${tile.temperature}°`, cx, cy + 8);
+      else if (cc === 'snow') ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
+      else if (cc === 'hot_plate') ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
       else if (cc === 'item') ctx.fillText(`${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
     }
     drawConnectionLines(ctx, x, y, tile);

@@ -746,12 +746,12 @@ export function getTileDisplayName(tile: Tile): string {
         case 'heater':
           if (tile.temperature < 0) return `Cooler ${tile.temperature}°`;
           return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
-        case 'ice':    return `Ice -${tile.cost} x ${tile.temperature}°`;
+        case 'ice':    return `Ice -${tile.temperature}° x ${tile.cost}`;
         case 'pump':
           if (tile.pressure < 0) return `Vacuum ${tile.pressure}P`;
           return `Pump +${tile.pressure}P`;
-        case 'snow':    return `Snow -${tile.cost} x ${tile.temperature}°`;
-        case 'sandstone': return `Sandstone -${tile.cost} x ${tile.temperature}° (H=${tile.hardness})`;
+        case 'snow':    return `Snow -${tile.temperature}° x ${tile.cost}`;
+        case 'sandstone': return `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
         case 'hot_plate': return `Hot Plate -${tile.cost} x ${tile.temperature}°`;
         default:       return 'Chamber';
       }
