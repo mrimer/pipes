@@ -570,9 +570,11 @@ export function drawTile(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       if (isHard) {
-        // Alternative display: show hardness value and "H" to indicate hardness exceeds pressure
+        // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(`${tile.hardness}H`, 0, 0);
+        ctx.fillText(`${tile.hardness}H`, 0, -7);
+        ctx.font = 'bold 9px Arial';
+        ctx.fillText(`${tile.temperature}° x ${cost}`, 0, 7);
       } else if (lockedCost !== null) {
         // Connected: show the single locked effective (negative) cost value
         ctx.font = 'bold 14px Arial';
