@@ -995,6 +995,11 @@ export class Board {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           if (deltaDamage >= 1) {
             newImpact = -(Math.ceil(tile.cost / deltaDamage) * deltaTemp);
+            // Locked sandstone costs may only increase (never decrease), consistent
+            // with ice and snow behaviour.  When reEvalPressure is higher than the
+            // pressure at lock time (e.g. a later pump is still active), the
+            // re-evaluated cost could be lower; in that case keep the locked value.
+            if (newImpact > oldImpact) continue;
           } else {
             // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
             // Skip the frozen counter – this impact has no ice-accounting meaning.

@@ -3027,6 +3027,85 @@ describe('Chamber tile (sandstone content)', () => {
     // deltaDamage=5-2=3, impact = -(ceil(4/3)*1) = -2
     expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-2);
   });
+
+  it('prevents sandstone locked cost decrease when a stronger later-connected pump remains active', () => {
+    // Layout (3 rows × 6 cols) – mirrors the previous test but with P1 weaker than P2:
+    //
+    //   (0,0) Pump P2[E,+10] → (0,1) player-pipe → (0,2) Source[W,E,S,P=1]
+    //                                                        → (0,3) player-pipe → (0,4) Sandstone[W,E,H=0,cost=6,temp=1] → (0,5) Sink[W]
+    //                                                                   ↓
+    //                                                          (1,2) player-pipe
+    //                                                                   ↓
+    //                                                          (2,2) Pump P1[N,+1]
+    //
+    // Sequence:
+    //   Turn 1: connect P1 (pressure=1+1=2)
+    //   Turn 2: connect sandstone  → deltaDamage=2-0=2, impact=-(ceil(6/2)*1)=-3
+    //   Turn 3: connect P2 (pressure=1+1+10=12)
+    //   Reclaim (1,2): P1 disconnects → current pressure=1+10=11 (P2 still active)
+    //
+    // Without the "only-increase" guard: reEvalPressure=11, deltaDamage=11,
+    //   newImpact=-(ceil(6/11)*1)=-1 → cost would DECREASE from -3 to -1.
+    // With the guard: the decrease is blocked; impact stays at -3.
+    const b = new Board(3, 6);
+    b.source = { row: 0, col: 2 };
+    b.sink   = { row: 0, col: 5 };
+    b.sourceCapacity = 100;
+    // Pump P2 at (0,0): pressure=+10, connects East
+    b.grid[0][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.East]), 'pump', 0, 10);
+    // (0,1): Empty – player will place E-W Straight to connect P2
+    b.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    // Source at (0,2): connects West+East+South, pressure=1
+    b.grid[0][2] = new Tile(PipeShape.Source, 0, true, 100, 0, null, 1, new Set([Direction.West, Direction.East, Direction.South]), null, 0, 1);
+    // (0,3): Empty – player will place E-W Straight to connect sandstone
+    b.grid[0][3] = new Tile(PipeShape.Empty, 0);
+    // Sandstone at (0,4): hardness=0, cost=6, temperature=1
+    b.grid[0][4] = new Tile(PipeShape.Chamber, 0, true, 0, 6, null, 1, new Set([Direction.West, Direction.East]), 'sandstone', 1, 0, 0);
+    // Sink at (0,5): connects West
+    b.grid[0][5] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    // (1,2): Empty – player will place N-S Straight to connect P1
+    b.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    // Pump P1 at (2,2): pressure=+1, connects North
+    b.grid[2][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 1);
+    // All remaining cells (rows 1–2 excluding the ones already set above): Empty
+    for (const [r, c] of [[1,0],[1,1],[1,3],[1,4],[1,5],[2,0],[2,1],[2,3],[2,4],[2,5]]) {
+      b.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    }
+    b.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    b.initHistory();
+
+    // Turn 1: Place N-S Straight at (1,2) → P1 connects, pressure=1+1=2
+    b.placeInventoryTile({ row: 1, col: 2 }, PipeShape.Straight, 0);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(2);
+
+    // Turn 2: Place E-W Straight at (0,3) → sandstone connects, deltaDamage=2-0=2
+    b.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    // Sandstone locked at deltaDamage=2: impact = -(ceil(6/2)*1) = -3
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-3);
+
+    // Turn 3: Place E-W Straight at (0,1) → P2 connects, pressure=1+1+10=12
+    b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(12);
+
+    // Reclaim (1,2): P1 disconnects → current pressure drops to 1+10=11
+    // _checkSandstoneConstraints: deltaDamage=11-0=11 > 0 → allowed
+    const result = b.reclaimTile({ row: 1, col: 2 });
+    expect(result).toBe(true);
+    expect(b.lastError).toBeNull();
+
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(11);
+    // Without the guard: reEvalPressure=11, newImpact=-(ceil(6/11)*1)=-1 (would DECREASE).
+    // With the guard: cost only increases → impact stays at -3.
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-3);
+  });
 });
 
 // ─── Ambient decorations ──────────────────────────────────────────────────────
