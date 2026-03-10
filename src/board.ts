@@ -1132,25 +1132,38 @@ export class Board {
   private _checkSandstoneConstraints(filled: Set<string>): string | null {
     const currentPressure = this._computePressureFromFilled(filled);
     const violating: GridPos[] = [];
+    const violatingHistoricalLock: GridPos[] = [];
     for (const key of filled) {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
       if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
-        const deltaDamage = currentPressure - tile.hardness;
-        if (deltaDamage <= 0) {
-          violating.push({ row: r, col: c });
+        if (this._lockedWaterImpact.has(key)) {
+          // For already-connected sandstone, check the historically-limited pressure to
+          // prevent disconnecting a pump that was required to make this tile viable at
+          // connection time (i.e. a pump connected before the sandstone tile itself).
+          const sandstoneConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
+          const historicalPressure = this._computePressureForIce(filled, sandstoneConnectedTurn);
+          if (historicalPressure - tile.hardness <= 0) {
+            violatingHistoricalLock.push({ row: r, col: c });
+          }
+        } else {
+          // For a newly-connecting tile, use the current pressure.
+          const deltaDamage = currentPressure - tile.hardness;
+          if (deltaDamage <= 0) {
+            violating.push({ row: r, col: c });
+          }
         }
       }
     }
+    if (violatingHistoricalLock.length > 0) {
+      this.lastErrorTilePositions = violatingHistoricalLock;
+      return 'Cannot disconnect pressure tiles that were necessary in connecting these sandstone blocks.';
+    }
     if (violating.length > 0) {
       const tile = this.grid[violating[0].row]?.[violating[0].col];
-      const currentPressureForMsg = currentPressure;
       const hardnessForMsg = tile?.hardness ?? 0;
       this.lastErrorTilePositions = violating;
-      const isNewlyConnected = !this._lockedWaterImpact.has(`${violating[0].row},${violating[0].col}`);
-      return isNewlyConnected
-        ? `Pressure must exceed Sandstone hardness to connect. (Pressure: ${currentPressureForMsg}, Hardness: ${hardnessForMsg})`
-        : `Cannot disconnect: Pressure would drop below Sandstone hardness. (Pressure: ${currentPressureForMsg}, Hardness: ${hardnessForMsg})`;
+      return `Pressure must exceed Sandstone hardness to connect. (Pressure: ${currentPressure}, Hardness: ${hardnessForMsg})`;
     }
     return null;
   }

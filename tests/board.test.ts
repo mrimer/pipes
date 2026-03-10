@@ -2948,7 +2948,7 @@ describe('Chamber tile (sandstone content)', () => {
     // Step 3: Try to reclaim pump connector → pressure drops to 1, deltaDamage=0 → blocked
     const result = b.reclaimTile({ row: 1, col: 0 });
     expect(result).toBe(false);
-    expect(b.lastError).toMatch(/Cannot disconnect.*Sandstone|Pressure.*Sandstone/);
+    expect(b.lastError).toMatch(/Cannot disconnect pressure tiles/);
     expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 2 }]);
     expect(b.grid[1][0].shape).toBe(PipeShape.Straight);
   });
@@ -2983,7 +2983,7 @@ describe('Chamber tile (sandstone content)', () => {
     expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-15);
   });
 
-  it('reclaimTile succeeds but sandstone re-evaluates to failure when earlier pump disconnects and later pump is historically excluded', () => {
+  it('reclaimTile fails when earlier pump disconnects and later pump is historically excluded for sandstone', () => {
     // Layout (3 rows × 6 cols):
     //   (0,0) Pump P2[E] → (0,1) player-pipe → (0,2) Source[W,E,S] → (0,3) player-pipe → (0,4) Sandstone[W,E] → (0,5) Sink[W]
     //                                                     ↓
@@ -2991,15 +2991,13 @@ describe('Chamber tile (sandstone content)', () => {
     //                                                     ↓
     //                                            (2,2) Pump P1[N]
     //
-    // Sequence:
-    //   Turn 1: connect P1 (pressure=1+5=6)
-    //   Turn 2: connect sandstone (deltaDamage=6-2=4, impact=-(ceil(4/4)*1)=-1)
-    //   Turn 3: connect P2 (pressure=1+5+4=10)
-    //   Reclaim P1 connector → current pressure=1+4=5, deltaDamage=5-2=3 > 0 → allowed
-    //
-    // Historically-limited re-evaluation after reclaim:
-    //   sandstone connectionTurn=3; P1 is gone from filled; P2 turn=4 > 3 → excluded.
-    //   effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → failure impact=-(100+1)=-101.
+    // Sequence (player moves):
+    //   Move 1: connect P1 (pressure=1+5=6)            → P1 connectionTurn=2
+    //   Move 2: connect sandstone (deltaDamage=6-2=4)  → sandstone connectionTurn=3
+    //   Move 3: connect P2 (pressure=1+5+4=10)         → P2 connectionTurn=4
+    //   Reclaim P1 connector → historically-limited pressure for sandstone (connectionTurn=3):
+    //   P1 gone from filled; P2 connectionTurn=4 > 3 → excluded → pressure=1 (source only)
+    //   → deltaDamage=1-2=-1 ≤ 0 → must be blocked.
     const b = new Board(3, 6);
     b.source = { row: 0, col: 2 };
     b.sink   = { row: 0, col: 5 };
@@ -3046,18 +3044,18 @@ describe('Chamber tile (sandstone content)', () => {
     b.recordMove();
     expect(b.getCurrentPressure()).toBe(10);
 
-    // Reclaim (1,2): P1 disconnects, current pressure drops to 1+4=5
-    // _checkSandstoneConstraints uses full current pressure=5, deltaDamage=5-2=3 > 0 → allowed
+    // Reclaim (1,2): P1 would disconnect. Current pressure would be 1+4=5, deltaDamage=5-2=3 > 0.
+    // But historically-limited pressure for sandstone (connectionTurn=3) uses only pumps connected
+    // at turn ≤ 3: P1 is gone from filled, P2 was connected at turn 4 > 3 → excluded.
+    // effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → must be blocked.
     const result = b.reclaimTile({ row: 1, col: 2 });
-    expect(result).toBe(true);
-    expect(b.lastError).toBeNull();
-
-    b.applyTurnDelta();
-    b.recordMove();
-    expect(b.getCurrentPressure()).toBe(5);
-    // Re-evaluated with historically-limited pressure: P1 gone, P2 connected at turn 4 > sandstone turn 3
-    // → effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → failure impact=-(100+1)=-101
-    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-101);
+    expect(result).toBe(false);
+    expect(b.lastError).toMatch(/Cannot disconnect pressure tiles/);
+    expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 4 }]);
+    // Tile should be restored
+    expect(b.grid[1][2].shape).toBe(PipeShape.Straight);
+    // Sandstone impact should be unchanged
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-1);
   });
 
   it('sandstone cost increases when earlier pump disconnects and later pump is historically excluded', () => {
@@ -3126,8 +3124,9 @@ describe('Chamber tile (sandstone content)', () => {
     b.recordMove();
     expect(b.getCurrentPressure()).toBe(12);
 
-    // Reclaim (1,2): P1 disconnects → current pressure drops to 1+10=11
-    // _checkSandstoneConstraints uses full current pressure: deltaDamage=11-0=11 > 0 → allowed
+    // Reclaim (1,2): P1 disconnects → historically-limited pressure for sandstone (connectionTurn=3):
+    // P1 gone from filled; P2 was connected at turn 4 > 3 → excluded. effectivePressure=1 (source only).
+    // deltaDamage=1-0=1 > 0 → allowed (historical pressure still sufficient with hardness=0).
     const result = b.reclaimTile({ row: 1, col: 2 });
     expect(result).toBe(true);
     expect(b.lastError).toBeNull();
