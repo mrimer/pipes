@@ -528,14 +528,14 @@ export function drawTile(
         // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
         // By default, show values adjusted by current Pressure and Temperature.
         // When shift is held, show the raw (unadjusted) values.
-        const snowThreshold = shiftHeld
+        const deltaTemp = shiftHeld
           ? tile.temperature
           : Math.max(0, tile.temperature - currentTemp);
         const snowCost = shiftHeld
           ? cost
           : Math.max(1, currentPressure >= 1 ? Math.ceil(cost / currentPressure) : cost);
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(`-${snowThreshold}°`, 0, -9);
+        ctx.fillText(`-${deltaTemp}°`, 0, -9);
         ctx.font = 'bold 9px Arial';
         ctx.fillText('x', 0, 0);
         ctx.font = 'bold 14px Arial';
@@ -621,10 +621,12 @@ export function drawTile(
         ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
       } else {
         // Unconnected: show boiling temp and mass.
-        // When shift is held, show the raw temp parameter; otherwise show 100+temp (the boiling point).
-        const boilingTemp = shiftHeld ? tile.temperature : 100 + tile.temperature;
+        // When shift is held, show the raw temp parameter; otherwise show currentTemp + temp.
+        const deltaTemp = shiftHeld
+          ? tile.temperature
+          : tile.temperature + currentTemp;
         ctx.font = 'bold 14px Arial';
-        ctx.fillText(`+${boilingTemp}°`, 0, -9);
+        ctx.fillText(`+${deltaTemp}°`, 0, -9);
         ctx.font = 'bold 9px Arial';
         ctx.fillText('x', 0, 0);
         ctx.font = 'bold 14px Arial';
@@ -717,7 +719,7 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
         case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity}` : 'Tank';
-        case 'dirt':   return 'Dirt block';
+        case 'dirt':   return `Dirt -${tile.cost}`;
         case 'item': {
           const itemName = _itemShapeDisplayName(tile.itemShape);
           return tile.itemCount > 1 ? `${tile.itemCount}× ${itemName}` : itemName;
@@ -725,13 +727,13 @@ export function getTileDisplayName(tile: Tile): string {
         case 'heater':
           if (tile.temperature < 0) return `Cooler ${tile.temperature}°`;
           return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
-        case 'ice':    return 'Ice';
+        case 'ice':    return `Ice -${tile.cost} x ${tile.temperature}°`;
         case 'pump':
           if (tile.pressure < 0) return `Vacuum ${tile.pressure}P`;
           return `Pump +${tile.pressure}P`;
-        case 'snow':    return 'Snow';
-        case 'sandstone': return 'Sandstone';
-        case 'hot_plate': return `Hot plate +${100 + tile.temperature}°`;
+        case 'snow':    return `Snow -${tile.cost} x ${tile.temperature}°`;
+        case 'sandstone': return `Sandstone -${tile.cost} x ${tile.temperature}° (H=${tile.hardness})`;
+        case 'hot_plate': return `Hot Plate -${tile.cost} x ${tile.temperature}°`;
         default:       return 'Chamber';
       }
     default: return '';
