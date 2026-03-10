@@ -2950,7 +2950,7 @@ describe('Chamber tile (sandstone content)', () => {
     expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-15);
   });
 
-  it('reclaimTile succeeds and sandstone uses actual current pressure (not historically-limited) when another pump is still connected', () => {
+  it('reclaimTile succeeds but sandstone re-evaluates to failure when earlier pump disconnects and later pump is historically excluded', () => {
     // Layout (3 rows × 6 cols):
     //   (0,0) Pump P2[E] → (0,1) player-pipe → (0,2) Source[W,E,S] → (0,3) player-pipe → (0,4) Sandstone[W,E] → (0,5) Sink[W]
     //                                                     ↓
@@ -2964,10 +2964,9 @@ describe('Chamber tile (sandstone content)', () => {
     //   Turn 3: connect P2 (pressure=1+5+4=10)
     //   Reclaim P1 connector → current pressure=1+4=5, deltaDamage=5-2=3 > 0 → allowed
     //
-    // Without fix: effectivePressure=1 (P2 connected at turn 3 > sandstone turn 2),
-    //   deltaDamage=-1 → invalid failure impact -(sourceCapacity+1)=-101
-    // With fix: reEvalPressure=5 (actual current), deltaDamage=3,
-    //   impact = -(ceil(4/3)*1) = -2
+    // Historically-limited re-evaluation after reclaim:
+    //   sandstone connectionTurn=3; P1 is gone from filled; P2 turn=4 > 3 → excluded.
+    //   effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → failure impact=-(100+1)=-101.
     const b = new Board(3, 6);
     b.source = { row: 0, col: 2 };
     b.sink   = { row: 0, col: 5 };
@@ -3015,7 +3014,7 @@ describe('Chamber tile (sandstone content)', () => {
     expect(b.getCurrentPressure()).toBe(10);
 
     // Reclaim (1,2): P1 disconnects, current pressure drops to 1+4=5
-    // _checkSandstoneConstraints: currentPressure=5, deltaDamage=5-2=3 > 0 → allowed
+    // _checkSandstoneConstraints uses full current pressure=5, deltaDamage=5-2=3 > 0 → allowed
     const result = b.reclaimTile({ row: 1, col: 2 });
     expect(result).toBe(true);
     expect(b.lastError).toBeNull();
@@ -3023,13 +3022,13 @@ describe('Chamber tile (sandstone content)', () => {
     b.applyTurnDelta();
     b.recordMove();
     expect(b.getCurrentPressure()).toBe(5);
-    // Re-evaluated with actual current pressure=5 (includes P2 still connected):
-    // deltaDamage=5-2=3, impact = -(ceil(4/3)*1) = -2
-    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-2);
+    // Re-evaluated with historically-limited pressure: P1 gone, P2 connected at turn 4 > sandstone turn 3
+    // → effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → failure impact=-(100+1)=-101
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-101);
   });
 
-  it('prevents sandstone locked cost decrease when a stronger later-connected pump remains active', () => {
-    // Layout (3 rows × 6 cols) – mirrors the previous test but with P1 weaker than P2:
+  it('sandstone cost increases when earlier pump disconnects and later pump is historically excluded', () => {
+    // Layout (3 rows × 6 cols) – P1 weaker than P2:
     //
     //   (0,0) Pump P2[E,+10] → (0,1) player-pipe → (0,2) Source[W,E,S,P=1]
     //                                                        → (0,3) player-pipe → (0,4) Sandstone[W,E,H=0,cost=6,temp=1] → (0,5) Sink[W]
@@ -3040,13 +3039,14 @@ describe('Chamber tile (sandstone content)', () => {
     //
     // Sequence:
     //   Turn 1: connect P1 (pressure=1+1=2)
-    //   Turn 2: connect sandstone  → deltaDamage=2-0=2, impact=-(ceil(6/2)*1)=-3
+    //   Turn 2: connect sandstone → deltaDamage=2-0=2, impact=-(ceil(6/2)*1)=-3
     //   Turn 3: connect P2 (pressure=1+1+10=12)
     //   Reclaim (1,2): P1 disconnects → current pressure=1+10=11 (P2 still active)
     //
-    // Without the "only-increase" guard: reEvalPressure=11, deltaDamage=11,
-    //   newImpact=-(ceil(6/11)*1)=-1 → cost would DECREASE from -3 to -1.
-    // With the guard: the decrease is blocked; impact stays at -3.
+    // Historically-limited re-evaluation after reclaim:
+    //   sandstone connectionTurn=3; P1 gone from filled; P2 turn=4 > 3 → excluded.
+    //   effectivePressure=1 (source only), deltaDamage=1-0=1 ≥ 1
+    //   newImpact = -(ceil(6/1)*1) = -6 → cost INCREASES from -3 to -6.
     const b = new Board(3, 6);
     b.source = { row: 0, col: 2 };
     b.sink   = { row: 0, col: 5 };
@@ -3094,7 +3094,7 @@ describe('Chamber tile (sandstone content)', () => {
     expect(b.getCurrentPressure()).toBe(12);
 
     // Reclaim (1,2): P1 disconnects → current pressure drops to 1+10=11
-    // _checkSandstoneConstraints: deltaDamage=11-0=11 > 0 → allowed
+    // _checkSandstoneConstraints uses full current pressure: deltaDamage=11-0=11 > 0 → allowed
     const result = b.reclaimTile({ row: 1, col: 2 });
     expect(result).toBe(true);
     expect(b.lastError).toBeNull();
@@ -3102,9 +3102,9 @@ describe('Chamber tile (sandstone content)', () => {
     b.applyTurnDelta();
     b.recordMove();
     expect(b.getCurrentPressure()).toBe(11);
-    // Without the guard: reEvalPressure=11, newImpact=-(ceil(6/11)*1)=-1 (would DECREASE).
-    // With the guard: cost only increases → impact stays at -3.
-    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-3);
+    // Historically-limited re-evaluation: P1 gone, P2 connected at turn 4 > sandstone turn 3 → excluded.
+    // effectivePressure=1, deltaDamage=1, newImpact=-(ceil(6/1)*1)=-6 → cost INCREASES from -3 to -6.
+    expect(b.getLockedWaterImpact({ row: 0, col: 4 })).toBe(-6);
   });
 });
 
@@ -3860,5 +3860,78 @@ describe('Chamber tile (hot_plate content)', () => {
     //   So frozen = 0 at end. OK that's consistent!
     expect(board.frozen).toBe(0);
     expect(board.getCurrentWater()).toBe(50);
+  });
+
+  it('hot_plate locked cost is re-evaluated with historically-limited temperature when a heater disconnects', () => {
+    // Layout (3 rows × 4 cols) – same topology as the sandstone pump-disconnect tests:
+    //   (0,0) Source[E,S]  (0,1) [player E-W pipe]  (0,2) HotPlate[W,E]  (0,3) Sink[W]
+    //                ↓
+    //   (1,0) [player N-S pipe]
+    //                ↓
+    //   (2,0) Heater[N, temp=5]
+    //
+    // initHistory: both slots empty → filled={Source} only.
+    //
+    // Turn 1: place N-S Straight at (1,0) → Heater connects; heaterTurn=2, temp=0+5=5.
+    // Turn 2: place E-W Straight at (0,1) → HotPlate and Sink connect; hotPlateTurn=3.
+    //   Historical temp for HotPlate = source(0) + Heater(turn=2 ≤ 3) = 5.
+    //   effectiveCost = 2*(3+5) = 16, frozen=0 → waterGain=0, impact=-16.
+    //
+    // Reclaim (1,0): Heater disconnects; HotPlate stays connected via (0,1) pipe.
+    //   beneficialDisconnected=true.
+    //   Re-evaluate HotPlate: historicalTemp = source(0) only (Heater gone from filled).
+    //   newEffectiveCost = 2*(3+0) = 6, frozen=0 → newWaterGain=0, newImpact=-6.
+    //   impact changes from -16 to -6.
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 50;
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 3);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][3] = new Tile(PipeShape.Empty, 0);
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.North]), 'heater', 5);
+    board.grid[2][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[2][2] = new Tile(PipeShape.Empty, 0);
+    board.grid[2][3] = new Tile(PipeShape.Empty, 0);
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: place N-S Straight at (1,0) → Heater connects, temp=0+5=5
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentTemperature()).toBe(5);
+
+    // Turn 2: place E-W Straight at (0,1) → HotPlate and Sink connect
+    // Historical temp = source(0) + Heater(heaterTurn=2 ≤ hotPlateTurn=3) = 5
+    // effectiveCost = 2*(3+5) = 16, frozen=0 → waterGain=0, impact=-16
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-16);
+    // getCurrentWater = 50 + 0(src) + (-1)(1,0) + 0(heater) + (-1)(0,1) + (-16)(hot_plate) + 0(sink) = 32
+    expect(board.getCurrentWater()).toBe(32);
+
+    // Reclaim (1,0): Heater disconnects; HotPlate remains connected via (0,1) pipe.
+    const result = board.reclaimTile({ row: 1, col: 0 });
+    expect(result).toBe(true);
+
+    board.applyTurnDelta();
+    board.recordMove();
+    // Re-evaluation: historicalTemp = source only = 0 (Heater gone from filled).
+    // newEffectiveCost = 2*(3+0) = 6, frozen=0 → newWaterGain=0, newImpact=-6.
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-6);
+    // getCurrentWater = 50 + 0(src) + (-1)(0,1) + (-6)(hot_plate) + 0(sink) = 43
+    expect(board.getCurrentWater()).toBe(43);
+    expect(board.frozen).toBe(0);
   });
 });
