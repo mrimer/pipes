@@ -549,6 +549,23 @@ export function drawTile(
       const sandstoneColor = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+      // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
+      ctx.strokeStyle = sandstoneColor;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      const sLineLeft = -bw + 4;
+      const sLineRight = bw - 4;
+      const sLineSpan = sLineRight - sLineLeft;
+      const sLineMid = 0;
+      const sLineQuart = sLineSpan / 4;
+      for (let i = 0; i < 2; i++) {
+        const sLineY = bh - 5 - i * 4;
+        ctx.beginPath();
+        ctx.moveTo(sLineLeft, sLineY);
+        ctx.quadraticCurveTo(sLineLeft + sLineQuart, sLineY - 2.5, sLineMid, sLineY);
+        ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + 2.5, sLineRight, sLineY);
+        ctx.stroke();
+      }
       ctx.fillStyle = sandstoneColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
