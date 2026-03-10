@@ -952,32 +952,31 @@ export class Board {
     // Advance the turn counter.
     this._turnNumber++;
 
-    // ── Re-evaluate still-connected ice/snow when a beneficial tile left ─
-    // When a heater or pump disconnects, any ice/snow tile whose locked cost
-    // was partially or fully neutralised by that tile may now be under-charged.
-    // Re-compute ice/snow using only heaters/pumps that were connected on or before
-    // each tile's own original connection turn ("historically-limited" pressure/temp),
-    // so no tile gains a retroactive benefit from a pump that connected after it.
-    // For sandstone, however, always use the actual current pressure (all pumps still
-    // connected, regardless of connection turn) so that the re-evaluation is
-    // consistent with _checkSandstoneConstraints, which also uses the full current
-    // pressure.  Using the historically-limited pressure for sandstone could exclude a
-    // pump that connected after the sandstone and is still providing pressure,
-    // producing deltaDamage ≤ 0 even though the disconnect was correctly permitted by
-    // the constraint check, leading to an invalid overly-high failure impact.
+    // ── Re-evaluate still-connected ice/snow/sandstone/hot_plate tiles ────────
+    // When a heater or pump disconnects, any tile whose locked cost was partially
+    // or fully offset by that tile may now be under-charged.
+    // Re-compute all such tiles using only heaters/pumps that were connected on or
+    // before each tile's own original connection turn ("historically-limited"
+    // pressure/temp), so no tile gains a retroactive benefit from a heater or pump
+    // that connected after it.  This is the same logic applied to ice and snow, now
+    // extended uniformly to sandstone and hot_plate as well.
     if (beneficialDisconnected) {
-      const reEvalPressure = this._computePressureFromFilled(filled);
       for (const key of filled) {
         if (!this._lockedWaterImpact.has(key)) continue; // Newly connecting – handled below.
 
         const [r, c] = key.split(',').map(Number);
         const tile = this.grid[r]?.[c];
         if (!tile || tile.shape !== PipeShape.Chamber) continue;
-        if (tile.chamberContent !== 'ice' && tile.chamberContent !== 'snow' && tile.chamberContent !== 'sandstone') continue;
+        if (
+          tile.chamberContent !== 'ice' &&
+          tile.chamberContent !== 'snow' &&
+          tile.chamberContent !== 'sandstone' &&
+          tile.chamberContent !== 'hot_plate'
+        ) continue;
 
-        const iceConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
-        const effectiveTemp = this._computeTemperatureForIce(filled, iceConnectedTurn);
-        const effectivePressure = this._computePressureForIce(filled, iceConnectedTurn);
+        const tileConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
+        const effectiveTemp = this._computeTemperatureForIce(filled, tileConnectedTurn);
+        const effectivePressure = this._computePressureForIce(filled, tileConnectedTurn);
 
         const oldImpact = this._lockedWaterImpact.get(key)!;
         let newImpact: number;
@@ -986,22 +985,15 @@ export class Board {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           newImpact = -(tile.cost * deltaTemp);
         } else if (tile.chamberContent === 'sandstone') {
-          // Use the actual current pressure (reEvalPressure) so the re-evaluation
-          // matches the validity check in _checkSandstoneConstraints.  A pump
-          // that connected after this sandstone tile may still be contributing
-          // pressure; excluding it via effectivePressure could incorrectly push
-          // deltaDamage below 0 even though the disconnect was allowed.
-          const deltaDamage = reEvalPressure - tile.hardness;
+          // Use historically-limited pressure so no tile benefits retroactively from
+          // a pump that connected after it – consistent with ice and snow.
+          const deltaDamage = effectivePressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           if (deltaDamage >= 1) {
             newImpact = -(Math.ceil(tile.cost / deltaDamage) * deltaTemp);
-            // Locked sandstone costs may only increase (never decrease), consistent
-            // with ice and snow behaviour.  When reEvalPressure is higher than the
-            // pressure at lock time (e.g. a later pump is still active), the
-            // re-evaluated cost could be lower; in that case keep the locked value.
-            if (newImpact > oldImpact) continue;
           } else {
-            // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
+            // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
+            // connection time are now gone.  Force immediate failure.
             // Skip the frozen counter – this impact has no ice-accounting meaning.
             const failureImpact = -(this.sourceCapacity + 1);
             if (failureImpact !== oldImpact) {
@@ -1009,6 +1001,21 @@ export class Board {
             }
             continue;
           }
+        } else if (tile.chamberContent === 'hot_plate') {
+          // Re-evaluate using historically-limited temperature at connection time.
+          const newEffectiveCost = tile.cost * (tile.temperature + effectiveTemp);
+          const oldWaterGain = this._hotPlateWaterGain.get(key) ?? 0;
+          // Restore the frozen water consumed at lock time, then re-apply with the
+          // new effective cost so the frozen counter stays accurate.
+          const restoredFrozen = this.frozen + oldWaterGain;
+          const newWaterGain = Math.min(restoredFrozen, newEffectiveCost);
+          newImpact = newWaterGain - Math.max(0, newEffectiveCost - newWaterGain);
+          if (newImpact !== oldImpact) {
+            this.frozen = restoredFrozen - newWaterGain;
+            this._hotPlateWaterGain.set(key, newWaterGain);
+            this._lockedWaterImpact.set(key, newImpact);
+          }
+          continue; // Frozen and impact already updated above.
         } else {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
           const effectiveCost = effectivePressure >= 1 ? Math.ceil(tile.cost / effectivePressure) : tile.cost;
