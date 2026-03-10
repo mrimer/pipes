@@ -138,6 +138,83 @@ describe('Board.rotateTileBy', () => {
   });
 });
 
+// ─── New: rotateTile container-grant constraint ───────────────────────────────
+
+describe('Board.rotateTile (container-grant constraint)', () => {
+  /**
+   * Build a 1×5 board:
+   *   Source(0) → Straight(1, E-W) → Chamber(2, item, grants 1 Straight) → Straight(3, E-W) → Sink(4)
+   *
+   * Straight at (0,1) is at rotation=90 (E-W) so the container at (0,2) IS in the fill path.
+   * Inventory has count=-1 (1 Straight placed using the container grant; effective = -1+1 = 0).
+   * When Straight(0,1) is rotated to 180° (N-S) it disconnects the source from the container
+   * → grant drops to 0 → base(-1) + grant(0) = -1 < 0 → rotation must be blocked.
+   */
+  function makeRotateConstraintBoard(): Board {
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);         // E-W, connects source↔chamber
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0,  true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);         // E-W, chamber↔sink
+    board.grid[0][4] = new Tile(PipeShape.Sink,     0,  true);
+    board.sourceCapacity = 10;
+    // Simulate the player having used the container grant: base count = -1, effective = -1+1 = 0.
+    board.inventory = [{ shape: PipeShape.Straight, count: -1 }];
+    return board;
+  }
+
+  it('blocks rotation that disconnects a container when its grant is in use', () => {
+    const board = makeRotateConstraintBoard();
+    // Straight at (0,1) rotates 90°→180° (E-W → N-S), disconnecting source↔chamber.
+    // After rotation: grant = 0 → base(-1) + grant(0) = -1 < 0 → blocked.
+    const result = board.rotateTile({ row: 0, col: 1 });
+    expect(result).toBe(false);
+    expect(board.lastError).not.toBeNull();
+    // Tile must be restored to original rotation (90°).
+    expect(board.grid[0][1].rotation).toBe(90);
+  });
+
+  it('allows rotation when no container grants have been used (count ≥ 0)', () => {
+    // Same board structure but inventory count is 0 (no overdraft from grants).
+    // The container-grant guard only fires for item.count < 0, so this rotation is allowed.
+    const board = makeRotateConstraintBoard();
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+    // Rotating Straight(0,1) E-W → N-S disconnects the container, but since
+    // no grant was over-used (count ≥ 0), the rotation is permitted.
+    const result = board.rotateTile({ row: 0, col: 1 });
+    expect(result).toBe(true);
+    expect(board.lastError).toBeNull();
+  });
+});
+
+describe('Board.rotateTileBy (container-grant constraint)', () => {
+  function makeRotateByConstraintBoard(): Board {
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,   0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);         // E-W
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0,  true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);         // E-W
+    board.grid[0][4] = new Tile(PipeShape.Sink,     0,  true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: -1 }];
+    return board;
+  }
+
+  it('blocks multi-step rotation that disconnects a container when its grant is in use', () => {
+    const board = makeRotateByConstraintBoard();
+    // 1 step: 90°→180° (E-W → N-S), disconnects source↔chamber → blocked.
+    const result = board.rotateTileBy({ row: 0, col: 1 }, 1);
+    expect(result).toBe(false);
+    expect(board.lastError).not.toBeNull();
+    // Tile must be restored to original rotation (90°).
+    expect(board.grid[0][1].rotation).toBe(90);
+  });
+});
+
 // ─── New: level loading ──────────────────────────────────────────────────────
 
 describe('Board (level mode)', () => {

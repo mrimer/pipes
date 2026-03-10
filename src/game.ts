@@ -1063,6 +1063,7 @@ export class Game {
       this._renderInventoryBar();
       this._updateWaterDisplay();
       this._updateUndoRedoButtons();
+      this._checkWinLose();
     } else if (this.board.lastError) {
       this._handleBoardError();
     }

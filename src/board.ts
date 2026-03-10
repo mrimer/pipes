@@ -1329,6 +1329,22 @@ export class Board {
       return false;
     }
 
+    // Validate container-grant constraints: rotation may disconnect a container from
+    // the fill path, which could leave placed tiles with no covering grant (inventory < 0).
+    const newBonuses = this.getContainerBonuses(filled);
+    for (const item of this.inventory) {
+      if (item.count < 0) {
+        const bonus = newBonuses.get(item.shape) ?? 0;
+        if (item.count + bonus < 0) {
+          tile.rotate(); tile.rotate(); tile.rotate();
+          this.lastError =
+            'Cannot rotate: you have used items granted by a connected container. ' +
+            'Reconfigure the path first.';
+          return false;
+        }
+      }
+    }
+
     return true;
   }
 
@@ -1363,6 +1379,25 @@ export class Board {
       this.lastError = constraintError;
       return false;
     }
+
+    // Validate container-grant constraints: rotation may disconnect a container from
+    // the fill path, which could leave placed tiles with no covering grant (inventory < 0).
+    const newBonuses = this.getContainerBonuses(filled);
+    for (const item of this.inventory) {
+      if (item.count < 0) {
+        const bonus = newBonuses.get(item.shape) ?? 0;
+        if (item.count + bonus < 0) {
+          for (let i = 0; i < 4 - normalizedSteps; i++) {
+            tile.rotate();
+          }
+          this.lastError =
+            'Cannot rotate: you have used items granted by a connected container. ' +
+            'Reconfigure the path first.';
+          return false;
+        }
+      }
+    }
+
     return true;
   }
 
