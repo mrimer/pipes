@@ -2428,14 +2428,14 @@ describe('getTileDisplayName', () => {
     expect(getTileDisplayName(tile)).toBe('Straight');
   });
 
-  it('returns "Dirt block" for a dirt chamber', () => {
+  it('returns "Dirt -3" for a dirt chamber', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'dirt');
-    expect(getTileDisplayName(tile)).toBe('Dirt block');
+    expect(getTileDisplayName(tile)).toBe('Dirt -3');
   });
 
-  it('returns "Ice" for an ice chamber', () => {
+  it('returns "Ice -5 x 1°" for an ice chamber', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'ice', 1);
-    expect(getTileDisplayName(tile)).toBe('Ice');
+    expect(getTileDisplayName(tile)).toBe('Ice -5 x 1°');
   });
 });
 
