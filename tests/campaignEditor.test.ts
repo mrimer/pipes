@@ -757,6 +757,40 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     fireInput(input!, '-5');
     expect(state._editorParams.pressure).toBe(-5);
   });
+
+  it('Hot plate chamber Mass and Boiling° inputs update params correctly', () => {
+    const editor = makeEditor();
+    const state = editorState(editor);
+    state._editorPalette = 'chamber:hot_plate';
+    state._editorParams.chamberContent = 'hot_plate';
+    const panel = state._buildParamPanel();
+    document.body.appendChild(panel);
+    const massInput = findInputByLabel(panel, 'Mass');
+    const boilingInput = findInputByLabel(panel, 'Boiling °');
+    expect(massInput).not.toBeNull();
+    expect(boilingInput).not.toBeNull();
+    fireInput(massInput!, '3');
+    fireInput(boilingInput!, '50');
+    expect(state._editorParams.cost).toBe(3);
+    expect(state._editorParams.temperature).toBe(50);
+  });
+
+  it('Hot plate _buildTileDef saves cost and temperature to TileDef', () => {
+    const editor = makeEditor();
+    const state = editor as unknown as {
+      _editorParams: TileParams;
+      _editorPalette: PipeShape | string;
+      _buildTileDef(palette: string): import('../src/types').TileDef;
+    };
+    state._editorPalette = 'chamber:hot_plate';
+    state._editorParams.chamberContent = 'hot_plate';
+    state._editorParams.cost = 3;
+    state._editorParams.temperature = 50;
+    const def = state._buildTileDef('chamber:hot_plate');
+    expect(def.chamberContent).toBe('hot_plate');
+    expect(def.cost).toBe(3);
+    expect(def.temperature).toBe(50);
+  });
 });
 
 // ─── CampaignEditor – canvas display size and mouse-position calibration ──────

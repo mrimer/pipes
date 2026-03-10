@@ -2045,6 +2045,7 @@ export class CampaignEditor {
       if (cc === 'pump') def.pressure = p.pressure;
       if (cc === 'snow') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; }
+      if (cc === 'hot_plate') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
     }
 
