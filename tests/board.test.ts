@@ -2433,9 +2433,19 @@ describe('getTileDisplayName', () => {
     expect(getTileDisplayName(tile)).toBe('Dirt -3');
   });
 
-  it('returns "Ice -5 x 1°" for an ice chamber', () => {
+  it('returns "Ice -1° x 5" for an ice chamber', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'ice', 1);
-    expect(getTileDisplayName(tile)).toBe('Ice -5 x 1°');
+    expect(getTileDisplayName(tile)).toBe('Ice -1° x 5');
+  });
+
+  it('returns "Snow -5° x 4" for a snow chamber', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, null, 'snow', 5);
+    expect(getTileDisplayName(tile)).toBe('Snow -5° x 4');
+  });
+
+  it('returns "Sandstone -3° x 2 (H=1)" for a sandstone chamber', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, null, 'sandstone', 3, 0, 1);
+    expect(getTileDisplayName(tile)).toBe('Sandstone -3° x 2 (H=1)');
   });
 });
 
