@@ -955,14 +955,16 @@ export class Board {
     // ── Re-evaluate still-connected ice/snow when a beneficial tile left ─
     // When a heater or pump disconnects, any ice/snow tile whose locked cost
     // was partially or fully neutralised by that tile may now be under-charged.
-    // Re-compute using only heaters/pumps that were connected on or before each
-    // ice tile's own original connection turn.
-    // For sandstone, always use the actual current pressure so that the
-    // re-evaluation is consistent with the _checkSandstoneConstraints validity
-    // check (which also uses the full current pressure).  Using a historically-
-    // limited pressure for sandstone could produce deltaDamage ≤ 0 even when
-    // the current pressure is still above the hardness threshold, leading to an
-    // invalid overly-high failure impact.
+    // Re-compute ice/snow using only heaters/pumps that were connected on or before
+    // each tile's own original connection turn ("historically-limited" pressure/temp),
+    // so no tile gains a retroactive benefit from a pump that connected after it.
+    // For sandstone, however, always use the actual current pressure (all pumps still
+    // connected, regardless of connection turn) so that the re-evaluation is
+    // consistent with _checkSandstoneConstraints, which also uses the full current
+    // pressure.  Using the historically-limited pressure for sandstone could exclude a
+    // pump that connected after the sandstone and is still providing pressure,
+    // producing deltaDamage ≤ 0 even though the disconnect was correctly permitted by
+    // the constraint check, leading to an invalid overly-high failure impact.
     if (beneficialDisconnected) {
       const reEvalPressure = this._computePressureFromFilled(filled);
       for (const key of filled) {
