@@ -1033,13 +1033,15 @@ export class Game {
       if (tile) {
         const filledBefore = this.board.getFilledPositions();
         let placed = false;
+        let replacedTile: Tile | undefined;
         if (tile.shape === PipeShape.Empty) {
           placed = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
         } else if (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation) {
+          replacedTile = tile;
           placed = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
         }
         if (placed) {
-          this._afterTilePlaced(this.selectedShape, filledBefore);
+          this._afterTilePlaced(this.selectedShape, filledBefore, replacedTile, pos.row, pos.col);
           this._suppressNextClick = true;
         } else if (this.board.lastError) {
           this._handleBoardError();
@@ -1158,7 +1160,7 @@ export class Game {
       // Also covers the same shape with a different orientation, which can disconnect a
       // granting container and must go through the container-grant constraint check.
       if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
-        this._afterTilePlaced(this.selectedShape, filledBefore);
+        this._afterTilePlaced(this.selectedShape, filledBefore, tile, pos.row, pos.col);
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1243,13 +1245,15 @@ export class Game {
         if (oldTile) {
           const filledBefore = this.board.getFilledPositions();
           let placed = false;
+          let replacedOldTile: Tile | undefined;
           if (oldTile.shape === PipeShape.Empty) {
             placed = this.board.placeInventoryTile(last, this.selectedShape, this.pendingRotation);
           } else if (oldTile.shape !== this.selectedShape || oldTile.rotation !== this.pendingRotation) {
+            replacedOldTile = oldTile;
             placed = this.board.replaceInventoryTile(last, this.selectedShape, this.pendingRotation);
           }
           if (placed) {
-            this._afterTilePlaced(this.selectedShape, filledBefore);
+            this._afterTilePlaced(this.selectedShape, filledBefore, replacedOldTile, last.row, last.col);
           } else if (this.board.lastError) {
             this._handleBoardError();
           }
@@ -1752,11 +1756,18 @@ export class Game {
    * Records the move, updates last-used rotation, deselects the shape when
    * inventory is exhausted, and refreshes all affected UI elements.
    */
-  private _afterTilePlaced(placedShape: PipeShape, filledBefore: Set<string>): void {
+  private _afterTilePlaced(
+    placedShape: PipeShape,
+    filledBefore: Set<string>,
+    replacedTile?: Tile,
+    replacedRow?: number,
+    replacedCol?: number,
+  ): void {
     if (!this.board) return;
     this.board.applyTurnDelta();
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
+    this._spawnDisconnectionAnimations(filledBefore, replacedTile, replacedRow, replacedCol);
     this._spawnLockedCostChangeAnimations();
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
@@ -1804,7 +1815,7 @@ export class Game {
             // Also covers the same shape with a different orientation, which can disconnect a
             // granting container and must go through the container-grant constraint check.
             if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
-              this._afterTilePlaced(this.selectedShape, filledBefore);
+              this._afterTilePlaced(this.selectedShape, filledBefore, tile, focusPos.row, focusPos.col);
             } else if (board.lastError) {
               this._handleBoardError();
             }
