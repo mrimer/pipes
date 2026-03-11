@@ -229,6 +229,19 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   drawTileOnEditor(ctx, x, y, tile);
 }
 
+/** Chamber content types whose tile label/detail text is rendered 1pt larger than the default. */
+const CHAMBER_TYPES_WITH_LARGER_FONT: ReadonlySet<string> = new Set([
+  'tank', 'dirt', 'heater', 'pump', 'snow', 'ice', 'star',
+]);
+
+/** Draw text with a 1px black outline for better visibility on the editor grid. */
+function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 1;
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
+}
+
 /** Simplified tile drawing for the editor canvas. */
 function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile): void {
   const CELL = TILE_SIZE;
@@ -257,13 +270,13 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       }
     }
     ctx.fillStyle = '#fff';
-    ctx.fillText('GRA', cx, cy);
+    strokeFillText(ctx, 'GRANITE', cx, cy);
   } else if (shape === PipeShape.GoldSpace) {
     ctx.fillStyle = '#b8860b';
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#ffd700';
-    ctx.fillText('GOLD', cx, cy - 7);
-    ctx.fillText('SPACE', cx, cy + 7);
+    strokeFillText(ctx, 'GOLD', cx, cy - 7);
+    strokeFillText(ctx, 'SPACE', cx, cy + 7);
   } else if (shape === PipeShape.Source) {
     ctx.fillStyle = SOURCE_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
@@ -276,10 +289,10 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     const lineHeight = 12;
     const totalH = (lines.length - 1) * lineHeight;
     let lineY = cy - totalH / 2;
-    ctx.font = 'bold 11px Arial';
+    ctx.font = 'bold 12px Arial';
     for (const line of lines) {
-      ctx.fillText(line, cx, lineY);
-      ctx.font = '10px Arial';
+      strokeFillText(ctx, line, cx, lineY);
+      ctx.font = '11px Arial';
       lineY += lineHeight;
     }
     // Draw connection lines
@@ -288,7 +301,8 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = SINK_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
-    ctx.fillText('SINK', cx, cy);
+    ctx.font = 'bold 12px Arial';
+    strokeFillText(ctx, 'SINK', cx, cy);
     drawConnectionLines(ctx, x, y, tile);
   } else if (shape === PipeShape.Chamber) {
     const cc = tile.chamberContent ?? 'tank';
@@ -299,26 +313,28 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = '#fff';
     if (cc === 'sandstone') {
       ctx.font = '9px Arial';
-      ctx.fillText('SANDSTONE', cx, cy - 10);
+      strokeFillText(ctx, 'SANDSTONE', cx, cy - 10);
       ctx.font = '10px Arial';
-      ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 2);
-      ctx.fillText(`H:${tile.hardness}`, cx, cy + 13);
+      strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 2);
+      strokeFillText(ctx, `H:${tile.hardness}`, cx, cy + 13);
     } else {
       let displayLabel: string;
       if (isNegHeater) displayLabel = 'COOLER';
       else if (isNegPump) displayLabel = 'VACUUM';
       else if (cc === 'hot_plate') displayLabel = 'HOT PLATE';
       else displayLabel = cc.toUpperCase();
-      ctx.fillText(displayLabel, cx, cy - 6);
-      ctx.font = '10px Arial';
-      if (cc === 'tank') ctx.fillText(`cap:${tile.capacity}`, cx, cy + 8);
-      else if (cc === 'dirt') ctx.fillText(`cost:${tile.cost}`, cx, cy + 8);
-      else if (cc === 'heater') ctx.fillText(`${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + 8);
-      else if (cc === 'ice') ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
-      else if (cc === 'pump') ctx.fillText(`${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + 8);
-      else if (cc === 'snow') ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
-      else if (cc === 'hot_plate') ctx.fillText(`${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
-      else if (cc === 'item') ctx.fillText(`${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
+      const needsBigFont = CHAMBER_TYPES_WITH_LARGER_FONT.has(cc);
+      ctx.font = needsBigFont ? 'bold 12px Arial' : 'bold 11px Arial';
+      strokeFillText(ctx, displayLabel, cx, cy - 6);
+      ctx.font = needsBigFont ? '11px Arial' : '10px Arial';
+      if (cc === 'tank') strokeFillText(ctx, `cap:${tile.capacity}`, cx, cy + 8);
+      else if (cc === 'dirt') strokeFillText(ctx, `cost:${tile.cost}`, cx, cy + 8);
+      else if (cc === 'heater') strokeFillText(ctx, `${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + 8);
+      else if (cc === 'ice') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
+      else if (cc === 'pump') strokeFillText(ctx, `${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + 8);
+      else if (cc === 'snow') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
+      else if (cc === 'hot_plate') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
+      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
     }
     drawConnectionLines(ctx, x, y, tile);
   } else {
