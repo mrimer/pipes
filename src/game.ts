@@ -275,19 +275,19 @@ export class Game {
       'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
     document.body.appendChild(this.tooltipEl);
 
-    // Create the frozen display element (inserted into the HUD next to water display)
+    // Create the frozen display element (inserted into the stats box after water display)
     this.frozenDisplayEl = document.createElement('span');
     this.frozenDisplayEl.style.cssText =
       'display:none;font-size:1.1rem;font-weight:bold;color:#a8d8ea;';
     this.waterDisplayEl.insertAdjacentElement('afterend', this.frozenDisplayEl);
 
-    // Create the temperature display element (inserted into the HUD after the frozen display)
+    // Create the temperature display element (inserted into the stats box after frozen display)
     this.tempDisplayEl = document.createElement('span');
     this.tempDisplayEl.style.cssText =
       'display:none;font-size:1.1rem;font-weight:bold;color:#74b9ff;';
     this.frozenDisplayEl.insertAdjacentElement('afterend', this.tempDisplayEl);
 
-    // Create the pressure display element (inserted into the HUD after the temp display)
+    // Create the pressure display element (inserted into the stats box after temp display)
     this.pressureDisplayEl = document.createElement('span');
     this.pressureDisplayEl.style.cssText =
       'display:none;font-size:1.1rem;font-weight:bold;color:#a8e063;';
@@ -753,7 +753,7 @@ export class Game {
     if (this.board.hasTempRelevantTiles()) {
       const t = this.board.getCurrentTemperature();
       this.tempDisplayEl.textContent = `🌡️ Temp: ${t}°`;
-      this.tempDisplayEl.style.display = 'inline';
+      this.tempDisplayEl.style.display = 'block';
     } else {
       this.tempDisplayEl.style.display = 'none';
     }
@@ -761,7 +761,7 @@ export class Game {
     const f = this.board.frozen;
     if (f > 0) {
       this.frozenDisplayEl.textContent = `❄️ Frozen: ${f}`;
-      this.frozenDisplayEl.style.display = 'inline';
+      this.frozenDisplayEl.style.display = 'block';
     } else {
       this.frozenDisplayEl.style.display = 'none';
     }
@@ -769,7 +769,7 @@ export class Game {
     if (this.board.hasPressureRelevantTiles()) {
       const p = this.board.getCurrentPressure();
       this.pressureDisplayEl.textContent = `🔧 Pressure: ${p}`;
-      this.pressureDisplayEl.style.display = 'inline';
+      this.pressureDisplayEl.style.display = 'block';
     } else {
       this.pressureDisplayEl.style.display = 'none';
     }

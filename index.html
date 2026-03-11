@@ -159,17 +159,35 @@
     .inv-shape { font-size: 0.85rem; }
     .inv-count { font-size: 0.9rem; color: #7ed321; font-weight: bold; }
 
-    /* ── HUD ──────────────────────────────────────────────────────── */
-    #hud {
+    /* ── Stats box (right panel, above inventory) ────────────────── */
+    #right-panel {
       display: flex;
-      gap: 16px;
-      align-items: center;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #stats-box {
+      width: 140px;
+      background: #16213e;
+      border: 2px solid #4a90d9;
+      border-radius: 6px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
     #water-display {
       font-size: 1.1rem;
       font-weight: bold;
       color: #7ed321;
+    }
+
+    /* ── HUD ──────────────────────────────────────────────────────── */
+    #hud {
+      display: flex;
+      gap: 16px;
+      align-items: center;
     }
 
     #undo-btn,
@@ -286,7 +304,6 @@
   <div id="play-screen">
     <div id="level-header"></div>
     <div id="hud">
-      <span id="water-display">💧 Water: –</span>
       <button id="undo-btn" type="button" disabled>↩ Undo</button>
       <button id="redo-btn" type="button" disabled>↪ Redo</button>
       <button id="restart-btn" type="button">↺ Restart</button>
@@ -294,7 +311,12 @@
     </div>
     <div id="play-area">
       <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
-      <div id="inventory-bar"></div>
+      <div id="right-panel">
+        <div id="stats-box">
+          <span id="water-display">💧 Water: –</span>
+        </div>
+        <div id="inventory-bar"></div>
+      </div>
     </div>
   </div>
 
