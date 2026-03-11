@@ -10,7 +10,6 @@
  */
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation } from './types';
-import { CHAPTERS } from './levels';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from './persistence';
 import { TILE_SIZE } from './renderer';
 
@@ -44,20 +43,6 @@ const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.GoldSpace, PipeShape.Granite,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
 ]);
-
-// ─── The built-in "Official" campaign ────────────────────────────────────────
-
-/**
- * The pre-loaded official campaign derived from the built-in levels.
- * Identified as official via the `official` flag (not by its id).
- */
-export const OFFICIAL_CAMPAIGN: CampaignDef = {
-  id: 'official',
-  official: true,
-  name: 'Official',
-  author: 'Pipes Team',
-  chapters: CHAPTERS,
-};
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -312,7 +297,7 @@ export class CampaignEditor {
     content.appendChild(actionBar);
 
     // Campaign list
-    const allCampaigns: CampaignDef[] = [OFFICIAL_CAMPAIGN, ...this._campaigns];
+    const allCampaigns: CampaignDef[] = [...this._campaigns];
     for (const campaign of allCampaigns) {
       content.appendChild(this._buildCampaignRow(campaign));
     }
@@ -322,11 +307,8 @@ export class CampaignEditor {
 
   private _buildCampaignRow(campaign: CampaignDef): HTMLElement {
     const isOfficial = campaign.official === true;
-    // The hardcoded official campaign (id 'official') is active when activeCampaignId is null.
-    // User campaigns (including official-flagged ones) are active when their ID matches.
-    const isDefaultOfficial = campaign.id === 'official';
     const activeCampaignId = loadActiveCampaignId();
-    const isActive = isDefaultOfficial ? activeCampaignId === null : activeCampaignId === campaign.id;
+    const isActive = activeCampaignId === campaign.id;
     const row = document.createElement('div');
     row.style.cssText =
       'background:#16213e;border:2px solid #4a90d9;border-radius:8px;' +
@@ -400,7 +382,6 @@ export class CampaignEditor {
   // ─── Screen: Campaign detail ──────────────────────────────────────────────
 
   private _getActiveCampaign(): CampaignDef | null {
-    if (this._activeCampaignId === 'official') return OFFICIAL_CAMPAIGN;
     return this._campaigns.find((c) => c.id === this._activeCampaignId) ?? null;
   }
 
@@ -2483,9 +2464,9 @@ export class CampaignEditor {
     saveImportedCampaigns(this._campaigns);
   }
 
-  /** Return all campaigns (Official + user campaigns) for external use (e.g. campaign select screen). */
+  /** Return all campaigns (user campaigns) for external use (e.g. campaign select screen). */
   getAllCampaigns(): CampaignDef[] {
-    return [OFFICIAL_CAMPAIGN, ...this._campaigns];
+    return [...this._campaigns];
   }
 
   /** Reload campaigns from storage (called after an import or external change). */
