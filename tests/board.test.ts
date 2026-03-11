@@ -1,7 +1,7 @@
 import { Board, SPIN_PIPE_SHAPES } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
-import { LEVELS } from '../src/levels';
+import { LEVELS } from './levels';
 
 /** Build a minimal 2×1 board and manually set the tiles for deterministic testing. */
 function makeTwoTileBoard(): Board {

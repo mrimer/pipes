@@ -7,7 +7,7 @@
  */
 
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress, saveActiveCampaignId, clearActiveCampaignId, migrateCampaign } from '../src/persistence';
-import { CampaignEditor, OFFICIAL_CAMPAIGN } from '../src/campaignEditor';
+import { CampaignEditor } from '../src/campaignEditor';
 import { CampaignDef, LevelDef, PipeShape } from '../src/types';
 import { TileParams } from '../src/campaignEditorTypes';
 
@@ -157,32 +157,6 @@ describe('loadImportedCampaigns – weak_ice migration', () => {
   });
 });
 
-// ─── OFFICIAL_CAMPAIGN ────────────────────────────────────────────────────────
-
-describe('OFFICIAL_CAMPAIGN', () => {
-  it('has id "official"', () => {
-    expect(OFFICIAL_CAMPAIGN.id).toBe('official');
-  });
-
-  it('has official flag set to true', () => {
-    expect(OFFICIAL_CAMPAIGN.official).toBe(true);
-  });
-
-  it('has a non-empty name and author', () => {
-    expect(OFFICIAL_CAMPAIGN.name.length).toBeGreaterThan(0);
-    expect(OFFICIAL_CAMPAIGN.author.length).toBeGreaterThan(0);
-  });
-
-  it('contains at least one chapter', () => {
-    expect(OFFICIAL_CAMPAIGN.chapters.length).toBeGreaterThan(0);
-  });
-
-  it('has at least one level across all chapters', () => {
-    const total = OFFICIAL_CAMPAIGN.chapters.reduce((n, ch) => n + ch.levels.length, 0);
-    expect(total).toBeGreaterThan(0);
-  });
-});
-
 // ─── CampaignEditor – active campaign Play button ─────────────────────────────
 
 /** Create a minimal CampaignEditor for DOM testing. */
@@ -235,22 +209,6 @@ describe('CampaignEditor – active campaign button', () => {
     document.body.innerHTML = '';
   });
 
-  it('Official campaign shows "Active" disabled button when no user campaign is active', () => {
-    // No active campaign stored → official is active
-    const editor = makeEditor();
-    editor.show();
-    expect(getFirstButtonTextForCampaign('Official')).toBe('Active');
-    expect(isFirstButtonDisabledForCampaign('Official')).toBe(true);
-  });
-
-  it('Official campaign shows "▶ Play" when a user campaign is active', () => {
-    const userCampaign: CampaignDef = { id: 'cmp_test1', name: 'My Campaign', author: 'Tester', chapters: [] };
-    saveActiveCampaignId('cmp_test1');
-    const editor = makeEditor([userCampaign]);
-    editor.show();
-    expect(getFirstButtonTextForCampaign('Official')).toBe('▶ Play');
-  });
-
   it('User campaign shows "Active" disabled button when it is the active campaign', () => {
     const userCampaign: CampaignDef = { id: 'cmp_test2', name: 'Adventure Pack', author: 'Tester', chapters: [] };
     saveActiveCampaignId('cmp_test2');
@@ -262,7 +220,7 @@ describe('CampaignEditor – active campaign button', () => {
 
   it('User campaign shows "▶ Play" when it is not the active campaign', () => {
     const userCampaign: CampaignDef = { id: 'cmp_test3', name: 'Bonus Levels', author: 'Tester', chapters: [] };
-    // No active campaign stored → official is active, not this user campaign
+    // No active campaign stored → no campaign is active
     clearActiveCampaignId();
     const editor = makeEditor([userCampaign]);
     editor.show();
@@ -277,7 +235,6 @@ describe('CampaignEditor – active campaign button', () => {
     editor.show();
     expect(getFirstButtonTextForCampaign('Campaign A')).toBe('Active');
     expect(getFirstButtonTextForCampaign('Campaign B')).toBe('▶ Play');
-    expect(getFirstButtonTextForCampaign('Official')).toBe('▶ Play');
   });
 });
 
@@ -1469,15 +1426,6 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
 
     const toggle = document.querySelector<HTMLInputElement>('#official-toggle');
     expect(toggle!.checked).toBe(true);
-  });
-
-  it('does NOT show the toggle for the hardcoded OFFICIAL_CAMPAIGN', () => {
-    const editor = makeEditor();
-    editor.show();
-    openCampaignDetail(editor, 'official');
-
-    const toggle = document.querySelector<HTMLInputElement>('#official-toggle');
-    expect(toggle).toBeNull();
   });
 
   it('checking the toggle marks the campaign as official', () => {

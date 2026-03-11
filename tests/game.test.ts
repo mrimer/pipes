@@ -4,7 +4,8 @@
 
 import { Game } from '../src/game';
 import { LevelDef, PipeShape, CampaignDef } from '../src/types';
-import { LEVELS, CHAPTERS } from '../src/levels';
+import { LEVELS, CHAPTERS } from './levels';
+import { saveImportedCampaigns } from '../src/persistence';
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
@@ -65,6 +66,9 @@ function makeGame(): {
   exitBtnEl: HTMLButtonElement;
   winNextBtnEl: HTMLButtonElement;
 } {
+  // Clear any previously saved state so the game starts without an active campaign.
+  localStorage.clear();
+
   document.body.innerHTML = `
     <canvas id="game-canvas"></canvas>
     <div id="level-select">
@@ -115,6 +119,17 @@ function makeGame(): {
     redoBtnEl,
     exitBtnEl,
   );
+
+  // Activate a test campaign using the original CHAPTERS reference so that
+  // tests can mutate LEVELS objects and see the changes reflected in startLevel().
+  const testCampaign: CampaignDef = {
+    id: 'test-campaign',
+    name: 'Test Campaign',
+    author: 'Test',
+    chapters: CHAPTERS,
+  };
+  saveImportedCampaigns([testCampaign]);
+  gameHooks(game)._activateCampaign(testCampaign);
 
   return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl, exitBtnEl,
     winNextBtnEl: get('win-next-btn') as HTMLButtonElement };
@@ -578,7 +593,7 @@ describe('Game – reset progress', () => {
     const hooks = gameHooks(game);
 
     // Mark level 1 as completed internally, then re-render
-    hooks.completedLevels.add(1);
+    hooks._activeCampaignProgress.add(1);
     hooks._renderLevelList();
 
     const levelListEl = document.getElementById('level-list')!;
@@ -591,8 +606,8 @@ describe('Game – reset progress', () => {
       .find((b) => b.textContent === 'Reset')! as HTMLButtonElement;
     confirmBtn.click();
 
-    // Completed levels should be cleared
-    expect(hooks.completedLevels.size).toBe(0);
+    // Campaign progress should be cleared
+    expect(hooks._activeCampaignProgress.size).toBe(0);
     // The first level button should no longer have the 'completed' class
     const firstLevelBtn = levelListEl.querySelector('.level-btn');
     expect(firstLevelBtn?.classList.contains('completed')).toBe(false);
@@ -1326,7 +1341,7 @@ describe('Game – Escape key returns to level select', () => {
 // ─── Tests: playtesting does not persist level-completion progress ─────────────
 
 describe('Game – playtesting does not persist progress', () => {
-  it('does not add the level to completedLevels when winning during a playtest', () => {
+  it('does not add the level to campaign progress when winning during a playtest', () => {
     const { game } = makeGame();
     const hooks = gameHooks(game);
 
@@ -1335,13 +1350,13 @@ describe('Game – playtesting does not persist progress', () => {
     expect(hooks._playtestExitCallback).not.toBeNull();
 
     const levelId = LEVELS[0].id;
-    hooks.completedLevels.delete(levelId); // reset any data loaded from shared localStorage
+    hooks._activeCampaignProgress.delete(levelId); // reset any data from shared localStorage
     hooks._markLevelCompleted(levelId);
 
-    expect(hooks.completedLevels.has(levelId)).toBe(false);
+    expect(hooks._activeCampaignProgress.has(levelId)).toBe(false);
   });
 
-  it('adds the level to completedLevels when winning during normal play', () => {
+  it('adds the level to campaign progress when winning during normal play', () => {
     const { game } = makeGame();
     const hooks = gameHooks(game);
 
@@ -1350,10 +1365,10 @@ describe('Game – playtesting does not persist progress', () => {
     expect(hooks._playtestExitCallback).toBeNull();
 
     const levelId = LEVELS[0].id;
-    hooks.completedLevels.delete(levelId); // reset any data loaded from shared localStorage
+    hooks._activeCampaignProgress.delete(levelId); // reset any data from shared localStorage
     hooks._markLevelCompleted(levelId);
 
-    expect(hooks.completedLevels.has(levelId)).toBe(true);
+    expect(hooks._activeCampaignProgress.has(levelId)).toBe(true);
   });
 });
 

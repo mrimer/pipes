@@ -56,7 +56,7 @@ export function renderLevelList(
 ): void {
   levelListEl.innerHTML = '';
 
-  // campaignChapters is always provided by game.ts (via OFFICIAL_CAMPAIGN or active campaign).
+  // campaignChapters is always provided by game.ts (via the active campaign).
   // The empty-array fallback guards against callers that omit the parameter.
   const chapters = campaignChapters ?? [];
 
