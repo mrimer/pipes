@@ -109,6 +109,17 @@ export class Board {
   lastErrorTilePositions: GridPos[] | null = null;
 
   /**
+   * Tiles whose locked water impact changed during the most recent
+   * {@link applyTurnDelta} call because a beneficial tile (heater/pump) was
+   * disconnected and the remaining costs were re-evaluated.
+   * Each entry records the grid position and the numeric delta
+   * (newImpact − oldImpact); negative means the tile now costs more water,
+   * positive means it costs less.  Cleared at the start of each
+   * {@link applyTurnDelta} call.
+   */
+  lastLockedCostChanges: Array<{ row: number; col: number; delta: number }> = [];
+
+  /**
    * Per-tile locked water impact, keyed by "row,col".
    * A negative value represents a water cost; a positive value represents a gain.
    * Populated by {@link applyTurnDelta} after each player action and by
@@ -913,6 +924,7 @@ export class Board {
    * which is the "state of the board" at the moment the turn is applied.
    */
   applyTurnDelta(): void {
+    this.lastLockedCostChanges = [];
     const filled = this.getFilledPositions();
 
     // ── Detect whether any heater or pump has been disconnected this turn ────
@@ -1008,6 +1020,7 @@ export class Board {
             const failureImpact = -(this.sourceCapacity + 1);
             if (failureImpact !== oldImpact) {
               this._lockedWaterImpact.set(key, failureImpact);
+              this.lastLockedCostChanges.push({ row: r, col: c, delta: failureImpact - oldImpact });
             }
             continue;
           }
@@ -1024,6 +1037,7 @@ export class Board {
             this.frozen = restoredFrozen - newWaterGain;
             this._hotPlateWaterGain.set(key, newWaterGain);
             this._lockedWaterImpact.set(key, newImpact);
+            this.lastLockedCostChanges.push({ row: r, col: c, delta: newImpact - oldImpact });
           }
           continue; // Frozen and impact already updated above.
         } else {
@@ -1036,6 +1050,7 @@ export class Board {
           // Adjust the frozen-water display counter by the change in cost.
           this.frozen += oldImpact - newImpact;
           this._lockedWaterImpact.set(key, newImpact);
+          this.lastLockedCostChanges.push({ row: r, col: c, delta: newImpact - oldImpact });
         }
       }
     }

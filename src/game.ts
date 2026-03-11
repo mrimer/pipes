@@ -1091,6 +1091,7 @@ export class Game {
       this.board.applyTurnDelta();
       this.board.recordMove();
       this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, pos.row, pos.col);
+      this._spawnLockedCostChangeAnimations();
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
         this.selectedShape = reclaimedShape;
@@ -1132,6 +1133,7 @@ export class Game {
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
         this._spawnDisconnectionAnimations(filledBefore);
+        this._spawnLockedCostChangeAnimations();
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._updateUndoRedoButtons();
@@ -1170,6 +1172,7 @@ export class Game {
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
         this._spawnDisconnectionAnimations(filledBefore);
+        this._spawnLockedCostChangeAnimations();
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._updateUndoRedoButtons();
@@ -1641,9 +1644,31 @@ export class Game {
   }
 
   /**
-   * (base inventory + container bonuses) has dropped below 1.
-   * Call this after any board mutation that may reduce available quantities.
+   * Spawn floating animation labels for tiles whose **locked** water impact
+   * changed because a beneficial tile (heater or pump) was disconnected and
+   * still-connected cost tiles were re-evaluated by {@link Board.applyTurnDelta}.
+   *
+   * The label shows the signed delta (newImpact − oldImpact): negative means
+   * the tile now costs more water (shown in red), positive means it costs less
+   * (shown in green).  This matches the appearance of the connection-time cost
+   * animations so players can immediately see what changed.
    */
+  private _spawnLockedCostChangeAnimations(): void {
+    if (!this.board) return;
+    const changes = this.board.lastLockedCostChanges;
+    if (changes.length === 0) return;
+    const now = performance.now();
+
+    for (const { row: r, col: c, delta } of changes) {
+      const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
+      const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
+      const text = delta > 0 ? `+${delta}` : `${delta}`;
+      const color = animColor(delta);
+      this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
+    }
+  }
+
+  /**
   private _deselectIfDepleted(): void {
     if (!this.board || this.selectedShape === null) return;
     const inv = this.board.inventory.find((it) => it.shape === this.selectedShape);
@@ -1703,6 +1728,7 @@ export class Game {
     this.board.applyTurnDelta();
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
+    this._spawnLockedCostChangeAnimations();
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._renderInventoryBar();
@@ -1761,6 +1787,7 @@ export class Game {
             board.recordMove();
             this._spawnConnectionAnimations(filledBefore);
             this._spawnDisconnectionAnimations(filledBefore);
+            this._spawnLockedCostChangeAnimations();
             this._renderInventoryBar();
             this._updateWaterDisplay();
             this._updateUndoRedoButtons();
