@@ -644,7 +644,7 @@ export function drawTile(
         ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
       } else {
         // Unconnected: show boiling temp and mass.
-        // When shift is held, show the raw temp parameter; otherwise show currentTemp + temp.
+        // When shift is held, show the raw temp parameter; otherwise show tile.temperature + currentTemp.
         const deltaTemp = shiftHeld
           ? tile.temperature
           : tile.temperature + currentTemp;
