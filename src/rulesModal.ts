@@ -9,7 +9,7 @@ import {
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
-  STAR_COLOR,
+  STAR_COLOR, HOT_PLATE_COLOR,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -157,6 +157,11 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: colorSwatch(SANDSTONE_COLOR),
     name: 'Chamber — Sandstone',
     description: 'Like Snow, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness.',
+  },
+  {
+    iconHtml: colorSwatch(HOT_PLATE_COLOR),
+    name: 'Chamber — Hot Plate',
+    description: 'Consumes water based on mass and temperature. Effective cost = mass × (boiling temp° − current temp°). First drains frozen water (restoring it to liquid); remaining cost draws from regular water. Boiling temp is displayed as (100 + temp)°.',
   },
   {
     iconHtml: colorSwatch(STAR_COLOR),
