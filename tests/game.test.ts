@@ -864,7 +864,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
 
     const dirtAnims = hooks._animations.filter((a) => a.text === '-0');
     expect(dirtAnims.length).toBeGreaterThanOrEqual(1);
-    expect(dirtAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
+    expect(dirtAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
 
   it('spawns a "-0" animation when a Chamber-ice becomes connected at zero cost', () => {
@@ -892,7 +892,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
 
     const iceAnims = hooks._animations.filter((a) => a.text === '-0');
     expect(iceAnims.length).toBeGreaterThanOrEqual(1);
-    expect(iceAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
+    expect(iceAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
 
   it('spawns no animation for a tile that was already in the fill path', () => {

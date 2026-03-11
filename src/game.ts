@@ -816,7 +816,7 @@ export class Game {
   private _loop(): void {
     if (this.screen === GameScreen.Play) {
       this._renderBoard();
-      renderAnimations(this.ctx, this._animations);
+      renderAnimations(this.ctx, this._animations, this.canvas.width);
       this._tickSourceSpray();
       this._tickWinFlow();
     }
@@ -1495,7 +1495,7 @@ export class Game {
         } else if (tile.chamberContent === 'dirt') {
           const val = -tile.cost;
           text = val > 0 ? `+${val}` : val < 0 ? `${val}` : '-0';
-          color = val > 0 ? animColor(val) : ANIM_NEGATIVE_COLOR;
+          color = animColor(val);
         } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
           const val = tile.itemCount;
           text = val >= 0 ? `+${val}` : `${val}`;
@@ -1509,7 +1509,7 @@ export class Game {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -(tile.cost * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
-          color = ANIM_NEGATIVE_COLOR;
+          color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
         } else if (tile.chamberContent === 'pump') {
           const pressVal = tile.pressure;
           text = pressVal >= 0 ? `+${pressVal}P` : `${pressVal}P`;
@@ -1518,13 +1518,13 @@ export class Game {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
-          color = ANIM_NEGATIVE_COLOR;
+          color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
         } else if (tile.chamberContent === 'sandstone') {
           const deltaDamage = currentPressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
           text = val < 0 ? `${val}` : '-0';
-          color = ANIM_NEGATIVE_COLOR;
+          color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
         } else if (tile.chamberContent === 'hot_plate') {
           // Use the locked values computed by applyTurnDelta
           const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
@@ -1632,7 +1632,7 @@ export class Game {
           if (waterLoss > 0) parts.push(`+${waterLoss}`);
           if (waterGain > 0) parts.push(`-${waterGain}`);
           text = parts.length > 0 ? parts.join(' ') : '-0';
-          color = waterLoss > waterGain ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
+          color = parts.length === 0 ? ANIM_ZERO_COLOR : waterLoss > waterGain ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
         }
         // heater, pump, item: no direct water impact – no animation label
       }
@@ -1669,6 +1669,10 @@ export class Game {
   }
 
   /**
+   * Deselects the current shape if the effective count of that shape
+   * (base inventory + container bonuses) has dropped below 1.
+   * Call this after any board mutation that may reduce available quantities.
+   */
   private _deselectIfDepleted(): void {
     if (!this.board || this.selectedShape === null) return;
     const inv = this.board.inventory.find((it) => it.shape === this.selectedShape);
