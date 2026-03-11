@@ -47,9 +47,13 @@ const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
 
 // ─── The built-in "Official" campaign ────────────────────────────────────────
 
-/** The pre-loaded read-only campaign derived from the built-in levels. */
+/**
+ * The pre-loaded official campaign derived from the built-in levels.
+ * Identified as official via the `official` flag (not by its id).
+ */
 export const OFFICIAL_CAMPAIGN: CampaignDef = {
   id: 'official',
+  official: true,
   name: 'Official',
   author: 'Pipes Team',
   chapters: CHAPTERS,
@@ -156,7 +160,7 @@ export class CampaignEditor {
     switch (this._screen) {
       case 'levelEditor': {
         const campaign = this._getActiveCampaign();
-        const readOnly = campaign?.id === 'official';
+        const readOnly = campaign?.official === true;
         this._showLevelEditor(readOnly);
         break;
       }
@@ -317,9 +321,12 @@ export class CampaignEditor {
   }
 
   private _buildCampaignRow(campaign: CampaignDef): HTMLElement {
-    const isOfficial = campaign.id === 'official';
+    const isOfficial = campaign.official === true;
+    // The hardcoded official campaign (id 'official') is active when activeCampaignId is null.
+    // User campaigns (including official-flagged ones) are active when their ID matches.
+    const isDefaultOfficial = campaign.id === 'official';
     const activeCampaignId = loadActiveCampaignId();
-    const isActive = isOfficial ? activeCampaignId === null : activeCampaignId === campaign.id;
+    const isActive = isDefaultOfficial ? activeCampaignId === null : activeCampaignId === campaign.id;
     const row = document.createElement('div');
     row.style.cssText =
       'background:#16213e;border:2px solid #4a90d9;border-radius:8px;' +
@@ -403,7 +410,9 @@ export class CampaignEditor {
 
     const campaign = this._getActiveCampaign();
     if (!campaign) { this._showCampaignList(); return; }
-    const isOfficial = campaign.id === 'official';
+    const isOfficial = campaign.official === true;
+    // Determine whether this is a user campaign that can have its official flag toggled
+    const isUserCampaign = this._campaigns.some((c) => c === campaign);
 
     const toolbar = this._buildToolbar(
       isOfficial ? `📋 ${campaign.name} (read-only)` : `✏️ Edit Campaign: ${campaign.name}`,
@@ -418,6 +427,32 @@ export class CampaignEditor {
     content.style.cssText =
       'width:100%;max-width:900px;padding:20px;box-sizing:border-box;display:flex;' +
       'flex-direction:column;gap:16px;';
+
+    // ── Dev – Official Campaign toggle (user campaigns only) ──────────────────
+    if (isUserCampaign) {
+      const toggleWrap = document.createElement('div');
+      toggleWrap.style.cssText =
+        'background:#16213e;border:1px solid #f0c040;border-radius:8px;padding:12px 16px;' +
+        'display:flex;align-items:center;gap:10px;';
+      const toggleCb = document.createElement('input');
+      toggleCb.type = 'checkbox';
+      toggleCb.id = 'official-toggle';
+      toggleCb.checked = isOfficial;
+      toggleCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+      const toggleLbl = document.createElement('label');
+      toggleLbl.htmlFor = 'official-toggle';
+      toggleLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
+      toggleLbl.textContent = 'Dev – Official Campaign';
+      toggleCb.addEventListener('change', () => {
+        campaign.official = toggleCb.checked ? true : undefined;
+        this._saveCampaigns();
+        // Re-render to update read-only state
+        this._showCampaignDetail();
+      });
+      toggleWrap.appendChild(toggleCb);
+      toggleWrap.appendChild(toggleLbl);
+      content.appendChild(toggleWrap);
+    }
 
     if (!isOfficial) {
       // Name and author fields
@@ -539,7 +574,7 @@ export class CampaignEditor {
     if (!campaign) { this._showCampaignList(); return; }
     const chapter = campaign.chapters[this._activeChapterIdx];
     if (!chapter) { this._showCampaignDetail(); return; }
-    const isOfficial = campaign.id === 'official';
+    const isOfficial = campaign.official === true;
 
     const toolbar = this._buildToolbar(
       `${isOfficial ? '📋' : '✏️'} Chapter ${this._activeChapterIdx + 1}: ${chapter.name}`,
@@ -2411,6 +2446,11 @@ export class CampaignEditor {
           if (data.id === 'official') {
             data.id = generateCampaignId();
             alert(`Note: this file has the reserved "official" ID. A new unique ID has been assigned to the imported campaign.`);
+          }
+          // Clear the official flag on import to prevent imported campaigns from
+          // automatically gaining read-only/official status.
+          if (data.official) {
+            data.official = undefined;
           }
           // Check for duplicate ID and reassign silently
           if (this._campaigns.some((c) => c.id === data.id)) {

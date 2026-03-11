@@ -164,6 +164,10 @@ describe('OFFICIAL_CAMPAIGN', () => {
     expect(OFFICIAL_CAMPAIGN.id).toBe('official');
   });
 
+  it('has official flag set to true', () => {
+    expect(OFFICIAL_CAMPAIGN.official).toBe(true);
+  });
+
   it('has a non-empty name and author', () => {
     expect(OFFICIAL_CAMPAIGN.name.length).toBeGreaterThan(0);
     expect(OFFICIAL_CAMPAIGN.author.length).toBeGreaterThan(0);
@@ -1415,5 +1419,127 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
     expect(window.alert).not.toHaveBeenCalled();
     expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+  });
+});
+
+// ─── CampaignEditor – Dev Official Campaign toggle ────────────────────────────
+
+describe('CampaignEditor – Dev Official Campaign toggle', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  /** Navigate the editor to the campaign detail page for the given user campaign. */
+  function openCampaignDetail(editor: CampaignEditor, campaignId: string): void {
+    const state = editor as unknown as {
+      _activeCampaignId: string | null;
+      _showCampaignDetail(): void;
+    };
+    state._activeCampaignId = campaignId;
+    state._showCampaignDetail();
+  }
+
+  it('shows the official toggle for user campaigns on the detail page', () => {
+    const campaign: CampaignDef = { id: 'cmp_t1', name: 'My Campaign', author: 'Tester', chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    openCampaignDetail(editor, 'cmp_t1');
+
+    const toggle = document.querySelector<HTMLInputElement>('#official-toggle');
+    expect(toggle).not.toBeNull();
+    expect(toggle!.checked).toBe(false);
+  });
+
+  it('toggle is unchecked when campaign has no official flag', () => {
+    const campaign: CampaignDef = { id: 'cmp_t2', name: 'My Campaign', author: 'Tester', chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    openCampaignDetail(editor, 'cmp_t2');
+
+    const toggle = document.querySelector<HTMLInputElement>('#official-toggle');
+    expect(toggle!.checked).toBe(false);
+  });
+
+  it('toggle is checked when campaign has official: true', () => {
+    const campaign: CampaignDef = { id: 'cmp_t3', name: 'My Campaign', author: 'Tester', official: true, chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    openCampaignDetail(editor, 'cmp_t3');
+
+    const toggle = document.querySelector<HTMLInputElement>('#official-toggle');
+    expect(toggle!.checked).toBe(true);
+  });
+
+  it('does NOT show the toggle for the hardcoded OFFICIAL_CAMPAIGN', () => {
+    const editor = makeEditor();
+    editor.show();
+    openCampaignDetail(editor, 'official');
+
+    const toggle = document.querySelector<HTMLInputElement>('#official-toggle');
+    expect(toggle).toBeNull();
+  });
+
+  it('checking the toggle marks the campaign as official', () => {
+    const campaign: CampaignDef = { id: 'cmp_t4', name: 'My Campaign', author: 'Tester', chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    openCampaignDetail(editor, 'cmp_t4');
+
+    const toggle = document.querySelector<HTMLInputElement>('#official-toggle')!;
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+
+    // Check the persisted campaign - makeEditor serializes campaigns, so we verify via storage
+    const stored = loadImportedCampaigns().find((c) => c.id === 'cmp_t4');
+    expect(stored?.official).toBe(true);
+  });
+
+  it('unchecking the toggle removes the official flag', () => {
+    const campaign: CampaignDef = { id: 'cmp_t5', name: 'My Campaign', author: 'Tester', official: true, chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    openCampaignDetail(editor, 'cmp_t5');
+
+    const toggle = document.querySelector<HTMLInputElement>('#official-toggle')!;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('change'));
+
+    // After unchecking, the campaign should no longer have official: true
+    const stored = loadImportedCampaigns().find((c) => c.id === 'cmp_t5');
+    expect(stored?.official).toBeFalsy();
+  });
+
+  it('official user campaigns show lock icon and read-only UI in campaign list', () => {
+    const campaign: CampaignDef = { id: 'cmp_t6', name: 'Locked Pack', author: 'Tester', official: true, chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+
+    // Check that name shows lock icon
+    const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
+    const nameDiv = nameDivs.find((d) => d.textContent === 'Locked Pack 🔒');
+    expect(nameDiv).toBeDefined();
+
+    // Check that Edit button is replaced with View button
+    expect(getFirstButtonTextForCampaign('Locked Pack')).not.toContain('Edit');
+  });
+
+  it('official user campaigns do not show delete button in campaign list', () => {
+    const campaign: CampaignDef = { id: 'cmp_t7', name: 'Protected Pack', author: 'Tester', official: true, chapters: [] };
+    const editor = makeEditor([campaign]);
+    editor.show();
+
+    // Find the campaign row and check no delete button
+    const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
+    for (const div of nameDivs) {
+      if (div.style.fontWeight === 'bold' && div.textContent?.startsWith('Protected Pack')) {
+        const row = div.closest('div[style*="border-radius"]') as HTMLElement | null;
+        if (row) {
+          const buttons = Array.from(row.querySelectorAll('button'));
+          const hasDelete = buttons.some((b) => b.textContent?.includes('Delete'));
+          expect(hasDelete).toBe(false);
+        }
+      }
+    }
   });
 });

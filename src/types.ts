@@ -202,4 +202,11 @@ export interface CampaignDef {
   name: string;
   author: string;
   chapters: ChapterDef[];
+  /**
+   * When true, this campaign is flagged as an "official" campaign.
+   * Official campaigns are displayed as read-only in the Campaign Editor
+   * and cannot be edited or deleted until this flag is unchecked.
+   * Multiple campaigns may be flagged as official simultaneously.
+   */
+  official?: boolean;
 }
