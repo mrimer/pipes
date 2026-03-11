@@ -290,6 +290,7 @@ type GameTestHooks = {
   mouseCanvasPos: { x: number; y: number } | null;
   tooltipEl: HTMLElement;
   _handleKey(e: KeyboardEvent): void;
+  _handleCanvasClick(e: MouseEvent): void;
   _handleCanvasRightClick(e: MouseEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
   _handleCanvasMouseMove(e: MouseEvent): void;
@@ -387,6 +388,57 @@ describe('Game – inventory bar re-renders on tile rotation', () => {
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(renderSpy).toHaveBeenCalled();
+  });
+});
+
+// ─── Tests: pending rotation syncs on tile click-rotate ───────────────────────
+
+describe('Game – pendingRotation syncs when rotating a tile whose shape is selected', () => {
+  it('updates pendingRotation to match the new tile rotation after a click-rotate', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+
+    // Place a Straight tile at (0,1) with rotation=0 using Enter key.
+    // (0,1) is an empty cell in level 1; inventory has Straight×4.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Now select Straight again with pendingRotation=0 matching the placed tile.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+
+    // TILE_SIZE=64: col 1 → clientX 96, row 0 → clientY 32.
+    hooks._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+
+    // The tile rotated from 0→90, so pendingRotation must follow.
+    expect(hooks.pendingRotation).toBe(90);
+  });
+
+  it('leaves pendingRotation unchanged when selectedShape is null', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+
+    // Place a Straight tile at (0,1) first.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Now deselect the inventory item.
+    hooks.selectedShape = null;
+    hooks.pendingRotation = 0;
+
+    // Click the placed Straight at (0,1) to rotate it (no inventory item selected).
+    hooks._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+
+    // pendingRotation must remain 0 (selectedShape is null, no sync).
+    expect(hooks.pendingRotation).toBe(0);
   });
 });
 
