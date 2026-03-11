@@ -50,12 +50,21 @@ export function animColor(value: number): string {
  *
  * @param ctx - The 2D rendering context to draw onto.
  * @param animations - The live array of active animations.
+ * @param canvasWidth - Optional canvas pixel width used to clamp animation
+ *   labels that would otherwise be clipped at the right edge of the board.
+ *   When provided, each label's x position is shifted left as needed so the
+ *   full text stays within the canvas.
  */
 export function renderAnimations(
   ctx: CanvasRenderingContext2D,
   animations: TileAnimation[],
+  canvasWidth?: number,
 ): void {
   const now = performance.now();
+  // Set constant text properties once before the loop.
+  ctx.font = 'bold 30px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   let i = 0;
   while (i < animations.length) {
     const anim = animations[i];
@@ -69,16 +78,22 @@ export function renderAnimations(
     const alpha = progress < 0.5 ? 1 : (1 - progress) * 2;
     const yOffset = -ANIM_RISE_PX * progress;
 
+    // Clamp x so the label doesn't overflow the right edge of the canvas.
+    let x = anim.x;
+    if (canvasWidth !== undefined) {
+      const halfW = ctx.measureText(anim.text).width / 2;
+      if (x + halfW > canvasWidth) {
+        x = canvasWidth - halfW;
+      }
+    }
+
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = 'bold 30px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 2;
-    ctx.strokeText(anim.text, anim.x, anim.y + yOffset);
+    ctx.strokeText(anim.text, x, anim.y + yOffset);
     ctx.fillStyle = anim.color;
-    ctx.fillText(anim.text, anim.x, anim.y + yOffset);
+    ctx.fillText(anim.text, x, anim.y + yOffset);
     ctx.restore();
 
     i++;
