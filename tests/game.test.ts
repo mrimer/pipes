@@ -1438,6 +1438,27 @@ describe('Game – reclaimTile records a move in the undo history', () => {
   });
 });
 
+// ─── Tests: contextmenu suppressed even when game-over modal is visible ──────
+
+describe('Game – contextmenu suppressed when game-over modal is showing', () => {
+  it('calls preventDefault() on a contextmenu event fired while in GameOver state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Force the game into GameOver state (as _checkWinLose does when water runs out)
+    (hooks as unknown as { gameState: GameState }).gameState = GameState.GameOver;
+
+    // Simulate a contextmenu event (e.g. fired on the modal element instead of canvas)
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    const preventDefaultSpy = jest.spyOn(event, 'preventDefault');
+
+    hooks._handleCanvasRightClick(event);
+
+    expect(preventDefaultSpy).toHaveBeenCalled();
+  });
+});
+
 // ─── Tests: disconnection animations after reclaimTile ────────────────────────
 
 describe('Game – disconnection animations after reclaimTile', () => {

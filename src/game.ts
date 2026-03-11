@@ -511,13 +511,17 @@ export class Game {
 
     canvas.addEventListener('mousedown',    (e) => this._handleCanvasMouseDown(e));
     canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
-    canvas.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
     canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); this.hoverRotationDelta = 0; this.mouseCanvasPos = null; });
-    // Capture mouseup on window so a release outside the canvas still ends the drag.
-    // Game is a singleton for the lifetime of the page, so this listener is never removed
+    // Capture mouseup and contextmenu on window so a release (or the contextmenu event that
+    // follows) outside the canvas still ends the drag and suppresses the browser context menu.
+    // This is necessary because a right-click that triggers a fail-state causes the game-over
+    // modal to appear before the contextmenu event fires, making the modal the event target
+    // rather than the canvas.  Listening on window ensures preventDefault() is always called.
+    // Game is a singleton for the lifetime of the page, so these listeners are never removed
     // (same pattern as the document keydown/keyup listeners below).
     window.addEventListener('mouseup',      (e) => this._handleCanvasMouseUp(e));
+    window.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
     canvas.addEventListener('keydown',      (e) => this._handleKey(e));
     canvas.addEventListener('wheel',        (e) => this._handleCanvasWheel(e), { passive: false });
     document.addEventListener('keydown',    (e) => this._handleDocKeyDown(e));
