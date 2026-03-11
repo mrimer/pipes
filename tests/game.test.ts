@@ -73,7 +73,7 @@ function makeGame(): {
     </div>
     <div id="play-screen">
       <div id="level-header"></div>
-      <span id="water-display"></span>
+      <div id="water-display" class="stat-row"><span class="stat-label">💧 Water</span><span class="stat-value"></span></div>
       <div id="inventory-bar"></div>
       <button id="undo-btn"></button>
       <button id="redo-btn"></button>

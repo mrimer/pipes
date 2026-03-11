@@ -95,7 +95,7 @@
 
     /* ── Inventory bar ────────────────────────────────────────────── */
     #inventory-bar {
-      width: 140px;
+      min-width: 160px;
       background: #16213e;
       border: 2px solid #4a90d9;
       border-radius: 6px;
@@ -167,7 +167,8 @@
     }
 
     #stats-box {
-      width: 140px;
+      min-width: 160px;
+      width: max-content;
       background: #16213e;
       border: 2px solid #4a90d9;
       border-radius: 6px;
@@ -177,10 +178,21 @@
       gap: 6px;
     }
 
-    #water-display {
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
       font-size: 1.1rem;
       font-weight: bold;
+      white-space: nowrap;
+    }
+
+    #water-display {
       color: #7ed321;
+    }
+
+    .stat-value {
+      text-align: right;
     }
 
     /* ── HUD ──────────────────────────────────────────────────────── */
@@ -313,7 +325,10 @@
       <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
       <div id="right-panel">
         <div id="stats-box">
-          <span id="water-display">💧 Water: –</span>
+          <div id="water-display" class="stat-row">
+            <span class="stat-label">💧 Water</span>
+            <span class="stat-value">–</span>
+          </div>
         </div>
         <div id="inventory-bar"></div>
       </div>

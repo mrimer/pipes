@@ -180,6 +180,18 @@ export class Game {
   /** Element showing the current game Pressure (shown when pressure-relevant tiles are present). */
   private readonly pressureDisplayEl: HTMLElement;
 
+  /** Span holding the numeric value in the water stat row. */
+  private readonly waterValueEl: HTMLElement;
+
+  /** Span holding the numeric value in the temperature stat row. */
+  private readonly tempValueEl: HTMLElement;
+
+  /** Span holding the numeric value in the frozen stat row. */
+  private readonly frozenValueEl: HTMLElement;
+
+  /** Span holding the numeric value in the pressure stat row. */
+  private readonly pressureValueEl: HTMLElement;
+
   /** Box shown beneath the grid with level notes (when the level has a note). */
   private readonly noteBoxEl: HTMLElement;
 
@@ -275,22 +287,46 @@ export class Game {
       'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
     document.body.appendChild(this.tooltipEl);
 
-    // Create the frozen display element (inserted into the stats box after water display)
-    this.frozenDisplayEl = document.createElement('span');
-    this.frozenDisplayEl.style.cssText =
-      'display:none;font-size:1.1rem;font-weight:bold;color:#a8d8ea;';
+    // Grab the value span from the water stat row (its second child span)
+    this.waterValueEl = this.waterDisplayEl.querySelector('.stat-value') as HTMLElement;
+
+    // Create the frozen stat row (inserted into the stats box after water display)
+    this.frozenDisplayEl = document.createElement('div');
+    this.frozenDisplayEl.className = 'stat-row';
+    this.frozenDisplayEl.style.cssText = 'display:none;color:#a8d8ea;';
+    const frozenLabelEl = document.createElement('span');
+    frozenLabelEl.className = 'stat-label';
+    frozenLabelEl.textContent = '❄️ Frozen';
+    this.frozenValueEl = document.createElement('span');
+    this.frozenValueEl.className = 'stat-value';
+    this.frozenDisplayEl.appendChild(frozenLabelEl);
+    this.frozenDisplayEl.appendChild(this.frozenValueEl);
     this.waterDisplayEl.insertAdjacentElement('afterend', this.frozenDisplayEl);
 
-    // Create the temperature display element (inserted into the stats box after frozen display)
-    this.tempDisplayEl = document.createElement('span');
-    this.tempDisplayEl.style.cssText =
-      'display:none;font-size:1.1rem;font-weight:bold;color:#74b9ff;';
+    // Create the temperature stat row (inserted into the stats box after frozen display)
+    this.tempDisplayEl = document.createElement('div');
+    this.tempDisplayEl.className = 'stat-row';
+    this.tempDisplayEl.style.cssText = 'display:none;color:#74b9ff;';
+    const tempLabelEl = document.createElement('span');
+    tempLabelEl.className = 'stat-label';
+    tempLabelEl.textContent = '🌡️ Temp';
+    this.tempValueEl = document.createElement('span');
+    this.tempValueEl.className = 'stat-value';
+    this.tempDisplayEl.appendChild(tempLabelEl);
+    this.tempDisplayEl.appendChild(this.tempValueEl);
     this.frozenDisplayEl.insertAdjacentElement('afterend', this.tempDisplayEl);
 
-    // Create the pressure display element (inserted into the stats box after temp display)
-    this.pressureDisplayEl = document.createElement('span');
-    this.pressureDisplayEl.style.cssText =
-      'display:none;font-size:1.1rem;font-weight:bold;color:#a8e063;';
+    // Create the pressure stat row (inserted into the stats box after temp display)
+    this.pressureDisplayEl = document.createElement('div');
+    this.pressureDisplayEl.className = 'stat-row';
+    this.pressureDisplayEl.style.cssText = 'display:none;color:#a8e063;';
+    const pressureLabelEl = document.createElement('span');
+    pressureLabelEl.className = 'stat-label';
+    pressureLabelEl.textContent = '🔧 Pressure';
+    this.pressureValueEl = document.createElement('span');
+    this.pressureValueEl.className = 'stat-value';
+    this.pressureDisplayEl.appendChild(pressureLabelEl);
+    this.pressureDisplayEl.appendChild(this.pressureValueEl);
     this.tempDisplayEl.insertAdjacentElement('afterend', this.pressureDisplayEl);
 
     // Create the note box (appended to the play screen, shown beneath the grid)
@@ -743,7 +779,7 @@ export class Game {
   private _updateWaterDisplay(): void {
     if (!this.board) return;
     const w = this.board.getCurrentWater();
-    this.waterDisplayEl.textContent = `💧 Water: ${w}`;
+    this.waterValueEl.textContent = `${w}`;
     let waterColor: string;
     if (w <= 0)      waterColor = LOW_WATER_COLOR;
     else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
@@ -752,24 +788,24 @@ export class Game {
 
     if (this.board.hasTempRelevantTiles()) {
       const t = this.board.getCurrentTemperature();
-      this.tempDisplayEl.textContent = `🌡️ Temp: ${t}°`;
-      this.tempDisplayEl.style.display = 'block';
+      this.tempValueEl.textContent = `${t}°`;
+      this.tempDisplayEl.style.display = 'flex';
     } else {
       this.tempDisplayEl.style.display = 'none';
     }
 
     const f = this.board.frozen;
     if (f > 0) {
-      this.frozenDisplayEl.textContent = `❄️ Frozen: ${f}`;
-      this.frozenDisplayEl.style.display = 'block';
+      this.frozenValueEl.textContent = `${f}`;
+      this.frozenDisplayEl.style.display = 'flex';
     } else {
       this.frozenDisplayEl.style.display = 'none';
     }
 
     if (this.board.hasPressureRelevantTiles()) {
       const p = this.board.getCurrentPressure();
-      this.pressureDisplayEl.textContent = `🔧 Pressure: ${p}`;
-      this.pressureDisplayEl.style.display = 'block';
+      this.pressureValueEl.textContent = `${p}`;
+      this.pressureDisplayEl.style.display = 'flex';
     } else {
       this.pressureDisplayEl.style.display = 'none';
     }
