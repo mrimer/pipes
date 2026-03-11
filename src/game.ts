@@ -17,6 +17,7 @@ import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './tileAnimation';
 import { CampaignEditor, OFFICIAL_CAMPAIGN } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './confetti';
+import { spawnStarSparkles, clearStarSparkles } from './starSparkle';
 import {
   SourceSprayDrop, FlowDrop,
   spawnSourceSprayDrop, renderSourceSpray,
@@ -550,6 +551,7 @@ export class Game {
     this._clearModalSparkle(this._challengeModalEl);
     this._pendingLevelId = null;
     clearConfetti();
+    clearStarSparkles();
     // Clear particle arrays so stale drops don't persist on the level-select screen.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
@@ -602,6 +604,7 @@ export class Game {
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
+    clearStarSparkles();
     // Reset particle arrays so stale drops from a previous level don't carry over.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
@@ -967,6 +970,17 @@ export class Game {
       this._positionModalBelowCanvas(this.winModalEl);
       this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
       spawnConfetti();
+      // Spawn golden sparkles over the star icon in the win modal when stars were collected
+      if (starsCollected > 0 && this.winStarsEl) {
+        const winStarsEl = this.winStarsEl;
+        // Short delay so the modal finishes rendering and is positioned before
+        // getBoundingClientRect() is called.
+        const MODAL_SPARKLE_DELAY_MS = 150;
+        setTimeout(() => {
+          const rect = winStarsEl.getBoundingClientRect();
+          spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
+        }, MODAL_SPARKLE_DELAY_MS);
+      }
       return;
     }
   }
@@ -1566,6 +1580,12 @@ export class Game {
             text = parts.length > 0 ? parts.join(' ') : '+0';
             color = lockedImpact >= 0 ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
           }
+        } else if (tile.chamberContent === 'star') {
+          // Star tile connected – spawn golden sparkle burst from the tile centre
+          const starCx = c * TILE_SIZE + TILE_SIZE / 2;
+          const starCy = r * TILE_SIZE + TILE_SIZE / 2;
+          const canvasRect = this.canvas.getBoundingClientRect();
+          spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
         }
       }
 
@@ -2022,6 +2042,7 @@ export class Game {
     this.winModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     clearConfetti();
+    clearStarSparkles();
     // Clear win-flow drops since we're no longer in a won state.
     this._flowDrops = [];
     this._flowGoodDirs = null;
@@ -2145,6 +2166,7 @@ export class Game {
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
+    clearStarSparkles();
     // Reset particle arrays for the playtested level.
     this._sourceSprayDrops = [];
     this._flowDrops = [];

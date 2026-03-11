@@ -1029,6 +1029,8 @@ export function renderBoard(
         const py = hoverRow * TILE_SIZE;
         ctx.save();
         ctx.globalAlpha = 0.5;
+        ctx.shadowColor = '#ffff00';
+        ctx.shadowBlur = 14;
         drawTile(ctx, px, py, previewTile, false, currentWater);
         ctx.restore();
       }
@@ -1053,6 +1055,8 @@ export function renderBoard(
         const py = hoverRow * TILE_SIZE;
         ctx.save();
         ctx.globalAlpha = 0.5;
+        ctx.shadowColor = '#ffff00';
+        ctx.shadowBlur = 14;
         drawTile(ctx, px, py, previewTile, false, currentWater);
         ctx.restore();
       }
