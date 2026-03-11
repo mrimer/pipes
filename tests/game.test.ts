@@ -1507,6 +1507,71 @@ describe('Game – disconnection animations after reclaimTile', () => {
   });
 });
 
+// ─── Tests: disconnection animations after replaceInventoryTile ───────────────
+
+describe('Game – disconnection animations after replaceInventoryTile', () => {
+  it('spawns a "+1" animation for a pipe disconnected by replacing a connected pipe', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place Straight E-W at (0,1) – connects east from Source(0,0)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Place Straight E-W at (0,2) – extends the chain via (0,1)
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 2 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Clear animations from the placements above
+    hooks._animations.length = 0;
+
+    // Replace the Straight at (0,1) with a N-S orientation (rotation=0):
+    // it no longer connects East → (0,2) becomes disconnected.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Expect a "+1" disconnection animation for the now-disconnected pipe at (0,2)
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
+    expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
+  });
+
+  it('spawns a "+1" animation for the replaced tile position itself when the new tile is not connected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place Straight E-W at (0,1) – connects east from Source(0,0); no downstream tiles
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // Clear animations
+    hooks._animations.length = 0;
+
+    // Replace with Straight N-S (rotation=0) – it doesn't connect to Source's East,
+    // so the position itself is disconnected and the old tile's cost is reversed.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // The replaced position (0,1) was in the fill path before and is not after,
+    // so a "+1" disconnection animation is shown for the old tile's water cost reversal.
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
+    expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
+  });
+});
+
 // ─── Tests: redo spawns tile impact animations ────────────────────────────────
 
 describe('Game – performRedo spawns tile impact animations', () => {
