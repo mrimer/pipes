@@ -234,12 +234,13 @@ const CHAMBER_TYPES_WITH_LARGER_FONT: ReadonlySet<string> = new Set([
   'tank', 'dirt', 'heater', 'pump', 'snow', 'ice', 'star',
 ]);
 
-/** Draw text with a 1px black outline for better visibility on the editor grid. */
+/** Draw text with a soft dark shadow for better visibility on the editor grid. */
 function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = 1;
-  ctx.strokeText(text, x, y);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 3;
   ctx.fillText(text, x, y);
+  ctx.restore();
 }
 
 /** Simplified tile drawing for the editor canvas. */
