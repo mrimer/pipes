@@ -309,7 +309,7 @@ export class Game {
     this.tempDisplayEl.style.cssText = 'display:none;color:#74b9ff;';
     const tempLabelEl = document.createElement('span');
     tempLabelEl.className = 'stat-label';
-    tempLabelEl.textContent = '🌡️ Temp';
+    tempLabelEl.textContent = '🌡️ Temp °';
     this.tempValueEl = document.createElement('span');
     this.tempValueEl.className = 'stat-value';
     this.tempDisplayEl.appendChild(tempLabelEl);
@@ -788,7 +788,7 @@ export class Game {
 
     if (this.board.hasTempRelevantTiles()) {
       const t = this.board.getCurrentTemperature();
-      this.tempValueEl.textContent = `${t}°`;
+      this.tempValueEl.textContent = `${t}`;
       this.tempDisplayEl.style.display = 'flex';
     } else {
       this.tempDisplayEl.style.display = 'none';
