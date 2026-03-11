@@ -1,6 +1,5 @@
 /** Helpers for rendering the level-selection screen. */
 
-import { CHAPTERS } from './levels';
 import { ChapterDef } from './types';
 import { renderMinimap } from './minimap';
 
@@ -57,7 +56,9 @@ export function renderLevelList(
 ): void {
   levelListEl.innerHTML = '';
 
-  const chapters = campaignChapters ?? CHAPTERS;
+  // campaignChapters is always provided by game.ts (via OFFICIAL_CAMPAIGN or active campaign).
+  // The empty-array fallback guards against callers that omit the parameter.
+  const chapters = campaignChapters ?? [];
 
   // ── Active campaign header ─────────────────────────────────────────────────
   if (activeCampaign) {

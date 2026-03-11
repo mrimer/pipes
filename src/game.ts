@@ -1,6 +1,5 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
-import { LEVELS, CHAPTERS } from './levels';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
@@ -568,16 +567,12 @@ export class Game {
 
   /** Start (or restart) the given level. */
   startLevel(levelId: number): void {
-    // Look up the level in either the active campaign or the official levels
+    // Look up the level in either the active campaign or the official campaign chapters
     let level: LevelDef | undefined;
-    if (this._activeCampaign) {
-      for (const ch of this._activeCampaign.chapters) {
-        level = ch.levels.find((l) => l.id === levelId);
-        if (level) break;
-      }
-    }
-    if (!level) {
-      level = LEVELS.find((l) => l.id === levelId);
+    const searchCampaign = this._activeCampaign ?? OFFICIAL_CAMPAIGN;
+    for (const ch of searchCampaign.chapters) {
+      level = ch.levels.find((l) => l.id === levelId);
+      if (level) break;
     }
     if (!level) return;
 
@@ -629,8 +624,8 @@ export class Game {
 
   /** Update the level-header element with the current chapter, level number and name. */
   private _updateLevelHeader(levelId: number): void {
-    // Search active campaign chapters first, then fall back to official chapters
-    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    // Search active campaign chapters first, then fall back to official campaign chapters
+    const chapters = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters;
     for (let ci = 0; ci < chapters.length; ci++) {
       const chapter = chapters[ci];
       const idx = chapter.levels.findIndex((l) => l.id === levelId);
@@ -648,7 +643,8 @@ export class Game {
     }
     // Fallback if level isn't in any chapter
     this.currentChapterId = 0;
-    const level = LEVELS.find((l) => l.id === levelId);
+    const allLevels = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters.flatMap((ch) => ch.levels);
+    const level = allLevels.find((l) => l.id === levelId);
     this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}` : '';
   }
 
@@ -724,7 +720,7 @@ export class Game {
       author: displayCampaign.author,
       completionPct: pct,
     };
-    const campaignChapters = this._activeCampaign?.chapters;
+    const campaignChapters = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters;
     const levelStars = loadLevelStars(this._activeCampaign?.id);
     renderLevelList(
       this.levelListEl,
@@ -1929,7 +1925,7 @@ export class Game {
   /** Advance to the next level in the campaign/chapter sequence. */
   nextLevel(): void {
     if (!this.currentLevel) return;
-    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const chapters = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters;
     // Collect all levels in order
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const idx = allLevels.findIndex((l) => l.id === this.currentLevel!.id);
@@ -1970,7 +1966,7 @@ export class Game {
    * Use this instead of `startLevel()` when navigating from the level-select screen.
    */
   requestLevel(levelId: number): void {
-    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const chapters = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters;
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === levelId);
     if (level?.challenge) {
@@ -1992,7 +1988,7 @@ export class Game {
     this._clearModalSparkle(this._newChapterModalEl);
     if (this._pendingLevelId === null) return;
 
-    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const chapters = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters;
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === this._pendingLevelId);
     if (level?.challenge) {
@@ -2026,7 +2022,7 @@ export class Game {
     this._clearModalSparkle(this._challengeModalEl);
     if (this._pendingLevelId === null) { this.exitToMenu(); return; }
 
-    const chapters = this._activeCampaign ? this._activeCampaign.chapters : CHAPTERS;
+    const chapters = (this._activeCampaign ?? OFFICIAL_CAMPAIGN).chapters;
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const idx = allLevels.findIndex((l) => l.id === this._pendingLevelId);
     this._pendingLevelId = null;
@@ -2244,7 +2240,8 @@ export class Game {
         markCampaignLevelCompleted(this._activeCampaign.id, id, this._activeCampaignProgress);
       }
     } else {
-      markAllLevelsCompleted(this.completedLevels, LEVELS.map((l) => l.id));
+      const allIds = OFFICIAL_CAMPAIGN.chapters.flatMap((ch) => ch.levels.map((l) => l.id));
+      markAllLevelsCompleted(this.completedLevels, allIds);
     }
     this._renderLevelList();
   }
