@@ -1149,6 +1149,10 @@ export class Game {
     if (SPIN_PIPE_SHAPES.has(tile.shape)) {
       // Spinnable pipes are always rotated on click (cannot be replaced or removed).
       if (this.board.rotateTile(pos)) {
+        // Sync the pending placement rotation so the ghost image stays aligned.
+        if (this.selectedShape === tile.shape) {
+          this.pendingRotation = tile.rotation as Rotation;
+        }
         this.board.applyTurnDelta();
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
@@ -1188,6 +1192,10 @@ export class Game {
         ? this.board.rotateTileBy(pos, delta)
         : this.board.rotateTile(pos);
       if (rotated) {
+        // Sync the pending placement rotation so the ghost image stays aligned.
+        if (this.selectedShape === tile.shape) {
+          this.pendingRotation = tile.rotation as Rotation;
+        }
         this.board.applyTurnDelta();
         this.board.recordMove();
         this._spawnConnectionAnimations(filledBefore);
