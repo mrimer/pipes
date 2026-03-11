@@ -1356,13 +1356,34 @@ export class Game {
       const isConnected = lockedImpact !== null;
       if (isConnected &&
           (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')) {
-        // Show the locked effective cost that was frozen when the tile was connected
-        tooltipText += ` cost: ${Math.abs(lockedImpact)}`;
+        // Show the locked calculation text using the stats at the time this tile connected.
+        const lockedTemp = this.board.getLockedConnectTemp({ row, col }) ?? 0;
+        const lockedPressure = this.board.getLockedConnectPressure({ row, col }) ?? 1;
+        const lockedCost = Math.abs(lockedImpact);
+        if (tile.chamberContent === 'ice') {
+          const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
+          tooltipText += ` (${lockedDeltaTemp}° x ${tile.cost}) cost: ${lockedCost}`;
+        } else if (tile.chamberContent === 'snow') {
+          const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
+          const lockedEffectiveCost = lockedPressure >= 1 ? Math.ceil(tile.cost / lockedPressure) : tile.cost;
+          tooltipText += ` (${lockedDeltaTemp}° x ⌈${tile.cost}/${lockedPressure}P⌉=${lockedEffectiveCost}) cost: ${lockedCost}`;
+        } else {
+          // sandstone
+          const lockedDeltaDamage = lockedPressure - tile.hardness;
+          if (lockedDeltaDamage >= 1) {
+            const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
+            const lockedEffectiveCost = Math.ceil(tile.cost / lockedDeltaDamage);
+            tooltipText += ` (${lockedDeltaTemp}° x ⌈${tile.cost}/${lockedPressure}P-${tile.hardness}⌉=${lockedEffectiveCost}) cost: ${lockedCost}`;
+          } else {
+            tooltipText += ` cost: ${lockedCost}`;
+          }
+        }
       } else if (isConnected && tile.chamberContent === 'hot_plate') {
         const lockedGain = this.board.getLockedHotPlateGain({ row, col });
+        const lockedTemp = this.board.getLockedConnectTemp({ row, col }) ?? 0;
         if (lockedGain !== null) {
           const loss = Math.max(0, lockedGain - lockedImpact);
-          tooltipText += ` (+${lockedGain} -${loss})`;
+          tooltipText += ` (${tile.temperature}+${lockedTemp}° x ${tile.cost}) (+${lockedGain} -${loss})`;
         }
       } else if (!isConnected) {
         let predictedCost: number | null = null;
