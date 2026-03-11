@@ -2766,6 +2766,21 @@ describe('Chamber tile (snow content)', () => {
     const impact = board.getLockedWaterImpact({ row: 0, col: 1 });
     expect(impact).toBe(-5);
   });
+
+  it('getLockedConnectTemp and getLockedConnectPressure record stats at connection time', () => {
+    // sourceTemp=3, source pressure=1, pump pressure=2: pressure=3, cost=3, temp=5
+    const board = makeBoard(30, 3, 5, 3, 2);
+    board.initHistory();
+    expect(board.getLockedConnectTemp({ row: 0, col: 1 })).toBe(3);
+    expect(board.getLockedConnectPressure({ row: 0, col: 1 })).toBe(3);
+  });
+
+  it('getLockedConnectTemp returns null for an unconnected tile', () => {
+    const board = makeBoard(30, 3, 5, 0);
+    // Do NOT call initHistory so no tile is evaluated yet.
+    expect(board.getLockedConnectTemp({ row: 0, col: 1 })).toBeNull();
+    expect(board.getLockedConnectPressure({ row: 0, col: 1 })).toBeNull();
+  });
 });
 
 
@@ -3795,6 +3810,13 @@ describe('Chamber tile (hot_plate content)', () => {
     expect(impact).toBe(-6);
     expect(board.getLockedHotPlateGain({ row: 0, col: 1 })).toBe(0);
     expect(board.getCurrentWater()).toBe(4);
+  });
+
+  it('getLockedConnectTemp records the board temperature at hot_plate connection time', () => {
+    // sourceTemp=2, mass=2, temp=3: effectiveCost=2*(3+2)=10
+    const board = makeDynamicBoard(20, 2, 3, 2, 0);
+    board.initHistory();
+    expect(board.getLockedConnectTemp({ row: 0, col: 1 })).toBe(2);
   });
 
   it('applyTurnDelta locks hot_plate impact when ice seeds frozen first', () => {

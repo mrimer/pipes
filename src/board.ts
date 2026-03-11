@@ -57,6 +57,16 @@ type Snapshot = {
    * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
    */
   hotPlateWaterGain: Map<string, number>;
+  /**
+   * The board temperature at the time each tile first connected, keyed by "row,col".
+   * Used to reconstruct the calculation text in the tile tooltip for connected tiles.
+   */
+  lockedConnectTemp: Map<string, number>;
+  /**
+   * The board pressure at the time each tile first connected, keyed by "row,col".
+   * Used to reconstruct the calculation text in the tile tooltip for connected tiles.
+   */
+  lockedConnectPressure: Map<string, number>;
 };
 
 /**
@@ -158,6 +168,18 @@ export class Board {
    * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
    */
   private _hotPlateWaterGain: Map<string, number> = new Map();
+
+  /**
+   * The board temperature recorded when each tile first connected, keyed by "row,col".
+   * Used to reconstruct the locked calculation text shown in tile tooltips.
+   */
+  private _lockedConnectTemp: Map<string, number> = new Map();
+
+  /**
+   * The board pressure recorded when each tile first connected, keyed by "row,col".
+   * Used to reconstruct the locked calculation text shown in tile tooltips.
+   */
+  private _lockedConnectPressure: Map<string, number> = new Map();
 
   /** Full move history for undo/redo support. history[0] is the initial state. */
   private _history: Snapshot[] = [];
@@ -270,6 +292,8 @@ export class Board {
     this._turnNumber = 0;
     this._connectionTurn = new Map();
     this._hotPlateWaterGain = new Map();
+    this._lockedConnectTemp = new Map();
+    this._lockedConnectPressure = new Map();
     this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
@@ -365,6 +389,8 @@ export class Board {
       turnNumber: this._turnNumber,
       connectionTurn: new Map(this._connectionTurn),
       hotPlateWaterGain: new Map(this._hotPlateWaterGain),
+      lockedConnectTemp: new Map(this._lockedConnectTemp),
+      lockedConnectPressure: new Map(this._lockedConnectPressure),
     };
   }
 
@@ -385,6 +411,8 @@ export class Board {
     this._turnNumber = snap.turnNumber;
     this._connectionTurn = new Map(snap.connectionTurn);
     this._hotPlateWaterGain = new Map(snap.hotPlateWaterGain);
+    this._lockedConnectTemp = new Map(snap.lockedConnectTemp);
+    this._lockedConnectPressure = new Map(snap.lockedConnectPressure);
   }
 
   /**
@@ -968,6 +996,8 @@ export class Board {
         }
         this._lockedWaterImpact.delete(key);
         this._connectionTurn.delete(key);
+        this._lockedConnectTemp.delete(key);
+        this._lockedConnectPressure.delete(key);
       }
     }
 
@@ -1039,6 +1069,9 @@ export class Board {
             this._lockedWaterImpact.set(key, newImpact);
             this.lastLockedCostChanges.push({ row: r, col: c, delta: newImpact - oldImpact });
           }
+          // Always update the locked stats so the tooltip formula stays consistent with the cost.
+          this._lockedConnectTemp.set(key, effectiveTemp);
+          this._lockedConnectPressure.set(key, effectivePressure);
           continue; // Frozen and impact already updated above.
         } else {
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
@@ -1052,6 +1085,9 @@ export class Board {
           this._lockedWaterImpact.set(key, newImpact);
           this.lastLockedCostChanges.push({ row: r, col: c, delta: newImpact - oldImpact });
         }
+        // Always update the locked stats so the tooltip formula stays consistent with the cost.
+        this._lockedConnectTemp.set(key, effectiveTemp);
+        this._lockedConnectPressure.set(key, effectivePressure);
       }
     }
 
@@ -1110,6 +1146,9 @@ export class Board {
 
       this._lockedWaterImpact.set(key, impact);
       this._connectionTurn.set(key, this._turnNumber);
+      // Record the temperature and pressure at connect time for tooltip reconstruction.
+      this._lockedConnectTemp.set(key, currentTemp);
+      this._lockedConnectPressure.set(key, currentPressure);
     }
   }
 
@@ -1133,6 +1172,28 @@ export class Board {
   getLockedHotPlateGain(pos: GridPos): number | null {
     const key = `${pos.row},${pos.col}`;
     const val = this._hotPlateWaterGain.get(key);
+    return val !== undefined ? val : null;
+  }
+
+  /**
+   * Return the board temperature that was recorded when the tile at the given position
+   * first connected, or `null` if that tile has not yet been evaluated.
+   * Used by the UI to reconstruct the locked calculation text in tile tooltips.
+   */
+  getLockedConnectTemp(pos: GridPos): number | null {
+    const key = `${pos.row},${pos.col}`;
+    const val = this._lockedConnectTemp.get(key);
+    return val !== undefined ? val : null;
+  }
+
+  /**
+   * Return the board pressure that was recorded when the tile at the given position
+   * first connected, or `null` if that tile has not yet been evaluated.
+   * Used by the UI to reconstruct the locked calculation text in tile tooltips.
+   */
+  getLockedConnectPressure(pos: GridPos): number | null {
+    const key = `${pos.row},${pos.col}`;
+    const val = this._lockedConnectPressure.get(key);
     return val !== undefined ? val : null;
   }
 
