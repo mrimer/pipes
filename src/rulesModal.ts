@@ -161,7 +161,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: colorSwatch(HOT_PLATE_COLOR),
     name: 'Chamber — Hot Plate',
-    description: 'Consumes water based on mass and temperature. Effective cost = mass × (boiling temp° − current temp°). First drains frozen water (restoring it to liquid); remaining cost draws from regular water. Boiling temp is displayed as (100 + temp)°.',
+    description: 'Consumes water based on mass and temperature. Effective cost = mass × (boiling temp° − current temp°). First drains frozen water (restoring it to liquid); remaining cost draws from regular water. Boiling temp is displayed as temp°.',
   },
   {
     iconHtml: colorSwatch(STAR_COLOR),
