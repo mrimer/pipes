@@ -1358,6 +1358,10 @@ export class CampaignEditor {
           this._editorParams.hardness = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
+        panel.appendChild(this._labeledInput('Shatter', String(this._editorParams.shatter), (v) => {
+          this._editorParams.shatter = Math.max(0, parseInt(v) || 0);
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
       }
       if (cc === 'pump') {
         panel.appendChild(this._labeledInput('Pressure', String(this._editorParams.pressure), (v) => {
@@ -1982,6 +1986,7 @@ export class CampaignEditor {
     if (def.temperature !== undefined) this._editorParams.temperature = def.temperature;
     if (def.pressure !== undefined) this._editorParams.pressure = def.pressure;
     if (def.hardness !== undefined) this._editorParams.hardness = def.hardness;
+    if (def.shatter !== undefined) this._editorParams.shatter = def.shatter;
     if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
     if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
     if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
@@ -2137,7 +2142,7 @@ export class CampaignEditor {
       if (cc === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'pump') def.pressure = p.pressure;
       if (cc === 'snow') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; }
+      if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; if (p.shatter !== 0) def.shatter = p.shatter; }
       if (cc === 'hot_plate') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
     }

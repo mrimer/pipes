@@ -118,6 +118,13 @@ export class Tile {
   hardness: number;
 
   /**
+   * Shatter value. For Chamber-sandstone tiles: when Shatter > Hardness and
+   * Pressure >= Shatter, the tile's effective cost is overridden to 0.
+   * Only meaningful when Shatter > Hardness.  Defaults to 0 (inactive).
+   */
+  shatter: number;
+
+  /**
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
@@ -130,8 +137,9 @@ export class Tile {
    * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/Snow/Sandstone/Hot Plate (cost factor).
    * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
+   * @param shatter - Shatter value for Sandstone tiles. When > Hardness and Pressure >= Shatter, effective cost is 0. Defaults to 0.
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0, shatter = 0) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
@@ -144,6 +152,7 @@ export class Tile {
     this.temperature = temperature;
     this.pressure = pressure;
     this.hardness = hardness;
+    this.shatter = shatter;
   }
 
   /** Return a deep copy of this tile. */
@@ -161,6 +170,7 @@ export class Tile {
       this.temperature,
       this.pressure,
       this.hardness,
+      this.shatter,
     );
   }
 

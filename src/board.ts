@@ -237,7 +237,7 @@ export class Board {
           // Spinnable pipes are not fixed so the player can rotate them, but they
           // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
           const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
-          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0);
+          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0);
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {
@@ -914,12 +914,16 @@ export class Board {
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           pipeCost += (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
         } else if (tile.chamberContent === 'sandstone') {
-          const deltaDamage = currentPressure - tile.hardness;
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
-          pipeCost += deltaDamage >= 1
-            ? Math.ceil(tile.cost / deltaDamage) * deltaTemp
-            : this.sourceCapacity + 1;
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+          if (!shatterOverride) {
+            const deltaDamage = currentPressure - tile.hardness;
+            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+            // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
+            pipeCost += deltaDamage >= 1
+              ? Math.ceil(tile.cost / deltaDamage) * deltaTemp
+              : this.sourceCapacity + 1;
+          }
         } else if (tile.chamberContent === 'hot_plate') {
           const effectiveCost = tile.cost * (tile.temperature + currentTemp);
           const waterGain = Math.min(this.frozen, effectiveCost);
@@ -1039,9 +1043,13 @@ export class Board {
         } else if (tile.chamberContent === 'sandstone') {
           // Use historically-limited pressure so no tile benefits retroactively from
           // a pump that connected after it – consistent with ice and snow.
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && effectivePressure >= tile.shatter;
           const deltaDamage = effectivePressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
-          if (deltaDamage >= 1) {
+          if (shatterOverride) {
+            newImpact = 0;
+          } else if (deltaDamage >= 1) {
             newImpact = -(Math.ceil(tile.cost / deltaDamage) * deltaTemp);
           } else {
             // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
@@ -1120,10 +1128,15 @@ export class Board {
           impact = -(effectiveCost * deltaTemp);
           this.frozen += effectiveCost * deltaTemp;
         } else if (tile.chamberContent === 'sandstone') {
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
           const deltaDamage = currentPressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
-          if (deltaDamage >= 1) {
+          if (shatterOverride) {
+            impact = 0;
+            // No frozen water consumed when shatter overrides to zero cost.
+          } else if (deltaDamage >= 1) {
+            // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
             const effectiveCost = Math.ceil(tile.cost / deltaDamage);
             impact = -(effectiveCost * deltaTemp);
             this.frozen += effectiveCost * deltaTemp;

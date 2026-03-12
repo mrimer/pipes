@@ -224,6 +224,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     def.temperature ?? 0,
     def.pressure ?? 0,
     def.hardness ?? 0,
+    def.shatter ?? 0,
   );
 
   drawTileOnEditor(ctx, x, y, tile);
@@ -317,7 +318,8 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       strokeFillText(ctx, 'SANDSTONE', cx, cy - 10);
       ctx.font = '10px Arial';
       strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 2);
-      strokeFillText(ctx, `H:${tile.hardness}`, cx, cy + 13);
+      const shatterActive = tile.shatter > tile.hardness;
+      strokeFillText(ctx, shatterActive ? `H:${tile.hardness} S:${tile.shatter}` : `H:${tile.hardness}`, cx, cy + 13);
     } else {
       let displayLabel: string;
       if (isNegHeater) displayLabel = 'COOLER';
