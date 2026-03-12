@@ -15,6 +15,12 @@ import { TILE_SIZE } from './renderer';
 
 /** Maximum CSS display size (px) for the editor canvas on either axis. */
 const MAX_EDITOR_CANVAS_PX = 512;
+/** Horizontal padding (px) of the main editor layout container. */
+const EDITOR_LAYOUT_PADDING = 16;
+/** Gap (px) between flex columns in the main editor layout. */
+const EDITOR_LAYOUT_GAP = 16;
+/** Border width (px) on each side of the editor canvas. */
+const EDITOR_CANVAS_BORDER = 3;
 import { Board, PIPE_SHAPES } from './board';
 import {
   EditorPalette,
@@ -101,6 +107,8 @@ export class CampaignEditor {
   private _linkedTileDirty = false;
   /** True when the level editor has unsaved changes (any snapshot recorded after initial open). */
   private _editorUnsavedChanges = false;
+  /** The outermost flex container of the level editor layout, used to measure available canvas space. */
+  private _editorMainLayout: HTMLElement | null = null;
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
@@ -812,8 +820,8 @@ export class CampaignEditor {
     // ── Main editor layout ─────────────────────────────────────────────────
     const mainLayout = document.createElement('div');
     mainLayout.style.cssText =
-      'width:100%;max-width:1200px;padding:16px;box-sizing:border-box;display:flex;' +
-      'gap:16px;align-items:flex-start;flex-wrap:wrap;';
+      `width:100%;max-width:1200px;padding:${EDITOR_LAYOUT_PADDING}px;box-sizing:border-box;display:flex;` +
+      `gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;flex-wrap:wrap;`;
 
     // ── Left column: palette + params ──────────────────────────────────────
     const leftCol = document.createElement('div');
@@ -823,7 +831,6 @@ export class CampaignEditor {
     if (!readOnly) {
       leftCol.appendChild(this._buildPalette());
       leftCol.appendChild(this._buildParamPanel());
-      leftCol.appendChild(this._buildGridSizePanel());
     }
 
     // ── Middle column: canvas ──────────────────────────────────────────────
@@ -859,7 +866,7 @@ export class CampaignEditor {
     canvas.width  = this._editCols * TILE_SIZE;
     canvas.height = this._editRows * TILE_SIZE;
     canvas.style.cssText =
-      'border:3px solid #4a90d9;border-radius:4px;cursor:' + (readOnly ? 'default' : 'crosshair') + ';' +
+      `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:4px;cursor:` + (readOnly ? 'default' : 'crosshair') + ';' +
       'display:block;';
     this._editorCanvas = canvas;
     this._updateCanvasDisplaySize();
@@ -1030,14 +1037,20 @@ export class CampaignEditor {
 
     if (!readOnly) {
       rightCol.appendChild(this._buildInventoryEditor());
+      rightCol.appendChild(this._buildGridSizePanel());
     } else {
       rightCol.appendChild(this._buildInventoryReadonly());
     }
 
+    this._editorMainLayout = mainLayout;
     mainLayout.appendChild(leftCol);
     mainLayout.appendChild(midCol);
     mainLayout.appendChild(rightCol);
     this._el.appendChild(mainLayout);
+
+    // Re-compute canvas display size now that the layout is in the DOM, so the
+    // board can fill any available horizontal space.
+    this._updateCanvasDisplaySize();
 
     // Initial render
     this._renderEditorCanvas();
@@ -1434,7 +1447,7 @@ export class CampaignEditor {
     const panel = document.createElement('div');
     panel.style.cssText =
       'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
-      'display:flex;flex-direction:column;gap:8px;';
+      'display:flex;flex-direction:column;gap:8px;min-width:180px;';
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
@@ -2014,12 +2027,46 @@ export class CampaignEditor {
     return { row, col };
   }
 
-  /** Set the canvas CSS display size so the grid fits within MAX_EDITOR_CANVAS_PX. */
+  /** Set the canvas CSS display size so the grid fills available space up to its intrinsic size.
+   *
+   * When the editor main layout is in the DOM we measure the actual horizontal space
+   * remaining after the side columns, allowing the board to grow beyond
+   * MAX_EDITOR_CANVAS_PX whenever the viewport has room.  Falls back to
+   * MAX_EDITOR_CANVAS_PX when the layout has not yet been attached (e.g. on the
+   * first call made during _showLevelEditor before mainLayout is inserted).
+   */
   private _updateCanvasDisplaySize(): void {
     if (!this._editorCanvas) return;
     const intrinsicW = this._editCols * TILE_SIZE;
     const intrinsicH = this._editRows * TILE_SIZE;
-    const scale = Math.min(1.0, MAX_EDITOR_CANVAS_PX / Math.max(intrinsicW, intrinsicH));
+
+    // Determine the maximum pixel width the canvas may occupy.
+    let maxPx = MAX_EDITOR_CANVAS_PX;
+    if (this._editorMainLayout) {
+      const layoutW = this._editorMainLayout.clientWidth;
+      // Sum the widths of all flex children that do NOT contain the canvas
+      // (i.e., the left and right side columns).
+      let otherW = 0;
+      let colCount = 0;
+      for (const child of this._editorMainLayout.children) {
+        if (!child.contains(this._editorCanvas)) {
+          otherW += (child as HTMLElement).offsetWidth;
+          colCount++;
+        }
+      }
+      // Available width = layout width
+      //   − side-column widths
+      //   − inter-column gaps  (EDITOR_LAYOUT_GAP × number of non-canvas columns)
+      //   − layout's own horizontal padding (EDITOR_LAYOUT_PADDING × 2)
+      //   − canvas border     (EDITOR_CANVAS_BORDER × 2 sides)
+      const availableW =
+        layoutW - otherW - colCount * EDITOR_LAYOUT_GAP - 2 * EDITOR_LAYOUT_PADDING - 2 * EDITOR_CANVAS_BORDER;
+      if (availableW > maxPx) {
+        maxPx = availableW;
+      }
+    }
+
+    const scale = Math.min(1.0, maxPx / Math.max(intrinsicW, intrinsicH));
     this._editorCanvas.style.width  = Math.round(intrinsicW * scale) + 'px';
     this._editorCanvas.style.height = Math.round(intrinsicH * scale) + 'px';
   }
