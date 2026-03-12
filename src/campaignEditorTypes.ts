@@ -40,6 +40,7 @@ export interface TileParams {
   temperature: number;
   pressure: number;
   hardness: number;
+  shatter: number;
   chamberContent: ChamberContent;
   itemShape: PipeShape;
   itemCount: number;
@@ -53,6 +54,7 @@ export const DEFAULT_PARAMS: TileParams = {
   temperature: 0,
   pressure: 0,
   hardness: 0,
+  shatter: 0,
   chamberContent: 'tank',
   itemShape: PipeShape.Straight,
   itemCount: 1,

@@ -3155,6 +3155,185 @@ describe('Chamber tile (sandstone content)', () => {
   });
 });
 
+// ─── Chamber tile (sandstone shatter) ────────────────────────────────────────
+
+describe('Chamber tile (sandstone shatter)', () => {
+  /**
+   * Build: Source(cap,pressure=basePressure) → Sandstone(cost,temp,hardness,shatter) → [Pump(pumpP)?] → Sink
+   * All tiles pre-connected (fixed); no player-placed pipes needed.
+   */
+  function makeShatterBoard(
+    cap: number, cost: number, thresholdTemp: number, hardness: number, shatter: number,
+    basePressure = 1, pumpPressure = 0,
+  ): Board {
+    const hasPump = pumpPressure > 0;
+    const cols = hasPump ? 4 : 3;
+    const b = new Board(1, cols);
+    b.source = { row: 0, col: 0 };
+    b.sink   = { row: 0, col: cols - 1 };
+    b.sourceCapacity = cap;
+    b.grid[0][0] = new Tile(PipeShape.Source, 0, true, cap, 0, null, 1, null, null, 0, basePressure);
+    // Pass shatter as the 13th constructor argument
+    b.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, cost, null, 1, null, 'sandstone', thresholdTemp, 0, hardness, shatter);
+    if (hasPump) {
+      b.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, pumpPressure);
+    }
+    b.grid[0][cols - 1] = new Tile(PipeShape.Sink, 0, true);
+    return b;
+  }
+
+  it('shatter <= hardness: ignored, normal cost applies', () => {
+    // hardness=3, shatter=3 (shatter not > hardness → inactive): pressure=4, deltaDamage=4-3=1
+    // cost=2, temp=5, deltaTemp=5: effective=ceil(2/1)*5=10
+    const b = makeShatterBoard(30, 2, 5, 3, 3, 4);
+    expect(b.getCurrentWater()).toBe(20); // 30−10=20
+  });
+
+  it('shatter=0: inactive regardless of hardness', () => {
+    // shatter=0 <= hardness=2 → inactive; pressure=3, deltaDamage=3-2=1, cost=2, temp=3, deltaTemp=3: effective=6
+    const b = makeShatterBoard(20, 2, 3, 2, 0, 3);
+    expect(b.getCurrentWater()).toBe(14);
+  });
+
+  it('shatter > hardness and pressure >= shatter: effective cost is 0', () => {
+    // hardness=1, shatter=3, pressure=4 (>=3): shatter override → cost=0
+    const b = makeShatterBoard(20, 4, 5, 1, 3, 4);
+    expect(b.getCurrentWater()).toBe(20); // no cost
+  });
+
+  it('shatter > hardness but pressure < shatter: normal cost applies', () => {
+    // hardness=1, shatter=5, pressure=3 (<5): shatter inactive; deltaDamage=3-1=2
+    // cost=4, temp=3, deltaTemp=3: effective=ceil(4/2)*3=6
+    const b = makeShatterBoard(20, 4, 3, 1, 5, 3);
+    expect(b.getCurrentWater()).toBe(14); // 20−6=14
+  });
+
+  it('applyTurnDelta: locks cost at 0 when shatter active at connection time', () => {
+    // hardness=1, shatter=3, pressure=1+3=4 (>=3 via pump): shatter override → impact=0
+    const b = makeShatterBoard(30, 4, 5, 1, 3, 1, 3);
+    b.initHistory();
+    b.applyTurnDelta();
+    expect(b.getLockedWaterImpact({ row: 0, col: 1 })).toBe(0);
+    expect(b.getCurrentWater()).toBe(30); // no water cost
+  });
+
+  it('applyTurnDelta: locks normal cost when shatter > hardness but pressure < shatter', () => {
+    // hardness=1, shatter=5, pressure=3 (<5): normal cost; deltaDamage=3-1=2, cost=6, temp=1, deltaTemp=1
+    // effective=ceil(6/2)*1=3
+    const b = makeShatterBoard(20, 6, 1, 1, 5, 3);
+    b.initHistory();
+    b.applyTurnDelta();
+    expect(b.getLockedWaterImpact({ row: 0, col: 1 })).toBe(-3);
+    expect(b.getCurrentWater()).toBe(17);
+  });
+
+  it('re-evaluation: pump disconnect below shatter is blocked by constraint when deltaDamage would drop to 0', () => {
+    // Layout (3 rows × 4 cols):
+    //   Source[E,S,P=1] → (0,1) empty → Sandstone[W,E,H=1,S=3,cost=2,temp=1] → Sink[W]
+    //       ↓
+    //   (1,0) empty  (player places N-S Straight)
+    //       ↓
+    //   Pump[N,P=3]
+    //
+    // hardness=1, shatter=3.  After pump connects: pressure=4 >= shatter → shatter override.
+    // Reclaiming pump connector: historical pressure for sandstone = 1, deltaDamage=1-1=0 ≤ 0 → blocked.
+    const b = new Board(3, 4);
+    b.source = { row: 0, col: 0 };
+    b.sink   = { row: 0, col: 3 };
+    b.sourceCapacity = 30;
+    b.grid[0][0] = new Tile(PipeShape.Source, 0, true, 30, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0, 1);
+    b.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    b.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, new Set([Direction.West, Direction.East]), 'sandstone', 1, 0, 1, 3);
+    b.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    b.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    b.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 3);
+    for (const [r, c] of [[1,1],[1,2],[1,3],[2,1],[2,2],[2,3]]) b.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    b.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    b.initHistory();
+
+    // Turn 1: Connect pump via N-S pipe at (1,0) → pressure=4
+    b.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(4);
+
+    // Turn 2: Connect sandstone via E-W pipe at (0,1) → pressure=4 >= shatter=3 → impact=0
+    b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(0);
+
+    // Attempt reclaim (1,0): historical pressure → 1, deltaDamage=1-1=0 → blocked
+    const result = b.reclaimTile({ row: 1, col: 0 });
+    expect(result).toBe(false);
+    expect(b.lastError).toMatch(/Cannot disconnect pressure tiles/);
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(0);
+  });
+
+  it('re-evaluation: cost becomes non-zero when pump disconnect drops pressure between hardness and shatter', () => {
+    // Layout (3 rows × 4 cols):
+    //   Source[E,S,P=1] → (0,1) empty → Sandstone[W,E,H=0,S=3,cost=2,temp=1] → Sink[W]
+    //       ↓
+    //   (1,0) empty  (player places N-S Straight)
+    //       ↓
+    //   Pump[N,P=3]
+    //
+    // hardness=0, shatter=3.  After pump connects: pressure=4 >= shatter=3 → shatter override → impact=0.
+    // After reclaiming pump connector (1,0): pressure drops to 1 < shatter=3.
+    // Historical constraint: deltaDamage=1-0=1 > 0 → allowed.
+    // Re-evaluation: effectivePressure=1, shatterOverride=false, deltaDamage=1, deltaTemp=1.
+    // newImpact = -(ceil(2/1)*1) = -2.
+    const b = new Board(3, 4);
+    b.source = { row: 0, col: 0 };
+    b.sink   = { row: 0, col: 3 };
+    b.sourceCapacity = 30;
+    b.grid[0][0] = new Tile(PipeShape.Source, 0, true, 30, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0, 1);
+    b.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    b.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, new Set([Direction.West, Direction.East]), 'sandstone', 1, 0, 0, 3);
+    b.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    b.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    b.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 3);
+    for (const [r, c] of [[1,1],[1,2],[1,3],[2,1],[2,2],[2,3]]) b.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    b.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    b.initHistory();
+
+    // Turn 1: Connect pump via N-S pipe at (1,0) → pressure=4
+    b.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getCurrentPressure()).toBe(4);
+
+    // Turn 2: Connect sandstone via E-W pipe at (0,1) → pressure=4 >= shatter=3 → impact=0
+    b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    b.applyTurnDelta();
+    b.recordMove();
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(0);
+    expect(b.getCurrentWater()).toBe(28); // 30 - 2 pipes = 28 (sandstone free due to shatter)
+
+    // Reclaim (1,0): pressure drops to 1 < shatter=3; deltaDamage=1-0=1 > 0 → allowed
+    const result = b.reclaimTile({ row: 1, col: 0 });
+    expect(result).toBe(true);
+    b.applyTurnDelta();
+    b.recordMove();
+
+    // Re-evaluation: effectivePressure=1, shatterOverride=false, deltaDamage=1, deltaTemp=1
+    // newImpact = -(ceil(2/1)*1) = -2
+    expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2);
+    // Water: 30 - pipe(0,1)=1 - sandstone=2 = 27 (pump pipe reclaimed adds back 1, but sandstone now costs 2)
+    expect(b.getCurrentWater()).toBe(27);
+  });
+
+  it('getTileDisplayName includes S=value when shatter > hardness', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, null, 'sandstone', 3, 0, 1, 5);
+    expect(getTileDisplayName(tile)).toBe('Sandstone -3° x 2 (H=1, S=5)');
+  });
+
+  it('getTileDisplayName omits S=value when shatter <= hardness', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1, null, 'sandstone', 3, 0, 3, 2);
+    expect(getTileDisplayName(tile)).toBe('Sandstone -3° x 2 (H=3)');
+  });
+});
+
 // ─── Ambient decorations ──────────────────────────────────────────────────────
 
 describe('Board ambientDecorations', () => {

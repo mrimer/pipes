@@ -156,7 +156,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: colorSwatch(SANDSTONE_COLOR),
     name: 'Chamber — Sandstone',
-    description: 'Like Snow, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness.',
+    description: 'Like Snow, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness. When a Shatter value (> Hardness) is set and Pressure ≥ Shatter, the tile has no cost.',
   },
   {
     iconHtml: colorSwatch(HOT_PLATE_COLOR),

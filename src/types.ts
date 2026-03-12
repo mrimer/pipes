@@ -116,6 +116,13 @@ export interface TileDef {
    */
   hardness?: number;
   /**
+   * Shatter value for Chamber-sandstone tiles (optional).
+   * Only active when Shatter > Hardness.  When active and Pressure >= Shatter,
+   * the tile's effective cost is overridden to 0 (the Mass/Pressure ratio is ignored).
+   * Defaults to 0 (inactive).
+   */
+  shatter?: number;
+  /**
    * Explicit set of open connection directions for Source, Sink, and Chamber tiles.
    * When provided, overrides the default (all four sides).
    */

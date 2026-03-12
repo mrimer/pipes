@@ -1392,13 +1392,19 @@ export class Game {
           tooltipText += ` (${lockedDeltaTemp}° x ⌈${tile.cost}/${lockedPressure}P⌉=${lockedEffectiveCost}) cost: ${lockedCost}`;
         } else {
           // sandstone
-          const lockedDeltaDamage = lockedPressure - tile.hardness;
-          if (lockedDeltaDamage >= 1) {
-            const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
-            const lockedEffectiveCost = Math.ceil(tile.cost / lockedDeltaDamage);
-            tooltipText += ` (${lockedDeltaTemp}° x ⌈${tile.cost}/${lockedPressure}P-${tile.hardness}⌉=${lockedEffectiveCost}) cost: ${lockedCost}`;
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && lockedPressure >= tile.shatter;
+          if (shatterOverride) {
+            tooltipText += ` [(${lockedPressure})P >= (${tile.shatter})S]`;
           } else {
-            tooltipText += ` cost: ${lockedCost}`;
+            const lockedDeltaDamage = lockedPressure - tile.hardness;
+            if (lockedDeltaDamage >= 1) {
+              const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
+              const lockedEffectiveCost = Math.ceil(tile.cost / lockedDeltaDamage);
+              tooltipText += ` (${lockedDeltaTemp}° x ⌈${tile.cost}/${lockedPressure}P-${tile.hardness}⌉=${lockedEffectiveCost}) cost: ${lockedCost}`;
+            } else {
+              tooltipText += ` cost: ${lockedCost}`;
+            }
           }
         }
       } else if (isConnected && tile.chamberContent === 'hot_plate') {
@@ -1429,14 +1435,21 @@ export class Game {
         } else if (tile.chamberContent === 'sandstone') {
           const currentTemp = this.board.getCurrentTemperature();
           const currentPressure = this.board.getCurrentPressure();
-          const deltaDamage = currentPressure - tile.hardness;
-          if (deltaDamage <= 0) {
-            tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+          if (shatterOverride) {
+            tooltipText += ` [(${currentPressure})P >= (${tile.shatter})S]`;
+            predictedCost = 0;
           } else {
-            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-            const effectiveCost = Math.ceil(tile.cost / deltaDamage);
-            tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}P-${tile.hardness}⌉=${effectiveCost})`;
-            predictedCost = effectiveCost * deltaTemp;
+            const deltaDamage = currentPressure - tile.hardness;
+            if (deltaDamage <= 0) {
+              tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
+            } else {
+              const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+              const effectiveCost = Math.ceil(tile.cost / deltaDamage);
+              tooltipText += ` (${deltaTemp}° x ⌈${tile.cost}/${currentPressure}P-${tile.hardness}⌉=${effectiveCost})`;
+              predictedCost = effectiveCost * deltaTemp;
+            }
           }
         } else if (tile.chamberContent === 'hot_plate') {
           const currentTemp = this.board.getCurrentTemperature();
@@ -1568,11 +1581,18 @@ export class Game {
           text = val < 0 ? `${val}` : '-0';
           color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
         } else if (tile.chamberContent === 'sandstone') {
-          const deltaDamage = currentPressure - tile.hardness;
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
-          text = val < 0 ? `${val}` : '-0';
-          color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+          if (shatterOverride) {
+            text = '-0';
+            color = ANIM_ZERO_COLOR;
+          } else {
+            const deltaDamage = currentPressure - tile.hardness;
+            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+            const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
+            text = val < 0 ? `${val}` : '-0';
+            color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
+          }
         } else if (tile.chamberContent === 'hot_plate') {
           // Use the locked values computed by applyTurnDelta
           const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
@@ -1670,11 +1690,18 @@ export class Game {
           text = val > 0 ? `+${val}` : `+0`;
           color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
         } else if (tile.chamberContent === 'sandstone') {
-          const deltaDamage = currentPressure - tile.hardness;
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
-          text = val > 0 ? `+${val}` : `+0`;
-          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+          const shatterActive = tile.shatter > tile.hardness;
+          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+          if (shatterOverride) {
+            text = '+0';
+            color = ANIM_ZERO_COLOR;
+          } else {
+            const deltaDamage = currentPressure - tile.hardness;
+            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+            const val = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
+            text = val > 0 ? `+${val}` : `+0`;
+            color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+          }
         } else if (tile.chamberContent === 'hot_plate') {
           // When disconnecting, the hot plate's effects are reversed:
           // gain (from frozen) is lost; water loss is recovered

@@ -191,7 +191,9 @@ export function drawTile(
     } else if (chamberContent === 'snow') {
       color = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
     } else if (chamberContent === 'sandstone') {
-      const isHard = tile.hardness >= currentPressure;
+      // When hardness >= pressure (and shatter not active), use darker color.
+      const shatterActive = tile.shatter > tile.hardness;
+      const isHard = !shatterActive && tile.hardness >= currentPressure;
       color = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
@@ -546,10 +548,12 @@ export function drawTile(
         ctx.fillText(String(snowCost), 0, 9);
       }
     } else if (chamberContent === 'sandstone') {
-      // When hardness >= pressure, use darker color and show the hardness value with "H".
+      // When hardness >= pressure (and shatter not active), use darker color and show hardness.
+      // When shatter > hardness, show the (H=value, S=value) format.
       // When connected, show the locked effective cost value.
       // Otherwise show three lines: negative adjusted cost, "x", and the temperature threshold.
-      const isHard = tile.hardness >= currentPressure;
+      const shatterActive = tile.shatter > tile.hardness;
+      const isHard = !shatterActive && tile.hardness >= currentPressure;
       const sandstoneColor = isHard
         ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
@@ -573,7 +577,12 @@ export function drawTile(
       ctx.fillStyle = sandstoneColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      if (isHard) {
+      if (shatterActive) {
+        // Display (H=value, S=value) on two lines when shatter is configured
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(`H=${tile.hardness}`, 0, -7);
+        ctx.fillText(`S=${tile.shatter}`, 0, 7);
+      } else if (isHard) {
         // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
         ctx.font = 'bold 14px Arial';
         ctx.fillText(`${tile.hardness}H`, 0, -7);
@@ -755,7 +764,12 @@ export function getTileDisplayName(tile: Tile): string {
           if (tile.pressure < 0) return `Vacuum ${tile.pressure}P`;
           return `Pump +${tile.pressure}P`;
         case 'snow':    return `Snow -${tile.temperature}° x ${tile.cost}`;
-        case 'sandstone': return `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
+        case 'sandstone': {
+          const shatterActive = tile.shatter > tile.hardness;
+          return shatterActive
+            ? `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness}, S=${tile.shatter})`
+            : `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
+        }
         case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
         default:       return 'Chamber';
       }
@@ -1049,7 +1063,7 @@ export function renderBoard(
         const previewTile = new Tile(
           hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,
           hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
-          hoverTile.temperature, hoverTile.pressure, hoverTile.hardness,
+          hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
         );
         const px = hoverCol * TILE_SIZE;
         const py = hoverRow * TILE_SIZE;
