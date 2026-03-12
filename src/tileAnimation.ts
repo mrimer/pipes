@@ -1,5 +1,7 @@
 /** Floating animation labels that rise and fade on the canvas after tile connections. */
 
+import { TILE_SIZE } from './renderer';
+
 /** A floating animation label drawn on the canvas. */
 export interface TileAnimation {
   /** Canvas pixel X of the animation origin (tile centre). */
@@ -62,9 +64,10 @@ export function renderAnimations(
 ): void {
   const now = performance.now();
   // Set constant text properties once before the loop.
-  ctx.font = 'bold 30px Arial';
+  ctx.font = `bold ${Math.round(30 * TILE_SIZE / 64)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  const riseAmount = ANIM_RISE_PX * TILE_SIZE / 64;
   let i = 0;
   while (i < animations.length) {
     const anim = animations[i];
@@ -76,7 +79,7 @@ export function renderAnimations(
     const progress = elapsed / anim.duration;
     // Remain fully visible for the first 50% of the duration, then fade out.
     const alpha = progress < 0.5 ? 1 : (1 - progress) * 2;
-    const yOffset = -ANIM_RISE_PX * progress;
+    const yOffset = -riseAmount * progress;
 
     // Clamp x so the label doesn't overflow the right edge of the canvas.
     let x = anim.x;

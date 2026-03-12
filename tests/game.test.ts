@@ -43,6 +43,9 @@ const MOCK_CTX = {
 
 // Stub out requestAnimationFrame so _loop() never fires.
 beforeAll(() => {
+  // Keep TILE_SIZE at 64 for tests by simulating a small viewport.
+  Object.defineProperty(window, 'innerWidth',  { value: 0, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
   jest.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
   Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
     value: () => MOCK_CTX,

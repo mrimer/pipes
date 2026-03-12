@@ -2,7 +2,7 @@ import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board'
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
-import { TILE_SIZE, renderBoard, getTileDisplayName } from './renderer';
+import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import {
@@ -585,6 +585,7 @@ export class Game {
     this.pendingRotation = 0;
     this.hoverRotationDelta = 0;
 
+    setTileSize(computeTileSize(level.rows, level.cols));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
 
@@ -2208,6 +2209,7 @@ export class Game {
     this.pendingRotation = 0;
     this.hoverRotationDelta = 0;
 
+    setTileSize(computeTileSize(level.rows, level.cols));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
 

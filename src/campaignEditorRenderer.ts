@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, Rotation } from './types';
-import { TILE_SIZE, drawSpinArrow } from './renderer';
+import { TILE_SIZE, drawSpinArrow, scalePx as _s } from './renderer';
 import { Tile } from './tile';
 import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
 import { SPIN_PIPE_SHAPES } from './board';
@@ -82,7 +82,7 @@ export function renderEditorCanvas(
         // Subtle dot
         ctx.fillStyle = '#2a3a5e';
         ctx.beginPath();
-        ctx.arc(x + CELL / 2, y + CELL / 2, 3, 0, Math.PI * 2);
+        ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
         ctx.fill();
       } else {
         drawEditorTile(ctx, x, y, def);
@@ -147,12 +147,12 @@ export function renderEditorCanvas(
         ctx.setLineDash([]);
         ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
         ctx.strokeStyle = 'rgba(255,64,64,0.8)';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = _s(3);
         ctx.beginPath();
-        ctx.moveTo(x + 8, y + 8);
-        ctx.lineTo(x + CELL - 8, y + CELL - 8);
-        ctx.moveTo(x + CELL - 8, y + 8);
-        ctx.lineTo(x + 8, y + CELL - 8);
+        ctx.moveTo(x + _s(8), y + _s(8));
+        ctx.lineTo(x + CELL - _s(8), y + CELL - _s(8));
+        ctx.moveTo(x + CELL - _s(8), y + _s(8));
+        ctx.lineTo(x + _s(8), y + CELL - _s(8));
         ctx.stroke();
       } else {
         ctx.globalAlpha = overlay.alpha;
@@ -251,7 +251,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
   const cy = y + CELL / 2;
 
   ctx.save();
-  ctx.font = 'bold 11px Arial';
+  ctx.font = `bold ${_s(11)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -277,8 +277,8 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = '#b8860b';
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#ffd700';
-    strokeFillText(ctx, 'GOLD', cx, cy - 7);
-    strokeFillText(ctx, 'SPACE', cx, cy + 7);
+    strokeFillText(ctx, 'GOLD', cx, cy - _s(7));
+    strokeFillText(ctx, 'SPACE', cx, cy + _s(7));
   } else if (shape === PipeShape.Source) {
     ctx.fillStyle = SOURCE_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
@@ -288,13 +288,13 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     // Show temp/pressure params only when non-zero
     if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
     if (tile.pressure !== 0) lines.push(`${tile.pressure}P`);
-    const lineHeight = 12;
+    const lineHeight = _s(12);
     const totalH = (lines.length - 1) * lineHeight;
     let lineY = cy - totalH / 2;
-    ctx.font = 'bold 12px Arial';
+    ctx.font = `bold ${_s(12)}px Arial`;
     for (const line of lines) {
       strokeFillText(ctx, line, cx, lineY);
-      ctx.font = '11px Arial';
+      ctx.font = `${_s(11)}px Arial`;
       lineY += lineHeight;
     }
     // Draw connection lines
@@ -303,7 +303,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = SINK_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px Arial';
+    ctx.font = `bold ${_s(12)}px Arial`;
     strokeFillText(ctx, 'SINK', cx, cy);
     drawConnectionLines(ctx, x, y, tile);
   } else if (shape === PipeShape.Chamber) {
@@ -314,12 +314,12 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
     if (cc === 'sandstone') {
-      ctx.font = '9px Arial';
-      strokeFillText(ctx, 'SANDSTONE', cx, cy - 10);
-      ctx.font = '10px Arial';
-      strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 2);
+      ctx.font = `${_s(9)}px Arial`;
+      strokeFillText(ctx, 'SANDSTONE', cx, cy - _s(10));
+      ctx.font = `${_s(10)}px Arial`;
+      strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(2));
       const shatterActive = tile.shatter > tile.hardness;
-      strokeFillText(ctx, shatterActive ? `H:${tile.hardness} S:${tile.shatter}` : `H:${tile.hardness}`, cx, cy + 13);
+      strokeFillText(ctx, shatterActive ? `H:${tile.hardness} S:${tile.shatter}` : `H:${tile.hardness}`, cx, cy + _s(13));
     } else {
       let displayLabel: string;
       if (isNegHeater) displayLabel = 'COOLER';
@@ -327,17 +327,17 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       else if (cc === 'hot_plate') displayLabel = 'HOT PLATE';
       else displayLabel = cc.toUpperCase();
       const needsBigFont = CHAMBER_TYPES_WITH_LARGER_FONT.has(cc);
-      ctx.font = needsBigFont ? 'bold 12px Arial' : 'bold 11px Arial';
-      strokeFillText(ctx, displayLabel, cx, cy - 6);
-      ctx.font = needsBigFont ? '11px Arial' : '10px Arial';
-      if (cc === 'tank') strokeFillText(ctx, `cap:${tile.capacity}`, cx, cy + 8);
-      else if (cc === 'dirt') strokeFillText(ctx, `cost:${tile.cost}`, cx, cy + 8);
-      else if (cc === 'heater') strokeFillText(ctx, `${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + 8);
-      else if (cc === 'ice') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
-      else if (cc === 'pump') strokeFillText(ctx, `${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + 8);
-      else if (cc === 'snow') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
-      else if (cc === 'hot_plate') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + 8);
-      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + 8);
+      ctx.font = needsBigFont ? `bold ${_s(12)}px Arial` : `bold ${_s(11)}px Arial`;
+      strokeFillText(ctx, displayLabel, cx, cy - _s(6));
+      ctx.font = needsBigFont ? `${_s(11)}px Arial` : `${_s(10)}px Arial`;
+      if (cc === 'tank') strokeFillText(ctx, `cap:${tile.capacity}`, cx, cy + _s(8));
+      else if (cc === 'dirt') strokeFillText(ctx, `cost:${tile.cost}`, cx, cy + _s(8));
+      else if (cc === 'heater') strokeFillText(ctx, `${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + _s(8));
+      else if (cc === 'ice') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
+      else if (cc === 'pump') strokeFillText(ctx, `${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + _s(8));
+      else if (cc === 'snow') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
+      else if (cc === 'hot_plate') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
+      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + _s(8));
     }
     drawConnectionLines(ctx, x, y, tile);
   } else {
@@ -348,7 +348,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillRect(x, y, CELL, CELL);
     // Draw pipe lines
     ctx.strokeStyle = isSpin ? '#7090c0' : (isGold ? '#ffd700' : '#4a90d9');
-    ctx.lineWidth = 8;
+    ctx.lineWidth = _s(8);
     ctx.lineCap = 'round';
     ctx.save();
     ctx.translate(cx, cy);
@@ -385,7 +385,7 @@ function drawConnectionLines(ctx: CanvasRenderingContext2D, x: number, y: number
   const cy = y + CELL / 2;
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = _s(3);
   ctx.lineCap = 'round';
   for (const dir of tile.connections) {
     ctx.beginPath();
