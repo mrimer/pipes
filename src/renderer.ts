@@ -1027,12 +1027,13 @@ export function renderBoard(
 
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
+  // Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
+  // is never covered by a neighbouring empty tile's background fill.
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      const isWater    = filled.has(`${r},${c}`);
       const isFocused  = focusPos.row === r && focusPos.col === c;
       const isGoldCell = board.goldSpaces.has(`${r},${c}`);
 
@@ -1103,6 +1104,18 @@ export function renderBoard(
         ctx.lineWidth = 3;
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
+    }
+  }
+
+  // Pass 2: Draw all tile content on top of all backgrounds so that pipe rounded
+  // caps (from lineCap='round') are never overwritten by a neighbouring empty tile's
+  // background fill.
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      const tile = board.grid[r][c];
+      const x = c * TILE_SIZE;
+      const y = r * TILE_SIZE;
+      const isWater = filled.has(`${r},${c}`);
 
       // For connected ice/snow/sandstone tiles, pass the locked effective cost so
       // the tile can display the single locked-in value instead of the live formula.
