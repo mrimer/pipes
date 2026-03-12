@@ -40,6 +40,18 @@ function colorSwatch(fill: string, border = fill): string {
   );
 }
 
+/** Return a small colored square with a text label overlaid, as an inline HTML string. */
+function chamberSwatch(fill: string, label: string, border = fill): string {
+  return (
+    `<svg width="28" height="28" viewBox="0 0 28 28">` +
+    `<rect x="2" y="2" width="24" height="24" rx="4" ry="4" ` +
+    `fill="${fill}" stroke="${border}" stroke-width="2"/>` +
+    `<text x="14" y="19" text-anchor="middle" font-family="Arial" ` +
+    `font-weight="bold" font-size="11" fill="white">${label}</text>` +
+    `</svg>`
+  );
+}
+
 /** Return a small colored circle as an inline HTML string. */
 function colorCircle(fill: string): string {
   return (
@@ -54,14 +66,14 @@ const CONTROL_ROWS: ControlRow[] = [
   { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
   { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory.' },
   { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
-  { input: 'Arrow Keys',         action: 'Move the keyboard focus cursor across the grid.' },
-  { input: 'Enter / Space',      action: 'Place or replace a pipe at the focused cell; rotate if nothing is selected.' },
+  { input: 'Hover + Scroll Wheel', action: 'Queue a placed pipe for rotation when no inventory item is selected.' },
   { input: 'Q',                  action: 'Rotate the selected pipe piece counter-clockwise.' },
   { input: 'W',                  action: 'Rotate the selected pipe piece clockwise.' },
   { input: 'R',                  action: 'Retry the current level from scratch.' },
   { input: 'Ctrl+Z',             action: 'Undo the last move.' },
   { input: 'Ctrl+Y',             action: 'Redo the last undone move.' },
-  { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/weak-ice/sandstone tile values: raw temperature threshold and unmodified cost.' },
+  { input: 'Shift',              action: 'Selects the next inventory piece.' },
+  { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/snow/sandstone tile values: raw temperature threshold and unmodified cost.' },
   { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
   { input: 'Escape',             action: 'Return to the level-select screen.' },
 ];
@@ -119,53 +131,53 @@ const LEGEND_ROWS: LegendRow[] = [
     description: 'Behaves like a normal pipe and can be placed on gold spaces.',
   },
   {
-    iconHtml: colorSwatch(TANK_COLOR),
-    name: 'Chamber — Tank',
+    iconHtml: chamberSwatch(TANK_COLOR, '~'),
+    name: 'Tank',
     description: 'Contains extra water. Adds to your supply when connected to it.',
   },
   {
-    iconHtml: colorSwatch(DIRT_COST_COLOR),
-    name: 'Chamber — Dirt',
+    iconHtml: chamberSwatch(DIRT_COST_COLOR, '−'),
+    name: 'Dirt',
     description: 'Wastes water when filled. The number shows how much water is consumed.',
   },
   {
-    iconHtml: colorSwatch(PIPE_COLOR),
-    name: 'Chamber — Item',
+    iconHtml: chamberSwatch(PIPE_COLOR, '+'),
+    name: 'Item',
     description: 'Grants bonus pipe pieces from your inventory when water flows through it.',
   },
   {
-    iconHtml: colorSwatch(HEATER_COLOR),
-    name: 'Chamber — Heater',
+    iconHtml: chamberSwatch(HEATER_COLOR, '+°'),
+    name: 'Heater',
     description: 'Raises the water temperature by the shown amount (°) when connected. Higher temperature reduces ice block costs.',
   },
   {
-    iconHtml: colorSwatch(ICE_COLOR),
-    name: 'Chamber — Ice',
+    iconHtml: chamberSwatch(ICE_COLOR, '❄'),
+    name: 'Ice',
     description: 'Reduces water capacity by cost × max(0, threshold° − current temp°). Costs nothing when temperature meets or exceeds the threshold.',
   },
   {
-    iconHtml: colorSwatch(PUMP_COLOR),
-    name: 'Chamber — Pump',
+    iconHtml: chamberSwatch(PUMP_COLOR, '+P'),
+    name: 'Pump',
     description: 'Increases the game Pressure variable by the shown amount (+P) when connected. Higher Pressure reduces the cost of Snow blocks.',
   },
   {
-    iconHtml: colorSwatch(SNOW_COLOR),
-    name: 'Chamber — Snow',
+    iconHtml: chamberSwatch(SNOW_COLOR, '❄'),
+    name: 'Snow',
     description: 'Like Ice, but its effective cost is ⌈cost÷Pressure⌉ × max(0, threshold° − current temp°). Higher Pressure lowers the cost.',
   },
   {
-    iconHtml: colorSwatch(SANDSTONE_COLOR),
-    name: 'Chamber — Sandstone',
+    iconHtml: chamberSwatch(SANDSTONE_COLOR, '≈'),
+    name: 'Sandstone',
     description: 'Like Snow, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness. When a Shatter value (> Hardness) is set and Pressure ≥ Shatter, the tile has no cost.',
   },
   {
-    iconHtml: colorSwatch(HOT_PLATE_COLOR),
-    name: 'Chamber — Hot Plate',
+    iconHtml: chamberSwatch(HOT_PLATE_COLOR, 'HP'),
+    name: 'Hot Plate',
     description: 'Consumes water based on mass and temperature. Effective cost = mass × (boiling temp° − current temp°). First drains frozen water (restoring it to liquid); remaining cost draws from regular water. Boiling temp is displayed as temp°.',
   },
   {
-    iconHtml: colorSwatch(STAR_COLOR),
-    name: 'Chamber — Star',
+    iconHtml: chamberSwatch(STAR_COLOR, '★'),
+    name: 'Star',
     description: 'A bonus collectible. Connect it to the water path before winning to count it as a collected star for the level. Stars are tracked per-level and shown on the level select screen.',
   },
 ];
@@ -205,6 +217,7 @@ export function createGameRulesModal(): HTMLElement {
   playLoop.textContent =
     'Select a pipe piece from the inventory panel, then click an empty cell to place it. ' +
     'Scroll the mouse wheel to rotate the piece before placing. ' +
+    'Rotate placed pipes to update your route. ' +
     'Water flows automatically once a complete path exists. ' +
     'Some chambers add water, waste it, or grant extra pieces when reached. ' +
     'Removing pieces returns water and reverts connections to their original state.';

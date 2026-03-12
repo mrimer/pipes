@@ -49,7 +49,7 @@ type Snapshot = {
   turnNumber: number;
   /**
    * The turn number on which each tile was first connected, keyed by "row,col".
-   * Used to re-evaluate ice/weak-ice costs when beneficial tiles (heaters, pumps) disconnect.
+   * Used to re-evaluate ice/snow costs when beneficial tiles (heaters, pumps) disconnect.
    */
   connectionTurn: Map<string, number>;
   /**
@@ -150,7 +150,7 @@ export class Board {
   /**
    * The turn number on which each tile was first added to the fill path,
    * keyed by "row,col".  Used when a beneficial tile (heater, pump) disconnects:
-   * ice/weak-ice tiles still connected are re-evaluated using only the
+   * ice/snow tiles still connected are re-evaluated using only the
    * heaters/pumps that were connected on or before each ice tile's own connection turn.
    */
   private _connectionTurn: Map<string, number> = new Map();
@@ -729,7 +729,7 @@ export class Board {
   }
 
   /**
-   * chamber, an ice chamber, a weak-ice chamber, or a source with a non-zero base temperature.
+   * chamber, an ice chamber, a snow chamber, or a source with a non-zero base temperature.
    * Used to decide whether to display the Temp stat in the UI.
    */
   hasTempRelevantTiles(): boolean {
@@ -944,7 +944,7 @@ export class Board {
    * - Previously-evaluated tiles keep their locked impact unchanged, so an ice
    *   tile's cost is never retroactively altered by a heater connected later.
    * - When a beneficial tile (heater or pump) is removed from the fill path,
-   *   any still-connected ice/weak-ice tiles are re-evaluated.  Re-evaluation
+   *   any still-connected ice/snow tiles are re-evaluated.  Re-evaluation
    *   only considers heaters/pumps whose own connection turn is ≤ the ice tile's
    *   original connection turn, so no ice tile ever gains a retroactive benefit
    *   from a heater that connected after it.
@@ -976,7 +976,7 @@ export class Board {
     }
 
     // Remove locked impacts for tiles that are no longer connected.
-    // For ice/weak-ice tiles that are being disconnected, subtract their contribution
+    // For ice/snow tiles that are being disconnected, subtract their contribution
     // from the frozen counter since they are no longer in the fill path.
     // For hot_plate tiles, restore the frozen water that was consumed when they connected.
     for (const key of this._lockedWaterImpact.keys()) {

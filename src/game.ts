@@ -115,7 +115,7 @@ export class Game {
   /** Whether the Ctrl key is currently held. */
   private ctrlHeld = false;
 
-  /** Whether the Shift key is currently held (used for adjusted ice/weak-ice display). */
+  /** Whether the Shift key is currently held (used for adjusted ice/snow display). */
   private shiftHeld = false;
 
   /** Tooltip element for displaying grid coordinates under Ctrl. */
