@@ -606,7 +606,7 @@ export function drawTile(
         const sandstoneCost = shiftHeld
           ? cost
           : Math.max(1, deltaDamage >= 1 ? Math.ceil(cost / deltaDamage) : cost);
-        if (shatterActive && isShatterTriggered) {
+        if (shatterActive) {
           ctx.font = 'bold 9px Arial';
           ctx.fillText(`-${sandstoneThreshold}° x ${sandstoneCost}`, 0, -7);
           ctx.fillText(`S @ ${tile.shatter}`, 0, 7);
