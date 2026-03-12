@@ -681,6 +681,89 @@ describe('CampaignEditor – import version comparison', () => {
     expect(new Date(saved.lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
     expect(saved.lastUpdated).not.toBe(old);
   });
+
+  it('lastUpdated is updated and level is saved when playtesting', () => {
+    const old = '2020-01-01T00:00:00.000Z';
+    const level: LevelDef = {
+      id: 99100,
+      name: 'Playtest Level',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+    };
+    const campaign: CampaignDef = {
+      id: 'cmp_pt1',
+      name: 'Playtest Campaign',
+      author: '',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+      lastUpdated: old,
+    };
+
+    const playtestCalls: LevelDef[] = [];
+    saveImportedCampaigns([campaign]);
+    // Clear body before construction so the editor's _el is attached to a fresh DOM.
+    document.body.innerHTML = '';
+    const editor = new CampaignEditor(
+      () => {},
+      (l: LevelDef) => { playtestCalls.push(l); },
+      (_c: CampaignDef) => {},
+    );
+
+    const state = editor as unknown as {
+      _campaigns: CampaignDef[];
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _activeLevelIdx: number;
+      _editLevelName: string;
+      _editLevelNote: string;
+      _editLevelHints: string[];
+      _editLevelChallenge: boolean;
+      _editRows: number;
+      _editCols: number;
+      _editGrid: (import('../src/types').TileDef | null)[][];
+      _editInventory: import('../src/types').InventoryItem[];
+      _showLevelEditor(readOnly: boolean): void;
+      _validateLevel(): { ok: boolean; messages: string[] };
+    };
+
+    // Set up editor state as if the level editor is open for this level.
+    state._activeCampaignId = 'cmp_pt1';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._editLevelName = 'Playtest Level';
+    state._editLevelNote = '';
+    state._editLevelHints = [''];
+    state._editLevelChallenge = false;
+    state._editRows = 2;
+    state._editCols = 2;
+    state._editGrid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
+    state._editInventory = [];
+
+    // Bypass _validateLevel so the test does not need a fully valid board.
+    jest.spyOn(state, '_validateLevel').mockReturnValue({ ok: true, messages: [] });
+
+    // Render the level editor toolbar.
+    state._showLevelEditor(false);
+
+    const before = Date.now();
+    const playtestBtn = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Playtest'));
+    expect(playtestBtn).toBeDefined();
+    playtestBtn!.click();
+
+    // lastUpdated must be updated.
+    const saved = loadImportedCampaigns()[0];
+    expect(saved.lastUpdated).not.toBe(old);
+    expect(new Date(saved.lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
+
+    // Level data must be persisted.
+    expect(saved.chapters[0].levels[0].name).toBe('Playtest Level');
+
+    // The onPlaytest callback must have been called.
+    expect(playtestCalls).toHaveLength(1);
+    expect(playtestCalls[0].name).toBe('Playtest Level');
+  });
 });
 
 // ─── CampaignEditor – challenge flag round-trip ───────────────────────────────

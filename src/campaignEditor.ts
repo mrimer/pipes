@@ -927,7 +927,10 @@ export class CampaignEditor {
           alert(`❌ Validation\n\n${result.messages.join('\n')}`);
           return;
         }
-        const level = this._buildCurrentLevelDef();
+        this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
+        const chapter = campaign.chapters[this._activeChapterIdx];
+        const level = chapter?.levels[this._activeLevelIdx];
+        if (!level) return;
         this._onPlaytest(level);
       }));
 
