@@ -1199,6 +1199,75 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     // Mouse below the canvas
     expect(state._canvasPos(mouseAt(50, 280))).toBeNull();
   });
+
+  // ─── Resize panel constraint: both dims cannot be <= 1 ──────────────────────
+
+  /** Get the "↔ Resize" button and both number inputs from the grid-size panel. */
+  function getResizeControls(panel: HTMLElement) {
+    const inputs = Array.from(panel.querySelectorAll<HTMLInputElement>('input[type="number"]'));
+    const rowsInp = inputs[0]!;
+    const colsInp = inputs[1]!;
+    const resizeBtn = Array.from(panel.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Resize'))!;
+    const errorDiv = Array.from(panel.querySelectorAll('div'))
+      .find((d) => d.style.color === 'rgb(255, 68, 68)')!;
+    return { rowsInp, colsInp, resizeBtn, errorDiv };
+  }
+
+  it('resize to 1×1 is rejected and shows an error', () => {
+    const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
+      _editRows: number;
+      _editCols: number;
+      _buildGridSizePanel(): HTMLElement;
+    };
+    const panel = state._buildGridSizePanel();
+    const { rowsInp, colsInp, resizeBtn, errorDiv } = getResizeControls(panel);
+
+    rowsInp.value = '1';
+    colsInp.value = '1';
+    resizeBtn.click();
+
+    // Grid must not have changed.
+    expect(state._editRows).toBe(4);
+    expect(state._editCols).toBe(4);
+    // Error message must be shown.
+    expect(errorDiv.style.display).not.toBe('none');
+    expect(errorDiv.textContent).toMatch(/dimension/i);
+  });
+
+  it('resize to 1×5 (one dim > 1) is accepted', () => {
+    const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
+      _editRows: number;
+      _editCols: number;
+      _buildGridSizePanel(): HTMLElement;
+    };
+    const panel = state._buildGridSizePanel();
+    const { rowsInp, colsInp, resizeBtn } = getResizeControls(panel);
+
+    rowsInp.value = '1';
+    colsInp.value = '5';
+    resizeBtn.click();
+
+    expect(state._editRows).toBe(1);
+    expect(state._editCols).toBe(5);
+  });
+
+  it('resize to 5×1 (one dim > 1) is accepted', () => {
+    const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
+      _editRows: number;
+      _editCols: number;
+      _buildGridSizePanel(): HTMLElement;
+    };
+    const panel = state._buildGridSizePanel();
+    const { rowsInp, colsInp, resizeBtn } = getResizeControls(panel);
+
+    rowsInp.value = '5';
+    colsInp.value = '1';
+    resizeBtn.click();
+
+    expect(state._editRows).toBe(5);
+    expect(state._editCols).toBe(1);
+  });
 });
 
 // ─── CampaignEditor – paint-drag undo snapshot timing ────────────────────────
