@@ -208,6 +208,118 @@ export class CampaignEditor {
     return b;
   }
 
+  /** Set the campaign's lastUpdated timestamp to the current time. */
+  private _touchCampaign(campaign: CampaignDef): void {
+    campaign.lastUpdated = new Date().toISOString();
+  }
+
+  /** Format an ISO timestamp for display, or return a fallback string if absent. */
+  private _formatTimestamp(ts: string | undefined): string {
+    if (!ts) return 'unknown';
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    return d.toLocaleString();
+  }
+
+  /**
+   * Show an info dialog telling the user the imported campaign is the same version
+   * as the local copy. The import is cancelled.
+   */
+  private _showImportSameVersionDialog(name: string, ts: string | undefined): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+      'justify-content:center;z-index:300;';
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
+      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:460px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
+    title.textContent = '✅ Same Version';
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
+    msg.innerHTML =
+      `<strong style="color:#fff;">"${name}"</strong> is already up to date.<br><br>` +
+      `The imported campaign has the same version as your local copy<br>` +
+      `(last updated: <em>${this._formatTimestamp(ts)}</em>).<br><br>` +
+      `The campaign will not be updated.`;
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
+
+    dialog.appendChild(title);
+    dialog.appendChild(msg);
+    dialog.appendChild(btnRow);
+    overlay.appendChild(dialog);
+    this._el.appendChild(overlay);
+  }
+
+  /**
+   * Show a confirmation dialog asking the user whether to overwrite a local campaign
+   * with an imported one of a different version.
+   * @param imported  The campaign data being imported.
+   * @param existing  The local campaign with the same ID.
+   * @param isNewer   True when the imported campaign is more recent.
+   * @param onConfirm Called when the user confirms the import.
+   */
+  private _showImportVersionConflictDialog(
+    imported: CampaignDef,
+    existing: CampaignDef,
+    isNewer: boolean,
+    onConfirm: () => void,
+  ): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+      'justify-content:center;z-index:300;';
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
+      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:480px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
+    title.textContent = isNewer ? '⏩ Import Newer Version?' : '⏪ Import Older Version?';
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
+    const localLabel = `Local version: <em>${this._formatTimestamp(existing.lastUpdated)}</em>`;
+    const importedLabel = `Imported version: <em>${this._formatTimestamp(imported.lastUpdated)}</em> (${isNewer ? 'newer' : 'older'})`;
+    msg.innerHTML =
+      `<strong style="color:#fff;">"${imported.name}"</strong> already exists locally.<br><br>` +
+      `${localLabel}<br>` +
+      `${importedLabel}<br><br>` +
+      `Importing will replace all chapters and levels in the local campaign.<br>` +
+      `Player progress will be retained.`;
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+    const confirmLabel = isNewer ? '⏩ Import newer version' : '⏪ Overwrite with older version';
+    const confirmColor = isNewer ? '#27ae60' : '#e67e22';
+    const confirmBtn = this._btn(confirmLabel, confirmColor, '#fff', () => {
+      overlay.remove();
+      onConfirm();
+    });
+    const cancelBtn = this._btn('Cancel', '#2a2a4a', '#aaa', () => overlay.remove());
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(msg);
+    dialog.appendChild(btnRow);
+    overlay.appendChild(dialog);
+    this._el.appendChild(overlay);
+  }
+
   /**
    * Show a modal dialog asking the user to Save or Discard unsaved level changes.
    * Appended to `_el`; removed when either button is clicked.
@@ -434,6 +546,7 @@ export class CampaignEditor {
       toggleLbl.textContent = 'Dev – Official Campaign';
       toggleCb.addEventListener('change', () => {
         campaign.official = toggleCb.checked ? true : undefined;
+        this._touchCampaign(campaign);
         this._saveCampaigns();
         // Re-render to update read-only state
         this._showCampaignDetail();
@@ -452,10 +565,12 @@ export class CampaignEditor {
 
       fields.appendChild(this._labeledInput('Name', campaign.name, (v) => {
         campaign.name = v;
+        this._touchCampaign(campaign);
         this._saveCampaigns();
       }));
       fields.appendChild(this._labeledInput('Author', campaign.author, (v) => {
         campaign.author = v;
+        this._touchCampaign(campaign);
         this._saveCampaigns();
       }));
       content.appendChild(fields);
@@ -528,6 +643,7 @@ export class CampaignEditor {
         btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
           [campaign.chapters[chapterIdx - 1], campaign.chapters[chapterIdx]] =
             [campaign.chapters[chapterIdx], campaign.chapters[chapterIdx - 1]];
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showCampaignDetail();
         }));
@@ -536,6 +652,7 @@ export class CampaignEditor {
         btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
           [campaign.chapters[chapterIdx], campaign.chapters[chapterIdx + 1]] =
             [campaign.chapters[chapterIdx + 1], campaign.chapters[chapterIdx]];
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showCampaignDetail();
         }));
@@ -543,6 +660,7 @@ export class CampaignEditor {
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
           campaign.chapters.splice(chapterIdx, 1);
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showCampaignDetail();
         }
@@ -583,6 +701,7 @@ export class CampaignEditor {
         'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:16px;';
       nameWrap.appendChild(this._labeledInput('Chapter Name', chapter.name, (v) => {
         chapter.name = v;
+        this._touchCampaign(campaign);
         this._saveCampaigns();
       }));
       content.appendChild(nameWrap);
@@ -663,6 +782,7 @@ export class CampaignEditor {
           name: level.name + ' (copy)',
         };
         chapter.levels.splice(levelIdx + 1, 0, copy);
+        this._touchCampaign(campaign);
         this._saveCampaigns();
         this._showChapterDetail();
       }));
@@ -671,6 +791,7 @@ export class CampaignEditor {
         btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
           [chapter.levels[levelIdx - 1], chapter.levels[levelIdx]] =
             [chapter.levels[levelIdx], chapter.levels[levelIdx - 1]];
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showChapterDetail();
         }));
@@ -679,6 +800,7 @@ export class CampaignEditor {
         btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
           [chapter.levels[levelIdx], chapter.levels[levelIdx + 1]] =
             [chapter.levels[levelIdx + 1], chapter.levels[levelIdx]];
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showChapterDetail();
         }));
@@ -686,6 +808,7 @@ export class CampaignEditor {
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete level "${level.name}"?`)) {
           chapter.levels.splice(levelIdx, 1);
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showChapterDetail();
         }
@@ -716,6 +839,7 @@ export class CampaignEditor {
           const [movedLevel] = chapter.levels.splice(levelIdx, 1);
           if (movedLevel === undefined) return;
           campaign.chapters[targetIdx].levels.push(movedLevel);
+          this._touchCampaign(campaign);
           this._saveCampaigns();
           this._showChapterDetail();
         });
@@ -2430,6 +2554,7 @@ export class CampaignEditor {
     } else {
       chapter.levels.push(newLevel);
     }
+    this._touchCampaign(campaign);
     this._saveCampaigns();
     this._editorUnsavedChanges = false;
 
@@ -2453,6 +2578,7 @@ export class CampaignEditor {
       name: name.trim(),
       author: author.trim(),
       chapters: [],
+      lastUpdated: new Date().toISOString(),
     };
     this._campaigns.push(campaign);
     this._saveCampaigns();
@@ -2464,6 +2590,7 @@ export class CampaignEditor {
     if (!name?.trim()) return;
     const newId = campaign.chapters.reduce((mx, ch) => Math.max(mx, ch.id), 0) + 1;
     campaign.chapters.push({ id: newId, name: name.trim(), levels: [] });
+    this._touchCampaign(campaign);
     this._saveCampaigns();
     this._showCampaignDetail();
   }
@@ -2484,6 +2611,7 @@ export class CampaignEditor {
       inventory: [],
     };
     chapter.levels.push(newLevel);
+    this._touchCampaign(campaign);
     this._saveCampaigns();
     // Open the level editor immediately
     this._activeLevelIdx = chapter.levels.length - 1;
@@ -2539,9 +2667,26 @@ export class CampaignEditor {
           if (data.official) {
             data.official = undefined;
           }
-          // Check for duplicate ID and reassign silently
-          if (this._campaigns.some((c) => c.id === data.id)) {
-            data.id = generateCampaignId();
+          // Check for a matching campaign ID in the local library.
+          const existingIdx = this._campaigns.findIndex((c) => c.id === data.id);
+          if (existingIdx !== -1) {
+            const existing = this._campaigns[existingIdx];
+            const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
+            const importedTime = data.lastUpdated ? new Date(data.lastUpdated).getTime() : 0;
+            if (existingTime === importedTime) {
+              // Same version: inform the user and cancel the import.
+              this._showImportSameVersionDialog(data.name, data.lastUpdated);
+              return;
+            }
+            const isNewer = importedTime > existingTime;
+            this._showImportVersionConflictDialog(data, existing, isNewer, () => {
+              // Replace the campaign record while retaining player progress (keyed by ID).
+              this._campaigns[existingIdx] = data;
+              this._saveCampaigns();
+              alert(`Campaign "${data.name}" imported successfully.`);
+              this._showCampaignList();
+            });
+            return;
           }
           this._campaigns.push(data);
           this._saveCampaigns();

@@ -476,6 +476,213 @@ describe('CampaignEditor – gzip import', () => {
   });
 });
 
+// ─── CampaignEditor – import version comparison ───────────────────────────────
+
+describe('CampaignEditor – import version comparison', () => {
+  /**
+   * Simulate importing a campaign from a JSON string by wiring up a mock FileReader
+   * and dispatching a change event on the hidden file input.
+   */
+  function simulateImportJson(editor: CampaignEditor, json: string): void {
+    const origFileReader = (globalThis as unknown as Record<string, unknown>).FileReader;
+    class MockFileReader {
+      result: string = json;
+      onload: (() => void) | null = null;
+      readAsText(_file: File): void {
+        // Deliver content synchronously to keep tests simple.
+        this.onload?.();
+      }
+    }
+    (globalThis as unknown as Record<string, unknown>).FileReader = MockFileReader;
+
+    const origCreate = document.createElement.bind(document) as (tag: string) => HTMLElement;
+    const createSpy = jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === 'input') {
+        const input = el as HTMLInputElement;
+        Object.defineProperty(input, 'click', {
+          value: () => {
+            Object.defineProperty(input, 'files', {
+              value: [new File([json], 'test.pipes.json', { type: 'application/json' })],
+              configurable: true,
+            });
+            input.dispatchEvent(new Event('change'));
+          },
+          writable: true,
+        });
+      }
+      return el;
+    });
+
+    try {
+      (editor as unknown as { _importCampaign(): void })._importCampaign();
+    } finally {
+      createSpy.mockRestore();
+      (globalThis as unknown as Record<string, unknown>).FileReader = origFileReader;
+    }
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('shows "same version" dialog and does not replace when timestamps match', () => {
+    const ts = '2024-06-01T12:00:00.000Z';
+    const existing: CampaignDef = { id: 'cmp_v1', name: 'My Campaign', author: 'A', chapters: [], lastUpdated: ts };
+    const editor = makeEditor([existing]);
+
+    simulateImportJson(editor, JSON.stringify({ ...existing }));
+
+    expect(document.body.innerHTML).toContain('Same Version');
+    expect(document.body.innerHTML).toContain('already up to date');
+    // No duplicate added
+    expect(loadImportedCampaigns()).toHaveLength(1);
+  });
+
+  it('does not modify the campaign when "same version" dialog is shown', () => {
+    const ts = '2024-06-01T12:00:00.000Z';
+    const existing: CampaignDef = { id: 'cmp_v2', name: 'Original', author: 'A', chapters: [], lastUpdated: ts };
+    const editor = makeEditor([existing]);
+
+    simulateImportJson(editor, JSON.stringify({ ...existing, name: 'Renamed' }));
+
+    // The "same version" path triggers on equal timestamps; name should be untouched
+    const campaigns = loadImportedCampaigns();
+    expect(campaigns[0].name).toBe('Original');
+  });
+
+  it('shows "Import Newer Version?" dialog when imported timestamp is more recent', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_v3', name: 'Campaign', author: 'A', chapters: [],
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+    };
+    const editor = makeEditor([existing]);
+
+    simulateImportJson(editor, JSON.stringify({ ...existing, lastUpdated: '2024-06-01T00:00:00.000Z' }));
+
+    expect(document.body.innerHTML).toContain('Import Newer Version?');
+    expect(document.body.innerHTML).toContain('Import newer version');
+  });
+
+  it('shows "Import Older Version?" dialog when imported timestamp is earlier', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_v4', name: 'Campaign', author: 'A', chapters: [],
+      lastUpdated: '2024-06-01T00:00:00.000Z',
+    };
+    const editor = makeEditor([existing]);
+
+    simulateImportJson(editor, JSON.stringify({ ...existing, lastUpdated: '2024-01-01T00:00:00.000Z' }));
+
+    expect(document.body.innerHTML).toContain('Import Older Version?');
+    expect(document.body.innerHTML).toContain('Overwrite with older version');
+  });
+
+  it('replaces campaign and retains player progress when confirming a newer import', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_v5', name: 'Campaign', author: 'A',
+      chapters: [{ id: 1, name: 'Old Chapter', levels: [] }],
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+    };
+    const editor = makeEditor([existing]);
+
+    // Record some player progress that should survive the import.
+    const prog = loadCampaignProgress('cmp_v5');
+    markCampaignLevelCompleted('cmp_v5', 42, prog);
+
+    simulateImportJson(editor, JSON.stringify({
+      ...existing,
+      chapters: [{ id: 1, name: 'New Chapter', levels: [] }],
+      lastUpdated: '2024-06-01T00:00:00.000Z',
+    }));
+
+    // Click the confirm button
+    const confirmBtn = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Import newer version'));
+    expect(confirmBtn).toBeDefined();
+    confirmBtn!.click();
+
+    const campaigns = loadImportedCampaigns();
+    expect(campaigns).toHaveLength(1);
+    expect(campaigns[0].chapters[0].name).toBe('New Chapter');
+    // Progress must be retained (keyed by campaign ID which is unchanged).
+    expect(loadCampaignProgress('cmp_v5').has(42)).toBe(true);
+  });
+
+  it('does not replace campaign when user cancels the version conflict dialog', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_v6', name: 'Campaign', author: 'A',
+      chapters: [{ id: 1, name: 'Original Chapter', levels: [] }],
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+    };
+    const editor = makeEditor([existing]);
+
+    simulateImportJson(editor, JSON.stringify({
+      ...existing,
+      chapters: [{ id: 1, name: 'New Chapter', levels: [] }],
+      lastUpdated: '2024-06-01T00:00:00.000Z',
+    }));
+
+    const cancelBtn = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.textContent === 'Cancel');
+    expect(cancelBtn).toBeDefined();
+    cancelBtn!.click();
+
+    expect(loadImportedCampaigns()[0].chapters[0].name).toBe('Original Chapter');
+  });
+
+  it('treats missing lastUpdated as epoch 0 – local with timestamp is "newer" than import without', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_v7', name: 'Campaign', author: 'A', chapters: [],
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+    };
+    const editor = makeEditor([existing]);
+
+    // Imported file has no lastUpdated at all (older pre-timestamp campaign)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { lastUpdated: _, ...noTs } = existing;
+    simulateImportJson(editor, JSON.stringify(noTs));
+
+    expect(document.body.innerHTML).toContain('Import Older Version?');
+    expect(document.body.innerHTML).toContain('Overwrite with older version');
+  });
+
+  it('lastUpdated is set on campaign creation', () => {
+    const before = Date.now();
+    jest.spyOn(window, 'prompt')
+      .mockReturnValueOnce('New Campaign')
+      .mockReturnValueOnce('Author');
+
+    const editor = makeEditor();
+    (editor as unknown as { _createCampaign(): void })._createCampaign();
+
+    const campaigns = loadImportedCampaigns();
+    expect(campaigns).toHaveLength(1);
+    expect(campaigns[0].lastUpdated).toBeDefined();
+    expect(new Date(campaigns[0].lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it('lastUpdated is updated when a chapter is added', () => {
+    const old = '2020-01-01T00:00:00.000Z';
+    const campaign: CampaignDef = { id: 'cmp_ts1', name: 'C', author: '', chapters: [], lastUpdated: old };
+    const editor = makeEditor([campaign]);
+    // Get the campaign reference that the editor actually owns (loaded from storage).
+    const internalCampaign = (editor as unknown as { _campaigns: CampaignDef[] })._campaigns[0];
+    jest.spyOn(window, 'prompt').mockReturnValueOnce('Chapter 1');
+
+    const before = Date.now();
+    (editor as unknown as { _addChapter(c: CampaignDef): void })._addChapter(internalCampaign);
+
+    const saved = loadImportedCampaigns()[0];
+    expect(new Date(saved.lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
+    expect(saved.lastUpdated).not.toBe(old);
+  });
+});
+
 // ─── CampaignEditor – challenge flag round-trip ───────────────────────────────
 
 describe('CampaignEditor – challenge flag in level definitions', () => {

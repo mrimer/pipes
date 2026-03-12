@@ -216,4 +216,9 @@ export interface CampaignDef {
    * Multiple campaigns may be flagged as official simultaneously.
    */
   official?: boolean;
+  /**
+   * ISO 8601 timestamp of when this campaign was last modified.
+   * Used for versioning during import to detect newer/older/same versions.
+   */
+  lastUpdated?: string;
 }
