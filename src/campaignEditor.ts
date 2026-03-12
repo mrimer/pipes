@@ -35,7 +35,7 @@ import {
   chamberPaletteContent,
   ungzipBlob,
 } from './campaignEditorTypes';
-import { renderEditorCanvas, HoverOverlay, DragState } from './campaignEditorRenderer';
+import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './campaignEditorRenderer';
 import { renderMinimap } from './minimap';
 
 /**
@@ -1344,12 +1344,12 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'ice' || cc === 'snow' || cc === 'sandstone') {
-        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = parseInt(v) || 0;
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = parseInt(v) || 0;
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
+        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
+          this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
@@ -1366,12 +1366,12 @@ export class CampaignEditor {
         }, 'number', '90px'));
       }
       if (cc === 'hot_plate') {
-        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = parseInt(v) || 0;
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Boiling °', String(this._editorParams.temperature), (v) => {
           this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
+        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
+          this._editorParams.cost = parseInt(v) || 0;
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
@@ -1408,7 +1408,7 @@ export class CampaignEditor {
       }
     }
 
-    // Connections (Source, Sink, Chamber)
+    // Connections (Source, Sink, Chamber) – positional compass layout
     if (p === PipeShape.Source || p === PipeShape.Sink || isChm) {
       const connWrap = document.createElement('div');
       connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
@@ -1416,25 +1416,55 @@ export class CampaignEditor {
       connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
       connLbl.textContent = 'Connections';
       connWrap.appendChild(connLbl);
-      const cbRow = document.createElement('div');
-      cbRow.style.cssText = 'display:flex;gap:8px;';
-      for (const dir of ['N', 'E', 'S', 'W'] as Array<keyof TileParams['connections']>) {
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = this._editorParams.connections[dir];
-        cb.id = `editor-conn-${dir}`;
-        cb.addEventListener('change', () => {
-          this._editorParams.connections[dir] = cb.checked;
+
+      // Compass grid: [empty][N][empty] / [W][tile][E] / [empty][S][empty]
+      const connGrid = document.createElement('div');
+      connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
+
+      const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
+        const active = this._editorParams.connections[dir];
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = dir;
+        b.title = `Toggle ${dir} connection`;
+        b.style.cssText =
+          'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
+          'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
+          'color:' + (active ? '#7ed321' : '#555') + ';' +
+          'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
+          'border-radius:4px;cursor:pointer;padding:0;';
+        b.addEventListener('click', () => {
+          this._editorParams.connections[dir] = !this._editorParams.connections[dir];
           this._applyParamsToLinkedTile();
+          const newPanel = this._buildParamPanel();
+          newPanel.id = 'editor-param-panel';
+          panel.replaceWith(newPanel);
         });
-        const cbLbl = document.createElement('label');
-        cbLbl.htmlFor = cb.id;
-        cbLbl.style.cssText = 'display:flex;align-items:center;gap:3px;font-size:0.8rem;';
-        cbLbl.appendChild(cb);
-        cbLbl.appendChild(document.createTextNode(dir));
-        cbRow.appendChild(cbLbl);
+        return b;
+      };
+
+      // Row 1: [empty] [N] [empty]
+      connGrid.appendChild(document.createElement('span'));
+      connGrid.appendChild(makeConnBtn('N'));
+      connGrid.appendChild(document.createElement('span'));
+      // Row 2: [W] [tile preview] [E]
+      connGrid.appendChild(makeConnBtn('W'));
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = TILE_SIZE;
+      previewCanvas.height = TILE_SIZE;
+      previewCanvas.style.cssText = 'width:28px;height:28px;border:1px solid #4a90d9;border-radius:4px;';
+      const previewCtx = previewCanvas.getContext('2d');
+      if (previewCtx) {
+        drawEditorTile(previewCtx, 0, 0, this._buildTileDef(this._editorPalette));
       }
-      connWrap.appendChild(cbRow);
+      connGrid.appendChild(previewCanvas);
+      connGrid.appendChild(makeConnBtn('E'));
+      // Row 3: [empty] [S] [empty]
+      connGrid.appendChild(document.createElement('span'));
+      connGrid.appendChild(makeConnBtn('S'));
+      connGrid.appendChild(document.createElement('span'));
+
+      connWrap.appendChild(connGrid);
       panel.appendChild(connWrap);
     }
 
