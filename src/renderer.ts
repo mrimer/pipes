@@ -196,7 +196,7 @@ export function drawTile(
       // When shatter is active and pressure reaches the shatter threshold, use lighter color.
       const shatterActive = tile.shatter > tile.hardness;
       const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-      const isHard = !shatterActive && tile.hardness >= currentPressure;
+      const isHard = tile.hardness >= currentPressure;
       color = isShatterTriggered
         ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
         : isHard
@@ -553,14 +553,13 @@ export function drawTile(
         ctx.fillText(String(snowCost), 0, 9);
       }
     } else if (chamberContent === 'sandstone') {
-      // When hardness >= pressure (and shatter not active), use darker color and show hardness.
-      // When shatter > hardness, show the (H=value, S=value) format.
+      // When hardness >= pressure, use darker color and show hardness.
       // When shatter is active and pressure reaches the shatter threshold, use lighter color.
       // When connected, show the locked effective cost value.
-      // Otherwise show three lines: negative adjusted cost, "x", and the temperature threshold.
+      // Otherwise show cost display lines.
       const shatterActive = tile.shatter > tile.hardness;
       const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-      const isHard = !shatterActive && tile.hardness >= currentPressure;
+      const isHard = tile.hardness >= currentPressure;
       const sandstoneColor = isShatterTriggered
         ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
         : isHard
@@ -586,12 +585,7 @@ export function drawTile(
       ctx.fillStyle = sandstoneColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      if (shatterActive) {
-        // Display (H=value, S=value) on two lines when shatter is configured
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText(`H=${tile.hardness}`, 0, -7);
-        ctx.fillText(`S=${tile.shatter}`, 0, 7);
-      } else if (isHard) {
+      if (isHard) {
         // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
         ctx.font = 'bold 14px Arial';
         ctx.fillText(`${tile.hardness}H`, 0, -7);
@@ -602,7 +596,7 @@ export function drawTile(
         ctx.font = 'bold 14px Arial';
         ctx.fillText(String(-lockedCost), 0, 0);
       } else {
-        // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
+        // Unconnected: show cost display.
         // deltaDamage = Pressure − Hardness is used as the cost divisor.
         // When shift is held, show the raw (unadjusted) values.
         const sandstoneThreshold = shiftHeld
@@ -612,12 +606,18 @@ export function drawTile(
         const sandstoneCost = shiftHeld
           ? cost
           : Math.max(1, deltaDamage >= 1 ? Math.ceil(cost / deltaDamage) : cost);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`-${sandstoneThreshold}°`, 0, -9);
-        ctx.font = 'bold 9px Arial';
-        ctx.fillText('x', 0, 0);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(sandstoneCost), 0, 9);
+        if (shatterActive && isShatterTriggered) {
+          ctx.font = 'bold 9px Arial';
+          ctx.fillText(`-${sandstoneThreshold}° x ${sandstoneCost}`, 0, -7);
+          ctx.fillText(`S @ ${tile.shatter}`, 0, 7);
+        } else {
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(`-${sandstoneThreshold}°`, 0, -9);
+          ctx.font = 'bold 9px Arial';
+          ctx.fillText('x', 0, 0);
+          ctx.font = 'bold 14px Arial';
+          ctx.fillText(String(sandstoneCost), 0, 9);
+        }
       }
     } else if (chamberContent === 'star') {
       // Draw a 5-pointed star
