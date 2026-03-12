@@ -59,15 +59,17 @@ export function scalePx(n: number): number {
 }
 
 /**
- * Compute the tile size (64 or 128 px) that best fills the available viewport.
- * Returns 128 when the whole grid at that size fits within the current
- * window's inner dimensions; otherwise returns 64 (the baseline size).
+ * Compute the largest tile size between 64 and 128 px (inclusive) such that
+ * the full grid fits within the current window's inner dimensions.
+ * Returns BASE_TILE_SIZE (64) when no window is available or the grid already
+ * overflows at the base size.
  */
 export function computeTileSize(rows: number, cols: number): number {
   if (typeof window === 'undefined') return BASE_TILE_SIZE;
   const avW = window.innerWidth;
   const avH = window.innerHeight;
-  return (cols * 128 <= avW && rows * 128 <= avH) ? 128 : BASE_TILE_SIZE;
+  const maxFit = Math.floor(Math.min(avW / cols, avH / rows));
+  return Math.max(BASE_TILE_SIZE, Math.min(128, maxFit));
 }
 
 /**
