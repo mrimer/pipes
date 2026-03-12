@@ -1644,6 +1644,11 @@ export class CampaignEditor {
     panel.appendChild(this._btn('↔ Resize', '#16213e', '#f0c040', () => {
       const MIN_DIM = 1;
       const MAX_DIM = 20;
+      const showErr = (msg: string) => {
+        resizeError.textContent = msg;
+        resizeError.style.display = 'block';
+        setTimeout(() => { resizeError.style.display = 'none'; }, 2000);
+      };
       const rVal = parseInt(rowsInp.value);
       const cVal = parseInt(colsInp.value);
       let outOfRange = false;
@@ -1656,9 +1661,11 @@ export class CampaignEditor {
         outOfRange = true;
       }
       if (outOfRange) {
-        resizeError.textContent = `Value out of range (${MIN_DIM} to ${MAX_DIM})`;
-        resizeError.style.display = 'block';
-        setTimeout(() => { resizeError.style.display = 'none'; }, 2000);
+        showErr(`Value out of range (${MIN_DIM} to ${MAX_DIM})`);
+        return;
+      }
+      if (rVal <= 1 && cVal <= 1) {
+        showErr('At least one dimension (rows or cols) must be > 1');
         return;
       }
       this._resizeGrid(rVal, cVal);
