@@ -8,7 +8,7 @@
 
 import { Board, NEIGHBOUR_DELTA } from './board';
 import { Direction, GridPos } from './types';
-import { TILE_SIZE } from './renderer';
+import { TILE_SIZE, scalePx as _s } from './renderer';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Source Spray
@@ -27,7 +27,7 @@ export interface SourceSprayDrop {
 }
 
 /** Distance at which a spray drop is fully transparent and removed. */
-const SPRAY_MAX_DIST = TILE_SIZE / 2;
+function _sprayMaxDist(): number { return TILE_SIZE / 2; }
 
 /** Maximum number of simultaneously live source spray drops. */
 const SPRAY_MAX_DROPS = 10;
@@ -40,9 +40,9 @@ export function spawnSourceSprayDrop(drops: SourceSprayDrop[]): void {
   if (drops.length >= SPRAY_MAX_DROPS) return;
   drops.push({
     angle: Math.random() * Math.PI * 2,
-    distance: Math.random() * 3,
-    speed: 0.5 + Math.random() * 0.8,
-    size: 1.5 + Math.random() * 2.0,
+    distance: Math.random() * _s(3),
+    speed: _s(0.5 + Math.random() * 0.8),
+    size: _s(1.5 + Math.random() * 2.0),
   });
 }
 
@@ -66,7 +66,7 @@ export function renderSourceSpray(
   while (i < drops.length) {
     const drop = drops[i];
     drop.distance += drop.speed;
-    if (drop.distance >= SPRAY_MAX_DIST) {
+    if (drop.distance >= _sprayMaxDist()) {
       drops.splice(i, 1);
       continue;
     }
@@ -75,7 +75,7 @@ export function renderSourceSpray(
     const y = sourceCy + Math.sin(drop.angle) * drop.distance;
 
     // Alpha: near-opaque at the centre, fades to transparent at the tile edge.
-    const progress = drop.distance / SPRAY_MAX_DIST;
+    const progress = drop.distance / _sprayMaxDist();
     const alpha = 0.6 * (1 - progress);
 
     ctx.save();
@@ -246,7 +246,7 @@ export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<str
     speed: 0.035 + Math.random() * 0.025,
     direction: dir,
     fromDir: null,
-    size: 6 + Math.random() * 4,
+    size: _s(6) + Math.random() * _s(4),
   });
 }
 
@@ -317,7 +317,7 @@ export function renderFlowDrops(
     ctx.fillStyle = color;
     ctx.fill();
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = _s(2);
     ctx.stroke();
     ctx.restore();
 

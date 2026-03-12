@@ -11,6 +11,12 @@ import { CampaignEditor } from '../src/campaignEditor';
 import { CampaignDef, LevelDef, PipeShape } from '../src/types';
 import { TileParams } from '../src/campaignEditorTypes';
 
+// Keep TILE_SIZE at 64 for all tests by simulating a small viewport.
+beforeAll(() => {
+  Object.defineProperty(window, 'innerWidth',  { value: 0, configurable: true });
+  Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
+});
+
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 
 describe('Campaign persistence', () => {

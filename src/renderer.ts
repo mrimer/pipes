@@ -34,9 +34,50 @@ import {
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
 } from './colors';
 
-const LINE_WIDTH = 10; // pipe stroke width in px
+let LINE_WIDTH = 10; // pipe stroke width in px
 
-export const TILE_SIZE = 64; // px
+/** The current tile size in pixels.  64 (default) or 128 (large) depending on the viewport. */
+export let TILE_SIZE = 64; // px
+
+/** Base tile size used as the reference for all pixel-value scaling. */
+const BASE_TILE_SIZE = 64;
+
+/**
+ * Scale a pixel value that was designed for BASE_TILE_SIZE to the current TILE_SIZE.
+ * Use for font sizes, small offsets and decoration dimensions.
+ */
+function _s(n: number): number {
+  return Math.round(n * TILE_SIZE / BASE_TILE_SIZE);
+}
+
+/**
+ * Exported alias for `_s`.  Allows other modules (e.g. campaignEditorRenderer)
+ * to scale pixel constants using the same factor.
+ */
+export function scalePx(n: number): number {
+  return _s(n);
+}
+
+/**
+ * Compute the tile size (64 or 128 px) that best fills the available viewport.
+ * Returns 128 when the whole grid at that size fits within the current
+ * window's inner dimensions; otherwise returns 64 (the baseline size).
+ */
+export function computeTileSize(rows: number, cols: number): number {
+  if (typeof window === 'undefined') return BASE_TILE_SIZE;
+  const avW = window.innerWidth;
+  const avH = window.innerHeight;
+  return (cols * 128 <= avW && rows * 128 <= avH) ? 128 : BASE_TILE_SIZE;
+}
+
+/**
+ * Update the active tile size and derived constants.
+ * Call this before setting canvas dimensions when loading a level.
+ */
+export function setTileSize(size: number): void {
+  TILE_SIZE = size;
+  LINE_WIDTH = Math.round(10 * size / BASE_TILE_SIZE);
+}
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
@@ -87,7 +128,7 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
  * The caller is responsible for translating the context to the desired centre.
  */
 export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
-  const r = 11;
+  const r = _s(11);
   // Arc spans ~270° clockwise: start at 150°, end at 60° (going CW = increasing angle).
   const startAngle = (150 * Math.PI) / 180;
   const endAngle   = startAngle + (270 * Math.PI) / 180;
@@ -99,8 +140,8 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
   const tdx = -Math.sin(tipAngle);
   const tdy =  Math.cos(tipAngle);
   // Arrowhead dimensions.
-  const headLen = 5;
-  const headHalf = 3;
+  const headLen = _s(5);
+  const headHalf = _s(3);
   const baseX = tipX - tdx * headLen;
   const baseY = tipY - tdy * headLen;
   const p1x = baseX + tdy * headHalf;
@@ -111,7 +152,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
   // Draw black outline layer.
   ctx.save();
   ctx.lineCap = 'round';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = _s(3);
   ctx.strokeStyle = 'black';
   ctx.beginPath();
   ctx.arc(0, 0, r, startAngle, endAngle, false);
@@ -125,7 +166,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
   ctx.fill();
 
   // Draw white arrow on top.
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.strokeStyle = 'white';
   ctx.beginPath();
   ctx.arc(0, 0, r, startAngle, endAngle, false);
@@ -165,7 +206,7 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
   // Show capacity number on Source (drawn last so it appears on top)
   if (shape === PipeShape.Source) {
     ctx.fillStyle = LABEL_COLOR;
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(currentWater), 0, 0);
@@ -178,14 +219,14 @@ function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
   ctx.fillStyle = GRANITE_FILL_COLOR;
   ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
   ctx.strokeStyle = GRANITE_COLOR;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = _s(3);
   ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
   // Stone texture – a few crack-like lines
   ctx.strokeStyle = GRANITE_COLOR;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(-bw + 4, -bh + 10); ctx.lineTo(bw - 6, -bh + 16); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + 2, 2);         ctx.lineTo(bw - 8, 8);        ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + 6, bh - 14);   ctx.lineTo(bw - 4, bh - 8);  ctx.stroke();
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
 }
 
 function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
@@ -231,9 +272,9 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
     const countLabel = String(itemCount);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 30px Arial';
+    ctx.font = `bold ${_s(30)}px Arial`;
     ctx.strokeStyle = 'black';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = _s(1);
     ctx.strokeText(countLabel, 0, 0);
     ctx.fillStyle = 'white';
     ctx.fillText(countLabel, 0, 0);
@@ -248,16 +289,16 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
     : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
   // Draw decorative lines near the top of the box
   ctx.strokeStyle = heaterBaseColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
-  const lineLeft = -bw + 4;
-  const lineRight = bw - 4;
+  const lineLeft = -bw + _s(4);
+  const lineRight = bw - _s(4);
   const lineSpan = lineRight - lineLeft;
   if (isCooler) {
     // Cooler: thin horizontal wind lines near top
     for (let i = 0; i < 3; i++) {
-      const lineY = -bh + 4 + i * 3.5;
-      const hw = (lineSpan - i * 5) / 2;
+      const lineY = -bh + _s(4) + i * _s(3.5);
+      const hw = (lineSpan - i * _s(5)) / 2;
       ctx.beginPath();
       ctx.moveTo(-hw, lineY);
       ctx.lineTo(hw, lineY);
@@ -266,18 +307,18 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
   } else {
     // Heater: 3 short, thin wavy heat lines near the top
     for (let i = 0; i < 3; i++) {
-      const lineY = -bh + 4 + i * 3.5;
+      const lineY = -bh + _s(4) + i * _s(3.5);
       const xMid = 0;
       const xQuart = lineSpan / 4;
       ctx.beginPath();
       ctx.moveTo(lineLeft, lineY);
-      ctx.quadraticCurveTo(lineLeft + xQuart, lineY - 2.5, xMid, lineY);
-      ctx.quadraticCurveTo(xMid + xQuart, lineY + 2.5, lineRight, lineY);
+      ctx.quadraticCurveTo(lineLeft + xQuart, lineY - _s(2.5), xMid, lineY);
+      ctx.quadraticCurveTo(xMid + xQuart, lineY + _s(2.5), lineRight, lineY);
       ctx.stroke();
     }
   }
   ctx.fillStyle = heaterBaseColor;
-  ctx.font = 'bold 13px Arial';
+  ctx.font = `bold ${_s(13)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const tempStr = tile.temperature >= 0 ? `+${tile.temperature}°` : `${tile.temperature}°`;
@@ -288,18 +329,18 @@ function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: n
   // Draw short diagonal ice lines in top-left and bottom-right corners
   const iceDecorColor = isWater ? ICE_WATER_COLOR : ICE_COLOR;
   ctx.strokeStyle = iceDecorColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(-bw + 3, -bh + 9); ctx.lineTo(-bw + 9, -bh + 3); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + 3, -bh + 13); ctx.lineTo(-bw + 13, -bh + 3); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(bw - 9, bh - 3); ctx.lineTo(bw - 3, bh - 9); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(bw - 13, bh - 3); ctx.lineTo(bw - 3, bh - 13); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(3), -bh + _s(9)); ctx.lineTo(-bw + _s(9), -bh + _s(3)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(3), -bh + _s(13)); ctx.lineTo(-bw + _s(13), -bh + _s(3)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bw - _s(9), bh - _s(3)); ctx.lineTo(bw - _s(3), bh - _s(9)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bw - _s(13), bh - _s(3)); ctx.lineTo(bw - _s(3), bh - _s(13)); ctx.stroke();
   ctx.fillStyle = iceDecorColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (lockedCost !== null) {
     // Connected: show the single locked effective (negative) cost value
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(String(-lockedCost), 0, 0);
   } else {
     // Unconnected: show three lines: negative cost, "x", and the temperature threshold.
@@ -308,12 +349,12 @@ function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: n
     const iceThreshold = shiftHeld
       ? tile.temperature
       : Math.max(0, tile.temperature - currentTemp);
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`-${iceThreshold}°`, 0, -9);
-    ctx.font = 'bold 9px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(`-${iceThreshold}°`, 0, -_s(9));
+    ctx.font = `bold ${_s(9)}px Arial`;
     ctx.fillText('x', 0, 0);
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(String(tile.cost), 0, 9);
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(String(tile.cost), 0, _s(9));
   }
 }
 
@@ -325,35 +366,35 @@ function _drawChamberPumpContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
     : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
   // Draw decorative graphics near the top of the box
   ctx.strokeStyle = pumpBaseColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
   if (isVacuum) {
     // Vacuum: simple vortex swirl near the top
-    const swirlY = -bh + 9;
+    const swirlY = -bh + _s(9);
     ctx.beginPath();
-    ctx.arc(0, swirlY, 7, 0, Math.PI * 1.5);
+    ctx.arc(0, swirlY, _s(7), 0, Math.PI * 1.5);
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(0, swirlY, 3.5, Math.PI * 0.5, Math.PI * 2);
+    ctx.arc(0, swirlY, _s(3.5), Math.PI * 0.5, Math.PI * 2);
     ctx.stroke();
   } else {
     // Pump: series of thin chevrons in a horizontal line near the top
-    const chevY = -bh + 7;
-    const chevH = 4;
-    const chevSpacing = 7;
+    const chevY = -bh + _s(7);
+    const chevH = _s(4);
+    const chevSpacing = _s(7);
     const numChev = 4;
     const chevStartX = -(numChev - 1) * chevSpacing / 2;
     for (let i = 0; i < numChev; i++) {
       const chx = chevStartX + i * chevSpacing;
       ctx.beginPath();
-      ctx.moveTo(chx - 2.5, chevY - chevH);
-      ctx.lineTo(chx + 2.5, chevY);
-      ctx.lineTo(chx - 2.5, chevY + chevH);
+      ctx.moveTo(chx - _s(2.5), chevY - chevH);
+      ctx.lineTo(chx + _s(2.5), chevY);
+      ctx.lineTo(chx - _s(2.5), chevY + chevH);
       ctx.stroke();
     }
   }
   ctx.fillStyle = pumpBaseColor;
-  ctx.font = 'bold 13px Arial';
+  ctx.font = `bold ${_s(13)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const pressStr = tile.pressure >= 0 ? `+${tile.pressure}P` : `${tile.pressure}P`;
@@ -364,11 +405,11 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   // Draw a small snowflake in the top-right inside corner
   const snowDecorColor = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
   ctx.strokeStyle = snowDecorColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
-  const sfx = bw - 8;
-  const sfy = -bh + 8;
-  const sfR = 5;
+  const sfx = bw - _s(8);
+  const sfy = -bh + _s(8);
+  const sfR = _s(5);
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 3) * i;
     ctx.beginPath();
@@ -381,7 +422,7 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   ctx.textBaseline = 'middle';
   if (lockedCost !== null) {
     // Connected: show the single locked effective (negative) cost value
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(String(-lockedCost), 0, 0);
   } else {
     // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
@@ -393,12 +434,12 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
     const snowCost = shiftHeld
       ? tile.cost
       : Math.max(1, currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost);
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`-${deltaTemp}°`, 0, -9);
-    ctx.font = 'bold 9px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(`-${deltaTemp}°`, 0, -_s(9));
+    ctx.font = `bold ${_s(9)}px Arial`;
     ctx.fillText('x', 0, 0);
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(String(snowCost), 0, 9);
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(String(snowCost), 0, _s(9));
   }
 }
 
@@ -412,23 +453,23 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
   // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
   ctx.strokeStyle = sandstoneColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
-  const sLineLeft = -bw + 4;
-  const sLineRight = bw - 4;
+  const sLineLeft = -bw + _s(4);
+  const sLineRight = bw - _s(4);
   const sLineSpan = sLineRight - sLineLeft;
   const sLineMid = 0;
   const sLineQuart = sLineSpan / 4;
   for (let i = 0; i < 2; i++) {
-    const sLineY = bh - 5 - i * 4;
+    const sLineY = bh - _s(5) - i * _s(4);
     ctx.beginPath();
     ctx.moveTo(sLineLeft, sLineY);
-    ctx.quadraticCurveTo(sLineLeft + sLineQuart, sLineY - 2.5, sLineMid, sLineY);
-    ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + 2.5, sLineRight, sLineY);
+    ctx.quadraticCurveTo(sLineLeft + sLineQuart, sLineY - _s(2.5), sLineMid, sLineY);
+    ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + _s(2.5), sLineRight, sLineY);
     ctx.stroke();
   }
-  // Vertically center text between the rect top (−bh) and the top of the wavy lines (bh − 11.5).
-  const wavesTop = bh - 11.5;
+  // Vertically center text between the rect top (−bh) and the top of the wavy lines.
+  const wavesTop = bh - _s(11.5);
   const textCenterY = (-bh + wavesTop) / 2;
   // Use the lighter standard sandstone color for text when isHard so it is readable
   // against the dark tile background.
@@ -437,13 +478,13 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   ctx.textBaseline = 'middle';
   if (isHard) {
     // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`${tile.hardness}H`, 0, textCenterY - 7);
-    ctx.font = (tile.temperature < 10 && tile.cost < 10) ? 'bold 11px Arial' : 'bold 9px Arial';
-    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, textCenterY + 7);
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(`${tile.hardness}H`, 0, textCenterY - _s(7));
+    ctx.font = (tile.temperature < 10 && tile.cost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, textCenterY + _s(7));
   } else if (lockedCost !== null) {
     // Connected: show the single locked effective (negative) cost value
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(String(-lockedCost), 0, textCenterY);
   } else {
     // Unconnected: show cost display.
@@ -458,17 +499,17 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
       : Math.max(1, deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost);
     if (shatterActive) {
       const displayCost = isShatterTriggered ? 0 : sandstoneCost;
-      ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? 'bold 11px Arial' : 'bold 9px Arial';
-      ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY - 7);
-      ctx.font = tile.shatter < 10 ? 'bold 12px Arial' : 'bold 9px Arial';
-      ctx.fillText(`S @ ${tile.shatter}P`, 0, textCenterY + 7);
+      ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+      ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY - _s(7));
+      ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
+      ctx.fillText(`S @ ${tile.shatter}P`, 0, textCenterY + _s(7));
     } else {
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(`-${sandstoneThreshold}°`, 0, textCenterY - 9);
-      ctx.font = 'bold 9px Arial';
+      ctx.font = `bold ${_s(14)}px Arial`;
+      ctx.fillText(`-${sandstoneThreshold}°`, 0, textCenterY - _s(9));
+      ctx.font = `bold ${_s(9)}px Arial`;
       ctx.fillText('x', 0, textCenterY);
-      ctx.font = 'bold 14px Arial';
-      ctx.fillText(String(sandstoneCost), 0, textCenterY + 9);
+      ctx.font = `bold ${_s(14)}px Arial`;
+      ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(9));
     }
   }
 }
@@ -477,12 +518,12 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
   // Draw a small flame icon in the top-right inside corner
   const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
   ctx.strokeStyle = hotColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
   // Flame: a simple upward-pointing flame shape
-  const fx = bw - 8;
-  const fy = -bh + 9;
-  const fr = 5;
+  const fx = bw - _s(8);
+  const fy = -bh + _s(9);
+  const fr = _s(5);
   ctx.beginPath();
   ctx.moveTo(fx, fy + fr);
   ctx.bezierCurveTo(fx - fr, fy, fx - fr * 0.5, fy - fr * 1.2, fx, fy - fr);
@@ -499,7 +540,7 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
     const parts: string[] = [];
     if (gain > 0) parts.push(`+${gain}`);
     if (loss > 0) parts.push(`-${loss}`);
-    ctx.font = 'bold 12px Arial';
+    ctx.font = `bold ${_s(12)}px Arial`;
     ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
   } else {
     // Unconnected: show boiling temp and mass.
@@ -507,12 +548,12 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
     const deltaTemp = shiftHeld
       ? tile.temperature
       : tile.temperature + currentTemp;
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(`${deltaTemp}°`, 0, -9);
-    ctx.font = 'bold 9px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(`${deltaTemp}°`, 0, -_s(9));
+    ctx.font = `bold ${_s(9)}px Arial`;
     ctx.fillText('x', 0, 0);
-    ctx.font = 'bold 14px Arial';
-    ctx.fillText(String(tile.cost), 0, 9);
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.fillText(String(tile.cost), 0, _s(9));
   }
 }
 
@@ -526,7 +567,7 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
   ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
   ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = _s(3);
   ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
@@ -534,21 +575,21 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
     // Draw water line with wave ripples near top of the box
     const tankDecorColor = isWater ? TANK_WATER_COLOR : TANK_COLOR;
     ctx.strokeStyle = tankDecorColor;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = _s(1.5);
     ctx.lineCap = 'round';
-    const wy = -bh + 7;
-    const wLeft = -bw + 4;
-    const wRight = bw - 4;
+    const wy = -bh + _s(7);
+    const wLeft = -bw + _s(4);
+    const wRight = bw - _s(4);
     const wMid = 0;
     const wQuart = (wRight - wLeft) / 4;
     ctx.beginPath();
     ctx.moveTo(wLeft, wy);
-    ctx.quadraticCurveTo(wLeft + wQuart, wy - 3, wMid, wy);
-    ctx.quadraticCurveTo(wMid + wQuart, wy + 3, wRight, wy);
+    ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
+    ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
     ctx.stroke();
     // Show capacity number in tank-like color
     ctx.fillStyle = tankDecorColor;
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(String(tile.capacity), 0, 0);
@@ -556,15 +597,15 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
     // Draw short diagonal dirt lines near top-right and bottom-left corners
     const dirtDecorColor = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
     ctx.strokeStyle = dirtDecorColor;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = _s(1.5);
     ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(bw - 9, -bh + 3); ctx.lineTo(bw - 3, -bh + 9); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bw - 13, -bh + 3); ctx.lineTo(bw - 3, -bh + 13); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw + 3, bh - 9); ctx.lineTo(-bw + 9, bh - 3); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw + 3, bh - 13); ctx.lineTo(-bw + 13, bh - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bw - _s(9), -bh + _s(3)); ctx.lineTo(bw - _s(3), -bh + _s(9)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bw - _s(13), -bh + _s(3)); ctx.lineTo(bw - _s(3), -bh + _s(13)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-bw + _s(3), bh - _s(9)); ctx.lineTo(-bw + _s(9), bh - _s(3)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-bw + _s(3), bh - _s(13)); ctx.lineTo(-bw + _s(13), bh - _s(3)); ctx.stroke();
     // Show negative cost label in dirt-like color
     ctx.fillStyle = dirtDecorColor;
-    ctx.font = 'bold 14px Arial';
+    ctx.font = `bold ${_s(14)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`-${tile.cost}`, 0, 0);
@@ -709,7 +750,7 @@ export function drawTile(
     // Draw a subtle dot so the tile is visually distinct from fixed tiles
     ctx.fillStyle = EMPTY_COLOR;
     ctx.beginPath();
-    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.arc(0, 0, _s(4), 0, Math.PI * 2);
     ctx.fill();
   } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
     ctx.beginPath();
@@ -886,10 +927,10 @@ const GRASS_COLOR = 'rgba(72,115,58,0.90)';
 function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
   const color = PEBBLE_COLORS[variant % PEBBLE_COLORS.length];
   const stones: Array<[number, number, number, number]> = [
-    [0, 0, 5.25, 3.75],
-    [7.5, -3.75, 4.2, 3.0],
+    [0, 0, _s(5.25), _s(3.75)],
+    [_s(7.5), -_s(3.75), _s(4.2), _s(3.0)],
   ];
-  if (variant < 2) stones.push([-6, 4.5, 3.3, 2.4]);
+  if (variant < 2) stones.push([-_s(6), _s(4.5), _s(3.3), _s(2.4)]);
   ctx.fillStyle = color;
   for (const [dx, dy, rx, ry] of stones) {
     ctx.beginPath();
@@ -902,8 +943,8 @@ function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
 function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
   const petalColor = FLOWER_PETAL_COLORS[variant % FLOWER_PETAL_COLORS.length];
   const petals = 5;
-  const petalDist = 4.5;
-  const petalR = 2.8;
+  const petalDist = _s(4.5);
+  const petalR = _s(2.8);
   ctx.fillStyle = petalColor;
   for (let i = 0; i < petals; i++) {
     const angle = (i / petals) * Math.PI * 2;
@@ -912,7 +953,7 @@ function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
     ctx.fill();
   }
   ctx.beginPath();
-  ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+  ctx.arc(0, 0, _s(2.2), 0, Math.PI * 2);
   ctx.fillStyle = FLOWER_CENTER_COLOR;
   ctx.fill();
 }
@@ -921,12 +962,12 @@ function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
 function _drawGrass(ctx: CanvasRenderingContext2D, variant: number): void {
   const blades = variant + 3; // 3–5 blades
   ctx.strokeStyle = GRASS_COLOR;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
   for (let i = 0; i < blades; i++) {
     // Fan the blades symmetrically; vary length slightly for a natural look
     const spread = (blades > 1) ? ((i / (blades - 1)) - 0.5) * (Math.PI * 0.55) : 0;
-    const len = 8.25 + (i % 2) * 3;
+    const len = _s(8.25 + (i % 2) * 3);
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(Math.sin(spread) * len, -Math.cos(spread) * len);

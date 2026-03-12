@@ -11,7 +11,7 @@
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation } from './types';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from './persistence';
-import { TILE_SIZE } from './renderer';
+import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 
 /** Maximum CSS display size (px) for the editor canvas on either axis. */
 const MAX_EDITOR_CANVAS_PX = 512;
@@ -863,6 +863,7 @@ export class CampaignEditor {
 
     // Canvas
     const canvas = document.createElement('canvas');
+    setTileSize(computeTileSize(this._editRows, this._editCols));
     canvas.width  = this._editCols * TILE_SIZE;
     canvas.height = this._editRows * TILE_SIZE;
     canvas.style.cssText =
@@ -2222,6 +2223,7 @@ export class CampaignEditor {
     this._editCols = snapshot.cols;
     this._editInventory = JSON.parse(JSON.stringify(snapshot.inventory)) as InventoryItem[];
     if (this._editorCanvas) {
+      setTileSize(computeTileSize(this._editRows, this._editCols));
       this._editorCanvas.width  = this._editCols * TILE_SIZE;
       this._editorCanvas.height = this._editRows * TILE_SIZE;
     }
@@ -2263,6 +2265,7 @@ export class CampaignEditor {
     this._editCols = newCols;
     this._editGrid = newGrid;
     if (this._editorCanvas) {
+      setTileSize(computeTileSize(newRows, newCols));
       this._editorCanvas.width  = newCols * TILE_SIZE;
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
