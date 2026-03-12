@@ -29,6 +29,7 @@ import {
   SNOW_COLOR, SNOW_WATER_COLOR,
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
+  SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
   STAR_COLOR, STAR_WATER_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
 } from './colors';
@@ -192,11 +193,15 @@ export function drawTile(
       color = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
     } else if (chamberContent === 'sandstone') {
       // When hardness >= pressure (and shatter not active), use darker color.
+      // When shatter is active and pressure reaches the shatter threshold, use lighter color.
       const shatterActive = tile.shatter > tile.hardness;
+      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
       const isHard = !shatterActive && tile.hardness >= currentPressure;
-      color = isHard
-        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+      color = isShatterTriggered
+        ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
+        : isHard
+          ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+          : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
     } else if (chamberContent === 'hot_plate') {
       color = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
     } else {
@@ -550,13 +555,17 @@ export function drawTile(
     } else if (chamberContent === 'sandstone') {
       // When hardness >= pressure (and shatter not active), use darker color and show hardness.
       // When shatter > hardness, show the (H=value, S=value) format.
+      // When shatter is active and pressure reaches the shatter threshold, use lighter color.
       // When connected, show the locked effective cost value.
       // Otherwise show three lines: negative adjusted cost, "x", and the temperature threshold.
       const shatterActive = tile.shatter > tile.hardness;
+      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
       const isHard = !shatterActive && tile.hardness >= currentPressure;
-      const sandstoneColor = isHard
-        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+      const sandstoneColor = isShatterTriggered
+        ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
+        : isHard
+          ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+          : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
       // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
       ctx.strokeStyle = sandstoneColor;
       ctx.lineWidth = 1.5;
