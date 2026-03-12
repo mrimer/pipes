@@ -5,7 +5,7 @@
 import { Game } from '../src/game';
 import { LevelDef, PipeShape, CampaignDef } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
-import { saveImportedCampaigns } from '../src/persistence';
+import { saveImportedCampaigns, loadActiveCampaignId } from '../src/persistence';
 
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
@@ -2159,5 +2159,83 @@ describe('Game – challenge-level modal', () => {
     const hooks = gameHooks(game);
     expect(hooks._challengeSkipBtnEl.style.display).not.toBe('none');
     expect(hooks._challengeMsgEl.style.display).not.toBe('none');
+  });
+});
+
+// ─── Tests: campaign auto-selection on startup ────────────────────────────────
+
+/** Set up the minimal DOM and construct a Game without touching localStorage. */
+function makeGameWithStorage(): Game {
+  document.body.innerHTML = `
+    <canvas id="game-canvas"></canvas>
+    <div id="level-select"><div id="level-list"></div></div>
+    <div id="play-screen">
+      <div id="level-header"></div>
+      <div id="water-display" class="stat-row"><span class="stat-label">💧 Water</span><span class="stat-value"></span></div>
+      <div id="inventory-bar"></div>
+      <button id="undo-btn"></button>
+      <button id="redo-btn"></button>
+      <button id="exit-btn">← Menu</button>
+    </div>
+    <div id="win-modal"><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
+    <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
+  `;
+  const get = (id: string) => document.getElementById(id) as HTMLElement;
+  return new Game(
+    get('game-canvas') as HTMLCanvasElement,
+    get('level-select'),
+    get('level-list'),
+    get('play-screen'),
+    get('level-header'),
+    get('inventory-bar'),
+    get('water-display'),
+    get('win-modal'),
+    get('gameover-modal'),
+    get('gameover-msg'),
+    get('undo-btn') as HTMLButtonElement,
+    get('redo-btn') as HTMLButtonElement,
+    get('exit-btn') as HTMLButtonElement,
+  );
+}
+
+describe('Game – campaign auto-selection on startup', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('selects no campaign when no campaigns are available', () => {
+    const game = makeGameWithStorage();
+    expect(gameHooks(game)._activeCampaign).toBeNull();
+  });
+
+  it('auto-selects the first available campaign when none is saved', () => {
+    const campaign: CampaignDef = { id: 'c1', name: 'Campaign 1', author: 'A', chapters: [] };
+    saveImportedCampaigns([campaign]);
+
+    const game = makeGameWithStorage();
+
+    expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'c1' });
+    expect(loadActiveCampaignId()).toBe('c1');
+  });
+
+  it('prefers an official campaign over a non-official one', () => {
+    const unofficial: CampaignDef = { id: 'u1', name: 'Unofficial', author: 'A', chapters: [] };
+    const official: CampaignDef = { id: 'o1', name: 'Official', author: 'A', chapters: [], official: true };
+    saveImportedCampaigns([unofficial, official]);
+
+    const game = makeGameWithStorage();
+
+    expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'o1' });
+    expect(loadActiveCampaignId()).toBe('o1');
+  });
+
+  it('does not override an existing saved campaign on startup', () => {
+    const c1: CampaignDef = { id: 'c1', name: 'Campaign 1', author: 'A', chapters: [] };
+    const c2: CampaignDef = { id: 'c2', name: 'Campaign 2', author: 'A', chapters: [], official: true };
+    saveImportedCampaigns([c1, c2]);
+    localStorage.setItem('pipes_active_campaign', 'c1');
+
+    const game = makeGameWithStorage();
+
+    // Should restore c1 (the saved one) rather than auto-selecting the official c2.
+    expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'c1' });
   });
 });
