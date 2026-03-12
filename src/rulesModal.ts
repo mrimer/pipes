@@ -177,7 +177,7 @@ const LEGEND_ROWS: LegendRow[] = [
 export function createGameRulesModal(): HTMLElement {
   const overlay = document.createElement('div');
   overlay.style.cssText =
-    'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);' +
+    'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
     'justify-content:center;align-items:flex-start;z-index:100;' +
     'overflow-y:auto;padding:24px 16px;';
 

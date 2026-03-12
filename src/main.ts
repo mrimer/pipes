@@ -19,6 +19,7 @@ const gameoverMsgEl  = getEl('gameover-msg');
 const undoBtnEl      = getEl<HTMLButtonElement>('undo-btn');
 const redoBtnEl      = getEl<HTMLButtonElement>('redo-btn');
 const exitBtnEl      = getEl<HTMLButtonElement>('exit-btn');
+const rulesBtnEl     = getEl<HTMLButtonElement>('rules-btn');
 
 const game = new Game(
   canvas,
@@ -54,4 +55,7 @@ getEl('restart-btn').addEventListener('click', () => game.retryLevel());
 
 // Exit to menu button on play screen
 exitBtnEl.addEventListener('click', () => game.exitToMenu());
+
+// Rules button on play screen
+rulesBtnEl.addEventListener('click', () => game.showRules());
 
