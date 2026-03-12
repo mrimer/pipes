@@ -140,6 +140,480 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
   ctx.restore();
 }
 
+function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape): void {
+  // Filled circle
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  // Radiating lines – only for connected directions
+  ctx.strokeStyle = color;
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.lineCap = 'round';
+  if (tile.connections.has(Direction.North)) {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -half); ctx.stroke();
+  }
+  if (tile.connections.has(Direction.South)) {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, half); ctx.stroke();
+  }
+  if (tile.connections.has(Direction.East)) {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
+  }
+  if (tile.connections.has(Direction.West)) {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-half, 0); ctx.stroke();
+  }
+  // Show capacity number on Source (drawn last so it appears on top)
+  if (shape === PipeShape.Source) {
+    ctx.fillStyle = LABEL_COLOR;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(currentWater), 0, 0);
+  }
+}
+
+function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
+  const bw = half * 0.7;
+  const bh = half * 0.7;
+  ctx.fillStyle = GRANITE_FILL_COLOR;
+  ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+  ctx.strokeStyle = GRANITE_COLOR;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+  // Stone texture – a few crack-like lines
+  ctx.strokeStyle = GRANITE_COLOR;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-bw + 4, -bh + 10); ctx.lineTo(bw - 6, -bh + 16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + 2, 2);         ctx.lineTo(bw - 8, 8);        ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + 6, bh - 14);   ctx.lineTo(bw - 4, bh - 8);  ctx.stroke();
+}
+
+function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
+  // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
+  const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
+  const itemColor = isGoldItem
+    ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
+    : (isWater ? WATER_COLOR : PIPE_COLOR);
+  if (itemShape !== null) {
+    let drawShape = itemShape;
+    if (itemShape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
+    else if (itemShape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
+    else if (itemShape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
+    else if (itemShape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
+    ctx.save();
+    // Clip to the inner box so the pipe image never bleeds onto the connection stubs
+    ctx.beginPath();
+    ctx.rect(-bw, -bh, bw * 2, bh * 2);
+    ctx.clip();
+    // 2px buffer between item shape and chamber walls
+    const scale = (bw - 2) / half;
+    ctx.scale(scale, scale);
+    ctx.strokeStyle = itemColor;
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.lineCap = 'round';
+    if (drawShape === PipeShape.Straight) {
+      ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+    } else if (drawShape === PipeShape.Elbow) {
+      ctx.beginPath();
+      ctx.moveTo(0, -half); ctx.lineTo(0, 0); ctx.lineTo(half, 0);
+      ctx.stroke();
+    } else if (drawShape === PipeShape.Tee) {
+      ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
+    } else if (drawShape === PipeShape.Cross) {
+      ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Draw quantity number centered, white with a 1px black outline
+  if (itemCount > 1) {
+    const countLabel = String(itemCount);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 30px Arial';
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 1;
+    ctx.strokeText(countLabel, 0, 0);
+    ctx.fillStyle = 'white';
+    ctx.fillText(countLabel, 0, 0);
+  }
+}
+
+function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
+  // Show temperature bonus (no plus sign for negative values)
+  const isCooler = tile.temperature < 0;
+  const heaterBaseColor = isCooler
+    ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
+    : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
+  // Draw decorative lines near the top of the box
+  ctx.strokeStyle = heaterBaseColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  const lineLeft = -bw + 4;
+  const lineRight = bw - 4;
+  const lineSpan = lineRight - lineLeft;
+  if (isCooler) {
+    // Cooler: thin horizontal wind lines near top
+    for (let i = 0; i < 3; i++) {
+      const lineY = -bh + 4 + i * 3.5;
+      const hw = (lineSpan - i * 5) / 2;
+      ctx.beginPath();
+      ctx.moveTo(-hw, lineY);
+      ctx.lineTo(hw, lineY);
+      ctx.stroke();
+    }
+  } else {
+    // Heater: 3 short, thin wavy heat lines near the top
+    for (let i = 0; i < 3; i++) {
+      const lineY = -bh + 4 + i * 3.5;
+      const xMid = 0;
+      const xQuart = lineSpan / 4;
+      ctx.beginPath();
+      ctx.moveTo(lineLeft, lineY);
+      ctx.quadraticCurveTo(lineLeft + xQuart, lineY - 2.5, xMid, lineY);
+      ctx.quadraticCurveTo(xMid + xQuart, lineY + 2.5, lineRight, lineY);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = heaterBaseColor;
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const tempStr = tile.temperature >= 0 ? `+${tile.temperature}°` : `${tile.temperature}°`;
+  ctx.fillText(tempStr, 0, 0);
+}
+
+function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null): void {
+  // Draw short diagonal ice lines in top-left and bottom-right corners
+  const iceDecorColor = isWater ? ICE_WATER_COLOR : ICE_COLOR;
+  ctx.strokeStyle = iceDecorColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-bw + 3, -bh + 9); ctx.lineTo(-bw + 9, -bh + 3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + 3, -bh + 13); ctx.lineTo(-bw + 13, -bh + 3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bw - 9, bh - 3); ctx.lineTo(bw - 3, bh - 9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bw - 13, bh - 3); ctx.lineTo(bw - 3, bh - 13); ctx.stroke();
+  ctx.fillStyle = iceDecorColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (lockedCost !== null) {
+    // Connected: show the single locked effective (negative) cost value
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(String(-lockedCost), 0, 0);
+  } else {
+    // Unconnected: show three lines: negative cost, "x", and the temperature threshold.
+    // By default, adjust the threshold display by current temperature (capped at 0).
+    // When shift is held, show the raw (unadjusted) threshold value.
+    const iceThreshold = shiftHeld
+      ? tile.temperature
+      : Math.max(0, tile.temperature - currentTemp);
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(`-${iceThreshold}°`, 0, -9);
+    ctx.font = 'bold 9px Arial';
+    ctx.fillText('x', 0, 0);
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(String(tile.cost), 0, 9);
+  }
+}
+
+function _drawChamberPumpContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
+  // Show pressure bonus (no plus sign for negative values)
+  const isVacuum = tile.pressure < 0;
+  const pumpBaseColor = isVacuum
+    ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
+    : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
+  // Draw decorative graphics near the top of the box
+  ctx.strokeStyle = pumpBaseColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  if (isVacuum) {
+    // Vacuum: simple vortex swirl near the top
+    const swirlY = -bh + 9;
+    ctx.beginPath();
+    ctx.arc(0, swirlY, 7, 0, Math.PI * 1.5);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, swirlY, 3.5, Math.PI * 0.5, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // Pump: series of thin chevrons in a horizontal line near the top
+    const chevY = -bh + 7;
+    const chevH = 4;
+    const chevSpacing = 7;
+    const numChev = 4;
+    const chevStartX = -(numChev - 1) * chevSpacing / 2;
+    for (let i = 0; i < numChev; i++) {
+      const chx = chevStartX + i * chevSpacing;
+      ctx.beginPath();
+      ctx.moveTo(chx - 2.5, chevY - chevH);
+      ctx.lineTo(chx + 2.5, chevY);
+      ctx.lineTo(chx - 2.5, chevY + chevH);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle = pumpBaseColor;
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const pressStr = tile.pressure >= 0 ? `+${tile.pressure}P` : `${tile.pressure}P`;
+  ctx.fillText(pressStr, 0, 0);
+}
+
+function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null): void {
+  // Draw a small snowflake in the top-right inside corner
+  const snowDecorColor = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
+  ctx.strokeStyle = snowDecorColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  const sfx = bw - 8;
+  const sfy = -bh + 8;
+  const sfR = 5;
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i;
+    ctx.beginPath();
+    ctx.moveTo(sfx, sfy);
+    ctx.lineTo(sfx + sfR * Math.cos(angle), sfy + sfR * Math.sin(angle));
+    ctx.stroke();
+  }
+  ctx.fillStyle = snowDecorColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (lockedCost !== null) {
+    // Connected: show the single locked effective (negative) cost value
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(String(-lockedCost), 0, 0);
+  } else {
+    // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
+    // By default, show values adjusted by current Pressure and Temperature.
+    // When shift is held, show the raw (unadjusted) values.
+    const deltaTemp = shiftHeld
+      ? tile.temperature
+      : Math.max(0, tile.temperature - currentTemp);
+    const snowCost = shiftHeld
+      ? tile.cost
+      : Math.max(1, currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost);
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(`-${deltaTemp}°`, 0, -9);
+    ctx.font = 'bold 9px Arial';
+    ctx.fillText('x', 0, 0);
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(String(snowCost), 0, 9);
+  }
+}
+
+function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, sandstoneColor: string, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null): void {
+  // When hardness >= pressure, use darker color and show hardness.
+  // When shatter is active and pressure reaches the shatter threshold, use lighter color.
+  // When connected, show the locked effective cost value.
+  // Otherwise show cost display lines.
+  const shatterActive = tile.shatter > tile.hardness;
+  const isHard = tile.hardness >= currentPressure;
+  // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
+  ctx.strokeStyle = sandstoneColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  const sLineLeft = -bw + 4;
+  const sLineRight = bw - 4;
+  const sLineSpan = sLineRight - sLineLeft;
+  const sLineMid = 0;
+  const sLineQuart = sLineSpan / 4;
+  for (let i = 0; i < 2; i++) {
+    const sLineY = bh - 5 - i * 4;
+    ctx.beginPath();
+    ctx.moveTo(sLineLeft, sLineY);
+    ctx.quadraticCurveTo(sLineLeft + sLineQuart, sLineY - 2.5, sLineMid, sLineY);
+    ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + 2.5, sLineRight, sLineY);
+    ctx.stroke();
+  }
+  ctx.fillStyle = sandstoneColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (isHard) {
+    // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(`${tile.hardness}H`, 0, -7);
+    ctx.font = 'bold 9px Arial';
+    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, 7);
+  } else if (lockedCost !== null) {
+    // Connected: show the single locked effective (negative) cost value
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(String(-lockedCost), 0, 0);
+  } else {
+    // Unconnected: show cost display.
+    // deltaDamage = Pressure − Hardness is used as the cost divisor.
+    // When shift is held, show the raw (unadjusted) values.
+    const sandstoneThreshold = shiftHeld
+      ? tile.temperature
+      : Math.max(0, tile.temperature - currentTemp);
+    const deltaDamage = currentPressure - tile.hardness;
+    const sandstoneCost = shiftHeld
+      ? tile.cost
+      : Math.max(1, deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost);
+    if (shatterActive) {
+      ctx.font = 'bold 9px Arial';
+      ctx.fillText(`-${sandstoneThreshold}° x ${sandstoneCost}`, 0, -7);
+      ctx.fillText(`S @ ${tile.shatter}`, 0, 7);
+    } else {
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(`-${sandstoneThreshold}°`, 0, -9);
+      ctx.font = 'bold 9px Arial';
+      ctx.fillText('x', 0, 0);
+      ctx.font = 'bold 14px Arial';
+      ctx.fillText(String(sandstoneCost), 0, 9);
+    }
+  }
+}
+
+function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null, lockedGain: number | null): void {
+  // Draw a small flame icon in the top-right inside corner
+  const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
+  ctx.strokeStyle = hotColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  // Flame: a simple upward-pointing flame shape
+  const fx = bw - 8;
+  const fy = -bh + 9;
+  const fr = 5;
+  ctx.beginPath();
+  ctx.moveTo(fx, fy + fr);
+  ctx.bezierCurveTo(fx - fr, fy, fx - fr * 0.5, fy - fr * 1.2, fx, fy - fr);
+  ctx.bezierCurveTo(fx + fr * 0.5, fy - fr * 1.2, fx + fr, fy, fx, fy + fr);
+  ctx.stroke();
+
+  ctx.fillStyle = hotColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if (lockedGain !== null || lockedCost !== null) {
+    // Connected: show gain and/or loss
+    const gain = lockedGain ?? 0;
+    const loss = lockedCost ?? 0;
+    const parts: string[] = [];
+    if (gain > 0) parts.push(`+${gain}`);
+    if (loss > 0) parts.push(`-${loss}`);
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
+  } else {
+    // Unconnected: show boiling temp and mass.
+    // When shift is held, show the raw temp parameter; otherwise show tile.temperature + currentTemp.
+    const deltaTemp = shiftHeld
+      ? tile.temperature
+      : tile.temperature + currentTemp;
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(`${deltaTemp}°`, 0, -9);
+    ctx.font = 'bold 9px Arial';
+    ctx.fillText('x', 0, 0);
+    ctx.font = 'bold 14px Arial';
+    ctx.fillText(String(tile.cost), 0, 9);
+  }
+}
+
+function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, isWater: boolean, half: number, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null, lockedGain: number | null): void {
+  // Clip to tile bounds so that connection stubs end exactly at the tile edge.
+  ctx.beginPath();
+  ctx.rect(-half, -half, half * 2, half * 2);
+  ctx.clip();
+  const bw = half * 0.7 + 2;
+  const bh = half * 0.7 + 2;
+  ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
+  ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+  // Draw inner content based on chamberContent
+  const { chamberContent } = tile;
+  if (chamberContent === 'tank') {
+    // Draw water line with wave ripples near top of the box
+    const tankDecorColor = isWater ? TANK_WATER_COLOR : TANK_COLOR;
+    ctx.strokeStyle = tankDecorColor;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    const wy = -bh + 7;
+    const wLeft = -bw + 4;
+    const wRight = bw - 4;
+    const wMid = 0;
+    const wQuart = (wRight - wLeft) / 4;
+    ctx.beginPath();
+    ctx.moveTo(wLeft, wy);
+    ctx.quadraticCurveTo(wLeft + wQuart, wy - 3, wMid, wy);
+    ctx.quadraticCurveTo(wMid + wQuart, wy + 3, wRight, wy);
+    ctx.stroke();
+    // Show capacity number in tank-like color
+    ctx.fillStyle = tankDecorColor;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(tile.capacity), 0, 0);
+  } else if (chamberContent === 'dirt') {
+    // Draw short diagonal dirt lines near top-right and bottom-left corners
+    const dirtDecorColor = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
+    ctx.strokeStyle = dirtDecorColor;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(bw - 9, -bh + 3); ctx.lineTo(bw - 3, -bh + 9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bw - 13, -bh + 3); ctx.lineTo(bw - 3, -bh + 13); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-bw + 3, bh - 9); ctx.lineTo(-bw + 9, bh - 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-bw + 3, bh - 13); ctx.lineTo(-bw + 13, bh - 3); ctx.stroke();
+    // Show negative cost label in dirt-like color
+    ctx.fillStyle = dirtDecorColor;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`-${tile.cost}`, 0, 0);
+  } else if (chamberContent === 'item') {
+    _drawChamberItemContent(ctx, tile.itemShape, tile.itemCount, bw, bh, isWater, half);
+  } else if (chamberContent === 'heater') {
+    _drawChamberHeaterContent(ctx, tile, bw, bh, isWater);
+  } else if (chamberContent === 'ice') {
+    _drawChamberIceContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost);
+  } else if (chamberContent === 'pump') {
+    _drawChamberPumpContent(ctx, tile, bw, bh, isWater);
+  } else if (chamberContent === 'snow') {
+    _drawChamberSnowContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, currentPressure, lockedCost);
+  } else if (chamberContent === 'sandstone') {
+    const shatterActive = tile.shatter > tile.hardness;
+    const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
+    const isHard = tile.hardness >= currentPressure;
+    const sandstoneColor = isShatterTriggered
+      ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
+      : isHard
+        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+    _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
+  } else if (chamberContent === 'star') {
+    // Draw a 5-pointed star
+    ctx.fillStyle = isWater ? STAR_WATER_COLOR : STAR_COLOR;
+    const outerR = half * 0.45;
+    const innerR = outerR * 0.42;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const angle = (Math.PI / 5) * i - Math.PI / 2;
+      const r = i % 2 === 0 ? outerR : innerR;
+      ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
+    }
+    ctx.closePath();
+    ctx.fill();
+  } else if (chamberContent === 'hot_plate') {
+    _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
+  }
+  // Connection stubs
+  ctx.strokeStyle = color;
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.lineCap = 'round';
+  if (tile.connections.has(Direction.North)) {
+    ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+  }
+  if (tile.connections.has(Direction.South)) {
+    ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+  }
+  if (tile.connections.has(Direction.West)) {
+    ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+  }
+  if (tile.connections.has(Direction.East)) {
+    ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+  }
+}
+
 /** Draw a single tile at canvas position (x, y). */
 export function drawTile(
   ctx: CanvasRenderingContext2D,
@@ -154,7 +628,7 @@ export function drawTile(
   lockedCost: number | null = null,
   lockedGain: number | null = null,
 ): void {
-  const { shape, rotation, isFixed, capacity, cost, itemShape, itemCount } = tile;
+  const { shape, rotation, isFixed, itemShape } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
@@ -263,451 +737,19 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    // Filled circle
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-    // Radiating lines – only for connected directions
-    ctx.strokeStyle = color;
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.lineCap = 'round';
-    if (tile.connections.has(Direction.North)) {
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -half); ctx.stroke();
-    }
-    if (tile.connections.has(Direction.South)) {
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, half); ctx.stroke();
-    }
-    if (tile.connections.has(Direction.East)) {
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
-    }
-    if (tile.connections.has(Direction.West)) {
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-half, 0); ctx.stroke();
-    }
-    // Show capacity number on Source (drawn last so it appears on top)
-    if (shape === PipeShape.Source) {
-      ctx.fillStyle = LABEL_COLOR;
-      ctx.font = 'bold 14px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(currentWater), 0, 0);
-    }
+    _drawSourceOrSink(ctx, tile, color, half, currentWater, shape);
   } else if (shape === PipeShape.Chamber) {
     // Chamber – a steel-blue enclosure whose interior display varies by content
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    // Clip to tile bounds so that connection stubs end exactly at the tile edge.
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    const bw = half * 0.7 + 2;
-    const bh = half * 0.7 + 2;
-    ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
-    ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
-    // Draw inner content based on chamberContent
-    const { chamberContent } = tile;
-    if (chamberContent === 'tank') {
-      // Draw water line with wave ripples near top of the box
-      const tankDecorColor = isWater ? TANK_WATER_COLOR : TANK_COLOR;
-      ctx.strokeStyle = tankDecorColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      const wy = -bh + 7;
-      const wLeft = -bw + 4;
-      const wRight = bw - 4;
-      const wMid = 0;
-      const wQuart = (wRight - wLeft) / 4;
-      ctx.beginPath();
-      ctx.moveTo(wLeft, wy);
-      ctx.quadraticCurveTo(wLeft + wQuart, wy - 3, wMid, wy);
-      ctx.quadraticCurveTo(wMid + wQuart, wy + 3, wRight, wy);
-      ctx.stroke();
-      // Show capacity number in tank-like color
-      ctx.fillStyle = tankDecorColor;
-      ctx.font = 'bold 14px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(capacity), 0, 0);
-    } else if (chamberContent === 'dirt') {
-      // Draw short diagonal dirt lines near top-right and bottom-left corners
-      const dirtDecorColor = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
-      ctx.strokeStyle = dirtDecorColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(bw - 9, -bh + 3); ctx.lineTo(bw - 3, -bh + 9); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(bw - 13, -bh + 3); ctx.lineTo(bw - 3, -bh + 13); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw + 3, bh - 9); ctx.lineTo(-bw + 9, bh - 3); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw + 3, bh - 13); ctx.lineTo(-bw + 13, bh - 3); ctx.stroke();
-      // Show negative cost label in dirt-like color
-      ctx.fillStyle = dirtDecorColor;
-      ctx.font = 'bold 14px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`-${cost}`, 0, 0);
-    } else if (chamberContent === 'item') {
-      // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
-      const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
-      const itemColor = isGoldItem
-        ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
-        : (isWater ? WATER_COLOR : PIPE_COLOR);
-      if (itemShape !== null) {
-        let drawShape = itemShape;
-        if (itemShape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
-        else if (itemShape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
-        else if (itemShape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
-        else if (itemShape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
-        ctx.save();
-        // Clip to the inner box so the pipe image never bleeds onto the connection stubs
-        ctx.beginPath();
-        ctx.rect(-bw, -bh, bw * 2, bh * 2);
-        ctx.clip();
-        // 2px buffer between item shape and chamber walls
-        const scale = (bw - 2) / half;
-        ctx.scale(scale, scale);
-        ctx.strokeStyle = itemColor;
-        ctx.lineWidth = LINE_WIDTH;
-        ctx.lineCap = 'round';
-        if (drawShape === PipeShape.Straight) {
-          ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
-        } else if (drawShape === PipeShape.Elbow) {
-          ctx.beginPath();
-          ctx.moveTo(0, -half); ctx.lineTo(0, 0); ctx.lineTo(half, 0);
-          ctx.stroke();
-        } else if (drawShape === PipeShape.Tee) {
-          ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
-        } else if (drawShape === PipeShape.Cross) {
-          ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
-        }
-        ctx.restore();
-      }
-      // Draw quantity number centered, white with a 1px black outline
-      if (itemCount > 1) {
-        const countLabel = String(itemCount);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = 'bold 30px Arial';
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 1;
-        ctx.strokeText(countLabel, 0, 0);
-        ctx.fillStyle = 'white';
-        ctx.fillText(countLabel, 0, 0);
-      }
-    } else if (chamberContent === 'heater') {
-      // Show temperature bonus (no plus sign for negative values)
-      const isCooler = tile.temperature < 0;
-      const heaterBaseColor = isCooler
-        ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
-        : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
-      // Draw decorative lines near the top of the box
-      ctx.strokeStyle = heaterBaseColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      const lineLeft = -bw + 4;
-      const lineRight = bw - 4;
-      const lineSpan = lineRight - lineLeft;
-      if (isCooler) {
-        // Cooler: thin horizontal wind lines near top
-        for (let i = 0; i < 3; i++) {
-          const lineY = -bh + 4 + i * 3.5;
-          const hw = (lineSpan - i * 5) / 2;
-          ctx.beginPath();
-          ctx.moveTo(-hw, lineY);
-          ctx.lineTo(hw, lineY);
-          ctx.stroke();
-        }
-      } else {
-        // Heater: 3 short, thin wavy heat lines near the top
-        for (let i = 0; i < 3; i++) {
-          const lineY = -bh + 4 + i * 3.5;
-          const xMid = 0;
-          const xQuart = lineSpan / 4;
-          ctx.beginPath();
-          ctx.moveTo(lineLeft, lineY);
-          ctx.quadraticCurveTo(lineLeft + xQuart, lineY - 2.5, xMid, lineY);
-          ctx.quadraticCurveTo(xMid + xQuart, lineY + 2.5, lineRight, lineY);
-          ctx.stroke();
-        }
-      }
-      ctx.fillStyle = heaterBaseColor;
-      ctx.font = 'bold 13px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const tempStr = tile.temperature >= 0 ? `+${tile.temperature}°` : `${tile.temperature}°`;
-      ctx.fillText(tempStr, 0, 0);
-    } else if (chamberContent === 'ice') {
-      // Draw short diagonal ice lines in top-left and bottom-right corners
-      const iceDecorColor = isWater ? ICE_WATER_COLOR : ICE_COLOR;
-      ctx.strokeStyle = iceDecorColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(-bw + 3, -bh + 9); ctx.lineTo(-bw + 9, -bh + 3); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-bw + 3, -bh + 13); ctx.lineTo(-bw + 13, -bh + 3); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(bw - 9, bh - 3); ctx.lineTo(bw - 3, bh - 9); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(bw - 13, bh - 3); ctx.lineTo(bw - 3, bh - 13); ctx.stroke();
-      ctx.fillStyle = iceDecorColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      if (lockedCost !== null) {
-        // Connected: show the single locked effective (negative) cost value
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(-lockedCost), 0, 0);
-      } else {
-        // Unconnected: show three lines: negative cost, "x", and the temperature threshold.
-        // By default, adjust the threshold display by current temperature (capped at 0).
-        // When shift is held, show the raw (unadjusted) threshold value.
-        const iceThreshold = shiftHeld
-          ? tile.temperature
-          : Math.max(0, tile.temperature - currentTemp);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`-${iceThreshold}°`, 0, -9);
-        ctx.font = 'bold 9px Arial';
-        ctx.fillText('x', 0, 0);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(cost), 0, 9);
-      }
-    } else if (chamberContent === 'pump') {
-      // Show pressure bonus (no plus sign for negative values)
-      const isVacuum = tile.pressure < 0;
-      const pumpBaseColor = isVacuum
-        ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
-        : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
-      // Draw decorative graphics near the top of the box
-      ctx.strokeStyle = pumpBaseColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      if (isVacuum) {
-        // Vacuum: simple vortex swirl near the top
-        const swirlY = -bh + 9;
-        ctx.beginPath();
-        ctx.arc(0, swirlY, 7, 0, Math.PI * 1.5);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(0, swirlY, 3.5, Math.PI * 0.5, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        // Pump: series of thin chevrons in a horizontal line near the top
-        const chevY = -bh + 7;
-        const chevH = 4;
-        const chevSpacing = 7;
-        const numChev = 4;
-        const chevStartX = -(numChev - 1) * chevSpacing / 2;
-        for (let i = 0; i < numChev; i++) {
-          const chx = chevStartX + i * chevSpacing;
-          ctx.beginPath();
-          ctx.moveTo(chx - 2.5, chevY - chevH);
-          ctx.lineTo(chx + 2.5, chevY);
-          ctx.lineTo(chx - 2.5, chevY + chevH);
-          ctx.stroke();
-        }
-      }
-      ctx.fillStyle = pumpBaseColor;
-      ctx.font = 'bold 13px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const pressStr = tile.pressure >= 0 ? `+${tile.pressure}P` : `${tile.pressure}P`;
-      ctx.fillText(pressStr, 0, 0);
-    } else if (chamberContent === 'snow') {
-      // Draw a small snowflake in the top-right inside corner
-      const snowDecorColor = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
-      ctx.strokeStyle = snowDecorColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      const sfx = bw - 8;
-      const sfy = -bh + 8;
-      const sfR = 5;
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i;
-        ctx.beginPath();
-        ctx.moveTo(sfx, sfy);
-        ctx.lineTo(sfx + sfR * Math.cos(angle), sfy + sfR * Math.sin(angle));
-        ctx.stroke();
-      }
-      ctx.fillStyle = snowDecorColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      if (lockedCost !== null) {
-        // Connected: show the single locked effective (negative) cost value
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(-lockedCost), 0, 0);
-      } else {
-        // Unconnected: show three lines: negative adjusted cost, "x", and the temperature threshold.
-        // By default, show values adjusted by current Pressure and Temperature.
-        // When shift is held, show the raw (unadjusted) values.
-        const deltaTemp = shiftHeld
-          ? tile.temperature
-          : Math.max(0, tile.temperature - currentTemp);
-        const snowCost = shiftHeld
-          ? cost
-          : Math.max(1, currentPressure >= 1 ? Math.ceil(cost / currentPressure) : cost);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`-${deltaTemp}°`, 0, -9);
-        ctx.font = 'bold 9px Arial';
-        ctx.fillText('x', 0, 0);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(snowCost), 0, 9);
-      }
-    } else if (chamberContent === 'sandstone') {
-      // When hardness >= pressure, use darker color and show hardness.
-      // When shatter is active and pressure reaches the shatter threshold, use lighter color.
-      // When connected, show the locked effective cost value.
-      // Otherwise show cost display lines.
-      const shatterActive = tile.shatter > tile.hardness;
-      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-      const isHard = tile.hardness >= currentPressure;
-      const sandstoneColor = isShatterTriggered
-        ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
-        : isHard
-          ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-          : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
-      // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
-      ctx.strokeStyle = sandstoneColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      const sLineLeft = -bw + 4;
-      const sLineRight = bw - 4;
-      const sLineSpan = sLineRight - sLineLeft;
-      const sLineMid = 0;
-      const sLineQuart = sLineSpan / 4;
-      for (let i = 0; i < 2; i++) {
-        const sLineY = bh - 5 - i * 4;
-        ctx.beginPath();
-        ctx.moveTo(sLineLeft, sLineY);
-        ctx.quadraticCurveTo(sLineLeft + sLineQuart, sLineY - 2.5, sLineMid, sLineY);
-        ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + 2.5, sLineRight, sLineY);
-        ctx.stroke();
-      }
-      ctx.fillStyle = sandstoneColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      if (isHard) {
-        // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`${tile.hardness}H`, 0, -7);
-        ctx.font = 'bold 9px Arial';
-        ctx.fillText(`${tile.temperature}° x ${cost}`, 0, 7);
-      } else if (lockedCost !== null) {
-        // Connected: show the single locked effective (negative) cost value
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(-lockedCost), 0, 0);
-      } else {
-        // Unconnected: show cost display.
-        // deltaDamage = Pressure − Hardness is used as the cost divisor.
-        // When shift is held, show the raw (unadjusted) values.
-        const sandstoneThreshold = shiftHeld
-          ? tile.temperature
-          : Math.max(0, tile.temperature - currentTemp);
-        const deltaDamage = currentPressure - tile.hardness;
-        const sandstoneCost = shiftHeld
-          ? cost
-          : Math.max(1, deltaDamage >= 1 ? Math.ceil(cost / deltaDamage) : cost);
-        if (shatterActive) {
-          ctx.font = 'bold 9px Arial';
-          ctx.fillText(`-${sandstoneThreshold}° x ${sandstoneCost}`, 0, -7);
-          ctx.fillText(`S @ ${tile.shatter}`, 0, 7);
-        } else {
-          ctx.font = 'bold 14px Arial';
-          ctx.fillText(`-${sandstoneThreshold}°`, 0, -9);
-          ctx.font = 'bold 9px Arial';
-          ctx.fillText('x', 0, 0);
-          ctx.font = 'bold 14px Arial';
-          ctx.fillText(String(sandstoneCost), 0, 9);
-        }
-      }
-    } else if (chamberContent === 'star') {
-      // Draw a 5-pointed star
-      ctx.fillStyle = isWater ? STAR_WATER_COLOR : STAR_COLOR;
-      const outerR = half * 0.45;
-      const innerR = outerR * 0.42;
-      ctx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const angle = (Math.PI / 5) * i - Math.PI / 2;
-        const r = i % 2 === 0 ? outerR : innerR;
-        ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
-      }
-      ctx.closePath();
-      ctx.fill();
-    } else if (chamberContent === 'hot_plate') {
-      // Draw a small flame icon in the top-right inside corner
-      const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
-      ctx.strokeStyle = hotColor;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      // Flame: a simple upward-pointing flame shape
-      const fx = bw - 8;
-      const fy = -bh + 9;
-      const fr = 5;
-      ctx.beginPath();
-      ctx.moveTo(fx, fy + fr);
-      ctx.bezierCurveTo(fx - fr, fy, fx - fr * 0.5, fy - fr * 1.2, fx, fy - fr);
-      ctx.bezierCurveTo(fx + fr * 0.5, fy - fr * 1.2, fx + fr, fy, fx, fy + fr);
-      ctx.stroke();
-
-      ctx.fillStyle = hotColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      if (lockedGain !== null || lockedCost !== null) {
-        // Connected: show gain and/or loss
-        const gain = lockedGain ?? 0;
-        const loss = lockedCost ?? 0;
-        const parts: string[] = [];
-        if (gain > 0) parts.push(`+${gain}`);
-        if (loss > 0) parts.push(`-${loss}`);
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
-      } else {
-        // Unconnected: show boiling temp and mass.
-        // When shift is held, show the raw temp parameter; otherwise show tile.temperature + currentTemp.
-        const deltaTemp = shiftHeld
-          ? tile.temperature
-          : tile.temperature + currentTemp;
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`${deltaTemp}°`, 0, -9);
-        ctx.font = 'bold 9px Arial';
-        ctx.fillText('x', 0, 0);
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(String(cost), 0, 9);
-      }
-    }
-    // Connection stubs
-    ctx.strokeStyle = color;
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.lineCap = 'round';
-    if (tile.connections.has(Direction.North)) {
-      ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
-    }
-    if (tile.connections.has(Direction.South)) {
-      ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
-    }
-    if (tile.connections.has(Direction.West)) {
-      ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
-    }
-    if (tile.connections.has(Direction.East)) {
-      ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
-    }
+    _drawChamber(ctx, tile, color, isWater, half, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
   } else if (shape === PipeShape.Granite) {
     // Granite – solid impassable stone block; no connections
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    const bw = half * 0.7;
-    const bh = half * 0.7;
-    ctx.fillStyle = GRANITE_FILL_COLOR;
-    ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-    ctx.strokeStyle = GRANITE_COLOR;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
-    // Stone texture – a few crack-like lines
-    ctx.strokeStyle = GRANITE_COLOR;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(-bw + 4, -bh + 10); ctx.lineTo(bw - 6, -bh + 16); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw + 2, 2);         ctx.lineTo(bw - 8, 8);        ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw + 6, bh - 14);   ctx.lineTo(bw - 4, bh - 8);  ctx.stroke();
+    _drawGranite(ctx, half);
   }
 
   ctx.restore();
