@@ -507,6 +507,9 @@ export class Game {
     const savedCampaignId = loadActiveCampaignId();
     if (savedCampaignId) {
       this._restoreActiveCampaign(savedCampaignId);
+    } else {
+      // No saved campaign – pick one from the available list, preferring official ones.
+      this._autoSelectCampaign();
     }
 
     canvas.addEventListener('mousedown',    (e) => this._handleCanvasMouseDown(e));
@@ -1492,7 +1495,7 @@ export class Game {
           } else {
             const deltaDamage = currentPressure - tile.hardness;
             if (deltaDamage <= 0) {
-              tooltipText += ` — Hardness too high to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
+              tooltipText += ` — Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
             } else {
               const deltaTemp = Math.max(0, tile.temperature - currentTemp);
               const effectiveCost = Math.ceil(tile.cost / deltaDamage);
@@ -2339,6 +2342,20 @@ export class Game {
     this._activeCampaignProgress = new Set();
     clearActiveCampaignId();
     this._showLevelSelect();
+  }
+
+  /**
+   * Auto-select a campaign when none is saved.
+   * Prefers the first official campaign; falls back to the first available campaign.
+   * Called during construction when no active campaign ID is stored.
+   */
+  private _autoSelectCampaign(): void {
+    const allCampaigns = this.campaignEditor.getAllCampaigns();
+    if (allCampaigns.length === 0) return;
+    const campaign = allCampaigns.find((c) => c.official === true) ?? allCampaigns[0];
+    this._activeCampaign = campaign;
+    this._activeCampaignProgress = loadCampaignProgress(campaign.id);
+    saveActiveCampaignId(campaign.id);
   }
 
   /**

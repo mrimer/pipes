@@ -487,9 +487,9 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   if (isHard) {
     // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
     ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(`${tile.hardness}H`, 0, textCenterY - _s(7));
+    ctx.fillText(`${tile.hardness}H`, 0, textCenterY - _s(4));
     ctx.font = (tile.temperature < 10 && tile.cost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
-    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, textCenterY + _s(7));
+    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, textCenterY + _s(10));
   } else if (lockedCost !== null) {
     // Connected: show the single locked effective (negative) cost value
     ctx.font = `bold ${_s(14)}px Arial`;
