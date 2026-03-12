@@ -501,17 +501,17 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
       : Math.max(1, deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost);
     if (shatterActive) {
       const displayCost = isShatterTriggered ? 0 : sandstoneCost;
-      ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY - _s(7));
       ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(`S @ ${tile.shatter}P`, 0, textCenterY + _s(7));
+      ctx.fillText(isShatterTriggered ? 'WEAK' : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
+      ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+      ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY + _s(7));
     } else {
       ctx.font = `bold ${_s(14)}px Arial`;
-      ctx.fillText(`-${sandstoneThreshold}°`, 0, textCenterY - _s(9));
+      ctx.fillText(`-${sandstoneThreshold}°`, 0, textCenterY - _s(5));
       ctx.font = `bold ${_s(9)}px Arial`;
-      ctx.fillText('x', 0, textCenterY);
+      ctx.fillText('x', 0, textCenterY + _s(4));
       ctx.font = `bold ${_s(14)}px Arial`;
-      ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(9));
+      ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(13));
     }
   }
 }
