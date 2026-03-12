@@ -1345,17 +1345,17 @@ export class CampaignEditor {
       }
       if (cc === 'ice' || cc === 'snow' || cc === 'sandstone') {
         panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
-          this._editorParams.temperature = parseInt(v) || 0;
+          this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = parseInt(v) || 0;
+          this._editorParams.cost = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
       if (cc === 'sandstone') {
         panel.appendChild(this._labeledInput('Hardness', String(this._editorParams.hardness), (v) => {
-          this._editorParams.hardness = parseInt(v) || 0;
+          this._editorParams.hardness = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Shatter', String(this._editorParams.shatter), (v) => {
@@ -1375,7 +1375,7 @@ export class CampaignEditor {
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
         panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = parseInt(v) || 0;
+          this._editorParams.cost = Math.max(0, parseInt(v) || 0);
           this._applyParamsToLinkedTile();
         }, 'number', '90px'));
       }
@@ -1490,13 +1490,13 @@ export class CampaignEditor {
 
     const rowsInp = document.createElement('input');
     rowsInp.type = 'number';
-    rowsInp.min = '2';
+    rowsInp.min = '1';
     rowsInp.max = '20';
     rowsInp.value = String(this._editRows);
     rowsInp.style.cssText = 'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
     const colsInp = document.createElement('input');
     colsInp.type = 'number';
-    colsInp.min = '2';
+    colsInp.min = '1';
     colsInp.max = '20';
     colsInp.value = String(this._editCols);
     colsInp.style.cssText = 'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
@@ -1509,10 +1509,31 @@ export class CampaignEditor {
     inputRow.appendChild(colsInp);
     panel.appendChild(inputRow);
 
+    const resizeError = document.createElement('div');
+    resizeError.style.cssText = 'font-size:0.8rem;color:#f44;display:none;';
+    panel.appendChild(resizeError);
+
     panel.appendChild(this._btn('↔ Resize', '#16213e', '#f0c040', () => {
-      const newR = Math.max(2, Math.min(20, parseInt(rowsInp.value) || this._editRows));
-      const newC = Math.max(2, Math.min(20, parseInt(colsInp.value) || this._editCols));
-      this._resizeGrid(newR, newC);
+      const MIN_DIM = 1;
+      const MAX_DIM = 20;
+      const rVal = parseInt(rowsInp.value);
+      const cVal = parseInt(colsInp.value);
+      let outOfRange = false;
+      if (isNaN(rVal) || rVal < MIN_DIM || rVal > MAX_DIM) {
+        rowsInp.value = String(Math.max(MIN_DIM, Math.min(MAX_DIM, isNaN(rVal) ? this._editRows : rVal)));
+        outOfRange = true;
+      }
+      if (isNaN(cVal) || cVal < MIN_DIM || cVal > MAX_DIM) {
+        colsInp.value = String(Math.max(MIN_DIM, Math.min(MAX_DIM, isNaN(cVal) ? this._editCols : cVal)));
+        outOfRange = true;
+      }
+      if (outOfRange) {
+        resizeError.textContent = `Value out of range (${MIN_DIM} to ${MAX_DIM})`;
+        resizeError.style.display = 'block';
+        setTimeout(() => { resizeError.style.display = 'none'; }, 2000);
+        return;
+      }
+      this._resizeGrid(rVal, cVal);
     }));
 
     // ── Slide buttons (N/E/S/W compass layout) ──
