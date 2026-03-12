@@ -1962,7 +1962,11 @@ export class Game {
         }
         break;
       case 'Escape':
-        if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
+        if (this.rulesModalEl.style.display !== 'none') {
+          // Close the rules modal first if it is open.
+          this.rulesModalEl.style.display = 'none';
+          this.canvas.focus();
+        } else if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
           // If the exit-confirm modal is already showing, dismiss it (toggle).
           if (this._exitConfirmModalEl.style.display !== 'none') {
             this._exitConfirmModalEl.style.display = 'none';
@@ -2193,6 +2197,11 @@ export class Game {
     } else {
       this._showLevelSelect();
     }
+  }
+
+  /** Show the game-rules modal overlay. */
+  showRules(): void {
+    this.rulesModalEl.style.display = 'flex';
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────
