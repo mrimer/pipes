@@ -1418,7 +1418,7 @@ export class Game {
           const shatterActive = tile.shatter > tile.hardness;
           const isShatterTriggered = shatterActive && lockedPressure >= tile.shatter;
           if (isShatterTriggered) {
-            tooltipText += ` [(${lockedPressure})P >= (${tile.shatter})S]`;
+            tooltipText += ` [${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
           } else {
             const lockedDeltaDamage = lockedPressure - tile.hardness;
             if (lockedDeltaDamage >= 1) {
@@ -1460,7 +1460,7 @@ export class Game {
           const shatterActive = tile.shatter > tile.hardness;
           const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
           if (isShatterTriggered) {
-            tooltipText += ` [(${currentPressure})P >= (${tile.shatter})S]`;
+            tooltipText += ` [${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
             predictedCost = 0;
           } else {
             const deltaDamage = currentPressure - tile.hardness;

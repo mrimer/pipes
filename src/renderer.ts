@@ -409,6 +409,7 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   // Otherwise show cost display lines.
   const shatterActive = tile.shatter > tile.hardness;
   const isHard = tile.hardness >= currentPressure;
+  const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
   // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
   ctx.strokeStyle = sandstoneColor;
   ctx.lineWidth = 1.5;
@@ -426,19 +427,24 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
     ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + 2.5, sLineRight, sLineY);
     ctx.stroke();
   }
-  ctx.fillStyle = sandstoneColor;
+  // Vertically center text between the rect top (−bh) and the top of the wavy lines (bh − 11.5).
+  const wavesTop = bh - 11.5;
+  const textCenterY = (-bh + wavesTop) / 2;
+  // Use the lighter standard sandstone color for text when isHard so it is readable
+  // against the dark tile background.
+  ctx.fillStyle = isHard ? (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR) : sandstoneColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (isHard) {
     // Alternative display: show hardness/H on top line and "temperature x cost" below, centered together
     ctx.font = 'bold 14px Arial';
-    ctx.fillText(`${tile.hardness}H`, 0, -7);
-    ctx.font = 'bold 9px Arial';
-    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, 7);
+    ctx.fillText(`${tile.hardness}H`, 0, textCenterY - 7);
+    ctx.font = (tile.temperature < 10 && tile.cost < 10) ? 'bold 11px Arial' : 'bold 9px Arial';
+    ctx.fillText(`${tile.temperature}° x ${tile.cost}`, 0, textCenterY + 7);
   } else if (lockedCost !== null) {
     // Connected: show the single locked effective (negative) cost value
     ctx.font = 'bold 14px Arial';
-    ctx.fillText(String(-lockedCost), 0, 0);
+    ctx.fillText(String(-lockedCost), 0, textCenterY);
   } else {
     // Unconnected: show cost display.
     // deltaDamage = Pressure − Hardness is used as the cost divisor.
@@ -451,16 +457,18 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
       ? tile.cost
       : Math.max(1, deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost);
     if (shatterActive) {
-      ctx.font = 'bold 9px Arial';
-      ctx.fillText(`-${sandstoneThreshold}° x ${sandstoneCost}`, 0, -7);
-      ctx.fillText(`S @ ${tile.shatter}`, 0, 7);
+      const displayCost = isShatterTriggered ? 0 : sandstoneCost;
+      ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? 'bold 11px Arial' : 'bold 9px Arial';
+      ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY - 7);
+      ctx.font = tile.shatter < 10 ? 'bold 12px Arial' : 'bold 9px Arial';
+      ctx.fillText(`S @ ${tile.shatter}P`, 0, textCenterY + 7);
     } else {
       ctx.font = 'bold 14px Arial';
-      ctx.fillText(`-${sandstoneThreshold}°`, 0, -9);
+      ctx.fillText(`-${sandstoneThreshold}°`, 0, textCenterY - 9);
       ctx.font = 'bold 9px Arial';
-      ctx.fillText('x', 0, 0);
+      ctx.fillText('x', 0, textCenterY);
       ctx.font = 'bold 14px Arial';
-      ctx.fillText(String(sandstoneCost), 0, 9);
+      ctx.fillText(String(sandstoneCost), 0, textCenterY + 9);
     }
   }
 }
