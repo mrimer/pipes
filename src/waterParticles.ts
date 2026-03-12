@@ -63,10 +63,11 @@ export function renderSourceSpray(
   color: string,
 ): void {
   let i = 0;
+  const maxDist = _sprayMaxDist();
   while (i < drops.length) {
     const drop = drops[i];
     drop.distance += drop.speed;
-    if (drop.distance >= _sprayMaxDist()) {
+    if (drop.distance >= maxDist) {
       drops.splice(i, 1);
       continue;
     }
@@ -75,7 +76,7 @@ export function renderSourceSpray(
     const y = sourceCy + Math.sin(drop.angle) * drop.distance;
 
     // Alpha: near-opaque at the centre, fades to transparent at the tile edge.
-    const progress = drop.distance / _sprayMaxDist();
+    const progress = drop.distance / maxDist;
     const alpha = 0.6 * (1 - progress);
 
     ctx.save();
