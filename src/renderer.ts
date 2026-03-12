@@ -63,11 +63,17 @@ export function scalePx(n: number): number {
  * the full grid fits within the current window's inner dimensions.
  * Returns BASE_TILE_SIZE (64) when no window is available or the grid already
  * overflows at the base size.
+ *
+ * @param vOverhead  Vertical pixels already consumed by UI elements outside
+ *                   the grid (e.g. title, header buttons, panels below the
+ *                   grid).  Subtracted from the available height before the
+ *                   tile size is computed so that those elements can all fit
+ *                   on screen at once.
  */
-export function computeTileSize(rows: number, cols: number): number {
+export function computeTileSize(rows: number, cols: number, vOverhead = 0): number {
   if (typeof window === 'undefined') return BASE_TILE_SIZE;
   const avW = window.innerWidth;
-  const avH = window.innerHeight;
+  const avH = window.innerHeight - vOverhead;
   const maxFit = Math.floor(Math.min(avW / cols, avH / rows));
   return Math.max(BASE_TILE_SIZE, Math.min(128, maxFit));
 }

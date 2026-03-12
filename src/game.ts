@@ -565,6 +565,32 @@ export class Game {
     this._renderLevelList();
   }
 
+  /**
+   * Estimate the total vertical pixels consumed by UI elements that appear
+   * alongside the grid while playing (page title, level header, HUD buttons,
+   * play-screen gaps / padding, and any visible collapsed panels below the
+   * grid).  The result is passed to {@link computeTileSize} so the grid fits
+   * on screen together with all of these elements.
+   */
+  private _computePlayOverhead(level: LevelDef): number {
+    // CSS-based height estimates for elements outside/alongside the canvas.
+    const H1_H           = 74; // <h1>: margin(20) + 2rem text(38) + margin(16)
+    const LEVEL_HEADER_H = 22; // #level-header: 1rem line
+    const HUD_H          = 32; // #hud: buttons with 6 px vertical padding
+    const GAP            = 10; // gap between flex children in #play-screen
+    const PADDING_BOTTOM = 24; // padding-bottom of #play-screen
+    const NOTE_PANEL_H   = 42; // note panel: 12 px padding × 2 + text line
+    const HINT_PANEL_H   = 37; // hint panel collapsed: toggle-button 10 px padding × 2 + font
+
+    const hasNote  = !!level.note;
+    const hasHints = !!(level.hints?.length || level.hint);
+
+    let overhead = H1_H + LEVEL_HEADER_H + GAP + HUD_H + GAP + PADDING_BOTTOM;
+    if (hasNote)  overhead += NOTE_PANEL_H  + GAP;
+    if (hasHints) overhead += HINT_PANEL_H + GAP;
+    return overhead;
+  }
+
   /** Start (or restart) the given level. */
   startLevel(levelId: number): void {
     // Look up the level in the active campaign; no-op if no campaign is active.
@@ -585,7 +611,7 @@ export class Game {
     this.pendingRotation = 0;
     this.hoverRotationDelta = 0;
 
-    setTileSize(computeTileSize(level.rows, level.cols));
+    setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level)));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
 
@@ -2209,7 +2235,7 @@ export class Game {
     this.pendingRotation = 0;
     this.hoverRotationDelta = 0;
 
-    setTileSize(computeTileSize(level.rows, level.cols));
+    setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level)));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
 
