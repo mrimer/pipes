@@ -7,6 +7,12 @@ import { LevelDef, PipeShape, CampaignDef } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
 import { saveImportedCampaigns, loadActiveCampaignId } from '../src/persistence';
 
+// Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
+jest.mock('../src/confetti', () => ({
+  spawnConfetti: (onComplete?: () => void) => { if (onComplete) onComplete(); },
+  clearConfetti: jest.fn(),
+}));
+
 // ─── Canvas mock ──────────────────────────────────────────────────────────────
 
 const MOCK_CTX = {

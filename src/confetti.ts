@@ -25,6 +25,7 @@ let _particles: ConfettiParticle[] = [];
 let _animId: number | null = null;
 let _canvas: HTMLCanvasElement | null = null;
 let _ctx: CanvasRenderingContext2D | null = null;
+let _onComplete: (() => void) | null = null;
 
 function _resizeCanvas(): void {
   if (!_canvas) return;
@@ -43,8 +44,9 @@ function _ensureCanvas(): void {
 }
 
 /** Spawn a burst of falling confetti across the top of the viewport. */
-export function spawnConfetti(): void {
+export function spawnConfetti(onComplete?: () => void): void {
   _ensureCanvas();
+  _onComplete = onComplete ?? null;
   const w = _canvas!.width;
   const now = performance.now();
   const count = 90;
@@ -118,12 +120,18 @@ function _tick(): void {
     _animId = requestAnimationFrame(_tick);
   } else {
     _animId = null;
+    if (_onComplete) {
+      const cb = _onComplete;
+      _onComplete = null;
+      cb();
+    }
   }
 }
 
 /** Stop any running confetti animation and clear the canvas. */
 export function clearConfetti(): void {
   _particles = [];
+  _onComplete = null;
   if (_animId !== null) {
     cancelAnimationFrame(_animId);
     _animId = null;

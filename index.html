@@ -226,6 +226,12 @@
       z-index: 100;
     }
 
+    @keyframes modal-fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .modal-overlay.fade-in { animation: modal-fade-in 900ms ease-in forwards; }
+
     .modal-box {
       background: #16213e;
       border: 3px solid #4a90d9;
