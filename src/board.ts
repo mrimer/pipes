@@ -485,15 +485,7 @@ export class Board {
     ) return false;
 
     // ── Cement constraint check ───────────────────────────────────────────────
-    const cementKey = `${pos.row},${pos.col}`;
-    if (this.cementData.has(cementKey)) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime === 0) {
-        this.lastError = 'Items placed in hardened cement may not be adjusted.';
-        this.lastErrorTilePositions = [pos];
-        return false;
-      }
-    }
+    if (this._isCementHardened(pos)) return false;
 
     // ── Container-grant constraint check ─────────────────────────────────────
     // Simulate tile removal and verify no inventory count would go below zero.
@@ -544,13 +536,7 @@ export class Board {
     }
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
     // Decrement cement setting time after successful reclaim
-    if (this.cementData.has(cementKey)) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime > 0) {
-        this.cementData.set(cementKey, settingTime - 1);
-        this.lastCementDecrement = { row: pos.row, col: pos.col };
-      }
-    }
+    this._applyCementDecrement(pos);
     return true;
   }
 
@@ -651,15 +637,7 @@ export class Board {
     ) return false;
 
     // ── Cement constraint check ───────────────────────────────────────────────
-    const cementKey = `${pos.row},${pos.col}`;
-    if (this.cementData.has(cementKey)) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime === 0) {
-        this.lastError = 'Items placed in hardened cement may not be adjusted.';
-        this.lastErrorTilePositions = [pos];
-        return false;
-      }
-    }
+    if (this._isCementHardened(pos)) return false;
 
     // Gold-space / gold-pipe constraint for the incoming shape
     const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
@@ -747,13 +725,7 @@ export class Board {
     }
 
     // Decrement cement setting time after successful replace
-    if (this.cementData.has(cementKey)) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime > 0) {
-        this.cementData.set(cementKey, settingTime - 1);
-        this.lastCementDecrement = { row: pos.row, col: pos.col };
-      }
-    }
+    this._applyCementDecrement(pos);
 
     return true;
   }
@@ -1314,6 +1286,43 @@ export class Board {
   }
 
   /**
+   * Check whether the cement at `pos` prevents an adjustment operation (T = 0).
+   * When `tile` is provided the check only applies to player-placed pipe tiles
+   * (regular or gold); omit or pass `null` to apply the check unconditionally.
+   * Sets {@link lastError} / {@link lastErrorTilePositions} when blocked.
+   * @returns `true` if the operation is blocked by hardened cement, `false` otherwise.
+   */
+  private _isCementHardened(pos: GridPos, tile?: Tile | null): boolean {
+    const key = `${pos.row},${pos.col}`;
+    if (!this.cementData.has(key)) return false;
+    if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) return false;
+    if (this.cementData.get(key)! === 0) {
+      this.lastError = 'Items placed in hardened cement may not be adjusted.';
+      this.lastErrorTilePositions = [pos];
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Decrement the setting time of a cement cell at `pos` after a successful
+   * adjustment operation (reclaim, replace, or rotate).
+   * When `tile` is provided the decrement only applies to player-placed pipe tiles
+   * (regular or gold); omit or pass `null` to apply unconditionally.
+   * Sets {@link lastCementDecrement} to `pos` when a decrement occurs.
+   */
+  private _applyCementDecrement(pos: GridPos, tile?: Tile | null): void {
+    const key = `${pos.row},${pos.col}`;
+    if (!this.cementData.has(key)) return;
+    if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) return;
+    const settingTime = this.cementData.get(key)!;
+    if (settingTime > 0) {
+      this.cementData.set(key, settingTime - 1);
+      this.lastCementDecrement = { row: pos.row, col: pos.col };
+    }
+  }
+
+  /**
    * Check whether any sandstone tile currently in the fill path has deltaDamage ≤ 0.
    * Checks both newly-connected tiles (not yet in the locked map) and already-connected
    * tiles (in case pressure dropped after a pump was disconnected).
@@ -1557,15 +1566,7 @@ export class Board {
     if (!tile) return false;
 
     // ── Cement constraint check (for player-placed pipe tiles only) ───────────
-    const cementKey = `${pos.row},${pos.col}`;
-    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime === 0) {
-        this.lastError = 'Items placed in hardened cement may not be adjusted.';
-        this.lastErrorTilePositions = [pos];
-        return false;
-      }
-    }
+    if (this._isCementHardened(pos, tile)) return false;
 
     tile.rotate();
 
@@ -1600,13 +1601,7 @@ export class Board {
     }
 
     // Decrement cement setting time after successful rotation
-    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime > 0) {
-        this.cementData.set(cementKey, settingTime - 1);
-        this.lastCementDecrement = { row: pos.row, col: pos.col };
-      }
-    }
+    this._applyCementDecrement(pos, tile);
 
     return true;
   }
@@ -1626,15 +1621,7 @@ export class Board {
     if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) return false;
 
     // ── Cement constraint check (for player-placed pipe tiles only) ───────────
-    const cementKey = `${pos.row},${pos.col}`;
-    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime === 0) {
-        this.lastError = 'Items placed in hardened cement may not be adjusted.';
-        this.lastErrorTilePositions = [pos];
-        return false;
-      }
-    }
+    if (this._isCementHardened(pos, tile)) return false;
 
     // Normalise to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
@@ -1676,13 +1663,7 @@ export class Board {
     }
 
     // Decrement cement setting time after successful rotation
-    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
-      const settingTime = this.cementData.get(cementKey)!;
-      if (settingTime > 0) {
-        this.cementData.set(cementKey, settingTime - 1);
-        this.lastCementDecrement = { row: pos.row, col: pos.col };
-      }
-    }
+    this._applyCementDecrement(pos, tile);
 
     return true;
   }
