@@ -1092,11 +1092,20 @@ export function renderBoard(
           if (dec) drawAmbientDecoration(ctx, dec);
         }
       } else {
-        // Non-empty, non-gold tile: player-placed (removable) pipes get a distinct background
-        const isRemovable = !tile.isFixed &&
-          (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
-        ctx.fillStyle = isRemovable ? REMOVABLE_BG_COLOR : TILE_BG;
-        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        // Non-empty tile: player-placed (removable) pipes get a distinct background
+        if (isGoldCell) {
+          // Gold pipe on a gold space: keep the darker gold background so the space is visible
+          ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+          ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        } else {
+          const isRemovable = !tile.isFixed &&
+            (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
+          ctx.fillStyle = isRemovable ? REMOVABLE_BG_COLOR : TILE_BG;
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        }
         // Overlay a target highlight when this tile is a valid replacement target
         if (isReplaceTarget) {
           ctx.fillStyle = EMPTY_TARGET_COLOR;
