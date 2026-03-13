@@ -83,3 +83,9 @@ export const HOT_PLATE_COLOR       = '#e44';
 export const HOT_PLATE_WATER_COLOR = '#f86';
 /** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
 export const SPIN_PIPE_COLOR  = '#3a5868';
+/** Colour for positive (beneficial) floating animation labels. */
+export const ANIM_POSITIVE_COLOR = '#4caf50';
+/** Colour for negative (costly) floating animation labels. */
+export const ANIM_NEGATIVE_COLOR = '#f44336';
+/** Colour for zero-value floating animation labels. */
+export const ANIM_ZERO_COLOR = '#9e9e9e';

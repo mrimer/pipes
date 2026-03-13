@@ -32,6 +32,7 @@ import {
   SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
   STAR_COLOR, STAR_WATER_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
+  ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR,
 } from './colors';
 
 let LINE_WIDTH = 10; // pipe stroke width in px
@@ -538,18 +539,29 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
   ctx.bezierCurveTo(fx + fr * 0.5, fy - fr * 1.2, fx + fr, fy, fx, fy + fr);
   ctx.stroke();
 
-  ctx.fillStyle = hotColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (lockedGain !== null || lockedCost !== null) {
-    // Connected: show gain and/or loss
+    // Connected: show gain in green and/or loss in red
     const gain = lockedGain ?? 0;
     const loss = lockedCost ?? 0;
-    const parts: string[] = [];
-    if (gain > 0) parts.push(`+${gain}`);
-    if (loss > 0) parts.push(`-${loss}`);
     ctx.font = `bold ${_s(12)}px Arial`;
-    ctx.fillText(parts.length > 0 ? parts.join(' ') : '0', 0, 0);
+    if (gain > 0 && loss > 0) {
+      // Both gain and loss: show each in its own colour, offset vertically
+      ctx.fillStyle = ANIM_POSITIVE_COLOR;
+      ctx.fillText(`+${gain}`, 0, -_s(6));
+      ctx.fillStyle = ANIM_NEGATIVE_COLOR;
+      ctx.fillText(`-${loss}`, 0, _s(6));
+    } else if (gain > 0) {
+      ctx.fillStyle = ANIM_POSITIVE_COLOR;
+      ctx.fillText(`+${gain}`, 0, 0);
+    } else if (loss > 0) {
+      ctx.fillStyle = ANIM_NEGATIVE_COLOR;
+      ctx.fillText(`-${loss}`, 0, 0);
+    } else {
+      ctx.fillStyle = hotColor;
+      ctx.fillText('0', 0, 0);
+    }
   } else {
     // Unconnected: show boiling temp and mass.
     // When shift is held, show the raw temp parameter; otherwise show tile.temperature + currentTemp.

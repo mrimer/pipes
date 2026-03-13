@@ -1,6 +1,8 @@
 /** Floating animation labels that rise and fade on the canvas after tile connections. */
 
 import { TILE_SIZE } from './renderer';
+import { ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR } from './colors';
+export { ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR };
 
 /** A floating animation label drawn on the canvas. */
 export interface TileAnimation {
@@ -23,15 +25,6 @@ export const ANIM_DURATION = 900;
 
 /** Vertical rise in pixels over the full animation duration. */
 export const ANIM_RISE_PX = 36;
-
-/** Colour for positive (beneficial) animation labels. */
-export const ANIM_POSITIVE_COLOR = '#4caf50';
-
-/** Colour for negative (costly) animation labels. */
-export const ANIM_NEGATIVE_COLOR = '#f44336';
-
-/** Colour for zero-value animation labels. */
-export const ANIM_ZERO_COLOR = '#9e9e9e';
 
 /** Colour for item-grant animation labels (gold, to distinguish from generic positive). */
 export const ANIM_ITEM_COLOR = '#ffd700';
