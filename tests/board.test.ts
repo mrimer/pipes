@@ -4095,6 +4095,57 @@ describe('Chamber tile (hot_plate content)', () => {
     expect(board.getCurrentWater()).toBe(50);
   });
 
+  it('hot_plate connected on same turn as ice sees newly-frozen water even when BFS discovers hot_plate first', () => {
+    // Layout: Source(0,0)[all] → player Tee(0,1) → HotPlate(0,2)[W,E] → Sink(0,3)
+    //                                         ↓
+    //                                      Ice(1,1)[N,S]  (dead-end going south into empty space)
+    //
+    // BFS order when Tee(0,1) is placed: Source → Tee → HotPlate(0,2) [East queued first]
+    //                                                  → Ice(1,1)     [South queued second]
+    // Without the fix, hot_plate is locked before ice, seeing frozen=0 → waterGain=0 → impact=-4.
+    // With the fix, ice is locked first (frozen=15), then hot_plate (waterGain=min(15,4)=4 → impact=+4).
+    //
+    // Ice(1,1): cost=3, thresh=5, sourceTemp=0 → deltaTemp=5 → frozen += 15
+    // HotPlate(0,2): mass=1, hpTemp=4 → effectiveCost=4, waterGain=min(15,4)=4 → impact=+4, frozen=11
+    // Water = 50 - 1(Tee) + 4(HotPlate) - 15(Ice) = 38
+    const board = new Board(2, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 50;
+
+    // Set all cells explicitly to prevent random tile interference.
+    // Row 0
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1, null, null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0); // player slot – will place Tee here
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1,
+      null, 1, new Set([Direction.West, Direction.East]), 'hot_plate', 4);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true);
+    // Row 1 – only Ice at (1,1); rest are Granite (no connections) to block accidents
+    board.grid[1][0] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 3,
+      null, 1, new Set([Direction.North, Direction.South]), 'ice', 5);
+    board.grid[1][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][3] = new Tile(PipeShape.Granite, 0, true);
+
+    board.inventory = [{ shape: PipeShape.Tee, count: 1 }];
+    board.initHistory();
+
+    // Before placing, nothing is connected past the source
+    expect(board.frozen).toBe(0);
+
+    // Place Tee at rotation=90 (connects West, East, South) so both HotPlate(0,2)
+    // and Ice(1,1) connect on the same turn.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
+    board.applyTurnDelta();
+
+    // Ice must be resolved before hot_plate regardless of BFS order.
+    expect(board.frozen).toBe(11);
+    expect(board.getLockedWaterImpact({ row: 1, col: 1 })).toBe(-15); // ice: cost=3, deltaTemp=5
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(4);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(4);  // waterGain=4, waterLoss=0
+    expect(board.getCurrentWater()).toBe(38); // 50 - 1(Tee) + 4(HotPlate) - 15(Ice) = 38
+  });
+
   it('hot_plate locked cost is re-evaluated with historically-limited temperature when a heater disconnects', () => {
     // Layout (3 rows × 4 cols) – same topology as the sandstone pump-disconnect tests:
     //   (0,0) Source[E,S]  (0,1) [player E-W pipe]  (0,2) HotPlate[W,E]  (0,3) Sink[W]
