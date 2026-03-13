@@ -76,6 +76,13 @@ describe('getConnections', () => {
       expect(c.size).toBe(0);
     }
   });
+
+  it('Cement has no connections (water cannot flow through it)', () => {
+    for (const rot of [0, 90, 180, 270] as const) {
+      const c = getConnections(PipeShape.Cement, rot);
+      expect(c.size).toBe(0);
+    }
+  });
 });
 
 describe('Tile', () => {

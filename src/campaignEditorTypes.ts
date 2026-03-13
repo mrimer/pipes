@@ -45,6 +45,8 @@ export interface TileParams {
   itemShape: PipeShape;
   itemCount: number;
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };
+  /** Setting Time for Cement tiles – number of adjustments allowed before hardening. */
+  settingTime: number;
 }
 
 export const DEFAULT_PARAMS: TileParams = {
@@ -59,6 +61,7 @@ export const DEFAULT_PARAMS: TileParams = {
   itemShape: PipeShape.Straight,
   itemCount: 1,
   connections: { N: true, E: true, S: true, W: true },
+  settingTime: 0,
 };
 
 // ─── Editor snapshot for undo/redo ───────────────────────────────────────────
@@ -87,6 +90,7 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.Tee]:          '#4a90d9',
   [PipeShape.Cross]:        '#4a90d9',
   [PipeShape.Granite]:      '#636e72',
+  [PipeShape.Cement]:       '#8090a0',
   [PipeShape.GoldSpace]:    '#b8860b',
   [PipeShape.GoldStraight]: '#f39c12',
   [PipeShape.GoldElbow]:    '#f39c12',

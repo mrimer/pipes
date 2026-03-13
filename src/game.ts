@@ -776,6 +776,7 @@ export class Game {
       this.board,
       this.selectedShape,
       (shape, count) => this._handleInventoryClick(shape, count),
+      (shape) => this._handleInventoryRightClick(shape),
     );
     if (this._pendingSparkleShapes.size > 0) {
       for (const shape of this._pendingSparkleShapes) {
@@ -806,6 +807,16 @@ export class Game {
     // Return focus to the canvas so Q/W rotation keys work immediately after
     // selecting an inventory piece without requiring a click on the board.
     this.canvas.focus();
+  }
+
+  private _handleInventoryRightClick(shape: PipeShape): void {
+    if (this.gameState !== GameState.Playing) return;
+    // Right-clicking a selected inventory tile deselects it.
+    if (this.selectedShape === shape) {
+      this.selectedShape = null;
+      this._renderInventoryBar();
+      this.canvas.focus();
+    }
   }
 
   // ─── Water display ────────────────────────────────────────────────────────
@@ -1129,6 +1140,7 @@ export class Game {
       this.board.recordMove();
       this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, pos.row, pos.col);
       this._spawnLockedCostChangeAnimations();
+      this._spawnCementDecrementAnimation();
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
         this.selectedShape = reclaimedShape;
@@ -1175,6 +1187,7 @@ export class Game {
         this._spawnConnectionAnimations(filledBefore);
         this._spawnDisconnectionAnimations(filledBefore);
         this._spawnLockedCostChangeAnimations();
+        this._spawnCementDecrementAnimation();
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._updateUndoRedoButtons();
@@ -1196,6 +1209,7 @@ export class Game {
       // granting container and must go through the container-grant constraint check.
       if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
         this._afterTilePlaced(this.selectedShape, filledBefore, tile, pos.row, pos.col);
+        this._spawnCementDecrementAnimation();
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1218,6 +1232,7 @@ export class Game {
         this._spawnConnectionAnimations(filledBefore);
         this._spawnDisconnectionAnimations(filledBefore);
         this._spawnLockedCostChangeAnimations();
+        this._spawnCementDecrementAnimation();
         this._renderInventoryBar();
         this._updateWaterDisplay();
         this._updateUndoRedoButtons();
@@ -1342,6 +1357,7 @@ export class Game {
           this._spawnConnectionAnimations(filledBefore);
           this._spawnDisconnectionAnimations(filledBefore);
           this._spawnLockedCostChangeAnimations();
+          this._spawnCementDecrementAnimation();
           this._renderInventoryBar();
           this._updateWaterDisplay();
           this._updateUndoRedoButtons();
@@ -1438,6 +1454,15 @@ export class Game {
     // Indicate a gold space regardless of the tile currently on top of it.
     if (this.board.goldSpaces.has(`${row},${col}`)) {
       tooltipText += ' (gold space)';
+    }
+    // Indicate cement cell status.
+    const cementSettingTime = this.board.getCementSettingTime({ row, col });
+    if (cementSettingTime !== null) {
+      if (cementSettingTime === 0 && tile.shape !== PipeShape.Empty) {
+        tooltipText += ' (Hardened)';
+      } else {
+        tooltipText += ` T=${cementSettingTime}`;
+      }
     }
     // Show a human-readable tile name derived from its shape and chamber content.
     const tileName = getTileDisplayName(tile);
@@ -1826,6 +1851,25 @@ export class Game {
       const color = animColor(delta);
       this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
     }
+  }
+
+  /**
+   * If the most recent board operation decremented a cement cell's setting time,
+   * spawn a floating gray "-1" animation above that cell.
+   */
+  private _spawnCementDecrementAnimation(): void {
+    if (!this.board?.lastCementDecrement) return;
+    const { row: r, col: c } = this.board.lastCementDecrement;
+    const cx = c * TILE_SIZE + TILE_SIZE / 4;
+    const cy = r * TILE_SIZE + TILE_SIZE / 4;
+    this._animations.push({
+      x: cx, y: cy,
+      text: '-1',
+      color: ANIM_ZERO_COLOR,
+      startTime: performance.now(),
+      duration: ANIM_DURATION,
+    });
+    this.board.lastCementDecrement = null;
   }
 
   /**

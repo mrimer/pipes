@@ -11,13 +11,15 @@ import { shapeIcon } from './renderer';
  * @param inventoryBarEl - The container element for inventory items.
  * @param board - The active board (provides inventory counts and container bonuses).
  * @param selectedShape - The pipe shape currently selected by the player, or null.
- * @param onItemClick - Callback invoked when the player clicks an inventory item.
+ * @param onItemClick - Callback invoked when the player left-clicks an inventory item.
+ * @param onItemRightClick - Callback invoked when the player right-clicks an inventory item.
  */
 export function renderInventoryBar(
   inventoryBarEl: HTMLElement,
   board: Board,
   selectedShape: PipeShape | null,
   onItemClick: (shape: PipeShape, effectiveCount: number) => void,
+  onItemRightClick?: (shape: PipeShape) => void,
 ): void {
   inventoryBarEl.innerHTML = '<h3 class="inv-title">Inventory</h3>';
 
@@ -48,6 +50,9 @@ export function renderInventoryBar(
 
     el.dataset['shape'] = item.shape;
     el.addEventListener('click', () => onItemClick(item.shape, effectiveCount));
+    if (onItemRightClick) {
+      el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(item.shape); });
+    }
     inventoryBarEl.appendChild(el);
     renderedCount++;
   }
@@ -75,6 +80,9 @@ export function renderInventoryBar(
 
     el.dataset['shape'] = bonusShape;
     el.addEventListener('click', () => onItemClick(bonusShape, bonusCount));
+    if (onItemRightClick) {
+      el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(bonusShape); });
+    }
     inventoryBarEl.appendChild(el);
     renderedCount++;
   }

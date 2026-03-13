@@ -29,6 +29,10 @@ export const CHAMBER_FILL_COLOR      = '#1c2e3a';
 export const CHAMBER_FILL_WATER_COLOR = '#2a3f4f';
 export const GRANITE_COLOR           = '#9ca3af';
 export const GRANITE_FILL_COLOR      = '#374151';
+/** Border/line color for Cement tiles (medium gray). */
+export const CEMENT_COLOR            = '#8090a0';
+/** Background fill color for Cement tiles (light blue-gray). */
+export const CEMENT_FILL_COLOR       = '#c0c8d4';
 export const GOLD_PIPE_COLOR         = '#ffd700';
 export const GOLD_PIPE_WATER_COLOR   = '#ffec6e';
 export const GOLD_SPACE_BASE_COLOR   = '#6b4d00';

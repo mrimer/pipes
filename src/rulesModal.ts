@@ -6,6 +6,7 @@ import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
   GRANITE_FILL_COLOR, GRANITE_COLOR,
+  CEMENT_FILL_COLOR, CEMENT_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
@@ -40,6 +41,30 @@ function colorSwatch(fill: string, border = fill): string {
   );
 }
 
+/** Return a small granite block icon (fill + crack lines) as an inline HTML string. */
+function graniteSwatch(): string {
+  return (
+    `<svg width="28" height="28" viewBox="0 0 28 28">` +
+    `<rect x="2" y="2" width="24" height="24" rx="2" ry="2" fill="${GRANITE_FILL_COLOR}" stroke="${GRANITE_COLOR}" stroke-width="2"/>` +
+    `<line x1="4" y1="9" x2="20" y2="11" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
+    `<line x1="5" y1="15" x2="21" y2="17" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
+    `<line x1="4" y1="21" x2="20" y2="23" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
+    `</svg>`
+  );
+}
+
+/** Return a cement tile icon (light-gray background + three diagonal wavy lines) as an inline HTML string. */
+function cementSwatch(): string {
+  return (
+    `<svg width="28" height="28" viewBox="0 0 28 28">` +
+    `<rect x="2" y="2" width="24" height="24" rx="2" ry="2" fill="${CEMENT_FILL_COLOR}" stroke="${CEMENT_COLOR}" stroke-width="2"/>` +
+    `<path d="M 4 22 Q 14 14 24 6" stroke="${CEMENT_COLOR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
+    `<path d="M 2 28 Q 14 18 26 10" stroke="${CEMENT_COLOR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
+    `<path d="M 6 16 Q 16 8 26 2" stroke="${CEMENT_COLOR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
+    `</svg>`
+  );
+}
+
 /** Return a small colored square with a text label overlaid, as an inline HTML string. */
 function chamberSwatch(fill: string, label: string, border = fill): string {
   return (
@@ -64,7 +89,7 @@ function colorCircle(fill: string): string {
 /** Controls reference table rows. */
 const CONTROL_ROWS: ControlRow[] = [
   { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
-  { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory.' },
+  { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory. Right-clicking a selected inventory tile deselects it.' },
   { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
   { input: 'Hover + Scroll Wheel', action: 'Queue a placed pipe for rotation when no inventory item is selected.' },
   { input: 'Q',                  action: 'Rotate the selected pipe piece counter-clockwise.' },
@@ -116,7 +141,12 @@ const LEGEND_ROWS: LegendRow[] = [
     description: 'Connects all four sides.',
   },
   {
-    iconHtml: colorSwatch(GRANITE_FILL_COLOR, GRANITE_COLOR),
+    iconHtml: cementSwatch(),
+    name: 'Cement',
+    description: 'Open background tile. Any pipe may be placed here. When Setting Time (T) = 0, placed pipes are hardened in cement and may not be removed or rotated. When T > 0, adjustments are allowed but decrement T by 1.',
+  },
+  {
+    iconHtml: graniteSwatch(),
     name: 'Granite Block',
     description: 'Impassable obstacle — water cannot flow through and it cannot be moved.',
   },

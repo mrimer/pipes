@@ -9,7 +9,7 @@ import { TILE_SIZE, drawSpinArrow, scalePx as _s } from './renderer';
 import { Tile } from './tile';
 import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
 import { SPIN_PIPE_SHAPES } from './board';
-import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR } from './colors';
+import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR } from './colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
 
@@ -198,6 +198,8 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = chamberColor(chamberContent);
   } else if (shape === PipeShape.GoldSpace) {
     bgColor = '#b8860b';
+  } else if (shape === PipeShape.Cement) {
+    bgColor = CEMENT_FILL_COLOR;
   } else if (shape === PipeShape.Granite) {
     bgColor = '#4a5568';
   } else {
@@ -206,6 +208,46 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   ctx.fillStyle = bgColor;
   ctx.fillRect(x, y, CELL, CELL);
+
+  // Handle Cement directly (no Tile construction needed)
+  if (shape === PipeShape.Cement) {
+    const settingTime = def.settingTime ?? 0;
+    const cx = x + CELL / 2;
+    const cy = y + CELL / 2;
+    ctx.strokeStyle = CEMENT_COLOR;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+    ctx.save();
+    ctx.strokeStyle = CEMENT_COLOR;
+    ctx.lineWidth = _s(1.5);
+    ctx.lineCap = 'round';
+    const sq2 = Math.SQRT1_2;
+    const len = CELL * 0.5;
+    for (let i = -1; i <= 1; i++) {
+      const px = i * _s(8) * sq2;
+      const py = i * _s(8) * sq2;
+      const lx = cx + px; const ly = cy + py;
+      ctx.beginPath();
+      ctx.moveTo(lx - len * sq2, ly + len * sq2);
+      ctx.quadraticCurveTo(lx + _s(2) * sq2, ly + _s(2) * sq2, lx + len * sq2, ly - len * sq2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.font = `bold ${_s(10)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'CEMENT', cx, cy - _s(7));
+    ctx.font = `${_s(9)}px Arial`;
+    strokeFillText(ctx, `T=${settingTime}`, cx, cy + _s(6));
+    ctx.restore();
+    ctx.strokeStyle = '#2a3a5e';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    return;
+  }
 
   // Draw the tile as a Tile object using existing drawTile infrastructure
   // We construct a temporary Tile to render it

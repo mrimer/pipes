@@ -18,6 +18,7 @@ import {
   CONTAINER_COLOR, CONTAINER_WATER_COLOR,
   CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
+  CEMENT_COLOR, CEMENT_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
   REMOVABLE_BG_COLOR,
@@ -236,6 +237,71 @@ function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
   ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
+}
+
+/**
+ * Draw the cement background for a grid cell.
+ * Call once during renderBoard pass 1, using full tile-space coordinates (x, y top-left).
+ */
+function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const ts = TILE_SIZE;
+  // Light-gray fill
+  ctx.fillStyle = CEMENT_FILL_COLOR;
+  ctx.fillRect(x + 1, y + 1, ts - 2, ts - 2);
+  // Slightly darker border
+  ctx.strokeStyle = CEMENT_COLOR;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 2, y + 2, ts - 4, ts - 4);
+  // Three diagonal wavy lines (SW→NE direction), clipped to tile interior
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x + 2, y + 2, ts - 4, ts - 4);
+  ctx.clip();
+  ctx.strokeStyle = CEMENT_COLOR;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  const cx = x + ts / 2;
+  const cy = y + ts / 2;
+  const len = ts * 0.52; // half-length of each line (will be clipped)
+  const spacing = _s(10); // spacing between parallel lines
+  const sq2 = Math.SQRT1_2;
+  for (let i = -1; i <= 1; i++) {
+    // Offset along perpendicular direction (1,1)/√2
+    const px = i * spacing * sq2;
+    const py = i * spacing * sq2;
+    const lx = cx + px;
+    const ly = cy + py;
+    // Line endpoints along direction (1,−1)/√2
+    const sx = lx - len * sq2;
+    const sy = ly + len * sq2;
+    const ex = lx + len * sq2;
+    const ey = ly - len * sq2;
+    // Wavy: control point offset slightly along (1,1)/√2 from the line midpoint
+    const wave = _s(3);
+    const cpx = lx + wave * sq2;
+    const cpy = ly + wave * sq2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(cpx, cpy, ex, ey);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Draw a dark shadow overlay on a tile that is hardened in cement.
+ * Call after drawTile() for cells that are hardened cement (Setting Time = 0)
+ * with a placed tile, using full tile-space coordinates (x, y top-left).
+ */
+function _drawCementShadow(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const ts = TILE_SIZE;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x + 2, y + 2, ts - 4, ts - 4);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(20,15,10,0.38)';
+  ctx.fillRect(x + 2, y + 2, ts - 4, ts - 4);
+  ctx.restore();
 }
 
 function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
@@ -868,6 +934,7 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Source:       return 'Source';
     case PipeShape.Sink:         return 'Sink';
     case PipeShape.Granite:      return 'Granite';
+    case PipeShape.Cement:       return 'Cement';
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
         case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity}` : 'Tank';
@@ -1054,6 +1121,7 @@ export function renderBoard(
       const y = r * TILE_SIZE;
       const isFocused  = focusPos.row === r && focusPos.col === c;
       const isGoldCell = board.goldSpaces.has(`${r},${c}`);
+      const isCementCell = board.cementData.has(`${r},${c}`);
 
       // A cell is a valid placement target when it's empty and either:
       // it's not a gold space (any pipe fits), or it IS a gold space (gold pipe required)
@@ -1068,7 +1136,20 @@ export function renderBoard(
         isReplaceableByShape(tile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
 
       // Tile background
-      if (tile.shape === PipeShape.Empty) {
+      if (isCementCell) {
+        // Cement cell: always show cement background regardless of tile on top
+        _drawCementBackground(ctx, x, y);
+        if (isTarget) {
+          ctx.fillStyle = 'rgba(140,160,200,0.22)';
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        }
+        if (isReplaceTarget) {
+          ctx.fillStyle = EMPTY_TARGET_COLOR;
+          ctx.globalAlpha = 0.35;
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+          ctx.globalAlpha = 1;
+        }
+      } else if (tile.shape === PipeShape.Empty) {
         if (isGoldCell) {
           // Shimmering gold background
           ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
@@ -1167,6 +1248,11 @@ export function renderBoard(
       }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
+
+      // Draw shadow overlay on hardened cement cells (Setting Time = 0) with a placed tile
+      if (tile.shape !== PipeShape.Empty && board.cementData.has(`${r},${c}`) && board.cementData.get(`${r},${c}`) === 0) {
+        _drawCementShadow(ctx, x, y);
+      }
     }
   }
 
