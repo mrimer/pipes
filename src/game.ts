@@ -18,9 +18,10 @@ import { CampaignEditor } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './confetti';
 import { spawnStarSparkles, clearStarSparkles } from './starSparkle';
 import {
-  SourceSprayDrop, FlowDrop,
+  SourceSprayDrop, FlowDrop, BubbleParticle,
   spawnSourceSprayDrop, renderSourceSpray,
   spawnFlowDrop, renderFlowDrops,
+  spawnBubble, renderBubbles,
   computeFlowGoodDirs,
 } from './waterParticles';
 
@@ -170,6 +171,12 @@ export class Game {
 
   /** `performance.now()` of the last win-flow drop spawn. */
   private _lastFlowSpawn = 0;
+
+  /** Active fizzing bubble particles rendered inside connected pipe tiles. */
+  private _bubbles: BubbleParticle[] = [];
+
+  /** `performance.now()` of the last bubble spawn. */
+  private _lastBubbleSpawn = 0;
 
   /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
   private _pendingSparkleShapes: Set<PipeShape> = new Set();
@@ -563,6 +570,7 @@ export class Game {
     // Clear particle arrays so stale drops don't persist on the level-select screen.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
+    this._bubbles = [];
     this._flowGoodDirs = null;
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
@@ -639,6 +647,7 @@ export class Game {
     // Reset particle arrays so stale drops from a previous level don't carry over.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
+    this._bubbles = [];
     this._flowGoodDirs = null;
 
     this._updateLevelHeader(levelId);
@@ -869,6 +878,7 @@ export class Game {
       this._renderBoard();
       renderAnimations(this.ctx, this._animations, this.canvas.width);
       this._tickSourceSpray();
+      this._tickBubbles();
       this._tickWinFlow();
     }
     requestAnimationFrame(() => this._loop());
@@ -886,6 +896,24 @@ export class Game {
     const sx = this.board.source.col * TILE_SIZE + TILE_SIZE / 2;
     const sy = this.board.source.row * TILE_SIZE + TILE_SIZE / 2;
     renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
+  }
+
+  /**
+   * Spawn and render fizzing bubble particles inside connected pipe tiles.
+   * Runs every frame during play to give a sense of liquid flowing in the pipes.
+   */
+  private _tickBubbles(): void {
+    if (!this.board) return;
+    const filledPositions = this.board.getFilledPositions();
+    // Only show bubbles when at least one regular pipe tile is in the fill path.
+    if (filledPositions.size <= 2) return; // source + sink only → nothing to show
+    const now = performance.now();
+    // Spawn a new bubble roughly every 90 ms (~11 per second).
+    if (now - this._lastBubbleSpawn >= 90) {
+      spawnBubble(this._bubbles, this.board, filledPositions);
+      this._lastBubbleSpawn = now;
+    }
+    renderBubbles(this.ctx, this._bubbles, WATER_COLOR);
   }
 
   /** Spawn and render the win-flow drops (only active in the Won state). */
@@ -2221,6 +2249,7 @@ export class Game {
     clearStarSparkles();
     // Clear win-flow drops since we're no longer in a won state.
     this._flowDrops = [];
+    this._bubbles = [];
     this._flowGoodDirs = null;
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
@@ -2352,6 +2381,7 @@ export class Game {
     // Reset particle arrays for the playtested level.
     this._sourceSprayDrops = [];
     this._flowDrops = [];
+    this._bubbles = [];
     this._flowGoodDirs = null;
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;

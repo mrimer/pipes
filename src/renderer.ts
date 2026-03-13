@@ -294,9 +294,13 @@ function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
  * hardened) with a black edge on a dark-gray fill for maximum readability over
  * any tile background.
  * Call after all tile content is drawn, using full tile-space coordinates (x, y top-left).
+ *
+ * @param isHardened - true when dryingTime is 0 AND a pipe has been placed on
+ *   the tile.  Only hardened tiles display the "X"; otherwise the numeric value
+ *   (including "0") is shown.
  */
-function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number): void {
-  const label = dryingTime === 0 ? 'X' : String(dryingTime);
+function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number, isHardened: boolean): void {
+  const label = isHardened ? 'X' : String(dryingTime);
   const fontSize = _s(18);
   ctx.save();
   ctx.font = `bold ${fontSize}px Arial`;
@@ -1277,7 +1281,13 @@ export function renderBoard(
       const dryingTime = board.cementData.get(`${r},${c}`) as number;
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      _drawCementLabel(ctx, x, y, dryingTime);
+      // A tile is "hardened" (shows 'X') only when dryingTime is 0 AND a pipe
+      // has actually been placed on it.  Cement cells at T=0 without a pipe
+      // still display the numeric "0" to avoid confusing the player.
+      const tileShape = board.grid[r][c].shape;
+      const hasPipe = PIPE_SHAPES.has(tileShape) || GOLD_PIPE_SHAPES.has(tileShape) || SPIN_PIPE_SHAPES.has(tileShape);
+      const isHardened = dryingTime === 0 && hasPipe;
+      _drawCementLabel(ctx, x, y, dryingTime, isHardened);
     }
   }
 
