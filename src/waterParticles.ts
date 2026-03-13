@@ -4,9 +4,11 @@
  * 1. Source spray – subtle water drops spraying from the Source tile during play.
  * 2. Win flow     – water drops flowing along connected pipes from source to sink
  *                   on level completion.
+ * 3. Pipe bubbles – fizzing bubble particles inside connected pipe tiles to
+ *                   indicate liquid is flowing through the connected network.
  */
 
-import { Board, NEIGHBOUR_DELTA } from './board';
+import { Board, NEIGHBOUR_DELTA, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Direction, GridPos } from './types';
 import { TILE_SIZE, scalePx as _s } from './renderer';
 
@@ -317,6 +319,162 @@ export function renderFlowDrops(
     ctx.fill();
     ctx.strokeStyle = 'black';
     ctx.lineWidth = _s(2);
+    ctx.stroke();
+    ctx.restore();
+
+    i++;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Pipe Bubbles
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** A single fizzing bubble particle rendered inside a connected pipe. */
+export interface BubbleParticle {
+  /** Canvas pixel X. */
+  x: number;
+  /** Canvas pixel Y. */
+  y: number;
+  /** Bubble radius in pixels. */
+  radius: number;
+  /** Current opacity (0–1). */
+  alpha: number;
+  /** 0 = appearing (alpha increasing), 1 = disappearing (alpha decreasing). */
+  phase: number;
+  /** Alpha change per frame (~60 fps). */
+  speed: number;
+}
+
+/** Maximum number of simultaneously live bubble particles. */
+const BUBBLE_MAX = 80;
+
+/**
+ * Attempt to spawn one new bubble inside a random connected pipe tile.
+ * Does nothing when the pool is full or there are no eligible tiles.
+ *
+ * @param bubbles         Mutable array of active bubbles.
+ * @param board           The current game board.
+ * @param filledPositions Pre-computed set of connected tile keys ("row,col").
+ */
+export function spawnBubble(
+  bubbles: BubbleParticle[],
+  board: Board,
+  filledPositions: Set<string>,
+): void {
+  if (bubbles.length >= BUBBLE_MAX) return;
+
+  // Collect filled positions that are actual pipe tiles (not source/sink/chamber).
+  const candidates: string[] = [];
+  for (const key of filledPositions) {
+    const [r, c] = key.split(',').map(Number);
+    const shape = board.grid[r][c].shape;
+    if (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape)) {
+      candidates.push(key);
+    }
+  }
+  if (candidates.length === 0) return;
+
+  const key = candidates[Math.floor(Math.random() * candidates.length)];
+  const [row, col] = key.split(',').map(Number);
+
+  // Collect the directions that have live mutual connections from this tile.
+  const connectedDirs: Direction[] = [];
+  for (const dir of Object.values(Direction)) {
+    if (board.areMutuallyConnected({ row, col }, dir)) {
+      connectedDirs.push(dir);
+    }
+  }
+
+  const cx = col * TILE_SIZE + TILE_SIZE / 2;
+  const cy = row * TILE_SIZE + TILE_SIZE / 2;
+  const half = TILE_SIZE / 2;
+  // Approximate inner half-width of the pipe tube at the current tile size.
+  const tubeHalf = _s(10) / 2;
+
+  let bx: number;
+  let by: number;
+
+  // Choose: the centre junction (always valid) or one of the pipe arms.
+  const choice = Math.floor(Math.random() * (connectedDirs.length + 1));
+  if (choice >= connectedDirs.length || connectedDirs.length === 0) {
+    // Centre junction – stay within the tube cross-section.
+    bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
+    by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
+  } else {
+    const dir = connectedDirs[choice];
+    // Place the bubble somewhere along the pipe arm towards `dir`.
+    // The arm runs from the tile centre to the tile edge; the bubble is
+    // confined within the tube width.
+    switch (dir) {
+      case Direction.North:
+        bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
+        by = cy - Math.random() * half;
+        break;
+      case Direction.South:
+        bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
+        by = cy + Math.random() * half;
+        break;
+      case Direction.East:
+        bx = cx + Math.random() * half;
+        by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
+        break;
+      default: // West
+        bx = cx - Math.random() * half;
+        by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
+        break;
+    }
+  }
+
+  bubbles.push({
+    x: bx,
+    y: by,
+    radius: _s(1.5 + Math.random() * 2.5),
+    alpha: 0,
+    phase: 0,
+    speed: 0.025 + Math.random() * 0.035,
+  });
+}
+
+/**
+ * Advance and render all bubble particles, removing expired ones.
+ *
+ * @param ctx     2D rendering context.
+ * @param bubbles Mutable array of active bubbles (modified in place).
+ * @param color   CSS colour string used for the bubble fill.
+ */
+export function renderBubbles(
+  ctx: CanvasRenderingContext2D,
+  bubbles: BubbleParticle[],
+  color: string,
+): void {
+  let i = 0;
+  while (i < bubbles.length) {
+    const b = bubbles[i];
+
+    if (b.phase === 0) {
+      b.alpha += b.speed;
+      if (b.alpha >= 1) {
+        b.alpha = 1;
+        b.phase = 1;
+      }
+    } else {
+      b.alpha -= b.speed;
+      if (b.alpha <= 0) {
+        bubbles.splice(i, 1);
+        continue;
+      }
+    }
+
+    ctx.save();
+    ctx.globalAlpha = b.alpha * 0.65;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    // Thin lighter ring to give a glassy bubble look.
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = _s(0.8);
     ctx.stroke();
     ctx.restore();
 
