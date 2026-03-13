@@ -162,6 +162,12 @@ export class Game {
    */
   private _flowGoodDirs: Map<string, Set<Direction>> | null = null;
 
+  /**
+   * Maximum number of simultaneously live win-flow drops – set on win to
+   * ~5 drops per tile in the solution path.
+   */
+  private _flowMaxDrops = 25;
+
   /** `performance.now()` of the last win-flow drop spawn. */
   private _lastFlowSpawn = 0;
 
@@ -886,9 +892,9 @@ export class Game {
   private _tickWinFlow(): void {
     if (this.gameState !== GameState.Won || !this.board || !this._flowGoodDirs) return;
     const now = performance.now();
-    // Spawn a new drop roughly every 120 ms.
-    if (now - this._lastFlowSpawn >= 120) {
-      spawnFlowDrop(this._flowDrops, this.board, this._flowGoodDirs);
+    // Spawn a new drop roughly every 70 ms to maintain ~5 drops per tile at steady state.
+    if (now - this._lastFlowSpawn >= 70) {
+      spawnFlowDrop(this._flowDrops, this.board, this._flowGoodDirs, this._flowMaxDrops);
       this._lastFlowSpawn = now;
     }
     renderFlowDrops(this.ctx, this._flowDrops, this.board, WATER_COLOR, this._flowGoodDirs);
@@ -985,6 +991,9 @@ export class Game {
     if (this.board.isSolved()) {
       this.gameState = GameState.Won;
       this._flowGoodDirs = computeFlowGoodDirs(this.board);
+      // Scale max drops to ~5 per tile in the solution path (min 10).
+      const pathLength = this.board.getFilledPositions().size;
+      this._flowMaxDrops = Math.max(10, pathLength * 5);
       const starsCollected = this.board.getStarsCollected();
       this._markLevelCompleted(this.currentLevel!.id);
       this._saveStars(this.currentLevel!.id, starsCollected);
@@ -1462,12 +1471,12 @@ export class Game {
       tooltipText += ' (gold space)';
     }
     // Indicate cement cell status.
-    const cementSettingTime = this.board.getCementSettingTime({ row, col });
-    if (cementSettingTime !== null) {
-      if (cementSettingTime === 0 && tile.shape !== PipeShape.Empty) {
+    const cementDryingTime = this.board.getCementDryingTime({ row, col });
+    if (cementDryingTime !== null) {
+      if (cementDryingTime === 0 && tile.shape !== PipeShape.Empty) {
         tooltipText += ' Cement (Hardened)';
       } else {
-        tooltipText += ` Cement T=${cementSettingTime}`;
+        tooltipText += ` Cement T=${cementDryingTime}`;
       }
     }
     // Show a human-readable tile name derived from its shape and chamber content.

@@ -224,9 +224,6 @@ export interface FlowDrop {
   size: number;
 }
 
-/** Maximum number of simultaneously live win-flow drops. */
-const FLOW_MAX_DROPS = 25;
-
 /**
  * Spawn a new win-flow drop at the source tile.
  * Does nothing when the pool is full or the source has no connected neighbours.
@@ -234,9 +231,10 @@ const FLOW_MAX_DROPS = 25;
  * @param drops     Mutable array of active flow drops.
  * @param board     The solved game board.
  * @param goodDirs  Pre-computed good-direction set from {@link computeFlowGoodDirs}.
+ * @param maxDrops  Maximum number of simultaneously live drops.
  */
-export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<string, Set<Direction>>): void {
-  if (drops.length >= FLOW_MAX_DROPS) return;
+export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<string, Set<Direction>>, maxDrops: number): void {
+  if (drops.length >= maxDrops) return;
   const dirs = _forwardDirs(board, board.source, null, goodDirs);
   if (dirs.length === 0) return;
   const dir = dirs[Math.floor(Math.random() * dirs.length)];

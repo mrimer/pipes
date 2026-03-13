@@ -211,7 +211,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   // Handle Cement directly (no Tile construction needed)
   if (shape === PipeShape.Cement) {
-    const settingTime = def.settingTime ?? 0;
+    const dryingTime = def.dryingTime ?? 0;
     const cx = x + CELL / 2;
     const cy = y + CELL / 2;
     ctx.strokeStyle = CEMENT_COLOR;
@@ -240,7 +240,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'CEMENT', cx, cy - _s(7));
     ctx.font = `${_s(9)}px Arial`;
-    strokeFillText(ctx, `T=${settingTime}`, cx, cy + _s(6));
+    strokeFillText(ctx, `T=${dryingTime}`, cx, cy + _s(6));
     ctx.restore();
     ctx.strokeStyle = '#2a3a5e';
     ctx.lineWidth = 1;

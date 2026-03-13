@@ -1383,10 +1383,10 @@ export class CampaignEditor {
       return panel;
     }
 
-    // Cement: show only Setting Time input (no rotation)
+    // Cement: show only Drying Time input (no rotation)
     if (p === PipeShape.Cement) {
-      panel.appendChild(this._labeledInput('Setting Time', String(this._editorParams.settingTime), (v) => {
-        this._editorParams.settingTime = Math.max(0, parseInt(v) || 0);
+      panel.appendChild(this._labeledInput('Drying Time', String(this._editorParams.dryingTime), (v) => {
+        this._editorParams.dryingTime = Math.max(0, parseInt(v) || 0);
         this._applyParamsToLinkedTile();
       }, 'number', '90px'));
       return panel;
@@ -2174,7 +2174,7 @@ export class CampaignEditor {
     if (def.pressure !== undefined) this._editorParams.pressure = def.pressure;
     if (def.hardness !== undefined) this._editorParams.hardness = def.hardness;
     if (def.shatter !== undefined) this._editorParams.shatter = def.shatter;
-    if (def.settingTime !== undefined) this._editorParams.settingTime = def.settingTime;
+    if (def.dryingTime !== undefined) this._editorParams.dryingTime = def.dryingTime;
     if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
     if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
     if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
@@ -2313,10 +2313,10 @@ export class CampaignEditor {
     const effectiveShape = isChm ? PipeShape.Chamber : (palette as PipeShape);
     const p = this._editorParams;
 
-    // Cement: only settingTime param; no rotation or connections
+    // Cement: only dryingTime param; no rotation or connections
     if (effectiveShape === PipeShape.Cement) {
       const def: TileDef = { shape: PipeShape.Cement };
-      if (p.settingTime !== 0) def.settingTime = p.settingTime;
+      if (p.dryingTime !== 0) def.dryingTime = p.dryingTime;
       return def;
     }
 
