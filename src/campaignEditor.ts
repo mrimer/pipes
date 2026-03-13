@@ -136,6 +136,7 @@ export class CampaignEditor {
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
       if (e.key === 'Escape' && this._linkedTilePos !== null) {
+        // Unlink the linked tile
         e.preventDefault();
         this._linkedTilePos = null;
         this._linkedTileDirty = false;
