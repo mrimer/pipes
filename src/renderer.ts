@@ -1094,7 +1094,7 @@ export function renderBoard(
       } else {
         // Non-empty tile: player-placed (removable) pipes get a distinct background
         if (isGoldCell) {
-          // Gold pipe on a gold space: keep the darker gold background so the space is visible
+          // Non-empty tile on a gold space: keep the darker gold background so the space is visible
           ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
