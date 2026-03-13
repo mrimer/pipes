@@ -1954,3 +1954,175 @@ describe('CampaignEditor – Escape key un-links the linked tile in the level ed
     expect(state._linkedTilePos).toEqual({ row: 0, col: 1 });
   });
 });
+
+// ─── CampaignEditor – wheel scroll rotates linked tile only when hovering ────
+
+describe('CampaignEditor – wheel scroll only rotates linked tile when cursor is over it', () => {
+  const MOCK_CTX = {
+    clearRect: jest.fn(), fillRect: jest.fn(), strokeRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type WheelState = {
+    _editorPalette: PipeShape | string;
+    _editorParams: TileParams;
+    _editorHover: { row: number; col: number } | null;
+    _linkedTilePos: { row: number; col: number } | null;
+    _editGrid: (import('../src/types').TileDef | null)[][];
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    _onEditorCanvasWheel(e: WheelEvent): void;
+  };
+
+  function makeWheelEditor(level: LevelDef): WheelState {
+    const camp: CampaignDef = {
+      id: 'cmp_wheel_test',
+      name: 'Wheel Test',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as WheelState;
+    state._activeCampaignId = 'cmp_wheel_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function wheelEvent(deltaY: number): WheelEvent {
+    return new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true });
+  }
+
+  it('wheel updates pending-placement rotation when no tile is linked', () => {
+    const level: LevelDef = {
+      id: 99930,
+      name: 'Wheel No Link',
+      rows: 4,
+      cols: 4,
+      grid: Array.from({ length: 4 }, () => Array(4).fill(null) as null[]),
+      inventory: [],
+    };
+    const state = makeWheelEditor(level);
+    state._editorPalette = PipeShape.Straight;
+    state._editorParams.rotation = 0;
+    state._linkedTilePos = null;
+
+    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+
+    expect(state._editorParams.rotation).toBe(90);
+  });
+
+  it('wheel rotates linked tile when cursor is hovering over it', () => {
+    const level: LevelDef = {
+      id: 99931,
+      name: 'Wheel Over Linked',
+      rows: 4,
+      cols: 4,
+      grid: [
+        [{ shape: PipeShape.Straight, rotation: 0 }, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null],
+      ],
+      inventory: [],
+    };
+    const state = makeWheelEditor(level);
+    state._editorPalette = PipeShape.Straight;
+    state._editorParams.rotation = 0;
+    // Link the tile at (0, 0) and position the hover over it
+    state._linkedTilePos = { row: 0, col: 0 };
+    state._editorHover = { row: 0, col: 0 };
+
+    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+
+    // Params should be updated
+    expect(state._editorParams.rotation).toBe(90);
+    // The linked grid tile should be updated too
+    expect(state._editGrid[0][0]?.rotation).toBe(90);
+  });
+
+  it('wheel does NOT rotate linked tile when cursor is NOT hovering over it', () => {
+    const level: LevelDef = {
+      id: 99932,
+      name: 'Wheel Away From Linked',
+      rows: 4,
+      cols: 4,
+      grid: [
+        [{ shape: PipeShape.Straight, rotation: 0 }, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null],
+      ],
+      inventory: [],
+    };
+    const state = makeWheelEditor(level);
+    state._editorPalette = PipeShape.Straight;
+    state._editorParams.rotation = 0;
+    // Link the tile at (0, 0) but hover over a different cell
+    state._linkedTilePos = { row: 0, col: 0 };
+    state._editorHover = { row: 1, col: 1 };
+
+    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+
+    // Pending-placement params should be updated
+    expect(state._editorParams.rotation).toBe(90);
+    // But the linked grid tile must remain unchanged at rotation 0
+    expect(state._editGrid[0][0]?.rotation).toBe(0);
+  });
+
+  it('wheel does NOT rotate linked tile when cursor is off the canvas (no hover)', () => {
+    const level: LevelDef = {
+      id: 99933,
+      name: 'Wheel No Hover',
+      rows: 4,
+      cols: 4,
+      grid: [
+        [{ shape: PipeShape.Straight, rotation: 0 }, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null],
+        [null, null, null, null],
+      ],
+      inventory: [],
+    };
+    const state = makeWheelEditor(level);
+    state._editorPalette = PipeShape.Straight;
+    state._editorParams.rotation = 0;
+    state._linkedTilePos = { row: 0, col: 0 };
+    state._editorHover = null; // no hover position
+
+    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+
+    expect(state._editorParams.rotation).toBe(90);
+    expect(state._editGrid[0][0]?.rotation).toBe(0);
+  });
+});

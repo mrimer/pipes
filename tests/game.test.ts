@@ -297,7 +297,7 @@ type GameTestHooks = {
   _challengeMsgEl: HTMLElement;
   _challengeSkipBtnEl: HTMLButtonElement;
   _exitConfirmModalEl: HTMLElement;
-  rulesModalEl: HTMLElement;
+  _rulesModalEl: HTMLElement;
   _pendingLevelId: number | null;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
   _animations: { x: number; y: number; text: string; color: string }[];
@@ -1335,10 +1335,10 @@ describe('Game – Escape key returns to level select', () => {
     const hooks = gameHooks(game);
 
     // Simulate opening the rules modal
-    hooks.rulesModalEl.style.display = 'flex';
+    hooks._rulesModalEl.style.display = 'flex';
 
     hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(hooks.rulesModalEl.style.display).toBe('none');
+    expect(hooks._rulesModalEl.style.display).toBe('none');
   });
 
   it('does not call exitToMenu when Esc closes the rules modal', () => {
@@ -1347,11 +1347,11 @@ describe('Game – Escape key returns to level select', () => {
     const hooks = gameHooks(game);
     const exitSpy = jest.spyOn(game, 'exitToMenu');
 
-    hooks.rulesModalEl.style.display = 'flex';
+    hooks._rulesModalEl.style.display = 'flex';
     hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
 
     expect(exitSpy).not.toHaveBeenCalled();
-    expect(hooks.rulesModalEl.style.display).toBe('none');
+    expect(hooks._rulesModalEl.style.display).toBe('none');
   });
 });
 
