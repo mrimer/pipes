@@ -991,9 +991,9 @@ export class Game {
     if (this.board.isSolved()) {
       this.gameState = GameState.Won;
       this._flowGoodDirs = computeFlowGoodDirs(this.board);
-      // Scale max drops to ~5 per tile in the solution path (min 10).
+      // Scale max drops to ~5 per tile in the solution path (min 50).
       const pathLength = this.board.getFilledPositions().size;
-      this._flowMaxDrops = Math.max(10, pathLength * 5);
+      this._flowMaxDrops = Math.max(50, pathLength * 5);
       const starsCollected = this.board.getStarsCollected();
       this._markLevelCompleted(this.currentLevel!.id);
       this._saveStars(this.currentLevel!.id, starsCollected);
