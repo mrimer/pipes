@@ -259,6 +259,9 @@ export function renderLevelList(
       levelRow.appendChild(minimap);
       levelRow.appendChild(btn);
       levelsContainer.appendChild(levelRow);
+
+      // Do not reveal levels beyond the first locked one.
+      if (isLocked) break;
     }
 
     if (totalInChapter === 0 && !chapterLocked) {

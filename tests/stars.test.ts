@@ -444,9 +444,10 @@ describe('renderLevelList – challenge levels', () => {
     expect(chapterTitle?.textContent).not.toMatch(/💀\s+\d+\/\d+/);
   });
 
-  it('locks a non-challenge level when the previous non-challenge level is incomplete', () => {
+  it('hides levels after the first locked level in a chapter', () => {
     // Levels: [L1 (regular, not done), L2 (challenge), L3 (regular)]
-    // L3 should be locked because L1 (the previous non-challenge level) is not done.
+    // L2 is locked because L1 is not done.  L3 should not be shown at all
+    // (levels after the first locked one are hidden to reveal them incrementally).
     const ch1 = {
       id: 1, name: 'Ch1',
       levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3)],
@@ -461,7 +462,8 @@ describe('renderLevelList – challenge levels', () => {
     );
 
     const levelBtns = container.querySelectorAll('.level-btn');
-    // L3 (index 2) must be locked because L1 is not completed.
-    expect(levelBtns[2]?.classList.contains('locked')).toBe(true);
+    // Only L1 (unlocked) and L2 (first locked) should be rendered; L3 is hidden.
+    expect(levelBtns.length).toBe(2);
+    expect(levelBtns[1]?.classList.contains('locked')).toBe(true);
   });
 });
