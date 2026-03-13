@@ -1103,12 +1103,23 @@ export class Board {
     const currentTemp = this._computeTemperatureFromFilled(filled);
     const currentPressure = this._computePressureFromFilled(filled);
 
+    // Two-pass approach: process ice/snow/sandstone before hot_plate so that
+    // water frozen this turn is visible to any hot_plate connected on the same
+    // turn, regardless of BFS discovery order.
+    const newHotPlateKeys: string[] = [];
+
     for (const key of filled) {
       if (this._lockedWaterImpact.has(key)) continue; // Already evaluated.
 
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
       if (!tile) continue;
+
+      // Defer hot_plate tiles to the second pass.
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'hot_plate') {
+        newHotPlateKeys.push(key);
+        continue;
+      }
 
       let impact = 0;
       if (PIPE_SHAPES.has(tile.shape)) {
@@ -1143,15 +1154,6 @@ export class Board {
           } else {
             impact = -(this.sourceCapacity + 1);
           }
-        } else if (tile.chamberContent === 'hot_plate') {
-          // effectiveCost = mass × (temp + playerTemp)
-          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          // First consume from frozen, then from water
-          const waterGain = Math.min(this.frozen, effectiveCost);
-          const waterLoss = Math.max(0, effectiveCost - waterGain);
-          this.frozen -= waterGain;
-          impact = waterGain - waterLoss;
-          this._hotPlateWaterGain.set(key, waterGain);
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }
@@ -1160,6 +1162,27 @@ export class Board {
       this._lockedWaterImpact.set(key, impact);
       this._connectionTurn.set(key, this._turnNumber);
       // Record the temperature and pressure at connect time for tooltip reconstruction.
+      this._lockedConnectTemp.set(key, currentTemp);
+      this._lockedConnectPressure.set(key, currentPressure);
+    }
+
+    // Second pass: lock hot_plate tiles after all ice/snow/sandstone have updated frozen,
+    // so newly-frozen water this turn counts toward what the hot_plate can re-melt.
+    for (const key of newHotPlateKeys) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (!tile) continue;
+      // effectiveCost = mass × (temp + playerTemp)
+      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+      // First consume from frozen, then from water
+      const waterGain = Math.min(this.frozen, effectiveCost);
+      const waterLoss = Math.max(0, effectiveCost - waterGain);
+      this.frozen -= waterGain;
+      const impact = waterGain - waterLoss;
+      this._hotPlateWaterGain.set(key, waterGain);
+
+      this._lockedWaterImpact.set(key, impact);
+      this._connectionTurn.set(key, this._turnNumber);
       this._lockedConnectTemp.set(key, currentTemp);
       this._lockedConnectPressure.set(key, currentPressure);
     }
