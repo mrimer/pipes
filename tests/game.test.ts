@@ -1137,28 +1137,23 @@ describe('Game – _positionModalBelowCanvas', () => {
     return { bottom, height, top: bottom - height, left: 0, right: 0, width: 0, x: 0, y: bottom - height, toJSON: () => ({}) } as DOMRect;
   }
 
-  it('positions the modal below the canvas when there is enough vertical space', () => {
+  it('positions the modal near the bottom of the screen', () => {
     const { game } = makeGame();
     game.startLevel(1);
-
-    // Canvas bottom at 100 px; viewport height 800 px → 700 px of space below
-    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(100, 100));
-    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
 
     const modal = document.createElement('div');
     modal.style.display = 'flex';
     positionModal(game, modal);
 
-    expect(modal.style.alignItems).toBe('flex-start');
-    // paddingTop should equal canvasBottom (100) + MARGIN (16) = '116px'
-    expect(modal.style.paddingTop).toBe('116px');
+    expect(modal.style.alignItems).toBe('flex-end');
+    expect(modal.style.paddingBottom).toBe('16px');
   });
 
-  it('keeps the default centred layout when there is not enough space below the canvas', () => {
+  it('always uses bottom positioning regardless of canvas position', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
-    // Canvas bottom at 700 px; viewport height 800 px → only 100 px of space below (< 236)
+    // Canvas bottom near the bottom of the viewport – modal still goes to bottom
     jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(700, 700));
     Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
 
@@ -1166,31 +1161,24 @@ describe('Game – _positionModalBelowCanvas', () => {
     modal.style.display = 'flex';
     positionModal(game, modal);
 
-    // Not enough room → styles are reset to empty strings (browser uses CSS default)
-    expect(modal.style.alignItems).toBe('');
-    expect(modal.style.paddingTop).toBe('');
+    expect(modal.style.alignItems).toBe('flex-end');
+    expect(modal.style.paddingBottom).toBe('16px');
   });
 
   it('resets stale positioning styles before re-evaluating', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
-    // First call: plenty of space → sets alignItems / paddingTop
-    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(50, 50));
-    Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
-
+    // Simulate a stale paddingTop from a previous implementation
     const modal = document.createElement('div');
     modal.style.display = 'flex';
+    modal.style.paddingTop = '116px';
     positionModal(game, modal);
-    expect(modal.style.alignItems).toBe('flex-start');
 
-    // Second call: no space → previous styles must be cleared
-    jest.spyOn(game['canvas'], 'getBoundingClientRect').mockReturnValue(mockCanvasRect(780, 780));
-    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
-
-    positionModal(game, modal);
-    expect(modal.style.alignItems).toBe('');
+    // paddingTop must be cleared; bottom layout applied
     expect(modal.style.paddingTop).toBe('');
+    expect(modal.style.alignItems).toBe('flex-end');
+    expect(modal.style.paddingBottom).toBe('16px');
   });
 });
 
