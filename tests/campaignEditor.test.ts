@@ -1856,3 +1856,101 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
     }
   });
 });
+
+// ─── CampaignEditor – Escape key un-links the joined tile ────────────────────
+
+describe('CampaignEditor – Escape key un-links the linked tile in the level editor', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type LinkedState = {
+    _screen: string;
+    _el: HTMLElement;
+    _linkedTilePos: { row: number; col: number } | null;
+    _linkedTileDirty: boolean;
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+  };
+
+  function makeLinkedEditor(level: LevelDef): LinkedState {
+    const campaign: CampaignDef = {
+      id: 'cmp_linked_test',
+      name: 'Linked Test',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([campaign]);
+    const state = editor as unknown as LinkedState;
+    state._activeCampaignId = 'cmp_linked_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    // Simulate the editor being visible
+    state._el.style.display = 'flex';
+    return state;
+  }
+
+  it('pressing Escape clears _linkedTilePos when a tile is linked', () => {
+    const level: LevelDef = {
+      id: 99920,
+      name: 'Link Esc Test',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+    };
+    const state = makeLinkedEditor(level);
+
+    // Simulate a tile being linked
+    state._linkedTilePos = { row: 0, col: 1 };
+    state._linkedTileDirty = false;
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(state._linkedTilePos).toBeNull();
+  });
+
+  it('pressing Escape does nothing when no tile is linked', () => {
+    const level: LevelDef = {
+      id: 99921,
+      name: 'Link Esc Noop Test',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+    };
+    const state = makeLinkedEditor(level);
+
+    // Ensure no tile is linked
+    state._linkedTilePos = null;
+
+    // Should not throw; _linkedTilePos stays null
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(state._linkedTilePos).toBeNull();
+  });
+
+  it('pressing Escape does not clear _linkedTilePos when not in the level editor screen', () => {
+    const level: LevelDef = {
+      id: 99922,
+      name: 'Link Esc Screen Test',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+    };
+    const state = makeLinkedEditor(level);
+
+    // Manually switch the screen away from levelEditor
+    state._screen = 'list';
+    state._linkedTilePos = { row: 0, col: 1 };
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    // The handler guards on _screen === 'levelEditor', so _linkedTilePos should be unchanged.
+    expect(state._linkedTilePos).toEqual({ row: 0, col: 1 });
+  });
+});
