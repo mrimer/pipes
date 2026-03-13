@@ -974,6 +974,9 @@ export class Game {
       this.gameState = GameState.GameOver;
       this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
       this.gameoverModalEl.style.display = 'flex';
+      this.gameoverModalEl.classList.remove('fade-in');
+      void this.gameoverModalEl.offsetWidth; // force reflow to restart animation
+      this.gameoverModalEl.classList.add('fade-in');
       this._positionModalBelowCanvas(this.gameoverModalEl);
       this._triggerModalSparkle(this.gameoverModalEl, 'sparkle-red');
       return;
@@ -994,21 +997,24 @@ export class Game {
           this.winStarsEl.style.display = 'none';
         }
       }
-      this.winModalEl.style.display = 'flex';
-      this._positionModalBelowCanvas(this.winModalEl);
-      this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
-      spawnConfetti();
-      // Spawn golden sparkles over the star icon in the win modal when stars were collected
-      if (starsCollected > 0 && this.winStarsEl) {
-        const winStarsEl = this.winStarsEl;
-        // Short delay so the modal finishes rendering and is positioned before
-        // getBoundingClientRect() is called.
-        const MODAL_SPARKLE_DELAY_MS = 150;
-        setTimeout(() => {
-          const rect = winStarsEl.getBoundingClientRect();
-          spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
-        }, MODAL_SPARKLE_DELAY_MS);
-      }
+      // Spawn confetti first; show win modal only after the confetti effect completes.
+      spawnConfetti(() => {
+        if (this.gameState !== GameState.Won) return;
+        this.winModalEl.style.display = 'flex';
+        this._positionModalBelowCanvas(this.winModalEl);
+        this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
+        // Spawn golden sparkles over the star icon in the win modal when stars were collected
+        if (starsCollected > 0 && this.winStarsEl) {
+          const winStarsEl = this.winStarsEl;
+          // Short delay so the modal finishes rendering and is positioned before
+          // getBoundingClientRect() is called.
+          const MODAL_SPARKLE_DELAY_MS = 150;
+          setTimeout(() => {
+            const rect = winStarsEl.getBoundingClientRect();
+            spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
+          }, MODAL_SPARKLE_DELAY_MS);
+        }
+      });
       return;
     }
   }
@@ -1459,9 +1465,9 @@ export class Game {
     const cementSettingTime = this.board.getCementSettingTime({ row, col });
     if (cementSettingTime !== null) {
       if (cementSettingTime === 0 && tile.shape !== PipeShape.Empty) {
-        tooltipText += ' (Hardened)';
+        tooltipText += ' Cement (Hardened)';
       } else {
-        tooltipText += ` T=${cementSettingTime}`;
+        tooltipText += ` Cement T=${cementSettingTime}`;
       }
     }
     // Show a human-readable tile name derived from its shape and chamber content.

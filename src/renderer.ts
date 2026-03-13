@@ -289,18 +289,28 @@ function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
 }
 
 /**
- * Draw a dark shadow overlay on a tile that is hardened in cement.
- * Call after drawTile() for cells that are hardened cement (Setting Time = 0)
- * with a placed tile, using full tile-space coordinates (x, y top-left).
+ * Draw the setting time label in the top-left corner of a cement cell.
+ * Replaces the dark shadow overlay: displays the numeric T value with a black
+ * edge on a dark-gray fill for maximum readability over any tile background.
+ * Call after all tile content is drawn, using full tile-space coordinates (x, y top-left).
  */
-function _drawCementShadow(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-  const ts = TILE_SIZE;
+function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, settingTime: number): void {
+  const label = String(settingTime);
+  const fontSize = _s(12);
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(x + 2, y + 2, ts - 4, ts - 4);
-  ctx.clip();
-  ctx.fillStyle = 'rgba(20,15,10,0.38)';
-  ctx.fillRect(x + 2, y + 2, ts - 4, ts - 4);
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const lx = x + _s(4);
+  const ly = y + _s(3);
+  // Black stroke for edge contrast over any background
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = _s(2.5);
+  ctx.lineJoin = 'round';
+  ctx.strokeText(label, lx, ly);
+  // Dark gray fill – readable but not as harsh as pure black
+  ctx.fillStyle = '#505050';
+  ctx.fillText(label, lx, ly);
   ctx.restore();
 }
 
@@ -1221,6 +1231,13 @@ export function renderBoard(
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
+      const isCementCell = board.cementData.has(`${r},${c}`);
+
+      // Skip drawing the empty-tile dot on cement cells – the cement background
+      // texture is already clearly visible and the label (pass 3) provides the
+      // setting-time indicator.
+      if (tile.shape === PipeShape.Empty && isCementCell) continue;
+
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       const isWater = filled.has(`${r},${c}`);
@@ -1248,11 +1265,18 @@ export function renderBoard(
       }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
+    }
+  }
 
-      // Draw shadow overlay on hardened cement cells (Setting Time = 0) with a placed tile
-      if (tile.shape !== PipeShape.Empty && board.cementData.has(`${r},${c}`) && board.cementData.get(`${r},${c}`) === 0) {
-        _drawCementShadow(ctx, x, y);
-      }
+  // Pass 3: Draw cement setting-time labels in the top-left corner of every cement cell.
+  // Drawn after all tile content so the label always appears on top of any pipe graphic.
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      if (!board.cementData.has(`${r},${c}`)) continue;
+      const settingTime = board.cementData.get(`${r},${c}`) as number;
+      const x = c * TILE_SIZE;
+      const y = r * TILE_SIZE;
+      _drawCementLabel(ctx, x, y, settingTime);
     }
   }
 

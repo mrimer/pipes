@@ -1179,8 +1179,15 @@ export class CampaignEditor {
 
     this._editorMainLayout = mainLayout;
     mainLayout.appendChild(leftCol);
-    mainLayout.appendChild(midCol);
-    mainLayout.appendChild(rightCol);
+    // Wrap the canvas column and the right column together so the inventory/
+    // grid-size panel always sits to the right of the canvas regardless of
+    // how the outer layout wraps relative to the palette column.
+    const midRightWrapper = document.createElement('div');
+    midRightWrapper.style.cssText =
+      `display:flex;flex-wrap:nowrap;gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;`;
+    midRightWrapper.appendChild(midCol);
+    midRightWrapper.appendChild(rightCol);
+    mainLayout.appendChild(midRightWrapper);
     this._el.appendChild(mainLayout);
 
     // Re-compute canvas display size now that the layout is in the DOM, so the
@@ -2260,14 +2267,25 @@ export class CampaignEditor {
     let maxPx = MAX_EDITOR_CANVAS_PX;
     if (this._editorMainLayout) {
       const layoutW = this._editorMainLayout.clientWidth;
-      // Sum the widths of all flex children that do NOT contain the canvas
-      // (i.e., the left and right side columns).
+      // Sum the widths of all flex children that do NOT contain the canvas.
+      // The canvas may be nested inside a wrapper element (midRightWrapper),
+      // so also inspect children of the direct wrapper to catch the right
+      // column that shares the row with the canvas.
       let otherW = 0;
       let colCount = 0;
       for (const child of this._editorMainLayout.children) {
         if (!child.contains(this._editorCanvas)) {
           otherW += (child as HTMLElement).offsetWidth;
           colCount++;
+        } else {
+          // The canvas is inside this child (midRightWrapper).  Also deduct
+          // siblings of the canvas's column that sit in the same row.
+          for (const innerChild of child.children) {
+            if (!innerChild.contains(this._editorCanvas)) {
+              otherW += (innerChild as HTMLElement).offsetWidth;
+              colCount++;
+            }
+          }
         }
       }
       // Available width = layout width
