@@ -67,6 +67,11 @@ type Snapshot = {
    * Used to reconstruct the calculation text in the tile tooltip for connected tiles.
    */
   lockedConnectPressure: Map<string, number>;
+  /**
+   * Cement setting-time values keyed by "row,col".
+   * Included in snapshots so undo/redo restores the correct setting time.
+   */
+  cementData: Map<string, number>;
 };
 
 /**
@@ -91,6 +96,22 @@ export class Board {
    * Populated from the level definition; never changes during play.
    */
   goldSpaces: Set<string>;
+
+  /**
+   * Cement setting-time values keyed by "row,col".
+   * Populated from the level definition (where Cement tiles appear).
+   * Values are decremented when a player removes or rotates a pipe placed on that cell.
+   * When the value is 0 the cell is "hardened" and placed pipes may not be adjusted.
+   */
+  cementData: Map<string, number>;
+
+  /**
+   * Set to the position of the cement cell whose setting time was just decremented
+   * by a successful {@link reclaimTile}, {@link rotateTile}, or {@link replaceInventoryTile}
+   * call.  Cleared to null at the start of each such call.
+   * Used by the UI to spawn a floating "-1" animation.
+   */
+  lastCementDecrement: GridPos | null = null;
 
   /**
    * Ambient background decorations (pebbles, flowers, grass tufts) generated
@@ -199,6 +220,7 @@ export class Board {
     this.sourceCapacity = 0;
     this.inventory = [];
     this.goldSpaces = new Set();
+    this.cementData = new Map();
 
     if (level) {
       this.grid = this._emptyGrid();
@@ -227,6 +249,10 @@ export class Board {
         } else if (def.shape === PipeShape.GoldSpace) {
           // Gold spaces are tracked separately; the cell behaves like Empty
           this.goldSpaces.add(`${r},${c}`);
+          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+        } else if (def.shape === PipeShape.Cement) {
+          // Cement tiles are tracked separately; the cell behaves like Empty
+          this.cementData.set(`${r},${c}`, def.settingTime ?? 0);
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
@@ -391,6 +417,7 @@ export class Board {
       hotPlateWaterGain: new Map(this._hotPlateWaterGain),
       lockedConnectTemp: new Map(this._lockedConnectTemp),
       lockedConnectPressure: new Map(this._lockedConnectPressure),
+      cementData: new Map(this.cementData),
     };
   }
 
@@ -413,6 +440,7 @@ export class Board {
     this._hotPlateWaterGain = new Map(snap.hotPlateWaterGain);
     this._lockedConnectTemp = new Map(snap.lockedConnectTemp);
     this._lockedConnectPressure = new Map(snap.lockedConnectPressure);
+    this.cementData = new Map(snap.cementData);
   }
 
   /**
@@ -445,6 +473,7 @@ export class Board {
   reclaimTile(pos: GridPos): boolean {
     this.lastError = null;
     this.lastErrorTilePositions = null;
+    this.lastCementDecrement = null;
     const tile = this.getTile(pos);
     if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
     if (
@@ -454,6 +483,17 @@ export class Board {
       tile.shape === PipeShape.Granite       ||
       SPIN_PIPE_SHAPES.has(tile.shape)
     ) return false;
+
+    // ── Cement constraint check ───────────────────────────────────────────────
+    const cementKey = `${pos.row},${pos.col}`;
+    if (this.cementData.has(cementKey)) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime === 0) {
+        this.lastError = 'Items placed in hardened cement may not be adjusted.';
+        this.lastErrorTilePositions = [pos];
+        return false;
+      }
+    }
 
     // ── Container-grant constraint check ─────────────────────────────────────
     // Simulate tile removal and verify no inventory count would go below zero.
@@ -503,6 +543,14 @@ export class Board {
       this.inventory.push({ shape: tile.shape, count: 1 });
     }
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+    // Decrement cement setting time after successful reclaim
+    if (this.cementData.has(cementKey)) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime > 0) {
+        this.cementData.set(cementKey, settingTime - 1);
+        this.lastCementDecrement = { row: pos.row, col: pos.col };
+      }
+    }
     return true;
   }
 
@@ -589,6 +637,7 @@ export class Board {
   replaceInventoryTile(pos: GridPos, newShape: PipeShape, rotation: Rotation = 0): boolean {
     this.lastError = null;
     this.lastErrorTilePositions = null;
+    this.lastCementDecrement = null;
     const tile = this.getTile(pos);
 
     // Must be a replaceable tile (same guard as reclaimTile)
@@ -600,6 +649,17 @@ export class Board {
       tile.shape === PipeShape.Granite ||
       SPIN_PIPE_SHAPES.has(tile.shape)
     ) return false;
+
+    // ── Cement constraint check ───────────────────────────────────────────────
+    const cementKey = `${pos.row},${pos.col}`;
+    if (this.cementData.has(cementKey)) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime === 0) {
+        this.lastError = 'Items placed in hardened cement may not be adjusted.';
+        this.lastErrorTilePositions = [pos];
+        return false;
+      }
+    }
 
     // Gold-space / gold-pipe constraint for the incoming shape
     const isGoldSpace = this.goldSpaces.has(`${pos.row},${pos.col}`);
@@ -684,6 +744,15 @@ export class Board {
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile;
       return false;
+    }
+
+    // Decrement cement setting time after successful replace
+    if (this.cementData.has(cementKey)) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime > 0) {
+        this.cementData.set(cementKey, settingTime - 1);
+        this.lastCementDecrement = { row: pos.row, col: pos.col };
+      }
     }
 
     return true;
@@ -1234,6 +1303,17 @@ export class Board {
   }
 
   /**
+   * Return the cement setting time for the given position, or `null` if the position
+   * is not a cement cell.  Used by the UI to display the cement status in tooltips
+   * and to render the appropriate background / shadow effect.
+   */
+  getCementSettingTime(pos: GridPos): number | null {
+    const key = `${pos.row},${pos.col}`;
+    const val = this.cementData.get(key);
+    return val !== undefined ? val : null;
+  }
+
+  /**
    * Check whether any sandstone tile currently in the fill path has deltaDamage ≤ 0.
    * Checks both newly-connected tiles (not yet in the locked map) and already-connected
    * tiles (in case pressure dropped after a pump was disconnected).
@@ -1472,8 +1552,21 @@ export class Board {
   rotateTile(pos: GridPos): boolean {
     this.lastError = null;
     this.lastErrorTilePositions = null;
+    this.lastCementDecrement = null;
     const tile = this.getTile(pos);
     if (!tile) return false;
+
+    // ── Cement constraint check (for player-placed pipe tiles only) ───────────
+    const cementKey = `${pos.row},${pos.col}`;
+    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime === 0) {
+        this.lastError = 'Items placed in hardened cement may not be adjusted.';
+        this.lastErrorTilePositions = [pos];
+        return false;
+      }
+    }
+
     tile.rotate();
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
@@ -1506,6 +1599,15 @@ export class Board {
       }
     }
 
+    // Decrement cement setting time after successful rotation
+    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime > 0) {
+        this.cementData.set(cementKey, settingTime - 1);
+        this.lastCementDecrement = { row: pos.row, col: pos.col };
+      }
+    }
+
     return true;
   }
 
@@ -1518,9 +1620,22 @@ export class Board {
   rotateTileBy(pos: GridPos, steps: number): boolean {
     this.lastError = null;
     this.lastErrorTilePositions = null;
+    this.lastCementDecrement = null;
     const tile = this.getTile(pos);
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
     if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) return false;
+
+    // ── Cement constraint check (for player-placed pipe tiles only) ───────────
+    const cementKey = `${pos.row},${pos.col}`;
+    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime === 0) {
+        this.lastError = 'Items placed in hardened cement may not be adjusted.';
+        this.lastErrorTilePositions = [pos];
+        return false;
+      }
+    }
+
     // Normalise to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return true;
@@ -1557,6 +1672,15 @@ export class Board {
             'Reconfigure the path first.';
           return false;
         }
+      }
+    }
+
+    // Decrement cement setting time after successful rotation
+    if (this.cementData.has(cementKey) && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape))) {
+      const settingTime = this.cementData.get(cementKey)!;
+      if (settingTime > 0) {
+        this.cementData.set(cementKey, settingTime - 1);
+        this.lastCementDecrement = { row: pos.row, col: pos.col };
       }
     }
 

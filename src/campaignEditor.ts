@@ -46,7 +46,7 @@ import { renderMinimap } from './minimap';
 const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
-  PipeShape.GoldSpace, PipeShape.Granite,
+  PipeShape.GoldSpace, PipeShape.Cement, PipeShape.Granite,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
 ]);
 
@@ -1197,6 +1197,7 @@ export class CampaignEditor {
   private readonly _PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
     { palette: PipeShape.Source,   label: '💧 Source' },
     { palette: PipeShape.Sink,     label: '🏁 Sink' },
+    { palette: PipeShape.Cement,   label: '🪧 Cement' },
     { palette: PipeShape.Granite,  label: '▪ Granite' },
     { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
   ];
@@ -1372,6 +1373,15 @@ export class CampaignEditor {
       none.style.cssText = 'font-size:0.8rem;color:#555;';
       none.textContent = 'No parameters';
       panel.appendChild(none);
+      return panel;
+    }
+
+    // Cement: show only Setting Time input (no rotation)
+    if (p === PipeShape.Cement) {
+      panel.appendChild(this._labeledInput('Setting Time', String(this._editorParams.settingTime), (v) => {
+        this._editorParams.settingTime = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
       return panel;
     }
 
@@ -2144,7 +2154,7 @@ export class CampaignEditor {
    * reserved for Source, Sink, and Chamber tiles that expose richer settings.
    */
   private _paletteHasNonRotationParams(palette: EditorPalette): boolean {
-    return palette === PipeShape.Source || palette === PipeShape.Sink || isChamberPalette(palette);
+    return palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Cement || isChamberPalette(palette);
   }
 
   /** Set _editorParams to match all relevant fields from a TileDef. */
@@ -2157,6 +2167,7 @@ export class CampaignEditor {
     if (def.pressure !== undefined) this._editorParams.pressure = def.pressure;
     if (def.hardness !== undefined) this._editorParams.hardness = def.hardness;
     if (def.shatter !== undefined) this._editorParams.shatter = def.shatter;
+    if (def.settingTime !== undefined) this._editorParams.settingTime = def.settingTime;
     if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
     if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
     if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
@@ -2283,6 +2294,14 @@ export class CampaignEditor {
     const isChm = isChamberPalette(palette);
     const effectiveShape = isChm ? PipeShape.Chamber : (palette as PipeShape);
     const p = this._editorParams;
+
+    // Cement: only settingTime param; no rotation or connections
+    if (effectiveShape === PipeShape.Cement) {
+      const def: TileDef = { shape: PipeShape.Cement };
+      if (p.settingTime !== 0) def.settingTime = p.settingTime;
+      return def;
+    }
+
     // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
     const noRotation = effectiveShape === PipeShape.Source || effectiveShape === PipeShape.Sink || effectiveShape === PipeShape.Chamber;
     const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
