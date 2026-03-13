@@ -143,7 +143,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: cementSwatch(),
     name: 'Cement',
-    description: 'Open background tile. Any pipe may be placed here. When Setting Time (T) = 0, placed pipes are hardened in cement and may not be removed or rotated. When T > 0, adjustments are allowed but decrement T by 1.',
+    description: 'Open background tile. Any pipe may be placed here. When Drying Time (T) = 0, placed pipes are hardened in cement and may not be removed or rotated. When T > 0, adjustments are allowed but decrement T by 1.',
   },
   {
     iconHtml: graniteSwatch(),

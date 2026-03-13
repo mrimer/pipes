@@ -32,7 +32,7 @@ export enum PipeShape {
   /** Granite block – an impassable obstacle; cannot be moved and water cannot flow through it */
   Granite = 'GRANITE',
   /** Cement – open background tile; any pipe may be placed here, but pipes placed on
-   *  hardened cement (Setting Time = 0) may not be removed or rotated. */
+   *  hardened cement (Drying Time = 0) may not be removed or rotated. */
   Cement = 'CEMENT',
   /** Gold space – background tile; only gold pipes may be placed here */
   GoldSpace = 'GOLD_SPACE',
@@ -126,12 +126,12 @@ export interface TileDef {
    */
   shatter?: number;
   /**
-   * Setting Time for Cement tiles.
+   * Drying Time for Cement tiles.
    * When 0 (hardened), any tile placed on this cell may not be removed or rotated.
    * When > 0, removal or rotation is allowed but decrements this value by 1.
    * Defaults to 0.
    */
-  settingTime?: number;
+  dryingTime?: number;
   /**
    * Explicit set of open connection directions for Source, Sink, and Chamber tiles.
    * When provided, overrides the default (all four sides).

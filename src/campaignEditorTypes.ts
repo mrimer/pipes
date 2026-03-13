@@ -45,8 +45,8 @@ export interface TileParams {
   itemShape: PipeShape;
   itemCount: number;
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };
-  /** Setting Time for Cement tiles – number of adjustments allowed before hardening. */
-  settingTime: number;
+  /** Drying Time for Cement tiles – number of adjustments allowed before hardening. */
+  dryingTime: number;
 }
 
 export const DEFAULT_PARAMS: TileParams = {
@@ -61,7 +61,7 @@ export const DEFAULT_PARAMS: TileParams = {
   itemShape: PipeShape.Straight,
   itemCount: 1,
   connections: { N: true, E: true, S: true, W: true },
-  settingTime: 0,
+  dryingTime: 0,
 };
 
 // ─── Editor snapshot for undo/redo ───────────────────────────────────────────

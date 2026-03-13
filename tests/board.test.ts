@@ -4224,11 +4224,11 @@ describe('Chamber tile (hot_plate content)', () => {
 
 describe('Cement tile constraints', () => {
   /** Build a 3×1 board with a cement cell at (0,1) and pipes placed on (0,0) and (0,2). */
-  function makeCementBoard(settingTime: number): Board {
+  function makeCementBoard(dryingTime: number): Board {
     const board = new Board(1, 3);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 2 };
-    board.cementData.set('0,1', settingTime);
+    board.cementData.set('0,1', dryingTime);
     board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
     board.grid[0][1] = new Tile(PipeShape.Empty, 0); // cement cell is initially empty
     board.initHistory();
@@ -4242,7 +4242,7 @@ describe('Cement tile constraints', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 
-  it('blocks removal when Setting Time = 0 (hardened)', () => {
+  it('blocks removal when Drying Time = 0 (hardened)', () => {
     const board = makeCementBoard(0);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();
@@ -4252,7 +4252,7 @@ describe('Cement tile constraints', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 
-  it('blocks rotation when Setting Time = 0 (hardened)', () => {
+  it('blocks rotation when Drying Time = 0 (hardened)', () => {
     const board = makeCementBoard(0);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();
@@ -4261,7 +4261,7 @@ describe('Cement tile constraints', () => {
     expect(board.lastError).toContain('hardened cement');
   });
 
-  it('allows removal and decrements Setting Time when T > 0', () => {
+  it('allows removal and decrements Drying Time when T > 0', () => {
     const board = makeCementBoard(3);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();
@@ -4272,7 +4272,7 @@ describe('Cement tile constraints', () => {
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 
-  it('allows rotation and decrements Setting Time when T > 0', () => {
+  it('allows rotation and decrements Drying Time when T > 0', () => {
     const board = makeCementBoard(2);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();
@@ -4282,17 +4282,17 @@ describe('Cement tile constraints', () => {
     expect(board.lastCementDecrement).toEqual({ row: 0, col: 1 });
   });
 
-  it('getCementSettingTime returns null for non-cement cell', () => {
+  it('getCementDryingTime returns null for non-cement cell', () => {
     const board = makeCementBoard(0);
-    expect(board.getCementSettingTime({ row: 0, col: 0 })).toBeNull();
+    expect(board.getCementDryingTime({ row: 0, col: 0 })).toBeNull();
   });
 
-  it('getCementSettingTime returns correct value', () => {
+  it('getCementDryingTime returns correct value', () => {
     const board = makeCementBoard(5);
-    expect(board.getCementSettingTime({ row: 0, col: 1 })).toBe(5);
+    expect(board.getCementDryingTime({ row: 0, col: 1 })).toBe(5);
   });
 
-  it('undo/redo restores cement setting time', () => {
+  it('undo/redo restores cement drying time', () => {
     const board = makeCementBoard(2);
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();

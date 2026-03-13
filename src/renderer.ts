@@ -289,14 +289,15 @@ function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
 }
 
 /**
- * Draw the setting time label in the top-left corner of a cement cell.
- * Replaces the dark shadow overlay: displays the numeric T value with a black
- * edge on a dark-gray fill for maximum readability over any tile background.
+ * Draw the drying time label in the top-left corner of a cement cell.
+ * Replaces the dark shadow overlay: displays the numeric T value (or "X" when
+ * hardened) with a black edge on a dark-gray fill for maximum readability over
+ * any tile background.
  * Call after all tile content is drawn, using full tile-space coordinates (x, y top-left).
  */
-function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, settingTime: number): void {
-  const label = String(settingTime);
-  const fontSize = _s(12);
+function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number): void {
+  const label = dryingTime === 0 ? 'X' : String(dryingTime);
+  const fontSize = _s(18);
   ctx.save();
   ctx.font = `bold ${fontSize}px Arial`;
   ctx.textAlign = 'left';
@@ -305,7 +306,7 @@ function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, s
   const ly = y + _s(3);
   // Black stroke for edge contrast over any background
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = _s(2.5);
+  ctx.lineWidth = _s(1.5);
   ctx.lineJoin = 'round';
   ctx.strokeText(label, lx, ly);
   // Dark gray fill – readable but not as harsh as pure black
@@ -331,8 +332,8 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
     ctx.beginPath();
     ctx.rect(-bw, -bh, bw * 2, bh * 2);
     ctx.clip();
-    // 2px buffer between item shape and chamber walls
-    const scale = (bw - 2) / half;
+    // Scale item to 75% of box size so it doesn't touch the chamber box edge
+    const scale = (bw * 0.75) / half;
     ctx.scale(scale, scale);
     ctx.strokeStyle = itemColor;
     ctx.lineWidth = LINE_WIDTH;
@@ -1268,15 +1269,15 @@ export function renderBoard(
     }
   }
 
-  // Pass 3: Draw cement setting-time labels in the top-left corner of every cement cell.
+  // Pass 3: Draw cement drying-time labels in the top-left corner of every cement cell.
   // Drawn after all tile content so the label always appears on top of any pipe graphic.
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       if (!board.cementData.has(`${r},${c}`)) continue;
-      const settingTime = board.cementData.get(`${r},${c}`) as number;
+      const dryingTime = board.cementData.get(`${r},${c}`) as number;
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      _drawCementLabel(ctx, x, y, settingTime);
+      _drawCementLabel(ctx, x, y, dryingTime);
     }
   }
 

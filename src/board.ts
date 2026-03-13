@@ -252,7 +252,7 @@ export class Board {
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else if (def.shape === PipeShape.Cement) {
           // Cement tiles are tracked separately; the cell behaves like Empty
-          this.cementData.set(`${r},${c}`, def.settingTime ?? 0);
+          this.cementData.set(`${r},${c}`, def.dryingTime ?? 0);
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
@@ -1279,7 +1279,7 @@ export class Board {
    * is not a cement cell.  Used by the UI to display the cement status in tooltips
    * and to render the appropriate background / shadow effect.
    */
-  getCementSettingTime(pos: GridPos): number | null {
+  getCementDryingTime(pos: GridPos): number | null {
     const key = `${pos.row},${pos.col}`;
     const val = this.cementData.get(key);
     return val !== undefined ? val : null;
@@ -1315,9 +1315,9 @@ export class Board {
     const key = `${pos.row},${pos.col}`;
     if (!this.cementData.has(key)) return;
     if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) return;
-    const settingTime = this.cementData.get(key)!;
-    if (settingTime > 0) {
-      this.cementData.set(key, settingTime - 1);
+    const dryingTime = this.cementData.get(key)!;
+    if (dryingTime > 0) {
+      this.cementData.set(key, dryingTime - 1);
       this.lastCementDecrement = { row: pos.row, col: pos.col };
     }
   }
