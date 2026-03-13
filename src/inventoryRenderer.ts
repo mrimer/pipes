@@ -25,6 +25,8 @@ export function renderInventoryBar(
 
   /** Shapes already rendered from board.inventory (avoids duplicates below). */
   const renderedShapes = new Set<PipeShape>();
+  /** Count of item elements actually appended to the bar. */
+  let renderedCount = 0;
 
   for (const item of board.inventory) {
     renderedShapes.add(item.shape);
@@ -47,6 +49,7 @@ export function renderInventoryBar(
     el.dataset['shape'] = item.shape;
     el.addEventListener('click', () => onItemClick(item.shape, effectiveCount));
     inventoryBarEl.appendChild(el);
+    renderedCount++;
   }
 
   // Also display shapes granted by connected Chamber-item tiles that are not
@@ -73,5 +76,14 @@ export function renderInventoryBar(
     el.dataset['shape'] = bonusShape;
     el.addEventListener('click', () => onItemClick(bonusShape, bonusCount));
     inventoryBarEl.appendChild(el);
+    renderedCount++;
+  }
+
+  // When no items are visible, show a placeholder so the bar isn't empty.
+  if (renderedCount === 0) {
+    const noneEl = document.createElement('p');
+    noneEl.classList.add('inv-none');
+    noneEl.textContent = 'None';
+    inventoryBarEl.appendChild(noneEl);
   }
 }

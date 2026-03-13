@@ -1496,7 +1496,8 @@ export class Board {
     this.lastError = null;
     this.lastErrorTilePositions = null;
     const tile = this.getTile(pos);
-    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
+    if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) return false;
     // Normalise to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return true;

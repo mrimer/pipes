@@ -906,29 +906,19 @@ export class Game {
   // ─── Win / game-over handling ─────────────────────────────────────────────
 
   /**
-   * Position a modal overlay so its inner box appears just below the game
-   * canvas when there is enough vertical space on screen.  Falls back to the
-   * default centred layout when the canvas sits too low in the viewport.
+   * Position a modal overlay so its inner box appears near the bottom of the
+   * viewport, avoiding coverage of the game board and win route.
    * Must be called *after* `display` has been set to `'flex'`.
    */
   private _positionModalBelowCanvas(modalEl: HTMLElement): void {
     // Reset any styles left over from a previous showing.
     modalEl.style.alignItems = '';
     modalEl.style.paddingTop = '';
+    modalEl.style.paddingBottom = '';
 
-    const canvasRect = this.canvas.getBoundingClientRect();
-    const viewportH  = window.innerHeight;
-    const spaceBelow = viewportH - canvasRect.bottom;
-
-    // Conservative upper-bound on the modal-box height.
-    // Approximate breakdown: h2 (~40 px) + p (~60 px) + button row (~50 px) + padding/gaps (~70 px).
-    const MODAL_APPROX_HEIGHT = 220;
     const MARGIN = 16;
-
-    if (spaceBelow >= MODAL_APPROX_HEIGHT + MARGIN) {
-      modalEl.style.alignItems = 'flex-start';
-      modalEl.style.paddingTop = `${canvasRect.bottom + MARGIN}px`;
-    }
+    modalEl.style.alignItems = 'flex-end';
+    modalEl.style.paddingBottom = `${MARGIN}px`;
   }
 
   /** Add a sparkle CSS animation to the .modal-box inside the given modal overlay. */
@@ -1336,11 +1326,35 @@ export class Game {
       } else {
         this.pendingRotation = ((this.pendingRotation + 270) % 360) as Rotation;
       }
-    } else {
-      // No inventory selected: preview rotation on hovered tile.
-      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
-      const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
-      if (changed) e.preventDefault();
+    } else if (this.mouseCanvasPos && this.board) {
+      const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+      const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      const hPos: GridPos = { row: hRow, col: hCol };
+      const hTile = this.board.getTile(hPos);
+      if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {
+        // Spin pipes: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
+        const steps = e.deltaY > 0 ? 1 : 3;
+        const filledBefore = this.board.getFilledPositions();
+        if (this.board.rotateTileBy(hPos, steps)) {
+          e.preventDefault();
+          this.board.applyTurnDelta();
+          this.board.recordMove();
+          this._spawnConnectionAnimations(filledBefore);
+          this._spawnDisconnectionAnimations(filledBefore);
+          this._spawnLockedCostChangeAnimations();
+          this._renderInventoryBar();
+          this._updateWaterDisplay();
+          this._updateUndoRedoButtons();
+          this._checkWinLose();
+        } else if (this.board.lastError) {
+          this._handleBoardError();
+        }
+      } else {
+        // No inventory selected and not a spin pipe: preview rotation on hovered tile.
+        // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
+        const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
+        if (changed) e.preventDefault();
+      }
     }
   }
 
