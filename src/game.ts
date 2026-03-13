@@ -1665,11 +1665,21 @@ export class Game {
           const lockedGain = this.board.getLockedHotPlateGain({ row: r, col: c });
           if (lockedImpact !== null && lockedGain !== null) {
             const loss = Math.max(0, lockedGain - lockedImpact);
-            const parts: string[] = [];
-            if (lockedGain > 0) parts.push(`+${lockedGain}`);
-            if (loss > 0) parts.push(`-${loss}`);
-            text = parts.length > 0 ? parts.join(' ') : '+0';
-            color = lockedImpact >= 0 ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
+            if (lockedGain > 0 && loss > 0) {
+              // Both gain and loss: spawn two separate labels offset left/right
+              this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+              this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+              // text stays null so the outer push is skipped
+            } else if (lockedGain > 0) {
+              text = `+${lockedGain}`;
+              color = ANIM_POSITIVE_COLOR;
+            } else if (loss > 0) {
+              text = `-${loss}`;
+              color = ANIM_NEGATIVE_COLOR;
+            } else {
+              text = '+0';
+              color = ANIM_ZERO_COLOR;
+            }
           }
         } else if (tile.chamberContent === 'star') {
           // Star tile connected – spawn golden sparkle burst from the tile centre
@@ -1774,12 +1784,22 @@ export class Game {
           const effectiveCost = tile.cost * (tile.temperature + currentTemp);
           const waterGain = Math.min(this.board.frozen, effectiveCost);
           const waterLoss = Math.max(0, effectiveCost - waterGain);
-          // Reverse: loss recovered (+waterLoss), gain forfeited (-waterGain)
-          const parts: string[] = [];
-          if (waterLoss > 0) parts.push(`+${waterLoss}`);
-          if (waterGain > 0) parts.push(`-${waterGain}`);
-          text = parts.length > 0 ? parts.join(' ') : '-0';
-          color = parts.length === 0 ? ANIM_ZERO_COLOR : waterLoss > waterGain ? ANIM_POSITIVE_COLOR : ANIM_NEGATIVE_COLOR;
+          // Reverse: loss recovered (+waterLoss in green), gain forfeited (-waterGain in red)
+          if (waterLoss > 0 && waterGain > 0) {
+            // Both parts: spawn two separate labels offset left/right
+            this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+            this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+            // text stays null so the outer push is skipped
+          } else if (waterLoss > 0) {
+            text = `+${waterLoss}`;
+            color = ANIM_POSITIVE_COLOR;
+          } else if (waterGain > 0) {
+            text = `-${waterGain}`;
+            color = ANIM_NEGATIVE_COLOR;
+          } else {
+            text = '-0';
+            color = ANIM_ZERO_COLOR;
+          }
         }
         // heater, pump, item: no direct water impact – no animation label
       }
