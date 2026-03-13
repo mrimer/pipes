@@ -955,7 +955,7 @@ export class CampaignEditor {
     const mainLayout = document.createElement('div');
     mainLayout.style.cssText =
       `width:100%;max-width:1200px;padding:${EDITOR_LAYOUT_PADDING}px;box-sizing:border-box;display:flex;` +
-      `gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;flex-wrap:wrap;justify-content:center;`;
+      `gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;flex-wrap:nowrap;justify-content:flex-start;`;
 
     // ── Left column: palette + params ──────────────────────────────────────
     const leftCol = document.createElement('div');

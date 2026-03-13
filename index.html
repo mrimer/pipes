@@ -7,6 +7,10 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    /* Allow the page to scroll horizontally on narrow viewports so that the
+       level editor's three-column layout never clips off-screen. */
+    html { min-width: min-content; }
+
     body {
       background: #1a1a2e;
       min-height: 100vh;
