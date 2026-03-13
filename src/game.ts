@@ -1359,6 +1359,11 @@ export class Game {
   }
 
   private _handleDocKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && this.rulesModalEl.style.display !== 'none') {
+      this.rulesModalEl.style.display = 'none';
+      this.canvas.focus();
+      return;
+    }
     if (e.key === 'Control' && !this.ctrlHeld) {
       this.ctrlHeld = true;
       if (this.gameState === GameState.Playing && this.mouseCanvasPos) {
@@ -1577,96 +1582,119 @@ export class Game {
   }
 
   /**
-   * Spawn floating animation labels for all tiles that became newly connected to
-   * the fill path since `filledBefore` was captured.  Called after every player
-   * action that may change the fill state (place, replace, rotate, undo, redo).
+   * Compute and push floating animation label(s) for a single tile that has
+   * just entered (`dir === 'connect'`) or left (`dir === 'disconnect'`) the fill
+   * path.
    *
-   * - Regular pipe tiles (Straight, Elbow, Tee, Cross and gold variants): "-1" (red)
-   * - Chamber-tank tiles: "+capacity" (green / gray / red)
-   * - Chamber-dirt tiles: "+cost" (red) when cost > 0, "-0" when cost = 0
-   * - Chamber-item tiles: "+itemCount" (green / gray / red)
-   * - Chamber-heater tiles: "+temperature°" (green) or "temperature°" (red) for negative
-   * - Chamber-ice tiles: "-(cost × deltaTemp)" or "-0" when free (always red)
-   * - Chamber-pump tiles: "+pressureP" (green) or "pressureP" (red) for negative
-   * - Chamber-snow tiles: "-(⌈cost/pressure⌉ × deltaTemp)" or "-0" (always red)
-   * - Chamber-sandstone tiles: "-(⌈cost/deltaDamage⌉ × deltaTemp)" or "-0" (always red)
+   * On connect the label shows the water impact of gaining this tile; on
+   * disconnect it shows the reversal (the mirror-image effect).  Multi-label
+   * tiles (hot-plate with both gain and loss) push their labels directly to
+   * `_animations` and leave `text` null so the outer push is skipped.
+   * Side effects: may add to `_pendingSparkleShapes` (item connect) or trigger
+   * star sparkle particles (star connect).
    */
-  private _spawnConnectionAnimations(filledBefore: Set<string>): void {
+  private _pushTileAnimLabels(
+    tile: Tile,
+    r: number,
+    c: number,
+    dir: 'connect' | 'disconnect',
+    currentTemp: number,
+    currentPressure: number,
+    now: number,
+  ): void {
     if (!this.board) return;
-    const filledAfter = this.board.getFilledPositions();
-    const now = performance.now();
-    const currentTemp = this.board.getCurrentTemperature(filledAfter);
-    const currentPressure = this.board.getCurrentPressure(filledAfter);
 
-    for (const key of filledAfter) {
-      if (filledBefore.has(key)) continue; // was already filled – skip
-      const [r, c] = key.split(',').map(Number);
-      const tile = this.board.grid[r]?.[c];
-      if (!tile) continue;
+    // Lower-right quadrant (avoids drawing over the pipe image)
+    const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
+    const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
 
-      // Lower-right quadrant of this tile (avoids drawing over the pipe image)
-      const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
-      const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
+    let text: string | null = null;
+    let color: string = dir === 'connect' ? ANIM_NEGATIVE_COLOR : ANIM_POSITIVE_COLOR;
 
-      let text: string | null = null;
-      let color: string = ANIM_NEGATIVE_COLOR;
-
-      if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
-        text = '-1';
-        color = ANIM_NEGATIVE_COLOR;
-      } else if (tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'tank') {
-          const val = tile.capacity;
-          text = val >= 0 ? `+${val}` : `${val}`;
-          color = animColor(val);
-        } else if (tile.chamberContent === 'dirt') {
-          const val = -tile.cost;
-          text = val > 0 ? `+${val}` : val < 0 ? `${val}` : '-0';
-          color = animColor(val);
-        } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
+    if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
+      // Each pipe costs 1 water when connected; removal returns it.
+      text = dir === 'connect' ? '-1' : '+1';
+      color = dir === 'connect' ? ANIM_NEGATIVE_COLOR : ANIM_POSITIVE_COLOR;
+    } else if (tile.shape === PipeShape.Chamber) {
+      if (tile.chamberContent === 'tank') {
+        // Tank adds capacity on connect, removes it on disconnect.
+        const val = dir === 'connect' ? tile.capacity : -tile.capacity;
+        text = val >= 0 ? `+${val}` : `${val}`;
+        color = animColor(val);
+      } else if (tile.chamberContent === 'dirt') {
+        // Dirt consumes water on connect; removal returns it.
+        const val = dir === 'connect' ? -tile.cost : tile.cost;
+        const prefix = val > 0 ? '+' : '';
+        text = val !== 0 ? `${prefix}${val}` : (dir === 'connect' ? '-0' : '+0');
+        color = animColor(val);
+      } else if (tile.chamberContent === 'item') {
+        if (dir === 'connect' && tile.itemShape !== null) {
           const val = tile.itemCount;
           text = val >= 0 ? `+${val}` : `${val}`;
           color = ANIM_ITEM_COLOR;
           this._pendingSparkleShapes.add(tile.itemShape);
-        } else if (tile.chamberContent === 'heater') {
-          const tempVal = tile.temperature;
-          text = tempVal >= 0 ? `+${tempVal}°` : `${tempVal}°`;
-          color = animColor(tempVal);
-        } else if (tile.chamberContent === 'ice') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = -(tile.cost * deltaTemp);
+        }
+        // disconnect: items already granted; no reversal animation
+      } else if (tile.chamberContent === 'heater') {
+        // Heater raises temperature on connect, lowers it on disconnect.
+        const val = dir === 'connect' ? tile.temperature : -tile.temperature;
+        text = val >= 0 ? `+${val}°` : `${val}°`;
+        color = animColor(val);
+      } else if (tile.chamberContent === 'ice') {
+        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+        const raw = tile.cost * deltaTemp;
+        if (dir === 'connect') {
+          const val = -raw;
           text = val < 0 ? `${val}` : '-0';
           color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
-        } else if (tile.chamberContent === 'pump') {
-          const pressVal = tile.pressure;
-          text = pressVal >= 0 ? `+${pressVal}P` : `${pressVal}P`;
-          color = animColor(pressVal);
-        } else if (tile.chamberContent === 'snow') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = -((currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp);
+        } else {
+          text = raw > 0 ? `+${raw}` : '+0';
+          color = raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        }
+      } else if (tile.chamberContent === 'pump') {
+        // Pump raises pressure on connect, lowers it on disconnect.
+        const val = dir === 'connect' ? tile.pressure : -tile.pressure;
+        text = val >= 0 ? `+${val}P` : `${val}P`;
+        color = animColor(val);
+      } else if (tile.chamberContent === 'snow') {
+        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+        const raw = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
+        if (dir === 'connect') {
+          const val = -raw;
           text = val < 0 ? `${val}` : '-0';
           color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
-        } else if (tile.chamberContent === 'sandstone') {
-          const shatterActive = tile.shatter > tile.hardness;
-          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
-          if (shatterOverride) {
-            text = '-0';
-            color = ANIM_ZERO_COLOR;
-          } else {
-            const deltaDamage = currentPressure - tile.hardness;
-            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-            const val = -((deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp);
+        } else {
+          text = raw > 0 ? `+${raw}` : '+0';
+          color = raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
+        }
+      } else if (tile.chamberContent === 'sandstone') {
+        const shatterActive = tile.shatter > tile.hardness;
+        const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+        if (shatterOverride) {
+          text = dir === 'connect' ? '-0' : '+0';
+          color = ANIM_ZERO_COLOR;
+        } else {
+          const deltaDamage = currentPressure - tile.hardness;
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const raw = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
+          if (dir === 'connect') {
+            const val = -raw;
             text = val < 0 ? `${val}` : '-0';
             color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
+          } else {
+            text = raw > 0 ? `+${raw}` : '+0';
+            color = raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
           }
-        } else if (tile.chamberContent === 'hot_plate') {
-          // Use the locked values computed by applyTurnDelta
+        }
+      } else if (tile.chamberContent === 'hot_plate') {
+        if (dir === 'connect') {
+          // Use the locked values computed by applyTurnDelta.
           const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
           const lockedGain = this.board.getLockedHotPlateGain({ row: r, col: c });
           if (lockedImpact !== null && lockedGain !== null) {
             const loss = Math.max(0, lockedGain - lockedImpact);
             if (lockedGain > 0 && loss > 0) {
-              // Both gain and loss: spawn two separate labels offset left/right
+              // Both gain and loss: spawn two separate labels offset left/right.
               this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
               this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
               // text stays null so the outer push is skipped
@@ -1681,18 +1709,58 @@ export class Game {
               color = ANIM_ZERO_COLOR;
             }
           }
-        } else if (tile.chamberContent === 'star') {
-          // Star tile connected – spawn golden sparkle burst from the tile centre
-          const starCx = c * TILE_SIZE + TILE_SIZE / 2;
-          const starCy = r * TILE_SIZE + TILE_SIZE / 2;
-          const canvasRect = this.canvas.getBoundingClientRect();
-          spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
+        } else {
+          // Disconnecting: reverse the hot plate's effects.
+          // gain (from frozen) is lost; water loss is recovered.
+          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+          const waterGain = Math.min(this.board.frozen, effectiveCost);
+          const waterLoss = Math.max(0, effectiveCost - waterGain);
+          if (waterLoss > 0 && waterGain > 0) {
+            this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+            this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+          } else if (waterLoss > 0) {
+            text = `+${waterLoss}`;
+            color = ANIM_POSITIVE_COLOR;
+          } else if (waterGain > 0) {
+            text = `-${waterGain}`;
+            color = ANIM_NEGATIVE_COLOR;
+          } else {
+            text = '-0';
+            color = ANIM_ZERO_COLOR;
+          }
         }
+      } else if (tile.chamberContent === 'star' && dir === 'connect') {
+        // Star tile connected – spawn golden sparkle burst from the tile centre.
+        const starCx = c * TILE_SIZE + TILE_SIZE / 2;
+        const starCy = r * TILE_SIZE + TILE_SIZE / 2;
+        const canvasRect = this.canvas.getBoundingClientRect();
+        spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
       }
+    }
 
-      if (text !== null) {
-        this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
-      }
+    if (text !== null) {
+      this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
+    }
+  }
+
+  /**
+   * Spawn floating animation labels for all tiles that became newly connected to
+   * the fill path since `filledBefore` was captured.  Called after every player
+   * action that may change the fill state (place, replace, rotate, undo, redo).
+   */
+  private _spawnConnectionAnimations(filledBefore: Set<string>): void {
+    if (!this.board) return;
+    const filledAfter = this.board.getFilledPositions();
+    const now = performance.now();
+    const currentTemp = this.board.getCurrentTemperature(filledAfter);
+    const currentPressure = this.board.getCurrentPressure(filledAfter);
+
+    for (const key of filledAfter) {
+      if (filledBefore.has(key)) continue; // was already filled – skip
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.board.grid[r]?.[c];
+      if (!tile) continue;
+      this._pushTileAnimLabels(tile, r, c, 'connect', currentTemp, currentPressure, now);
     }
   }
 
@@ -1731,82 +1799,7 @@ export class Game {
         ? reclaimedTile
         : this.board.grid[r]?.[c];
       if (!tile) continue;
-
-      // Lower-right quadrant of this tile (matches connection animation position)
-      const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
-      const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
-
-      let text: string | null = null;
-      let color: string = ANIM_POSITIVE_COLOR;
-
-      if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
-        // Each pipe costs 1 water when connected; removal returns it.
-        text = '+1';
-        color = ANIM_POSITIVE_COLOR;
-      } else if (tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'tank') {
-          // Tank added capacity; losing it costs capacity (val is always ≤ 0).
-          const val = -tile.capacity;
-          text = `${val}`;
-          color = animColor(val);
-        } else if (tile.chamberContent === 'dirt') {
-          // Dirt cost water; removal returns that water.
-          const val = tile.cost;
-          text = val > 0 ? `+${val}` : val < 0 ? `${val}` : '+0';
-          color = animColor(val);
-        } else if (tile.chamberContent === 'ice') {
-          // Ice froze water (negative impact); removal unfreezes it.
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = tile.cost * deltaTemp;
-          text = val > 0 ? `+${val}` : `+0`;
-          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-        } else if (tile.chamberContent === 'snow') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const val = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
-          text = val > 0 ? `+${val}` : `+0`;
-          color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-        } else if (tile.chamberContent === 'sandstone') {
-          const shatterActive = tile.shatter > tile.hardness;
-          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
-          if (shatterOverride) {
-            text = '+0';
-            color = ANIM_ZERO_COLOR;
-          } else {
-            const deltaDamage = currentPressure - tile.hardness;
-            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-            const val = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
-            text = val > 0 ? `+${val}` : `+0`;
-            color = val > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-          }
-        } else if (tile.chamberContent === 'hot_plate') {
-          // When disconnecting, the hot plate's effects are reversed:
-          // gain (from frozen) is lost; water loss is recovered
-          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          const waterGain = Math.min(this.board.frozen, effectiveCost);
-          const waterLoss = Math.max(0, effectiveCost - waterGain);
-          // Reverse: loss recovered (+waterLoss in green), gain forfeited (-waterGain in red)
-          if (waterLoss > 0 && waterGain > 0) {
-            // Both parts: spawn two separate labels offset left/right
-            this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-            this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-            // text stays null so the outer push is skipped
-          } else if (waterLoss > 0) {
-            text = `+${waterLoss}`;
-            color = ANIM_POSITIVE_COLOR;
-          } else if (waterGain > 0) {
-            text = `-${waterGain}`;
-            color = ANIM_NEGATIVE_COLOR;
-          } else {
-            text = '-0';
-            color = ANIM_ZERO_COLOR;
-          }
-        }
-        // heater, pump, item: no direct water impact – no animation label
-      }
-
-      if (text !== null) {
-        this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
-      }
+      this._pushTileAnimLabels(tile, r, c, 'disconnect', currentTemp, currentPressure, now);
     }
   }
 

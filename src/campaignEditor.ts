@@ -130,11 +130,17 @@ export class CampaignEditor {
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
     document.body.appendChild(this._el);
 
-    // Global keyboard handler for undo/redo shortcuts (active only in level editor screen)
+    // Global keyboard handler for shortcuts (active only in level editor screen)
     document.addEventListener('keydown', (e: KeyboardEvent) => {
       if (this._screen !== 'levelEditor' || this._el.style.display === 'none') return;
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
+      if (e.key === 'Escape' && this._linkedTilePos !== null) {
+        e.preventDefault();
+        this._linkedTilePos = null;
+        this._linkedTileDirty = false;
+        this._renderEditorCanvas();
+      }
     });
   }
 
