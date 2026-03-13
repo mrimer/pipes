@@ -135,7 +135,7 @@ export class Game {
   private readonly resetConfirmModalEl: HTMLElement;
 
   /** Modal overlay showing game rules and tile legend. */
-  private readonly rulesModalEl: HTMLElement;
+  private readonly _rulesModalEl: HTMLElement;
 
   /** Campaign editor overlay (manages its own DOM). */
   private readonly campaignEditor: CampaignEditor;
@@ -395,7 +395,7 @@ export class Game {
     document.body.appendChild(this.resetConfirmModalEl);
 
     // Create the game-rules modal (appends itself to document.body)
-    this.rulesModalEl = createGameRulesModal();
+    this._rulesModalEl = createGameRulesModal();
 
     // Create the new-chapter intro modal
     this._newChapterModalEl = document.createElement('div');
@@ -758,7 +758,7 @@ export class Game {
       displayProgress,
       (id) => this.requestLevel(id),
       () => { this.resetConfirmModalEl.style.display = 'flex'; },
-      () => { this.rulesModalEl.style.display = 'flex'; },
+      () => { this._rulesModalEl.style.display = 'flex'; },
       () => { this._openCampaignEditor(); },
       () => { this._unlockAll(); },
       activeCampaignInfo,
@@ -1359,8 +1359,8 @@ export class Game {
   }
 
   private _handleDocKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Escape' && this.rulesModalEl.style.display !== 'none') {
-      this.rulesModalEl.style.display = 'none';
+    if (e.key === 'Escape' && this._rulesModalEl.style.display !== 'none') {
+      this._rulesModalEl.style.display = 'none';
       this.canvas.focus();
       return;
     }
@@ -1989,9 +1989,9 @@ export class Game {
         }
         break;
       case 'Escape':
-        if (this.rulesModalEl.style.display !== 'none') {
+        if (this._rulesModalEl.style.display !== 'none') {
           // Close the rules modal first if it is open.
-          this.rulesModalEl.style.display = 'none';
+          this._rulesModalEl.style.display = 'none';
           this.canvas.focus();
         } else if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
           // If the exit-confirm modal is already showing, dismiss it (toggle).
@@ -2228,7 +2228,7 @@ export class Game {
 
   /** Show the game-rules modal overlay. */
   showRules(): void {
-    this.rulesModalEl.style.display = 'flex';
+    this._rulesModalEl.style.display = 'flex';
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────

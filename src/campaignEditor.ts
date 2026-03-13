@@ -130,7 +130,7 @@ export class CampaignEditor {
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
     document.body.appendChild(this._el);
 
-    // Global keyboard handler for shortcuts (active only in level editor screen)
+    // Global keyboard handler for shortcuts (guarded to the level editor screen)
     document.addEventListener('keydown', (e: KeyboardEvent) => {
       if (this._screen !== 'levelEditor' || this._el.style.display === 'none') return;
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
@@ -2100,7 +2100,14 @@ export class CampaignEditor {
       }
     }
 
-    this._applyParamsToLinkedTile();
+    // Only write the rotation/connection change back to the linked tile when the
+    // cursor is hovering directly over it.  When the cursor is elsewhere the
+    // wheel only updates the pending-placement params (the ghost preview).
+    const hover = this._editorHover;
+    const linked = this._linkedTilePos;
+    if (linked && hover && hover.row === linked.row && hover.col === linked.col) {
+      this._applyParamsToLinkedTile();
+    }
     this._refreshPaletteUI();
     this._renderEditorCanvas();
   }
