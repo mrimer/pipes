@@ -444,7 +444,7 @@ function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: n
     ctx.font = `bold ${_s(9)}px Arial`;
     ctx.fillText('x', 0, 0);
     ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(tile.cost), 0, _s(9));
+    ctx.fillText(String(tile.cost), 0, _s(11));
   }
 }
 
@@ -529,7 +529,7 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
     ctx.font = `bold ${_s(9)}px Arial`;
     ctx.fillText('x', 0, 0);
     ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(snowCost), 0, _s(9));
+    ctx.fillText(String(snowCost), 0, _s(11));
   }
 }
 
@@ -599,7 +599,7 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
       ctx.font = `bold ${_s(9)}px Arial`;
       ctx.fillText('x', 0, textCenterY + _s(4));
       ctx.font = `bold ${_s(14)}px Arial`;
-      ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(13));
+      ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(14));
     }
   }
 }
@@ -655,7 +655,7 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
     ctx.font = `bold ${_s(9)}px Arial`;
     ctx.fillText('x', 0, 0);
     ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(tile.cost), 0, _s(9));
+    ctx.fillText(String(tile.cost), 0, _s(11));
   }
 }
 
