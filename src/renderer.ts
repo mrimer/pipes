@@ -649,6 +649,7 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
     const deltaTemp = shiftHeld
       ? tile.temperature
       : tile.temperature + currentTemp;
+    ctx.fillStyle = hotColor;
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(`${deltaTemp}°`, 0, -_s(9));
     ctx.font = `bold ${_s(9)}px Arial`;
