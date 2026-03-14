@@ -18,8 +18,9 @@ import { CampaignEditor } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './confetti';
 import { spawnStarSparkles, clearStarSparkles } from './starSparkle';
 import {
-  SourceSprayDrop, FlowDrop, BubbleParticle,
+  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff,
   spawnSourceSprayDrop, renderSourceSpray,
+  spawnDryPuff, renderDryPuffs,
   spawnFlowDrop, renderFlowDrops,
   spawnBubble, renderBubbles,
   computeFlowGoodDirs,
@@ -152,6 +153,9 @@ export class Game {
 
   /** `performance.now()` of the last source spray drop spawn. */
   private _lastSpraySpawn = 0;
+
+  /** Active dry-air puffs rendered over the source tile when the tank runs dry. */
+  private _dryPuffs: DryPuff[] = [];
 
   /** Active win-flow water drops following connected pipes from source to sink. */
   private _flowDrops: FlowDrop[] = [];
@@ -569,6 +573,7 @@ export class Game {
     clearStarSparkles();
     // Clear particle arrays so stale drops don't persist on the level-select screen.
     this._sourceSprayDrops = [];
+    this._dryPuffs = [];
     this._flowDrops = [];
     this._bubbles = [];
     this._flowGoodDirs = null;
@@ -646,6 +651,7 @@ export class Game {
     clearStarSparkles();
     // Reset particle arrays so stale drops from a previous level don't carry over.
     this._sourceSprayDrops = [];
+    this._dryPuffs = [];
     this._flowDrops = [];
     this._bubbles = [];
     this._flowGoodDirs = null;
@@ -886,14 +892,23 @@ export class Game {
   private _tickSourceSpray(): void {
     if (!this.board) return;
     const now = performance.now();
-    // Spawn a new drop roughly every 150 ms (~6–7 per second).
-    if (now - this._lastSpraySpawn >= 150) {
-      spawnSourceSprayDrop(this._sourceSprayDrops);
-      this._lastSpraySpawn = now;
-    }
     const sx = this.board.source.col * TILE_SIZE + TILE_SIZE / 2;
     const sy = this.board.source.row * TILE_SIZE + TILE_SIZE / 2;
-    renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
+    if (this.gameState === GameState.GameOver) {
+      // Tank ran dry: show puffs of dry air bursting from the source.
+      if (now - this._lastSpraySpawn >= 200) {
+        spawnDryPuff(this._dryPuffs);
+        this._lastSpraySpawn = now;
+      }
+      renderDryPuffs(this.ctx, this._dryPuffs, sx, sy);
+    } else {
+      // Normal play: show water drops spraying from the source.
+      if (now - this._lastSpraySpawn >= 150) {
+        spawnSourceSprayDrop(this._sourceSprayDrops);
+        this._lastSpraySpawn = now;
+      }
+      renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
+    }
   }
 
   /**
@@ -1760,9 +1775,9 @@ export class Game {
           if (lockedImpact !== null && lockedGain !== null) {
             const loss = Math.max(0, lockedGain - lockedImpact);
             if (lockedGain > 0 && loss > 0) {
-              // Both gain and loss: spawn two separate labels offset left/right.
-              this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-              this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+              // Both gain and loss: spawn two separate labels offset above/below.
+              this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+              this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
               // text stays null so the outer push is skipped
             } else if (lockedGain > 0) {
               text = `+${lockedGain}`;
@@ -1782,8 +1797,8 @@ export class Game {
           const waterGain = Math.min(this.board.frozen, effectiveCost);
           const waterLoss = Math.max(0, effectiveCost - waterGain);
           if (waterLoss > 0 && waterGain > 0) {
-            this._animations.push({ x: cx - TILE_SIZE / 4, y: cy, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-            this._animations.push({ x: cx + TILE_SIZE / 4, y: cy, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+            this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+            this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
           } else if (waterLoss > 0) {
             text = `+${waterLoss}`;
             color = ANIM_POSITIVE_COLOR;
@@ -2378,6 +2393,7 @@ export class Game {
     clearStarSparkles();
     // Reset particle arrays for the playtested level.
     this._sourceSprayDrops = [];
+    this._dryPuffs = [];
     this._flowDrops = [];
     this._bubbles = [];
     this._flowGoodDirs = null;
