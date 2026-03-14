@@ -2126,3 +2126,278 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
     expect(state._editGrid[0][0]?.rotation).toBe(0);
   });
 });
+
+// ─── Data validation ──────────────────────────────────────────────────────────
+
+import { getValidTileDefKeys } from '../src/campaignEditorTypes';
+import { TileDef } from '../src/types';
+
+describe('getValidTileDefKeys', () => {
+  it('Empty tile: only shape is valid', () => {
+    const tile: TileDef = { shape: PipeShape.Empty };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('capacity')).toBe(false);
+    expect(valid.has('dryingTime')).toBe(false);
+  });
+
+  it('Straight tile: shape + rotation valid', () => {
+    const tile: TileDef = { shape: PipeShape.Straight, rotation: 90 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(true);
+    expect(valid.has('capacity')).toBe(false);
+    expect(valid.has('connections')).toBe(false);
+  });
+
+  it('Cross tile: rotation is NOT valid (symmetric shape)', () => {
+    const tile: TileDef = { shape: PipeShape.Cross };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+  });
+
+  it('GoldSpace tile: rotation is NOT valid', () => {
+    const tile: TileDef = { shape: PipeShape.GoldSpace };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+  });
+
+  it('Granite tile: only shape is valid', () => {
+    const tile: TileDef = { shape: PipeShape.Granite };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('dryingTime')).toBe(false);
+  });
+
+  it('Cement tile: shape + dryingTime valid', () => {
+    const tile: TileDef = { shape: PipeShape.Cement };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('dryingTime')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('capacity')).toBe(false);
+  });
+
+  it('Source tile: shape + capacity + connections + temperature + pressure valid', () => {
+    const tile: TileDef = { shape: PipeShape.Source, capacity: 6 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('capacity')).toBe(true);
+    expect(valid.has('connections')).toBe(true);
+    expect(valid.has('temperature')).toBe(true);
+    expect(valid.has('pressure')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('dryingTime')).toBe(false);
+  });
+
+  it('Sink tile: shape + connections valid; rotation NOT valid', () => {
+    const tile: TileDef = { shape: PipeShape.Sink };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('connections')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('capacity')).toBe(false);
+  });
+
+  it('Chamber-tank: chamberContent + capacity + connections valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'tank', capacity: 5 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('chamberContent')).toBe(true);
+    expect(valid.has('capacity')).toBe(true);
+    expect(valid.has('connections')).toBe(true);
+    expect(valid.has('cost')).toBe(false);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('temperature')).toBe(false);
+  });
+
+  it('Chamber-dirt: cost valid; capacity NOT valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'dirt' };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('cost')).toBe(true);
+    expect(valid.has('capacity')).toBe(false);
+    expect(valid.has('temperature')).toBe(false);
+  });
+
+  it('Chamber-item: itemShape + itemCount valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'item', itemShape: PipeShape.Straight, itemCount: 1 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('itemShape')).toBe(true);
+    expect(valid.has('itemCount')).toBe(true);
+    expect(valid.has('cost')).toBe(false);
+    expect(valid.has('capacity')).toBe(false);
+  });
+
+  it('Chamber-heater: temperature valid; cost NOT valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'heater' };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('temperature')).toBe(true);
+    expect(valid.has('cost')).toBe(false);
+    expect(valid.has('pressure')).toBe(false);
+  });
+
+  it('Chamber-pump: pressure valid; temperature NOT valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'pump' };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('pressure')).toBe(true);
+    expect(valid.has('temperature')).toBe(false);
+    expect(valid.has('cost')).toBe(false);
+  });
+
+  it('Chamber-sandstone: cost + temperature + hardness + shatter valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'sandstone' };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('cost')).toBe(true);
+    expect(valid.has('temperature')).toBe(true);
+    expect(valid.has('hardness')).toBe(true);
+    expect(valid.has('shatter')).toBe(true);
+    expect(valid.has('capacity')).toBe(false);
+    expect(valid.has('itemShape')).toBe(false);
+  });
+
+  it('Chamber-hot_plate: cost + temperature valid; hardness NOT valid', () => {
+    const tile: TileDef = { shape: PipeShape.Chamber, chamberContent: 'hot_plate' };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('cost')).toBe(true);
+    expect(valid.has('temperature')).toBe(true);
+    expect(valid.has('hardness')).toBe(false);
+    expect(valid.has('capacity')).toBe(false);
+  });
+
+  it('GoldStraight: rotation valid (asymmetric gold pipe)', () => {
+    const tile: TileDef = { shape: PipeShape.GoldStraight, rotation: 90 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('rotation')).toBe(true);
+    expect(valid.has('capacity')).toBe(false);
+  });
+
+  it('GoldCross: rotation NOT valid (symmetric)', () => {
+    const tile: TileDef = { shape: PipeShape.GoldCross };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('rotation')).toBe(false);
+  });
+
+  it('SpinElbow: rotation valid', () => {
+    const tile: TileDef = { shape: PipeShape.SpinElbow, rotation: 180 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('rotation')).toBe(true);
+  });
+});
+
+describe('_scanCampaignData – dry run', () => {
+  function makeEditor(): CampaignEditor {
+    localStorage.clear();
+    return new CampaignEditor(() => {}, (_level: LevelDef) => {}, (_campaign: CampaignDef) => {});
+  }
+
+  function makeCampaign(overrides: Partial<CampaignDef> = {}): CampaignDef {
+    return {
+      id: 'cmp_test',
+      name: 'Test',
+      author: 'Tester',
+      chapters: [],
+      ...overrides,
+    };
+  }
+
+  it('returns empty issues map when campaign data is clean', () => {
+    const editor = makeEditor();
+    const campaign = makeCampaign();
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.size).toBe(0);
+  });
+
+  it('detects unrecognized field on campaign record', () => {
+    const editor = makeEditor();
+    const campaign = makeCampaign();
+    (campaign as unknown as Record<string, unknown>)['extraField'] = 'oops';
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.get('Campaign')?.get('extraField')).toBe(1);
+    // dry run: field must still be present
+    expect((campaign as unknown as Record<string, unknown>)['extraField']).toBe('oops');
+  });
+
+  it('detects rotation on GoldSpace tile', () => {
+    const editor = makeEditor();
+    const tile: TileDef = { shape: PipeShape.GoldSpace };
+    (tile as unknown as Record<string, unknown>)['rotation'] = 0;
+    const campaign = makeCampaign({
+      chapters: [{
+        id: 1, name: 'Ch1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 1,
+          grid: [[tile]],
+          inventory: [],
+        }],
+      }],
+    });
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.get('Tile')?.get('rotation')).toBe(1);
+    // dry run: field must still be present
+    expect((tile as unknown as Record<string, unknown>)['rotation']).toBe(0);
+  });
+
+  it('removes invalid fields when dryRun is false', () => {
+    const editor = makeEditor();
+    const campaign = makeCampaign();
+    (campaign as unknown as Record<string, unknown>)['badKey'] = 42;
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, false);
+    expect(issues.get('Campaign')?.get('badKey')).toBe(1);
+    // non-dry-run: field must be gone
+    expect(Object.keys(campaign)).not.toContain('badKey');
+  });
+
+  it('counts multiple occurrences of the same invalid field across tiles', () => {
+    const editor = makeEditor();
+    const makeGoldSpaceWithRotation = (): TileDef => {
+      const t: TileDef = { shape: PipeShape.GoldSpace };
+      (t as unknown as Record<string, unknown>)['rotation'] = 0;
+      return t;
+    };
+    const campaign = makeCampaign({
+      chapters: [{
+        id: 1, name: 'Ch1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 3,
+          grid: [[makeGoldSpaceWithRotation(), makeGoldSpaceWithRotation(), makeGoldSpaceWithRotation()]],
+          inventory: [],
+        }],
+      }],
+    });
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.get('Tile')?.get('rotation')).toBe(3);
+  });
+
+  it('detects invalid field on InventoryItem', () => {
+    const editor = makeEditor();
+    const item = { shape: PipeShape.Straight, count: 2 };
+    (item as unknown as Record<string, unknown>)['extra'] = true;
+    const campaign = makeCampaign({
+      chapters: [{
+        id: 1, name: 'Ch1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 1,
+          grid: [[null]],
+          inventory: [item],
+        }],
+      }],
+    });
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.get('InventoryItem')?.get('extra')).toBe(1);
+  });
+});
