@@ -42,6 +42,7 @@ const MOCK_CTX = {
   strokeText: jest.fn(),
   quadraticCurveTo: jest.fn(),
   rect:       jest.fn(),
+  roundRect:  jest.fn(),
   clip:       jest.fn(),
   scale:      jest.fn(),
   closePath:  jest.fn(),
