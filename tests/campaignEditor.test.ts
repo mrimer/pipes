@@ -128,6 +128,49 @@ describe('migrateCampaign', () => {
     const result = migrateCampaign(campaign);
     expect(result).toBe(campaign);
   });
+
+  it('migrates legacy hint string to hints array', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_hint_test',
+      name: 'Hint Test',
+      author: 'Tester',
+      chapters: [{
+        id: 1, name: 'Ch 1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 1,
+          grid: [[null]],
+          inventory: [],
+        }],
+      }],
+    };
+    // Inject the deprecated field via a cast (it's no longer in LevelDef).
+    (campaign.chapters[0].levels[0] as unknown as Record<string, unknown>)['hint'] = 'A legacy hint.';
+    const migrated = migrateCampaign(campaign);
+    expect(migrated.chapters[0].levels[0].hints).toEqual(['A legacy hint.']);
+    expect((migrated.chapters[0].levels[0] as unknown as Record<string, unknown>)['hint']).toBeUndefined();
+  });
+
+  it('does not overwrite existing hints when hint is also present', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_hint_test2',
+      name: 'Hint Test 2',
+      author: 'Tester',
+      chapters: [{
+        id: 1, name: 'Ch 1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 1,
+          grid: [[null]],
+          inventory: [],
+          hints: ['Existing hint.'],
+        }],
+      }],
+    };
+    (campaign.chapters[0].levels[0] as unknown as Record<string, unknown>)['hint'] = 'Old hint.';
+    const migrated = migrateCampaign(campaign);
+    // hints should be preserved; old hint deleted
+    expect(migrated.chapters[0].levels[0].hints).toEqual(['Existing hint.']);
+    expect((migrated.chapters[0].levels[0] as unknown as Record<string, unknown>)['hint']).toBeUndefined();
+  });
 });
 
 // ─── loadImportedCampaigns – applies weak_ice → snow migration ───────────────
@@ -296,7 +339,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     expect(state._editLevelHints).toEqual(['This is a hint.']);
   });
 
-  it('_openLevelEditor falls back to legacy hint field for backward compat', () => {
+  it('_openLevelEditor uses empty hints when level has no hints', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     const level: LevelDef = {
@@ -306,10 +349,9 @@ describe('CampaignEditor – note and hint in level definitions', () => {
       cols: 3,
       grid: Array.from({ length: 3 }, () => Array(3).fill(null) as null[]),
       inventory: [],
-      hint: 'Legacy hint.',
     };
     state._openLevelEditor(level, true);
-    expect(state._editLevelHints).toEqual(['Legacy hint.']);
+    expect(state._editLevelHints).toEqual(['']);
   });
 
   it('_openLevelEditor sets empty array when level has no note or hint', () => {
