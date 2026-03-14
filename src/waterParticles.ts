@@ -98,6 +98,83 @@ export function renderSourceSpray(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Dry-air puffs (source runs dry on level fail)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** A single puff of dry air bursting outward from the source tile on level fail. */
+export interface DryPuff {
+  /** Direction angle in radians (0 = right, π/2 = down, etc.). */
+  angle: number;
+  /** Current distance from the tile centre in pixels. */
+  distance: number;
+  /** Movement speed in pixels per frame at ~60 fps. */
+  speed: number;
+  /** Radius of the puff circle in pixels. */
+  size: number;
+}
+
+/** Maximum number of simultaneously live dry-air puffs. */
+const DRY_PUFF_MAX = 8;
+
+/**
+ * Attempt to add one new dry puff to the pool.
+ * Does nothing when the pool is already full.
+ */
+export function spawnDryPuff(puffs: DryPuff[]): void {
+  if (puffs.length >= DRY_PUFF_MAX) return;
+  puffs.push({
+    angle: Math.random() * Math.PI * 2,
+    distance: Math.random() * _s(2),
+    speed: _s(0.4 + Math.random() * 0.6),
+    size: _s(4 + Math.random() * 4),
+  });
+}
+
+/**
+ * Advance and render all dry-air puffs, then remove expired ones.
+ *
+ * @param ctx       2D rendering context.
+ * @param puffs     Mutable array of active puffs (modified in place).
+ * @param sourceCx  Canvas X of the source tile centre.
+ * @param sourceCy  Canvas Y of the source tile centre.
+ */
+export function renderDryPuffs(
+  ctx: CanvasRenderingContext2D,
+  puffs: DryPuff[],
+  sourceCx: number,
+  sourceCy: number,
+): void {
+  let i = 0;
+  // Puffs travel a bit further than water drops to feel more expansive.
+  const maxDist = _sprayMaxDist() * 1.4;
+  while (i < puffs.length) {
+    const puff = puffs[i];
+    puff.distance += puff.speed;
+    if (puff.distance >= maxDist) {
+      puffs.splice(i, 1);
+      continue;
+    }
+
+    const x = sourceCx + Math.cos(puff.angle) * puff.distance;
+    const y = sourceCy + Math.sin(puff.angle) * puff.distance;
+
+    // Fade from opaque near the centre to transparent at the edge.
+    const progress = puff.distance / maxDist;
+    const alpha = 0.55 * (1 - progress);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, puff.size, 0, Math.PI * 2);
+    ctx.fillStyle = 'white';
+    ctx.fill();
+    ctx.restore();
+
+    i++;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Win Flow
 // ──────────────────────────────────────────────────────────────────────────────
 
