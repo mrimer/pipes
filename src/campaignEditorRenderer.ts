@@ -8,7 +8,7 @@ import { PipeShape, TileDef, Direction, Rotation } from './types';
 import { TILE_SIZE, drawSpinArrow, scalePx as _s } from './renderer';
 import { Tile } from './tile';
 import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
-import { SPIN_PIPE_SHAPES } from './board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR } from './colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
@@ -86,13 +86,31 @@ export function renderEditorCanvas(
     }
   }
 
-  // Pass 2: Draw all non-empty (fixed) tiles on top of all backgrounds so that
-  // pipe rounded caps are never overwritten by a neighbouring empty cell's fill.
+  // Pass 2: Draw all non-pipe fixed tiles on top of the empty-space backgrounds.
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
-      if (def === null) continue;
+      if (def === null || PIPE_SHAPES.has(def.shape)) continue;
+      const x = c * CELL;
+      const y = r * CELL;
+      drawEditorTile(ctx, x, y, def);
+      // Solid border for fixed tiles
+      ctx.strokeStyle = '#2a3a5e';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    }
+  }
+
+  // Pass 3: Draw all pipe tiles last so their rounded caps appear on top of
+  // every other tile type (e.g. a pipe adjacent to a Chamber won't be clipped
+  // by the Chamber's background fill).
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
+      const def = isDragSource ? null : (grid[r]?.[c] ?? null);
+      if (def === null || !PIPE_SHAPES.has(def.shape)) continue;
       const x = c * CELL;
       const y = r * CELL;
       drawEditorTile(ctx, x, y, def);

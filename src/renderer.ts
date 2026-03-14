@@ -1259,16 +1259,15 @@ export function renderBoard(
     }
   }
 
-  // Pass 2: Draw all tile content on top of all backgrounds so that pipe rounded
-  // caps (from lineCap='round') are never overwritten by a neighbouring empty tile's
-  // background fill.
+  // Pass 2: Draw all non-pipe tile content on top of all backgrounds.
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
+      if (PIPE_SHAPES.has(tile.shape)) continue;
       const isCementCell = board.cementData.has(`${r},${c}`);
 
       // Skip drawing the empty-tile dot on cement cells – the cement background
-      // texture is already clearly visible and the label (pass 3) provides the
+      // texture is already clearly visible and the label (pass 4) provides the
       // setting-time indicator.
       if (tile.shape === PipeShape.Empty && isCementCell) continue;
 
@@ -1302,7 +1301,23 @@ export function renderBoard(
     }
   }
 
-  // Pass 3: Draw cement drying-time labels in the top-left corner of every cement cell.
+  // Pass 3: Draw all pipe tile content on top of all non-pipe tile content so that
+  // pipe rounded caps (from lineCap='round') are never overwritten by a neighbouring
+  // non-pipe tile's fill (e.g. a Chamber or Source adjacent to a pipe).
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      const tile = board.grid[r][c];
+      if (!PIPE_SHAPES.has(tile.shape)) continue;
+
+      const x = c * TILE_SIZE;
+      const y = r * TILE_SIZE;
+      const isWater = filled.has(`${r},${c}`);
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null);
+    }
+  }
+
+  // Pass 4: Draw cement drying-time labels in the top-left corner of every cement cell.
   // Drawn after all tile content so the label always appears on top of any pipe graphic.
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
