@@ -569,10 +569,11 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   // When pressure > hardness, show the hardness number in the top-left corner for reference
   if (!isHard) {
     ctx.save();
+    ctx.fillStyle = isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.font = `bold ${_s(9)}px Arial`;
-    ctx.fillText(String(tile.hardness), -bw + _s(2), -bh + _s(2));
+    ctx.fillText(`${tile.hardness}H`, -bw + _s(2), -bh + _s(2));
     ctx.restore();
   }
   if (lockedCost !== null) {
