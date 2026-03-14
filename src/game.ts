@@ -600,7 +600,7 @@ export class Game {
     const HINT_PANEL_H   = 37; // hint panel collapsed: toggle-button 10 px padding × 2 + font
 
     const hasNote  = !!level.note;
-    const hasHints = !!(level.hints?.length || level.hint);
+    const hasHints = !!(level.hints?.length);
 
     let overhead = H1_H + LEVEL_HEADER_H + GAP + HUD_H + GAP + PADDING_BOTTOM;
     if (hasNote)  overhead += NOTE_PANEL_H  + GAP;
@@ -704,9 +704,7 @@ export class Game {
 
     // Hint box – always starts collapsed when a new level loads.
     // Supports multiple hints nested sequentially: Hint 2 is revealed inside Hint 1, etc.
-    const hints = level.hints?.length
-      ? level.hints
-      : (level.hint ? [level.hint] : []);
+    const hints = level.hints ?? [];
 
     this.hintBoxEl.innerHTML = '';
     if (hints.length === 0) {

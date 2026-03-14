@@ -21,7 +21,7 @@ export const VALID_CHAPTER_KEYS: ReadonlySet<string> = new Set([
 /** Valid keys for a LevelDef record. */
 export const VALID_LEVEL_KEYS: ReadonlySet<string> = new Set([
   'id', 'name', 'rows', 'cols', 'grid', 'inventory',
-  'note', 'hint', 'hints', 'starCount', 'challenge',
+  'note', 'hints', 'starCount', 'challenge',
 ]);
 
 /** Valid keys for an InventoryItem record. */

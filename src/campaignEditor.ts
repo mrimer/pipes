@@ -869,9 +869,7 @@ export class CampaignEditor {
   private _openLevelEditor(level: LevelDef, readOnly: boolean): void {
     this._editLevelName = level.name;
     this._editLevelNote = level.note ?? '';
-    this._editLevelHints = level.hints?.length
-      ? [...level.hints]
-      : (level.hint ? [level.hint] : ['']);
+    this._editLevelHints = level.hints?.length ? [...level.hints] : [''];
     this._editLevelChallenge = level.challenge ?? false;
     this._editRows = level.rows;
     this._editCols = level.cols;

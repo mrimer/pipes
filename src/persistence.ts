@@ -60,10 +60,20 @@ const CAMPAIGNS_STORAGE_KEY = 'pipes_campaigns';
  *
  * Currently handles:
  *   - chamberContent 'weak_ice' → 'snow'  (renamed in the v2026-03 refactor)
+ *   - level.hint → level.hints            (deprecated single-string field folded into array)
  */
 export function migrateCampaign(campaign: CampaignDef): CampaignDef {
   for (const chapter of campaign.chapters) {
     for (const level of chapter.levels) {
+      // Migrate deprecated single-string `hint` to the `hints` array.
+      const levelRec = level as unknown as Record<string, unknown>;
+      if (typeof levelRec['hint'] === 'string') {
+        const hintStr = levelRec['hint'] as string;
+        if (!level.hints?.length && hintStr.trim()) {
+          level.hints = [hintStr];
+        }
+        delete levelRec['hint'];
+      }
       for (const row of level.grid) {
         for (let i = 0; i < row.length; i++) {
           const tile = row[i];

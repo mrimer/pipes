@@ -152,13 +152,6 @@ export interface LevelDef {
   /** Optional notes displayed in a box beneath the grid while playing. */
   note?: string;
   /**
-   * Optional hints shown as collapsible boxes beneath the grid while playing.
-   * The first hint is revealed when the player clicks "Show Hint"; each
-   * subsequent hint is nested inside the previous one and revealed in sequence.
-   * @deprecated Use `hints` instead. Kept for backward compatibility with saved campaigns.
-   */
-  hint?: string;
-  /**
    * Optional ordered list of hints. The first is revealed when the player
    * clicks "Show Hint", and each subsequent hint is nested inside the previous
    * one so they are revealed in sequence.
