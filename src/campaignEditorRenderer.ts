@@ -60,38 +60,47 @@ export function renderEditorCanvas(
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
 
+  // Pass 1: Draw all open (player-fillable) spaces first so that pipe rounded
+  // caps drawn in pass 2 are never covered by a neighbouring empty cell's fill.
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const x = c * CELL;
-      const y = r * CELL;
-      // During a drag, render the source cell as empty
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
+      if (def !== null) continue;
+      const x = c * CELL;
+      const y = r * CELL;
+      // Empty (player-fillable) – light grid cell
+      ctx.fillStyle = '#1a2840';
+      ctx.fillRect(x, y, CELL, CELL);
+      // Dashed border
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#2a3a5e';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+      ctx.setLineDash([]);
+      // Subtle dot
+      ctx.fillStyle = '#2a3a5e';
+      ctx.beginPath();
+      ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
-      // Cell background
-      if (def === null) {
-        // Empty (player-fillable) – light grid cell
-        ctx.fillStyle = '#1a2840';
-        ctx.fillRect(x, y, CELL, CELL);
-        // Dashed border
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = '#2a3a5e';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
-        ctx.setLineDash([]);
-        // Subtle dot
-        ctx.fillStyle = '#2a3a5e';
-        ctx.beginPath();
-        ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        drawEditorTile(ctx, x, y, def);
-        // Solid border for fixed tiles
-        ctx.strokeStyle = '#2a3a5e';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([]);
-        ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
-      }
+  // Pass 2: Draw all non-empty (fixed) tiles on top of all backgrounds so that
+  // pipe rounded caps are never overwritten by a neighbouring empty cell's fill.
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
+      const def = isDragSource ? null : (grid[r]?.[c] ?? null);
+      if (def === null) continue;
+      const x = c * CELL;
+      const y = r * CELL;
+      drawEditorTile(ctx, x, y, def);
+      // Solid border for fixed tiles
+      ctx.strokeStyle = '#2a3a5e';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
     }
   }
 
