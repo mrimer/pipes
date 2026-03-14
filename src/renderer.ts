@@ -676,11 +676,14 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   ctx.clip();
   const bw = half * 0.7 + 2;
   const bh = half * 0.7 + 2;
+  const br = _s(3); // slight corner radius for the inner box
+  ctx.beginPath();
+  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
-  ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+  ctx.fill();
   ctx.strokeStyle = color;
   ctx.lineWidth = _s(3);
-  ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+  ctx.stroke();
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
   if (chamberContent === 'tank') {

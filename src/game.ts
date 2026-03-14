@@ -1051,6 +1051,9 @@ export class Game {
       spawnConfetti(() => {
         if (this.gameState !== GameState.Won) return;
         this.winModalEl.style.display = 'flex';
+        this.winModalEl.classList.remove('fade-in');
+        void this.winModalEl.offsetWidth; // force reflow to restart animation
+        this.winModalEl.classList.add('fade-in');
         this._positionModalBelowCanvas(this.winModalEl);
         this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
         // Spawn golden sparkles over the star icon in the win modal when stars were collected
