@@ -88,6 +88,8 @@ export class CampaignEditor {
   private _goldSectionExpanded = false;
   private _chamberSectionExpanded = false;
   private _pipesSectionExpanded = false;
+  private _floorSectionExpanded = false;
+  private _editorSourceErrorEl: HTMLDivElement | null = null;
   /** Drag state: set when the user is dragging a tile across the grid. */
   private _dragState: {
     startPos: { row: number; col: number };
@@ -882,6 +884,8 @@ export class CampaignEditor {
     this._editorHover = null;
     this._goldSectionExpanded = false;
     this._chamberSectionExpanded = false;
+    this._pipesSectionExpanded = false;
+    this._floorSectionExpanded = false;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
     this._editorUnsavedChanges = false;
@@ -1051,6 +1055,14 @@ export class CampaignEditor {
 
     midCol.appendChild(canvas);
 
+    // Flash error element for Source tile placement constraint
+    if (!readOnly) {
+      const sourceErrorDiv = document.createElement('div');
+      sourceErrorDiv.style.cssText = 'font-size:0.85rem;color:#f44;display:none;font-weight:bold;';
+      this._editorSourceErrorEl = sourceErrorDiv;
+      midCol.appendChild(sourceErrorDiv);
+    }
+
     // Note and hint text fields below the canvas
     if (!readOnly) {
       const textareaStyle =
@@ -1208,9 +1220,6 @@ export class CampaignEditor {
   private readonly _PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
     { palette: PipeShape.Source,   label: '💧 Source' },
     { palette: PipeShape.Sink,     label: '🏁 Sink' },
-    { palette: PipeShape.Cement,   label: '🪧 Cement' },
-    { palette: PipeShape.Granite,  label: '▪ Granite' },
-    { palette: 'erase',            label: '🗑 Erase (→ Empty)' },
   ];
 
   private readonly _PIPES_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -1237,11 +1246,16 @@ export class CampaignEditor {
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.GoldSpace,    label: '✦ Gold Space' },
     { palette: PipeShape.GoldStraight, label: '━ Gold Straight' },
     { palette: PipeShape.GoldElbow,    label: '┗ Gold Elbow' },
     { palette: PipeShape.GoldTee,      label: '┣ Gold Tee' },
     { palette: PipeShape.GoldCross,    label: '╋ Gold Cross' },
+  ];
+
+  private readonly _FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+    { palette: PipeShape.Granite,   label: '▪ Granite' },
+    { palette: PipeShape.Cement,    label: '🪧 Cement' },
+    { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
   ];
 
   private _buildPalette(): HTMLElement {
@@ -1257,8 +1271,11 @@ export class CampaignEditor {
     panel.appendChild(title);
 
     const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
+    const isFloorSelected = this._FLOOR_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
     // Auto-expand the gold section if a gold item is currently selected
     if (isGoldSelected) this._goldSectionExpanded = true;
+    // Auto-expand the floor section if a floor item is currently selected
+    if (isFloorSelected) this._floorSectionExpanded = true;
     // Auto-expand the chamber section if a chamber item is currently selected
     if (isChamberPalette(this._editorPalette)) this._chamberSectionExpanded = true;
     // Auto-expand the pipes section if a pipe item is currently selected
@@ -1320,6 +1337,46 @@ export class CampaignEditor {
       }
     }
 
+    // Gold collapsible section (placed under Pipes)
+    const goldToggle = document.createElement('button');
+    goldToggle.type = 'button';
+    goldToggle.textContent = (this._goldSectionExpanded ? '▾' : '▸') + ' Gold';
+    goldToggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      'border:1px solid #b8860b;background:#1a1400;color:#ffd700;font-weight:bold;margin-top:2px;';
+    goldToggle.addEventListener('click', () => {
+      this._goldSectionExpanded = !this._goldSectionExpanded;
+      const newPanel = this._buildPalette();
+      panel.replaceWith(newPanel);
+    });
+    panel.appendChild(goldToggle);
+
+    if (this._goldSectionExpanded) {
+      for (const item of this._GOLD_PALETTE_ITEMS) {
+        panel.appendChild(makeItemBtn(item, true));
+      }
+    }
+
+    // Floor collapsible section (Granite, Cement, Gold Space)
+    const floorToggle = document.createElement('button');
+    floorToggle.type = 'button';
+    floorToggle.textContent = (this._floorSectionExpanded ? '▾' : '▸') + ' Floor';
+    floorToggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      'border:1px solid #888;background:#1a1a1a;color:#ccc;font-weight:bold;margin-top:2px;';
+    floorToggle.addEventListener('click', () => {
+      this._floorSectionExpanded = !this._floorSectionExpanded;
+      const newPanel = this._buildPalette();
+      panel.replaceWith(newPanel);
+    });
+    panel.appendChild(floorToggle);
+
+    if (this._floorSectionExpanded) {
+      for (const item of this._FLOOR_PALETTE_ITEMS) {
+        panel.appendChild(makeItemBtn(item, true));
+      }
+    }
+
     // Chamber collapsible section
     const chamberToggle = document.createElement('button');
     chamberToggle.type = 'button';
@@ -1340,25 +1397,8 @@ export class CampaignEditor {
       }
     }
 
-    // Gold collapsible section
-    const goldToggle = document.createElement('button');
-    goldToggle.type = 'button';
-    goldToggle.textContent = (this._goldSectionExpanded ? '▾' : '▸') + ' Gold';
-    goldToggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      'border:1px solid #b8860b;background:#1a1400;color:#ffd700;font-weight:bold;margin-top:2px;';
-    goldToggle.addEventListener('click', () => {
-      this._goldSectionExpanded = !this._goldSectionExpanded;
-      const newPanel = this._buildPalette();
-      panel.replaceWith(newPanel);
-    });
-    panel.appendChild(goldToggle);
-
-    if (this._goldSectionExpanded) {
-      for (const item of this._GOLD_PALETTE_ITEMS) {
-        panel.appendChild(makeItemBtn(item, true));
-      }
-    }
+    // Erase at the end of the palette
+    panel.appendChild(makeItemBtn({ palette: 'erase', label: '🗑 Erase (→ Empty)' }));
 
     return panel;
   }
@@ -1902,6 +1942,15 @@ export class CampaignEditor {
     return false;
   }
 
+  /** Flashes an error message below the canvas when the Source placement constraint is violated. */
+  private _showSourceError(): void {
+    const el = this._editorSourceErrorEl;
+    if (!el) return;
+    el.textContent = 'Only one source tile is allowed.';
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  }
+
   /**
    * Places the current palette tile on the given grid cell.
    */
@@ -1949,7 +1998,7 @@ export class CampaignEditor {
     } else {
       // Guard: only one Source tile is allowed per level.
       if (this._editorPalette === PipeShape.Source && this._hasSourceElsewhere()) {
-        alert('A Source tile already exists on the board. Only one Source is allowed per level.');
+        this._showSourceError();
         return;
       }
       // Paint / erase immediately
@@ -2011,7 +2060,7 @@ export class CampaignEditor {
       if (e.ctrlKey) {
         // Guard: only one Source tile is allowed per level.
         if (this._editorPalette === PipeShape.Source && this._hasSourceElsewhere(startPos)) {
-          alert('A Source tile already exists on the board. Only one Source is allowed per level.');
+          this._showSourceError();
           return;
         }
         // Ctrl+click: force-overwrite with current palette selection

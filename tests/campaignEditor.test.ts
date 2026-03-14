@@ -1678,6 +1678,7 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
+    _editorSourceErrorEl: HTMLDivElement | null;
     _editRows: number;
     _editCols: number;
     _editGrid: (import('../src/types').TileDef | null)[][];
@@ -1736,10 +1737,10 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
     expect(state._editGrid[0][0]).not.toBeNull();
     expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
-    expect(window.alert).not.toHaveBeenCalled();
+    expect(state._editorSourceErrorEl?.style.display).not.toBe('block');
   });
 
-  it('shows an alert and does not place a second Source tile', () => {
+  it('shows a flash error and does not place a second Source tile', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
 
     // Place first Source at (0,0)
@@ -1750,11 +1751,12 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     // Attempt to place second Source at (0,1)
     state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32)); // row 0, col 1
 
-    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(state._editorSourceErrorEl?.style.display).toBe('block');
+    expect(state._editorSourceErrorEl?.textContent).toBe('Only one source tile is allowed.');
     expect(state._editGrid[0][1]).toBeNull(); // second Source not placed
   });
 
-  it('shows an alert when trying to overwrite a non-Source tile with Source via Ctrl+click', () => {
+  it('shows a flash error when trying to overwrite a non-Source tile with Source via Ctrl+click', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
 
     // Place a Straight tile at (0,0) and a Source at (1,0)
@@ -1766,7 +1768,8 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
     state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
-    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(state._editorSourceErrorEl?.style.display).toBe('block');
+    expect(state._editorSourceErrorEl?.textContent).toBe('Only one source tile is allowed.');
     expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Straight); // not overwritten
   });
 
