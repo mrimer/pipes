@@ -968,7 +968,7 @@ export class CampaignEditor {
     // ── Left column: palette + params ──────────────────────────────────────
     const leftCol = document.createElement('div');
     leftCol.style.cssText =
-      'display:flex;flex-direction:column;gap:12px;min-width:180px;';
+      'display:flex;flex-direction:column;gap:12px;min-width:220px;';
 
     if (!readOnly) {
       leftCol.appendChild(this._buildPalette());
