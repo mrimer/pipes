@@ -1323,7 +1323,7 @@ export class CampaignEditor {
     // Chamber collapsible section
     const chamberToggle = document.createElement('button');
     chamberToggle.type = 'button';
-    chamberToggle.textContent = (this._chamberSectionExpanded ? '▾' : '▸') + ' Chamber';
+    chamberToggle.textContent = (this._chamberSectionExpanded ? '▾' : '▸') + ' Blocks';
     chamberToggle.style.cssText =
       'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
       'border:1px solid #74b9ff;background:#0a1520;color:#74b9ff;font-weight:bold;margin-top:2px;';
@@ -2325,7 +2325,11 @@ export class CampaignEditor {
     }
 
     // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
-    const noRotation = effectiveShape === PipeShape.Source || effectiveShape === PipeShape.Sink || effectiveShape === PipeShape.Chamber;
+    // GoldSpace and Granite are connectionless background/block tiles with no rotation either.
+    const noRotation = new Set([
+      PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
+      PipeShape.GoldSpace, PipeShape.Granite,
+    ]).has(effectiveShape);
     const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
 
     // Connections
@@ -2591,12 +2595,24 @@ export class CampaignEditor {
       }
     }
 
+    const rawGrid = JSON.parse(JSON.stringify(this._editGrid)) as (TileDef | null)[][];
+    // Strip any fields not supported by each tile's shape to keep saved data clean.
+    const cleanGrid: (TileDef | null)[][] = rawGrid.map(row =>
+      row.map(tile => {
+        if (!tile) return null;
+        const validKeys = getValidTileDefKeys(tile);
+        for (const key of Object.keys(tile)) {
+          if (!validKeys.has(key)) delete (tile as unknown as Record<string, unknown>)[key];
+        }
+        return tile;
+      })
+    );
     const def: LevelDef = {
       id: existingId,
       name: this._editLevelName,
       rows: this._editRows,
       cols: this._editCols,
-      grid: JSON.parse(JSON.stringify(this._editGrid)) as (TileDef | null)[][],
+      grid: cleanGrid,
       inventory: JSON.parse(JSON.stringify(this._editInventory)) as InventoryItem[],
     };
     if (this._editLevelNote.trim()) def.note = this._editLevelNote.trim();

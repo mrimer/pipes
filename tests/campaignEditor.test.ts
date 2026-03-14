@@ -2443,3 +2443,132 @@ describe('_scanCampaignData – dry run', () => {
     expect(issues.get('InventoryItem')?.get('extra')).toBe(1);
   });
 });
+
+// ─── _buildTileDef: no rotation for shape-less tiles ─────────────────────────
+
+describe('CampaignEditor – _buildTileDef omits rotation for non-rotatable shapes', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  function editorBuildTileDef(palette: PipeShape | string): import('../src/types').TileDef {
+    const editor = makeEditor();
+    const state = editor as unknown as {
+      _editorParams: TileParams;
+      _buildTileDef(palette: PipeShape | string): import('../src/types').TileDef;
+    };
+    state._editorParams.rotation = 90; // non-zero rotation to detect if it leaks
+    return state._buildTileDef(palette);
+  }
+
+  it('GoldSpace _buildTileDef does not include rotation field', () => {
+    const def = editorBuildTileDef(PipeShape.GoldSpace);
+    expect(def.shape).toBe(PipeShape.GoldSpace);
+    expect('rotation' in def).toBe(false);
+  });
+
+  it('Granite _buildTileDef does not include rotation field', () => {
+    const def = editorBuildTileDef(PipeShape.Granite);
+    expect(def.shape).toBe(PipeShape.Granite);
+    expect('rotation' in def).toBe(false);
+  });
+});
+
+// ─── _buildCurrentLevelDef: strips unsupported fields from tiles ──────────────
+
+describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile fields', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  function makeEditorWithGrid(grid: (TileDef | null)[][]): {
+    buildCurrentLevelDef(): LevelDef;
+  } {
+    const userCampaign: CampaignDef = {
+      id: 'cmp_strip_test',
+      name: 'Test',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch1', levels: [{ id: 1, name: 'L1', rows: 1, cols: grid[0].length, grid, inventory: [] }] }],
+    };
+    const editor = makeEditor([userCampaign]);
+    const state = editor as unknown as {
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _activeLevelIdx: number;
+      _editLevelName: string;
+      _editLevelNote: string;
+      _editLevelHints: string[];
+      _editRows: number;
+      _editCols: number;
+      _editGrid: (TileDef | null)[][];
+      _editInventory: import('../src/types').InventoryItem[];
+      _buildCurrentLevelDef(): LevelDef;
+    };
+    state._activeCampaignId = 'cmp_strip_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._editLevelName = 'L1';
+    state._editLevelNote = '';
+    state._editLevelHints = [];
+    state._editRows = 1;
+    state._editCols = grid[0].length;
+    state._editGrid = grid;
+    state._editInventory = [];
+    return { buildCurrentLevelDef: () => state._buildCurrentLevelDef() };
+  }
+
+  it('strips rotation from GoldSpace tile when saving', () => {
+    const tile: TileDef = { shape: PipeShape.GoldSpace };
+    (tile as unknown as Record<string, unknown>)['rotation'] = 0;
+    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
+    const def = buildCurrentLevelDef();
+    const savedTile = def.grid[0][0];
+    expect(savedTile).not.toBeNull();
+    expect('rotation' in (savedTile as object)).toBe(false);
+  });
+
+  it('strips rotation from Granite tile when saving', () => {
+    const tile: TileDef = { shape: PipeShape.Granite };
+    (tile as unknown as Record<string, unknown>)['rotation'] = 90;
+    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
+    const def = buildCurrentLevelDef();
+    const savedTile = def.grid[0][0];
+    expect(savedTile).not.toBeNull();
+    expect('rotation' in (savedTile as object)).toBe(false);
+  });
+
+  it('preserves rotation on Straight tile when saving', () => {
+    const tile: TileDef = { shape: PipeShape.Straight, rotation: 90 };
+    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
+    const def = buildCurrentLevelDef();
+    const savedTile = def.grid[0][0];
+    expect(savedTile).not.toBeNull();
+    expect((savedTile as TileDef).rotation).toBe(90);
+  });
+});
+
+// ─── Campaign editor palette: "Blocks" section label ─────────────────────────
+
+describe('CampaignEditor palette – Blocks section label', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  it('palette has a "Blocks" toggle button, not "Chamber"', () => {
+    const editor = makeEditor();
+    const state = editor as unknown as {
+      _chamberSectionExpanded: boolean;
+      _buildPalette(): HTMLElement;
+    };
+    state._chamberSectionExpanded = false;
+    const panel = state._buildPalette();
+    const buttons = Array.from(panel.querySelectorAll('button'));
+    const blocksBtn = buttons.find(b => b.textContent?.includes('Blocks'));
+    const chamberBtn = buttons.find(b => b.textContent?.includes('Chamber'));
+    expect(blocksBtn).not.toBeUndefined();
+    expect(chamberBtn).toBeUndefined();
+  });
+});
