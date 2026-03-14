@@ -1172,7 +1172,7 @@ export function renderBoard(
           // Darken cement cells that have the same piece and orientation as the
           // selected shape: replacing with an identical tile is not a valid move,
           // so shade the cell to indicate it is not a placement target.
-          ctx.fillStyle = '#000000';
+          ctx.fillStyle = EMPTY_TARGET_COLOR; //'#000000';
           ctx.globalAlpha = 0.35;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           ctx.globalAlpha = 1;
