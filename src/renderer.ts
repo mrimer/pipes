@@ -566,8 +566,9 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   ctx.fillStyle = isHard ? (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR) : sandstoneColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // When pressure > hardness, show the hardness number in the top-left corner for reference
-  if (!isHard) {
+  // When pressure > hardness, or when connected (locked cost), show the hardness number
+  // in the top-left corner for reference
+  if (!isHard || lockedCost !== null) {
     ctx.save();
     ctx.fillStyle = isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
     ctx.textAlign = 'left';
@@ -760,23 +761,22 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
   }
-  // Connection stubs.  Each stub's inner endpoint is pulled outward by LINE_WIDTH/2
-  // so the round lineCap tip lands exactly at the box edge instead of poking inside.
-  const stubInset = LINE_WIDTH / 2;
+  // Connection stubs drawn with flat (butt) caps, starting exactly at the box edge
+  // so each stub connects flush with the outside edge of the inner rectangle.
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'round';
+  ctx.lineCap = 'butt';
   if (tile.connections.has(Direction.North)) {
-    ctx.beginPath(); ctx.moveTo(0, -bh - stubInset); ctx.lineTo(0, -half); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
   }
   if (tile.connections.has(Direction.South)) {
-    ctx.beginPath(); ctx.moveTo(0, bh + stubInset);  ctx.lineTo(0, half);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
   }
   if (tile.connections.has(Direction.West)) {
-    ctx.beginPath(); ctx.moveTo(-bw - stubInset, 0); ctx.lineTo(-half, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
   }
   if (tile.connections.has(Direction.East)) {
-    ctx.beginPath(); ctx.moveTo(bw + stubInset, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
   }
 }
 
