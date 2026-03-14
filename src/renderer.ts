@@ -760,21 +760,23 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
   }
-  // Connection stubs
+  // Connection stubs.  Each stub's inner endpoint is pulled outward by LINE_WIDTH/2
+  // so the round lineCap tip lands exactly at the box edge instead of poking inside.
+  const stubInset = LINE_WIDTH / 2;
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
   ctx.lineCap = 'round';
   if (tile.connections.has(Direction.North)) {
-    ctx.beginPath(); ctx.moveTo(0, -bh);   ctx.lineTo(0, -half); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -bh - stubInset); ctx.lineTo(0, -half); ctx.stroke();
   }
   if (tile.connections.has(Direction.South)) {
-    ctx.beginPath(); ctx.moveTo(0, bh);    ctx.lineTo(0, half);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, bh + stubInset);  ctx.lineTo(0, half);  ctx.stroke();
   }
   if (tile.connections.has(Direction.West)) {
-    ctx.beginPath(); ctx.moveTo(-bw, 0);   ctx.lineTo(-half, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-bw - stubInset, 0); ctx.lineTo(-half, 0); ctx.stroke();
   }
   if (tile.connections.has(Direction.East)) {
-    ctx.beginPath(); ctx.moveTo(bw, 0);    ctx.lineTo(half, 0);  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bw + stubInset, 0);  ctx.lineTo(half, 0);  ctx.stroke();
   }
 }
 
