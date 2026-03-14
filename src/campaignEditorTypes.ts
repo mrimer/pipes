@@ -6,6 +6,70 @@
 import { PipeShape, TileDef, InventoryItem, Rotation } from './types';
 import { DIRT_COLOR, ICE_COLOR } from './colors';
 
+// ─── Valid field sets for data validation ─────────────────────────────────────
+
+/** Valid keys for a CampaignDef record. */
+export const VALID_CAMPAIGN_KEYS: ReadonlySet<string> = new Set([
+  'id', 'name', 'author', 'chapters', 'official', 'lastUpdated',
+]);
+
+/** Valid keys for a ChapterDef record. */
+export const VALID_CHAPTER_KEYS: ReadonlySet<string> = new Set([
+  'id', 'name', 'levels',
+]);
+
+/** Valid keys for a LevelDef record. */
+export const VALID_LEVEL_KEYS: ReadonlySet<string> = new Set([
+  'id', 'name', 'rows', 'cols', 'grid', 'inventory',
+  'note', 'hint', 'hints', 'starCount', 'challenge',
+]);
+
+/** Valid keys for an InventoryItem record. */
+export const VALID_INVENTORY_ITEM_KEYS: ReadonlySet<string> = new Set(['shape', 'count']);
+
+/** Pipe shapes for which the `rotation` TileDef field is semantically meaningful
+ *  (i.e. the shape has an asymmetric connection pattern and rotation changes which
+ *  sides are open). Symmetric and connectionless shapes are excluded. */
+const ROTATION_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee,
+  PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee,
+  PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+]);
+
+/**
+ * Return the set of valid TileDef field names for the given tile definition,
+ * based on the tile's shape and (for Chamber tiles) chamber content type.
+ */
+export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
+  const valid = new Set<string>(['shape']);
+  const shape = tile.shape;
+
+  if (ROTATION_SHAPES.has(shape)) valid.add('rotation');
+
+  if (shape === PipeShape.Source) {
+    valid.add('capacity');
+    valid.add('connections');
+    valid.add('temperature');
+    valid.add('pressure');
+  } else if (shape === PipeShape.Sink) {
+    valid.add('connections');
+  } else if (shape === PipeShape.Chamber) {
+    valid.add('chamberContent');
+    valid.add('connections');
+    const cc = tile.chamberContent;
+    if (cc === 'tank') valid.add('capacity');
+    if (cc === 'dirt' || cc === 'ice' || cc === 'snow' || cc === 'sandstone' || cc === 'hot_plate') valid.add('cost');
+    if (cc === 'item') { valid.add('itemShape'); valid.add('itemCount'); }
+    if (cc === 'heater' || cc === 'ice' || cc === 'snow' || cc === 'sandstone' || cc === 'hot_plate') valid.add('temperature');
+    if (cc === 'pump') valid.add('pressure');
+    if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
+  } else if (shape === PipeShape.Cement) {
+    valid.add('dryingTime');
+  }
+
+  return valid;
+}
+
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
 /** All chamber content types. */

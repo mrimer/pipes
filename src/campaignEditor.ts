@@ -34,6 +34,11 @@ import {
   isChamberPalette,
   chamberPaletteContent,
   ungzipBlob,
+  VALID_CAMPAIGN_KEYS,
+  VALID_CHAPTER_KEYS,
+  VALID_LEVEL_KEYS,
+  VALID_INVENTORY_ITEM_KEYS,
+  getValidTileDefKeys,
 } from './campaignEditorTypes';
 import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './campaignEditorRenderer';
 import { renderMinimap } from './minimap';
@@ -528,6 +533,7 @@ export class CampaignEditor {
     );
     if (!isOfficial) {
       toolbar.appendChild(this._btn('📤 Export', '#16213e', '#4a90d9', () => this._exportCampaign(campaign)));
+      toolbar.appendChild(this._btn('🔍 Dev – Validate data', '#16213e', '#f0c040', () => this._showValidateDataModal(campaign)));
     }
     this._el.appendChild(toolbar);
 
@@ -2688,11 +2694,192 @@ export class CampaignEditor {
     this._showCampaignList();
   }
 
-  // ─── Import / Export ──────────────────────────────────────────────────────
+  // ─── Dev: Data validation ─────────────────────────────────────────────────
 
-  /** Export a campaign by triggering a JSON file download. */
+  /**
+   * Scan a campaign for unrecognized field names, optionally removing them
+   * in place (clean-up pass when dryRun is false).
+   *
+   * @param campaign  The campaign to scan (may be modified in place when dryRun is false).
+   * @param dryRun    When true, only tallies issues without modifying data.
+   * @returns Map from record-type label to a Map of { fieldName → occurrence count }.
+   */
+  private _scanCampaignData(
+    campaign: CampaignDef,
+    dryRun: boolean,
+  ): Map<string, Map<string, number>> {
+    const issues = new Map<string, Map<string, number>>();
+
+    const tally = (recordType: string, field: string): void => {
+      if (!issues.has(recordType)) issues.set(recordType, new Map());
+      const m = issues.get(recordType)!;
+      m.set(field, (m.get(field) ?? 0) + 1);
+    };
+
+    const checkKeys = (
+      obj: Record<string, unknown>,
+      validKeys: ReadonlySet<string>,
+      recordType: string,
+    ): void => {
+      for (const key of Object.keys(obj)) {
+        if (!validKeys.has(key)) {
+          tally(recordType, key);
+          if (!dryRun) delete obj[key];
+        }
+      }
+    };
+
+    // Campaign-level fields
+    checkKeys(campaign as unknown as Record<string, unknown>, VALID_CAMPAIGN_KEYS, 'Campaign');
+
+    for (const chapter of campaign.chapters) {
+      checkKeys(chapter as unknown as Record<string, unknown>, VALID_CHAPTER_KEYS, 'Chapter');
+
+      for (const level of chapter.levels) {
+        checkKeys(level as unknown as Record<string, unknown>, VALID_LEVEL_KEYS, 'Level');
+
+        for (const row of level.grid) {
+          for (const tile of row) {
+            if (!tile) continue;
+            checkKeys(
+              tile as unknown as Record<string, unknown>,
+              getValidTileDefKeys(tile),
+              'Tile',
+            );
+          }
+        }
+
+        for (const item of level.inventory) {
+          checkKeys(
+            item as unknown as Record<string, unknown>,
+            VALID_INVENTORY_ITEM_KEYS,
+            'InventoryItem',
+          );
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  /**
+   * Show a modal dialog that reports unrecognized field names found in the
+   * campaign data.  Offers a "Clean Up" button that removes those fields,
+   * saves the campaign, and updates its lastUpdated timestamp.
+   */
+  private _showValidateDataModal(campaign: CampaignDef): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+      'justify-content:center;z-index:300;';
+
+    const buildContent = (
+      issues: Map<string, Map<string, number>>,
+      cleanupDone: boolean,
+    ): void => {
+      overlay.innerHTML = '';
+
+      const dialog = document.createElement('div');
+      dialog.style.cssText =
+        'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
+        'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:520px;' +
+        'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
+      title.textContent = cleanupDone ? '🧹 Cleanup Complete' : '🔍 Dev – Validate Data';
+      dialog.appendChild(title);
+
+      let totalIssues = 0;
+      for (const m of issues.values()) for (const c of m.values()) totalIssues += c;
+
+      const body = document.createElement('div');
+      body.style.cssText = 'font-size:0.9rem;color:#eee;line-height:1.6;';
+
+      if (totalIssues === 0) {
+        const p = document.createElement('p');
+        p.style.margin = '0';
+        p.textContent = cleanupDone
+          ? 'Cleanup complete. No issues were found.'
+          : 'Data validation complete. No issues found.';
+        body.appendChild(p);
+      } else {
+        const intro = document.createElement('p');
+        intro.style.margin = '0 0 8px 0';
+        intro.textContent = cleanupDone
+          ? 'The following unrecognized fields were removed:'
+          : 'The following unrecognized fields were found:';
+        body.appendChild(intro);
+
+        const table = document.createElement('table');
+        table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.85rem;';
+
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        for (const [label, align] of [['Record Type', 'left'], ['Field Name', 'left'], ['Count', 'right']] as const) {
+          const th = document.createElement('th');
+          th.style.cssText =
+            `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid #2a3a5e;`;
+          th.textContent = label;
+          headerRow.appendChild(th);
+        }
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        for (const [recordType, fieldMap] of issues) {
+          for (const [fieldName, count] of fieldMap) {
+            const tr = document.createElement('tr');
+            for (const [txt, align] of [
+              [recordType, 'left'],
+              [fieldName, 'left'],
+              [String(count), 'right'],
+            ] as const) {
+              const td = document.createElement('td');
+              td.style.cssText =
+                `text-align:${align};padding:4px 8px;border-bottom:1px solid #1a2a3e;`;
+              td.textContent = txt;
+              tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+          }
+        }
+        table.appendChild(tbody);
+        body.appendChild(table);
+      }
+      dialog.appendChild(body);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+      if (totalIssues > 0 && !cleanupDone) {
+        const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {
+          const cleanIssues = this._scanCampaignData(campaign, false);
+          this._touchCampaign(campaign);
+          this._saveCampaigns();
+          buildContent(cleanIssues, true);
+        });
+        btnRow.appendChild(cleanupBtn);
+      }
+
+      btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
+      dialog.appendChild(btnRow);
+      overlay.appendChild(dialog);
+    };
+
+    buildContent(this._scanCampaignData(campaign, true), false);
+    this._el.appendChild(overlay);
+  }
+
+
+
+  /** Export a campaign by triggering a JSON file download.
+   *  Unrecognized fields are stripped from the output via a clean pass. */
   private _exportCampaign(campaign: CampaignDef): void {
-    const json = JSON.stringify(campaign, null, 2);
+    // Deep-clone and strip any unrecognized fields before serializing.
+    const clean = JSON.parse(JSON.stringify(campaign)) as CampaignDef;
+    this._scanCampaignData(clean, false);
+    const json = JSON.stringify(clean, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
