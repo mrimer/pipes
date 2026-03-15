@@ -29,6 +29,14 @@ export const CHAMBER_FILL_COLOR      = '#1c2e3a';
 export const CHAMBER_FILL_WATER_COLOR = '#2a3f4f';
 export const GRANITE_COLOR           = '#9ca3af';
 export const GRANITE_FILL_COLOR      = '#374151';
+/** Border/line color for Tree tiles (dark green outline). */
+export const TREE_COLOR              = '#2d6e1a';
+/** Leaf canopy fill color for Tree tiles (medium green). */
+export const TREE_LEAF_COLOR         = '#3a8c24';
+/** Secondary leaf cluster color for Tree tiles (lighter green). */
+export const TREE_LEAF_ALT_COLOR     = '#56b03a';
+/** Trunk color for Tree tiles (warm brown). */
+export const TREE_TRUNK_COLOR        = '#6b3a2a';
 /** Border/line color for Cement tiles (medium gray). */
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */

@@ -31,6 +31,9 @@ export enum PipeShape {
   Chamber = 'CHAMBER',
   /** Granite block – an impassable obstacle; cannot be moved and water cannot flow through it */
   Granite = 'GRANITE',
+  /** Tree – an impassable obstacle; cannot be moved and water cannot flow through it.
+   *  Rendered as a 2-D top-down view of a broad-leafed tree (fern / palm style). */
+  Tree = 'TREE',
   /** Cement – open background tile; any pipe may be placed here, but pipes placed on
    *  hardened cement (Drying Time = 0) may not be removed or rotated. */
   Cement = 'CEMENT',

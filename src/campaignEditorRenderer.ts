@@ -229,6 +229,8 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = CEMENT_FILL_COLOR;
   } else if (shape === PipeShape.Granite) {
     bgColor = '#4a5568';
+  } else if (shape === PipeShape.Tree) {
+    bgColor = '#1a4a0e';
   } else {
     bgColor = EDITOR_COLORS[shape] ?? '#4a90d9';
   }
@@ -342,6 +344,35 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     }
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'GRANITE', cx, cy);
+  } else if (shape === PipeShape.Tree) {
+    // Render tree as a green canopy with leaf lobes (top-down view)
+    ctx.fillStyle = '#1a4a0e';
+    ctx.fillRect(x, y, CELL, CELL);
+    const r = CELL * 0.38;
+    ctx.fillStyle = '#3a8c24';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#56b03a';
+    const lobeR = r * 0.48;
+    const lobeOff = r * 0.52;
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * lobeOff, cy + Math.sin(a) * lobeOff, lobeR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#6b3a2a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, CELL * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2d6e1a';
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'TREE', cx, cy);
   } else if (shape === PipeShape.GoldSpace) {
     ctx.fillStyle = '#b8860b';
     ctx.fillRect(x, y, CELL, CELL);

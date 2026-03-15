@@ -39,6 +39,14 @@ export const SPIN_PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.SpinTee,
 ]);
 
+/**
+ * Returns true for impassable obstacle tiles (Granite, Tree).
+ * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
+ */
+export function isObstacleTile(shape: PipeShape): boolean {
+  return shape === PipeShape.Granite || shape === PipeShape.Tree;
+}
+
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
   grid: Tile[][];
@@ -483,7 +491,7 @@ export class Board {
       tile.shape === PipeShape.Source        ||
       tile.shape === PipeShape.Sink          ||
       tile.shape === PipeShape.Chamber       ||
-      tile.shape === PipeShape.Granite       ||
+      isObstacleTile(tile.shape)             ||
       SPIN_PIPE_SHAPES.has(tile.shape)
     ) return false;
 
@@ -635,7 +643,7 @@ export class Board {
       tile.shape === PipeShape.Source  ||
       tile.shape === PipeShape.Sink    ||
       tile.shape === PipeShape.Chamber ||
-      tile.shape === PipeShape.Granite ||
+      isObstacleTile(tile.shape)       ||
       SPIN_PIPE_SHAPES.has(tile.shape)
     ) return false;
 
@@ -1201,7 +1209,7 @@ export class Board {
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }
-      // Source, Sink, Empty, Granite: no water impact (impact stays 0).
+      // Source, Sink, Empty, Granite, Tree: no water impact (impact stays 0).
 
       this._lockedWaterImpact.set(key, impact);
       this._connectionTurn.set(key, this._turnNumber);

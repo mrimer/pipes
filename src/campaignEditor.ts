@@ -51,7 +51,7 @@ import { renderMinimap } from './minimap';
 const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
-  PipeShape.GoldSpace, PipeShape.Cement, PipeShape.Granite,
+  PipeShape.GoldSpace, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
 ]);
 
@@ -1267,6 +1267,7 @@ export class CampaignEditor {
 
   private readonly _FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
     { palette: PipeShape.Granite,   label: '▪ Granite' },
+    { palette: PipeShape.Tree,      label: '🌿 Tree' },
     { palette: PipeShape.Cement,    label: '🪧 Cement' },
     { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
   ];
@@ -1432,7 +1433,7 @@ export class CampaignEditor {
 
     const p = this._editorPalette;
     const isChm = isChamberPalette(p);
-    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.GoldSpace ||
+    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.GoldSpace ||
         PIPE_SHAPES.has(p as PipeShape)) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
@@ -2136,7 +2137,7 @@ export class CampaignEditor {
    */
   private _rotateEditorPalette(clockwise: boolean): void {
     const p = this._editorPalette;
-    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Empty) return;
+    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Empty) return;
 
     if (
       p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)
@@ -2367,10 +2368,10 @@ export class CampaignEditor {
     }
 
     // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
-    // GoldSpace and Granite are connectionless background/block tiles with no rotation either.
+    // GoldSpace, Granite, and Tree are connectionless background/block tiles with no rotation either.
     const noRotation = new Set([
       PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
-      PipeShape.GoldSpace, PipeShape.Granite,
+      PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree,
     ]).has(effectiveShape);
     const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
 

@@ -957,6 +957,36 @@ describe('Granite tile', () => {
   });
 });
 
+// ─── New: Tree tile ───────────────────────────────────────────────────────────
+
+describe('Tree tile', () => {
+  it('has no connections and cannot carry water', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Tree,   0, true);  // blocks the path
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
+    expect(board.isSolved()).toBe(false);
+    expect(board.getFilledPositions().has('0,1')).toBe(false);
+  });
+
+  it('cannot be placed on by placeInventoryTile', () => {
+    const board = new Board(1, 3);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Tree,   0, true);
+    board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 5 }];
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+  });
+
+  it('cannot be reclaimed even when not marked fixed', () => {
+    const board = new Board(1, 3);
+    board.grid[0][1] = new Tile(PipeShape.Tree, 0, false);
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+  });
+});
+
 // ─── New: Gold pipe tiles and gold spaces ─────────────────────────────────────
 
 describe('Gold pipes and gold spaces', () => {
