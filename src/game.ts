@@ -1,6 +1,6 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
@@ -614,7 +614,7 @@ export class Game {
   }
 
   /** Start (or restart) the given level. */
-  startLevel(levelId: number): void {
+  startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[]): void {
     // Look up the level in the active campaign; no-op if no campaign is active.
     if (!this._activeCampaign) return;
     let level: LevelDef | undefined;
@@ -625,7 +625,7 @@ export class Game {
     if (!level) return;
 
     this.currentLevel = level;
-    this.board = new Board(level.rows, level.cols, level);
+    this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this.board.initHistory();
     this.gameState = GameState.Playing;
     this.focusPos = { ...this.board.source };
@@ -2121,11 +2121,14 @@ export class Game {
    * Retry the current level from scratch.
    * Preserves the undo history so the player can undo back to the state that
    * was in play before the restart (if there is any previous history).
+   * Persists the ambient decorations from the previous board so the grid decor
+   * does not change on restart.
    */
   retryLevel(): void {
     if (!this.currentLevel) return;
     const prevBoard = this.board;
-    this.startLevel(this.currentLevel.id);
+    const prevDecorations = prevBoard?.ambientDecorations;
+    this.startLevel(this.currentLevel.id, prevDecorations);
     // Graft the pre-restart history onto the new board so Undo can revert to
     // the state the player was in before restarting.
     // Guard against the edge case where startLevel() returned early (level not

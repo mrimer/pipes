@@ -21,7 +21,7 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 /** Border width (px) on each side of the editor canvas. */
 const EDITOR_CANVAS_BORDER = 3;
-import { Board, PIPE_SHAPES } from './board';
+import { Board, PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import {
   EditorPalette,
   ChamberPalette,
@@ -148,6 +148,24 @@ export class CampaignEditor {
         this._linkedTilePos = null;
         this._linkedTileDirty = false;
         this._renderEditorCanvas();
+      }
+      // Q = rotate counter-clockwise, W = rotate clockwise (mirrors in-game mouse wheel)
+      const tag = (e.target as HTMLElement | null)?.tagName ?? '';
+      const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (!e.ctrlKey && !e.altKey && !isInputFocused) {
+        if (e.key === 'q' || e.key === 'Q') {
+          e.preventDefault();
+          this._rotateEditorPalette(false);
+          if (this._linkedTilePos) this._applyParamsToLinkedTile();
+          this._refreshPaletteUI();
+          this._renderEditorCanvas();
+        } else if (e.key === 'w' || e.key === 'W') {
+          e.preventDefault();
+          this._rotateEditorPalette(true);
+          if (this._linkedTilePos) this._applyParamsToLinkedTile();
+          this._refreshPaletteUI();
+          this._renderEditorCanvas();
+        }
       }
     });
   }
@@ -1317,6 +1335,26 @@ export class CampaignEditor {
       panel.appendChild(makeItemBtn(item));
     }
 
+    // Floor collapsible section (Granite, Cement, Gold Space)
+    const floorToggle = document.createElement('button');
+    floorToggle.type = 'button';
+    floorToggle.textContent = (this._floorSectionExpanded ? '▾' : '▸') + ' Floor';
+    floorToggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      'border:1px solid #888;background:#1a1a1a;color:#ccc;font-weight:bold;margin-top:2px;';
+    floorToggle.addEventListener('click', () => {
+      this._floorSectionExpanded = !this._floorSectionExpanded;
+      const newPanel = this._buildPalette();
+      panel.replaceWith(newPanel);
+    });
+    panel.appendChild(floorToggle);
+
+    if (this._floorSectionExpanded) {
+      for (const item of this._FLOOR_PALETTE_ITEMS) {
+        panel.appendChild(makeItemBtn(item, true));
+      }
+    }
+
     // Pipes collapsible section (standard pipes + spinnable pipes)
     const pipesToggle = document.createElement('button');
     pipesToggle.type = 'button';
@@ -1353,26 +1391,6 @@ export class CampaignEditor {
 
     if (this._goldSectionExpanded) {
       for (const item of this._GOLD_PALETTE_ITEMS) {
-        panel.appendChild(makeItemBtn(item, true));
-      }
-    }
-
-    // Floor collapsible section (Granite, Cement, Gold Space)
-    const floorToggle = document.createElement('button');
-    floorToggle.type = 'button';
-    floorToggle.textContent = (this._floorSectionExpanded ? '▾' : '▸') + ' Floor';
-    floorToggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      'border:1px solid #888;background:#1a1a1a;color:#ccc;font-weight:bold;margin-top:2px;';
-    floorToggle.addEventListener('click', () => {
-      this._floorSectionExpanded = !this._floorSectionExpanded;
-      const newPanel = this._buildPalette();
-      panel.replaceWith(newPanel);
-    });
-    panel.appendChild(floorToggle);
-
-    if (this._floorSectionExpanded) {
-      for (const item of this._FLOOR_PALETTE_ITEMS) {
         panel.appendChild(makeItemBtn(item, true));
       }
     }
@@ -1436,8 +1454,10 @@ export class CampaignEditor {
       return panel;
     }
 
-    // Rotation (for pipe tiles only; Source, Sink, and Chamber use explicit connections instead)
-    const noRotation = p === PipeShape.Source || p === PipeShape.Sink || isChm;
+    // Rotation (for pipe tiles only; Source, Sink, Chamber, and standard/spin/gold pipes use
+    // other rotation commands and don't need explicit rotation buttons)
+    const isPipe = PIPE_SHAPES.has(p as PipeShape) || SPIN_PIPE_SHAPES.has(p as PipeShape);
+    const noRotation = p === PipeShape.Source || p === PipeShape.Sink || isChm || isPipe;
     if (!noRotation) {
       const rotWrap = document.createElement('div');
       rotWrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
@@ -2145,9 +2165,11 @@ export class CampaignEditor {
 
   // ─── Mouse wheel: rotate tile or connections ──────────────────────────────
 
-  private _onEditorCanvasWheel(e: WheelEvent): void {
-    e.preventDefault();
-    const clockwise = e.deltaY > 0;
+  /**
+   * Rotate the currently selected palette item clockwise or counter-clockwise.
+   * Updates pending-placement params and, if a tile is linked, applies the change.
+   */
+  private _rotateEditorPalette(clockwise: boolean): void {
     const p = this._editorPalette;
     if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Empty) return;
 
@@ -2170,6 +2192,12 @@ export class CampaignEditor {
         this._editorParams.rotation = ((cur + 270) % 360) as Rotation;
       }
     }
+  }
+
+  private _onEditorCanvasWheel(e: WheelEvent): void {
+    e.preventDefault();
+    const clockwise = e.deltaY > 0;
+    this._rotateEditorPalette(clockwise);
 
     // Only write the rotation/connection change back to the linked tile when the
     // cursor is hovering directly over it.  When the cursor is elsewhere the
