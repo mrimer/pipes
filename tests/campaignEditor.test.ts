@@ -1310,6 +1310,29 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     expect(state._editRows).toBe(5);
     expect(state._editCols).toBe(1);
   });
+
+  it('undo after resize restores the pre-resize grid dimensions', () => {
+    const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
+      _editRows: number;
+      _editCols: number;
+      _buildGridSizePanel(): HTMLElement;
+      _editorUndo(): void;
+    };
+    const panel = state._buildGridSizePanel();
+    const { rowsInp, colsInp, resizeBtn } = getResizeControls(panel);
+
+    // Resize from 4×4 to 6×8.
+    rowsInp.value = '6';
+    colsInp.value = '8';
+    resizeBtn.click();
+    expect(state._editRows).toBe(6);
+    expect(state._editCols).toBe(8);
+
+    // Undo should restore to the original 4×4.
+    state._editorUndo();
+    expect(state._editRows).toBe(4);
+    expect(state._editCols).toBe(4);
+  });
 });
 
 // ─── CampaignEditor – paint-drag undo snapshot timing ────────────────────────
