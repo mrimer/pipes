@@ -211,8 +211,11 @@ export class Board {
    * @param rows - Number of rows.
    * @param cols - Number of columns.
    * @param level - Optional level definition.  If omitted a random grid is built.
+   * @param existingDecorations - Optional pre-built decorations to reuse instead of
+   *   generating new ones.  Pass the previous board's {@link ambientDecorations} when
+   *   restarting a level to keep the same decor visible.
    */
-  constructor(rows: number, cols: number, level?: LevelDef) {
+  constructor(rows: number, cols: number, level?: LevelDef, existingDecorations?: readonly AmbientDecoration[]) {
     this.rows = rows;
     this.cols = cols;
     this.source = { row: 0, col: 0 };
@@ -225,7 +228,7 @@ export class Board {
     if (level) {
       this.grid = this._emptyGrid();
       this._initFromLevel(level);
-      this.ambientDecorations = this._generateAmbientDecorations();
+      this.ambientDecorations = existingDecorations ?? this._generateAmbientDecorations();
     } else {
       this.grid = this._buildGrid();
       this.ambientDecorations = [];
