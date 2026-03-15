@@ -153,15 +153,10 @@ export class CampaignEditor {
       const tag = (e.target as HTMLElement | null)?.tagName ?? '';
       const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       if (!e.ctrlKey && !e.altKey && !isInputFocused) {
-        if (e.key === 'q' || e.key === 'Q') {
+        const key = e.key.toLowerCase();
+        if (key === 'q' || key === 'w') {
           e.preventDefault();
-          this._rotateEditorPalette(false);
-          if (this._linkedTilePos) this._applyParamsToLinkedTile();
-          this._refreshPaletteUI();
-          this._renderEditorCanvas();
-        } else if (e.key === 'w' || e.key === 'W') {
-          e.preventDefault();
-          this._rotateEditorPalette(true);
+          this._rotateEditorPalette(key === 'w');
           if (this._linkedTilePos) this._applyParamsToLinkedTile();
           this._refreshPaletteUI();
           this._renderEditorCanvas();
