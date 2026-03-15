@@ -21,7 +21,7 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 /** Border width (px) on each side of the editor canvas. */
 const EDITOR_CANVAS_BORDER = 3;
-import { Board, PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
+import { Board, PIPE_SHAPES } from './board';
 import {
   EditorPalette,
   ChamberPalette,
@@ -1452,38 +1452,6 @@ export class CampaignEditor {
         this._applyParamsToLinkedTile();
       }, 'number', '90px'));
       return panel;
-    }
-
-    // Rotation (for pipe tiles only; Source, Sink, Chamber, and standard/spin/gold pipes use
-    // other rotation commands and don't need explicit rotation buttons)
-    const isPipe = PIPE_SHAPES.has(p as PipeShape) || SPIN_PIPE_SHAPES.has(p as PipeShape);
-    const noRotation = p === PipeShape.Source || p === PipeShape.Sink || isChm || isPipe;
-    if (!noRotation) {
-      const rotWrap = document.createElement('div');
-      rotWrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;align-items:center;';
-      const rotLbl = document.createElement('span');
-      rotLbl.style.cssText = 'font-size:0.78rem;color:#aaa;width:56px;';
-      rotLbl.textContent = 'Rotation:';
-      rotWrap.appendChild(rotLbl);
-      for (const rot of [0, 90, 180, 270] as Rotation[]) {
-        const rb = document.createElement('button');
-        rb.type = 'button';
-        rb.textContent = `${rot}°`;
-        rb.style.cssText =
-          'padding:3px 7px;font-size:0.78rem;border-radius:3px;cursor:pointer;' +
-          'border:1px solid ' + (this._editorParams.rotation === rot ? '#f0c040' : '#555') + ';' +
-          'background:' + (this._editorParams.rotation === rot ? '#2a3a1a' : '#0d1a30') + ';' +
-          'color:' + (this._editorParams.rotation === rot ? '#f0c040' : '#aaa') + ';';
-        rb.addEventListener('click', () => {
-          this._editorParams.rotation = rot;
-          this._applyParamsToLinkedTile();
-          const newPanel = this._buildParamPanel();
-          newPanel.id = 'editor-param-panel';
-          panel.replaceWith(newPanel);
-        });
-        rotWrap.appendChild(rb);
-      }
-      panel.appendChild(rotWrap);
     }
 
     // Source/Chamber(tank): capacity
