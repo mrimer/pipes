@@ -980,10 +980,10 @@ export class Game {
   }
 
   /** Add a sparkle CSS animation to the .modal-box inside the given modal overlay. */
-  private _triggerModalSparkle(modalEl: HTMLElement, colorClass: 'sparkle-gold' | 'sparkle-red' | 'sparkle-blue'): void {
+  private _triggerModalSparkle(modalEl: HTMLElement, colorClass: 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue'): void {
     const box = modalEl.querySelector<HTMLElement>('.modal-box');
     if (!box) return;
-    box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-blue');
+    box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-yellow', 'sparkle-blue');
     void box.offsetWidth; // force reflow so removing+re-adding restarts the animation
     box.classList.add(colorClass);
   }
@@ -991,7 +991,7 @@ export class Game {
   /** Remove sparkle CSS animation classes from the .modal-box inside the given modal overlay. */
   private _clearModalSparkle(modalEl: HTMLElement): void {
     const box = modalEl.querySelector<HTMLElement>('.modal-box');
-    if (box) box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-blue');
+    if (box) box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-yellow', 'sparkle-blue');
   }
 
   /** Show the new-chapter intro modal for the given chapter (by 0-based index). */
@@ -1010,7 +1010,7 @@ export class Game {
     this._challengeMsgEl.style.display    = canSkip ? '' : 'none';
     this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
     this._challengeModalEl.style.display = 'flex';
-    this._triggerModalSparkle(this._challengeModalEl, 'sparkle-red');
+    this._triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
   }
 
   private _checkWinLose(): void {

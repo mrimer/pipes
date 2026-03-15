@@ -535,12 +535,8 @@ export class Board {
       this.inventory.push({ shape: tile.shape, count: 1 });
     }
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
-    // Decrement cement setting time after successful reclaim
-    this._applyCementDecrement(pos);
     return true;
   }
-
-  // ─── Inventory placement ───────────────────────────────────────────────────
 
   /**
    * Place a pipe from the inventory onto an empty cell.
@@ -552,6 +548,7 @@ export class Board {
   placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): boolean {
     this.lastError = null;
     this.lastErrorTilePositions = null;
+    this.lastCementDecrement = null;
     const tile = this.getTile(pos);
     if (!tile || tile.shape !== PipeShape.Empty) return false;
 
@@ -598,6 +595,9 @@ export class Board {
       this.lastError = constraintError;
       return false;
     }
+
+    // Decrement cement setting time after successful placement
+    this._applyCementDecrement(pos);
 
     return true;
   }
