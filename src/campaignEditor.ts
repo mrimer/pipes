@@ -21,7 +21,7 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 /** Border width (px) on each side of the editor canvas. */
 const EDITOR_CANVAS_BORDER = 3;
-import { Board, PIPE_SHAPES } from './board';
+import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
 import {
   EditorPalette,
   ChamberPalette,
@@ -1432,7 +1432,11 @@ export class CampaignEditor {
 
     const p = this._editorPalette;
     const isChm = isChamberPalette(p);
-    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.GoldSpace) {
+    const paletteAsShape = p as PipeShape;
+    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.GoldSpace ||
+        GOLD_PIPE_SHAPES.has(paletteAsShape) || SPIN_PIPE_SHAPES.has(paletteAsShape) ||
+        p === PipeShape.Straight || p === PipeShape.Elbow ||
+        p === PipeShape.Tee || p === PipeShape.Cross) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
       none.textContent = 'No parameters';
