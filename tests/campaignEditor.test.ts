@@ -2841,3 +2841,192 @@ describe('CampaignEditor palette – Blocks section label', () => {
     expect(chamberBtn).toBeUndefined();
   });
 });
+
+// ─── CampaignEditor – save then undo/redo triggers unsaved-changes dialog ─────
+
+describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type SaveUndoState = {
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _editRows: number;
+    _editCols: number;
+    _editGrid: (import('../src/types').TileDef | null)[][];
+    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistoryIdx: number;
+    _editorUnsavedChanges: boolean;
+    _editorSavedHistoryIdx: number;
+    _campaigns: CampaignDef[];
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    _editorUndo(): void;
+    _editorRedo(): void;
+    _saveLevel(campaign: CampaignDef, chapterIdx: number, levelIdx: number): void;
+    _onEditorMouseDown(e: MouseEvent): void;
+    _onEditorMouseUp(e: MouseEvent): void;
+    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
+  };
+
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99920,
+      name: 'Save Undo Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  function makeSaveUndoEditor(level: LevelDef): SaveUndoState {
+    const camp: CampaignDef = {
+      id: 'cmp_save_undo_test',
+      name: 'Save Undo Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as SaveUndoState;
+    state._activeCampaignId = 'cmp_save_undo_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function leftMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, bubbles: true });
+  }
+
+  it('_editorUnsavedChanges is false after opening the editor (no changes)', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    expect(state._editorUnsavedChanges).toBe(false);
+  });
+
+  it('_editorUnsavedChanges is true after making a change', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    expect(state._editorUnsavedChanges).toBe(true);
+  });
+
+  it('_editorUnsavedChanges is false after saving', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    // Make a change then save.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._saveLevel(campaign, 0, 0);
+    expect(state._editorUnsavedChanges).toBe(false);
+  });
+
+  it('_editorUnsavedChanges is true after save then undo', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    // Make a change.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    // Save.
+    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._saveLevel(campaign, 0, 0);
+    expect(state._editorUnsavedChanges).toBe(false);
+    // Undo: now differs from saved state.
+    state._editorUndo();
+    expect(state._editorUnsavedChanges).toBe(true);
+  });
+
+  it('_editorUnsavedChanges is true after save then redo', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    // Make two changes.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
+    // Undo once to move away from the latest change.
+    state._editorUndo();
+    // Save at this intermediate state.
+    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._saveLevel(campaign, 0, 0);
+    expect(state._editorUnsavedChanges).toBe(false);
+    // Redo: now differs from saved state.
+    state._editorRedo();
+    expect(state._editorUnsavedChanges).toBe(true);
+  });
+
+  it('_editorUnsavedChanges returns to false after redo brings state back to saved index', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    // Make a change.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    // Save.
+    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._saveLevel(campaign, 0, 0);
+    const savedIdx = state._editorSavedHistoryIdx;
+    // Undo (moves away from saved).
+    state._editorUndo();
+    expect(state._editorUnsavedChanges).toBe(true);
+    // Redo (comes back to saved state).
+    state._editorRedo();
+    expect(state._editorHistoryIdx).toBe(savedIdx);
+    expect(state._editorUnsavedChanges).toBe(false);
+  });
+
+  it('back button shows unsaved-changes modal after save then undo', () => {
+    const state = makeSaveUndoEditor(makeLevel(4, 4));
+    // Make a change then save.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._saveLevel(campaign, 0, 0);
+    // Undo: differs from saved state.
+    state._editorUndo();
+    // Click the back button – the unsaved-changes modal should appear.
+    const backBtn = Array.from(document.querySelectorAll('button'))
+      .find(b => b.textContent?.includes('← Back'));
+    expect(backBtn).toBeDefined();
+    backBtn!.click();
+    // The unsaved-changes modal must be visible – it contains Save and Discard buttons.
+    const allBtns = Array.from(document.querySelectorAll('button'));
+    const discardBtn = allBtns.find(b => b.textContent?.toLowerCase().includes('discard'));
+    expect(discardBtn).toBeDefined();
+  });
+});

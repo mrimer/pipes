@@ -114,6 +114,8 @@ export class CampaignEditor {
   private _linkedTileDirty = false;
   /** True when the level editor has unsaved changes (any snapshot recorded after initial open). */
   private _editorUnsavedChanges = false;
+  /** The history index at which the level was last saved (or 0 if never saved in this session). */
+  private _editorSavedHistoryIdx = 0;
   /** The outermost flex container of the level editor layout, used to measure available canvas space. */
   private _editorMainLayout: HTMLElement | null = null;
 
@@ -902,6 +904,7 @@ export class CampaignEditor {
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
     this._editorUnsavedChanges = false;
+    this._editorSavedHistoryIdx = 0;
     this._recordEditorSnapshot();
     this._showLevelEditor(readOnly);
   }
@@ -918,7 +921,7 @@ export class CampaignEditor {
     const toolbar = this._buildToolbar(
       readOnly ? `👁 View Level: ${this._editLevelName}` : `✏️ Level Editor`,
       () => {
-        if (!readOnly && this._editorUnsavedChanges && this._editorHistoryIdx > 0) {
+        if (!readOnly && this._editorUnsavedChanges) {
           this._showUnsavedModal(
             () => {
               this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
@@ -2437,6 +2440,7 @@ export class CampaignEditor {
     if (this._editorHistoryIdx <= 0) return;
     this._editorHistoryIdx--;
     this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
+    this._editorUnsavedChanges = this._editorHistoryIdx !== this._editorSavedHistoryIdx;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
     this._updateEditorUndoRedoButtons();
@@ -2447,6 +2451,7 @@ export class CampaignEditor {
     if (this._editorHistoryIdx >= this._editorHistory.length - 1) return;
     this._editorHistoryIdx++;
     this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
+    this._editorUnsavedChanges = this._editorHistoryIdx !== this._editorSavedHistoryIdx;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
     this._updateEditorUndoRedoButtons();
@@ -2681,6 +2686,7 @@ export class CampaignEditor {
     this._touchCampaign(campaign);
     this._saveCampaigns();
     this._editorUnsavedChanges = false;
+    this._editorSavedHistoryIdx = this._editorHistoryIdx;
 
     // Visual confirmation on the Save button
     const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
