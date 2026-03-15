@@ -357,17 +357,17 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
     }
     ctx.restore();
   }
-  // Draw quantity number centered, white with a 1px black outline
+  // Draw quantity number in the inner top-left corner, white with a 1px black outline
   if (itemCount > 1) {
     const countLabel = String(itemCount);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `bold ${_s(30)}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.font = `bold ${_s(20)}px Arial`;
     ctx.strokeStyle = 'black';
     ctx.lineWidth = _s(1);
-    ctx.strokeText(countLabel, 0, 0);
+    ctx.strokeText(countLabel, -bw + _s(3), -bh + _s(2));
     ctx.fillStyle = 'white';
-    ctx.fillText(countLabel, 0, 0);
+    ctx.fillText(countLabel, -bw + _s(3), -bh + _s(2));
   }
 }
 
@@ -1325,12 +1325,8 @@ export function renderBoard(
       const dryingTime = board.cementData.get(`${r},${c}`) as number;
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      // A tile is "hardened" (shows 'X') only when dryingTime is 0 AND a pipe
-      // has actually been placed on it.  Cement cells at T=0 without a pipe
-      // still display the numeric "0" to avoid confusing the player.
-      const tileShape = board.grid[r][c].shape;
-      const hasPipe = PIPE_SHAPES.has(tileShape) || GOLD_PIPE_SHAPES.has(tileShape) || SPIN_PIPE_SHAPES.has(tileShape);
-      const isHardened = dryingTime === 0 && hasPipe;
+      // A tile is "hardened" (shows 'X') whenever dryingTime is 0.
+      const isHardened = dryingTime === 0;
       _drawCementLabel(ctx, x, y, dryingTime, isHardened);
     }
   }
