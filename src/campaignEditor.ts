@@ -897,10 +897,6 @@ export class CampaignEditor {
     this._editorHistory = [];
     this._editorHistoryIdx = -1;
     this._editorHover = null;
-    this._goldSectionExpanded = false;
-    this._chamberSectionExpanded = false;
-    this._pipesSectionExpanded = false;
-    this._floorSectionExpanded = false;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
     this._editorUnsavedChanges = false;
