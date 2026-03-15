@@ -154,6 +154,7 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.Tee]:          '#4a90d9',
   [PipeShape.Cross]:        '#4a90d9',
   [PipeShape.Granite]:      '#636e72',
+  [PipeShape.Tree]:         '#2d6e1a',
   [PipeShape.Cement]:       '#8090a0',
   [PipeShape.GoldSpace]:    '#b8860b',
   [PipeShape.GoldStraight]: '#f39c12',

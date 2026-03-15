@@ -2419,6 +2419,14 @@ describe('getValidTileDefKeys', () => {
     expect(valid.has('dryingTime')).toBe(false);
   });
 
+  it('Tree tile: only shape is valid', () => {
+    const tile: TileDef = { shape: PipeShape.Tree };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(false);
+    expect(valid.has('dryingTime')).toBe(false);
+  });
+
   it('Cement tile: shape + dryingTime valid', () => {
     const tile: TileDef = { shape: PipeShape.Cement };
     const valid = getValidTileDefKeys(tile);
@@ -2592,6 +2600,47 @@ describe('_scanCampaignData – dry run', () => {
     expect((tile as unknown as Record<string, unknown>)['rotation']).toBe(0);
   });
 
+  it('detects invalid field on Tree tile', () => {
+    const editor = makeEditor();
+    const tile: TileDef = { shape: PipeShape.Tree };
+    (tile as unknown as Record<string, unknown>)['rotation'] = 0;
+    const campaign = makeCampaign({
+      chapters: [{
+        id: 1, name: 'Ch1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 1,
+          grid: [[tile]],
+          inventory: [],
+        }],
+      }],
+    });
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.get('Tile')?.get('rotation')).toBe(1);
+    // dry run: field must still be present
+    expect((tile as unknown as Record<string, unknown>)['rotation']).toBe(0);
+  });
+
+  it('Tree tile with only shape field has no validation issues', () => {
+    const editor = makeEditor();
+    const tile: TileDef = { shape: PipeShape.Tree };
+    const campaign = makeCampaign({
+      chapters: [{
+        id: 1, name: 'Ch1',
+        levels: [{
+          id: 1, name: 'L1', rows: 1, cols: 1,
+          grid: [[tile]],
+          inventory: [],
+        }],
+      }],
+    });
+    const issues = (editor as unknown as {
+      _scanCampaignData(c: CampaignDef, d: boolean): Map<string, Map<string, number>>;
+    })._scanCampaignData(campaign, true);
+    expect(issues.size).toBe(0);
+  });
+
   it('removes invalid fields when dryRun is false', () => {
     const editor = makeEditor();
     const campaign = makeCampaign();
@@ -2677,6 +2726,12 @@ describe('CampaignEditor – _buildTileDef omits rotation for non-rotatable shap
     expect(def.shape).toBe(PipeShape.Granite);
     expect('rotation' in def).toBe(false);
   });
+
+  it('Tree _buildTileDef does not include rotation field', () => {
+    const def = editorBuildTileDef(PipeShape.Tree);
+    expect(def.shape).toBe(PipeShape.Tree);
+    expect('rotation' in def).toBe(false);
+  });
 });
 
 // ─── _buildCurrentLevelDef: strips unsupported fields from tiles ──────────────
@@ -2735,6 +2790,16 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
 
   it('strips rotation from Granite tile when saving', () => {
     const tile: TileDef = { shape: PipeShape.Granite };
+    (tile as unknown as Record<string, unknown>)['rotation'] = 90;
+    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
+    const def = buildCurrentLevelDef();
+    const savedTile = def.grid[0][0];
+    expect(savedTile).not.toBeNull();
+    expect('rotation' in (savedTile as object)).toBe(false);
+  });
+
+  it('strips rotation from Tree tile when saving', () => {
+    const tile: TileDef = { shape: PipeShape.Tree };
     (tile as unknown as Record<string, unknown>)['rotation'] = 90;
     const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
     const def = buildCurrentLevelDef();

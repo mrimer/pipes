@@ -30,6 +30,7 @@ import {
   HOT_PLATE_COLOR,
   SANDSTONE_COLOR,
   STAR_COLOR,
+  TREE_COLOR,
 } from './colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
@@ -74,6 +75,8 @@ function tileColor(tile: TileDef | null): string {
       }
     case PipeShape.Granite:
       return GRANITE_FILL_COLOR;
+    case PipeShape.Tree:
+      return TREE_COLOR;
     case PipeShape.Cement:
       return CEMENT_FILL_COLOR;
     case PipeShape.GoldSpace:

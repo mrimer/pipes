@@ -6,6 +6,7 @@ import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
   GRANITE_FILL_COLOR, GRANITE_COLOR,
+  TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
   CEMENT_FILL_COLOR, CEMENT_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
@@ -49,6 +50,22 @@ function graniteSwatch(): string {
     `<line x1="4" y1="9" x2="20" y2="11" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
     `<line x1="5" y1="15" x2="21" y2="17" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
     `<line x1="4" y1="21" x2="20" y2="23" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
+    `</svg>`
+  );
+}
+
+/** Return a small tree icon (top-down canopy view) as an inline HTML string. */
+function treeSwatch(): string {
+  return (
+    `<svg width="28" height="28" viewBox="0 0 28 28">` +
+    `<rect x="0" y="0" width="28" height="28" fill="#1a4a0e"/>` +
+    `<circle cx="14" cy="14" r="10" fill="${TREE_LEAF_COLOR}"/>` +
+    `<circle cx="14" cy="5"  r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
+    `<circle cx="23" cy="14" r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
+    `<circle cx="14" cy="23" r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
+    `<circle cx="5"  cy="14" r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
+    `<circle cx="14" cy="14" r="2" fill="${TREE_TRUNK_COLOR}"/>` +
+    `<circle cx="14" cy="14" r="10" fill="none" stroke="${TREE_COLOR}" stroke-width="1.5"/>` +
     `</svg>`
   );
 }
@@ -148,6 +165,11 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: graniteSwatch(),
     name: 'Granite Block',
+    description: 'Impassable obstacle — water cannot flow through and it cannot be moved.',
+  },
+  {
+    iconHtml: treeSwatch(),
+    name: 'Tree',
     description: 'Impassable obstacle — water cannot flow through and it cannot be moved.',
   },
   {

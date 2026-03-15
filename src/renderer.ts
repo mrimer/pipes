@@ -18,6 +18,7 @@ import {
   CONTAINER_COLOR, CONTAINER_WATER_COLOR,
   CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
+  TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
   CEMENT_COLOR, CEMENT_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
@@ -242,6 +243,47 @@ function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
   ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
   ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
+}
+
+/** Draw a 2-D top-down tree (fern/palm style) centred at the origin. */
+function _drawTree(ctx: CanvasRenderingContext2D, half: number): void {
+  const r = half * 0.75; // outer canopy radius – occupies most of the tile
+  // Main canopy – large dark-green filled circle
+  ctx.fillStyle = TREE_LEAF_COLOR;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  // Leaf clusters – four overlapping lighter-green lobes around the edge
+  const lobeR = r * 0.48;
+  const lobeOff = r * 0.52;
+  ctx.fillStyle = TREE_LEAF_ALT_COLOR;
+  for (let i = 0; i < 4; i++) {
+    const angle = (i * Math.PI) / 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * lobeOff, Math.sin(angle) * lobeOff, lobeR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Diagonal leaf clusters (45°) – smaller, medium green
+  const dLobeR = lobeR * 0.72;
+  const dLobeOff = lobeOff * 0.88;
+  ctx.fillStyle = TREE_LEAF_COLOR;
+  for (let i = 0; i < 4; i++) {
+    const angle = Math.PI / 4 + (i * Math.PI) / 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * dLobeOff, Math.sin(angle) * dLobeOff, dLobeR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Small brown trunk circle in the centre
+  ctx.fillStyle = TREE_TRUNK_COLOR;
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.14, 0, Math.PI * 2);
+  ctx.fill();
+  // Dark green outline around the whole canopy
+  ctx.strokeStyle = TREE_COLOR;
+  ctx.lineWidth = _s(2);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 /**
@@ -854,6 +896,8 @@ export function drawTile(
     }
   } else if (shape === PipeShape.Granite) {
     color = GRANITE_COLOR;
+  } else if (shape === PipeShape.Tree) {
+    color = TREE_COLOR;
   } else if (GOLD_PIPE_SHAPES.has(shape)) {
     color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
   } else if (SPIN_PIPE_SHAPES.has(shape)) {
@@ -921,6 +965,12 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     _drawGranite(ctx, half);
+  } else if (shape === PipeShape.Tree) {
+    // Tree – impassable obstacle rendered as a top-down broad-leafed tree
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    _drawTree(ctx, half);
   }
 
   ctx.restore();
@@ -971,6 +1021,7 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Source:       return 'Source';
     case PipeShape.Sink:         return 'Sink';
     case PipeShape.Granite:      return 'Granite';
+    case PipeShape.Tree:         return 'Tree';
     case PipeShape.Cement:       return 'Cement';
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
