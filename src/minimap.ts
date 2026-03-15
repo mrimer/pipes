@@ -6,7 +6,8 @@
  * is surrounded by a 2px white border.
  */
 
-import { LevelDef, PipeShape, TileDef } from './types';
+import { Direction, LevelDef, PipeShape, Rotation, TileDef } from './types';
+import { getConnections } from './tile';
 import {
   EMPTY_COLOR,
   PIPE_COLOR,
@@ -20,12 +21,15 @@ import {
   SNOW_COLOR,
   CHAMBER_COLOR,
   GRANITE_FILL_COLOR,
+  CEMENT_FILL_COLOR,
   GOLD_SPACE_BASE_COLOR,
   GOLD_PIPE_COLOR,
   CONTAINER_COLOR,
   SPIN_PIPE_COLOR,
   BG_COLOR,
   HOT_PLATE_COLOR,
+  SANDSTONE_COLOR,
+  STAR_COLOR,
 } from './colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
@@ -56,18 +60,22 @@ function tileColor(tile: TileDef | null): string {
       return SINK_COLOR;
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
-        case 'tank':     return TANK_COLOR;
-        case 'dirt':     return DIRT_COLOR;
-        case 'item':     return CONTAINER_COLOR;
-        case 'heater':   return HEATER_COLOR;
-        case 'ice':      return ICE_COLOR;
-        case 'pump':     return PUMP_COLOR;
-        case 'snow':     return SNOW_COLOR;
+        case 'tank':      return TANK_COLOR;
+        case 'dirt':      return DIRT_COLOR;
+        case 'item':      return CONTAINER_COLOR;
+        case 'heater':    return HEATER_COLOR;
+        case 'ice':       return ICE_COLOR;
+        case 'pump':      return PUMP_COLOR;
+        case 'snow':      return SNOW_COLOR;
         case 'hot_plate': return HOT_PLATE_COLOR;
-        default:         return CHAMBER_COLOR;
+        case 'sandstone': return SANDSTONE_COLOR;
+        case 'star':      return STAR_COLOR;
+        default:          return CHAMBER_COLOR;
       }
     case PipeShape.Granite:
       return GRANITE_FILL_COLOR;
+    case PipeShape.Cement:
+      return CEMENT_FILL_COLOR;
     case PipeShape.GoldSpace:
       return GOLD_SPACE_BASE_COLOR;
     case PipeShape.GoldStraight:
@@ -77,6 +85,67 @@ function tileColor(tile: TileDef | null): string {
       return GOLD_PIPE_COLOR;
     default:
       return BG_COLOR;
+  }
+}
+
+/** Minimum tile size (px) needed to draw pipe connection lines instead of a flat fill. */
+const MIN_PX_FOR_LINES = 3;
+
+/** Pipe shapes that carry directional connections and should be drawn as line art. */
+const PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
+  PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+  PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+]);
+
+/**
+ * Returns the background fill and line stroke colors for a pipe tile that will
+ * be drawn as connection-line art on the minimap.
+ */
+function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
+  if (shape === PipeShape.GoldStraight || shape === PipeShape.GoldElbow ||
+      shape === PipeShape.GoldTee || shape === PipeShape.GoldCross) {
+    return { bg: GOLD_SPACE_BASE_COLOR, line: GOLD_PIPE_COLOR };
+  }
+  if (shape === PipeShape.SpinStraight || shape === PipeShape.SpinElbow ||
+      shape === PipeShape.SpinTee) {
+    return { bg: EMPTY_COLOR, line: SPIN_PIPE_COLOR };
+  }
+  return { bg: EMPTY_COLOR, line: PIPE_COLOR };
+}
+
+/**
+ * Draws a tiny pipe connection-line diagram for one tile.
+ * Uses 1-px-wide lines from the tile centre to each connected edge.
+ * Only meaningful when px >= MIN_PX_FOR_LINES.
+ */
+function drawPipeLines(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  px: number,
+  shape: PipeShape,
+  rotation: Rotation,
+): void {
+  const { bg, line } = pipeLineColors(shape);
+  const halfPx = Math.floor(px / 2); // offset from tile edge to centre pixel
+  const conns = getConnections(shape, rotation);
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(x, y, px, px);
+
+  ctx.fillStyle = line;
+  if (conns.has(Direction.North)) {
+    ctx.fillRect(x + halfPx, y, 1, halfPx + 1);           // top edge → centre
+  }
+  if (conns.has(Direction.South)) {
+    ctx.fillRect(x + halfPx, y + halfPx, 1, px - halfPx); // centre → bottom edge
+  }
+  if (conns.has(Direction.East)) {
+    ctx.fillRect(x + halfPx, y + halfPx, px - halfPx, 1); // centre → right edge
+  }
+  if (conns.has(Direction.West)) {
+    ctx.fillRect(x, y + halfPx, halfPx + 1, 1);           // left edge → centre
   }
 }
 
@@ -110,12 +179,18 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // Draw each tile as a colored rectangle
+  // Draw each tile as a coloured rectangle; pipe tiles get connection-line art when large enough.
   for (let r = 0; r < level.rows; r++) {
     for (let c = 0; c < level.cols; c++) {
       const tile = (level.grid[r]?.[c]) ?? null;
-      ctx.fillStyle = tileColor(tile);
-      ctx.fillRect(BORDER_PX + c * px, BORDER_PX + r * px, px, px);
+      const tx = BORDER_PX + c * px;
+      const ty = BORDER_PX + r * px;
+      if (tile && px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape)) {
+        drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0) as Rotation);
+      } else {
+        ctx.fillStyle = tileColor(tile);
+        ctx.fillRect(tx, ty, px, px);
+      }
     }
   }
 
