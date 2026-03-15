@@ -133,22 +133,27 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
 }
 
 /**
- * Draw a white CW curved arrow with a black outline, centred at the canvas
- * origin.  Used to indicate that a spinnable pipe can be rotated clockwise.
+ * Draw a curved rotation arrow with a black outline, centred at the canvas
+ * origin.  When `ccw` is false (default) the arrow points clockwise; when true
+ * it points counter-clockwise.  Used to indicate the direction a spinnable
+ * pipe will be rotated on click.
  * The caller is responsible for translating the context to the desired centre.
  */
-export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
+export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void {
   const r = _s(11);
-  // Arc spans ~270° clockwise: start at 150°, end at 60° (going CW = increasing angle).
-  const startAngle = (150 * Math.PI) / 180;
-  const endAngle   = startAngle + (270 * Math.PI) / 180;
-  // Tip of the arrowhead: the point on the circle at endAngle (mod 2π = 60°).
-  const tipAngle = endAngle % (Math.PI * 2);
+  // CW: arc spans ~270° clockwise: start at 150°, end at 60°.
+  // CCW: mirror by negating angles – start at 30° (=–150°), end at –60° (= 300°).
+  const startAngle = ccw ? (30 * Math.PI) / 180 : (150 * Math.PI) / 180;
+  const sweep     = (270 * Math.PI) / 180;
+  const endAngle  = ccw ? startAngle - sweep : startAngle + sweep;
+  // Tip of the arrowhead: the point on the circle at endAngle (normalised to 0–2π).
+  const tipAngle = ((endAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   const tipX = r * Math.cos(tipAngle);
   const tipY = r * Math.sin(tipAngle);
-  // Tangent direction at tipAngle going CW (increasing angle in canvas coords).
-  const tdx = -Math.sin(tipAngle);
-  const tdy =  Math.cos(tipAngle);
+  // Tangent direction at tipAngle.  For CW (increasing angle) the tangent is
+  // (-sin, cos); for CCW (decreasing angle) it is reversed: (sin, -cos).
+  const tdx = ccw ?  Math.sin(tipAngle) : -Math.sin(tipAngle);
+  const tdy = ccw ? -Math.cos(tipAngle) :  Math.cos(tipAngle);
   // Arrowhead dimensions.
   const headLen = _s(5);
   const headHalf = _s(3);
@@ -165,7 +170,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
   ctx.lineWidth = _s(3);
   ctx.strokeStyle = 'black';
   ctx.beginPath();
-  ctx.arc(0, 0, r, startAngle, endAngle, false);
+  ctx.arc(0, 0, r, startAngle, endAngle, ccw);
   ctx.stroke();
   ctx.fillStyle = 'black';
   ctx.beginPath();
@@ -179,7 +184,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D): void {
   ctx.lineWidth = _s(1.5);
   ctx.strokeStyle = 'white';
   ctx.beginPath();
-  ctx.arc(0, 0, r, startAngle, endAngle, false);
+  ctx.arc(0, 0, r, startAngle, endAngle, ccw);
   ctx.stroke();
   ctx.fillStyle = 'white';
   ctx.beginPath();
@@ -920,11 +925,12 @@ export function drawTile(
 
   ctx.restore();
 
-  // CW rotation arrow overlay for spinnable pipes
+  // Rotation arrow overlay for spinnable pipes.
+  // When Shift is held the arrow reflects CCW to indicate the click direction.
   if (SPIN_PIPE_SHAPES.has(shape)) {
     ctx.save();
     ctx.translate(cx, cy);
-    drawSpinArrow(ctx);
+    drawSpinArrow(ctx, shiftHeld);
     ctx.restore();
   }
 }

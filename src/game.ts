@@ -1214,6 +1214,46 @@ export class Game {
     }
   }
 
+  /**
+   * Called after successfully rotating a spinner tile.
+   * Records the move, updates animations, and refreshes all dependent UI.
+   * Shared by click, wheel, and keyboard (Q/W) spinner rotation paths.
+   */
+  private _afterSpinnerRotated(filledBefore: Set<string>): void {
+    if (!this.board) return;
+    this.board.applyTurnDelta();
+    this.board.recordMove();
+    this._spawnConnectionAnimations(filledBefore);
+    this._spawnDisconnectionAnimations(filledBefore);
+    this._spawnLockedCostChangeAnimations();
+    this._spawnCementDecrementAnimation();
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
+    this._checkWinLose();
+  }
+
+  /**
+   * If the mouse is currently hovering a spinner tile, rotate it by `steps`
+   * clockwise quarter-turns and update the UI.  Returns true on success.
+   */
+  private _tryRotateHoverSpinner(steps: number): boolean {
+    if (!this.mouseCanvasPos || !this.board) return false;
+    const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
+    const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+    const hPos: GridPos = { row: hRow, col: hCol };
+    const hTile = this.board.getTile(hPos);
+    if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
+    const filledBefore = this.board.getFilledPositions();
+    if (this.board.rotateTileBy(hPos, steps)) {
+      this._afterSpinnerRotated(filledBefore);
+      return true;
+    } else if (this.board.lastError) {
+      this._handleBoardError();
+    }
+    return false;
+  }
+
   private _handleCanvasClick(e: MouseEvent): void {
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
@@ -1236,21 +1276,14 @@ export class Game {
 
     if (SPIN_PIPE_SHAPES.has(tile.shape)) {
       // Spinnable pipes are always rotated on click (cannot be replaced or removed).
-      if (this.board.rotateTile(pos)) {
+      // Shift+click rotates CCW (3 steps); plain click rotates CW (1 step).
+      const steps = e.shiftKey ? 3 : 1;
+      if (this.board.rotateTileBy(pos, steps)) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this.board.applyTurnDelta();
-        this.board.recordMove();
-        this._spawnConnectionAnimations(filledBefore);
-        this._spawnDisconnectionAnimations(filledBefore);
-        this._spawnLockedCostChangeAnimations();
-        this._spawnCementDecrementAnimation();
-        this._renderInventoryBar();
-        this._updateWaterDisplay();
-        this._updateUndoRedoButtons();
-        this._checkWinLose();
+        this._afterSpinnerRotated(filledBefore);
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1411,16 +1444,7 @@ export class Game {
         const filledBefore = this.board.getFilledPositions();
         if (this.board.rotateTileBy(hPos, steps)) {
           e.preventDefault();
-          this.board.applyTurnDelta();
-          this.board.recordMove();
-          this._spawnConnectionAnimations(filledBefore);
-          this._spawnDisconnectionAnimations(filledBefore);
-          this._spawnLockedCostChangeAnimations();
-          this._spawnCementDecrementAnimation();
-          this._renderInventoryBar();
-          this._updateWaterDisplay();
-          this._updateUndoRedoButtons();
-          this._checkWinLose();
+          this._afterSpinnerRotated(filledBefore);
         } else if (this.board.lastError) {
           this._handleBoardError();
         }
@@ -2077,7 +2101,8 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           this.pendingRotation = (((this.pendingRotation - 90) + 360) % 360) as Rotation;
-        } else {
+        } else if (!this._tryRotateHoverSpinner(3)) {
+          // 3 CW steps = 1 CCW step
           this._tryAdjustHoverRotation(-1);
         }
         break;
@@ -2087,7 +2112,7 @@ export class Game {
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
           this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
-        } else {
+        } else if (!this._tryRotateHoverSpinner(1)) {
           this._tryAdjustHoverRotation(1);
         }
         break;
