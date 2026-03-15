@@ -1985,8 +1985,8 @@ export class CampaignEditor {
         this._showSourceError();
         return;
       }
-      // Paint / erase immediately
-      this._recordEditorSnapshot();
+      // Paint / erase immediately; snapshot recorded after the change so that
+      // the placed/erased tile is captured in the new history entry.
       if (this._editorPalette === 'erase') {
         this._editGrid[pos.row][pos.col] = null;
         // Clear the link if the erased tile was linked
@@ -2000,6 +2000,7 @@ export class CampaignEditor {
           this._linkedTileDirty = false;
         }
       }
+      this._recordEditorSnapshot();
       this._renderEditorCanvas();
     }
   }
@@ -2030,8 +2031,7 @@ export class CampaignEditor {
     this._dragState = null;
 
     if (moved) {
-      // Commit the drag: move tile from startPos to currentPos
-      this._recordEditorSnapshot();
+      // Commit the drag: move tile from startPos to currentPos; snapshot after.
       this._editGrid[startPos.row][startPos.col] = null;
       this._editGrid[currentPos.row][currentPos.col] = tile;
       // Only link the moved tile if it has parameters beyond rotation.
@@ -2039,6 +2039,7 @@ export class CampaignEditor {
         this._linkedTilePos = currentPos;
         this._linkedTileDirty = false;
       }
+      this._recordEditorSnapshot();
     } else {
       // It was a click on a non-empty tile (no movement occurred)
       if (e.ctrlKey) {
@@ -2047,8 +2048,7 @@ export class CampaignEditor {
           this._showSourceError();
           return;
         }
-        // Ctrl+click: force-overwrite with current palette selection
-        this._recordEditorSnapshot();
+        // Ctrl+click: force-overwrite; snapshot recorded after the change.
         if (this._editorPalette === 'erase') {
           this._editGrid[startPos.row][startPos.col] = null;
           // Clear the link if the erased tile was linked
@@ -2061,19 +2061,20 @@ export class CampaignEditor {
             this._linkedTileDirty = false;
           }
         }
+        this._recordEditorSnapshot();
       } else if (
         this._editorPalette !== 'erase' &&
         PIPE_SHAPES.has(this._editorPalette as PipeShape) &&
         PIPE_SHAPES.has(tile.shape)
       ) {
-        // Both palette and tile are pipe shapes: auto-replace
-        this._recordEditorSnapshot();
+        // Both palette and tile are pipe shapes: auto-replace; snapshot after.
         this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
         // Only link if the new tile has parameters beyond rotation.
         if (this._paletteHasNonRotationParams(this._editorPalette)) {
           this._linkedTilePos = startPos;
           this._linkedTileDirty = false;
         }
+        this._recordEditorSnapshot();
       } else {
         // Select the clicked tile in the palette and populate Tile Params
         this._selectTileFromDef(tile, startPos);

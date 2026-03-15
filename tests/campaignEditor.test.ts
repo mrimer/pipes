@@ -1637,6 +1637,207 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
   });
 });
 
+// ─── CampaignEditor – single-click placement undo snapshot timing ─────────────
+
+describe('CampaignEditor – single-click placement snapshot is recorded after placement', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type EditorPlaceState = {
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _editRows: number;
+    _editCols: number;
+    _editGrid: (import('../src/types').TileDef | null)[][];
+    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistoryIdx: number;
+    _linkedTilePos: { row: number; col: number } | null;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+    _onEditorMouseDown(e: MouseEvent): void;
+    _onEditorMouseUp(e: MouseEvent): void;
+    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
+  };
+
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99913,
+      name: 'Placement Snapshot Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  function makePlaceEditor(level: LevelDef): EditorPlaceState {
+    const camp: CampaignDef = {
+      id: 'cmp_place_test',
+      name: 'Placement Snapshot Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as EditorPlaceState;
+    state._activeCampaignId = 'cmp_place_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function leftMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, bubbles: true });
+  }
+
+  function ctrlLeftMouseEvent(type: string, clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent(type, { clientX, clientY, button: 0, ctrlKey: true, bubbles: true });
+  }
+
+  it('placed container tile IS present in the new snapshot', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    const historyLenBefore = state._editorHistory.length;
+
+    // Place a container tile (Chamber with chamberContent='item') by single-click on empty cell.
+    state._editorPalette = 'chamber:item' as import('../src/campaignEditorTypes').EditorPalette;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+
+    // Exactly one new snapshot should have been added.
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+
+    // The new snapshot must include the placed container tile.
+    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(newSnapshot.grid[0][0]).not.toBeNull();
+    expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Chamber);
+    expect(newSnapshot.grid[0][0]?.chamberContent).toBe('item');
+  });
+
+  it('placed non-repeatable tile (Sink) IS present in the new snapshot', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    const historyLenBefore = state._editorHistory.length;
+
+    state._editorPalette = PipeShape.Sink;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Sink);
+  });
+
+  it('erased tile IS absent in the new snapshot (single-click erase on occupied cell)', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    // Seed a tile to erase.
+    state._editGrid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    const historyLenBefore = state._editorHistory.length;
+
+    state._editorPalette = 'erase';
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(newSnapshot.grid[0][0]).toBeNull();
+  });
+
+  it('previous snapshot is the pre-placement state when a container is placed', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    // Capture the pre-placement state from history.
+    const prePlacementSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
+
+    state._editorPalette = 'chamber:item' as import('../src/campaignEditorTypes').EditorPalette;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+
+    // The snapshot before the latest must still reflect the empty pre-placement grid.
+    const prevSnapshot = state._editorHistory[state._editorHistoryIdx - 1];
+    expect(JSON.stringify(prevSnapshot.grid)).toBe(prePlacementSnapshot);
+    // And the placed tile should NOT be in that previous snapshot.
+    expect(prevSnapshot.grid[0][0]).toBeNull();
+  });
+
+  it('ctrl+click overwrite: new tile IS present in the snapshot after overwrite', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    // Seed an Elbow tile at (0,0).
+    state._editGrid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
+    const historyLenBefore = state._editorHistory.length;
+
+    // Mousedown registers a drag-state (tile exists), then ctrl+mouseup overwrites.
+    state._editorPalette = PipeShape.Tee;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
+
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Tee);
+  });
+
+  it('auto-replace pipe: replaced tile IS present in the snapshot after auto-replace', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    // Seed an Elbow tile at (0,0).
+    state._editGrid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
+    const historyLenBefore = state._editorHistory.length;
+
+    // Click on the occupied tile with a different pipe shape palette (no drag, no ctrl).
+    state._editorPalette = PipeShape.Cross;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Cross);
+  });
+
+  it('drag-move: moved tile IS present at the destination in the snapshot', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    // Seed a tile at (0,0).
+    state._editGrid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    const historyLenBefore = state._editorHistory.length;
+
+    // Mousedown grabs the tile; mousemove to (0,1); mouseup commits.
+    state._editorPalette = PipeShape.Straight;
+    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));  // row 0, col 0
+    (state as unknown as { _onEditorCanvasMouseMove(e: MouseEvent): void })
+      ._onEditorCanvasMouseMove(leftMouseEvent('mousemove', 96, 32));  // row 0, col 1
+    state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
+
+    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    // Tile moved from (0,0) to (0,1).
+    expect(newSnapshot.grid[0][0]).toBeNull();
+    expect(newSnapshot.grid[0][1]?.shape).toBe(PipeShape.Straight);
+  });
+});
+
 // ─── CampaignEditor – Source tile placement constraint ────────────────────────
 
 describe('CampaignEditor – Source tile placement constraint', () => {
