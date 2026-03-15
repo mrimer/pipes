@@ -3030,3 +3030,115 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     expect(discardBtn).toBeDefined();
   });
 });
+
+// ─── CampaignEditor – palette section state retained between editor sessions ──
+
+describe('CampaignEditor – palette section expanded state is retained between editor sessions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type PaletteState = {
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _goldSectionExpanded: boolean;
+    _chamberSectionExpanded: boolean;
+    _pipesSectionExpanded: boolean;
+    _floorSectionExpanded: boolean;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+  };
+
+  function makeLevel(id: number): LevelDef {
+    return {
+      id,
+      name: `Level ${id}`,
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  it('section states start as false when the editor is first opened', () => {
+    const level = makeLevel(99931);
+    const camp: CampaignDef = {
+      id: 'cmp_pal_test',
+      name: 'Palette Test',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as PaletteState;
+    state._activeCampaignId = 'cmp_pal_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+
+    expect(state._goldSectionExpanded).toBe(false);
+    expect(state._chamberSectionExpanded).toBe(false);
+    expect(state._pipesSectionExpanded).toBe(false);
+    expect(state._floorSectionExpanded).toBe(false);
+  });
+
+  it('manually set section states are preserved when re-opening the level editor', () => {
+    const level = makeLevel(99932);
+    const camp: CampaignDef = {
+      id: 'cmp_pal_retain',
+      name: 'Palette Retain Test',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as PaletteState;
+    state._activeCampaignId = 'cmp_pal_retain';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+
+    // First session: open editor and expand all sections.
+    state._openLevelEditor(level, false);
+    state._goldSectionExpanded = true;
+    state._chamberSectionExpanded = true;
+    state._pipesSectionExpanded = true;
+    state._floorSectionExpanded = true;
+
+    // Second session: re-open the same (or any) level.
+    state._openLevelEditor(level, false);
+
+    // All section states must still be expanded.
+    expect(state._goldSectionExpanded).toBe(true);
+    expect(state._chamberSectionExpanded).toBe(true);
+    expect(state._pipesSectionExpanded).toBe(true);
+    expect(state._floorSectionExpanded).toBe(true);
+  });
+
+  it('only the expanded sections remain expanded; collapsed ones stay collapsed', () => {
+    const level = makeLevel(99933);
+    const camp: CampaignDef = {
+      id: 'cmp_pal_mixed',
+      name: 'Palette Mixed Test',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as PaletteState;
+    state._activeCampaignId = 'cmp_pal_mixed';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+
+    // First session: expand only gold and pipes.
+    state._openLevelEditor(level, false);
+    state._goldSectionExpanded = true;
+    state._pipesSectionExpanded = true;
+    // chamber and floor remain false.
+
+    // Second session: re-open.
+    state._openLevelEditor(level, false);
+
+    expect(state._goldSectionExpanded).toBe(true);
+    expect(state._pipesSectionExpanded).toBe(true);
+    expect(state._chamberSectionExpanded).toBe(false);
+    expect(state._floorSectionExpanded).toBe(false);
+  });
+});
