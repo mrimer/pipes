@@ -2488,7 +2488,6 @@ export class CampaignEditor {
   // ─── Grid resize ──────────────────────────────────────────────────────────
 
   private _resizeGrid(newRows: number, newCols: number): void {
-    this._recordEditorSnapshot();
     const newGrid: (TileDef | null)[][] = [];
     for (let r = 0; r < newRows; r++) {
       newGrid[r] = [];
@@ -2501,6 +2500,7 @@ export class CampaignEditor {
     this._editRows = newRows;
     this._editCols = newCols;
     this._editGrid = newGrid;
+    this._recordEditorSnapshot();
     if (this._editorCanvas) {
       setTileSize(computeTileSize(newRows, newCols));
       this._editorCanvas.width  = newCols * TILE_SIZE;
