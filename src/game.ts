@@ -1487,6 +1487,10 @@ export class Game {
       e.preventDefault();
       if (this.gameState === GameState.Playing) this.performRedo();
     }
+    if (e.key === 'Backspace' && this.screen === GameScreen.Play) {
+      e.preventDefault();
+      if (this.gameState === GameState.Playing || this.gameState === GameState.GameOver) this.performUndo();
+    }
   }
 
   private _handleDocKeyUp(e: KeyboardEvent): void {

@@ -1774,6 +1774,54 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
   });
 });
 
+// ─── Tests: Backspace key undo shortcut ───────────────────────────────────────
+
+describe('Game – Backspace key undo shortcut', () => {
+  it('Backspace calls performUndo during gameplay', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a tile so there is something to undo
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const undoSpy = jest.spyOn(game, 'performUndo');
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+
+    expect(undoSpy).toHaveBeenCalled();
+  });
+
+  it('Backspace calls performUndo from the game-over modal', () => {
+    const { game, gameoverModalEl } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+
+    // Place a tile to create undo history, then simulate game-over state
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks.gameState = 'GAME_OVER';
+    gameoverModalEl.style.display = 'flex';
+
+    const undoSpy = jest.spyOn(game, 'performUndo');
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+
+    expect(undoSpy).toHaveBeenCalled();
+    expect(gameoverModalEl.style.display).toBe('none');
+  });
+
+  it('Backspace does nothing when not on the play screen', () => {
+    const { game } = makeGame();
+    // game starts on level-select screen
+    const hooks = gameHooks(game);
+    const undoSpy = jest.spyOn(game, 'performUndo');
+    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+    expect(undoSpy).not.toHaveBeenCalled();
+  });
+});
+
 // ─── Tests: note and hint boxes ───────────────────────────────────────────────
 
 describe('Game – note and hint boxes', () => {
