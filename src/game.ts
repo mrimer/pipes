@@ -1489,7 +1489,7 @@ export class Game {
     }
     if (e.key === 'Backspace' && this.screen === GameScreen.Play) {
       e.preventDefault();
-      if (this.gameState === GameState.Playing || this.gameState === GameState.GameOver) this.performUndo();
+      if (this.gameState === GameState.Playing || this.gameState === GameState.GameOver || this.gameState === GameState.Won) this.performUndo();
     }
   }
 
