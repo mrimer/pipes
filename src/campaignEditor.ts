@@ -977,14 +977,13 @@ export class CampaignEditor {
       `width:100%;max-width:1200px;padding:${EDITOR_LAYOUT_PADDING}px;box-sizing:border-box;display:flex;` +
       `gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;flex-wrap:nowrap;justify-content:flex-start;`;
 
-    // ── Left column: palette + params ──────────────────────────────────────
+    // ── Left column: palette ───────────────────────────────────────────────
     const leftCol = document.createElement('div');
     leftCol.style.cssText =
       'display:flex;flex-direction:column;gap:12px;min-width:220px;';
 
     if (!readOnly) {
       leftCol.appendChild(this._buildPalette());
-      leftCol.appendChild(this._buildParamPanel());
     }
 
     // ── Middle column: canvas ──────────────────────────────────────────────
@@ -1194,12 +1193,13 @@ export class CampaignEditor {
       }
     }
 
-    // ── Right column: inventory editor ─────────────────────────────────────
+    // ── Right column: inventory editor, tile params, grid size ────────────
     const rightCol = document.createElement('div');
     rightCol.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:180px;';
 
     if (!readOnly) {
       rightCol.appendChild(this._buildInventoryEditor());
+      rightCol.appendChild(this._buildParamPanel());
       rightCol.appendChild(this._buildGridSizePanel());
     } else {
       rightCol.appendChild(this._buildInventoryReadonly());
