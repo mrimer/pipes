@@ -664,6 +664,21 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   }
 }
 
+/** Draw a 5-pointed star inside the chamber inner box. */
+function _drawChamberStarContent(ctx: CanvasRenderingContext2D, isWater: boolean, half: number): void {
+  ctx.fillStyle = isWater ? STAR_WATER_COLOR : STAR_COLOR;
+  const outerR = half * 0.45;
+  const innerR = outerR * 0.42;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
 function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null, lockedGain: number | null): void {
   // Draw a small flame icon in the top-right inside corner
   const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
@@ -795,18 +810,7 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
         : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
     _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
   } else if (chamberContent === 'star') {
-    // Draw a 5-pointed star
-    ctx.fillStyle = isWater ? STAR_WATER_COLOR : STAR_COLOR;
-    const outerR = half * 0.45;
-    const innerR = outerR * 0.42;
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const angle = (Math.PI / 5) * i - Math.PI / 2;
-      const r = i % 2 === 0 ? outerR : innerR;
-      ctx.lineTo(r * Math.cos(angle), r * Math.sin(angle));
-    }
-    ctx.closePath();
-    ctx.fill();
+    _drawChamberStarContent(ctx, isWater, half);
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
   }
