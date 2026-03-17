@@ -238,6 +238,27 @@ export class CampaignEditor {
     return b;
   }
 
+  /**
+   * Create a standard full-screen modal overlay and a centred dialog box,
+   * append the overlay to `_el`, and return both elements for the caller to
+   * populate.
+   * @param maxWidth CSS max-width for the dialog (default '460px').
+   */
+  private _createDialogOverlay(maxWidth = '460px'): { overlay: HTMLDivElement; dialog: HTMLDivElement } {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+      'justify-content:center;z-index:300;';
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      `background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;` +
+      `display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:${maxWidth};` +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+    overlay.appendChild(dialog);
+    this._el.appendChild(overlay);
+    return { overlay, dialog };
+  }
+
   /** Set the campaign's lastUpdated timestamp to the current time. */
   private _touchCampaign(campaign: CampaignDef): void {
     campaign.lastUpdated = new Date().toISOString();
@@ -256,16 +277,7 @@ export class CampaignEditor {
    * as the local copy. The import is cancelled.
    */
   private _showImportSameVersionDialog(name: string, ts: string | undefined): void {
-    const overlay = document.createElement('div');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
-
-    const dialog = document.createElement('div');
-    dialog.style.cssText =
-      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
-      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:460px;' +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+    const { overlay, dialog } = this._createDialogOverlay('460px');
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
@@ -286,8 +298,6 @@ export class CampaignEditor {
     dialog.appendChild(title);
     dialog.appendChild(msg);
     dialog.appendChild(btnRow);
-    overlay.appendChild(dialog);
-    this._el.appendChild(overlay);
   }
 
   /**
@@ -304,16 +314,7 @@ export class CampaignEditor {
     isNewer: boolean,
     onConfirm: () => void,
   ): void {
-    const overlay = document.createElement('div');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
-
-    const dialog = document.createElement('div');
-    dialog.style.cssText =
-      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
-      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:480px;' +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+    const { overlay, dialog } = this._createDialogOverlay('480px');
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
@@ -346,8 +347,6 @@ export class CampaignEditor {
     dialog.appendChild(title);
     dialog.appendChild(msg);
     dialog.appendChild(btnRow);
-    overlay.appendChild(dialog);
-    this._el.appendChild(overlay);
   }
 
   /**
@@ -355,16 +354,7 @@ export class CampaignEditor {
    * Appended to `_el`; removed when either button is clicked.
    */
   private _showUnsavedModal(onSave: () => void, onDiscard: () => void): void {
-    const overlay = document.createElement('div');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
-
-    const dialog = document.createElement('div');
-    dialog.style.cssText =
-      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
-      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:420px;' +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+    const { overlay, dialog } = this._createDialogOverlay('420px');
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:1rem;color:#eee;line-height:1.5;';
@@ -390,8 +380,6 @@ export class CampaignEditor {
     btnRow.appendChild(saveBtn);
     dialog.appendChild(msg);
     dialog.appendChild(btnRow);
-    overlay.appendChild(dialog);
-    this._el.appendChild(overlay);
   }
 
   private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
