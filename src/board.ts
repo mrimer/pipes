@@ -1237,11 +1237,7 @@ export class Board {
       }
       // Source, Sink, Empty, Granite, Tree: no water impact (impact stays 0).
 
-      this._lockedWaterImpact.set(key, impact);
-      this._connectionTurn.set(key, this._turnNumber);
-      // Record the temperature and pressure at connect time for tooltip reconstruction.
-      this._lockedConnectTemp.set(key, currentTemp);
-      this._lockedConnectPressure.set(key, currentPressure);
+      this._recordLockedTileState(key, impact, currentTemp, currentPressure);
     }
 
     // Second pass: lock hot_plate tiles after all ice/snow/sandstone have updated frozen,
@@ -1259,11 +1255,21 @@ export class Board {
       const impact = waterGain - waterLoss;
       this._hotPlateWaterGain.set(key, waterGain);
 
-      this._lockedWaterImpact.set(key, impact);
-      this._connectionTurn.set(key, this._turnNumber);
-      this._lockedConnectTemp.set(key, currentTemp);
-      this._lockedConnectPressure.set(key, currentPressure);
+      this._recordLockedTileState(key, impact, currentTemp, currentPressure);
     }
+  }
+
+  /**
+   * Record the locked water impact and connection stats for a newly-connected tile.
+   * Called once per tile from {@link _lockNewTiles} when the impact has been computed.
+   * The temperature and pressure are stored so that the tooltip can reconstruct the
+   * formula used at connection time, even if conditions change later.
+   */
+  private _recordLockedTileState(key: string, impact: number, temp: number, pressure: number): void {
+    this._lockedWaterImpact.set(key, impact);
+    this._connectionTurn.set(key, this._turnNumber);
+    this._lockedConnectTemp.set(key, temp);
+    this._lockedConnectPressure.set(key, pressure);
   }
 
   /**
