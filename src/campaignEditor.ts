@@ -1450,9 +1450,9 @@ export class CampaignEditor {
       return panel;
     }
 
-    // Source/Chamber(tank): capacity
+    // Source/Chamber(tank)/Chamber(skill): capacity
     const cc = isChm ? chamberPaletteContent(p as ChamberPalette) : null;
-    if (p === PipeShape.Source || cc === 'tank') {
+    if (p === PipeShape.Source || cc === 'tank' || cc === 'skill') {
       panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
         this._editorParams.capacity = Math.max(0, parseInt(v) || 0);
         this._applyParamsToLinkedTile();
@@ -1480,8 +1480,9 @@ export class CampaignEditor {
       const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
         tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
         ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
+        skill: 'Skill',
       };
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate']) {
+      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate', 'skill']) {
         const o = document.createElement('option');
         o.value = opt;
         o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
@@ -2402,6 +2403,7 @@ export class CampaignEditor {
       if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; if (p.shatter !== 0) def.shatter = p.shatter; }
       if (cc === 'hot_plate') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
+      if (cc === 'skill') def.capacity = p.capacity;
     }
 
     return def;

@@ -4351,3 +4351,160 @@ describe('Cement tile constraints', () => {
     expect(board.cementData.get('0,1')).toBe(1);
   });
 });
+
+// ─── Chamber tile (skill content) ─────────────────────────────────────────────
+
+describe('Chamber tile (skill content)', () => {
+  /**
+   * Build a board: Source(cap) → Skill(skillCap) → Sink with initHistory.
+   * All tiles are pre-connected (fixed).
+   */
+  function makeSkillBoard(sourceCap: number, skillCap: number): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.sourceCapacity = sourceCap;
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, sourceCap);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, skillCap, 0, null, 1, null, 'skill');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.initHistory();
+    return board;
+  }
+
+  it('permanently increases sourceCapacity when connected', () => {
+    const board = makeSkillBoard(10, 5);
+    // Skill is pre-connected at initHistory → sourceCapacity should increase by 5
+    expect(board.sourceCapacity).toBe(15);
+    expect(board.getCurrentWater()).toBe(15);
+  });
+
+  it('locked water impact for the skill tile is 0 (bonus is in sourceCapacity)', () => {
+    const board = makeSkillBoard(10, 5);
+    expect(board.getLockedWaterImpact({ row: 0, col: 1 })).toBe(0);
+  });
+
+  it('skill bonus is not reversed when tile is disconnected', () => {
+    // Board: Source → [player slot] → Skill → Sink
+    // After placing Straight the skill connects; reclaiming disconnects it.
+    // sourceCapacity should stay elevated after disconnect.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 10;
+    board.grid[0][0] = new Tile(PipeShape.Source,  90, true, 10);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);                 // player slot
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 4, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'skill');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    90, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    expect(board.sourceCapacity).toBe(10); // skill not yet connected
+
+    // Connect skill by placing Straight
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    expect(board.sourceCapacity).toBe(14); // +4 from skill
+    expect(board.getCurrentWater()).toBe(13); // 14 - 1 (straight) = 13
+
+    // Reclaim Straight – skill disconnects but bonus persists
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    expect(board.sourceCapacity).toBe(14); // bonus remains
+    expect(board.getCurrentWater()).toBe(14); // no Straight cost, skill bonus still applies
+  });
+
+  it('skill bonus is not applied a second time on reconnect', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 10;
+    board.grid[0][0] = new Tile(PipeShape.Source,  90, true, 10);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 3, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'skill');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    90, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // First connect
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    expect(board.sourceCapacity).toBe(13); // +3
+
+    // Disconnect
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    expect(board.sourceCapacity).toBe(13); // still +3
+
+    // Reconnect
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    expect(board.sourceCapacity).toBe(13); // not +6; bonus only applied once
+  });
+
+  it('undo reverts the skill bonus when undoing past the collection turn', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 10;
+    board.grid[0][0] = new Tile(PipeShape.Source,  90, true, 10);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 5, 0, null, 1,
+      new Set([Direction.East, Direction.West]), 'skill');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    90, true);
+    board.inventory  = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    expect(board.sourceCapacity).toBe(10); // before skill connected
+
+    // Collect skill
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.sourceCapacity).toBe(15); // +5
+
+    // Undo → skill uncollected, sourceCapacity restored
+    board.undoMove();
+    expect(board.sourceCapacity).toBe(10);
+
+    // Redo → skill re-collected
+    board.redoMove();
+    expect(board.sourceCapacity).toBe(15);
+  });
+
+  it('getSkillsCollected returns 0 when no skill chambers are in the fill path', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    expect(board.getSkillsCollected()).toBe(0);
+  });
+
+  it('getSkillsCollected counts a skill chamber in the fill path', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 3, 0, null, 1, null, 'skill');
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    expect(board.getSkillsCollected()).toBe(1);
+  });
+
+  it('getSkillsCollected does not count a skill chamber not in the fill path', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    // Straight N-S at (0,1) blocks E-W fill → skill at (0,2) not reached
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 0);          // N-S, blocks E-W
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 3, 0, null, 1, null, 'skill');
+    expect(board.getSkillsCollected()).toBe(0);
+  });
+
+  it('skill chamber carries its capacity value', () => {
+    const tile = new Tile(PipeShape.Chamber, 0, true, 7, 0, null, 1, null, 'skill');
+    expect(tile.chamberContent).toBe('skill');
+    expect(tile.capacity).toBe(7);
+  });
+});

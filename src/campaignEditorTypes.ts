@@ -63,6 +63,7 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
     if (cc === 'heater' || cc === 'ice' || cc === 'snow' || cc === 'sandstone' || cc === 'hot_plate') valid.add('temperature');
     if (cc === 'pump') valid.add('pressure');
     if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
+    if (cc === 'skill') valid.add('capacity');
   } else if (shape === PipeShape.Cement) {
     valid.add('dryingTime');
   }
@@ -73,7 +74,7 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
 /** All chamber content types. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'skill';
 
 /** A palette entry that represents a Chamber tile with a specific content type. */
 export type ChamberPalette = `chamber:${ChamberContent}`;

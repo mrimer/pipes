@@ -80,6 +80,18 @@ type Snapshot = {
    * Included in snapshots so undo/redo restores the correct setting time.
    */
   cementData: Map<string, number>;
+  /**
+   * Effective source capacity at the moment this snapshot was captured.
+   * Stored so undo/redo correctly restores skill bonuses that permanently
+   * modify sourceCapacity.
+   */
+  sourceCapacity: number;
+  /**
+   * Set of "row,col" keys for skill chamber tiles that have already granted
+   * their permanent capacity bonus.  Included in snapshots so undo/redo
+   * correctly reinstates or removes the "already collected" state.
+   */
+  collectedSkills: Set<string>;
 };
 
 /**
@@ -197,6 +209,15 @@ export class Board {
    * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
    */
   private _hotPlateWaterGain: Map<string, number> = new Map();
+
+  /**
+   * Set of "row,col" keys for skill chamber tiles that have already granted their
+   * permanent capacity bonus to {@link sourceCapacity}.
+   * Prevents the bonus from being applied again if the tile is disconnected and
+   * reconnected during the same session.  Restored by undo/redo via the snapshot
+   * mechanism so that undoing past the first connection correctly removes the bonus.
+   */
+  private _collectedSkills: Set<string> = new Set();
 
   /**
    * The board temperature recorded when each tile first connected, keyed by "row,col".
@@ -329,6 +350,7 @@ export class Board {
     this._turnNumber = 0;
     this._connectionTurn = new Map();
     this._hotPlateWaterGain = new Map();
+    this._collectedSkills = new Set();
     this._lockedConnectTemp = new Map();
     this._lockedConnectPressure = new Map();
     this.applyTurnDelta();
@@ -429,6 +451,8 @@ export class Board {
       lockedConnectTemp: new Map(this._lockedConnectTemp),
       lockedConnectPressure: new Map(this._lockedConnectPressure),
       cementData: new Map(this.cementData),
+      sourceCapacity: this.sourceCapacity,
+      collectedSkills: new Set(this._collectedSkills),
     };
   }
 
@@ -452,6 +476,8 @@ export class Board {
     this._lockedConnectTemp = new Map(snap.lockedConnectTemp);
     this._lockedConnectPressure = new Map(snap.lockedConnectPressure);
     this.cementData = new Map(snap.cementData);
+    this.sourceCapacity = snap.sourceCapacity;
+    this._collectedSkills = new Set(snap.collectedSkills);
   }
 
   /**
@@ -774,6 +800,24 @@ export class Board {
       const [r, c] = key.split(',').map(Number);
       const tile = this.grid[r]?.[c];
       if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'star') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Count how many skill chamber tiles are currently in the water fill path.
+   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
+   * @returns The number of connected skill chambers.
+   */
+  getSkillsCollected(filled?: Set<string>): number {
+    const filledSet = filled ?? this.getFilledPositions();
+    let count = 0;
+    for (const key of filledSet) {
+      const [r, c] = key.split(',').map(Number);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'skill') {
         count++;
       }
     }
@@ -1207,9 +1251,21 @@ export class Board {
             impact = -(this.sourceCapacity + 1);
           }
         }
-        // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
+        // 'heater', 'pump', 'item', and 'star': no direct water impact (impact stays 0).
+        // 'skill': grants a permanent capacity bonus on first connect (handled separately below).
       }
       // Source, Sink, Empty, Granite, Tree: no water impact (impact stays 0).
+
+      // Skill chambers permanently increase sourceCapacity on first connection.
+      // The bonus is NOT applied again on subsequent reconnects within the same
+      // session – _collectedSkills guards against double-counting.
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'skill') {
+        if (!this._collectedSkills.has(key)) {
+          this.sourceCapacity += tile.capacity;
+          this._collectedSkills.add(key);
+        }
+        // impact stays 0 – the capacity change is reflected in sourceCapacity, not here.
+      }
 
       this._lockedWaterImpact.set(key, impact);
       this._connectionTurn.set(key, this._turnNumber);

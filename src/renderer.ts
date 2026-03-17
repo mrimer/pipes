@@ -34,6 +34,7 @@ import {
   SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
   STAR_COLOR, STAR_WATER_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
+  SKILL_COLOR, SKILL_WATER_COLOR,
   ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR,
 } from './colors';
 
@@ -717,6 +718,39 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
   }
 }
 
+function _drawChamberSkillContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
+  const skillColor = isWater ? SKILL_WATER_COLOR : SKILL_COLOR;
+  // Draw a small book icon (open book outline) in the top-right inside corner
+  const bkX = bw - _s(10);
+  const bkY = -bh + _s(9);
+  const bkW = _s(7);
+  const bkH = _s(6);
+  ctx.strokeStyle = skillColor;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // Left page
+  ctx.beginPath();
+  ctx.moveTo(bkX, bkY + bkH);
+  ctx.lineTo(bkX - bkW, bkY + bkH);
+  ctx.lineTo(bkX - bkW, bkY - bkH);
+  ctx.quadraticCurveTo(bkX, bkY - bkH + _s(1.5), bkX, bkY);
+  ctx.stroke();
+  // Right page
+  ctx.beginPath();
+  ctx.moveTo(bkX, bkY + bkH);
+  ctx.lineTo(bkX + bkW, bkY + bkH);
+  ctx.lineTo(bkX + bkW, bkY - bkH);
+  ctx.quadraticCurveTo(bkX, bkY - bkH + _s(1.5), bkX, bkY);
+  ctx.stroke();
+  // Show capacity bonus in the centre
+  ctx.fillStyle = skillColor;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`+${tile.capacity}`, 0, _s(3));
+}
+
 function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, isWater: boolean, half: number, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null, lockedGain: number | null): void {
   // Clip to tile bounds so that connection stubs end exactly at the tile edge.
   ctx.beginPath();
@@ -807,6 +841,8 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
     ctx.fill();
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
+  } else if (chamberContent === 'skill') {
+    _drawChamberSkillContent(ctx, tile, bw, bh, isWater);
   }
   // Connection stubs drawn with flat (butt) caps, starting exactly at the box edge
   // so each stub connects flush with the outside edge of the inner rectangle.
@@ -891,6 +927,8 @@ export function drawTile(
           : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
     } else if (chamberContent === 'hot_plate') {
       color = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
+    } else if (chamberContent === 'skill') {
+      color = isWater ? SKILL_WATER_COLOR : SKILL_COLOR;
     } else {
       color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
     }
@@ -1046,6 +1084,7 @@ export function getTileDisplayName(tile: Tile): string {
             : `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
         }
         case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
+        case 'skill':     return tile.capacity > 0 ? `Skill +${tile.capacity}` : 'Skill';
         default:       return 'Chamber';
       }
     default: return '';

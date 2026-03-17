@@ -1847,6 +1847,15 @@ export class Game {
         const starCy = r * TILE_SIZE + TILE_SIZE / 2;
         const canvasRect = this.canvas.getBoundingClientRect();
         spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
+      } else if (tile.chamberContent === 'skill' && dir === 'connect') {
+        // Skill tile connected – permanently boosts sourceCapacity; show +N and sparkle.
+        const val = tile.capacity;
+        text = `+${val}`;
+        color = animColor(val);
+        const skillCx = c * TILE_SIZE + TILE_SIZE / 2;
+        const skillCy = r * TILE_SIZE + TILE_SIZE / 2;
+        const canvasRect = this.canvas.getBoundingClientRect();
+        spawnStarSparkles(canvasRect.left + skillCx, canvasRect.top + skillCy);
       }
     }
 

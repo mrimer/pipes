@@ -56,7 +56,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'skill';
 
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
@@ -94,7 +94,7 @@ export interface InventoryItem {
 export interface TileDef {
   shape: PipeShape;
   rotation?: Rotation;
-  /** Water capacity (Source and Chamber-tank tiles only). */
+  /** Water capacity (Source, Chamber-tank, and Chamber-skill tiles only). */
   capacity?: number;
   /** Water cost for Chamber-dirt and Chamber-ice tiles – water wasted when water flows through this tile. */
   cost?: number;

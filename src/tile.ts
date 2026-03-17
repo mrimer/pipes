@@ -91,6 +91,8 @@ export class Tile {
    * 'hot_plate' has a unique application: effectiveCost = mass×(temp+playerTemp);
    * first, the amount is taken from the frozen variable (adding back to water capacity),
    * then any remaining cost is subtracted from water capacity.
+   * 'skill' permanently increases sourceCapacity by its capacity value when first
+   * connected; unlike 'tank', the bonus is not reversed when the tile is disconnected.
    */
   chamberContent: ChamberContent | null;
   /**
@@ -130,12 +132,12 @@ export class Tile {
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
-   * @param capacity - Water capacity (Source / Chamber-tank tiles only).
+   * @param capacity - Water capacity (Source / Chamber-tank / Chamber-skill tiles only).
    * @param cost - Water cost (Chamber-dirt/ice/snow/sandstone/hot plate tiles).
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
-   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', or 'hot plate').
+   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'hot plate', or 'skill').
    * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/Snow/Sandstone/Hot Plate (cost factor).
    * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.

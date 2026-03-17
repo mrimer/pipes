@@ -93,6 +93,10 @@ export const STAR_WATER_COLOR = '#ffe880';
 export const HOT_PLATE_COLOR       = '#e44';
 /** Hot plate chamber tile color when water is flowing through it. */
 export const HOT_PLATE_WATER_COLOR = '#f86';
+/** Skill chamber tile color (vivid purple – represents a learned ability). */
+export const SKILL_COLOR       = '#9c27b0';
+/** Skill chamber tile color when water is flowing through it. */
+export const SKILL_WATER_COLOR = '#ce93d8';
 /** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
 export const SPIN_PIPE_COLOR  = '#3a5868';
 /** Colour for positive (beneficial) floating animation labels. */
