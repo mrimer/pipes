@@ -1,4 +1,4 @@
-import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey } from './board';
+import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
@@ -379,10 +379,7 @@ export class Game {
     document.body.appendChild(this.errorFlashEl);
 
     // Create the reset-progress confirmation modal
-    this.resetConfirmModalEl = document.createElement('div');
-    this.resetConfirmModalEl.style.cssText =
-      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);' +
-      'justify-content:center;align-items:center;z-index:100;';
+    this.resetConfirmModalEl = Game._createModalOverlay(0.7);
     const resetModalBox = document.createElement('div');
     resetModalBox.style.cssText =
       'background:#16213e;border:3px solid #e74c3c;border-radius:10px;' +
@@ -424,10 +421,7 @@ export class Game {
     this._rulesModalEl = createGameRulesModal();
 
     // Create the new-chapter intro modal
-    this._newChapterModalEl = document.createElement('div');
-    this._newChapterModalEl.style.cssText =
-      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
-      'justify-content:center;align-items:center;z-index:100;';
+    this._newChapterModalEl = Game._createModalOverlay();
     const newChapterBox = document.createElement('div');
     newChapterBox.className = 'modal-box';
     const newChapterTitle = document.createElement('h2');
@@ -452,10 +446,7 @@ export class Game {
     document.body.appendChild(this._newChapterModalEl);
 
     // Create the challenge-level warning modal
-    this._challengeModalEl = document.createElement('div');
-    this._challengeModalEl.style.cssText =
-      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
-      'justify-content:center;align-items:center;z-index:100;';
+    this._challengeModalEl = Game._createModalOverlay();
     const challengeBox = document.createElement('div');
     challengeBox.className = 'modal-box';
     const challengeTitle = document.createElement('h2');
@@ -486,10 +477,7 @@ export class Game {
     document.body.appendChild(this._challengeModalEl);
 
     // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
-    this._exitConfirmModalEl = document.createElement('div');
-    this._exitConfirmModalEl.style.cssText =
-      'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
-      'justify-content:center;align-items:center;z-index:100;';
+    this._exitConfirmModalEl = Game._createModalOverlay();
     const exitConfirmBox = document.createElement('div');
     exitConfirmBox.className = 'modal-box';
     const exitConfirmTitle = document.createElement('h2');
@@ -558,6 +546,20 @@ export class Game {
 
     this._showLevelSelect();
     this._loop();
+  }
+
+  // ─── Modal helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Create a standard full-screen modal overlay element (hidden by default).
+   * @param backgroundAlpha - Opacity of the dark backdrop (default 0.5).
+   */
+  private static _createModalOverlay(backgroundAlpha = 0.5): HTMLDivElement {
+    const el = document.createElement('div');
+    el.style.cssText =
+      `display:none;position:fixed;inset:0;background:rgba(0,0,0,${backgroundAlpha});` +
+      'justify-content:center;align-items:center;z-index:100;';
+    return el;
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
@@ -1800,8 +1802,7 @@ export class Game {
         text = val >= 0 ? `+${val}°` : `${val}°`;
         color = animColor(val);
       } else if (tile.chamberContent === 'ice') {
-        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-        const raw = tile.cost * deltaTemp;
+        const raw = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
         ({ text, color } = this._formatWaterCostLabel(raw, dir));
       } else if (tile.chamberContent === 'pump') {
         // Pump raises pressure on connect, lowers it on disconnect.
@@ -1809,19 +1810,17 @@ export class Game {
         text = val >= 0 ? `+${val}P` : `${val}P`;
         color = animColor(val);
       } else if (tile.chamberContent === 'snow') {
-        const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-        const raw = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
+        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+        const raw = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
         ({ text, color } = this._formatWaterCostLabel(raw, dir));
       } else if (tile.chamberContent === 'sandstone') {
-        const shatterActive = tile.shatter > tile.hardness;
-        const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+        const { shatterOverride, costPerDeltaTemp } =
+          sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
         if (shatterOverride) {
           text = dir === 'connect' ? '-0' : '+0';
           color = ANIM_ZERO_COLOR;
         } else {
-          const deltaDamage = currentPressure - tile.hardness;
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const raw = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
+          const raw = costPerDeltaTemp * computeDeltaTemp(tile.temperature, currentTemp);
           ({ text, color } = this._formatWaterCostLabel(raw, dir));
         }
       } else if (tile.chamberContent === 'hot_plate') {
