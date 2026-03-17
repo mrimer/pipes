@@ -317,42 +317,18 @@ export class Game {
     this.waterValueEl = this.waterDisplayEl.querySelector('.stat-value') as HTMLElement;
 
     // Create the frozen stat row (inserted into the stats box after water display)
-    this.frozenDisplayEl = document.createElement('div');
-    this.frozenDisplayEl.className = 'stat-row';
-    this.frozenDisplayEl.style.cssText = 'display:none;color:#a8d8ea;';
-    const frozenLabelEl = document.createElement('span');
-    frozenLabelEl.className = 'stat-label';
-    frozenLabelEl.textContent = '❄️ Frozen';
-    this.frozenValueEl = document.createElement('span');
-    this.frozenValueEl.className = 'stat-value';
-    this.frozenDisplayEl.appendChild(frozenLabelEl);
-    this.frozenDisplayEl.appendChild(this.frozenValueEl);
+    ({ rowEl: this.frozenDisplayEl, valueEl: this.frozenValueEl } =
+      Game._createStatRow('❄️ Frozen', '#a8d8ea'));
     this.waterDisplayEl.insertAdjacentElement('afterend', this.frozenDisplayEl);
 
     // Create the temperature stat row (inserted into the stats box after frozen display)
-    this.tempDisplayEl = document.createElement('div');
-    this.tempDisplayEl.className = 'stat-row';
-    this.tempDisplayEl.style.cssText = 'display:none;color:#74b9ff;';
-    const tempLabelEl = document.createElement('span');
-    tempLabelEl.className = 'stat-label';
-    tempLabelEl.textContent = '🌡️ Temp °';
-    this.tempValueEl = document.createElement('span');
-    this.tempValueEl.className = 'stat-value';
-    this.tempDisplayEl.appendChild(tempLabelEl);
-    this.tempDisplayEl.appendChild(this.tempValueEl);
+    ({ rowEl: this.tempDisplayEl, valueEl: this.tempValueEl } =
+      Game._createStatRow('🌡️ Temp °', '#74b9ff'));
     this.frozenDisplayEl.insertAdjacentElement('afterend', this.tempDisplayEl);
 
     // Create the pressure stat row (inserted into the stats box after temp display)
-    this.pressureDisplayEl = document.createElement('div');
-    this.pressureDisplayEl.className = 'stat-row';
-    this.pressureDisplayEl.style.cssText = 'display:none;color:#a8e063;';
-    const pressureLabelEl = document.createElement('span');
-    pressureLabelEl.className = 'stat-label';
-    pressureLabelEl.textContent = '🔧 Pressure';
-    this.pressureValueEl = document.createElement('span');
-    this.pressureValueEl.className = 'stat-value';
-    this.pressureDisplayEl.appendChild(pressureLabelEl);
-    this.pressureDisplayEl.appendChild(this.pressureValueEl);
+    ({ rowEl: this.pressureDisplayEl, valueEl: this.pressureValueEl } =
+      Game._createStatRow('🔧 Pressure', '#a8e063'));
     this.tempDisplayEl.insertAdjacentElement('afterend', this.pressureDisplayEl);
 
     // Create the note box (appended to the play screen, shown beneath the grid)
@@ -560,6 +536,26 @@ export class Game {
       `display:none;position:fixed;inset:0;background:rgba(0,0,0,${backgroundAlpha});` +
       'justify-content:center;align-items:center;z-index:100;';
     return el;
+  }
+
+  /**
+   * Create a stats-box row element (hidden by default) with a label and value span.
+   * @param labelText - Emoji + text for the label span.
+   * @param color     - CSS color applied to the whole row.
+   * @returns `{ rowEl, valueEl }` – caller inserts `rowEl` and updates `valueEl`.
+   */
+  private static _createStatRow(labelText: string, color: string): { rowEl: HTMLDivElement; valueEl: HTMLElement } {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'stat-row';
+    rowEl.style.cssText = `display:none;color:${color};`;
+    const labelEl = document.createElement('span');
+    labelEl.className = 'stat-label';
+    labelEl.textContent = labelText;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'stat-value';
+    rowEl.appendChild(labelEl);
+    rowEl.appendChild(valueEl);
+    return { rowEl, valueEl };
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
@@ -1029,58 +1025,69 @@ export class Game {
 
     // Fail condition takes precedence: zero or negative water is always a loss, even if the sink was reached.
     if (this.board.getCurrentWater() <= 0) {
-      this.gameState = GameState.GameOver;
-      this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
-      this.gameoverModalEl.style.display = 'flex';
-      this.gameoverModalEl.classList.remove('fade-in');
-      void this.gameoverModalEl.offsetWidth; // force reflow to restart animation
-      this.gameoverModalEl.classList.add('fade-in');
-      this._positionModalBelowCanvas(this.gameoverModalEl);
-      this._triggerModalSparkle(this.gameoverModalEl, 'sparkle-red');
+      this._showGameOver();
       return;
     }
 
     if (this.board.isSolved()) {
-      this.gameState = GameState.Won;
-      this._flowGoodDirs = computeFlowGoodDirs(this.board);
-      // Scale max drops to ~5 per tile in the solution path (min 10).
-      const pathLength = this.board.getFilledPositions().size;
-      this._flowMaxDrops = Math.max(10, pathLength * 5);
-      const starsCollected = this.board.getStarsCollected();
-      this._markLevelCompleted(this.currentLevel!.id);
-      this._saveStars(this.currentLevel!.id, starsCollected);
-      // Show star count on win modal when at least one star was connected
-      if (this.winStarsEl) {
-        if (starsCollected > 0) {
-          this.winStarsEl.textContent = `⭐ × ${starsCollected}`;
-          this.winStarsEl.style.display = 'block';
-        } else {
-          this.winStarsEl.style.display = 'none';
-        }
-      }
-      // Spawn confetti first; show win modal only after the confetti effect completes.
-      spawnConfetti(() => {
-        if (this.gameState !== GameState.Won) return;
-        this.winModalEl.style.display = 'flex';
-        this.winModalEl.classList.remove('fade-in');
-        void this.winModalEl.offsetWidth; // force reflow to restart animation
-        this.winModalEl.classList.add('fade-in');
-        this._positionModalBelowCanvas(this.winModalEl);
-        this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
-        // Spawn golden sparkles over the star icon in the win modal when stars were collected
-        if (starsCollected > 0 && this.winStarsEl) {
-          const winStarsEl = this.winStarsEl;
-          // Short delay so the modal finishes rendering and is positioned before
-          // getBoundingClientRect() is called.
-          const MODAL_SPARKLE_DELAY_MS = 150;
-          setTimeout(() => {
-            const rect = winStarsEl.getBoundingClientRect();
-            spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
-          }, MODAL_SPARKLE_DELAY_MS);
-        }
-      });
+      this._showWin();
       return;
     }
+  }
+
+  /** Transition the game to the GameOver state and show the gameover modal. */
+  private _showGameOver(): void {
+    this.gameState = GameState.GameOver;
+    this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
+    this.gameoverModalEl.style.display = 'flex';
+    this.gameoverModalEl.classList.remove('fade-in');
+    void this.gameoverModalEl.offsetWidth; // force reflow to restart animation
+    this.gameoverModalEl.classList.add('fade-in');
+    this._positionModalBelowCanvas(this.gameoverModalEl);
+    this._triggerModalSparkle(this.gameoverModalEl, 'sparkle-red');
+  }
+
+  /** Transition the game to the Won state and show the win modal after confetti. */
+  private _showWin(): void {
+    if (!this.board) return;
+    this.gameState = GameState.Won;
+    this._flowGoodDirs = computeFlowGoodDirs(this.board);
+    // Scale max drops to ~5 per tile in the solution path (min 10).
+    const pathLength = this.board.getFilledPositions().size;
+    this._flowMaxDrops = Math.max(10, pathLength * 5);
+    const starsCollected = this.board.getStarsCollected();
+    this._markLevelCompleted(this.currentLevel!.id);
+    this._saveStars(this.currentLevel!.id, starsCollected);
+    // Show star count on win modal when at least one star was connected
+    if (this.winStarsEl) {
+      if (starsCollected > 0) {
+        this.winStarsEl.textContent = `⭐ × ${starsCollected}`;
+        this.winStarsEl.style.display = 'block';
+      } else {
+        this.winStarsEl.style.display = 'none';
+      }
+    }
+    // Spawn confetti first; show win modal only after the confetti effect completes.
+    spawnConfetti(() => {
+      if (this.gameState !== GameState.Won) return;
+      this.winModalEl.style.display = 'flex';
+      this.winModalEl.classList.remove('fade-in');
+      void this.winModalEl.offsetWidth; // force reflow to restart animation
+      this.winModalEl.classList.add('fade-in');
+      this._positionModalBelowCanvas(this.winModalEl);
+      this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
+      // Spawn golden sparkles over the star icon in the win modal when stars were collected
+      if (starsCollected > 0 && this.winStarsEl) {
+        const winStarsEl = this.winStarsEl;
+        // Short delay so the modal finishes rendering and is positioned before
+        // getBoundingClientRect() is called.
+        const MODAL_SPARKLE_DELAY_MS = 150;
+        setTimeout(() => {
+          const rect = winStarsEl.getBoundingClientRect();
+          spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
+        }, MODAL_SPARKLE_DELAY_MS);
+      }
+    });
   }
 
   // ─── Input handlers ────────────────────────────────────────────────────────
