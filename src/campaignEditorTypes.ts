@@ -70,6 +70,16 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
   return valid;
 }
 
+// ─── Editor navigation ────────────────────────────────────────────────────────
+
+/** Top-level screens within the Campaign Editor UI. */
+export enum EditorScreen {
+  List        = 'list',
+  Campaign    = 'campaign',
+  Chapter     = 'chapter',
+  LevelEditor = 'levelEditor',
+}
+
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
 /** All chamber content types. */

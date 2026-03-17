@@ -21,9 +21,10 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 /** Border width (px) on each side of the editor canvas. */
 const EDITOR_CANVAS_BORDER = 3;
-import { Board, PIPE_SHAPES } from './board';
+import { Board, PIPE_SHAPES, parseKey } from './board';
 import {
   EditorPalette,
+  EditorScreen,
   ChamberPalette,
   TileParams,
   DEFAULT_PARAMS,
@@ -64,7 +65,7 @@ export class CampaignEditor {
   private _campaigns: CampaignDef[];
 
   // ── Navigation state ──────────────────────────────────────────────────────
-  private _screen: 'list' | 'campaign' | 'chapter' | 'levelEditor' = 'list';
+  private _screen: EditorScreen = EditorScreen.List;
   private _activeCampaignId: string | null = null;
   private _activeChapterIdx = -1;
   private _activeLevelIdx = -1;
@@ -141,7 +142,7 @@ export class CampaignEditor {
 
     // Global keyboard handler for shortcuts (guarded to the level editor screen)
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (this._screen !== 'levelEditor' || this._el.style.display === 'none') return;
+      if (this._screen !== EditorScreen.LevelEditor || this._el.style.display === 'none') return;
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
       if (e.key === 'Escape' && this._linkedTilePos !== null) {
@@ -180,16 +181,16 @@ export class CampaignEditor {
   showAndRestore(): void {
     this._el.style.display = 'flex';
     switch (this._screen) {
-      case 'levelEditor': {
+      case EditorScreen.LevelEditor: {
         const campaign = this._getActiveCampaign();
         const readOnly = campaign?.official === true;
         this._showLevelEditor(readOnly);
         break;
       }
-      case 'chapter':
+      case EditorScreen.Chapter:
         this._showChapterDetail();
         break;
-      case 'campaign':
+      case EditorScreen.Campaign:
         this._showCampaignDetail();
         break;
       default:
@@ -415,7 +416,7 @@ export class CampaignEditor {
   // ─── Screen: Campaign list ────────────────────────────────────────────────
 
   private _showCampaignList(): void {
-    this._screen = 'list';
+    this._screen = EditorScreen.List;
     this._el.innerHTML = '';
 
     const toolbar = this._buildToolbar('🗺️ Select Campaign', null);
@@ -535,7 +536,7 @@ export class CampaignEditor {
   }
 
   private _showCampaignDetail(): void {
-    this._screen = 'campaign';
+    this._screen = EditorScreen.Campaign;
     this._el.innerHTML = '';
 
     const campaign = this._getActiveCampaign();
@@ -704,7 +705,7 @@ export class CampaignEditor {
   // ─── Screen: Chapter detail ───────────────────────────────────────────────
 
   private _showChapterDetail(): void {
-    this._screen = 'chapter';
+    this._screen = EditorScreen.Chapter;
     this._el.innerHTML = '';
 
     const campaign = this._getActiveCampaign();
@@ -906,7 +907,7 @@ export class CampaignEditor {
   }
 
   private _showLevelEditor(readOnly: boolean): void {
-    this._screen = 'levelEditor';
+    this._screen = EditorScreen.LevelEditor;
     this._el.innerHTML = '';
 
     const campaign = this._getActiveCampaign();
@@ -2585,7 +2586,7 @@ export class CampaignEditor {
       const initialFilled = board.getFilledPositions();
       const initialPressure = board.getCurrentPressure(initialFilled);
       for (const key of initialFilled) {
-        const [r, c] = key.split(',').map(Number);
+        const [r, c] = parseKey(key);
         const tile = board.grid[r]?.[c];
         if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
           const deltaDamage = initialPressure - tile.hardness;

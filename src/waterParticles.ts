@@ -8,7 +8,7 @@
  *                   indicate liquid is flowing through the connected network.
  */
 
-import { Board, NEIGHBOUR_DELTA, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
+import { Board, NEIGHBOUR_DELTA, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from './board';
 import { Direction, GridPos } from './types';
 import { TILE_SIZE, scalePx as _s } from './renderer';
 
@@ -444,7 +444,7 @@ export function spawnBubble(
   // Collect filled positions that are actual pipe tiles (not source/sink/chamber).
   const candidates: string[] = [];
   for (const key of filledPositions) {
-    const [r, c] = key.split(',').map(Number);
+    const [r, c] = parseKey(key);
     const shape = board.grid[r][c].shape;
     if (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape)) {
       candidates.push(key);
@@ -453,7 +453,7 @@ export function spawnBubble(
   if (candidates.length === 0) return;
 
   const key = candidates[Math.floor(Math.random() * candidates.length)];
-  const [row, col] = key.split(',').map(Number);
+  const [row, col] = parseKey(key);
 
   // Collect the directions that have live mutual connections from this tile.
   const connectedDirs: Direction[] = [];

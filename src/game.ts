@@ -1,4 +1,4 @@
-import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
+import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
@@ -1074,14 +1074,24 @@ export class Game {
 
   // ─── Input handlers ────────────────────────────────────────────────────────
 
+  /**
+   * Convert a mouse event's client coordinates into a grid {@link GridPos} using
+   * the current canvas bounding rectangle and tile size.
+   */
+  private _getGridPosFromEvent(e: MouseEvent): GridPos {
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      row: Math.floor((e.clientY - rect.top)  / TILE_SIZE),
+      col: Math.floor((e.clientX - rect.left) / TILE_SIZE),
+    };
+  }
+
   private _handleCanvasMouseDown(e: MouseEvent): void {
     if (e.button === 2) {
       if (this.screen !== GameScreen.Play) return;
       if (this.gameState !== GameState.Playing) return;
       if (!this.board) return;
-      const rect = this.canvas.getBoundingClientRect();
-      const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-      const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
+      const { row, col } = this._getGridPosFromEvent(e);
       this._isRightDragging = true;
       this._rightDragLastTile = { row, col };
       this._suppressNextContextMenu = false;
@@ -1092,9 +1102,7 @@ export class Game {
     if (this.gameState !== GameState.Playing) return;
     if (this.selectedShape === null) return; // No shape selected; click/rotation handled separately
 
-    const rect = this.canvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
+    const { row, col } = this._getGridPosFromEvent(e);
     this._isDragging = true;
     this._dragLastTile = { row, col };
     this._suppressNextClick = false;
@@ -1265,10 +1273,7 @@ export class Game {
       return;
     }
 
-    const rect = this.canvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left)  / TILE_SIZE);
-    const row = Math.floor((e.clientY - rect.top)   / TILE_SIZE);
-    const pos: GridPos = { row, col };
+    const pos = this._getGridPosFromEvent(e);
     const tile = this.board.getTile(pos);
     if (!tile) return;
 
@@ -1346,10 +1351,7 @@ export class Game {
     if (this.gameState !== GameState.Playing) return;
     if (!this.board) return;
 
-    const rect = this.canvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) / TILE_SIZE);
-    const row = Math.floor((e.clientY - rect.top)  / TILE_SIZE);
-    const pos: GridPos = { row, col };
+    const pos = this._getGridPosFromEvent(e);
     const tile = this.board.getTile(pos);
 
     // Right-clicking an empty tile: clear any pending inventory selection.
@@ -1539,7 +1541,7 @@ export class Game {
     let tooltipText = `(${row}, ${col})`;
     const tile = this.board.grid[row][col];
     // Indicate a gold space regardless of the tile currently on top of it.
-    if (this.board.goldSpaces.has(`${row},${col}`)) {
+    if (this.board.goldSpaces.has(posKey(row, col))) {
       tooltipText += ' (gold space)';
     }
     // Indicate cement cell status.
@@ -1869,7 +1871,7 @@ export class Game {
 
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue; // was already filled – skip
-      const [r, c] = key.split(',').map(Number);
+      const [r, c] = parseKey(key);
       const tile = this.board.grid[r]?.[c];
       if (!tile) continue;
       this._pushTileAnimLabels(tile, r, c, 'connect', currentTemp, currentPressure, now);
@@ -1901,7 +1903,7 @@ export class Game {
 
     for (const key of filledBefore) {
       if (filledAfter.has(key)) continue; // still filled – skip
-      const [r, c] = key.split(',').map(Number);
+      const [r, c] = parseKey(key);
 
       // When a tile was reclaimed its cell is now Empty in the grid; use the
       // captured tile data instead.  For rotation moves all tiles remain on the
