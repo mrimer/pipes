@@ -1272,6 +1272,38 @@ export class CampaignEditor {
     { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
   ];
 
+  /**
+   * Build a collapsible section toggle button plus its items and append both to
+   * `parent`.  The toggle button uses the supplied `borderColor`/`bgColor`/`textColor`
+   * for its visual style.  When expanded, each item is added via `makeItemBtn`.
+   */
+  private _buildCollapsibleSection(
+    parent: HTMLElement,
+    label: string,
+    expanded: boolean,
+    onToggle: () => void,
+    borderColor: string,
+    bgColor: string,
+    textColor: string,
+    items: { palette: EditorPalette; label: string }[],
+    makeItemBtn: (item: { palette: EditorPalette; label: string }, indent?: boolean) => HTMLButtonElement,
+  ): void {
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.textContent = (expanded ? '▾' : '▸') + ' ' + label;
+    toggle.style.cssText =
+      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      `border:1px solid ${borderColor};background:${bgColor};color:${textColor};font-weight:bold;margin-top:2px;`;
+    toggle.addEventListener('click', onToggle);
+    parent.appendChild(toggle);
+
+    if (expanded) {
+      for (const item of items) {
+        parent.appendChild(makeItemBtn(item, true));
+      }
+    }
+  }
+
   private _buildPalette(): HTMLElement {
     const panel = document.createElement('div');
     panel.id = 'editor-palette-panel';
@@ -1331,85 +1363,27 @@ export class CampaignEditor {
       panel.appendChild(makeItemBtn(item));
     }
 
-    // Floor collapsible section (Granite, Cement, Gold Space)
-    const floorToggle = document.createElement('button');
-    floorToggle.type = 'button';
-    floorToggle.textContent = (this._floorSectionExpanded ? '▾' : '▸') + ' Floor';
-    floorToggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      'border:1px solid #888;background:#1a1a1a;color:#ccc;font-weight:bold;margin-top:2px;';
-    floorToggle.addEventListener('click', () => {
-      this._floorSectionExpanded = !this._floorSectionExpanded;
-      const newPanel = this._buildPalette();
-      panel.replaceWith(newPanel);
-    });
-    panel.appendChild(floorToggle);
-
-    if (this._floorSectionExpanded) {
-      for (const item of this._FLOOR_PALETTE_ITEMS) {
-        panel.appendChild(makeItemBtn(item, true));
-      }
-    }
-
-    // Pipes collapsible section (standard pipes + spinnable pipes)
-    const pipesToggle = document.createElement('button');
-    pipesToggle.type = 'button';
-    pipesToggle.textContent = (this._pipesSectionExpanded ? '▾' : '▸') + ' Pipes';
-    pipesToggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      'border:1px solid #4a90d9;background:#0a1520;color:#4a90d9;font-weight:bold;margin-top:2px;';
-    pipesToggle.addEventListener('click', () => {
-      this._pipesSectionExpanded = !this._pipesSectionExpanded;
-      const newPanel = this._buildPalette();
-      panel.replaceWith(newPanel);
-    });
-    panel.appendChild(pipesToggle);
-
-    if (this._pipesSectionExpanded) {
-      for (const item of this._PIPES_PALETTE_ITEMS) {
-        panel.appendChild(makeItemBtn(item, true));
-      }
-    }
-
-    // Gold collapsible section (placed under Pipes)
-    const goldToggle = document.createElement('button');
-    goldToggle.type = 'button';
-    goldToggle.textContent = (this._goldSectionExpanded ? '▾' : '▸') + ' Gold';
-    goldToggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      'border:1px solid #b8860b;background:#1a1400;color:#ffd700;font-weight:bold;margin-top:2px;';
-    goldToggle.addEventListener('click', () => {
-      this._goldSectionExpanded = !this._goldSectionExpanded;
-      const newPanel = this._buildPalette();
-      panel.replaceWith(newPanel);
-    });
-    panel.appendChild(goldToggle);
-
-    if (this._goldSectionExpanded) {
-      for (const item of this._GOLD_PALETTE_ITEMS) {
-        panel.appendChild(makeItemBtn(item, true));
-      }
-    }
-
-    // Chamber collapsible section
-    const chamberToggle = document.createElement('button');
-    chamberToggle.type = 'button';
-    chamberToggle.textContent = (this._chamberSectionExpanded ? '▾' : '▸') + ' Blocks';
-    chamberToggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      'border:1px solid #74b9ff;background:#0a1520;color:#74b9ff;font-weight:bold;margin-top:2px;';
-    chamberToggle.addEventListener('click', () => {
-      this._chamberSectionExpanded = !this._chamberSectionExpanded;
-      const newPanel = this._buildPalette();
-      panel.replaceWith(newPanel);
-    });
-    panel.appendChild(chamberToggle);
-
-    if (this._chamberSectionExpanded) {
-      for (const item of this._CHAMBER_PALETTE_ITEMS) {
-        panel.appendChild(makeItemBtn(item, true));
-      }
-    }
+    // Collapsible sections: Floor, Pipes, Gold, Blocks (chambers)
+    this._buildCollapsibleSection(
+      panel, 'Floor', this._floorSectionExpanded,
+      () => { this._floorSectionExpanded = !this._floorSectionExpanded; panel.replaceWith(this._buildPalette()); },
+      '#888', '#1a1a1a', '#ccc', this._FLOOR_PALETTE_ITEMS, makeItemBtn,
+    );
+    this._buildCollapsibleSection(
+      panel, 'Pipes', this._pipesSectionExpanded,
+      () => { this._pipesSectionExpanded = !this._pipesSectionExpanded; panel.replaceWith(this._buildPalette()); },
+      '#4a90d9', '#0a1520', '#4a90d9', this._PIPES_PALETTE_ITEMS, makeItemBtn,
+    );
+    this._buildCollapsibleSection(
+      panel, 'Gold', this._goldSectionExpanded,
+      () => { this._goldSectionExpanded = !this._goldSectionExpanded; panel.replaceWith(this._buildPalette()); },
+      '#b8860b', '#1a1400', '#ffd700', this._GOLD_PALETTE_ITEMS, makeItemBtn,
+    );
+    this._buildCollapsibleSection(
+      panel, 'Blocks', this._chamberSectionExpanded,
+      () => { this._chamberSectionExpanded = !this._chamberSectionExpanded; panel.replaceWith(this._buildPalette()); },
+      '#74b9ff', '#0a1520', '#74b9ff', this._CHAMBER_PALETTE_ITEMS, makeItemBtn,
+    );
 
     // Erase at the end of the palette
     panel.appendChild(makeItemBtn({ palette: 'erase', label: '🗑 Erase (→ Empty)' }));

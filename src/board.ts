@@ -544,11 +544,8 @@ export class Board {
     {
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       const filledAfter = this.getFilledPositions();
-      const sandstoneError = this._checkSandstoneConstraints(filledAfter);
-      const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filledAfter);
-      const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filledAfter);
+      const constraintError = this._validateConstraints(filledAfter);
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
-      const constraintError = sandstoneError ?? heaterError ?? pumpError;
       if (constraintError) {
         this.lastError = constraintError;
         return false;
@@ -606,10 +603,7 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
-    const sandstoneError = this._checkSandstoneConstraints(filled);
-    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
-    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
-    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    const constraintError = this._validateConstraints(filled);
     if (constraintError) {
       // Roll back placement.
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
@@ -740,10 +734,7 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filledAfterReplace = this.getFilledPositions();
-    const sandstoneError = this._checkSandstoneConstraints(filledAfterReplace);
-    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filledAfterReplace);
-    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filledAfterReplace);
-    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    const constraintError = this._validateConstraints(filledAfterReplace);
     if (constraintError) {
       this.lastError = constraintError;
       this.inventory = savedInventory;
@@ -1366,6 +1357,21 @@ export class Board {
       this.cementData.set(key, dryingTime - 1);
       this.lastCementDecrement = { row: pos.row, col: pos.col };
     }
+  }
+
+  /**
+   * Run all three constraint checks (sandstone → heater → pump) in order,
+   * stopping at the first failure.  Convenience wrapper used by
+   * {@link placeInventoryTile}, {@link replaceInventoryTile}, and
+   * {@link reclaimTile} to avoid duplicating the short-circuit chain.
+   * @param filled - Current fill set (after the board mutation).
+   * @returns The first error message found, or `null` if all constraints pass.
+   */
+  private _validateConstraints(filled: Set<string>): string | null {
+    const sandstoneError = this._checkSandstoneConstraints(filled);
+    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
+    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
+    return sandstoneError ?? heaterError ?? pumpError;
   }
 
   /**
