@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
+import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey } from './board';
 import { Tile } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction } from './types';
 import {
@@ -1208,8 +1208,8 @@ export function renderBoard(
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       const isFocused  = focusPos.row === r && focusPos.col === c;
-      const isGoldCell = board.goldSpaces.has(`${r},${c}`);
-      const isCementCell = board.cementData.has(`${r},${c}`);
+      const isGoldCell = board.goldSpaces.has(posKey(r, c));
+      const isCementCell = board.cementData.has(posKey(r, c));
 
       // A cell is a valid placement target when it's empty and either:
       // it's not a gold space (any pipe fits), or it IS a gold space (gold pipe required)
@@ -1270,7 +1270,7 @@ export function renderBoard(
           ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : EMPTY_COLOR;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           // Draw any ambient decoration on this empty non-gold cell
-          const dec = board.ambientDecorationMap.get(`${r},${c}`);
+          const dec = board.ambientDecorationMap.get(posKey(r, c));
           if (dec) drawAmbientDecoration(ctx, dec);
         }
       } else {
@@ -1305,7 +1305,7 @@ export function renderBoard(
       }
 
       // Sandstone error highlight (pulsing red overlay)
-      if (highlightedPositions.has(`${r},${c}`)) {
+      if (highlightedPositions.has(posKey(r, c))) {
         const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
         ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
         ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
@@ -1321,7 +1321,7 @@ export function renderBoard(
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
       if (PIPE_SHAPES.has(tile.shape)) continue;
-      const isCementCell = board.cementData.has(`${r},${c}`);
+      const isCementCell = board.cementData.has(posKey(r, c));
 
       // Skip drawing the empty-tile dot on cement cells – the cement background
       // texture is already clearly visible and the label (pass 4) provides the
@@ -1330,7 +1330,7 @@ export function renderBoard(
 
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      const isWater = filled.has(`${r},${c}`);
+      const isWater = filled.has(posKey(r, c));
 
       // For connected ice/snow/sandstone tiles, pass the locked effective cost so
       // the tile can display the single locked-in value instead of the live formula.
@@ -1368,7 +1368,7 @@ export function renderBoard(
 
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      const isWater = filled.has(`${r},${c}`);
+      const isWater = filled.has(posKey(r, c));
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null);
     }
@@ -1378,8 +1378,8 @@ export function renderBoard(
   // Drawn after all tile content so the label always appears on top of any pipe graphic.
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
-      if (!board.cementData.has(`${r},${c}`)) continue;
-      const dryingTime = board.cementData.get(`${r},${c}`) as number;
+      if (!board.cementData.has(posKey(r, c))) continue;
+      const dryingTime = board.cementData.get(posKey(r, c)) as number;
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       // A tile is "hardened" (shows 'X') whenever dryingTime is 0.
@@ -1394,7 +1394,7 @@ export function renderBoard(
     const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
     if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
       const hoverTile = board.grid[hoverRow][hoverCol];
-      const isGoldCell = board.goldSpaces.has(`${hoverRow},${hoverCol}`);
+      const isGoldCell = board.goldSpaces.has(posKey(hoverRow, hoverCol));
       const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
       const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
       if (canPlace || canReplace) {
