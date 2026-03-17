@@ -106,6 +106,7 @@ function colorCircle(fill: string): string {
 /** Controls reference table rows. */
 const CONTROL_ROWS: ControlRow[] = [
   { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
+  { input: 'Shift + Left Click', action: 'Rotate a placed pipe counter-clockwise.' },
   { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory. Right-clicking a selected inventory tile deselects it.' },
   { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
   { input: 'Hover + Scroll Wheel', action: 'Queue a placed pipe for rotation when no inventory item is selected.' },

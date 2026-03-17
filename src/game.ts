@@ -1313,7 +1313,7 @@ export class Game {
       this.hoverRotationDelta = 0;
       const rotated = delta > 0
         ? this.board.rotateTileBy(pos, delta)
-        : this.board.rotateTile(pos);
+        : e.shiftKey ? this.board.rotateTileBy(pos, 3) : this.board.rotateTile(pos);
       if (rotated) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this.selectedShape === tile.shape) {
