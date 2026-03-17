@@ -26,6 +26,15 @@ import {
   computeFlowGoodDirs,
 } from './waterParticles';
 
+/** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
+const DRY_PUFF_SPAWN_INTERVAL_MS = 200;
+/** How often (ms) to spawn a water-spray drop from the source during normal play. */
+const SPRAY_SPAWN_INTERVAL_MS = 150;
+/** How often (ms) to spawn a fizzing bubble particle inside connected pipes. */
+const BUBBLE_SPAWN_INTERVAL_MS = 90;
+/** How often (ms) to spawn a win-flow drop during the won state. */
+const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
+
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
  * Handles both the level-selection menu and the active play screen.
@@ -896,14 +905,14 @@ export class Game {
     const sy = this.board.source.row * TILE_SIZE + TILE_SIZE / 2;
     if (this.gameState === GameState.GameOver) {
       // Tank ran dry: show puffs of dry air bursting from the source.
-      if (now - this._lastSpraySpawn >= 200) {
+      if (now - this._lastSpraySpawn >= DRY_PUFF_SPAWN_INTERVAL_MS) {
         spawnDryPuff(this._dryPuffs);
         this._lastSpraySpawn = now;
       }
       renderDryPuffs(this.ctx, this._dryPuffs, sx, sy);
     } else {
       // Normal play: show water drops spraying from the source.
-      if (now - this._lastSpraySpawn >= 150) {
+      if (now - this._lastSpraySpawn >= SPRAY_SPAWN_INTERVAL_MS) {
         spawnSourceSprayDrop(this._sourceSprayDrops);
         this._lastSpraySpawn = now;
       }
@@ -922,7 +931,7 @@ export class Game {
     if (filledPositions.size <= 2) return; // source + sink only → nothing to show
     const now = performance.now();
     // Spawn a new bubble roughly every 90 ms (~11 per second).
-    if (now - this._lastBubbleSpawn >= 90) {
+    if (now - this._lastBubbleSpawn >= BUBBLE_SPAWN_INTERVAL_MS) {
       spawnBubble(this._bubbles, this.board, filledPositions);
       this._lastBubbleSpawn = now;
     }
@@ -934,7 +943,7 @@ export class Game {
     if (this.gameState !== GameState.Won || !this.board || !this._flowGoodDirs) return;
     const now = performance.now();
     // Spawn a new drop roughly every 70 ms to maintain ~5 drops per tile at steady state.
-    if (now - this._lastFlowSpawn >= 70) {
+    if (now - this._lastFlowSpawn >= WIN_FLOW_SPAWN_INTERVAL_MS) {
       spawnFlowDrop(this._flowDrops, this.board, this._flowGoodDirs, this._flowMaxDrops);
       this._lastFlowSpawn = now;
     }
@@ -1424,6 +1433,16 @@ export class Game {
     }
   }
 
+  /** Rotate `pendingRotation` 90° clockwise (for wheel/keyboard placement rotation). */
+  private _rotatePendingCW(): void {
+    this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
+  }
+
+  /** Rotate `pendingRotation` 90° counter-clockwise (for wheel/keyboard placement rotation). */
+  private _rotatePendingCCW(): void {
+    this.pendingRotation = ((this.pendingRotation - 90 + 360) % 360) as Rotation;
+  }
+
   private _handleCanvasWheel(e: WheelEvent): void {
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
@@ -1431,9 +1450,9 @@ export class Game {
       e.preventDefault();
       // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
       if (e.deltaY > 0) {
-        this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
+        this._rotatePendingCW();
       } else {
-        this.pendingRotation = ((this.pendingRotation + 270) % 360) as Rotation;
+        this._rotatePendingCCW();
       }
     } else if (this.mouseCanvasPos && this.board) {
       const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
@@ -1783,14 +1802,7 @@ export class Game {
       } else if (tile.chamberContent === 'ice') {
         const deltaTemp = Math.max(0, tile.temperature - currentTemp);
         const raw = tile.cost * deltaTemp;
-        if (dir === 'connect') {
-          const val = -raw;
-          text = val < 0 ? `${val}` : '-0';
-          color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
-        } else {
-          text = raw > 0 ? `+${raw}` : '+0';
-          color = raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-        }
+        ({ text, color } = this._formatWaterCostLabel(raw, dir));
       } else if (tile.chamberContent === 'pump') {
         // Pump raises pressure on connect, lowers it on disconnect.
         const val = dir === 'connect' ? tile.pressure : -tile.pressure;
@@ -1799,14 +1811,7 @@ export class Game {
       } else if (tile.chamberContent === 'snow') {
         const deltaTemp = Math.max(0, tile.temperature - currentTemp);
         const raw = (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
-        if (dir === 'connect') {
-          const val = -raw;
-          text = val < 0 ? `${val}` : '-0';
-          color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
-        } else {
-          text = raw > 0 ? `+${raw}` : '+0';
-          color = raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-        }
+        ({ text, color } = this._formatWaterCostLabel(raw, dir));
       } else if (tile.chamberContent === 'sandstone') {
         const shatterActive = tile.shatter > tile.hardness;
         const shatterOverride = shatterActive && currentPressure >= tile.shatter;
@@ -1817,58 +1822,10 @@ export class Game {
           const deltaDamage = currentPressure - tile.hardness;
           const deltaTemp = Math.max(0, tile.temperature - currentTemp);
           const raw = (deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost) * deltaTemp;
-          if (dir === 'connect') {
-            const val = -raw;
-            text = val < 0 ? `${val}` : '-0';
-            color = val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR;
-          } else {
-            text = raw > 0 ? `+${raw}` : '+0';
-            color = raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR;
-          }
+          ({ text, color } = this._formatWaterCostLabel(raw, dir));
         }
       } else if (tile.chamberContent === 'hot_plate') {
-        if (dir === 'connect') {
-          // Use the locked values computed by applyTurnDelta.
-          const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
-          const lockedGain = this.board.getLockedHotPlateGain({ row: r, col: c });
-          if (lockedImpact !== null && lockedGain !== null) {
-            const loss = Math.max(0, lockedGain - lockedImpact);
-            if (lockedGain > 0 && loss > 0) {
-              // Both gain and loss: spawn two separate labels offset above/below.
-              this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-              this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-              // text stays null so the outer push is skipped
-            } else if (lockedGain > 0) {
-              text = `+${lockedGain}`;
-              color = ANIM_POSITIVE_COLOR;
-            } else if (loss > 0) {
-              text = `-${loss}`;
-              color = ANIM_NEGATIVE_COLOR;
-            } else {
-              text = '+0';
-              color = ANIM_ZERO_COLOR;
-            }
-          }
-        } else {
-          // Disconnecting: reverse the hot plate's effects.
-          // gain (from frozen) is lost; water loss is recovered.
-          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          const waterGain = Math.min(this.board.frozen, effectiveCost);
-          const waterLoss = Math.max(0, effectiveCost - waterGain);
-          if (waterLoss > 0 && waterGain > 0) {
-            this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-            this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-          } else if (waterLoss > 0) {
-            text = `+${waterLoss}`;
-            color = ANIM_POSITIVE_COLOR;
-          } else if (waterGain > 0) {
-            text = `-${waterGain}`;
-            color = ANIM_NEGATIVE_COLOR;
-          } else {
-            text = '-0';
-            color = ANIM_ZERO_COLOR;
-          }
-        }
+        ({ text, color } = this._pushHotPlateAnimLabels(tile, r, c, dir, currentTemp, cx, cy, now));
       } else if (tile.chamberContent === 'star' && dir === 'connect') {
         // Star tile connected – spawn golden sparkle burst from the tile centre.
         const starCx = c * TILE_SIZE + TILE_SIZE / 2;
@@ -1880,6 +1837,76 @@ export class Game {
 
     if (text !== null) {
       this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
+    }
+  }
+
+  /**
+   * Format the water-cost animation label for tiles (ice/snow/sandstone) whose
+   * cost is expressed as a raw positive number.  On connect the label is shown
+   * as a negative cost; on disconnect as a positive refund.
+   */
+  private _formatWaterCostLabel(raw: number, dir: 'connect' | 'disconnect'): { text: string; color: string } {
+    if (dir === 'connect') {
+      const val = -raw;
+      return { text: val < 0 ? `${val}` : '-0', color: val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR };
+    } else {
+      return { text: raw > 0 ? `+${raw}` : '+0', color: raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR };
+    }
+  }
+
+  /**
+   * Compute and push the animation label(s) for a hot-plate tile.
+   * Returns `{ text, color }` for a single-label result, or `{ text: null, color }` if
+   * two separate labels were pushed directly to `_animations` (dual gain+loss case).
+   */
+  private _pushHotPlateAnimLabels(
+    tile: Tile,
+    r: number,
+    c: number,
+    dir: 'connect' | 'disconnect',
+    currentTemp: number,
+    cx: number,
+    cy: number,
+    now: number,
+  ): { text: string | null; color: string } {
+    if (!this.board) return { text: null, color: ANIM_ZERO_COLOR };
+    if (dir === 'connect') {
+      // Use the locked values computed by applyTurnDelta.
+      const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
+      const lockedGain = this.board.getLockedHotPlateGain({ row: r, col: c });
+      if (lockedImpact !== null && lockedGain !== null) {
+        const loss = Math.max(0, lockedGain - lockedImpact);
+        if (lockedGain > 0 && loss > 0) {
+          // Both gain and loss: spawn two separate labels offset above/below.
+          this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+          this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+          return { text: null, color: ANIM_ZERO_COLOR }; // outer push skipped
+        } else if (lockedGain > 0) {
+          return { text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR };
+        } else if (loss > 0) {
+          return { text: `-${loss}`, color: ANIM_NEGATIVE_COLOR };
+        } else {
+          return { text: '+0', color: ANIM_ZERO_COLOR };
+        }
+      }
+      return { text: null, color: ANIM_ZERO_COLOR };
+    } else {
+      // Disconnecting: reverse the hot plate's effects.
+      // gain (from frozen) is lost; water loss is recovered.
+      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+      const waterGain = Math.min(this.board.frozen, effectiveCost);
+      const waterLoss = Math.max(0, effectiveCost - waterGain);
+      if (waterLoss > 0 && waterGain > 0) {
+        this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+        this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+        return { text: null, color: ANIM_ZERO_COLOR }; // outer push skipped
+      } else if (waterLoss > 0) {
+        return { text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR };
+      } else if (waterGain > 0) {
+        return { text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR };
+      } else {
+        return { text: '-0', color: ANIM_ZERO_COLOR };
+      }
     }
   }
 
@@ -2132,7 +2159,7 @@ export class Game {
         e.preventDefault();
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
-          this.pendingRotation = (((this.pendingRotation - 90) + 360) % 360) as Rotation;
+          this._rotatePendingCCW();
         } else if (!this._tryRotateHoverSpinner(3)) {
           // 3 CW steps = 1 CCW step
           this._tryAdjustHoverRotation(-1);
@@ -2143,7 +2170,7 @@ export class Game {
         e.preventDefault();
         if (this.gameState !== GameState.Playing) break;
         if (this.selectedShape !== null) {
-          this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
+          this._rotatePendingCW();
         } else if (!this._tryRotateHoverSpinner(1)) {
           this._tryAdjustHoverRotation(1);
         }
