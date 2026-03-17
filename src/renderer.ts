@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey } from './board';
+import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction } from './types';
 import {
@@ -487,7 +487,7 @@ function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: n
     // When shift is held, show the raw (unadjusted) threshold value.
     const iceThreshold = shiftHeld
       ? tile.temperature
-      : Math.max(0, tile.temperature - currentTemp);
+      : computeDeltaTemp(tile.temperature, currentTemp);
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(`-${iceThreshold}°`, 0, -_s(9));
     ctx.font = `bold ${_s(9)}px Arial`;
@@ -569,10 +569,10 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
     // When shift is held, show the raw (unadjusted) values.
     const deltaTemp = shiftHeld
       ? tile.temperature
-      : Math.max(0, tile.temperature - currentTemp);
+      : computeDeltaTemp(tile.temperature, currentTemp);
     const snowCost = shiftHeld
       ? tile.cost
-      : Math.max(1, currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost);
+      : Math.max(1, snowCostPerDeltaTemp(tile.cost, currentPressure));
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(`-${deltaTemp}°`, 0, -_s(9));
     ctx.font = `bold ${_s(9)}px Arial`;
@@ -587,9 +587,10 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   // When shatter is active and pressure reaches the shatter threshold, use lighter color.
   // When connected, show the locked effective cost value.
   // Otherwise show cost display lines.
+  const { shatterOverride: isShatterTriggered, deltaDamage, costPerDeltaTemp } =
+    sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
   const shatterActive = tile.shatter > tile.hardness;
   const isHard = tile.hardness >= currentPressure;
-  const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
   // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
   ctx.strokeStyle = sandstoneColor;
   ctx.lineWidth = _s(1.5);
@@ -642,11 +643,10 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
     // When shift is held, show the raw (unadjusted) values.
     const sandstoneThreshold = shiftHeld
       ? tile.temperature
-      : Math.max(0, tile.temperature - currentTemp);
-    const deltaDamage = currentPressure - tile.hardness;
+      : computeDeltaTemp(tile.temperature, currentTemp);
     const sandstoneCost = shiftHeld
       ? tile.cost
-      : Math.max(1, deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : tile.cost);
+      : Math.max(1, deltaDamage >= 1 ? costPerDeltaTemp : tile.cost);
     if (shatterActive) {
       const displayCost = isShatterTriggered ? 0 : sandstoneCost;
       ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
