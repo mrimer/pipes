@@ -63,6 +63,53 @@ export function isObstacleTile(shape: PipeShape): boolean {
   return shape === PipeShape.Granite || shape === PipeShape.Tree;
 }
 
+// ── Ice / snow / sandstone cost-calculation helpers ──────────────────────────
+// These formulas appear in getCurrentWater(), _lockNewTiles(), and
+// _reEvaluateConnectedTiles() in board.ts, and in _pushTileAnimLabels() in
+// game.ts.  Centralising them here avoids copy-paste bugs and makes the
+// cost model easier to understand.
+
+/**
+ * Compute how much colder a tile is than the current environment temperature.
+ * Returns 0 if the tile is warmer than (or at) the current temperature.
+ * Used as the per-deltaTemp multiplier for ice/snow/sandstone/hot_plate costs.
+ */
+export function computeDeltaTemp(tileTemperature: number, effectiveTemp: number): number {
+  return Math.max(0, tileTemperature - effectiveTemp);
+}
+
+/**
+ * Compute the pressure-adjusted cost per deltaTemp unit for a snow tile.
+ * When pressure ≥ 1 the cost is divided by pressure (rounded up); otherwise
+ * the full cost applies.
+ */
+export function snowCostPerDeltaTemp(tileCost: number, pressure: number): number {
+  return pressure >= 1 ? Math.ceil(tileCost / pressure) : tileCost;
+}
+
+/**
+ * Determine the sandstone cost factors based on the current pressure.
+ *
+ * - `shatterOverride`: pressure meets or exceeds the shatter threshold, so the
+ *   tile is shattered and costs **zero** water regardless of temperature.
+ * - `deltaDamage`: `pressure − hardness`.  Values < 1 indicate an invalid play
+ *   state (caller must apply a failure penalty; see {@link Board.sourceCapacity}).
+ * - `costPerDeltaTemp`: water cost per deltaTemp unit when `deltaDamage ≥ 1`.
+ *   Falls back to `tileCost` for the failure case so callers can still display
+ *   a readable label (e.g. in animation tooltips).
+ */
+export function sandstoneCostFactors(
+  tileCost: number,
+  hardness: number,
+  shatter: number,
+  pressure: number,
+): { shatterOverride: boolean; deltaDamage: number; costPerDeltaTemp: number } {
+  const shatterOverride = shatter > hardness && pressure >= shatter;
+  const deltaDamage = pressure - hardness;
+  const costPerDeltaTemp = deltaDamage >= 1 ? Math.ceil(tileCost / deltaDamage) : tileCost;
+  return { shatterOverride, deltaDamage, costPerDeltaTemp };
+}
+
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
   grid: Tile[][];
@@ -964,23 +1011,24 @@ export class Board {
       if (PIPE_SHAPES.has(tile.shape)) {
         pipeCost++;
       } else if (tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'tank') tankGain += tile.capacity;
-        else if (tile.chamberContent === 'dirt') pipeCost += tile.cost;
-        else if (tile.chamberContent === 'ice') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+        if (tile.chamberContent === 'tank') {
+          tankGain += tile.capacity;
+        } else if (tile.chamberContent === 'dirt') {
+          pipeCost += tile.cost;
+        } else if (tile.chamberContent === 'ice') {
+          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
           pipeCost += tile.cost * deltaTemp;
         } else if (tile.chamberContent === 'snow') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          pipeCost += (currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost) * deltaTemp;
+          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+          pipeCost += snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
         } else if (tile.chamberContent === 'sandstone') {
-          const shatterActive = tile.shatter > tile.hardness;
-          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
+          const { shatterOverride, deltaDamage, costPerDeltaTemp } =
+            sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
           if (!shatterOverride) {
-            const deltaDamage = currentPressure - tile.hardness;
-            const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+            const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
             // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
             pipeCost += deltaDamage >= 1
-              ? Math.ceil(tile.cost / deltaDamage) * deltaTemp
+              ? costPerDeltaTemp * deltaTemp
               : this.sourceCapacity + 1;
           }
         } else if (tile.chamberContent === 'hot_plate') {
@@ -1111,19 +1159,18 @@ export class Board {
       let newImpact: number;
 
       if (tile.chamberContent === 'ice') {
-        const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
+        const deltaTemp = computeDeltaTemp(tile.temperature, effectiveTemp);
         newImpact = -(tile.cost * deltaTemp);
       } else if (tile.chamberContent === 'sandstone') {
         // Use historically-limited pressure so no tile benefits retroactively from
         // a pump that connected after it – consistent with ice and snow.
-        const shatterActive = tile.shatter > tile.hardness;
-        const shatterOverride = shatterActive && effectivePressure >= tile.shatter;
-        const deltaDamage = effectivePressure - tile.hardness;
-        const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
+        const { shatterOverride, deltaDamage, costPerDeltaTemp } =
+          sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, effectivePressure);
+        const deltaTemp = computeDeltaTemp(tile.temperature, effectiveTemp);
         if (shatterOverride) {
           newImpact = 0;
         } else if (deltaDamage >= 1) {
-          newImpact = -(Math.ceil(tile.cost / deltaDamage) * deltaTemp);
+          newImpact = -(costPerDeltaTemp * deltaTemp);
         } else {
           // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
           // connection time are now gone.  Force immediate failure.
@@ -1155,9 +1202,9 @@ export class Board {
         this._lockedConnectPressure.set(key, effectivePressure);
         continue; // Frozen and impact already updated above.
       } else {
-        const deltaTemp = Math.max(0, tile.temperature - effectiveTemp);
-        const effectiveCost = effectivePressure >= 1 ? Math.ceil(tile.cost / effectivePressure) : tile.cost;
-        newImpact = -(effectiveCost * deltaTemp);
+        // snow: pressure-adjusted cost per deltaTemp unit
+        const deltaTemp = computeDeltaTemp(tile.temperature, effectiveTemp);
+        newImpact = -(snowCostPerDeltaTemp(tile.cost, effectivePressure) * deltaTemp);
       }
 
       if (newImpact !== oldImpact) {
@@ -1208,27 +1255,25 @@ export class Board {
         } else if (tile.chamberContent === 'dirt') {
           impact = -tile.cost;
         } else if (tile.chamberContent === 'ice') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
           impact = -(tile.cost * deltaTemp);
           this.frozen += tile.cost * deltaTemp;
         } else if (tile.chamberContent === 'snow') {
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
+          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+          const effectiveCost = snowCostPerDeltaTemp(tile.cost, currentPressure);
           impact = -(effectiveCost * deltaTemp);
           this.frozen += effectiveCost * deltaTemp;
         } else if (tile.chamberContent === 'sandstone') {
-          const shatterActive = tile.shatter > tile.hardness;
-          const shatterOverride = shatterActive && currentPressure >= tile.shatter;
-          const deltaDamage = currentPressure - tile.hardness;
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const { shatterOverride, deltaDamage, costPerDeltaTemp } =
+            sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
+          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
           if (shatterOverride) {
             impact = 0;
             // No frozen water consumed when shatter overrides to zero cost.
           } else if (deltaDamage >= 1) {
             // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
-            const effectiveCost = Math.ceil(tile.cost / deltaDamage);
-            impact = -(effectiveCost * deltaTemp);
-            this.frozen += effectiveCost * deltaTemp;
+            impact = -(costPerDeltaTemp * deltaTemp);
+            this.frozen += costPerDeltaTemp * deltaTemp;
           } else {
             impact = -(this.sourceCapacity + 1);
           }
