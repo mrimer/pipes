@@ -110,15 +110,17 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
   const base = `width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"`;
   const line = (x1: number, y1: number, x2: number, y2: number) =>
     `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
-  // Map gold pipe shapes to their base shape for icon rendering
-  let drawShape = shape;
-  if (shape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
-  else if (shape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
-  else if (shape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
-  else if (shape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
-  else if (shape === PipeShape.SpinStraight) drawShape = PipeShape.Straight;
-  else if (shape === PipeShape.SpinElbow) drawShape = PipeShape.Elbow;
-  else if (shape === PipeShape.SpinTee) drawShape = PipeShape.Tee;
+  // Normalize gold and spin variants to their base shape for icon rendering
+  const SHAPE_ICON_BASE: Partial<Record<PipeShape, PipeShape>> = {
+    [PipeShape.GoldStraight]: PipeShape.Straight,
+    [PipeShape.GoldElbow]:    PipeShape.Elbow,
+    [PipeShape.GoldTee]:      PipeShape.Tee,
+    [PipeShape.GoldCross]:    PipeShape.Cross,
+    [PipeShape.SpinStraight]: PipeShape.Straight,
+    [PipeShape.SpinElbow]:    PipeShape.Elbow,
+    [PipeShape.SpinTee]:      PipeShape.Tee,
+  };
+  const drawShape = SHAPE_ICON_BASE[shape] ?? shape;
   switch (drawShape) {
     case PipeShape.Straight:
       return `<svg ${base}>${line(H, 0, H, S)}</svg>`;

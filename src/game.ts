@@ -1529,6 +1529,110 @@ export class Game {
     return `(${tileTemp}+${envTemp}° x ${cost})`;
   }
 
+  /**
+   * Append cost-related tooltip text for a chamber tile that is **already connected**
+   * (locked-in values are used).
+   * @returns The updated tooltip string.
+   */
+  private _tooltipForConnectedChamber(
+    tooltipText: string,
+    tile: Tile,
+    pos: { row: number; col: number },
+    lockedImpact: number,
+  ): string {
+    if (!this.board) return tooltipText;
+    const lockedCost = Math.abs(lockedImpact);
+    const content = tile.chamberContent;
+    if (content === 'ice' || content === 'snow' || content === 'sandstone') {
+      const lockedTemp = this.board.getLockedConnectTemp(pos) ?? 0;
+      const lockedPressure = this.board.getLockedConnectPressure(pos) ?? 1;
+      const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
+      if (content === 'ice') {
+        return tooltipText + ` ${this._iceCostFormula(lockedDeltaTemp, tile.cost)} cost: ${lockedCost}`;
+      } else if (content === 'snow') {
+        return tooltipText + ` ${this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost)} cost: ${lockedCost}`;
+      } else {
+        // sandstone
+        const shatterActive = tile.shatter > tile.hardness;
+        const isShatterTriggered = shatterActive && lockedPressure >= tile.shatter;
+        if (isShatterTriggered) {
+          return tooltipText + ` [${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
+        }
+        const lockedDeltaDamage = lockedPressure - tile.hardness;
+        if (lockedDeltaDamage >= 1) {
+          return tooltipText + ` ${this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile)} cost: ${lockedCost}`;
+        }
+        return tooltipText + ` cost: ${lockedCost}`;
+      }
+    } else if (content === 'hot_plate') {
+      const lockedGain = this.board.getLockedHotPlateGain(pos);
+      const lockedTemp = this.board.getLockedConnectTemp(pos) ?? 0;
+      if (lockedGain !== null) {
+        const loss = Math.max(0, lockedGain - lockedImpact);
+        return tooltipText + ` ${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
+      }
+    }
+    return tooltipText;
+  }
+
+  /**
+   * Append cost-related tooltip text for a chamber tile that is **not yet connected**
+   * (predicted cost using current live stats).
+   * @returns The updated tooltip string, with predicted cost appended if non-zero.
+   */
+  private _tooltipForUnconnectedChamber(tooltipText: string, tile: Tile): string {
+    if (!this.board) return tooltipText;
+    const content = tile.chamberContent;
+    let predictedCost: number | null = null;
+
+    if (content === 'dirt') {
+      predictedCost = tile.cost;
+    } else if (content === 'ice') {
+      const currentTemp = this.board.getCurrentTemperature();
+      const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+      tooltipText += ` ${this._iceCostFormula(deltaTemp, tile.cost)}`;
+      predictedCost = tile.cost * deltaTemp;
+    } else if (content === 'snow') {
+      const currentTemp = this.board.getCurrentTemperature();
+      const currentPressure = this.board.getCurrentPressure();
+      const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+      const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
+      tooltipText += ` ${this._snowCostFormula(deltaTemp, currentPressure, tile.cost)}`;
+      predictedCost = effectiveCost * deltaTemp;
+    } else if (content === 'sandstone') {
+      const currentTemp = this.board.getCurrentTemperature();
+      const currentPressure = this.board.getCurrentPressure();
+      const shatterActive = tile.shatter > tile.hardness;
+      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
+      if (isShatterTriggered) {
+        tooltipText += ` [${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
+        predictedCost = 0;
+      } else {
+        const deltaDamage = currentPressure - tile.hardness;
+        if (deltaDamage <= 0) {
+          tooltipText += ` — Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
+        } else {
+          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
+          const effectiveCost = Math.ceil(tile.cost / deltaDamage);
+          tooltipText += ` ${this._sandstoneCostFormula(deltaTemp, currentPressure, tile)}`;
+          predictedCost = effectiveCost * deltaTemp;
+        }
+      }
+    } else if (content === 'hot_plate') {
+      const currentTemp = this.board.getCurrentTemperature();
+      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+      tooltipText += ` ${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
+      predictedCost = effectiveCost;
+    } else {
+      predictedCost = 0;
+    }
+
+    if (predictedCost !== null && predictedCost !== 0) {
+      tooltipText += ` cost: ${predictedCost}`;
+    }
+    return tooltipText;
+  }
+
   private _showTooltip(clientX: number, clientY: number): void {
     if (this.screen !== GameScreen.Play || !this.mouseCanvasPos) return;
     const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
@@ -1564,89 +1668,11 @@ export class Game {
       // for ice/snow/sandstone/hot_plate show the locked-in effective cost value.
       const lockedImpact = this.board.getLockedWaterImpact({ row, col });
       const isConnected = lockedImpact !== null;
-      if (isConnected &&
-          (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')) {
-        // Show the locked calculation text using the stats at the time this tile connected.
-        const lockedTemp = this.board.getLockedConnectTemp({ row, col }) ?? 0;
-        const lockedPressure = this.board.getLockedConnectPressure({ row, col }) ?? 1;
-        const lockedCost = Math.abs(lockedImpact);
-        if (tile.chamberContent === 'ice') {
-          const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
-          tooltipText += ` ${this._iceCostFormula(lockedDeltaTemp, tile.cost)} cost: ${lockedCost}`;
-        } else if (tile.chamberContent === 'snow') {
-          const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
-          tooltipText += ` ${this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost)} cost: ${lockedCost}`;
-        } else {
-          // sandstone
-          const shatterActive = tile.shatter > tile.hardness;
-          const isShatterTriggered = shatterActive && lockedPressure >= tile.shatter;
-          if (isShatterTriggered) {
-            tooltipText += ` [${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
-          } else {
-            const lockedDeltaDamage = lockedPressure - tile.hardness;
-            if (lockedDeltaDamage >= 1) {
-              const lockedDeltaTemp = Math.max(0, tile.temperature - lockedTemp);
-              tooltipText += ` ${this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile)} cost: ${lockedCost}`;
-            } else {
-              tooltipText += ` cost: ${lockedCost}`;
-            }
-          }
-        }
-      } else if (isConnected && tile.chamberContent === 'hot_plate') {
-        const lockedGain = this.board.getLockedHotPlateGain({ row, col });
-        const lockedTemp = this.board.getLockedConnectTemp({ row, col }) ?? 0;
-        if (lockedGain !== null) {
-          const loss = Math.max(0, lockedGain - lockedImpact);
-          tooltipText += ` ${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
-        }
-      } else if (!isConnected) {
-        let predictedCost: number | null = null;
-        if (tile.chamberContent === 'dirt') {
-          predictedCost = tile.cost;
-        } else if (tile.chamberContent === 'ice') {
-          // Predicted cost uses the current live temperature so the estimate updates
-          // as connections (e.g. heaters on other branches) change the temperature.
-          const currentTemp = this.board.getCurrentTemperature();
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          tooltipText += ` ${this._iceCostFormula(deltaTemp, tile.cost)}`;
-          predictedCost = tile.cost * deltaTemp;
-        } else if (tile.chamberContent === 'snow') {
-          const currentTemp = this.board.getCurrentTemperature();
-          const currentPressure = this.board.getCurrentPressure();
-          const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-          const effectiveCost = currentPressure >= 1 ? Math.ceil(tile.cost / currentPressure) : tile.cost;
-          tooltipText += ` ${this._snowCostFormula(deltaTemp, currentPressure, tile.cost)}`;
-          predictedCost = effectiveCost * deltaTemp;
-        } else if (tile.chamberContent === 'sandstone') {
-          const currentTemp = this.board.getCurrentTemperature();
-          const currentPressure = this.board.getCurrentPressure();
-          const shatterActive = tile.shatter > tile.hardness;
-          const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-          if (isShatterTriggered) {
-            tooltipText += ` [${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
-            predictedCost = 0;
-          } else {
-            const deltaDamage = currentPressure - tile.hardness;
-            if (deltaDamage <= 0) {
-              tooltipText += ` — Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
-            } else {
-              const deltaTemp = Math.max(0, tile.temperature - currentTemp);
-              const effectiveCost = Math.ceil(tile.cost / deltaDamage);
-              tooltipText += ` ${this._sandstoneCostFormula(deltaTemp, currentPressure, tile)}`;
-              predictedCost = effectiveCost * deltaTemp;
-            }
-          }
-        } else if (tile.chamberContent === 'hot_plate') {
-          const currentTemp = this.board.getCurrentTemperature();
-          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          tooltipText += ` ${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
-          predictedCost = effectiveCost;
-        } else {
-          predictedCost = 0;
-        }
-        if (predictedCost !== null && predictedCost !== 0) {
-          tooltipText += ` cost: ${predictedCost}`;
-        }
+      const pos = { row, col };
+      if (isConnected) {
+        tooltipText = this._tooltipForConnectedChamber(tooltipText, tile, pos, lockedImpact);
+      } else {
+        tooltipText = this._tooltipForUnconnectedChamber(tooltipText, tile);
       }
     }
     this.tooltipEl.textContent = tooltipText;
