@@ -37,6 +37,15 @@ const PALETTE_ITEM_UNSELECTED_BG = '#0d1a30';
 const PALETTE_ITEM_SELECTED_COLOR = '#f0c040';
 /** Text color for an unselected palette item button. */
 const PALETTE_ITEM_UNSELECTED_COLOR = '#eee';
+/** CSS for a flex row that centers items and adds a small gap (used for label+input pairs). */
+const EDITOR_FLEX_ROW_CSS = 'display:flex;align-items:center;gap:8px;';
+/** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
+const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
+/** Base CSS for a side-panel box in the level editor (background, border, radius, padding). */
+const EDITOR_PANEL_BASE_CSS =
+  'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
+/** CSS for the all-caps section-title label inside an editor side-panel. */
+const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
 import { Board, PIPE_SHAPES, parseKey } from './board';
 import {
   EditorPalette,
@@ -387,7 +396,7 @@ export class CampaignEditor {
       `The campaign will not be updated.`;
 
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
     btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
 
     dialog.appendChild(title);
@@ -427,7 +436,7 @@ export class CampaignEditor {
       `Player progress will be retained.`;
 
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
 
     const confirmLabel = isNewer ? '⏩ Import newer version' : '⏪ Overwrite with older version';
     const confirmColor = isNewer ? '#27ae60' : '#e67e22';
@@ -456,7 +465,7 @@ export class CampaignEditor {
     msg.textContent = 'You have unsaved changes. Would you like to save before leaving?';
 
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
 
     const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
       overlay.remove();
@@ -479,7 +488,7 @@ export class CampaignEditor {
 
   private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    wrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const lbl = document.createElement('label');
     lbl.textContent = labelText;
     lbl.style.cssText = 'font-size:0.85rem;color:#aaa;min-width:80px;';
@@ -1076,7 +1085,7 @@ export class CampaignEditor {
   private _buildLevelNameSection(readOnly: boolean): HTMLElement {
     if (!readOnly) {
       const nameWrap = document.createElement('div');
-      nameWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      nameWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
       const nameLbl = document.createElement('label');
       nameLbl.textContent = 'Level Name:';
       nameLbl.style.cssText = 'font-size:0.85rem;color:#aaa;';
@@ -1251,7 +1260,7 @@ export class CampaignEditor {
 
     // Challenge level checkbox
     const challengeWrap = document.createElement('div');
-    challengeWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    challengeWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const challengeChk = document.createElement('input');
     challengeChk.type = 'checkbox';
     challengeChk.id = 'editor-challenge-chk';
@@ -1366,11 +1375,10 @@ export class CampaignEditor {
     const panel = document.createElement('div');
     panel.id = 'editor-palette-panel';
     panel.style.cssText =
-      'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
-      'display:flex;flex-direction:column;gap:4px;';
+      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:4px;';
 
     const title = document.createElement('div');
-    title.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;margin-bottom:4px;letter-spacing:1px;';
+    title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
     title.textContent = 'TILE PALETTE';
     panel.appendChild(title);
 
@@ -1456,11 +1464,10 @@ export class CampaignEditor {
     const panel = document.createElement('div');
     panel.id = 'editor-param-panel';
     panel.style.cssText =
-      'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
-      'display:flex;flex-direction:column;gap:8px;';
+      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;';
 
     const title = document.createElement('div');
-    title.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
+    title.style.cssText = EDITOR_PANEL_TITLE_CSS;
     title.textContent = 'TILE PARAMS';
     panel.appendChild(title);
 
@@ -1553,7 +1560,7 @@ export class CampaignEditor {
       panel.replaceWith(newPanel);
     });
     const selWrap = document.createElement('div');
-    selWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    selWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const selLbl = document.createElement('span');
     selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
     selLbl.textContent = 'Content:';
@@ -1647,7 +1654,7 @@ export class CampaignEditor {
       this._applyParamsToLinkedTile();
     });
     const itemSelWrap = document.createElement('div');
-    itemSelWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    itemSelWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const itemLbl = document.createElement('span');
     itemLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
     itemLbl.textContent = 'Shape:';
@@ -1725,11 +1732,10 @@ export class CampaignEditor {
   private _buildGridSizePanel(): HTMLElement {
     const panel = document.createElement('div');
     panel.style.cssText =
-      'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
-      'display:flex;flex-direction:column;gap:8px;min-width:180px;';
+      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;min-width:180px;';
 
     const title = document.createElement('div');
-    title.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
+    title.style.cssText = EDITOR_PANEL_TITLE_CSS;
     title.textContent = 'GRID SIZE';
     panel.appendChild(title);
 
@@ -1835,11 +1841,10 @@ export class CampaignEditor {
     const panel = document.createElement('div');
     panel.id = 'editor-inventory-panel';
     panel.style.cssText =
-      'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
-      'display:flex;flex-direction:column;gap:6px;min-width:180px;';
+      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:6px;min-width:180px;';
 
     const title = document.createElement('div');
-    title.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;margin-bottom:4px;';
+    title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
     title.textContent = 'PLAYER INVENTORY';
     panel.appendChild(title);
 
@@ -1923,11 +1928,10 @@ export class CampaignEditor {
   private _buildInventoryReadonly(): HTMLElement {
     const panel = document.createElement('div');
     panel.style.cssText =
-      'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;' +
-      'display:flex;flex-direction:column;gap:6px;min-width:180px;';
+      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:6px;min-width:180px;';
 
     const title = document.createElement('div');
-    title.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;margin-bottom:4px;';
+    title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
     title.textContent = 'PLAYER INVENTORY';
     panel.appendChild(title);
 
@@ -2982,7 +2986,7 @@ export class CampaignEditor {
     dialog.appendChild(body);
 
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
 
     if (totalIssues > 0 && !cleanupDone) {
       const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {

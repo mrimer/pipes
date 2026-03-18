@@ -996,6 +996,26 @@ export class Board {
   }
 
   /**
+   * Compute the net water impact of a hot-plate tile given its effective heat cost
+   * and the amount of frozen water available to absorb it.
+   *
+   * The hot plate first melts frozen water (water gain), then consumes regular water
+   * for any remaining cost (water loss).  The net impact is gain − loss.
+   *
+   * @param effectiveCost  - The total heat cost: `tile.cost × (tile.temperature + envTemp)`.
+   * @param availableFrozen - How much frozen water is available to melt.
+   * @returns `{ waterGain, impact }` where `impact = waterGain − waterLoss`.
+   */
+  private _computeHotPlateWaterEffect(
+    effectiveCost: number,
+    availableFrozen: number,
+  ): { waterGain: number; impact: number } {
+    const waterGain = Math.min(availableFrozen, effectiveCost);
+    const waterLoss = Math.max(0, effectiveCost - waterGain);
+    return { waterGain, impact: waterGain - waterLoss };
+  }
+
+  /**
    * Compute current water remaining in the source tank based on the live fill state.
    *
    * When incremental turn tracking is active (i.e. {@link applyTurnDelta} has been
@@ -1175,7 +1195,6 @@ export class Board {
       const effectivePressure = this._computePressureForIce(filled, tileConnectedTurn);
 
       const oldImpact = this._lockedWaterImpact.get(key)!;
-      let newImpact: number;
 
       if (tile.chamberContent === 'hot_plate') {
         // Re-evaluate using historically-limited temperature at connection time.
@@ -1184,13 +1203,13 @@ export class Board {
         // Restore the frozen water consumed at lock time, then re-apply with the
         // new effective cost so the frozen counter stays accurate.
         const restoredFrozen = this.frozen + oldWaterGain;
-        const newWaterGain = Math.min(restoredFrozen, newEffectiveCost);
-        newImpact = newWaterGain - Math.max(0, newEffectiveCost - newWaterGain);
-        if (newImpact !== oldImpact) {
+        const { waterGain: newWaterGain, impact: hotPlateImpact } =
+          this._computeHotPlateWaterEffect(newEffectiveCost, restoredFrozen);
+        if (hotPlateImpact !== oldImpact) {
           this.frozen = restoredFrozen - newWaterGain;
           this._hotPlateWaterGain.set(key, newWaterGain);
-          this._lockedWaterImpact.set(key, newImpact);
-          this.lastLockedCostChanges.push({ row: r, col: c, delta: newImpact - oldImpact });
+          this._lockedWaterImpact.set(key, hotPlateImpact);
+          this.lastLockedCostChanges.push({ row: r, col: c, delta: hotPlateImpact - oldImpact });
         }
         // Always update the locked stats so the tooltip formula stays consistent with the cost.
         this._lockedConnectTemp.set(key, effectiveTemp);
@@ -1212,7 +1231,7 @@ export class Board {
         }
         continue;
       }
-      newImpact = result.kind === 'frozen' ? -result.frozenCost : 0;
+      const newImpact = result.kind === 'frozen' ? -result.frozenCost : 0;
 
       if (newImpact !== oldImpact) {
         // Adjust the frozen-water display counter by the change in cost.
@@ -1288,11 +1307,8 @@ export class Board {
       if (!tile) continue;
       // effectiveCost = mass × (temp + playerTemp)
       const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-      // First consume from frozen, then from water
-      const waterGain = Math.min(this.frozen, effectiveCost);
-      const waterLoss = Math.max(0, effectiveCost - waterGain);
+      const { waterGain, impact } = this._computeHotPlateWaterEffect(effectiveCost, this.frozen);
       this.frozen -= waterGain;
-      const impact = waterGain - waterLoss;
       this._hotPlateWaterGain.set(key, waterGain);
 
       this._recordLockedTileState(key, impact, currentTemp, currentPressure);
