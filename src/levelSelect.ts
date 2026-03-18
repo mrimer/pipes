@@ -10,6 +10,74 @@ export interface ActiveCampaignInfo {
   completionPct: number;
 }
 
+/**
+ * Find the level ID to use for the "Continue" button.
+ *
+ * Priority:
+ *  1. First non-completed, non-challenge level that is available for selection.
+ *  2. First non-completed challenge level that is available for selection.
+ *  3. First available level that has at least one uncollected star.
+ *  4. `null` when every selectable level has been completed and all stars collected.
+ *
+ * A level is considered "available for selection" when it would not be shown as
+ * locked in the level list (same locking logic used by renderLevelList).
+ */
+export function findContinueLevelId(
+  chapters: import('./types').ChapterDef[],
+  completedLevels: Set<number>,
+  levelStars: Record<number, number> = {},
+): number | null {
+  let firstNonCompleteChallenge: number | null = null;
+  let firstUncollectedStar: number | null = null;
+  let foundLockedChapter = false;
+
+  for (let ci = 0; ci < chapters.length; ci++) {
+    const chapter = chapters[ci];
+
+    const prevChapter = ci > 0 ? chapters[ci - 1] : null;
+    const prevNonChallengeCount = prevChapter
+      ? prevChapter.levels.filter((l) => !l.challenge).length : 0;
+    const prevCompletedCount = prevChapter
+      ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
+    const chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+
+    if (chapterLocked) {
+      if (foundLockedChapter) break;
+      foundLockedChapter = true;
+    }
+
+    for (let li = 0; li < chapter.levels.length; li++) {
+      const level = chapter.levels[li];
+
+      const prevNonChallenge = li > 0
+        ? (chapter.levels.slice(0, li).reverse().find((l) => !l.challenge) ?? null)
+        : null;
+      const isLocked = chapterLocked || (prevNonChallenge !== null && !completedLevels.has(prevNonChallenge.id));
+
+      // Stop scanning within this chapter once the first locked level is hit.
+      if (isLocked) break;
+
+      if (!completedLevels.has(level.id)) {
+        if (!level.challenge) {
+          // Best match: first available, non-completed, non-challenge level.
+          return level.id;
+        }
+        if (firstNonCompleteChallenge === null) {
+          firstNonCompleteChallenge = level.id;
+        }
+      } else if (firstUncollectedStar === null) {
+        // Completed level: check whether it has stars that haven't all been collected.
+        const starTotal = level.starCount ?? 0;
+        if (starTotal > 0 && (levelStars[level.id] ?? 0) < starTotal) {
+          firstUncollectedStar = level.id;
+        }
+      }
+    }
+  }
+
+  return firstNonCompleteChallenge ?? firstUncollectedStar;
+}
+
 /** Compute the total stars available and collected across a set of levels. */
 function chapterStarTotals(
   levels: import('./types').LevelDef[],
@@ -107,6 +175,23 @@ export function renderLevelList(
         header.appendChild(starRow);
       }
     }
+
+    // ── Continue button ────────────────────────────────────────────────────
+    const continueId = findContinueLevelId(chapters, completedLevels, levelStars);
+    const continueBtn = document.createElement('button');
+    continueBtn.textContent = '▶ Continue';
+    continueBtn.disabled = continueId === null;
+    continueBtn.style.cssText =
+      'padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:6px;' +
+      'border:1px solid ' + (continueId !== null ? '#f0c040' : '#555') + ';' +
+      'background:' + (continueId !== null ? '#f0c040' : '#333') + ';' +
+      'color:' + (continueId !== null ? '#16213e' : '#888') + ';' +
+      'cursor:' + (continueId !== null ? 'pointer' : 'default') + ';' +
+      'width:100%;';
+    if (continueId !== null) {
+      continueBtn.addEventListener('click', () => startLevel(continueId));
+    }
+    header.appendChild(continueBtn);
 
     levelListEl.appendChild(header);
   }
