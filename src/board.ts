@@ -865,18 +865,41 @@ export class Board {
     return this._computeTemperatureFromFilled(filledSet);
   }
 
-  /** Internal helper: compute temperature from a pre-computed fill set. */
-  private _computeTemperatureFromFilled(filled: Set<string>): number {
+  /**
+   * Generic helper: sum an environment stat (temperature or pressure) over a fill set.
+   *
+   * Starting from the source tile's base value, it adds the bonus from every
+   * connected Chamber whose `chamberContent` matches `content` ('heater' for
+   * temperature, 'pump' for pressure).
+   *
+   * When `maxTurn` is provided, only modifier tiles whose connection turn is ≤
+   * `maxTurn` contribute.  This enforces the historical-lock rule used during
+   * re-evaluation: a cost tile must not receive a retroactive benefit from a
+   * heater or pump that connected *after* it did.
+   */
+  private _aggregateEnvStat(
+    filled: Set<string>,
+    content: 'heater' | 'pump',
+    maxTurn?: number,
+  ): number {
     const sourceTile = this.grid[this.source.row][this.source.col];
-    let temp = sourceTile.temperature;
+    const isTemp = content === 'heater';
+    let total = isTemp ? sourceTile.temperature : sourceTile.pressure;
     for (const key of filled) {
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'heater') {
-        temp += tile.temperature;
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === content) {
+        if (maxTurn === undefined || (this._connectionTurn.get(key) ?? Infinity) <= maxTurn) {
+          total += isTemp ? tile.temperature : tile.pressure;
+        }
       }
     }
-    return temp;
+    return total;
+  }
+
+  /** Internal helper: compute temperature from a pre-computed fill set. */
+  private _computeTemperatureFromFilled(filled: Set<string>): number {
+    return this._aggregateEnvStat(filled, 'heater');
   }
 
   /**
@@ -891,16 +914,7 @@ export class Board {
 
   /** Internal helper: compute pressure from a pre-computed fill set. */
   private _computePressureFromFilled(filled: Set<string>): number {
-    const sourceTile = this.grid[this.source.row][this.source.col];
-    let pressure = sourceTile.pressure;
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
-        pressure += tile.pressure;
-      }
-    }
-    return pressure;
+    return this._aggregateEnvStat(filled, 'pump');
   }
 
   /**
@@ -911,19 +925,7 @@ export class Board {
    * must not receive benefit from heaters that connected after it did.
    */
   private _computeTemperatureForIce(filled: Set<string>, iceConnectedTurn: number): number {
-    const sourceTile = this.grid[this.source.row][this.source.col];
-    let temp = sourceTile.temperature;
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'heater') {
-        const heaterTurn = this._connectionTurn.get(key) ?? Infinity;
-        if (heaterTurn <= iceConnectedTurn) {
-          temp += tile.temperature;
-        }
-      }
-    }
-    return temp;
+    return this._aggregateEnvStat(filled, 'heater', iceConnectedTurn);
   }
 
   /**
@@ -933,20 +935,8 @@ export class Board {
    * Used symmetrically with {@link _computeTemperatureForIce} during re-evaluation.
    */
   private _computePressureForIce(filled: Set<string>, iceConnectedTurn: number): number {
-    const sourceTile = this.grid[this.source.row][this.source.col];
     // The source is always connected first, so its pressure always counts for any ice tile.
-    let pressure = sourceTile.pressure;
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump') {
-        const pumpTurn = this._connectionTurn.get(key) ?? Infinity;
-        if (pumpTurn <= iceConnectedTurn) {
-          pressure += tile.pressure;
-        }
-      }
-    }
-    return pressure;
+    return this._aggregateEnvStat(filled, 'pump', iceConnectedTurn);
   }
 
   /**
@@ -1507,6 +1497,46 @@ export class Board {
   }
 
   /**
+   * Shared helper for {@link _checkHeaterConstraints} and {@link _checkPumpConstraints}.
+   *
+   * Checks whether the given environment stat value (temperature or pressure) has
+   * gone negative after a board mutation.  When it has, collects all connected
+   * Chamber tiles of type `content` whose contributing stat field is negative
+   * (i.e. the tiles actually responsible for the negative value) and records them
+   * in {@link lastErrorTilePositions}.
+   *
+   * @param filled       - Current fill set (after the board mutation).
+   * @param content      - Chamber content type to blame: `'heater'` or `'pump'`.
+   * @param currentValue - Pre-computed current value of the stat (temp or pressure).
+   * @param constraintName - Human-readable name of the negative variant (e.g. `'Cooler'`).
+   * @param statLabel    - Human-readable stat label for the error message (e.g. `'Temperature'`).
+   * @returns An error message string if the stat is negative, or `null` if valid.
+   */
+  private _checkEnvStatConstraint(
+    filled: Set<string>,
+    content: 'heater' | 'pump',
+    currentValue: number,
+    constraintName: string,
+    statLabel: string,
+  ): string | null {
+    if (currentValue >= 0) return null;
+    const isTemp = content === 'heater';
+    const violating: GridPos[] = [];
+    for (const key of filled) {
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === content) {
+        const stat = isTemp ? tile.temperature : tile.pressure;
+        if (stat < 0) violating.push({ row: r, col: c });
+      }
+    }
+    if (violating.length > 0) {
+      this.lastErrorTilePositions = violating;
+    }
+    return `Connecting this ${constraintName} would reduce ${statLabel.toLowerCase()} below 0. (${statLabel}: ${currentValue})`;
+  }
+
+  /**
    * Check whether the current temperature (based on the fill set) is below 0.
    * A negative-temperature Heater (Cooler) that would bring the temperature below 0
    * must not be connected.  Similarly, disconnecting a positive Heater when the
@@ -1516,22 +1546,9 @@ export class Board {
    * @returns An error message string if a violation is found, or `null` if valid.
    */
   private _checkHeaterConstraints(filled: Set<string>): string | null {
-    const currentTemp = this._computeTemperatureFromFilled(filled);
-    if (currentTemp < 0) {
-      const violating: GridPos[] = [];
-      for (const key of filled) {
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'heater' && tile.temperature < 0) {
-          violating.push({ row: r, col: c });
-        }
-      }
-      if (violating.length > 0) {
-        this.lastErrorTilePositions = violating;
-      }
-      return `Connecting this Cooler would reduce temperature below 0. (Temperature: ${currentTemp})`;
-    }
-    return null;
+    return this._checkEnvStatConstraint(
+      filled, 'heater', this._computeTemperatureFromFilled(filled), 'Cooler', 'Temperature',
+    );
   }
 
   /**
@@ -1544,22 +1561,9 @@ export class Board {
    * @returns An error message string if a violation is found, or `null` if valid.
    */
   private _checkPumpConstraints(filled: Set<string>): string | null {
-    const currentPressure = this._computePressureFromFilled(filled);
-    if (currentPressure < 0) {
-      const violating: GridPos[] = [];
-      for (const key of filled) {
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'pump' && tile.pressure < 0) {
-          violating.push({ row: r, col: c });
-        }
-      }
-      if (violating.length > 0) {
-        this.lastErrorTilePositions = violating;
-      }
-      return `Connecting this Vacuum would reduce pressure below 0. (Pressure: ${currentPressure})`;
-    }
-    return null;
+    return this._checkEnvStatConstraint(
+      filled, 'pump', this._computePressureFromFilled(filled), 'Vacuum', 'Pressure',
+    );
   }
 
   /**

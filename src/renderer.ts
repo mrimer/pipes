@@ -377,6 +377,26 @@ function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, d
   ctx.restore();
 }
 
+/**
+ * Draw the three-line "ΔTemp° × cost" formula label used by ice, snow, and
+ * hot-plate chamber tiles when they are unconnected.
+ *
+ * The canvas context must already have `textAlign = 'center'` and
+ * `textBaseline = 'middle'` set; `fillStyle` must be the desired text colour.
+ * The three lines are drawn centred on `(0, 0)` in the current coordinate system.
+ *
+ * @param tempLine - First line text, e.g. `'-3°'` or `'5°'`.
+ * @param costLine - Third line text, e.g. `'4'` (the cost/mass value).
+ */
+function _drawDeltaTempCostFormula(ctx: CanvasRenderingContext2D, tempLine: string, costLine: string): void {
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.fillText(tempLine, 0, -_s(9));
+  ctx.font = `bold ${_s(9)}px Arial`;
+  ctx.fillText('x', 0, 0);
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.fillText(costLine, 0, _s(11));
+}
+
 function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
   // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
   const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
@@ -497,12 +517,7 @@ function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: n
     const iceThreshold = shiftHeld
       ? tile.temperature
       : computeDeltaTemp(tile.temperature, currentTemp);
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(`-${iceThreshold}°`, 0, -_s(9));
-    ctx.font = `bold ${_s(9)}px Arial`;
-    ctx.fillText('x', 0, 0);
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(tile.cost), 0, _s(11));
+    _drawDeltaTempCostFormula(ctx, `-${iceThreshold}°`, String(tile.cost));
   }
 }
 
@@ -582,12 +597,7 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
     const snowCost = shiftHeld
       ? tile.cost
       : Math.max(1, snowCostPerDeltaTemp(tile.cost, currentPressure));
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(`-${deltaTemp}°`, 0, -_s(9));
-    ctx.font = `bold ${_s(9)}px Arial`;
-    ctx.fillText('x', 0, 0);
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(snowCost), 0, _s(11));
+    _drawDeltaTempCostFormula(ctx, `-${deltaTemp}°`, String(snowCost));
   }
 }
 
@@ -751,12 +761,7 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
       ? tile.temperature
       : tile.temperature + currentTemp;
     ctx.fillStyle = hotColor;
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(`${deltaTemp}°`, 0, -_s(9));
-    ctx.font = `bold ${_s(9)}px Arial`;
-    ctx.fillText('x', 0, 0);
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(tile.cost), 0, _s(11));
+    _drawDeltaTempCostFormula(ctx, `${deltaTemp}°`, String(tile.cost));
   }
 }
 
