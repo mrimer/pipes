@@ -564,6 +564,18 @@ export class Board {
   }
 
   /**
+   * Clear all error/action state fields at the start of each mutating operation.
+   * Called by {@link reclaimTile}, {@link placeInventoryTile},
+   * {@link replaceInventoryTile}, {@link rotateTile}, and {@link rotateTileBy}
+   * before performing any validation.
+   */
+  private _clearLastError(): void {
+    this.lastError = null;
+    this.lastErrorTilePositions = null;
+    this.lastCementDecrement = null;
+  }
+
+  /**
    * Return a player-placed pipe tile back to the inventory.
    * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross and their gold
    * variants) can be reclaimed.
@@ -572,9 +584,7 @@ export class Board {
    * @returns true if the tile was successfully reclaimed.
    */
   reclaimTile(pos: GridPos): boolean {
-    this.lastError = null;
-    this.lastErrorTilePositions = null;
-    this.lastCementDecrement = null;
+    this._clearLastError();
     const tile = this.getTile(pos);
     if (!this._isReplaceableTile(tile)) return false;
 
@@ -630,9 +640,7 @@ export class Board {
    * @returns true if the placement succeeded.
    */
   placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): boolean {
-    this.lastError = null;
-    this.lastErrorTilePositions = null;
-    this.lastCementDecrement = null;
+    this._clearLastError();
     const tile = this.getTile(pos);
     if (!tile || tile.shape !== PipeShape.Empty) return false;
 
@@ -692,9 +700,7 @@ export class Board {
    * @returns true on success; false on failure (lastError is set when relevant).
    */
   replaceInventoryTile(pos: GridPos, newShape: PipeShape, rotation: Rotation = 0): boolean {
-    this.lastError = null;
-    this.lastErrorTilePositions = null;
-    this.lastCementDecrement = null;
+    this._clearLastError();
     const tile = this.getTile(pos);
 
     // Must be a replaceable tile (same guard as reclaimTile)
@@ -1407,16 +1413,25 @@ export class Board {
   }
 
   /**
+   * Adjust the inventory count for `shape` by `delta`.
+   * Adds a new entry if the shape is not already present.
+   * Used by {@link _reclaimInventory} and {@link _spendInventory}.
+   */
+  private _adjustInventory(shape: PipeShape, delta: number): void {
+    const idx = this.inventory.findIndex((it) => it.shape === shape);
+    if (idx !== -1) {
+      this.inventory[idx].count += delta;
+    } else {
+      this.inventory.push({ shape, count: delta });
+    }
+  }
+
+  /**
    * Increment the inventory count for `shape` by 1 (reclaim one tile from the board).
    * Adds a new entry with count=1 if the shape is not already present.
    */
   private _reclaimInventory(shape: PipeShape): void {
-    const idx = this.inventory.findIndex((it) => it.shape === shape);
-    if (idx !== -1) {
-      this.inventory[idx].count++;
-    } else {
-      this.inventory.push({ shape, count: 1 });
-    }
+    this._adjustInventory(shape, +1);
   }
 
   /**
@@ -1425,12 +1440,7 @@ export class Board {
    * new entry with count=-1 to track the over-draw.
    */
   private _spendInventory(shape: PipeShape): void {
-    const idx = this.inventory.findIndex((it) => it.shape === shape);
-    if (idx !== -1) {
-      this.inventory[idx].count--;
-    } else {
-      this.inventory.push({ shape, count: -1 });
-    }
+    this._adjustInventory(shape, -1);
   }
 
   /**
@@ -1700,9 +1710,7 @@ export class Board {
    * @returns true if the rotation succeeded; false if it was blocked by a constraint.
    */
   rotateTile(pos: GridPos): boolean {
-    this.lastError = null;
-    this.lastErrorTilePositions = null;
-    this.lastCementDecrement = null;
+    this._clearLastError();
     const tile = this.getTile(pos);
     if (!tile) return false;
 
@@ -1749,9 +1757,7 @@ export class Board {
    * Returns false if the tile is fixed/empty or if the final state violates constraints.
    */
   rotateTileBy(pos: GridPos, steps: number): boolean {
-    this.lastError = null;
-    this.lastErrorTilePositions = null;
-    this.lastCementDecrement = null;
+    this._clearLastError();
     const tile = this.getTile(pos);
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
     if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) return false;
