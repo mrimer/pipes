@@ -39,6 +39,15 @@ const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) before spawning star sparkles over the win modal star icon. */
 const MODAL_SPARKLE_DELAY_MS = 150;
 
+/** CSS style for the toggle button of each hint in the hint box. */
+const HINT_TOGGLE_BTN_STYLE =
+  'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
+  'border:none;cursor:pointer;text-align:left;font-family:inherit;';
+
+/** CSS style for the collapsible text area of each hint in the hint box. */
+const HINT_TEXT_STYLE =
+  'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
+
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
  * Handles both the level-selection menu and the active play screen.
@@ -750,22 +759,16 @@ export class Game {
 
     // Build nested hint elements. Each hint has a toggle button and a content div.
     // Hints after the first are nested inside the previous hint's content div.
-    const btnStyle =
-      'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
-      'border:none;cursor:pointer;text-align:left;font-family:inherit;';
-    const textStyle =
-      'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
-
     let containerEl: HTMLElement = this.hintBoxEl;
 
     hints.forEach((hint, idx) => {
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
       toggleBtn.textContent = idx === 0 ? '💡 Show Hint' : '💡 Show Next Hint';
-      toggleBtn.style.cssText = btnStyle;
+      toggleBtn.style.cssText = HINT_TOGGLE_BTN_STYLE;
 
       const textEl = document.createElement('div');
-      textEl.style.cssText = textStyle;
+      textEl.style.cssText = HINT_TEXT_STYLE;
       textEl.textContent = hint;
 
       toggleBtn.addEventListener('click', () => {
@@ -2155,6 +2158,8 @@ export class Game {
           if (tile?.shape === PipeShape.Empty) {
             if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
               this._afterTilePlaced(this.selectedShape, filledBefore);
+            } else if (board.lastError) {
+              this._handleBoardError();
             }
           } else if (tile && (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
             // Replace the existing tile with the selected inventory shape.
