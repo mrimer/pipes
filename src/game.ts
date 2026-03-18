@@ -364,14 +364,14 @@ export class Game {
 
     // Create the new-chapter intro modal
     const newChapterModal = this._buildNewChapterModal();
-    this._newChapterModalEl  = newChapterModal.el;
+    this._newChapterModalEl = newChapterModal.el;
     this._newChapterNumberEl = newChapterModal.numberEl;
-    this._newChapterNameEl   = newChapterModal.nameEl;
+    this._newChapterNameEl = newChapterModal.nameEl;
 
     // Create the challenge-level warning modal
     const challengeModal = this._buildChallengeModal();
-    this._challengeModalEl   = challengeModal.el;
-    this._challengeMsgEl     = challengeModal.msgEl;
+    this._challengeModalEl = challengeModal.el;
+    this._challengeMsgEl = challengeModal.msgEl;
     this._challengeSkipBtnEl = challengeModal.skipBtnEl;
 
     // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
@@ -1269,11 +1269,11 @@ export class Game {
   }
 
   /**
-   * Called after successfully rotating a spinner tile.
+   * Called after successfully rotating any tile (spinner or regular pipe).
    * Records the move, updates animations, and refreshes all dependent UI.
-   * Shared by click, wheel, and keyboard (Q/W) spinner rotation paths.
+   * Shared by click, wheel, and keyboard rotation paths.
    */
-  private _afterSpinnerRotated(filledBefore: Set<string>): void {
+  private _afterTileRotated(filledBefore: Set<string>): void {
     if (!this.board) return;
     this.board.applyTurnDelta();
     this.board.recordMove();
@@ -1300,7 +1300,7 @@ export class Game {
     if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
     const filledBefore = this.board.getFilledPositions();
     if (this.board.rotateTileBy(hPos, steps)) {
-      this._afterSpinnerRotated(filledBefore);
+      this._afterTileRotated(filledBefore);
       return true;
     } else if (this.board.lastError) {
       this._handleBoardError();
@@ -1334,7 +1334,7 @@ export class Game {
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this._afterSpinnerRotated(filledBefore);
+        this._afterTileRotated(filledBefore);
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1370,16 +1370,7 @@ export class Game {
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this.board.applyTurnDelta();
-        this.board.recordMove();
-        this._spawnConnectionAnimations(filledBefore);
-        this._spawnDisconnectionAnimations(filledBefore);
-        this._spawnLockedCostChangeAnimations();
-        this._spawnCementDecrementAnimation();
-        this._renderInventoryBar();
-        this._updateWaterDisplay();
-        this._updateUndoRedoButtons();
-        this._checkWinLose();
+        this._afterTileRotated(filledBefore);
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1502,7 +1493,7 @@ export class Game {
         const filledBefore = this.board.getFilledPositions();
         if (this.board.rotateTileBy(hPos, steps)) {
           e.preventDefault();
-          this._afterSpinnerRotated(filledBefore);
+          this._afterTileRotated(filledBefore);
         } else if (this.board.lastError) {
           this._handleBoardError();
         }
@@ -2169,15 +2160,7 @@ export class Game {
         } else {
           const filledBefore = board.getFilledPositions();
           if (board.rotateTile(focusPos)) {
-            board.applyTurnDelta();
-            board.recordMove();
-            this._spawnConnectionAnimations(filledBefore);
-            this._spawnDisconnectionAnimations(filledBefore);
-            this._spawnLockedCostChangeAnimations();
-            this._renderInventoryBar();
-            this._updateWaterDisplay();
-            this._updateUndoRedoButtons();
-            this._checkWinLose();
+            this._afterTileRotated(filledBefore);
           } else if (board.lastError) {
             this._handleBoardError();
           }
