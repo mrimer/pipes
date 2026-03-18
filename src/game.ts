@@ -692,9 +692,7 @@ export class Game {
     this._flowGoodDirs = null;
 
     this._updateLevelHeader(levelId);
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
-    this._updateUndoRedoButtons();
+    this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
     this.canvas.focus();
 
@@ -908,6 +906,20 @@ export class Game {
     } else {
       this.pressureDisplayEl.style.display = 'none';
     }
+  }
+
+  /**
+   * Refresh the three HUD elements that must stay in sync after every board mutation
+   * or undo/redo: the inventory bar, the water/temp/pressure display, and the
+   * undo/redo button enabled states.
+   *
+   * Call this instead of the three individual methods whenever all three need to be
+   * updated together (which is the common case).
+   */
+  private _refreshPlayUI(): void {
+    this._renderInventoryBar();
+    this._updateWaterDisplay();
+    this._updateUndoRedoButtons();
   }
 
   // ─── Main render loop ──────────────────────────────────────────────────────
@@ -1270,9 +1282,7 @@ export class Game {
         this.selectedShape = reclaimedShape;
         this.pendingRotation = reclaimedRotation;
       }
-      this._renderInventoryBar();
-      this._updateWaterDisplay();
-      this._updateUndoRedoButtons();
+      this._refreshPlayUI();
       this._checkWinLose();
     } else if (this.board.lastError) {
       this._handleBoardError();
@@ -1292,9 +1302,7 @@ export class Game {
     this._spawnDisconnectionAnimations(filledBefore);
     this._spawnLockedCostChangeAnimations();
     this._spawnCementDecrementAnimation();
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
-    this._updateUndoRedoButtons();
+    this._refreshPlayUI();
     this._checkWinLose();
   }
 
@@ -2110,9 +2118,7 @@ export class Game {
     this._spawnLockedCostChangeAnimations();
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
-    this._updateUndoRedoButtons();
+    this._refreshPlayUI();
     this._checkWinLose();
   }
 
@@ -2370,9 +2376,7 @@ export class Game {
     this._flowGoodDirs = null;
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
-    this._updateUndoRedoButtons();
+    this._refreshPlayUI();
     this._renderBoard();
   }
 
@@ -2389,9 +2393,7 @@ export class Game {
     this._clearModalSparkle(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
-    this._updateUndoRedoButtons();
+    this._refreshPlayUI();
     this._renderBoard();
   }
 
@@ -2403,9 +2405,7 @@ export class Game {
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
     this._deselectIfDepleted();
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
-    this._updateUndoRedoButtons();
+    this._refreshPlayUI();
     this._renderBoard();
     this._checkWinLose();
   }
