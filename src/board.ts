@@ -173,6 +173,18 @@ type Snapshot = {
 };
 
 /**
+ * Result of {@link Board._computeColdChamberImpact} for an ice, snow, or sandstone tile.
+ *  - `frozen`  – normal case: the tile freezes `frozenCost` water; impact = -frozenCost.
+ *  - `zero`    – sandstone shatter override: the tile costs zero water.
+ *  - `failure` – sandstone with deltaDamage ≤ 0: caller must apply the drain-all penalty
+ *                and skip any frozen-counter update.
+ */
+type ColdChamberImpact =
+  | { kind: 'frozen'; frozenCost: number }
+  | { kind: 'zero' }
+  | { kind: 'failure' };
+
+/**
  * The game board – a 2-D grid of {@link Tile} objects.
  * Contains all game logic for path-finding, water tracking and win detection.
  */
@@ -956,6 +968,34 @@ export class Board {
   }
 
   /**
+   * Compute the water impact for a cold Chamber tile (ice, snow, or sandstone)
+   * at the given environment temperature and pressure.
+   *
+   * Returns one of three variants:
+   *  - `frozen`  – normal case; the tile freezes water equal to `frozenCost`;
+   *                `impact = -frozenCost`.
+   *  - `zero`    – sandstone shatter override; the tile costs zero water.
+   *  - `failure` – sandstone with deltaDamage ≤ 0; the caller must apply
+   *                {@link _drainAllImpact} and skip frozen-counter updates.
+   */
+  private _computeColdChamberImpact(tile: Tile, temp: number, pressure: number): ColdChamberImpact {
+    const deltaTemp = computeDeltaTemp(tile.temperature, temp);
+
+    if (tile.chamberContent === 'ice') {
+      return { kind: 'frozen', frozenCost: tile.cost * deltaTemp };
+    }
+    if (tile.chamberContent === 'snow') {
+      return { kind: 'frozen', frozenCost: snowCostPerDeltaTemp(tile.cost, pressure) * deltaTemp };
+    }
+    // sandstone
+    const { shatterOverride, deltaDamage, costPerDeltaTemp } =
+      sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, pressure);
+    if (shatterOverride) return { kind: 'zero' };
+    if (deltaDamage >= 1) return { kind: 'frozen', frozenCost: costPerDeltaTemp * deltaTemp };
+    return { kind: 'failure' };
+  }
+
+  /**
    * Compute current water remaining in the source tank based on the live fill state.
    *
    * When incremental turn tracking is active (i.e. {@link applyTurnDelta} has been
@@ -1137,31 +1177,7 @@ export class Board {
       const oldImpact = this._lockedWaterImpact.get(key)!;
       let newImpact: number;
 
-      if (tile.chamberContent === 'ice') {
-        const deltaTemp = computeDeltaTemp(tile.temperature, effectiveTemp);
-        newImpact = -(tile.cost * deltaTemp);
-      } else if (tile.chamberContent === 'sandstone') {
-        // Use historically-limited pressure so no tile benefits retroactively from
-        // a pump that connected after it – consistent with ice and snow.
-        const { shatterOverride, deltaDamage, costPerDeltaTemp } =
-          sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, effectivePressure);
-        const deltaTemp = computeDeltaTemp(tile.temperature, effectiveTemp);
-        if (shatterOverride) {
-          newImpact = 0;
-        } else if (deltaDamage >= 1) {
-          newImpact = -(costPerDeltaTemp * deltaTemp);
-        } else {
-          // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
-          // connection time are now gone.  Force immediate failure.
-          // Skip the frozen counter – this impact has no ice-accounting meaning.
-          const failureImpact = this._drainAllImpact;
-          if (failureImpact !== oldImpact) {
-            this._lockedWaterImpact.set(key, failureImpact);
-            this.lastLockedCostChanges.push({ row: r, col: c, delta: failureImpact - oldImpact });
-          }
-          continue;
-        }
-      } else if (tile.chamberContent === 'hot_plate') {
+      if (tile.chamberContent === 'hot_plate') {
         // Re-evaluate using historically-limited temperature at connection time.
         const newEffectiveCost = tile.cost * (tile.temperature + effectiveTemp);
         const oldWaterGain = this._hotPlateWaterGain.get(key) ?? 0;
@@ -1180,11 +1196,23 @@ export class Board {
         this._lockedConnectTemp.set(key, effectiveTemp);
         this._lockedConnectPressure.set(key, effectivePressure);
         continue; // Frozen and impact already updated above.
-      } else {
-        // snow: pressure-adjusted cost per deltaTemp unit
-        const deltaTemp = computeDeltaTemp(tile.temperature, effectiveTemp);
-        newImpact = -(snowCostPerDeltaTemp(tile.cost, effectivePressure) * deltaTemp);
       }
+
+      // ice, snow, or sandstone: use historically-limited temp/pressure so no tile
+      // benefits retroactively from a heater or pump that connected after it did.
+      const result = this._computeColdChamberImpact(tile, effectiveTemp, effectivePressure);
+      if (result.kind === 'failure') {
+        // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
+        // connection time are now gone.  Force immediate failure.
+        // Skip the frozen counter – this impact has no ice-accounting meaning.
+        const failureImpact = this._drainAllImpact;
+        if (failureImpact !== oldImpact) {
+          this._lockedWaterImpact.set(key, failureImpact);
+          this.lastLockedCostChanges.push({ row: r, col: c, delta: failureImpact - oldImpact });
+        }
+        continue;
+      }
+      newImpact = result.kind === 'frozen' ? -result.frozenCost : 0;
 
       if (newImpact !== oldImpact) {
         // Adjust the frozen-water display counter by the change in cost.
@@ -1233,29 +1261,17 @@ export class Board {
           impact = tile.capacity;
         } else if (tile.chamberContent === 'dirt') {
           impact = -tile.cost;
-        } else if (tile.chamberContent === 'ice') {
-          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-          impact = -(tile.cost * deltaTemp);
-          this.frozen += tile.cost * deltaTemp;
-        } else if (tile.chamberContent === 'snow') {
-          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-          const effectiveCost = snowCostPerDeltaTemp(tile.cost, currentPressure);
-          impact = -(effectiveCost * deltaTemp);
-          this.frozen += effectiveCost * deltaTemp;
-        } else if (tile.chamberContent === 'sandstone') {
-          const { shatterOverride, deltaDamage, costPerDeltaTemp } =
-            sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-          if (shatterOverride) {
-            impact = 0;
-            // No frozen water consumed when shatter overrides to zero cost.
-          } else if (deltaDamage >= 1) {
-            // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
-            impact = -(costPerDeltaTemp * deltaTemp);
-            this.frozen += costPerDeltaTemp * deltaTemp;
-          } else {
+        } else if (tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
+          // ice, snow, or sandstone: freeze water proportional to the cold delta
+          const result = this._computeColdChamberImpact(tile, currentTemp, currentPressure);
+          if (result.kind === 'frozen') {
+            impact = -result.frozenCost;
+            this.frozen += result.frozenCost;
+          } else if (result.kind === 'failure') {
+            // deltaDamage ≤ 0: invalid play state – drain all water to force immediate failure.
             impact = this._drainAllImpact;
           }
+          // 'zero' (sandstone shatter): impact stays 0, no frozen water consumed.
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
       }

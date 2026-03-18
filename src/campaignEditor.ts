@@ -21,6 +21,10 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 /** Border width (px) on each side of the editor canvas. */
 const EDITOR_CANVAS_BORDER = 3;
+/** Minimum allowed grid dimension (rows or cols). */
+const GRID_MIN_DIM = 1;
+/** Maximum allowed grid dimension (rows or cols). */
+const GRID_MAX_DIM = 20;
 import { Board, PIPE_SHAPES, parseKey } from './board';
 import {
   EditorPalette,
@@ -1716,18 +1720,20 @@ export class CampaignEditor {
     title.textContent = 'GRID SIZE';
     panel.appendChild(title);
 
+    const gridSizeInputStyle = 'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
+
     const rowsInp = document.createElement('input');
     rowsInp.type = 'number';
-    rowsInp.min = '1';
-    rowsInp.max = '20';
+    rowsInp.min = String(GRID_MIN_DIM);
+    rowsInp.max = String(GRID_MAX_DIM);
     rowsInp.value = String(this._editRows);
-    rowsInp.style.cssText = 'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
+    rowsInp.style.cssText = gridSizeInputStyle;
     const colsInp = document.createElement('input');
     colsInp.type = 'number';
-    colsInp.min = '1';
-    colsInp.max = '20';
+    colsInp.min = String(GRID_MIN_DIM);
+    colsInp.max = String(GRID_MAX_DIM);
     colsInp.value = String(this._editCols);
-    colsInp.style.cssText = 'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
+    colsInp.style.cssText = gridSizeInputStyle;
 
     const inputRow = document.createElement('div');
     inputRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:0.85rem;';
@@ -1742,8 +1748,6 @@ export class CampaignEditor {
     panel.appendChild(resizeError);
 
     panel.appendChild(this._btn('↔ Resize', '#16213e', '#f0c040', () => {
-      const MIN_DIM = 1;
-      const MAX_DIM = 20;
       const showErr = (msg: string) => {
         resizeError.textContent = msg;
         resizeError.style.display = 'block';
@@ -1752,16 +1756,16 @@ export class CampaignEditor {
       const rVal = parseInt(rowsInp.value);
       const cVal = parseInt(colsInp.value);
       let outOfRange = false;
-      if (isNaN(rVal) || rVal < MIN_DIM || rVal > MAX_DIM) {
-        rowsInp.value = String(Math.max(MIN_DIM, Math.min(MAX_DIM, isNaN(rVal) ? this._editRows : rVal)));
+      if (isNaN(rVal) || rVal < GRID_MIN_DIM || rVal > GRID_MAX_DIM) {
+        rowsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(rVal) ? this._editRows : rVal)));
         outOfRange = true;
       }
-      if (isNaN(cVal) || cVal < MIN_DIM || cVal > MAX_DIM) {
-        colsInp.value = String(Math.max(MIN_DIM, Math.min(MAX_DIM, isNaN(cVal) ? this._editCols : cVal)));
+      if (isNaN(cVal) || cVal < GRID_MIN_DIM || cVal > GRID_MAX_DIM) {
+        colsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(cVal) ? this._editCols : cVal)));
         outOfRange = true;
       }
       if (outOfRange) {
-        showErr(`Value out of range (${MIN_DIM} to ${MAX_DIM})`);
+        showErr(`Value out of range (${GRID_MIN_DIM} to ${GRID_MAX_DIM})`);
         return;
       }
       if (rVal <= 1 && cVal <= 1) {
@@ -2870,6 +2874,119 @@ export class CampaignEditor {
   }
 
   /**
+   * Build an HTML table summarising the unrecognized field issues found in campaign data.
+   * Each row contains the record type, field name, and occurrence count.
+   * Returns null when there are no issues to display.
+   */
+  private _buildValidationIssuesTable(
+    issues: Map<string, Map<string, number>>,
+  ): HTMLTableElement | null {
+    let totalIssues = 0;
+    for (const m of issues.values()) for (const c of m.values()) totalIssues += c;
+    if (totalIssues === 0) return null;
+
+    const table = document.createElement('table');
+    table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.85rem;';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    for (const [label, align] of [['Record Type', 'left'], ['Field Name', 'left'], ['Count', 'right']] as const) {
+      const th = document.createElement('th');
+      th.style.cssText = `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid #2a3a5e;`;
+      th.textContent = label;
+      headerRow.appendChild(th);
+    }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (const [recordType, fieldMap] of issues) {
+      for (const [fieldName, count] of fieldMap) {
+        const tr = document.createElement('tr');
+        for (const [txt, align] of [
+          [recordType, 'left'],
+          [fieldName, 'left'],
+          [String(count), 'right'],
+        ] as const) {
+          const td = document.createElement('td');
+          td.style.cssText = `text-align:${align};padding:4px 8px;border-bottom:1px solid #1a2a3e;`;
+          td.textContent = txt;
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /**
+   * Render the validate-data dialog content into `overlay`.
+   * Called initially with the scan results, and again after a clean-up to show the updated state.
+   */
+  private _renderValidateDataContent(
+    overlay: HTMLElement,
+    campaign: CampaignDef,
+    issues: Map<string, Map<string, number>>,
+    cleanupDone: boolean,
+  ): void {
+    overlay.innerHTML = '';
+
+    let totalIssues = 0;
+    for (const m of issues.values()) for (const c of m.values()) totalIssues += c;
+
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
+      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:520px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
+    title.textContent = cleanupDone ? '🧹 Cleanup Complete' : '🔍 Dev – Validate Data';
+    dialog.appendChild(title);
+
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size:0.9rem;color:#eee;line-height:1.6;';
+
+    const issuesTable = this._buildValidationIssuesTable(issues);
+    if (!issuesTable) {
+      const p = document.createElement('p');
+      p.style.margin = '0';
+      p.textContent = cleanupDone
+        ? 'Cleanup complete. No issues were found.'
+        : 'Data validation complete. No issues found.';
+      body.appendChild(p);
+    } else {
+      const intro = document.createElement('p');
+      intro.style.margin = '0 0 8px 0';
+      intro.textContent = cleanupDone
+        ? 'The following unrecognized fields were removed:'
+        : 'The following unrecognized fields were found:';
+      body.appendChild(intro);
+      body.appendChild(issuesTable);
+    }
+    dialog.appendChild(body);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+    if (totalIssues > 0 && !cleanupDone) {
+      const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {
+        const cleanIssues = this._scanCampaignData(campaign, false);
+        this._touchCampaign(campaign);
+        this._saveCampaigns();
+        this._renderValidateDataContent(overlay, campaign, cleanIssues, true);
+      });
+      btnRow.appendChild(cleanupBtn);
+    }
+
+    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
+    dialog.appendChild(btnRow);
+    overlay.appendChild(dialog);
+  }
+
+  /**
    * Show a modal dialog that reports unrecognized field names found in the
    * campaign data.  Offers a "Clean Up" button that removes those fields,
    * saves the campaign, and updates its lastUpdated timestamp.
@@ -2880,101 +2997,7 @@ export class CampaignEditor {
       'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
       'justify-content:center;z-index:300;';
 
-    const buildContent = (
-      issues: Map<string, Map<string, number>>,
-      cleanupDone: boolean,
-    ): void => {
-      overlay.innerHTML = '';
-
-      const dialog = document.createElement('div');
-      dialog.style.cssText =
-        'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
-        'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:520px;' +
-        'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
-
-      const title = document.createElement('div');
-      title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
-      title.textContent = cleanupDone ? '🧹 Cleanup Complete' : '🔍 Dev – Validate Data';
-      dialog.appendChild(title);
-
-      let totalIssues = 0;
-      for (const m of issues.values()) for (const c of m.values()) totalIssues += c;
-
-      const body = document.createElement('div');
-      body.style.cssText = 'font-size:0.9rem;color:#eee;line-height:1.6;';
-
-      if (totalIssues === 0) {
-        const p = document.createElement('p');
-        p.style.margin = '0';
-        p.textContent = cleanupDone
-          ? 'Cleanup complete. No issues were found.'
-          : 'Data validation complete. No issues found.';
-        body.appendChild(p);
-      } else {
-        const intro = document.createElement('p');
-        intro.style.margin = '0 0 8px 0';
-        intro.textContent = cleanupDone
-          ? 'The following unrecognized fields were removed:'
-          : 'The following unrecognized fields were found:';
-        body.appendChild(intro);
-
-        const table = document.createElement('table');
-        table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.85rem;';
-
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        for (const [label, align] of [['Record Type', 'left'], ['Field Name', 'left'], ['Count', 'right']] as const) {
-          const th = document.createElement('th');
-          th.style.cssText =
-            `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid #2a3a5e;`;
-          th.textContent = label;
-          headerRow.appendChild(th);
-        }
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-        for (const [recordType, fieldMap] of issues) {
-          for (const [fieldName, count] of fieldMap) {
-            const tr = document.createElement('tr');
-            for (const [txt, align] of [
-              [recordType, 'left'],
-              [fieldName, 'left'],
-              [String(count), 'right'],
-            ] as const) {
-              const td = document.createElement('td');
-              td.style.cssText =
-                `text-align:${align};padding:4px 8px;border-bottom:1px solid #1a2a3e;`;
-              td.textContent = txt;
-              tr.appendChild(td);
-            }
-            tbody.appendChild(tr);
-          }
-        }
-        table.appendChild(tbody);
-        body.appendChild(table);
-      }
-      dialog.appendChild(body);
-
-      const btnRow = document.createElement('div');
-      btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
-
-      if (totalIssues > 0 && !cleanupDone) {
-        const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {
-          const cleanIssues = this._scanCampaignData(campaign, false);
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
-          buildContent(cleanIssues, true);
-        });
-        btnRow.appendChild(cleanupBtn);
-      }
-
-      btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
-      dialog.appendChild(btnRow);
-      overlay.appendChild(dialog);
-    };
-
-    buildContent(this._scanCampaignData(campaign, true), false);
+    this._renderValidateDataContent(overlay, campaign, this._scanCampaignData(campaign, true), false);
     this._el.appendChild(overlay);
   }
 
