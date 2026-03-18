@@ -582,6 +582,23 @@ function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   }
 }
 
+/**
+ * Compute the sandstone visual state from the tile's hardness/shatter config
+ * and the current board pressure.  Used by both {@link _drawChamber} and
+ * {@link _resolveTileColor} to derive the appropriate color without duplicating
+ * the threshold logic.
+ */
+function _sandstoneColorState(
+  tile: Tile,
+  currentPressure: number,
+): { isShatterTriggered: boolean; isHard: boolean } {
+  const shatterActive = tile.shatter > tile.hardness;
+  return {
+    isShatterTriggered: shatterActive && currentPressure >= tile.shatter,
+    isHard: tile.hardness >= currentPressure,
+  };
+}
+
 function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, sandstoneColor: string, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null): void {
   // When hardness >= pressure, use darker color and show hardness.
   // When shatter is active and pressure reaches the shatter threshold, use lighter color.
@@ -800,9 +817,7 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   } else if (chamberContent === 'snow') {
     _drawChamberSnowContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, currentPressure, lockedCost);
   } else if (chamberContent === 'sandstone') {
-    const shatterActive = tile.shatter > tile.hardness;
-    const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-    const isHard = tile.hardness >= currentPressure;
+    const { isShatterTriggered, isHard } = _sandstoneColorState(tile, currentPressure);
     const sandstoneColor = isShatterTriggered
       ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
       : isHard
@@ -884,11 +899,7 @@ function _resolveTileColor(
       return isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
     }
     if (chamberContent === 'sandstone') {
-      // When hardness >= pressure (and shatter not active), use darker color.
-      // When shatter is active and pressure reaches the shatter threshold, use lighter color.
-      const shatterActive = tile.shatter > tile.hardness;
-      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-      const isHard = tile.hardness >= currentPressure;
+      const { isShatterTriggered, isHard } = _sandstoneColorState(tile, currentPressure);
       return isShatterTriggered
         ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
         : isHard
