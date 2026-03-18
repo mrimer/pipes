@@ -76,9 +76,9 @@ const ERROR_FLASH_CSS =
 // the canvas can be sized to fill the remaining viewport height.
 
 /** Estimated height (px) of the <h1> title: margin(20) + 2rem text(32) + margin(16) = 68,
- *  plus a small rounding allowance to reach the empirically-calibrated value. */
+ *  plus ~6 px empirical allowance for line-height and sub-pixel rounding = 74. */
 const PLAY_H1_H = 74;
-/** Estimated height (px) of the #level-header row (1 rem line-height). */
+/** Estimated height (px) of the #level-header row: 1rem font (16 px) × ~1.4 line-height ≈ 22. */
 const PLAY_LEVEL_HEADER_H = 22;
 /** Estimated height (px) of the #hud button row (buttons with 6 px vertical padding). */
 const PLAY_HUD_H = 32;
