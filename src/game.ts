@@ -1132,6 +1132,18 @@ export class Game {
     };
   }
 
+  /**
+   * Convert the current {@link mouseCanvasPos} into a grid {@link GridPos}.
+   * Returns `null` when no mouse position is available.
+   */
+  private _getHoverGridPos(): GridPos | null {
+    if (!this.mouseCanvasPos) return null;
+    return {
+      row: Math.floor(this.mouseCanvasPos.y / TILE_SIZE),
+      col: Math.floor(this.mouseCanvasPos.x / TILE_SIZE),
+    };
+  }
+
   private _handleCanvasMouseDown(e: MouseEvent): void {
     if (e.button === 2) {
       if (this.screen !== GameScreen.Play) return;
@@ -1227,9 +1239,8 @@ export class Game {
    */
   private _tryAdjustHoverRotation(steps: 1 | -1): boolean {
     if (!this.mouseCanvasPos || !this.board) return false;
-    const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-    const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-    const hTile = this.board.getTile({ row: hRow, col: hCol });
+    const hPos = this._getHoverGridPos()!;
+    const hTile = this.board.getTile(hPos);
     if (!hTile || hTile.isFixed || hTile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(hTile.shape)) {
       return false;
     }
@@ -1293,9 +1304,7 @@ export class Game {
    */
   private _tryRotateHoverSpinner(steps: number): boolean {
     if (!this.mouseCanvasPos || !this.board) return false;
-    const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-    const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-    const hPos: GridPos = { row: hRow, col: hCol };
+    const hPos = this._getHoverGridPos()!;
     const hTile = this.board.getTile(hPos);
     if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
     const filledBefore = this.board.getFilledPositions();
@@ -1405,12 +1414,10 @@ export class Game {
 
   private _handleCanvasMouseMove(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
-    const prevCol = this.mouseCanvasPos ? Math.floor(this.mouseCanvasPos.x / TILE_SIZE) : -1;
-    const prevRow = this.mouseCanvasPos ? Math.floor(this.mouseCanvasPos.y / TILE_SIZE) : -1;
+    const prevPos = this._getHoverGridPos();
     this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    const newCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-    const newRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-    if (newRow !== prevRow || newCol !== prevCol) {
+    const newPos = this._getHoverGridPos()!;
+    if (newPos.row !== prevPos?.row || newPos.col !== prevPos?.col) {
       this.hoverRotationDelta = 0;
     }
     if (this.ctrlHeld && this.gameState === GameState.Playing) {
@@ -1421,8 +1428,7 @@ export class Game {
     if (this._isDragging && this.selectedShape !== null &&
         this.board && this.screen === GameScreen.Play &&
         this.gameState === GameState.Playing) {
-      const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-      const row = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      const { row, col } = newPos;
       const last = this._dragLastTile;
       if (last && (row !== last.row || col !== last.col)) {
         // Moved to a new tile: place at the tile we just left.
@@ -1450,8 +1456,7 @@ export class Game {
     // Drag-erase: reclaim the OLD tile each time the cursor enters a new grid cell.
     if (this._isRightDragging && this.board && this.screen === GameScreen.Play &&
         this.gameState === GameState.Playing) {
-      const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-      const row = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+      const { row, col } = newPos;
       const last = this._rightDragLastTile;
       if (last && (row !== last.row || col !== last.col)) {
         // Moved to a new tile: reclaim the tile we just left.
@@ -1483,9 +1488,7 @@ export class Game {
         this._rotatePendingCCW();
       }
     } else if (this.mouseCanvasPos && this.board) {
-      const hCol = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-      const hRow = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
-      const hPos: GridPos = { row: hRow, col: hCol };
+      const hPos = this._getHoverGridPos()!;
       const hTile = this.board.getTile(hPos);
       if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {
         // Spin pipes: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
@@ -1677,8 +1680,7 @@ export class Game {
 
   private _showTooltip(clientX: number, clientY: number): void {
     if (this.screen !== GameScreen.Play || !this.mouseCanvasPos) return;
-    const col = Math.floor(this.mouseCanvasPos.x / TILE_SIZE);
-    const row = Math.floor(this.mouseCanvasPos.y / TILE_SIZE);
+    const { row, col } = this._getHoverGridPos()!;
     if (!this.board || row < 0 || row >= this.board.rows || col < 0 || col >= this.board.cols) {
       this._hideTooltip();
       return;
