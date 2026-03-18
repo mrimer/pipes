@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, ENV_MODIFIER_CONTENTS } from './types';
 
 /**
  * Encode a grid row/col pair into the canonical string key used by all internal
@@ -845,7 +845,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'heater' || tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone' || tile.chamberContent === 'hot_plate')
+          TEMP_RELEVANT_CONTENTS.has(tile.chamberContent!)
         ) {
           return true;
         }
@@ -868,7 +868,7 @@ export class Board {
       for (const tile of row) {
         if (
           tile.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'pump' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone')
+          PRESSURE_RELEVANT_CONTENTS.has(tile.chamberContent!)
         ) {
           return true;
         }
@@ -1086,7 +1086,7 @@ export class Board {
         const tile = this.grid[r]?.[c];
         if (
           tile?.shape === PipeShape.Chamber &&
-          (tile.chamberContent === 'heater' || tile.chamberContent === 'pump')
+          ENV_MODIFIER_CONTENTS.has(tile.chamberContent!)
         ) {
           return true;
         }
@@ -1108,7 +1108,7 @@ export class Board {
         const tile = this.grid[r]?.[c];
         if (tile?.shape === PipeShape.Chamber) {
           if (
-            (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone') &&
+            tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent) &&
             impact < 0
           ) {
             // impact is negative (a cost); subtract it back out of frozen.
@@ -1144,12 +1144,7 @@ export class Board {
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
       if (!tile || tile.shape !== PipeShape.Chamber) continue;
-      if (
-        tile.chamberContent !== 'ice' &&
-        tile.chamberContent !== 'snow' &&
-        tile.chamberContent !== 'sandstone' &&
-        tile.chamberContent !== 'hot_plate'
-      ) continue;
+      if (tile.chamberContent === null || !TEMP_CHAMBER_CONTENTS.has(tile.chamberContent)) continue;
 
       const tileConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
       const effectiveTemp = this._computeTemperatureForIce(filled, tileConnectedTurn);
