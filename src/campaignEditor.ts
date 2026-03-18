@@ -240,6 +240,34 @@ export class CampaignEditor {
   }
 
   /**
+   * Create the common skeleton shared by {@link _buildCampaignRow},
+   * {@link _buildChapterRow}, and {@link _buildLevelRow}: an outer flex row, an
+   * expandable info area, and a button cluster.  Callers populate `info` and
+   * `btns` with their specific content, then return `row`.
+   *
+   * @param borderColor - CSS colour for the 2px solid border.
+   * @param padding     - CSS padding shorthand for the outer row.
+   * @param btnGap      - CSS gap for the button container (default `'8px'`).
+   */
+  private _buildItemRow(
+    borderColor: string,
+    padding: string,
+    btnGap = '8px',
+  ): { row: HTMLElement; info: HTMLElement; btns: HTMLElement } {
+    const row = document.createElement('div');
+    row.style.cssText =
+      `background:#16213e;border:2px solid ${borderColor};border-radius:8px;` +
+      `padding:${padding};display:flex;align-items:center;gap:12px;`;
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;';
+    const btns = document.createElement('div');
+    btns.style.cssText = `display:flex;gap:${btnGap};flex-wrap:wrap;`;
+    row.appendChild(info);
+    row.appendChild(btns);
+    return { row, info, btns };
+  }
+
+  /**
    * Create a standard full-screen modal overlay and a centred dialog box,
    * append the overlay to `_el`, and return both elements for the caller to
    * populate.
@@ -448,13 +476,8 @@ export class CampaignEditor {
     const isOfficial = campaign.official === true;
     const activeCampaignId = loadActiveCampaignId();
     const isActive = activeCampaignId === campaign.id;
-    const row = document.createElement('div');
-    row.style.cssText =
-      'background:#16213e;border:2px solid #4a90d9;border-radius:8px;' +
-      'padding:14px 18px;display:flex;align-items:center;gap:12px;';
+    const { row, info, btns } = this._buildItemRow('#4a90d9', '14px 18px');
 
-    const info = document.createElement('div');
-    info.style.cssText = 'flex:1;';
     const name = document.createElement('div');
     name.style.cssText = 'font-size:1rem;font-weight:bold;';
     name.textContent = campaign.name + (isOfficial ? ' 🔒' : '');
@@ -475,10 +498,6 @@ export class CampaignEditor {
     meta.textContent = `By ${campaign.author}  ·  ${campaign.chapters.length} ${chapterWord}  ·  ${levelCount} ${levelWord}${progressText}`;
     info.appendChild(name);
     info.appendChild(meta);
-    row.appendChild(info);
-
-    const btns = document.createElement('div');
-    btns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
 
     // Play or Active button (shared for both official and user campaigns)
     if (isActive) {
@@ -514,7 +533,6 @@ export class CampaignEditor {
       }));
     }
 
-    row.appendChild(btns);
     return row;
   }
 
@@ -627,13 +645,8 @@ export class CampaignEditor {
 
   private _buildChapterRow(campaign: CampaignDef, chapterIdx: number, readOnly: boolean): HTMLElement {
     const chapter = campaign.chapters[chapterIdx];
-    const row = document.createElement('div');
-    row.style.cssText =
-      'background:#16213e;border:2px solid #2a3a5e;border-radius:8px;' +
-      'padding:12px 16px;display:flex;align-items:center;gap:12px;';
+    const { row, info, btns } = this._buildItemRow('#2a3a5e', '12px 16px', '6px');
 
-    const info = document.createElement('div');
-    info.style.cssText = 'flex:1;';
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
     name.textContent = `Chapter ${chapterIdx + 1}: ${chapter.name}`;
@@ -647,10 +660,6 @@ export class CampaignEditor {
     meta.textContent = metaParts.join('  ');
     info.appendChild(name);
     info.appendChild(meta);
-    row.appendChild(info);
-
-    const btns = document.createElement('div');
-    btns.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
     const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
     btns.appendChild(this._btn(editOrViewLabel, '#16213e', '#f0c040', () => {
@@ -687,7 +696,6 @@ export class CampaignEditor {
       }));
     }
 
-    row.appendChild(btns);
     return row;
   }
 
@@ -764,13 +772,8 @@ export class CampaignEditor {
   ): HTMLElement {
     const chapter = campaign.chapters[chapterIdx];
     const level = chapter.levels[levelIdx];
-    const row = document.createElement('div');
-    row.style.cssText =
-      'background:#16213e;border:2px solid #2a3a5e;border-radius:8px;' +
-      'padding:12px 16px;display:flex;align-items:center;gap:12px;';
+    const { row, info, btns } = this._buildItemRow('#2a3a5e', '12px 16px', '6px');
 
-    const info = document.createElement('div');
-    info.style.cssText = 'flex:1;';
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
     const starSuffix = (level.starCount ?? 0) > 0 ? ` ⭐×${level.starCount}` : '';
@@ -783,10 +786,6 @@ export class CampaignEditor {
     });
     info.appendChild(name);
     info.appendChild(minimap);
-    row.appendChild(info);
-
-    const btns = document.createElement('div');
-    btns.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
     const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
     btns.appendChild(this._btn(editOrViewLabel, '#16213e', '#f0c040', () => {
@@ -867,7 +866,6 @@ export class CampaignEditor {
       }
     }
 
-    row.appendChild(btns);
     return row;
   }
 
@@ -920,45 +918,7 @@ export class CampaignEditor {
         }
       },
     );
-
-    if (!readOnly) {
-      // Undo/redo
-      const undoBtn = this._btn('↩ Undo', '#2a2a4a', '#aaa', () => this._editorUndo());
-      undoBtn.id = 'editor-undo-btn';
-      toolbar.appendChild(undoBtn);
-      const redoBtn = this._btn('↪ Redo', '#2a2a4a', '#aaa', () => this._editorRedo());
-      redoBtn.id = 'editor-redo-btn';
-      toolbar.appendChild(redoBtn);
-
-      // Validate
-      toolbar.appendChild(this._btn('✔ Validate', '#16213e', '#7ed321', () => {
-        const result = this._validateLevel();
-        const icon = result.ok ? '✅' : '❌';
-        alert(`${icon} Validation\n\n${result.messages.join('\n')}`);
-      }));
-
-      // Playtest
-      toolbar.appendChild(this._btn('▶ Playtest', '#16213e', '#f0c040', () => {
-        const result = this._validateLevel();
-        if (!result.ok) {
-          alert(`❌ Validation\n\n${result.messages.join('\n')}`);
-          return;
-        }
-        this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
-        const chapter = campaign.chapters[this._activeChapterIdx];
-        const level = chapter?.levels[this._activeLevelIdx];
-        if (!level) return;
-        this._onPlaytest(level);
-      }));
-
-      // Save
-      const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
-        this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
-      });
-      saveBtn.id = 'editor-save-btn';
-      toolbar.appendChild(saveBtn);
-    }
-
+    this._addLevelEditorToolbarActions(toolbar, readOnly, campaign);
     this._el.appendChild(toolbar);
 
     // ── Main editor layout ─────────────────────────────────────────────────
@@ -976,7 +936,98 @@ export class CampaignEditor {
       leftCol.appendChild(this._buildPalette());
     }
 
-    // ── Middle column: canvas ──────────────────────────────────────────────
+    // ── Middle column: canvas + metadata ──────────────────────────────────
+    const midCol = this._buildLevelEditorMidCol(readOnly);
+
+    // ── Right column: inventory editor, tile params, grid size ────────────
+    const rightCol = document.createElement('div');
+    rightCol.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:180px;';
+
+    if (!readOnly) {
+      rightCol.appendChild(this._buildInventoryEditor());
+      rightCol.appendChild(this._buildParamPanel());
+      rightCol.appendChild(this._buildGridSizePanel());
+    } else {
+      rightCol.appendChild(this._buildInventoryReadonly());
+    }
+
+    this._editorMainLayout = mainLayout;
+    mainLayout.appendChild(leftCol);
+    // Wrap the canvas column and the right column together so the inventory/
+    // grid-size panel always sits to the right of the canvas regardless of
+    // how the outer layout wraps relative to the palette column.
+    const midRightWrapper = document.createElement('div');
+    midRightWrapper.style.cssText =
+      `display:flex;flex-wrap:nowrap;gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;`;
+    midRightWrapper.appendChild(midCol);
+    midRightWrapper.appendChild(rightCol);
+    mainLayout.appendChild(midRightWrapper);
+    this._el.appendChild(mainLayout);
+
+    // Re-compute canvas display size now that the layout is in the DOM, so the
+    // board can fill any available horizontal space.
+    this._updateCanvasDisplaySize();
+
+    // Initial render
+    this._renderEditorCanvas();
+    this._updateEditorUndoRedoButtons();
+  }
+
+  /**
+   * Append the level-editor action buttons (undo, redo, validate, playtest,
+   * save) to `toolbar`.  Called only in edit mode; a no-op when `readOnly`.
+   */
+  private _addLevelEditorToolbarActions(
+    toolbar: HTMLElement,
+    readOnly: boolean,
+    campaign: CampaignDef,
+  ): void {
+    if (readOnly) return;
+
+    // Undo/redo
+    const undoBtn = this._btn('↩ Undo', '#2a2a4a', '#aaa', () => this._editorUndo());
+    undoBtn.id = 'editor-undo-btn';
+    toolbar.appendChild(undoBtn);
+    const redoBtn = this._btn('↪ Redo', '#2a2a4a', '#aaa', () => this._editorRedo());
+    redoBtn.id = 'editor-redo-btn';
+    toolbar.appendChild(redoBtn);
+
+    // Validate
+    toolbar.appendChild(this._btn('✔ Validate', '#16213e', '#7ed321', () => {
+      const result = this._validateLevel();
+      const icon = result.ok ? '✅' : '❌';
+      alert(`${icon} Validation\n\n${result.messages.join('\n')}`);
+    }));
+
+    // Playtest
+    toolbar.appendChild(this._btn('▶ Playtest', '#16213e', '#f0c040', () => {
+      const result = this._validateLevel();
+      if (!result.ok) {
+        alert(`❌ Validation\n\n${result.messages.join('\n')}`);
+        return;
+      }
+      this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
+      const chapter = campaign.chapters[this._activeChapterIdx];
+      const level = chapter?.levels[this._activeLevelIdx];
+      if (!level) return;
+      this._onPlaytest(level);
+    }));
+
+    // Save
+    const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
+      this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
+    });
+    saveBtn.id = 'editor-save-btn';
+    toolbar.appendChild(saveBtn);
+  }
+
+  /**
+   * Build the middle column for the level editor: canvas + level-name field
+   * + note/hint/challenge metadata below the canvas.  Populates
+   * `_editorCanvas`, `_editorCtx`, and `_editorSourceErrorEl` as side
+   * effects.
+   */
+  private _buildLevelEditorMidCol(readOnly: boolean): HTMLElement {
     const midCol = document.createElement('div');
     midCol.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
 
@@ -1183,39 +1234,9 @@ export class CampaignEditor {
       }
     }
 
-    // ── Right column: inventory editor, tile params, grid size ────────────
-    const rightCol = document.createElement('div');
-    rightCol.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:180px;';
-
-    if (!readOnly) {
-      rightCol.appendChild(this._buildInventoryEditor());
-      rightCol.appendChild(this._buildParamPanel());
-      rightCol.appendChild(this._buildGridSizePanel());
-    } else {
-      rightCol.appendChild(this._buildInventoryReadonly());
-    }
-
-    this._editorMainLayout = mainLayout;
-    mainLayout.appendChild(leftCol);
-    // Wrap the canvas column and the right column together so the inventory/
-    // grid-size panel always sits to the right of the canvas regardless of
-    // how the outer layout wraps relative to the palette column.
-    const midRightWrapper = document.createElement('div');
-    midRightWrapper.style.cssText =
-      `display:flex;flex-wrap:nowrap;gap:${EDITOR_LAYOUT_GAP}px;align-items:flex-start;`;
-    midRightWrapper.appendChild(midCol);
-    midRightWrapper.appendChild(rightCol);
-    mainLayout.appendChild(midRightWrapper);
-    this._el.appendChild(mainLayout);
-
-    // Re-compute canvas display size now that the layout is in the DOM, so the
-    // board can fill any available horizontal space.
-    this._updateCanvasDisplaySize();
-
-    // Initial render
-    this._renderEditorCanvas();
-    this._updateEditorUndoRedoButtons();
+    return midCol;
   }
+
 
   // ─── Palette panel ────────────────────────────────────────────────────────
 
