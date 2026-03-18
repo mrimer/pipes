@@ -575,23 +575,35 @@ describe('Game – reset progress', () => {
 
   it('shows the reset confirm modal when the reset button is clicked', () => {
     const { game } = makeGame();
+    const hooks = gameHooks(game);
+
+    // Add progress so the Reset Progress button becomes enabled.
+    hooks._activeCampaignProgress.add(1);
+    hooks._renderLevelList();
+
     const levelListEl = document.getElementById('level-list')!;
     const resetBtn = Array.from(levelListEl.querySelectorAll('button'))
       .find((b) => b.textContent?.includes('Reset Progress'))!;
 
     resetBtn.click();
 
-    expect(gameHooks(game).resetConfirmModalEl.style.display).toBe('flex');
+    expect(hooks.resetConfirmModalEl.style.display).toBe('flex');
   });
 
   it('hides the reset confirm modal when cancel is clicked', () => {
     const { game } = makeGame();
+    const hooks = gameHooks(game);
+
+    // Add progress so the Reset Progress button becomes enabled.
+    hooks._activeCampaignProgress.add(1);
+    hooks._renderLevelList();
+
     const levelListEl = document.getElementById('level-list')!;
     const resetBtn = Array.from(levelListEl.querySelectorAll('button'))
       .find((b) => b.textContent?.includes('Reset Progress'))!;
     resetBtn.click();
 
-    const modal = gameHooks(game).resetConfirmModalEl;
+    const modal = hooks.resetConfirmModalEl;
     const cancelBtn = Array.from(modal.querySelectorAll('button'))
       .find((b) => b.textContent === 'Cancel')! as HTMLButtonElement;
     cancelBtn.click();

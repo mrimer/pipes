@@ -528,3 +528,84 @@ describe('renderLevelList – no-campaign / campaign header', () => {
     expect(h2).toBeNull();
   });
 });
+
+// ─── renderLevelList – Reset Progress button visibility ───────────────────────
+
+describe('renderLevelList – Reset Progress button', () => {
+  let container: HTMLElement;
+  const campaign = { name: 'C', author: 'A', completionPct: 0 };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  function getResetBtn(): HTMLButtonElement | null {
+    return Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b.textContent?.includes('Reset Progress')) ?? null;
+  }
+
+  it('does not render the Reset Progress button when no activeCampaign is provided', () => {
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, [],
+    );
+    expect(getResetBtn()).toBeNull();
+  });
+
+  it('renders but disables Reset Progress when campaign has no completed levels or stars', () => {
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, [],
+    );
+    const btn = getResetBtn();
+    expect(btn).not.toBeNull();
+    expect(btn!.disabled).toBe(true);
+  });
+
+  it('renders and enables Reset Progress when at least one level is completed', () => {
+    renderLevelList(
+      container, new Set<number>([1]),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, [],
+    );
+    const btn = getResetBtn();
+    expect(btn).not.toBeNull();
+    expect(btn!.disabled).toBe(false);
+  });
+
+  it('renders and enables Reset Progress when stars have been collected but no levels completed', () => {
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, [], { 1: 2 },
+    );
+    const btn = getResetBtn();
+    expect(btn).not.toBeNull();
+    expect(btn!.disabled).toBe(false);
+  });
+
+  it('invokes onResetClick when the enabled Reset Progress button is clicked', () => {
+    let clicked = false;
+    renderLevelList(
+      container, new Set<number>([1]),
+      () => {}, () => { clicked = true; }, () => {}, () => {}, () => {},
+      campaign, [],
+    );
+    getResetBtn()!.click();
+    expect(clicked).toBe(true);
+  });
+
+  it('does not invoke onResetClick when the disabled Reset Progress button is clicked', () => {
+    let clicked = false;
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => { clicked = true; }, () => {}, () => {}, () => {},
+      campaign, [],
+    );
+    getResetBtn()!.click();
+    expect(clicked).toBe(false);
+  });
+});

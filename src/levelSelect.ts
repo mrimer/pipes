@@ -394,14 +394,25 @@ export function renderLevelList(
   rulesBtn.addEventListener('click', onRulesClick);
   levelListEl.appendChild(rulesBtn);
 
-  // Reset-progress button at the bottom of the level list
-  const resetBtn = document.createElement('button');
-  resetBtn.textContent = '🔄 Reset Progress';
-  resetBtn.style.cssText =
-    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#e74c3c;' +
-    'border:1px solid #e74c3c;border-radius:6px;cursor:pointer;width:100%;';
-  resetBtn.addEventListener('click', onResetClick);
-  levelListEl.appendChild(resetBtn);
+  // Reset-progress button: hidden when no campaign is active; disabled when there is no
+  // recorded progress (no completed levels and no collected stars) so it cannot be clicked.
+  if (activeCampaign) {
+    const hasProgress =
+      completedLevels.size > 0 ||
+      Object.values(levelStars).some((s) => s > 0);
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = '🔄 Reset Progress';
+    resetBtn.disabled = !hasProgress;
+    resetBtn.style.cssText =
+      'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;width:100%;' +
+      'border-radius:6px;border:1px solid ' + (hasProgress ? '#e74c3c' : '#555') + ';' +
+      'color:' + (hasProgress ? '#e74c3c' : '#888') + ';' +
+      'cursor:' + (hasProgress ? 'pointer' : 'default') + ';';
+    if (hasProgress) {
+      resetBtn.addEventListener('click', onResetClick);
+    }
+    levelListEl.appendChild(resetBtn);
+  }
 
   // Dev cheat button: mark all levels completed and unlock all chapters/levels
   const unlockAllBtn = document.createElement('button');
