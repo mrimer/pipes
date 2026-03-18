@@ -397,6 +397,48 @@ function _drawDeltaTempCostFormula(ctx: CanvasRenderingContext2D, tempLine: stri
   ctx.fillText(costLine, 0, _s(11));
 }
 
+function _drawChamberTankContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
+  // Draw water line with wave ripples near top of the box
+  const tankDecorColor = isWater ? TANK_WATER_COLOR : TANK_COLOR;
+  ctx.strokeStyle = tankDecorColor;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  const wy = -bh + _s(7);
+  const wLeft = -bw + _s(4);
+  const wRight = bw - _s(4);
+  const wMid = 0;
+  const wQuart = (wRight - wLeft) / 4;
+  ctx.beginPath();
+  ctx.moveTo(wLeft, wy);
+  ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
+  ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
+  ctx.stroke();
+  // Show capacity number in tank-like color
+  ctx.fillStyle = tankDecorColor;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(tile.capacity), 0, 0);
+}
+
+function _drawChamberDirtContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
+  // Draw short diagonal dirt lines near top-right and bottom-left corners
+  const dirtDecorColor = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
+  ctx.strokeStyle = dirtDecorColor;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(bw - _s(9), -bh + _s(3)); ctx.lineTo(bw - _s(3), -bh + _s(9)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bw - _s(13), -bh + _s(3)); ctx.lineTo(bw - _s(3), -bh + _s(13)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(3), bh - _s(9)); ctx.lineTo(-bw + _s(9), bh - _s(3)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(3), bh - _s(13)); ctx.lineTo(-bw + _s(13), bh - _s(3)); ctx.stroke();
+  // Show negative cost label in dirt-like color
+  ctx.fillStyle = dirtDecorColor;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`-${tile.cost}`, 0, 0);
+}
+
 function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
   // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
   const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
@@ -783,43 +825,9 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
   if (chamberContent === 'tank') {
-    // Draw water line with wave ripples near top of the box
-    const tankDecorColor = isWater ? TANK_WATER_COLOR : TANK_COLOR;
-    ctx.strokeStyle = tankDecorColor;
-    ctx.lineWidth = _s(1.5);
-    ctx.lineCap = 'round';
-    const wy = -bh + _s(7);
-    const wLeft = -bw + _s(4);
-    const wRight = bw - _s(4);
-    const wMid = 0;
-    const wQuart = (wRight - wLeft) / 4;
-    ctx.beginPath();
-    ctx.moveTo(wLeft, wy);
-    ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
-    ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
-    ctx.stroke();
-    // Show capacity number in tank-like color
-    ctx.fillStyle = tankDecorColor;
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(tile.capacity), 0, 0);
+    _drawChamberTankContent(ctx, tile, bw, bh, isWater);
   } else if (chamberContent === 'dirt') {
-    // Draw short diagonal dirt lines near top-right and bottom-left corners
-    const dirtDecorColor = isWater ? DIRT_WATER_COLOR : DIRT_COST_COLOR;
-    ctx.strokeStyle = dirtDecorColor;
-    ctx.lineWidth = _s(1.5);
-    ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(bw - _s(9), -bh + _s(3)); ctx.lineTo(bw - _s(3), -bh + _s(9)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bw - _s(13), -bh + _s(3)); ctx.lineTo(bw - _s(3), -bh + _s(13)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw + _s(3), bh - _s(9)); ctx.lineTo(-bw + _s(9), bh - _s(3)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-bw + _s(3), bh - _s(13)); ctx.lineTo(-bw + _s(13), bh - _s(3)); ctx.stroke();
-    // Show negative cost label in dirt-like color
-    ctx.fillStyle = dirtDecorColor;
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`-${tile.cost}`, 0, 0);
+    _drawChamberDirtContent(ctx, tile, bw, bh, isWater);
   } else if (chamberContent === 'item') {
     _drawChamberItemContent(ctx, tile.itemShape, tile.itemCount, bw, bh, isWater, half);
   } else if (chamberContent === 'heater') {

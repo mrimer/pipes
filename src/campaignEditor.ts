@@ -288,6 +288,25 @@ export class CampaignEditor {
     return { overlay, dialog };
   }
 
+  /**
+   * Create a small styled info-box `<div>` used to display a level note, hint
+   * summary, or challenge badge in the non-edit level card view.
+   *
+   * All three box types share the same background and padding; only the border
+   * colour changes to distinguish note (blue), hint (gold), and challenge (red).
+   *
+   * @param borderColor CSS colour for the 1 px solid border (e.g. `'#4a90d9'`).
+   * @param text        Content to display inside the box.
+   */
+  private _createInfoBox(borderColor: string, text: string): HTMLDivElement {
+    const el = document.createElement('div');
+    el.style.cssText =
+      `background:#16213e;border:1px solid ${borderColor};border-radius:6px;` +
+      'padding:10px 14px;font-size:0.85rem;color:#eee;';
+    el.textContent = text;
+    return el;
+  }
+
   /** Set the campaign's lastUpdated timestamp to the current time. */
   private _touchCampaign(campaign: CampaignDef): void {
     campaign.lastUpdated = new Date().toISOString();
@@ -1208,29 +1227,14 @@ export class CampaignEditor {
       midCol.appendChild(challengeWrap);
     } else {
       if (this._editLevelNote) {
-        const noteEl = document.createElement('div');
-        noteEl.style.cssText =
-          'background:#16213e;border:1px solid #4a90d9;border-radius:6px;' +
-          'padding:10px 14px;font-size:0.85rem;color:#eee;';
-        noteEl.textContent = `📝 ${this._editLevelNote}`;
-        midCol.appendChild(noteEl);
+        midCol.appendChild(this._createInfoBox('#4a90d9', `📝 ${this._editLevelNote}`));
       }
       const activeHints = this._editLevelHints.filter(h => h.trim());
       if (activeHints.length > 0) {
-        const hintEl = document.createElement('div');
-        hintEl.style.cssText =
-          'background:#16213e;border:1px solid #f0c040;border-radius:6px;' +
-          'padding:10px 14px;font-size:0.85rem;color:#eee;';
-        hintEl.textContent = `💡 ${activeHints.join(' → ')}`;
-        midCol.appendChild(hintEl);
+        midCol.appendChild(this._createInfoBox('#f0c040', `💡 ${activeHints.join(' → ')}`));
       }
       if (this._editLevelChallenge) {
-        const challengeEl = document.createElement('div');
-        challengeEl.style.cssText =
-          'background:#16213e;border:1px solid #e74c3c;border-radius:6px;' +
-          'padding:10px 14px;font-size:0.85rem;color:#eee;';
-        challengeEl.textContent = '💀 Challenge level';
-        midCol.appendChild(challengeEl);
+        midCol.appendChild(this._createInfoBox('#e74c3c', '💀 Challenge level'));
       }
     }
 
