@@ -48,6 +48,49 @@ const HINT_TOGGLE_BTN_STYLE =
 const HINT_TEXT_STYLE =
   'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
 
+/** CSS style for the Ctrl-hover coordinate tooltip element. */
+const TOOLTIP_CSS =
+  'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
+  'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
+
+/** CSS style for the note box shown beneath the grid when a level has a note. */
+const NOTE_BOX_CSS =
+  'display:none;background:#16213e;border:1px solid #4a90d9;border-radius:6px;' +
+  'padding:12px 16px;font-size:0.9rem;color:#eee;max-width:600px;width:100%;box-sizing:border-box;';
+
+/** CSS style for the collapsible hint box shown beneath the grid when a level has hints. */
+const HINT_BOX_CSS =
+  'display:none;border:1px solid #f0c040;border-radius:6px;' +
+  'max-width:600px;width:100%;box-sizing:border-box;overflow:hidden;';
+
+/** CSS style for the brief error-flash message shown when an action is blocked. */
+const ERROR_FLASH_CSS =
+  'display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);' +
+  'background:#c0392b;color:#fff;border:2px solid #e74c3c;' +
+  'border-radius:6px;padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;' +
+  'text-align:center;max-width:360px;';
+
+// ── Play-screen layout overhead estimates ────────────────────────────────────
+// These CSS-derived pixel heights are used by _computePlayOverhead() to calculate
+// how much vertical space is consumed by UI elements outside the game canvas, so
+// the canvas can be sized to fill the remaining viewport height.
+
+/** Estimated height (px) of the <h1> title: margin(20) + 2rem text(32) + margin(16) = 68,
+ *  plus a small rounding allowance to reach the empirically-calibrated value. */
+const PLAY_H1_H = 74;
+/** Estimated height (px) of the #level-header row (1 rem line-height). */
+const PLAY_LEVEL_HEADER_H = 22;
+/** Estimated height (px) of the #hud button row (buttons with 6 px vertical padding). */
+const PLAY_HUD_H = 32;
+/** Gap (px) between flex children in the #play-screen column layout. */
+const PLAY_GAP = 10;
+/** Bottom padding (px) of the #play-screen element. */
+const PLAY_PADDING_BOTTOM = 24;
+/** Estimated height (px) of the note panel: 12 px padding × 2 + one text line. */
+const PLAY_NOTE_PANEL_H = 42;
+/** Estimated height (px) of the collapsed hint panel: toggle-button 10 px padding × 2 + font. */
+const PLAY_HINT_PANEL_H = 37;
+
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
  * Handles both the level-selection menu and the active play screen.
@@ -321,9 +364,7 @@ export class Game {
 
     // Create the tooltip element for Ctrl+hover grid coordinates
     this.tooltipEl = document.createElement('div');
-    this.tooltipEl.style.cssText =
-      'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
-      'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
+    this.tooltipEl.style.cssText = TOOLTIP_CSS;
     document.body.appendChild(this.tooltipEl);
 
     // Grab the value span from the water stat row (its second child span)
@@ -346,25 +387,17 @@ export class Game {
 
     // Create the note box (appended to the play screen, shown beneath the grid)
     this.noteBoxEl = document.createElement('div');
-    this.noteBoxEl.style.cssText =
-      'display:none;background:#16213e;border:1px solid #4a90d9;border-radius:6px;' +
-      'padding:12px 16px;font-size:0.9rem;color:#eee;max-width:600px;width:100%;box-sizing:border-box;';
+    this.noteBoxEl.style.cssText = NOTE_BOX_CSS;
     playScreenEl.appendChild(this.noteBoxEl);
 
     // Create the hint box (appended to the play screen after the note box, collapsible)
     this.hintBoxEl = document.createElement('div');
-    this.hintBoxEl.style.cssText =
-      'display:none;border:1px solid #f0c040;border-radius:6px;' +
-      'max-width:600px;width:100%;box-sizing:border-box;overflow:hidden;';
+    this.hintBoxEl.style.cssText = HINT_BOX_CSS;
     playScreenEl.appendChild(this.hintBoxEl);
 
     // Create the error-flash element for brief action-blocked messages
     this.errorFlashEl = document.createElement('div');
-    this.errorFlashEl.style.cssText =
-      'display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);' +
-      'background:#c0392b;color:#fff;border:2px solid #e74c3c;' +
-      'border-radius:6px;padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;' +
-      'text-align:center;max-width:360px;';
+    this.errorFlashEl.style.cssText = ERROR_FLASH_CSS;
     document.body.appendChild(this.errorFlashEl);
 
     // Create the reset-progress confirmation modal
@@ -458,6 +491,20 @@ export class Game {
     rowEl.appendChild(labelEl);
     rowEl.appendChild(valueEl);
     return { rowEl, valueEl };
+  }
+
+  /**
+   * Show or hide a stats-box row based on whether a value is available.
+   * When `value` is not null, updates `valueEl.textContent` and sets `rowEl` to flex;
+   * when null, hides `rowEl`.
+   */
+  private static _showStatRow(rowEl: HTMLElement, valueEl: HTMLElement, value: number | null): void {
+    if (value !== null) {
+      valueEl.textContent = `${value}`;
+      rowEl.style.display = 'flex';
+    } else {
+      rowEl.style.display = 'none';
+    }
   }
 
   /**
@@ -630,21 +677,12 @@ export class Game {
    * on screen together with all of these elements.
    */
   private _computePlayOverhead(level: LevelDef): number {
-    // CSS-based height estimates for elements outside/alongside the canvas.
-    const H1_H           = 74; // <h1>: margin(20) + 2rem text(38) + margin(16)
-    const LEVEL_HEADER_H = 22; // #level-header: 1rem line
-    const HUD_H          = 32; // #hud: buttons with 6 px vertical padding
-    const GAP            = 10; // gap between flex children in #play-screen
-    const PADDING_BOTTOM = 24; // padding-bottom of #play-screen
-    const NOTE_PANEL_H   = 42; // note panel: 12 px padding × 2 + text line
-    const HINT_PANEL_H   = 37; // hint panel collapsed: toggle-button 10 px padding × 2 + font
-
     const hasNote  = !!level.note;
     const hasHints = !!(level.hints?.length);
 
-    let overhead = H1_H + LEVEL_HEADER_H + GAP + HUD_H + GAP + PADDING_BOTTOM;
-    if (hasNote)  overhead += NOTE_PANEL_H  + GAP;
-    if (hasHints) overhead += HINT_PANEL_H + GAP;
+    let overhead = PLAY_H1_H + PLAY_LEVEL_HEADER_H + PLAY_GAP + PLAY_HUD_H + PLAY_GAP + PLAY_PADDING_BOTTOM;
+    if (hasNote)  overhead += PLAY_NOTE_PANEL_H + PLAY_GAP;
+    if (hasHints) overhead += PLAY_HINT_PANEL_H + PLAY_GAP;
     return overhead;
   }
 
@@ -873,29 +911,14 @@ export class Game {
     else             waterColor = WATER_COLOR;
     this.waterDisplayEl.style.color = waterColor;
 
-    if (this.board.hasTempRelevantTiles()) {
-      const t = this.board.getCurrentTemperature();
-      this.tempValueEl.textContent = `${t}`;
-      this.tempDisplayEl.style.display = 'flex';
-    } else {
-      this.tempDisplayEl.style.display = 'none';
-    }
+    const tempValue = this.board.hasTempRelevantTiles() ? this.board.getCurrentTemperature() : null;
+    Game._showStatRow(this.tempDisplayEl, this.tempValueEl, tempValue);
 
-    const f = this.board.frozen;
-    if (f > 0) {
-      this.frozenValueEl.textContent = `${f}`;
-      this.frozenDisplayEl.style.display = 'flex';
-    } else {
-      this.frozenDisplayEl.style.display = 'none';
-    }
+    const frozenValue = this.board.frozen > 0 ? this.board.frozen : null;
+    Game._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
 
-    if (this.board.hasPressureRelevantTiles()) {
-      const p = this.board.getCurrentPressure();
-      this.pressureValueEl.textContent = `${p}`;
-      this.pressureDisplayEl.style.display = 'flex';
-    } else {
-      this.pressureDisplayEl.style.display = 'none';
-    }
+    const pressureValue = this.board.hasPressureRelevantTiles() ? this.board.getCurrentPressure() : null;
+    Game._showStatRow(this.pressureDisplayEl, this.pressureValueEl, pressureValue);
   }
 
   /**
@@ -1046,6 +1069,16 @@ export class Game {
   private _clearModalSparkle(modalEl: HTMLElement): void {
     const box = modalEl.querySelector<HTMLElement>('.modal-box');
     if (box) box.classList.remove('sparkle-gold', 'sparkle-red', 'sparkle-yellow', 'sparkle-blue');
+  }
+
+  /**
+   * Hide a modal overlay and clear its sparkle animation classes.
+   * Use whenever a player action dismisses a modal – pairs the two cleanup steps
+   * that must always happen together.
+   */
+  private _closeModal(modalEl: HTMLElement): void {
+    modalEl.style.display = 'none';
+    this._clearModalSparkle(modalEl);
   }
 
   /** Show the new-chapter intro modal for the given chapter (by 0-based index). */
@@ -2313,8 +2346,7 @@ export class Game {
    * challenge-level modal when the pending level is a challenge.
    */
   startChapterLevel(): void {
-    this._newChapterModalEl.style.display = 'none';
-    this._clearModalSparkle(this._newChapterModalEl);
+    this._closeModal(this._newChapterModalEl);
     if (this._pendingLevelId === null) return;
 
     const chapters = this._activeCampaign?.chapters ?? [];
@@ -2334,8 +2366,7 @@ export class Game {
    * Dismisses the challenge modal and starts the pending level.
    */
   playChallengeLevel(): void {
-    this._challengeModalEl.style.display = 'none';
-    this._clearModalSparkle(this._challengeModalEl);
+    this._closeModal(this._challengeModalEl);
     if (this._pendingLevelId === null) return;
     const id = this._pendingLevelId;
     this._pendingLevelId = null;
@@ -2347,8 +2378,7 @@ export class Game {
    * Dismisses the challenge modal and advances to the next level after the challenge.
    */
   skipChallengeLevel(): void {
-    this._challengeModalEl.style.display = 'none';
-    this._clearModalSparkle(this._challengeModalEl);
+    this._closeModal(this._challengeModalEl);
     if (this._pendingLevelId === null) { this.exitToMenu(); return; }
 
     const chapters = this._activeCampaign?.chapters ?? [];
@@ -2372,8 +2402,7 @@ export class Game {
     const filledBefore = this.board.getFilledPositions();
     this.board.undoMove();
     this.gameState = GameState.Playing;
-    this.winModalEl.style.display = 'none';
-    this._clearModalSparkle(this.winModalEl);
+    this._closeModal(this.winModalEl);
     clearConfetti();
     clearStarSparkles();
     // Clear win-flow drops since we're no longer in a won state.
@@ -2395,8 +2424,7 @@ export class Game {
     const filledBefore = this.board.getFilledPositions();
     this.board.undoMove();
     this.gameState = GameState.Playing;
-    this.gameoverModalEl.style.display = 'none';
-    this._clearModalSparkle(this.gameoverModalEl);
+    this._closeModal(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
     this._refreshPlayUI();
