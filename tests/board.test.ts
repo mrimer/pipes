@@ -1,4 +1,4 @@
-import { Board, SPIN_PIPE_SHAPES } from '../src/board';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
@@ -1022,7 +1022,7 @@ describe('Gold pipes and gold spaces', () => {
   it('sets lastError when placing a regular pipe on a gold space', () => {
     const board = makeGoldSpaceBoard();
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(board.lastError).toBe('Only gold pipes may be placed on a gold space.');
+    expect(board.lastError).toBe(ERR_GOLD_SPACE);
   });
 
   it('clears lastError on successful placement', () => {
@@ -1041,7 +1041,7 @@ describe('Gold pipes and gold spaces', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
     board.inventory.push({ shape: PipeShape.Straight, count: 1 });
     board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(board.lastError).toBe('Only gold pipes may be placed on a gold space.');
+    expect(board.lastError).toBe(ERR_GOLD_SPACE);
     // Tile should remain unchanged
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
   });

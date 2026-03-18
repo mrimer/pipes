@@ -110,6 +110,33 @@ export function sandstoneCostFactors(
   return { shatterOverride, deltaDamage, costPerDeltaTemp };
 }
 
+// ── Error message constants ────────────────────────────────────────────────
+// Centralised here so changes propagate automatically and tests can reference
+// the same strings without hard-coding them again.
+
+/** Error shown when a non-gold pipe is placed on a gold space. */
+export const ERR_GOLD_SPACE = 'Only gold pipes may be placed on a gold space.';
+
+/** Error shown when removing a tile would leave placed tiles without covering container grants. */
+const ERR_CONTAINER_REMOVE =
+  'Cannot remove: you have used items granted by a connected container. ' +
+  'Reconfigure the path first.';
+
+/** Error shown when a replacement would disconnect the container that grants the new shape. */
+const ERR_CONTAINER_DISCONNECT =
+  'Cannot replace: placing this pipe would disconnect a container that grants it. ' +
+  'Reconfigure the path first.';
+
+/** Error shown when replacing a tile would leave placed tiles without covering container grants. */
+const ERR_CONTAINER_REPLACE =
+  'Cannot replace: you have used items granted by a connected container. ' +
+  'Reconfigure the path first.';
+
+/** Error shown when rotating a tile would leave placed tiles without covering container grants. */
+const ERR_CONTAINER_ROTATE =
+  'Cannot rotate: you have used items granted by a connected container. ' +
+  'Reconfigure the path first.';
+
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
   grid: Tile[][];
@@ -549,14 +576,7 @@ export class Board {
     this.lastErrorTilePositions = null;
     this.lastCementDecrement = null;
     const tile = this.getTile(pos);
-    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
-    if (
-      tile.shape === PipeShape.Source        ||
-      tile.shape === PipeShape.Sink          ||
-      tile.shape === PipeShape.Chamber       ||
-      isObstacleTile(tile.shape)             ||
-      SPIN_PIPE_SHAPES.has(tile.shape)
-    ) return false;
+    if (!this._isReplaceableTile(tile)) return false;
 
     // ── Cement constraint check ───────────────────────────────────────────────
     if (this._isCementHardened(pos)) return false;
@@ -577,9 +597,7 @@ export class Board {
         // count would be `baseCount + newBonus`; block if that would go below zero.
         const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
         if (baseCount + newBonus < 0) {
-          this.lastError =
-            'Cannot remove: you have used items granted by a connected container. ' +
-            'Reconfigure the path first.';
+          this.lastError = ERR_CONTAINER_REMOVE;
           return false;
         }
       }
@@ -599,12 +617,7 @@ export class Board {
       }
     }
 
-    const idx = this.inventory.findIndex((it) => it.shape === tile.shape);
-    if (idx !== -1) {
-      this.inventory[idx].count++;
-    } else {
-      this.inventory.push({ shape: tile.shape, count: 1 });
-    }
+    this._reclaimInventory(tile.shape);
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
     return true;
   }
@@ -628,7 +641,7 @@ export class Board {
 
     // Gold spaces only accept gold pipes; regular pipes may not go on gold spaces
     if (isGoldSpace && !isGoldPipe) {
-      this.lastError = 'Only gold pipes may be placed on a gold space.';
+      this.lastError = ERR_GOLD_SPACE;
       return false;
     }
 
@@ -639,12 +652,7 @@ export class Board {
     const effectiveCount = baseCount + (bonuses.get(shape) ?? 0);
     if (effectiveCount <= 0) return false;
 
-    if (idx !== -1) {
-      this.inventory[idx].count--;
-    } else {
-      // Shape comes entirely from container bonuses – track usage with a negative base count
-      this.inventory.push({ shape, count: -1 });
-    }
+    this._spendInventory(shape);
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
@@ -695,14 +703,7 @@ export class Board {
     const tile = this.getTile(pos);
 
     // Must be a replaceable tile (same guard as reclaimTile)
-    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
-    if (
-      tile.shape === PipeShape.Source  ||
-      tile.shape === PipeShape.Sink    ||
-      tile.shape === PipeShape.Chamber ||
-      isObstacleTile(tile.shape)       ||
-      SPIN_PIPE_SHAPES.has(tile.shape)
-    ) return false;
+    if (!this._isReplaceableTile(tile)) return false;
 
     // ── Cement constraint check ───────────────────────────────────────────────
     if (this._isCementHardened(pos)) return false;
@@ -711,7 +712,7 @@ export class Board {
     const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
     if (isGoldSpace && !isGoldPipe) {
-      this.lastError = 'Only gold pipes may be placed on a gold space.';
+      this.lastError = ERR_GOLD_SPACE;
       return false;
     }
 
@@ -720,12 +721,7 @@ export class Board {
     const oldShape = tile.shape;
 
     // ── Step 1: Reclaim old tile into inventory (no constraint check yet) ──────
-    const oldIdx = this.inventory.findIndex((it) => it.shape === oldShape);
-    if (oldIdx !== -1) {
-      this.inventory[oldIdx].count++;
-    } else {
-      this.inventory.push({ shape: oldShape, count: 1 });
-    }
+    this._reclaimInventory(oldShape);
 
     // ── Step 2: Place new tile from inventory ──────────────────────────────────
     // Evaluate container bonuses with the new tile already in place so that a
@@ -746,20 +742,14 @@ export class Board {
       const originalBonuses = this.getContainerBonuses();
       const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
       if (originalEffective > 0) {
-        this.lastError =
-          'Cannot replace: placing this pipe would disconnect a container that grants it. ' +
-          'Reconfigure the path first.';
+        this.lastError = ERR_CONTAINER_DISCONNECT;
       }
       this.inventory = savedInventory;
       // grid[pos.row][pos.col] is already restored to the old tile above
       return false;
     }
 
-    if (newIdx !== -1) {
-      this.inventory[newIdx].count--;
-    } else {
-      this.inventory.push({ shape: newShape, count: -1 });
-    }
+    this._spendInventory(newShape);
     // grid[pos.row][pos.col] is already set to new Tile(newShape, rotation) above
 
     // ── Step 3: Post-replacement state validation ──────────────────────────────
@@ -769,9 +759,7 @@ export class Board {
     for (const item of this.inventory) {
       const bonus = finalBonuses.get(item.shape) ?? 0;
       if (item.count + bonus < 0) {
-        this.lastError =
-          'Cannot replace: you have used items granted by a connected container. ' +
-          'Reconfigure the path first.';
+        this.lastError = ERR_CONTAINER_REPLACE;
         this.inventory = savedInventory;
         this.grid[pos.row][pos.col] = tile;
         return false;
@@ -1403,8 +1391,9 @@ export class Board {
   /**
    * Run all three constraint checks (sandstone → heater → pump) in order,
    * stopping at the first failure.  Convenience wrapper used by
-   * {@link placeInventoryTile}, {@link replaceInventoryTile}, and
-   * {@link reclaimTile} to avoid duplicating the short-circuit chain.
+   * {@link placeInventoryTile}, {@link replaceInventoryTile},
+   * {@link reclaimTile}, {@link rotateTile}, and {@link rotateTileBy}
+   * to avoid duplicating the short-circuit chain.
    * @param filled - Current fill set (after the board mutation).
    * @returns The first error message found, or `null` if all constraints pass.
    */
@@ -1413,6 +1402,50 @@ export class Board {
     const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
     const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
     return sandstoneError ?? heaterError ?? pumpError;
+  }
+
+  /**
+   * Returns `true` when the tile at the given position can be reclaimed or
+   * replaced by the player.  A tile passes this check when it is non-fixed,
+   * non-empty, and is not a Source, Sink, Chamber, obstacle, or spinner pipe.
+   * Setting `lastError` / `lastErrorTilePositions` is the caller's responsibility.
+   */
+  private _isReplaceableTile(tile: Tile | null | undefined): tile is Tile {
+    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    return (
+      tile.shape !== PipeShape.Source &&
+      tile.shape !== PipeShape.Sink &&
+      tile.shape !== PipeShape.Chamber &&
+      !isObstacleTile(tile.shape) &&
+      !SPIN_PIPE_SHAPES.has(tile.shape)
+    );
+  }
+
+  /**
+   * Increment the inventory count for `shape` by 1 (reclaim one tile from the board).
+   * Adds a new entry with count=1 if the shape is not already present.
+   */
+  private _reclaimInventory(shape: PipeShape): void {
+    const idx = this.inventory.findIndex((it) => it.shape === shape);
+    if (idx !== -1) {
+      this.inventory[idx].count++;
+    } else {
+      this.inventory.push({ shape, count: 1 });
+    }
+  }
+
+  /**
+   * Decrement the inventory count for `shape` by 1 (spend one tile from the inventory).
+   * When the shape has no base count (comes purely from container bonuses), pushes a
+   * new entry with count=-1 to track the over-draw.
+   */
+  private _spendInventory(shape: PipeShape): void {
+    const idx = this.inventory.findIndex((it) => it.shape === shape);
+    if (idx !== -1) {
+      this.inventory[idx].count--;
+    } else {
+      this.inventory.push({ shape, count: -1 });
+    }
   }
 
   /**
@@ -1666,10 +1699,7 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
-    const sandstoneError = this._checkSandstoneConstraints(filled);
-    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
-    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
-    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    const constraintError = this._validateConstraints(filled);
     if (constraintError) {
       // Reverse the rotation (3 clockwise = 1 counter-clockwise).
       tile.rotate(); tile.rotate(); tile.rotate();
@@ -1685,9 +1715,7 @@ export class Board {
         const bonus = newBonuses.get(item.shape) ?? 0;
         if (item.count + bonus < 0) {
           tile.rotate(); tile.rotate(); tile.rotate();
-          this.lastError =
-            'Cannot rotate: you have used items granted by a connected container. ' +
-            'Reconfigure the path first.';
+          this.lastError = ERR_CONTAINER_ROTATE;
           return false;
         }
       }
@@ -1724,10 +1752,7 @@ export class Board {
     }
     // Validate the final state.
     const filled = this.getFilledPositions();
-    const sandstoneError = this._checkSandstoneConstraints(filled);
-    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
-    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
-    const constraintError = sandstoneError ?? heaterError ?? pumpError;
+    const constraintError = this._validateConstraints(filled);
     if (constraintError) {
       // Revert by rotating the remaining steps to complete a full 360°.
       for (let i = 0; i < 4 - normalizedSteps; i++) {
@@ -1747,9 +1772,7 @@ export class Board {
           for (let i = 0; i < 4 - normalizedSteps; i++) {
             tile.rotate();
           }
-          this.lastError =
-            'Cannot rotate: you have used items granted by a connected container. ' +
-            'Reconfigure the path first.';
+          this.lastError = ERR_CONTAINER_ROTATE;
           return false;
         }
       }
