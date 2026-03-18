@@ -1474,7 +1474,7 @@ export class CampaignEditor {
     }
     sel.addEventListener('change', () => {
       this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
-      if (TEMP_CHAMBER_CONTENTS.has(sel.value as TileParams['chamberContent'])) {
+      if ((TEMP_CHAMBER_CONTENTS as ReadonlySet<string>).has(sel.value)) {
         if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
       }
       this._applyParamsToLinkedTile();
