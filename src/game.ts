@@ -611,11 +611,7 @@ export class Game {
     clearConfetti();
     clearStarSparkles();
     // Clear particle arrays so stale drops don't persist on the level-select screen.
-    this._sourceSprayDrops = [];
-    this._dryPuffs = [];
-    this._flowDrops = [];
-    this._bubbles = [];
-    this._flowGoodDirs = null;
+    this._clearAllParticles();
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
@@ -689,11 +685,7 @@ export class Game {
     clearConfetti();
     clearStarSparkles();
     // Reset particle arrays so stale drops from a previous level don't carry over.
-    this._sourceSprayDrops = [];
-    this._dryPuffs = [];
-    this._flowDrops = [];
-    this._bubbles = [];
-    this._flowGoodDirs = null;
+    this._clearAllParticles();
 
     this._updateLevelHeader(levelId);
     this._refreshPlayUI();
@@ -1215,19 +1207,7 @@ export class Game {
       const tile = this.board.getTile(pos);
       if (tile) {
         const filledBefore = this.board.getFilledPositions();
-        let placed = false;
-        let replacedTile: Tile | undefined;
-        if (tile.shape === PipeShape.Empty) {
-          placed = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
-        } else if (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation) {
-          replacedTile = tile;
-          placed = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
-        }
-        if (placed) {
-          this._afterTilePlaced(this.selectedShape, filledBefore, replacedTile, pos.row, pos.col);
-          this._suppressNextClick = true;
-        } else if (this.board.lastError) {
-          this._handleBoardError();
+        if (this._tryPlaceOrReplaceSelectedAt(pos, tile, filledBefore)) {
           this._suppressNextClick = true;
         }
       }
@@ -1262,6 +1242,19 @@ export class Game {
     }
     this.hoverRotationDelta = ((this.hoverRotationDelta + steps + 4) % 4);
     return true;
+  }
+
+  /**
+   * Reset all per-level particle arrays to empty.
+   * Call whenever a new level begins or when returning to the level-select
+   * screen so stale particles from a previous session don't carry over.
+   */
+  private _clearAllParticles(): void {
+    this._sourceSprayDrops = [];
+    this._dryPuffs = [];
+    this._flowDrops = [];
+    this._bubbles = [];
+    this._flowGoodDirs = null;
   }
 
   /**
@@ -1359,26 +1352,15 @@ export class Game {
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
-    } else if (this.selectedShape !== null && tile.shape === PipeShape.Empty) {
-      // Place pipe from inventory onto an empty cell
-      if (this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
-        this._afterTilePlaced(this.selectedShape, filledBefore);
-      } else if (this.board.lastError) {
-        this._handleBoardError();
-      }
-    } else if (this.selectedShape !== null && tile.shape !== PipeShape.Empty &&
-               (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
-      // Replace the existing tile with the selected inventory shape (single atomic action).
-      // Also covers the same shape with a different orientation, which can disconnect a
-      // granting container and must go through the container-grant constraint check.
-      if (this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation)) {
-        this._afterTilePlaced(this.selectedShape, filledBefore, tile, pos.row, pos.col);
-        this._spawnCementDecrementAnimation();
-      } else if (this.board.lastError) {
-        this._handleBoardError();
-      }
+    } else if (this.selectedShape !== null &&
+               (tile.shape === PipeShape.Empty ||
+                tile.shape !== this.selectedShape ||
+                tile.rotation !== this.pendingRotation)) {
+      // Place on an empty cell or replace a tile with a different shape/rotation.
+      // When tile already matches exactly (same shape+rotation), fall through to rotate.
+      this._tryPlaceOrReplaceSelectedAt(pos, tile, filledBefore);
     } else if (tile.shape !== PipeShape.Empty) {
-      // Rotate existing pipe (no inventory item selected, or same shape as selected).
+      // Rotate existing pipe (no inventory item selected, or same shape+rotation as selected).
       // If the user has previewed multiple rotations via Q/W/wheel, apply all of them
       // as a single game turn; otherwise fall back to a standard single 90° rotation.
       const delta = this.hoverRotationDelta;
@@ -1447,19 +1429,7 @@ export class Game {
         const oldTile = this.board.getTile(last);
         if (oldTile) {
           const filledBefore = this.board.getFilledPositions();
-          let placed = false;
-          let replacedOldTile: Tile | undefined;
-          if (oldTile.shape === PipeShape.Empty) {
-            placed = this.board.placeInventoryTile(last, this.selectedShape, this.pendingRotation);
-          } else if (oldTile.shape !== this.selectedShape || oldTile.rotation !== this.pendingRotation) {
-            replacedOldTile = oldTile;
-            placed = this.board.replaceInventoryTile(last, this.selectedShape, this.pendingRotation);
-          }
-          if (placed) {
-            this._afterTilePlaced(this.selectedShape, filledBefore, replacedOldTile, last.row, last.col);
-          } else if (this.board.lastError) {
-            this._handleBoardError();
-          }
+          this._tryPlaceOrReplaceSelectedAt(last, oldTile, filledBefore);
         }
         this._dragLastTile = { row, col };
       }
@@ -2120,10 +2090,67 @@ export class Game {
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore, replacedTile, replacedRow, replacedCol);
     this._spawnLockedCostChangeAnimations();
+    this._spawnCementDecrementAnimation();
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._refreshPlayUI();
     this._checkWinLose();
+  }
+
+  /**
+   * Attempt to place or replace the currently selected inventory shape at `pos`.
+   *
+   * - If `currentTile` is empty, tries {@link Board.placeInventoryTile}.
+   * - If `currentTile` differs in shape or rotation from the selection, tries
+   *   {@link Board.replaceInventoryTile}.
+   * - If the tile already matches the selected shape and rotation exactly, this
+   *   is a no-op (returns `false`) so the caller can fall through to another
+   *   action (e.g. rotation).
+   *
+   * On success, calls `_afterTilePlaced` (which includes the cement-decrement
+   * animation).  On board error, calls `_handleBoardError`.
+   *
+   * @returns `true` when a board operation was attempted (whether it succeeded
+   *   or failed with an error), `false` when the tile already matched (no-op).
+   */
+  private _tryPlaceOrReplaceSelectedAt(
+    pos: GridPos,
+    currentTile: Tile,
+    filledBefore: Set<string>,
+  ): boolean {
+    if (!this.board || this.selectedShape === null) return false;
+    let replacedTile: Tile | undefined;
+    let placed: boolean;
+    if (currentTile.shape === PipeShape.Empty) {
+      placed = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
+    } else if (currentTile.shape !== this.selectedShape || currentTile.rotation !== this.pendingRotation) {
+      replacedTile = currentTile;
+      placed = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
+    } else {
+      return false; // tile already has the selected shape+rotation – no action
+    }
+    if (placed) {
+      this._afterTilePlaced(this.selectedShape, filledBefore, replacedTile, pos.row, pos.col);
+    } else if (this.board.lastError) {
+      this._handleBoardError();
+    }
+    return true; // a board operation was attempted
+  }
+
+  /**
+   * Move the keyboard focus position by one step along the given axis.
+   * Clamps to the board boundaries and calls `e.preventDefault()` to
+   * suppress scroll.
+   */
+  private _moveFocusPos(e: KeyboardEvent, axis: 'row' | 'col', delta: -1 | 1): void {
+    if (!this.board) return;
+    e.preventDefault();
+    const cur = this.focusPos[axis];
+    const max = axis === 'row' ? this.board.rows : this.board.cols;
+    const next = cur + delta;
+    if (next >= 0 && next < max) {
+      this.focusPos = { ...this.focusPos, [axis]: next };
+    }
   }
 
   private _handleKey(e: KeyboardEvent): void {
@@ -2132,22 +2159,10 @@ export class Game {
     const { focusPos, board } = this;
 
     switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        if (focusPos.row > 0) this.focusPos = { ...focusPos, row: focusPos.row - 1 };
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        if (focusPos.row < board.rows - 1) this.focusPos = { ...focusPos, row: focusPos.row + 1 };
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (focusPos.col > 0) this.focusPos = { ...focusPos, col: focusPos.col - 1 };
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (focusPos.col < board.cols - 1) this.focusPos = { ...focusPos, col: focusPos.col + 1 };
-        break;
+      case 'ArrowUp':    this._moveFocusPos(e, 'row', -1); break;
+      case 'ArrowDown':  this._moveFocusPos(e, 'row',  1); break;
+      case 'ArrowLeft':  this._moveFocusPos(e, 'col', -1); break;
+      case 'ArrowRight': this._moveFocusPos(e, 'col',  1); break;
       case 'Enter':
       case ' ':
         e.preventDefault();
@@ -2155,22 +2170,7 @@ export class Game {
         if (this.selectedShape !== null) {
           const tile = board.getTile(focusPos);
           const filledBefore = board.getFilledPositions();
-          if (tile?.shape === PipeShape.Empty) {
-            if (board.placeInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
-              this._afterTilePlaced(this.selectedShape, filledBefore);
-            } else if (board.lastError) {
-              this._handleBoardError();
-            }
-          } else if (tile && (tile.shape !== this.selectedShape || tile.rotation !== this.pendingRotation)) {
-            // Replace the existing tile with the selected inventory shape.
-            // Also covers the same shape with a different orientation, which can disconnect a
-            // granting container and must go through the container-grant constraint check.
-            if (board.replaceInventoryTile(focusPos, this.selectedShape, this.pendingRotation)) {
-              this._afterTilePlaced(this.selectedShape, filledBefore, tile, focusPos.row, focusPos.col);
-            } else if (board.lastError) {
-              this._handleBoardError();
-            }
-          }
+          if (tile) this._tryPlaceOrReplaceSelectedAt(focusPos, tile, filledBefore);
         } else {
           const filledBefore = board.getFilledPositions();
           if (board.rotateTile(focusPos)) {
@@ -2502,11 +2502,7 @@ export class Game {
     clearConfetti();
     clearStarSparkles();
     // Reset particle arrays for the playtested level.
-    this._sourceSprayDrops = [];
-    this._dryPuffs = [];
-    this._flowDrops = [];
-    this._bubbles = [];
-    this._flowGoodDirs = null;
+    this._clearAllParticles();
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();

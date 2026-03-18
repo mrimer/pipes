@@ -25,6 +25,18 @@ const EDITOR_CANVAS_BORDER = 3;
 const GRID_MIN_DIM = 1;
 /** Maximum allowed grid dimension (rows or cols). */
 const GRID_MAX_DIM = 20;
+/** Border color for the currently selected palette item button. */
+const PALETTE_ITEM_SELECTED_BORDER = '#f0c040';
+/** Border color for an unselected palette item button. */
+const PALETTE_ITEM_UNSELECTED_BORDER = '#2a3a5e';
+/** Background color for the currently selected palette item button. */
+const PALETTE_ITEM_SELECTED_BG = '#2a3a1a';
+/** Background color for an unselected palette item button. */
+const PALETTE_ITEM_UNSELECTED_BG = '#0d1a30';
+/** Text color for the currently selected palette item button. */
+const PALETTE_ITEM_SELECTED_COLOR = '#f0c040';
+/** Text color for an unselected palette item button. */
+const PALETTE_ITEM_UNSELECTED_COLOR = '#eee';
 import { Board, PIPE_SHAPES, parseKey } from './board';
 import {
   EditorPalette,
@@ -1378,12 +1390,13 @@ export class CampaignEditor {
       btn.type = 'button';
       btn.textContent = item.label;
       btn.dataset['palette'] = String(item.palette);
+      const isSelected = this._editorPalette === item.palette;
       btn.style.cssText =
         'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
         (indent ? 'margin-left:12px;' : '') +
-        'border:1px solid ' + (this._editorPalette === item.palette ? '#f0c040' : '#2a3a5e') + ';' +
-        'background:' + (this._editorPalette === item.palette ? '#2a3a1a' : '#0d1a30') + ';' +
-        'color:' + (this._editorPalette === item.palette ? '#f0c040' : '#eee') + ';';
+        'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
+        'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
+        'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
 
       btn.addEventListener('click', () => {
         this._editorPalette = item.palette;
