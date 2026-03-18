@@ -835,23 +835,31 @@ export class Board {
   }
 
   /**
-   * chamber, an ice chamber, a snow chamber, or a source with a non-zero base temperature.
-   * Used to decide whether to display the Temp stat in the UI.
+   * Returns true when any tile in the grid is a Chamber whose content belongs
+   * to the given set.  Used by {@link hasTempRelevantTiles} and
+   * {@link hasPressureRelevantTiles} to avoid duplicating the grid scan.
+   * @param contents - The set of chamber content types to search for.
    */
-  hasTempRelevantTiles(): boolean {
-    const sourceTile = this.grid[this.source.row][this.source.col];
-    if (sourceTile.temperature !== 0) return true;
+  private _hasAnyTileWithContents(contents: ReadonlySet<string>): boolean {
     for (const row of this.grid) {
       for (const tile of row) {
-        if (
-          tile.shape === PipeShape.Chamber &&
-          TEMP_RELEVANT_CONTENTS.has(tile.chamberContent!)
-        ) {
+        if (tile.shape === PipeShape.Chamber && contents.has(tile.chamberContent!)) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  /**
+   * Returns true when the level has any temperature-relevant tiles: a heater
+   * chamber, an ice chamber, a snow chamber, a sandstone chamber, a hot-plate
+   * chamber, or a source with a non-zero base temperature.
+   * Used to decide whether to display the Temp stat in the UI.
+   */
+  hasTempRelevantTiles(): boolean {
+    const sourceTile = this.grid[this.source.row][this.source.col];
+    return sourceTile.temperature !== 0 || this._hasAnyTileWithContents(TEMP_RELEVANT_CONTENTS);
   }
 
   /**
@@ -861,20 +869,7 @@ export class Board {
    */
   hasPressureRelevantTiles(): boolean {
     const sourceTile = this.grid[this.source.row][this.source.col];
-    if (sourceTile.pressure > 0) {
-      return true;
-    }
-    for (const row of this.grid) {
-      for (const tile of row) {
-        if (
-          tile.shape === PipeShape.Chamber &&
-          PRESSURE_RELEVANT_CONTENTS.has(tile.chamberContent!)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return sourceTile.pressure > 0 || this._hasAnyTileWithContents(PRESSURE_RELEVANT_CONTENTS);
   }
 
   /**
