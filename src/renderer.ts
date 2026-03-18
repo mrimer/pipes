@@ -834,6 +834,81 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
 }
 
 /** Draw a single tile at canvas position (x, y). */
+/**
+ * Resolve the canvas stroke/fill color for a tile based on its shape, fill
+ * state, and current board metrics.
+ *
+ * Separated from {@link drawTile} so that color logic can be read and tested
+ * independently of the drawing commands.
+ */
+function _resolveTileColor(
+  tile: Tile,
+  isWater: boolean,
+  currentPressure: number,
+): string {
+  const { shape, isFixed } = tile;
+  if (shape === PipeShape.Source) {
+    return isWater ? SOURCE_WATER_COLOR : SOURCE_COLOR;
+  }
+  if (shape === PipeShape.Sink) {
+    return isWater ? SINK_WATER_COLOR : SINK_COLOR;
+  }
+  if (shape === PipeShape.Chamber) {
+    const { chamberContent } = tile;
+    if (chamberContent === 'tank') {
+      return isWater ? TANK_WATER_COLOR : TANK_COLOR;
+    }
+    if (chamberContent === 'dirt') {
+      return isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
+    }
+    if (chamberContent === 'item') {
+      const isGoldItem = tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape);
+      return isGoldItem
+        ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
+        : (isWater ? WATER_COLOR : PIPE_COLOR);
+    }
+    if (chamberContent === 'heater') {
+      return tile.temperature < 0
+        ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
+        : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
+    }
+    if (chamberContent === 'ice') {
+      return isWater ? ICE_WATER_COLOR : ICE_COLOR;
+    }
+    if (chamberContent === 'pump') {
+      return tile.pressure < 0
+        ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
+        : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
+    }
+    if (chamberContent === 'snow') {
+      return isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
+    }
+    if (chamberContent === 'sandstone') {
+      // When hardness >= pressure (and shatter not active), use darker color.
+      // When shatter is active and pressure reaches the shatter threshold, use lighter color.
+      const shatterActive = tile.shatter > tile.hardness;
+      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
+      const isHard = tile.hardness >= currentPressure;
+      return isShatterTriggered
+        ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
+        : isHard
+          ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+          : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+    }
+    if (chamberContent === 'hot_plate') {
+      return isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
+    }
+    return isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
+  }
+  if (shape === PipeShape.Granite) return GRANITE_COLOR;
+  if (shape === PipeShape.Tree) return TREE_COLOR;
+  if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+  if (SPIN_PIPE_SHAPES.has(shape)) return isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR;
+  return isFixed
+    ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
+    : isWater ? WATER_COLOR : PIPE_COLOR;
+}
+
 export function drawTile(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -847,7 +922,7 @@ export function drawTile(
   lockedCost: number | null = null,
   lockedGain: number | null = null,
 ): void {
-  const { shape, rotation, isFixed, itemShape } = tile;
+  const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
@@ -856,63 +931,7 @@ export function drawTile(
   ctx.translate(cx, cy);
   ctx.rotate((rotation * Math.PI) / 180);
 
-  let color: string;
-  if (shape === PipeShape.Source) {
-    color = isWater ? SOURCE_WATER_COLOR : SOURCE_COLOR;
-  } else if (shape === PipeShape.Sink) {
-    color = isWater ? SINK_WATER_COLOR : SINK_COLOR;
-  } else if (shape === PipeShape.Chamber) {
-    const { chamberContent } = tile;
-    if (chamberContent === 'tank') {
-      color = isWater ? TANK_WATER_COLOR : TANK_COLOR;
-    } else if (chamberContent === 'dirt') {
-      color = isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
-    } else if (chamberContent === 'item') {
-      const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
-      color = isGoldItem
-        ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
-        : (isWater ? WATER_COLOR : PIPE_COLOR);
-    } else if (chamberContent === 'heater') {
-      color = tile.temperature < 0
-        ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
-        : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
-    } else if (chamberContent === 'ice') {
-      color = isWater ? ICE_WATER_COLOR : ICE_COLOR;
-    } else if (chamberContent === 'pump') {
-      color = tile.pressure < 0
-        ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
-        : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
-    } else if (chamberContent === 'snow') {
-      color = isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
-    } else if (chamberContent === 'sandstone') {
-      // When hardness >= pressure (and shatter not active), use darker color.
-      // When shatter is active and pressure reaches the shatter threshold, use lighter color.
-      const shatterActive = tile.shatter > tile.hardness;
-      const isShatterTriggered = shatterActive && currentPressure >= tile.shatter;
-      const isHard = tile.hardness >= currentPressure;
-      color = isShatterTriggered
-        ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
-        : isHard
-          ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-          : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
-    } else if (chamberContent === 'hot_plate') {
-      color = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
-    } else {
-      color = isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
-    }
-  } else if (shape === PipeShape.Granite) {
-    color = GRANITE_COLOR;
-  } else if (shape === PipeShape.Tree) {
-    color = TREE_COLOR;
-  } else if (GOLD_PIPE_SHAPES.has(shape)) {
-    color = isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
-  } else if (SPIN_PIPE_SHAPES.has(shape)) {
-    color = isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR;
-  } else {
-    color = isFixed
-      ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
-      : isWater ? WATER_COLOR : PIPE_COLOR;
-  }
+  const color = _resolveTileColor(tile, isWater, currentPressure);
 
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
@@ -1206,8 +1225,27 @@ export function renderBoard(
 
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
-  // Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
-  // is never covered by a neighbouring empty tile's background fill.
+  _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
+  _renderPass2NonPipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure);
+  _renderPass3PipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure);
+  _renderPass4CementLabels(ctx, board);
+  _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater);
+}
+
+/**
+ * Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
+ * is never covered by a neighbouring empty tile's background fill.
+ */
+function _renderPass1Backgrounds(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  focusPos: GridPos,
+  selectedShape: PipeShape | null,
+  pendingRotation: number,
+  selectedIsGold: boolean,
+  shimmerAlpha: number,
+  highlightedPositions: Set<string>,
+): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
@@ -1321,8 +1359,20 @@ export function renderBoard(
       }
     }
   }
+}
 
-  // Pass 2: Draw all non-pipe tile content on top of all backgrounds.
+/**
+ * Pass 2: Draw all non-pipe tile content on top of all backgrounds.
+ */
+function _renderPass2NonPipeTiles(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  filled: Set<string>,
+  currentWater: number,
+  shiftHeld: boolean,
+  currentTemp: number,
+  currentPressure: number,
+): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
@@ -1363,10 +1413,22 @@ export function renderBoard(
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
     }
   }
+}
 
-  // Pass 3: Draw all pipe tile content on top of all non-pipe tile content so that
-  // pipe rounded caps (from lineCap='round') are never overwritten by a neighbouring
-  // non-pipe tile's fill (e.g. a Chamber or Source adjacent to a pipe).
+/**
+ * Pass 3: Draw all pipe tile content on top of all non-pipe tile content so that
+ * pipe rounded caps (from lineCap='round') are never overwritten by a neighbouring
+ * non-pipe tile's fill (e.g. a Chamber or Source adjacent to a pipe).
+ */
+function _renderPass3PipeTiles(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  filled: Set<string>,
+  currentWater: number,
+  shiftHeld: boolean,
+  currentTemp: number,
+  currentPressure: number,
+): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
@@ -1379,9 +1441,13 @@ export function renderBoard(
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null);
     }
   }
+}
 
-  // Pass 4: Draw cement drying-time labels in the top-left corner of every cement cell.
-  // Drawn after all tile content so the label always appears on top of any pipe graphic.
+/**
+ * Pass 4: Draw cement drying-time labels in the top-left corner of every cement cell.
+ * Drawn after all tile content so the label always appears on top of any pipe graphic.
+ */
+function _renderPass4CementLabels(ctx: CanvasRenderingContext2D, board: Board): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       if (!board.cementData.has(posKey(r, c))) continue;
@@ -1393,53 +1459,60 @@ export function renderBoard(
       _drawCementLabel(ctx, x, y, dryingTime, isHardened);
     }
   }
+}
 
-  // Draw semi-transparent hover preview of the pending inventory item
-  if (selectedShape !== null && mouseCanvasPos) {
-    const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
-    const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
-    if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
-      const hoverTile = board.grid[hoverRow][hoverCol];
-      const isGoldCell = board.goldSpaces.has(posKey(hoverRow, hoverCol));
-      const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
-      const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
-      if (canPlace || canReplace) {
-        const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
-        const px = hoverCol * TILE_SIZE;
-        const py = hoverRow * TILE_SIZE;
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-        ctx.shadowColor = '#ffff00';
-        ctx.shadowBlur = 14;
-        drawTile(ctx, px, py, previewTile, false, currentWater);
-        ctx.restore();
-      }
+/**
+ * Draw semi-transparent hover previews: the pending inventory item placement
+ * preview and the rotation preview for an existing tile.
+ */
+function _renderHoverPreview(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  selectedShape: PipeShape | null,
+  pendingRotation: number,
+  selectedIsGold: boolean,
+  mouseCanvasPos: { x: number; y: number } | null,
+  hoverRotationDelta: number,
+  currentWater: number,
+): void {
+  if (!mouseCanvasPos) return;
+  const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
+  const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
+  if (hoverRow < 0 || hoverRow >= board.rows || hoverCol < 0 || hoverCol >= board.cols) return;
+
+  const hoverTile = board.grid[hoverRow][hoverCol];
+  const isGoldCell = board.goldSpaces.has(posKey(hoverRow, hoverCol));
+  const px = hoverCol * TILE_SIZE;
+  const py = hoverRow * TILE_SIZE;
+
+  if (selectedShape !== null) {
+    // Inventory item placement preview
+    const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
+    const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
+    if (canPlace || canReplace) {
+      const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.shadowColor = '#ffff00';
+      ctx.shadowBlur = 14;
+      drawTile(ctx, px, py, previewTile, false, currentWater);
+      ctx.restore();
     }
-  }
-
-  // Draw semi-transparent preview when a rotation is being previewed on an existing tile
-  // (no inventory item selected, user pressed Q/W or scrolled the wheel).
-  if (selectedShape === null && hoverRotationDelta > 0 && mouseCanvasPos) {
-    const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
-    const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
-    if (hoverRow >= 0 && hoverRow < board.rows && hoverCol >= 0 && hoverCol < board.cols) {
-      const hoverTile = board.grid[hoverRow][hoverCol];
-      if (!hoverTile.isFixed && hoverTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hoverTile.shape)) {
-        const previewRotation = ((hoverTile.rotation + hoverRotationDelta * 90) % 360) as 0 | 90 | 180 | 270;
-        const previewTile = new Tile(
-          hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,
-          hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
-          hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
-        );
-        const px = hoverCol * TILE_SIZE;
-        const py = hoverRow * TILE_SIZE;
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-        ctx.shadowColor = '#ffff00';
-        ctx.shadowBlur = 14;
-        drawTile(ctx, px, py, previewTile, false, currentWater);
-        ctx.restore();
-      }
+  } else if (hoverRotationDelta > 0) {
+    // Rotation preview on an existing tile (no inventory item selected, Q/W or scroll)
+    if (!hoverTile.isFixed && hoverTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hoverTile.shape)) {
+      const previewRotation = ((hoverTile.rotation + hoverRotationDelta * 90) % 360) as 0 | 90 | 180 | 270;
+      const previewTile = new Tile(
+        hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,
+        hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
+        hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
+      );
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.shadowColor = '#ffff00';
+      ctx.shadowBlur = 14;
+      drawTile(ctx, px, py, previewTile, false, currentWater);
+      ctx.restore();
     }
   }
 }
