@@ -467,3 +467,64 @@ describe('renderLevelList – challenge levels', () => {
     expect(levelBtns[1]?.classList.contains('locked')).toBe(true);
   });
 });
+
+// ─── renderLevelList – no-campaign message and Select a Level header ──────────
+
+describe('renderLevelList – no-campaign / campaign header', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  it('shows "Click Campaign Editor" message when no activeCampaign is provided', () => {
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, [],
+    );
+
+    const msg = container.querySelector('p');
+    expect(msg).not.toBeNull();
+    expect(msg?.textContent).toContain('Campaign Editor');
+    expect(msg?.textContent).toContain('import or create');
+  });
+
+  it('does not show the "Click Campaign Editor" message when activeCampaign is provided', () => {
+    const chapters = [{ id: 1, name: 'Ch1', levels: [] }];
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      { name: 'My Campaign', author: 'Author', completionPct: 0 },
+      chapters,
+    );
+
+    const allText = container.textContent ?? '';
+    expect(allText).not.toContain('Campaign Editor to import');
+  });
+
+  it('shows "Select a Level" h2 when activeCampaign is provided', () => {
+    const chapters = [{ id: 1, name: 'Ch1', levels: [] }];
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      { name: 'My Campaign', author: 'Author', completionPct: 0 },
+      chapters,
+    );
+
+    const h2 = container.querySelector('h2');
+    expect(h2).not.toBeNull();
+    expect(h2?.textContent).toBe('Select a Level');
+  });
+
+  it('does not show "Select a Level" h2 when no activeCampaign is provided', () => {
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, [],
+    );
+
+    const h2 = container.querySelector('h2');
+    expect(h2).toBeNull();
+  });
+});

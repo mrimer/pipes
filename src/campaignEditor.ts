@@ -3079,14 +3079,16 @@ export class CampaignEditor {
               this._campaigns[existingIdx] = data;
               this._saveCampaigns();
               alert(`Campaign "${data.name}" imported successfully.`);
-              this._showCampaignList();
+              this.hide();
+              this._onPlayCampaign(data);
             });
             return;
           }
           this._campaigns.push(data);
           this._saveCampaigns();
           alert(`Campaign "${data.name}" imported successfully.`);
-          this._showCampaignList();
+          this.hide();
+          this._onPlayCampaign(data);
         } catch {
           alert('Failed to parse campaign file. Please check the format.');
         }

@@ -808,6 +808,119 @@ describe('CampaignEditor – import version comparison', () => {
   });
 });
 
+// ─── CampaignEditor – import activates the campaign ──────────────────────────
+
+describe('CampaignEditor – import activates the campaign', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /** Simulate importing a JSON string through the file-input flow on an existing editor. */
+  function simulateImportOn(editor: CampaignEditor, json: string): void {
+    const origFileReader = (globalThis as unknown as Record<string, unknown>).FileReader;
+    class MockFileReader {
+      result: string = json;
+      onload: (() => void) | null = null;
+      readAsText(_file: File): void { this.onload?.(); }
+    }
+    (globalThis as unknown as Record<string, unknown>).FileReader = MockFileReader;
+
+    const origCreate = document.createElement.bind(document) as (tag: string) => HTMLElement;
+    const createSpy = jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === 'input') {
+        const input = el as HTMLInputElement;
+        Object.defineProperty(input, 'click', {
+          value: () => {
+            Object.defineProperty(input, 'files', {
+              value: [new File([json], 'test.json', { type: 'application/json' })],
+              configurable: true,
+            });
+            input.dispatchEvent(new Event('change'));
+          },
+          writable: true,
+        });
+      }
+      return el;
+    });
+
+    try {
+      (editor as unknown as { _importCampaign(): void })._importCampaign();
+    } finally {
+      createSpy.mockRestore();
+      (globalThis as unknown as Record<string, unknown>).FileReader = origFileReader;
+    }
+  }
+
+  /** Create a CampaignEditor whose onPlayCampaign calls are captured in the returned array. */
+  function makeEditorWithCapture(initial: CampaignDef[] = []): [CampaignEditor, CampaignDef[]] {
+    const playCalls: CampaignDef[] = [];
+    saveImportedCampaigns(initial);
+    const editor = new CampaignEditor(
+      () => {},
+      (_l: LevelDef) => {},
+      (c: CampaignDef) => { playCalls.push(c); },
+    );
+    return [editor, playCalls];
+  }
+
+  it('calls onPlayCampaign with the imported campaign when importing a new campaign', () => {
+    const campaign: CampaignDef = { id: 'cmp_new_import', name: 'Imported', author: 'A', chapters: [] };
+    const [editor, playCalls] = makeEditorWithCapture();
+    simulateImportOn(editor, JSON.stringify(campaign));
+    expect(playCalls).toHaveLength(1);
+    expect(playCalls[0].id).toBe('cmp_new_import');
+    expect(playCalls[0].name).toBe('Imported');
+  });
+
+  it('calls onPlayCampaign when a version-conflict import is confirmed', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_conflict', name: 'Old', author: 'A', chapters: [],
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+    };
+    const [editor, playCalls] = makeEditorWithCapture([existing]);
+
+    simulateImportOn(editor, JSON.stringify({
+      ...existing, name: 'New', lastUpdated: '2024-06-01T00:00:00.000Z',
+    }));
+
+    // onPlayCampaign must NOT be called before the user confirms the dialog.
+    expect(playCalls).toHaveLength(0);
+
+    const confirmBtn = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.textContent?.includes('Import newer version'));
+    expect(confirmBtn).toBeDefined();
+    confirmBtn!.click();
+
+    expect(playCalls).toHaveLength(1);
+    expect(playCalls[0].name).toBe('New');
+  });
+
+  it('does not call onPlayCampaign when import is cancelled in version conflict dialog', () => {
+    const existing: CampaignDef = {
+      id: 'cmp_cancel', name: 'Old', author: 'A', chapters: [],
+      lastUpdated: '2024-01-01T00:00:00.000Z',
+    };
+    const [editor, playCalls] = makeEditorWithCapture([existing]);
+
+    simulateImportOn(editor, JSON.stringify({
+      ...existing, name: 'New', lastUpdated: '2024-06-01T00:00:00.000Z',
+    }));
+
+    const cancelBtn = Array.from(document.querySelectorAll('button'))
+      .find((b) => b.textContent === 'Cancel');
+    expect(cancelBtn).toBeDefined();
+    cancelBtn!.click();
+
+    expect(playCalls).toHaveLength(0);
+  });
+});
+
 // ─── CampaignEditor – challenge flag round-trip ───────────────────────────────
 
 describe('CampaignEditor – challenge flag in level definitions', () => {
