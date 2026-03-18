@@ -45,6 +45,15 @@ export let TILE_SIZE = 64; // px
 /** Base tile size used as the reference for all pixel-value scaling. */
 const BASE_TILE_SIZE = 64;
 
+/** Translucent blue-grey overlay drawn over empty cement cells that are valid placement targets. */
+const CEMENT_TARGET_OVERLAY = 'rgba(140,160,200,0.22)';
+
+/** Translucent gold overlay drawn over empty gold-space cells that are valid placement targets. */
+const GOLD_TARGET_OVERLAY = 'rgba(255,215,0,0.2)';
+
+/** Border color used for error-highlighted sandstone tiles. */
+const ERROR_HIGHLIGHT_BORDER = '#ff2020';
+
 /**
  * Scale a pixel value that was designed for BASE_TILE_SIZE to the current TILE_SIZE.
  * Use for font sizes, small offsets and decoration dimensions.
@@ -1283,7 +1292,7 @@ function _renderPass1Backgrounds(
         // Cement cell: always show cement background regardless of tile on top
         _drawCementBackground(ctx, x, y);
         if (isTarget) {
-          ctx.fillStyle = 'rgba(140,160,200,0.22)';
+          ctx.fillStyle = CEMENT_TARGET_OVERLAY;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
         }
         if (isReplaceTarget) {
@@ -1318,7 +1327,7 @@ function _renderPass1Backgrounds(
           ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
           // Brighten when it's a valid drop target
           if (isTarget) {
-            ctx.fillStyle = 'rgba(255,215,0,0.2)';
+            ctx.fillStyle = GOLD_TARGET_OVERLAY;
             ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           }
         } else {
@@ -1364,7 +1373,7 @@ function _renderPass1Backgrounds(
         const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
         ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
         ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        ctx.strokeStyle = '#ff2020';
+        ctx.strokeStyle = ERROR_HIGHLIGHT_BORDER;
         ctx.lineWidth = 3;
         ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }

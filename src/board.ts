@@ -645,8 +645,8 @@ export class Board {
       return false;
     }
 
-    const idx = this.inventory.findIndex((it) => it.shape === shape);
-    const baseCount = idx !== -1 ? this.inventory[idx].count : 0;
+    const existing = this.inventory.find((it) => it.shape === shape);
+    const baseCount = existing?.count ?? 0;
 
     const bonuses = this.getContainerBonuses();
     const effectiveCount = baseCount + (bonuses.get(shape) ?? 0);
@@ -662,12 +662,7 @@ export class Board {
     if (constraintError) {
       // Roll back placement.
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
-      if (idx !== -1) {
-        this.inventory[idx].count++;
-      } else {
-        const pushIdx = this.inventory.findIndex((it) => it.shape === shape && it.count < 0);
-        if (pushIdx !== -1) this.inventory.splice(pushIdx, 1);
-      }
+      this._unspendInventory(shape);
       this.lastError = constraintError;
       return false;
     }
@@ -728,8 +723,8 @@ export class Board {
     // container bridged by this position remains connected in the affordability
     // check.  (Computing bonuses with an Empty cell here would temporarily
     // disconnect such a container and produce a false "not available" result.)
-    const newIdx = this.inventory.findIndex((it) => it.shape === newShape);
-    const baseCount = newIdx !== -1 ? this.inventory[newIdx].count : 0;
+    const newExisting = this.inventory.find((it) => it.shape === newShape);
+    const baseCount = newExisting?.count ?? 0;
     this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
     const bonuses = this.getContainerBonuses();
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
@@ -1445,6 +1440,22 @@ export class Board {
       this.inventory[idx].count--;
     } else {
       this.inventory.push({ shape, count: -1 });
+    }
+  }
+
+  /**
+   * Undo a previous {@link _spendInventory} call for `shape`.
+   * If the shape has an existing inventory entry, increments its count.
+   * Otherwise, removes the sentinel over-draw entry (count === -1) that was
+   * pushed by `_spendInventory` when the shape had no base inventory entry.
+   */
+  private _unspendInventory(shape: PipeShape): void {
+    const idx = this.inventory.findIndex((it) => it.shape === shape);
+    if (idx !== -1) {
+      this.inventory[idx].count++;
+    } else {
+      const pushIdx = this.inventory.findIndex((it) => it.shape === shape && it.count < 0);
+      if (pushIdx !== -1) this.inventory.splice(pushIdx, 1);
     }
   }
 
