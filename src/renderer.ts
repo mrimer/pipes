@@ -587,7 +587,7 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   // When shatter is active and pressure reaches the shatter threshold, use lighter color.
   // When connected, show the locked effective cost value.
   // Otherwise show cost display lines.
-  const { shatterOverride: isShatterTriggered, deltaDamage, costPerDeltaTemp } =
+  const { shatterOverride, deltaDamage, costPerDeltaTemp } =
     sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
   const shatterActive = tile.shatter > tile.hardness;
   const isHard = tile.hardness >= currentPressure;
@@ -648,9 +648,9 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
       ? tile.cost
       : Math.max(1, deltaDamage >= 1 ? costPerDeltaTemp : tile.cost);
     if (shatterActive) {
-      const displayCost = isShatterTriggered ? 0 : sandstoneCost;
+      const displayCost = shatterOverride ? 0 : sandstoneCost;
       ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(isShatterTriggered ? 'WEAK' : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
+      ctx.fillText(shatterOverride ? 'WEAK' : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
       ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
       ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY + _s(7));
     } else {
