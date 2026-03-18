@@ -1266,6 +1266,18 @@ export function renderBoard(
 }
 
 /**
+ * Draw a semi-transparent placement-target overlay over a tile cell.
+ * Used to shade cells that are valid replacement targets, or cement cells
+ * with an identical piece where replacement is disallowed.
+ */
+function _drawCellTargetOverlay(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.fillStyle = EMPTY_TARGET_COLOR;
+  ctx.globalAlpha = 0.35;
+  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+  ctx.globalAlpha = 1;
+}
+
+/**
  * Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
  * is never covered by a neighbouring empty tile's background fill.
  */
@@ -1309,10 +1321,7 @@ function _renderPass1Backgrounds(
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
         }
         if (isReplaceTarget) {
-          ctx.fillStyle = EMPTY_TARGET_COLOR;
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          ctx.globalAlpha = 1;
+          _drawCellTargetOverlay(ctx, x, y);
         } else if (
           selectedShape !== null &&
           tile.shape !== PipeShape.Empty &&
@@ -1322,10 +1331,7 @@ function _renderPass1Backgrounds(
           // Darken cement cells that have the same piece and orientation as the
           // selected shape: replacing with an identical tile is not a valid move,
           // so shade the cell to indicate it is not a placement target.
-          ctx.fillStyle = EMPTY_TARGET_COLOR; //'#000000';
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          ctx.globalAlpha = 1;
+          _drawCellTargetOverlay(ctx, x, y);
         }
       } else if (tile.shape === PipeShape.Empty) {
         if (isGoldCell) {
@@ -1367,10 +1373,7 @@ function _renderPass1Backgrounds(
         }
         // Overlay a target highlight when this tile is a valid replacement target
         if (isReplaceTarget) {
-          ctx.fillStyle = EMPTY_TARGET_COLOR;
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          ctx.globalAlpha = 1;
+          _drawCellTargetOverlay(ctx, x, y);
         }
       }
 

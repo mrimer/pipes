@@ -240,6 +240,37 @@ export class CampaignEditor {
   }
 
   /**
+   * Append ▲ / ▼ reorder buttons to `btns` for the item at `idx` within
+   * `items`.  Each button swaps adjacent items, touches the campaign, saves,
+   * and calls `onRefresh` to re-render.  No button is appended when the move
+   * would be out of bounds.
+   */
+  private _appendReorderButtons<T>(
+    btns: HTMLElement,
+    items: T[],
+    idx: number,
+    campaign: CampaignDef,
+    onRefresh: () => void,
+  ): void {
+    if (idx > 0) {
+      btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
+        [items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
+        this._touchCampaign(campaign);
+        this._saveCampaigns();
+        onRefresh();
+      }));
+    }
+    if (idx < items.length - 1) {
+      btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
+        [items[idx], items[idx + 1]] = [items[idx + 1], items[idx]];
+        this._touchCampaign(campaign);
+        this._saveCampaigns();
+        onRefresh();
+      }));
+    }
+  }
+
+  /**
    * Create the common skeleton shared by {@link _buildCampaignRow},
    * {@link _buildChapterRow}, and {@link _buildLevelRow}: an outer flex row, an
    * expandable info area, and a button cluster.  Callers populate `info` and
@@ -687,24 +718,7 @@ export class CampaignEditor {
     }));
 
     if (!readOnly) {
-      if (chapterIdx > 0) {
-        btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
-          [campaign.chapters[chapterIdx - 1], campaign.chapters[chapterIdx]] =
-            [campaign.chapters[chapterIdx], campaign.chapters[chapterIdx - 1]];
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
-          this._showCampaignDetail();
-        }));
-      }
-      if (chapterIdx < campaign.chapters.length - 1) {
-        btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
-          [campaign.chapters[chapterIdx], campaign.chapters[chapterIdx + 1]] =
-            [campaign.chapters[chapterIdx + 1], campaign.chapters[chapterIdx]];
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
-          this._showCampaignDetail();
-        }));
-      }
+      this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail());
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
           campaign.chapters.splice(chapterIdx, 1);
@@ -825,24 +839,7 @@ export class CampaignEditor {
         this._showChapterDetail();
       }));
 
-      if (levelIdx > 0) {
-        btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
-          [chapter.levels[levelIdx - 1], chapter.levels[levelIdx]] =
-            [chapter.levels[levelIdx], chapter.levels[levelIdx - 1]];
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
-          this._showChapterDetail();
-        }));
-      }
-      if (levelIdx < chapter.levels.length - 1) {
-        btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
-          [chapter.levels[levelIdx], chapter.levels[levelIdx + 1]] =
-            [chapter.levels[levelIdx + 1], chapter.levels[levelIdx]];
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
-          this._showChapterDetail();
-        }));
-      }
+      this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail());
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete level "${level.name}"?`)) {
           chapter.levels.splice(levelIdx, 1);
@@ -1049,9 +1046,19 @@ export class CampaignEditor {
   private _buildLevelEditorMidCol(readOnly: boolean): HTMLElement {
     const midCol = document.createElement('div');
     midCol.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
-
+    midCol.appendChild(this._buildLevelNameSection(readOnly));
+    midCol.appendChild(this._buildEditorCanvasSection(readOnly));
     if (!readOnly) {
-      // Level name input above canvas
+      midCol.appendChild(this._buildLevelTextFieldsSection());
+    } else {
+      midCol.appendChild(this._buildReadOnlyMetaSection());
+    }
+    return midCol;
+  }
+
+  /** Build the level-name row: an editable input in edit mode, or a styled label in read-only mode. */
+  private _buildLevelNameSection(readOnly: boolean): HTMLElement {
+    if (!readOnly) {
       const nameWrap = document.createElement('div');
       nameWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
       const nameLbl = document.createElement('label');
@@ -1066,15 +1073,21 @@ export class CampaignEditor {
       nameInp.addEventListener('input', () => { this._editLevelName = nameInp.value; });
       nameWrap.appendChild(nameLbl);
       nameWrap.appendChild(nameInp);
-      midCol.appendChild(nameWrap);
+      return nameWrap;
     } else {
       const lvlNameEl = document.createElement('div');
       lvlNameEl.style.cssText = 'font-size:1rem;font-weight:bold;color:#f0c040;';
       lvlNameEl.textContent = this._editLevelName;
-      midCol.appendChild(lvlNameEl);
+      return lvlNameEl;
     }
+  }
 
-    // Canvas
+  /**
+   * Build the editor canvas element and (in edit mode) attach mouse event
+   * listeners and a source-placement error div.  Sets `_editorCanvas`,
+   * `_editorCtx`, and `_editorSourceErrorEl` as side effects.
+   */
+  private _buildEditorCanvasSection(readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
     setTileSize(computeTileSize(this._editRows, this._editCols));
     canvas.width  = this._editCols * TILE_SIZE;
@@ -1124,121 +1137,136 @@ export class CampaignEditor {
       window.addEventListener('mouseup', this._windowMouseUpHandler);
     }
 
-    midCol.appendChild(canvas);
-
-    // Flash error element for Source tile placement constraint
     if (!readOnly) {
+      // Wrap canvas + error div in a container element
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      wrap.appendChild(canvas);
       const sourceErrorDiv = document.createElement('div');
       sourceErrorDiv.style.cssText = 'font-size:0.85rem;color:#f44;display:none;font-weight:bold;';
       this._editorSourceErrorEl = sourceErrorDiv;
-      midCol.appendChild(sourceErrorDiv);
+      wrap.appendChild(sourceErrorDiv);
+      return wrap;
     }
+    return canvas;
+  }
 
-    // Note and hint text fields below the canvas
-    if (!readOnly) {
-      const textareaStyle =
-        'padding:6px 10px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-        'border:1px solid #4a90d9;border-radius:4px;resize:vertical;min-height:52px;font-family:inherit;';
+  /**
+   * Build the note, hints, and challenge-flag fields for edit mode
+   * (displayed below the editor canvas).
+   */
+  private _buildLevelTextFieldsSection(): HTMLElement {
+    const container = document.createElement('div');
+    container.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
 
-      const noteWrap = document.createElement('div');
-      noteWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-      const noteLbl = document.createElement('label');
-      noteLbl.textContent = 'Note (shown beneath the grid while playing):';
-      noteLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
-      const noteInp = document.createElement('textarea');
-      noteInp.value = this._editLevelNote;
-      noteInp.placeholder = 'Optional – displayed in a box below the puzzle grid.';
-      noteInp.style.cssText = textareaStyle;
-      noteInp.addEventListener('input', () => { this._editLevelNote = noteInp.value; });
-      noteWrap.appendChild(noteLbl);
-      noteWrap.appendChild(noteInp);
-      midCol.appendChild(noteWrap);
+    const textareaStyle =
+      'padding:6px 10px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+      'border:1px solid #4a90d9;border-radius:4px;resize:vertical;min-height:52px;font-family:inherit;';
 
-      const hintWrap = document.createElement('div');
-      hintWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
-      const hintLbl = document.createElement('label');
-      hintLbl.textContent = 'Hints (collapsible, revealed in sequence while playing):';
-      hintLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
-      hintWrap.appendChild(hintLbl);
+    const noteWrap = document.createElement('div');
+    noteWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    const noteLbl = document.createElement('label');
+    noteLbl.textContent = 'Note (shown beneath the grid while playing):';
+    noteLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
+    const noteInp = document.createElement('textarea');
+    noteInp.value = this._editLevelNote;
+    noteInp.placeholder = 'Optional – displayed in a box below the puzzle grid.';
+    noteInp.style.cssText = textareaStyle;
+    noteInp.addEventListener('input', () => { this._editLevelNote = noteInp.value; });
+    noteWrap.appendChild(noteLbl);
+    noteWrap.appendChild(noteInp);
+    container.appendChild(noteWrap);
 
-      const hintListEl = document.createElement('div');
-      hintListEl.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    const hintWrap = document.createElement('div');
+    hintWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+    const hintLbl = document.createElement('label');
+    hintLbl.textContent = 'Hints (collapsible, revealed in sequence while playing):';
+    hintLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
+    hintWrap.appendChild(hintLbl);
 
-      const rebuildHintList = (): void => {
-        hintListEl.innerHTML = '';
-        this._editLevelHints.forEach((hint, idx) => {
-          const rowEl = document.createElement('div');
-          rowEl.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
-          const inp = document.createElement('textarea');
-          inp.value = hint;
-          inp.placeholder = idx === 0
-            ? 'Hint 1 – hidden until the player clicks "Show Hint".'
-            : `Hint ${idx + 1} – revealed after expanding the previous hint.`;
-          inp.style.cssText = textareaStyle + 'border-color:#f0c040;flex:1;';
-          inp.addEventListener('input', () => { this._editLevelHints[idx] = inp.value; });
-          const removeBtn = document.createElement('button');
-          removeBtn.type = 'button';
-          removeBtn.textContent = '✕';
-          removeBtn.title = 'Remove this hint';
-          removeBtn.style.cssText =
-            'padding:4px 7px;font-size:0.8rem;background:#2c1a00;color:#f0c040;' +
-            'border:1px solid #f0c040;border-radius:4px;cursor:pointer;flex-shrink:0;';
-          removeBtn.addEventListener('click', () => {
-            this._editLevelHints.splice(idx, 1);
-            if (this._editLevelHints.length === 0) this._editLevelHints = [''];
-            rebuildHintList();
-          });
-          rowEl.appendChild(inp);
-          rowEl.appendChild(removeBtn);
-          hintListEl.appendChild(rowEl);
+    const hintListEl = document.createElement('div');
+    hintListEl.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+
+    const rebuildHintList = (): void => {
+      hintListEl.innerHTML = '';
+      this._editLevelHints.forEach((hint, idx) => {
+        const rowEl = document.createElement('div');
+        rowEl.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
+        const inp = document.createElement('textarea');
+        inp.value = hint;
+        inp.placeholder = idx === 0
+          ? 'Hint 1 – hidden until the player clicks "Show Hint".'
+          : `Hint ${idx + 1} – revealed after expanding the previous hint.`;
+        inp.style.cssText = textareaStyle + 'border-color:#f0c040;flex:1;';
+        inp.addEventListener('input', () => { this._editLevelHints[idx] = inp.value; });
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.textContent = '✕';
+        removeBtn.title = 'Remove this hint';
+        removeBtn.style.cssText =
+          'padding:4px 7px;font-size:0.8rem;background:#2c1a00;color:#f0c040;' +
+          'border:1px solid #f0c040;border-radius:4px;cursor:pointer;flex-shrink:0;';
+        removeBtn.addEventListener('click', () => {
+          this._editLevelHints.splice(idx, 1);
+          if (this._editLevelHints.length === 0) this._editLevelHints = [''];
+          rebuildHintList();
         });
-      };
-
-      rebuildHintList();
-      hintWrap.appendChild(hintListEl);
-
-      const addHintBtn = document.createElement('button');
-      addHintBtn.type = 'button';
-      addHintBtn.textContent = '+ Add Hint';
-      addHintBtn.style.cssText =
-        'align-self:flex-start;padding:4px 10px;font-size:0.8rem;background:#1a1400;color:#f0c040;' +
-        'border:1px solid #f0c040;border-radius:4px;cursor:pointer;';
-      addHintBtn.addEventListener('click', () => {
-        this._editLevelHints.push('');
-        rebuildHintList();
+        rowEl.appendChild(inp);
+        rowEl.appendChild(removeBtn);
+        hintListEl.appendChild(rowEl);
       });
-      hintWrap.appendChild(addHintBtn);
-      midCol.appendChild(hintWrap);
+    };
 
-      // Challenge level checkbox
-      const challengeWrap = document.createElement('div');
-      challengeWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const challengeChk = document.createElement('input');
-      challengeChk.type = 'checkbox';
-      challengeChk.id = 'editor-challenge-chk';
-      challengeChk.checked = this._editLevelChallenge;
-      challengeChk.addEventListener('change', () => { this._editLevelChallenge = challengeChk.checked; });
-      const challengeLbl = document.createElement('label');
-      challengeLbl.htmlFor = 'editor-challenge-chk';
-      challengeLbl.textContent = '💀 Challenge level (optional – not required to unlock next chapter)';
-      challengeLbl.style.cssText = 'font-size:0.8rem;color:#aaa;cursor:pointer;';
-      challengeWrap.appendChild(challengeChk);
-      challengeWrap.appendChild(challengeLbl);
-      midCol.appendChild(challengeWrap);
-    } else {
-      if (this._editLevelNote) {
-        midCol.appendChild(this._createInfoBox('#4a90d9', `📝 ${this._editLevelNote}`));
-      }
-      const activeHints = this._editLevelHints.filter(h => h.trim());
-      if (activeHints.length > 0) {
-        midCol.appendChild(this._createInfoBox('#f0c040', `💡 ${activeHints.join(' → ')}`));
-      }
-      if (this._editLevelChallenge) {
-        midCol.appendChild(this._createInfoBox('#e74c3c', '💀 Challenge level'));
-      }
+    rebuildHintList();
+    hintWrap.appendChild(hintListEl);
+
+    const addHintBtn = document.createElement('button');
+    addHintBtn.type = 'button';
+    addHintBtn.textContent = '+ Add Hint';
+    addHintBtn.style.cssText =
+      'align-self:flex-start;padding:4px 10px;font-size:0.8rem;background:#1a1400;color:#f0c040;' +
+      'border:1px solid #f0c040;border-radius:4px;cursor:pointer;';
+    addHintBtn.addEventListener('click', () => {
+      this._editLevelHints.push('');
+      rebuildHintList();
+    });
+    hintWrap.appendChild(addHintBtn);
+    container.appendChild(hintWrap);
+
+    // Challenge level checkbox
+    const challengeWrap = document.createElement('div');
+    challengeWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    const challengeChk = document.createElement('input');
+    challengeChk.type = 'checkbox';
+    challengeChk.id = 'editor-challenge-chk';
+    challengeChk.checked = this._editLevelChallenge;
+    challengeChk.addEventListener('change', () => { this._editLevelChallenge = challengeChk.checked; });
+    const challengeLbl = document.createElement('label');
+    challengeLbl.htmlFor = 'editor-challenge-chk';
+    challengeLbl.textContent = '💀 Challenge level (optional – not required to unlock next chapter)';
+    challengeLbl.style.cssText = 'font-size:0.8rem;color:#aaa;cursor:pointer;';
+    challengeWrap.appendChild(challengeChk);
+    challengeWrap.appendChild(challengeLbl);
+    container.appendChild(challengeWrap);
+
+    return container;
+  }
+
+  /** Build the read-only info boxes for note, hints, and challenge flag (displayed below the canvas). */
+  private _buildReadOnlyMetaSection(): HTMLElement {
+    const container = document.createElement('div');
+    container.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+    if (this._editLevelNote) {
+      container.appendChild(this._createInfoBox('#4a90d9', `📝 ${this._editLevelNote}`));
     }
-
-    return midCol;
+    const activeHints = this._editLevelHints.filter(h => h.trim());
+    if (activeHints.length > 0) {
+      container.appendChild(this._createInfoBox('#f0c040', `💡 ${activeHints.join(' → ')}`));
+    }
+    if (this._editLevelChallenge) {
+      container.appendChild(this._createInfoBox('#e74c3c', '💀 Challenge level'));
+    }
+    return container;
   }
 
 
