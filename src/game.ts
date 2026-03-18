@@ -36,6 +36,8 @@ const BUBBLE_SPAWN_INTERVAL_MS = 90;
 const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
+/** Delay (ms) before spawning star sparkles over the win modal star icon. */
+const MODAL_SPARKLE_DELAY_MS = 150;
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -1028,6 +1030,23 @@ export class Game {
     box.classList.add(colorClass);
   }
 
+  /**
+   * Make a modal overlay visible with a fade-in animation, position it below
+   * the canvas, and trigger the given sparkle colour on its inner box.
+   * Combines the three steps that always appear together for win/gameover modals.
+   */
+  private _showModalWithAnimation(
+    modalEl: HTMLElement,
+    sparkleClass: 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue',
+  ): void {
+    modalEl.style.display = 'flex';
+    modalEl.classList.remove('fade-in');
+    void modalEl.offsetWidth; // force reflow to restart animation
+    modalEl.classList.add('fade-in');
+    this._positionModalBelowCanvas(modalEl);
+    this._triggerModalSparkle(modalEl, sparkleClass);
+  }
+
   /** Remove sparkle CSS animation classes from the .modal-box inside the given modal overlay. */
   private _clearModalSparkle(modalEl: HTMLElement): void {
     const box = modalEl.querySelector<HTMLElement>('.modal-box');
@@ -1072,12 +1091,7 @@ export class Game {
   private _showGameOver(): void {
     this.gameState = GameState.GameOver;
     this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
-    this.gameoverModalEl.style.display = 'flex';
-    this.gameoverModalEl.classList.remove('fade-in');
-    void this.gameoverModalEl.offsetWidth; // force reflow to restart animation
-    this.gameoverModalEl.classList.add('fade-in');
-    this._positionModalBelowCanvas(this.gameoverModalEl);
-    this._triggerModalSparkle(this.gameoverModalEl, 'sparkle-red');
+    this._showModalWithAnimation(this.gameoverModalEl, 'sparkle-red');
   }
 
   /** Transition the game to the Won state and show the win modal after confetti. */
@@ -1103,18 +1117,12 @@ export class Game {
     // Spawn confetti first; show win modal only after the confetti effect completes.
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
-      this.winModalEl.style.display = 'flex';
-      this.winModalEl.classList.remove('fade-in');
-      void this.winModalEl.offsetWidth; // force reflow to restart animation
-      this.winModalEl.classList.add('fade-in');
-      this._positionModalBelowCanvas(this.winModalEl);
-      this._triggerModalSparkle(this.winModalEl, 'sparkle-gold');
+      this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
       // Spawn golden sparkles over the star icon in the win modal when stars were collected
       if (starsCollected > 0 && this.winStarsEl) {
         const winStarsEl = this.winStarsEl;
         // Short delay so the modal finishes rendering and is positioned before
         // getBoundingClientRect() is called.
-        const MODAL_SPARKLE_DELAY_MS = 150;
         setTimeout(() => {
           const rect = winStarsEl.getBoundingClientRect();
           spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
