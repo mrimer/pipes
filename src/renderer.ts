@@ -4,7 +4,7 @@
 
 import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
-import { AmbientDecoration, GridPos, PipeShape, Direction } from './types';
+import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
   EMPTY_COLOR, EMPTY_TARGET_COLOR,
@@ -1344,7 +1344,7 @@ export function renderBoard(
       let lockedCost: number | null = null;
       let lockedGain: number | null = null;
       if (isWater && tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'ice' || tile.chamberContent === 'snow' || tile.chamberContent === 'sandstone') {
+        if (tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
           const impact = board.getLockedWaterImpact({ row: r, col: c });
           if (impact !== null) {
             lockedCost = Math.abs(impact);

@@ -1,6 +1,6 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
@@ -1573,7 +1573,7 @@ export class Game {
     if (!this.board) return tooltipText;
     const lockedCost = Math.abs(lockedImpact);
     const content = tile.chamberContent;
-    if (content === 'ice' || content === 'snow' || content === 'sandstone') {
+    if (content !== null && COLD_CHAMBER_CONTENTS.has(content)) {
       const lockedTemp = this.board.getLockedConnectTemp(pos) ?? 0;
       const lockedPressure = this.board.getLockedConnectPressure(pos) ?? 1;
       const lockedDeltaTemp = computeDeltaTemp(tile.temperature, lockedTemp);

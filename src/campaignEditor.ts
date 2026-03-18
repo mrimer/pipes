@@ -9,7 +9,7 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation } from './types';
+import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from './types';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from './persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 
@@ -26,6 +26,7 @@ import {
   EditorPalette,
   EditorScreen,
   ChamberPalette,
+  ChamberContent,
   TileParams,
   DEFAULT_PARAMS,
   EditorSnapshot,
@@ -1434,188 +1435,219 @@ export class CampaignEditor {
       }, 'number', '90px'));
     }
 
-    // Chamber: content type
+    // Chamber: content type selector + content-specific param inputs
     if (p === PipeShape.Chamber) {
-      const sel = document.createElement('select');
-      sel.style.cssText =
-        'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-        'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-      const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
-        tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
-        ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
-      };
-      for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate']) {
-        const o = document.createElement('option');
-        o.value = opt;
-        o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
-        if (this._editorParams.chamberContent === opt) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener('change', () => {
-        this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
-        if (sel.value === 'ice' || sel.value === 'snow' || sel.value === 'sandstone' || sel.value === 'hot_plate') {
-          if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
-        }
-        this._applyParamsToLinkedTile();
-        const newPanel = this._buildParamPanel();
-        newPanel.id = 'editor-param-panel';
-        panel.replaceWith(newPanel);
-      });
-      const selWrap = document.createElement('div');
-      selWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const selLbl = document.createElement('span');
-      selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-      selLbl.textContent = 'Content:';
-      selWrap.appendChild(selLbl);
-      selWrap.appendChild(sel);
-      panel.appendChild(selWrap);
+      panel.appendChild(this._buildChamberContentSelector(panel));
     }
-
     if (isChm) {
-      // Chamber content-specific params (content type is determined by the palette selection)
-      const cc = chamberPaletteContent(p as ChamberPalette);
-      if (cc === 'dirt') {
-        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = parseInt(v) || 0;
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
-      if (cc === 'heater') {
-        panel.appendChild(this._labeledInput('Temp', String(this._editorParams.temperature), (v) => {
-          this._editorParams.temperature = parseInt(v) || 0;
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
-      if (cc === 'ice' || cc === 'snow' || cc === 'sandstone') {
-        panel.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
-          this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = Math.max(0, parseInt(v) || 0);
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
-      if (cc === 'sandstone') {
-        panel.appendChild(this._labeledInput('Hardness', String(this._editorParams.hardness), (v) => {
-          this._editorParams.hardness = Math.max(0, parseInt(v) || 0);
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-        panel.appendChild(this._labeledInput('Shatter', String(this._editorParams.shatter), (v) => {
-          this._editorParams.shatter = Math.max(0, parseInt(v) || 0);
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
-      if (cc === 'pump') {
-        panel.appendChild(this._labeledInput('Pressure', String(this._editorParams.pressure), (v) => {
-          this._editorParams.pressure = parseInt(v) || 0;
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
-      if (cc === 'hot_plate') {
-        panel.appendChild(this._labeledInput('Boiling °', String(this._editorParams.temperature), (v) => {
-          this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-        panel.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-          this._editorParams.cost = Math.max(0, parseInt(v) || 0);
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
-      if (cc === 'item') {
-        // Item shape selector
-        const itemSel = document.createElement('select');
-        itemSel.style.cssText =
-          'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-          'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-        for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
-                           PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross]) {
-          const o = document.createElement('option');
-          o.value = shp;
-          o.textContent = shp;
-          if (this._editorParams.itemShape === shp) o.selected = true;
-          itemSel.appendChild(o);
-        }
-        itemSel.addEventListener('change', () => {
-          this._editorParams.itemShape = itemSel.value as PipeShape;
-          this._applyParamsToLinkedTile();
-        });
-        const itemSelWrap = document.createElement('div');
-        itemSelWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
-        const itemLbl = document.createElement('span');
-        itemLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-        itemLbl.textContent = 'Shape:';
-        itemSelWrap.appendChild(itemLbl);
-        itemSelWrap.appendChild(itemSel);
-        panel.appendChild(itemSelWrap);
-        panel.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
-          this._editorParams.itemCount = parseInt(v) || 1;
-          this._applyParamsToLinkedTile();
-        }, 'number', '90px'));
-      }
+      this._buildChamberContentParams(panel, chamberPaletteContent(p as ChamberPalette));
     }
 
     // Connections (Source, Sink, Chamber) – positional compass layout
     if (p === PipeShape.Source || p === PipeShape.Sink || isChm) {
-      const connWrap = document.createElement('div');
-      connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-      const connLbl = document.createElement('div');
-      connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-      connLbl.textContent = 'Connections';
-      connWrap.appendChild(connLbl);
-
-      // Compass grid: [empty][N][empty] / [W][tile][E] / [empty][S][empty]
-      const connGrid = document.createElement('div');
-      connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
-
-      const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
-        const active = this._editorParams.connections[dir];
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = dir;
-        b.title = `Toggle ${dir} connection`;
-        b.style.cssText =
-          'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
-          'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
-          'color:' + (active ? '#7ed321' : '#555') + ';' +
-          'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
-          'border-radius:4px;cursor:pointer;padding:0;';
-        b.addEventListener('click', () => {
-          this._editorParams.connections[dir] = !this._editorParams.connections[dir];
-          this._applyParamsToLinkedTile();
-          const newPanel = this._buildParamPanel();
-          newPanel.id = 'editor-param-panel';
-          panel.replaceWith(newPanel);
-        });
-        return b;
-      };
-
-      // Row 1: [empty] [N] [empty]
-      connGrid.appendChild(document.createElement('span'));
-      connGrid.appendChild(makeConnBtn('N'));
-      connGrid.appendChild(document.createElement('span'));
-      // Row 2: [W] [tile preview] [E]
-      connGrid.appendChild(makeConnBtn('W'));
-      const previewCanvas = document.createElement('canvas');
-      previewCanvas.width = TILE_SIZE;
-      previewCanvas.height = TILE_SIZE;
-      previewCanvas.style.cssText = 'width:28px;height:28px;border:1px solid #4a90d9;border-radius:4px;';
-      const previewCtx = previewCanvas.getContext('2d');
-      if (previewCtx) {
-        drawEditorTile(previewCtx, 0, 0, this._buildTileDef(this._editorPalette));
-      }
-      connGrid.appendChild(previewCanvas);
-      connGrid.appendChild(makeConnBtn('E'));
-      // Row 3: [empty] [S] [empty]
-      connGrid.appendChild(document.createElement('span'));
-      connGrid.appendChild(makeConnBtn('S'));
-      connGrid.appendChild(document.createElement('span'));
-
-      connWrap.appendChild(connGrid);
-      panel.appendChild(connWrap);
+      panel.appendChild(this._buildConnectionsWidget(panel));
     }
 
     return panel;
+  }
+
+  /**
+   * Build the chamber content-type `<select>` element (shown only when the
+   * palette selection is the generic Chamber tool, not a specific content type).
+   * When the selection changes the param panel rebuilds itself.
+   */
+  private _buildChamberContentSelector(panel: HTMLElement): HTMLElement {
+    const sel = document.createElement('select');
+    sel.style.cssText =
+      'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+    const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
+      tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
+      ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
+    };
+    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate']) {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
+      if (this._editorParams.chamberContent === opt) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => {
+      this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
+      if (TEMP_CHAMBER_CONTENTS.has(sel.value as TileParams['chamberContent'])) {
+        if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
+      }
+      this._applyParamsToLinkedTile();
+      const newPanel = this._buildParamPanel();
+      newPanel.id = 'editor-param-panel';
+      panel.replaceWith(newPanel);
+    });
+    const selWrap = document.createElement('div');
+    selWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    const selLbl = document.createElement('span');
+    selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
+    selLbl.textContent = 'Content:';
+    selWrap.appendChild(selLbl);
+    selWrap.appendChild(sel);
+    return selWrap;
+  }
+
+  /**
+   * Append content-type-specific parameter inputs for a Chamber tile to `parent`.
+   * Called when the active palette is a `ChamberPalette` entry (not the generic
+   * Chamber tool), so `cc` is always the concrete content type.
+   */
+  private _buildChamberContentParams(parent: HTMLElement, cc: ChamberContent): void {
+    if (cc === 'dirt') {
+      parent.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
+        this._editorParams.cost = parseInt(v) || 0;
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+    if (cc === 'heater') {
+      parent.appendChild(this._labeledInput('Temp', String(this._editorParams.temperature), (v) => {
+        this._editorParams.temperature = parseInt(v) || 0;
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+    if (COLD_CHAMBER_CONTENTS.has(cc)) {
+      parent.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
+        this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+      parent.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
+        this._editorParams.cost = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+    if (cc === 'sandstone') {
+      parent.appendChild(this._labeledInput('Hardness', String(this._editorParams.hardness), (v) => {
+        this._editorParams.hardness = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+      parent.appendChild(this._labeledInput('Shatter', String(this._editorParams.shatter), (v) => {
+        this._editorParams.shatter = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+    if (cc === 'pump') {
+      parent.appendChild(this._labeledInput('Pressure', String(this._editorParams.pressure), (v) => {
+        this._editorParams.pressure = parseInt(v) || 0;
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+    if (cc === 'hot_plate') {
+      parent.appendChild(this._labeledInput('Boiling °', String(this._editorParams.temperature), (v) => {
+        this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+      parent.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
+        this._editorParams.cost = Math.max(0, parseInt(v) || 0);
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+    if (cc === 'item') {
+      parent.appendChild(this._buildItemShapeSelector());
+      parent.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
+        this._editorParams.itemCount = parseInt(v) || 1;
+        this._applyParamsToLinkedTile();
+      }, 'number', '90px'));
+    }
+  }
+
+  /**
+   * Build the item-shape `<select>` widget for Chamber-item tiles.
+   * Extracted to keep {@link _buildChamberContentParams} focused.
+   */
+  private _buildItemShapeSelector(): HTMLElement {
+    const itemSel = document.createElement('select');
+    itemSel.style.cssText =
+      'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+    for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
+                       PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross]) {
+      const o = document.createElement('option');
+      o.value = shp;
+      o.textContent = shp;
+      if (this._editorParams.itemShape === shp) o.selected = true;
+      itemSel.appendChild(o);
+    }
+    itemSel.addEventListener('change', () => {
+      this._editorParams.itemShape = itemSel.value as PipeShape;
+      this._applyParamsToLinkedTile();
+    });
+    const itemSelWrap = document.createElement('div');
+    itemSelWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    const itemLbl = document.createElement('span');
+    itemLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
+    itemLbl.textContent = 'Shape:';
+    itemSelWrap.appendChild(itemLbl);
+    itemSelWrap.appendChild(itemSel);
+    return itemSelWrap;
+  }
+
+  /**
+   * Build the compass-layout connections widget for Source, Sink, and Chamber tiles.
+   * Each direction button toggles the connection and rebuilds the param panel when clicked.
+   * @param replaceTarget - The outer param panel element that connection-change rebuilds replace.
+   */
+  private _buildConnectionsWidget(replaceTarget: HTMLElement): HTMLElement {
+    const connWrap = document.createElement('div');
+    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    const connLbl = document.createElement('div');
+    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
+    connLbl.textContent = 'Connections';
+    connWrap.appendChild(connLbl);
+
+    // Compass grid: [empty][N][empty] / [W][tile][E] / [empty][S][empty]
+    const connGrid = document.createElement('div');
+    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
+
+    const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
+      const active = this._editorParams.connections[dir];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = dir;
+      b.title = `Toggle ${dir} connection`;
+      b.style.cssText =
+        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
+        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
+        'color:' + (active ? '#7ed321' : '#555') + ';' +
+        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
+        'border-radius:4px;cursor:pointer;padding:0;';
+      b.addEventListener('click', () => {
+        this._editorParams.connections[dir] = !this._editorParams.connections[dir];
+        this._applyParamsToLinkedTile();
+        const newPanel = this._buildParamPanel();
+        newPanel.id = 'editor-param-panel';
+        replaceTarget.replaceWith(newPanel);
+      });
+      return b;
+    };
+
+    // Row 1: [empty] [N] [empty]
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn('N'));
+    connGrid.appendChild(document.createElement('span'));
+    // Row 2: [W] [tile preview] [E]
+    connGrid.appendChild(makeConnBtn('W'));
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = TILE_SIZE;
+    previewCanvas.height = TILE_SIZE;
+    previewCanvas.style.cssText = 'width:28px;height:28px;border:1px solid #4a90d9;border-radius:4px;';
+    const previewCtx = previewCanvas.getContext('2d');
+    if (previewCtx) {
+      drawEditorTile(previewCtx, 0, 0, this._buildTileDef(this._editorPalette));
+    }
+    connGrid.appendChild(previewCanvas);
+    connGrid.appendChild(makeConnBtn('E'));
+    // Row 3: [empty] [S] [empty]
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn('S'));
+    connGrid.appendChild(document.createElement('span'));
+
+    connWrap.appendChild(connGrid);
+    return connWrap;
   }
 
   // ─── Grid size panel ──────────────────────────────────────────────────────

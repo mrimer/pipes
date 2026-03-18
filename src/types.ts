@@ -58,6 +58,44 @@ export enum PipeShape {
 /** The type of content housed inside a Chamber tile. */
 export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate';
 
+/**
+ * Chamber content types that apply a cold (temperature-delta) water cost.
+ * These tiles freeze water when connected: ice, snow, sandstone.
+ */
+export const COLD_CHAMBER_CONTENTS: ReadonlySet<ChamberContent> = new Set(['ice', 'snow', 'sandstone']);
+
+/**
+ * Chamber content types that are temperature-sensitive (their water cost or
+ * frozen water gain depends on the current temperature): ice, snow, sandstone, hot_plate.
+ */
+export const TEMP_CHAMBER_CONTENTS: ReadonlySet<ChamberContent> = new Set(['ice', 'snow', 'sandstone', 'hot_plate']);
+
+/**
+ * Chamber content types that interact with or affect the temperature variable.
+ * Includes both tiles that raise/lower temperature (heater) and tiles whose
+ * cost is temperature-dependent: heater, ice, snow, sandstone, hot_plate.
+ */
+export const TEMP_RELEVANT_CONTENTS: ReadonlySet<ChamberContent> = new Set(['heater', 'ice', 'snow', 'sandstone', 'hot_plate']);
+
+/**
+ * Chamber content types that interact with or affect the pressure variable.
+ * Includes both tiles that raise/lower pressure (pump) and tiles whose
+ * cost is pressure-dependent: pump, snow, sandstone.
+ */
+export const PRESSURE_RELEVANT_CONTENTS: ReadonlySet<ChamberContent> = new Set(['pump', 'snow', 'sandstone']);
+
+/**
+ * Chamber content types that have a water cost (i.e. the `cost` field is used):
+ * dirt, ice, snow, sandstone, hot_plate.
+ */
+export const COST_CHAMBER_CONTENTS: ReadonlySet<ChamberContent> = new Set(['dirt', 'ice', 'snow', 'sandstone', 'hot_plate']);
+
+/**
+ * Chamber content types that modify the environment variables (temperature or
+ * pressure): heater, pump.
+ */
+export const ENV_MODIFIER_CONTENTS: ReadonlySet<ChamberContent> = new Set(['heater', 'pump']);
+
 /** Valid rotation values (clockwise, in degrees). */
 export type Rotation = 0 | 90 | 180 | 270;
 

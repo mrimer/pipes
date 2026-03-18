@@ -3,7 +3,7 @@
  * Campaign Editor. Kept separate to reduce the size of campaignEditor.ts.
  */
 
-import { PipeShape, TileDef, InventoryItem, Rotation } from './types';
+import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS } from './types';
 import { DIRT_COLOR, ICE_COLOR } from './colors';
 
 // ─── Valid field sets for data validation ─────────────────────────────────────
@@ -58,9 +58,9 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
     valid.add('connections');
     const cc = tile.chamberContent;
     if (cc === 'tank') valid.add('capacity');
-    if (cc === 'dirt' || cc === 'ice' || cc === 'snow' || cc === 'sandstone' || cc === 'hot_plate') valid.add('cost');
+    if (cc !== undefined && COST_CHAMBER_CONTENTS.has(cc)) valid.add('cost');
     if (cc === 'item') { valid.add('itemShape'); valid.add('itemCount'); }
-    if (cc === 'heater' || cc === 'ice' || cc === 'snow' || cc === 'sandstone' || cc === 'hot_plate') valid.add('temperature');
+    if (cc !== undefined && TEMP_RELEVANT_CONTENTS.has(cc)) valid.add('temperature');
     if (cc === 'pump') valid.add('pressure');
     if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
   } else if (shape === PipeShape.Cement) {
@@ -82,8 +82,8 @@ export enum EditorScreen {
 
 // ─── Editor palette tool ──────────────────────────────────────────────────────
 
-/** All chamber content types. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate';
+// Re-export ChamberContent from types so consumers that import from here still work.
+export type { ChamberContent };
 
 /** A palette entry that represents a Chamber tile with a specific content type. */
 export type ChamberPalette = `chamber:${ChamberContent}`;
