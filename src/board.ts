@@ -74,8 +74,8 @@ export function isObstacleTile(shape: PipeShape): boolean {
  * Returns 0 if the tile is warmer than (or at) the current temperature.
  * Used as the per-deltaTemp multiplier for ice/snow/sandstone/hot_plate costs.
  */
-export function computeDeltaTemp(tileTemperature: number, effectiveTemp: number): number {
-  return Math.max(0, tileTemperature - effectiveTemp);
+export function computeDeltaTemp(tileTemperature: number, currentTemp: number): number {
+  return Math.max(0, tileTemperature - currentTemp);
 }
 
 /**

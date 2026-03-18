@@ -1051,15 +1051,15 @@ export class Game {
 
   /** Transition the game to the Won state and show the win modal after confetti. */
   private _showWin(): void {
-    if (!this.board) return;
+    if (!this.board || !this.currentLevel) return;
     this.gameState = GameState.Won;
     this._flowGoodDirs = computeFlowGoodDirs(this.board);
     // Scale max drops to ~5 per tile in the solution path (min 10).
     const pathLength = this.board.getFilledPositions().size;
     this._flowMaxDrops = Math.max(10, pathLength * 5);
     const starsCollected = this.board.getStarsCollected();
-    this._markLevelCompleted(this.currentLevel!.id);
-    this._saveStars(this.currentLevel!.id, starsCollected);
+    this._markLevelCompleted(this.currentLevel.id);
+    this._saveStars(this.currentLevel.id, starsCollected);
     // Show star count on win modal when at least one star was connected
     if (this.winStarsEl) {
       if (starsCollected > 0) {
