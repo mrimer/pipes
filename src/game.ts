@@ -34,6 +34,8 @@ const SPRAY_SPAWN_INTERVAL_MS = 150;
 const BUBBLE_SPAWN_INTERVAL_MS = 90;
 /** How often (ms) to spawn a win-flow drop during the won state. */
 const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
+/** How long (ms) error flash messages and tile error highlights are displayed. */
+const ERROR_DISPLAY_MS = 2000;
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -1716,7 +1718,7 @@ export class Game {
     this._errorFlashTimer = setTimeout(() => {
       this.errorFlashEl.style.display = 'none';
       this._errorFlashTimer = null;
-    }, 2000);
+    }, ERROR_DISPLAY_MS);
   }
 
   /**
@@ -1729,7 +1731,7 @@ export class Game {
     this._errorHighlightTimer = setTimeout(() => {
       this._errorHighlightKeys = new Set();
       this._errorHighlightTimer = null;
-    }, 2000);
+    }, ERROR_DISPLAY_MS);
   }
 
   /**
