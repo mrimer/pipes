@@ -128,6 +128,19 @@ export function renderLevelList(
   // The empty-array fallback guards against callers that omit the parameter.
   const chapters = campaignChapters ?? [];
 
+  // ── Campaign-state header ──────────────────────────────────────────────────
+  if (!activeCampaign) {
+    const msg = document.createElement('p');
+    msg.style.cssText =
+      'font-size:0.95rem;color:#aaa;text-align:center;margin:16px 0;';
+    msg.textContent = 'Click Campaign Editor to import or create levels.';
+    levelListEl.appendChild(msg);
+  } else {
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Select a Level';
+    levelListEl.appendChild(h2);
+  }
+
   // ── Active campaign header ─────────────────────────────────────────────────
   if (activeCampaign) {
     const header = document.createElement('div');
