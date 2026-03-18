@@ -54,6 +54,12 @@ const GOLD_TARGET_OVERLAY = 'rgba(255,215,0,0.2)';
 /** Border color used for error-highlighted sandstone tiles. */
 const ERROR_HIGHLIGHT_BORDER = '#ff2020';
 
+/** Fill color for the hover-preview tile glow shadow. */
+const PREVIEW_SHADOW_COLOR = '#ffff00';
+
+/** Blur radius (px) for the hover-preview tile glow shadow. */
+const PREVIEW_SHADOW_BLUR = 14;
+
 /**
  * Scale a pixel value that was designed for BASE_TILE_SIZE to the current TILE_SIZE.
  * Use for font sizes, small offsets and decoration dimensions.
@@ -1498,6 +1504,26 @@ function _renderPass4CementLabels(ctx: CanvasRenderingContext2D, board: Board): 
 }
 
 /**
+ * Draw a semi-transparent placement/rotation preview overlay at (px, py).
+ * Applies 50% alpha and a yellow glow so the preview is visually distinct from
+ * a live tile without obscuring what is beneath it.
+ */
+function _drawPreviewTile(
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  previewTile: Tile,
+  currentWater: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.shadowColor = PREVIEW_SHADOW_COLOR;
+  ctx.shadowBlur = PREVIEW_SHADOW_BLUR;
+  drawTile(ctx, px, py, previewTile, false, currentWater);
+  ctx.restore();
+}
+
+/**
  * Draw semi-transparent hover previews: the pending inventory item placement
  * preview and the rotation preview for an existing tile.
  */
@@ -1527,12 +1553,7 @@ function _renderHoverPreview(
     const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
     if (canPlace || canReplace) {
       const previewTile = new Tile(selectedShape, pendingRotation as 0 | 90 | 180 | 270);
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.shadowColor = '#ffff00';
-      ctx.shadowBlur = 14;
-      drawTile(ctx, px, py, previewTile, false, currentWater);
-      ctx.restore();
+      _drawPreviewTile(ctx, px, py, previewTile, currentWater);
     }
   } else if (hoverRotationDelta > 0) {
     // Rotation preview on an existing tile (no inventory item selected, Q/W or scroll)
@@ -1543,12 +1564,7 @@ function _renderHoverPreview(
         hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
         hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
       );
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-      ctx.shadowColor = '#ffff00';
-      ctx.shadowBlur = 14;
-      drawTile(ctx, px, py, previewTile, false, currentWater);
-      ctx.restore();
+      _drawPreviewTile(ctx, px, py, previewTile, currentWater);
     }
   }
 }

@@ -946,6 +946,16 @@ export class Board {
   }
 
   /**
+   * A water impact large enough to drain the entire source and force an immediate
+   * game-over.  Used as the penalty for sandstone tiles that become unpowered
+   * (deltaDamage ≤ 0) after their initial connection — an illegal board state
+   * that must be resolved immediately.
+   */
+  private get _drainAllImpact(): number {
+    return -(this.sourceCapacity + 1);
+  }
+
+  /**
    * Compute current water remaining in the source tank based on the live fill state.
    *
    * When incremental turn tracking is active (i.e. {@link applyTurnDelta} has been
@@ -1144,7 +1154,7 @@ export class Board {
           // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
           // connection time are now gone.  Force immediate failure.
           // Skip the frozen counter – this impact has no ice-accounting meaning.
-          const failureImpact = -(this.sourceCapacity + 1);
+          const failureImpact = this._drainAllImpact;
           if (failureImpact !== oldImpact) {
             this._lockedWaterImpact.set(key, failureImpact);
             this.lastLockedCostChanges.push({ row: r, col: c, delta: failureImpact - oldImpact });
@@ -1244,7 +1254,7 @@ export class Board {
             impact = -(costPerDeltaTemp * deltaTemp);
             this.frozen += costPerDeltaTemp * deltaTemp;
           } else {
-            impact = -(this.sourceCapacity + 1);
+            impact = this._drainAllImpact;
           }
         }
         // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
