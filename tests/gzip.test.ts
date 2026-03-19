@@ -5,7 +5,7 @@
  * all available as globals in Node.js 18+.
  */
 
-import { ungzipBlob } from '../src/campaignEditorTypes';
+import { ungzipBlob } from '../src/campaignEditor/types';
 
 // Helper to gzip a string using Node.js built-ins (for test setup only)
 async function gzipStringNode(text: string): Promise<Blob> {

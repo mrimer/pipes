@@ -9,7 +9,7 @@
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress, saveActiveCampaignId, clearActiveCampaignId, migrateCampaign } from '../src/persistence';
 import { CampaignEditor } from '../src/campaignEditor';
 import { CampaignDef, LevelDef, PipeShape } from '../src/types';
-import { TileParams } from '../src/campaignEditorTypes';
+import { TileParams } from '../src/campaignEditor/types';
 
 // Keep TILE_SIZE at 64 for all tests by simulating a small viewport.
 beforeAll(() => {
@@ -1487,9 +1487,9 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     _editRows: number;
     _editCols: number;
     _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
     _paintDragActive: boolean;
-    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
     _editorHistoryIdx: number;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
@@ -1626,10 +1626,10 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     _editRows: number;
     _editCols: number;
     _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
+    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
     _rightEraseDragActive: boolean;
     _suppressNextContextMenu: boolean;
-    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
     _editorHistoryIdx: number;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
@@ -1812,8 +1812,8 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     _editRows: number;
     _editCols: number;
     _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
-    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
+    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
     _editorHistoryIdx: number;
     _linkedTilePos: { row: number; col: number } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
@@ -1867,7 +1867,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const historyLenBefore = state._editorHistory.length;
 
     // Place a container tile (Chamber with chamberContent='item') by single-click on empty cell.
-    state._editorPalette = 'chamber:item' as import('../src/campaignEditorTypes').EditorPalette;
+    state._editorPalette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Exactly one new snapshot should have been added.
@@ -1911,7 +1911,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     // Capture the pre-placement state from history.
     const prePlacementSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
 
-    state._editorPalette = 'chamber:item' as import('../src/campaignEditorTypes').EditorPalette;
+    state._editorPalette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
 
     // The snapshot before the latest must still reflect the empty pre-placement grid.
@@ -2019,8 +2019,8 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     _editRows: number;
     _editCols: number;
     _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
-    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
+    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
     _editorHistoryIdx: number;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
@@ -2511,7 +2511,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
 
 // ─── Data validation ──────────────────────────────────────────────────────────
 
-import { getValidTileDefKeys } from '../src/campaignEditorTypes';
+import { getValidTileDefKeys } from '../src/campaignEditor/types';
 import { TileDef } from '../src/types';
 
 describe('getValidTileDefKeys', () => {
@@ -3017,8 +3017,8 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     _editRows: number;
     _editCols: number;
     _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditorTypes').EditorPalette;
-    _editorHistory: import('../src/campaignEditorTypes').EditorSnapshot[];
+    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
+    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
     _editorHistoryIdx: number;
     _editorUnsavedChanges: boolean;
     _editorSavedHistoryIdx: number;

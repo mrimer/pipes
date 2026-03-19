@@ -69,7 +69,7 @@ function _s(n: number): number {
 }
 
 /**
- * Exported alias for `_s`.  Allows other modules (e.g. campaignEditorRenderer)
+ * Exported alias for `_s`.  Allows other modules (e.g. campaignEditor/renderer)
  * to scale pixel constants using the same factor.
  */
 export function scalePx(n: number): number {

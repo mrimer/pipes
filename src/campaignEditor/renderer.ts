@@ -4,12 +4,12 @@
  * write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, Rotation } from './types';
-import { TILE_SIZE, drawSpinArrow, scalePx as _s } from './renderer';
-import { Tile } from './tile';
-import { EDITOR_COLORS, chamberColor } from './campaignEditorTypes';
-import { PIPE_SHAPES, SPIN_PIPE_SHAPES } from './board';
-import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR } from './colors';
+import { PipeShape, TileDef, Direction, Rotation } from '../types';
+import { TILE_SIZE, drawSpinArrow, scalePx as _s } from '../renderer';
+import { Tile } from '../tile';
+import { EDITOR_COLORS, chamberColor } from './types';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES } from '../board';
+import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR } from '../colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
 
