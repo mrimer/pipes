@@ -13,10 +13,10 @@ import {
   loadLevelStars, saveLevelStar, clearLevelStars,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
-import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './tileAnimation';
+import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './visuals/tileAnimation';
 import { CampaignEditor } from './campaignEditor';
-import { spawnConfetti, clearConfetti } from './confetti';
-import { spawnStarSparkles, clearStarSparkles } from './starSparkle';
+import { spawnConfetti, clearConfetti } from './visuals/confetti';
+import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
 import {
   SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff,
   spawnSourceSprayDrop, renderSourceSpray,
@@ -24,7 +24,7 @@ import {
   spawnFlowDrop, renderFlowDrops,
   spawnBubble, renderBubbles,
   computeFlowGoodDirs,
-} from './waterParticles';
+} from './visuals/waterParticles';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;

@@ -8,9 +8,9 @@
  *                   indicate liquid is flowing through the connected network.
  */
 
-import { Board, NEIGHBOUR_DELTA, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from './board';
-import { Direction, GridPos } from './types';
-import { TILE_SIZE, scalePx as _s } from './renderer';
+import { Board, NEIGHBOUR_DELTA, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
+import { Direction, GridPos } from '../types';
+import { TILE_SIZE, scalePx as _s } from '../renderer';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Source Spray

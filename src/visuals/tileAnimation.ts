@@ -1,7 +1,7 @@
 /** Floating animation labels that rise and fade on the canvas after tile connections. */
 
-import { TILE_SIZE } from './renderer';
-import { ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR } from './colors';
+import { TILE_SIZE } from '../renderer';
+import { ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR } from '../colors';
 export { ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR };
 
 /** A floating animation label drawn on the canvas. */
