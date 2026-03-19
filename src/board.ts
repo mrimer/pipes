@@ -1743,53 +1743,14 @@ export class Board {
 
   /**
    * Rotate the tile at the given position 90° clockwise.
+   * Convenience wrapper around {@link rotateTileBy} with `steps = 1`.
    * Returns false (and sets {@link lastError} / {@link lastErrorTilePositions}) if the
-   * rotation would result in any connected sandstone tile having deltaDamage ≤ 0 (either
-   * by newly connecting a sandstone tile, or by disconnecting a pump and dropping pressure),
-   * or if temperature/pressure would drop below 0.
-   * The rotation is reversed in that case.
+   * tile is fixed/empty or if the rotation would violate any game constraint.
    * @param pos - Grid coordinate.
-   * @returns true if the rotation succeeded; false if it was blocked by a constraint.
+   * @returns true if the rotation succeeded; false if it was blocked.
    */
   rotateTile(pos: GridPos): boolean {
-    this._clearLastError();
-    const tile = this.getTile(pos);
-    if (!tile) return false;
-
-    // ── Cement constraint check (for player-placed pipe tiles only) ───────────
-    if (this._isCementHardened(pos, tile)) return false;
-
-    tile.rotate();
-
-    // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
-    // and that temperature/pressure don't go below 0.
-    const filled = this.getFilledPositions();
-    const constraintError = this._validateConstraints(filled);
-    if (constraintError) {
-      // Reverse the rotation (3 clockwise = 1 counter-clockwise).
-      tile.rotate(); tile.rotate(); tile.rotate();
-      this.lastError = constraintError;
-      return false;
-    }
-
-    // Validate container-grant constraints: rotation may disconnect a container from
-    // the fill path, which could leave placed tiles with no covering grant (inventory < 0).
-    const newBonuses = this.getContainerBonuses(filled);
-    for (const item of this.inventory) {
-      if (item.count < 0) {
-        const bonus = newBonuses.get(item.shape) ?? 0;
-        if (item.count + bonus < 0) {
-          tile.rotate(); tile.rotate(); tile.rotate();
-          this.lastError = ERR_CONTAINER_ROTATE;
-          return false;
-        }
-      }
-    }
-
-    // Decrement cement setting time after successful rotation
-    this._applyCementDecrement(pos, tile);
-
-    return true;
+    return this.rotateTileBy(pos, 1);
   }
 
   /**

@@ -403,12 +403,19 @@ describe('Game – inventory bar re-renders on tile rotation', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
+    const hooks = gameHooks(game);
+
+    // Place a Straight tile at (1,0) – a player slot in level 1 – so there is
+    // a non-fixed tile to rotate.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 1, col: 0 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
     const renderSpy = jest.spyOn(game as unknown as { _renderInventoryBar(): void }, '_renderInventoryBar');
 
-    const hooks = gameHooks(game);
     hooks.selectedShape = null;
-    // (1,1) is a fixed Straight tile in level 1
-    hooks.focusPos = { row: 1, col: 1 };
+    // (1,0) now holds a player-placed Straight tile
+    hooks.focusPos = { row: 1, col: 0 };
 
     // Enter with no selected shape rotates the focused tile
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
