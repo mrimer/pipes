@@ -3,8 +3,8 @@
  * Campaign Editor. Kept separate to reduce the size of campaignEditor.ts.
  */
 
-import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS } from './types';
-import { DIRT_COLOR, ICE_COLOR } from './colors';
+import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS } from '../types';
+import { DIRT_COLOR, ICE_COLOR } from '../colors';
 
 // ─── Valid field sets for data validation ─────────────────────────────────────
 

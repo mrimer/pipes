@@ -9,9 +9,9 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from './types';
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from './persistence';
-import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
+import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from '../types';
+import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from '../persistence';
+import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 
 /** Maximum CSS display size (px) for the editor canvas on either axis. */
 const MAX_EDITOR_CANVAS_PX = 512;
@@ -46,7 +46,7 @@ const EDITOR_PANEL_BASE_CSS =
   'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
 /** CSS for the all-caps section-title label inside an editor side-panel. */
 const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
-import { Board, PIPE_SHAPES, parseKey } from './board';
+import { Board, PIPE_SHAPES, parseKey } from '../board';
 import {
   EditorPalette,
   EditorScreen,
@@ -66,9 +66,9 @@ import {
   VALID_LEVEL_KEYS,
   VALID_INVENTORY_ITEM_KEYS,
   getValidTileDefKeys,
-} from './campaignEditorTypes';
-import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './campaignEditorRenderer';
-import { renderMinimap } from './minimap';
+} from './types';
+import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './renderer';
+import { renderMinimap } from '../minimap';
 
 /**
  * Palette values that support paint-drag: clicking and dragging across multiple
