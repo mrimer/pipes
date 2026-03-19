@@ -8,7 +8,7 @@ import { LEVELS, CHAPTERS } from './levels';
 import { saveImportedCampaigns, loadActiveCampaignId } from '../src/persistence';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
-jest.mock('../src/confetti', () => ({
+jest.mock('../src/visuals/confetti', () => ({
   spawnConfetti: (onComplete?: () => void) => { if (onComplete) onComplete(); },
   clearConfetti: jest.fn(),
 }));
@@ -858,7 +858,7 @@ describe('Game – undoLastMove', () => {
 
 // ─── Tests: tile connection animations ───────────────────────────────────────
 
-import { ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from '../src/tileAnimation';
+import { ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR } from '../src/visuals/tileAnimation';
 
 describe('Game – tile connection animations (_spawnConnectionAnimations)', () => {
   it('spawns a "-1" animation when a regular pipe becomes newly connected', () => {

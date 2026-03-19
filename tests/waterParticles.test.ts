@@ -3,7 +3,7 @@
 import { Board } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
-import { computeFlowGoodDirs } from '../src/waterParticles';
+import { computeFlowGoodDirs } from '../src/visuals/waterParticles';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import {
   ANIM_ZERO_COLOR,
   ANIM_ITEM_COLOR,
   ANIM_RISE_PX,
-} from '../src/tileAnimation';
+} from '../src/visuals/tileAnimation';
 
 // ─── animColor ────────────────────────────────────────────────────────────────
 
