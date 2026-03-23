@@ -1148,6 +1148,12 @@ export class Game {
     const isChallenge = !!this.currentLevel.challenge;
     this._markLevelCompleted(this.currentLevel.id);
     this._saveStars(this.currentLevel.id, starsCollected);
+    // Load previous best before saving so we can detect a new personal record.
+    // Skip the comparison during playtesting (data isn't persisted in that mode).
+    let previousBest: number | undefined;
+    if (!this._playtestExitCallback) {
+      previousBest = loadLevelWater(this._activeCampaign?.id)[this.currentLevel.id] as number | undefined;
+    }
     this._saveWater(this.currentLevel.id, waterRemaining);
     // Show challenge skull icon on win modal when the completed level is a challenge level
     if (this.winChallengeEl) {
@@ -1160,7 +1166,8 @@ export class Game {
     }
     // Show water retained on win modal (always show since water is the core resource)
     if (this.winWaterEl) {
-      this.winWaterEl.textContent = `💧 ${waterRemaining} water retained`;
+      const isNewBest = previousBest !== undefined && waterRemaining > previousBest;
+      this.winWaterEl.textContent = `💧 ${waterRemaining} water retained${isNewBest ? ' (New Best!)' : ''}`;
       this.winWaterEl.style.display = 'block';
     }
     // Show star count on win modal when at least one star was connected
