@@ -4,7 +4,7 @@
 
 /** Tests for star-progress persistence and level-select star display. */
 
-import { loadLevelStars, saveLevelStar, clearLevelStars } from '../src/persistence';
+import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
 import { LevelDef, PipeShape, Direction } from '../src/types';
 
@@ -62,6 +62,43 @@ describe('loadLevelStars / saveLevelStar / clearLevelStars', () => {
   it('returns {} gracefully when localStorage contains invalid JSON', () => {
     localStorage.setItem('pipes_level_stars', 'not-json');
     expect(loadLevelStars()).toEqual({});
+  });
+});
+
+// ─── clearLevelStarRecord ─────────────────────────────────────────────────────
+
+describe('clearLevelStarRecord', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('removes only the specified level from the star record', () => {
+    saveLevelStar(1, 2);
+    saveLevelStar(2, 3);
+    clearLevelStarRecord(1);
+    expect(loadLevelStars()[1]).toBeUndefined();
+    expect(loadLevelStars()[2]).toBe(3);
+  });
+
+  it('does nothing when the level has no stored star record', () => {
+    saveLevelStar(5, 2);
+    clearLevelStarRecord(99); // no record for level 99
+    expect(loadLevelStars()[5]).toBe(2);
+  });
+
+  it('works with a campaign-specific star record', () => {
+    saveLevelStar(10, 3, 'cmp_abc');
+    saveLevelStar(11, 2, 'cmp_abc');
+    clearLevelStarRecord(10, 'cmp_abc');
+    expect(loadLevelStars('cmp_abc')[10]).toBeUndefined();
+    expect(loadLevelStars('cmp_abc')[11]).toBe(2);
+  });
+
+  it('does not affect the official star record when called with a campaign ID', () => {
+    saveLevelStar(10, 2);
+    saveLevelStar(10, 3, 'cmp_abc');
+    clearLevelStarRecord(10, 'cmp_abc');
+    expect(loadLevelStars()[10]).toBe(2);
   });
 });
 

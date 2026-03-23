@@ -4,7 +4,7 @@
 
 /** Tests for water-remaining persistence and level-select water display. */
 
-import { loadLevelWater, saveLevelWater, clearLevelWater } from '../src/persistence';
+import { loadLevelWater, saveLevelWater, clearLevelWater, clearLevelWaterRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
 import { LevelDef, PipeShape, Direction } from '../src/types';
 
@@ -64,6 +64,43 @@ describe('loadLevelWater / saveLevelWater / clearLevelWater', () => {
   it('returns {} gracefully when localStorage contains invalid JSON', () => {
     localStorage.setItem('pipes_level_water', 'not-json');
     expect(loadLevelWater()).toEqual({});
+  });
+});
+
+// ─── clearLevelWaterRecord ────────────────────────────────────────────────────
+
+describe('clearLevelWaterRecord', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('removes only the specified level from the water record', () => {
+    saveLevelWater(1, 10);
+    saveLevelWater(2, 4);
+    clearLevelWaterRecord(1);
+    expect(loadLevelWater()[1]).toBeUndefined();
+    expect(loadLevelWater()[2]).toBe(4);
+  });
+
+  it('does nothing when the level has no stored water record', () => {
+    saveLevelWater(5, 3);
+    clearLevelWaterRecord(99); // no record for level 99
+    expect(loadLevelWater()[5]).toBe(3);
+  });
+
+  it('works with a campaign-specific water record', () => {
+    saveLevelWater(10, 5, 'cmp_abc');
+    saveLevelWater(11, 2, 'cmp_abc');
+    clearLevelWaterRecord(10, 'cmp_abc');
+    expect(loadLevelWater('cmp_abc')[10]).toBeUndefined();
+    expect(loadLevelWater('cmp_abc')[11]).toBe(2);
+  });
+
+  it('does not affect the official water record when called with a campaign ID', () => {
+    saveLevelWater(10, 2);
+    saveLevelWater(10, 5, 'cmp_abc');
+    clearLevelWaterRecord(10, 'cmp_abc');
+    expect(loadLevelWater()[10]).toBe(2);
   });
 });
 

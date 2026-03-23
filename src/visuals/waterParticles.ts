@@ -44,7 +44,7 @@ export function spawnSourceSprayDrop(drops: SourceSprayDrop[]): void {
     angle: Math.random() * Math.PI * 2,
     distance: Math.random() * _s(3),
     speed: _s(0.5 + Math.random() * 0.8),
-    size: _s(1.5 + Math.random() * 2.0),
+    size: _s(3 + Math.random() * 3),
   });
 }
 

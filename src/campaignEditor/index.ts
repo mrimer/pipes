@@ -10,7 +10,7 @@
  */
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from '../types';
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign } from '../persistence';
+import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign, clearLevelStarRecord, clearLevelWaterRecord } from '../persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 
 /** Maximum CSS display size (px) for the editor canvas on either axis. */
@@ -2744,6 +2744,10 @@ export class CampaignEditor {
 
     const newLevel = this._buildCurrentLevelDef();
     if (levelIdx >= 0 && levelIdx < chapter.levels.length) {
+      // Updating an existing level – clear any stored player progress for it so
+      // the player must replay the new version to record a new score.
+      clearLevelStarRecord(newLevel.id, campaign.id);
+      clearLevelWaterRecord(newLevel.id, campaign.id);
       chapter.levels[levelIdx] = newLevel;
     } else {
       chapter.levels.push(newLevel);

@@ -237,6 +237,18 @@ export function clearLevelStars(campaignId?: string): void {
   }
 }
 
+/** Clear the star record for a single level (for a campaign or the official campaign). */
+export function clearLevelStarRecord(levelId: number, campaignId?: string): void {
+  try {
+    const stars = loadLevelStars(campaignId);
+    if (!(levelId in stars)) return;
+    delete stars[levelId];
+    localStorage.setItem(levelStarsStorageKey(campaignId), JSON.stringify(stars));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 // ─── Water-remaining progress ──────────────────────────────────────────────────
 
 const LEVEL_WATER_KEY = 'pipes_level_water';
@@ -279,6 +291,18 @@ export function saveLevelWater(levelId: number, water: number, campaignId?: stri
 export function clearLevelWater(campaignId?: string): void {
   try {
     localStorage.removeItem(levelWaterStorageKey(campaignId));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Clear the water record for a single level (for a campaign or the official campaign). */
+export function clearLevelWaterRecord(levelId: number, campaignId?: string): void {
+  try {
+    const waterMap = loadLevelWater(campaignId);
+    if (!(levelId in waterMap)) return;
+    delete waterMap[levelId];
+    localStorage.setItem(levelWaterStorageKey(campaignId), JSON.stringify(waterMap));
   } catch {
     // ignore storage errors
   }
