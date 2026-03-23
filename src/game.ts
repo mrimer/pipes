@@ -1244,8 +1244,8 @@ export class Game {
       if (this._rightDragLastTile && this.board &&
           this.gameState === GameState.Playing && this.screen === GameScreen.Play) {
         const tile = this.board.getTile(this._rightDragLastTile);
-        if (tile && tile.shape === PipeShape.Empty) {
-          // Right-clicking an empty tile: clear any pending inventory selection.
+        if (!tile || tile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(tile.shape)) {
+          // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
           if (this.selectedShape !== null) {
             this.selectedShape = null;
             this._renderInventoryBar();
@@ -1268,7 +1268,8 @@ export class Game {
         this.screen === GameScreen.Play) {
       const pos = this._dragLastTile;
       const tile = this.board.getTile(pos);
-      if (tile) {
+      // Spinner tiles cannot be replaced; skip placement so the click event can rotate them.
+      if (tile && !SPIN_PIPE_SHAPES.has(tile.shape)) {
         const filledBefore = this.board.getFilledPositions();
         if (this._tryPlaceOrReplaceSelectedAt(pos, tile, filledBefore)) {
           this._suppressNextClick = true;
@@ -1467,8 +1468,8 @@ export class Game {
 
     const tile = this.board.getTile(pos);
 
-    // Right-clicking an empty tile: clear any pending inventory selection.
-    if (tile && tile.shape === PipeShape.Empty) {
+    // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
+    if (tile && (tile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(tile.shape))) {
       if (this.selectedShape !== null) {
         this.selectedShape = null;
         this._renderInventoryBar();
