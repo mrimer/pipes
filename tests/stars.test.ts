@@ -468,6 +468,100 @@ describe('renderLevelList – challenge levels', () => {
   });
 });
 
+// ─── renderLevelList – campaign totals denominator gating ────────────────────
+
+describe('renderLevelList – campaign totals denominator gating', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  it('shows ⭐ without denominator in campaign header until all non-challenge levels are done', () => {
+    // Campaign: 2 regular levels + 1 challenge level; only L1 done.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1, 2), makeLevel(2, 1), makeLevel(3, undefined, true)],
+    };
+    const chapters = [ch1];
+    const levelStars: Record<number, number> = { 1: 1 };
+    const activeCampaign = { name: 'Partial', author: 'T', completionPct: 33 };
+
+    renderLevelList(
+      container, new Set<number>([1]),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      activeCampaign, chapters, levelStars,
+    );
+
+    const header = container.querySelector('div');
+    // Should show collected star count but NOT the total denominator
+    expect(header?.textContent).toContain('⭐');
+    expect(header?.textContent).not.toMatch(/⭐\s*\d+\/\d+/);
+  });
+
+  it('shows ⭐ X/Y denominator in campaign header once all non-challenge levels are done', () => {
+    // Campaign: 2 regular levels + 1 challenge level; L1 and L2 both done (all non-challenge).
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1, 2), makeLevel(2, 1), makeLevel(3, undefined, true)],
+    };
+    const chapters = [ch1];
+    const levelStars: Record<number, number> = { 1: 1, 2: 1 };
+    const activeCampaign = { name: 'Done', author: 'T', completionPct: 67 };
+
+    renderLevelList(
+      container, new Set<number>([1, 2]),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      activeCampaign, chapters, levelStars,
+    );
+
+    const header = container.querySelector('div');
+    // All non-challenge done → show collected/total
+    expect(header?.textContent).toMatch(/⭐\s*\d+\/\d+/);
+  });
+
+  it('shows 💀 without denominator in campaign header until all non-challenge levels are done', () => {
+    // Campaign: 2 regular levels + 2 challenge levels; only L1 done, L3 (challenge) done.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2), makeLevel(3, undefined, true), makeLevel(4, undefined, true)],
+    };
+    const chapters = [ch1];
+    const activeCampaign = { name: 'Partial', author: 'T', completionPct: 25 };
+
+    renderLevelList(
+      container, new Set<number>([1, 3]),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      activeCampaign, chapters,
+    );
+
+    const header = container.querySelector('div');
+    // Should show completed challenge count but NOT the total denominator
+    expect(header?.textContent).toContain('💀');
+    expect(header?.textContent).not.toMatch(/💀\s*\d+\/\d+/);
+  });
+
+  it('shows 💀 X/Y denominator in campaign header once all non-challenge levels are done', () => {
+    // Campaign: 2 regular + 2 challenge; L1 & L2 done (all non-challenge), L3 (challenge) done.
+    const ch1 = {
+      id: 1, name: 'Ch1',
+      levels: [makeLevel(1), makeLevel(2), makeLevel(3, undefined, true), makeLevel(4, undefined, true)],
+    };
+    const chapters = [ch1];
+    const activeCampaign = { name: 'Done', author: 'T', completionPct: 75 };
+
+    renderLevelList(
+      container, new Set<number>([1, 2, 3]),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      activeCampaign, chapters,
+    );
+
+    const header = container.querySelector('div');
+    // All non-challenge done → show X/Y
+    expect(header?.textContent).toMatch(/💀\s*\d+\/\d+/);
+  });
+});
+
 // ─── renderLevelList – no-campaign message and Select a Level header ──────────
 
 describe('renderLevelList – no-campaign / campaign header', () => {
