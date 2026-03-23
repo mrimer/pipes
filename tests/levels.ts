@@ -486,11 +486,37 @@ const LEVEL_7: LevelDef = {
   ],
 };
 
-export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7];
+/**
+ * Level 8 – Spinner Test
+ * ======================
+ * 3 × 3 grid: Source(0,0)→SpinStraight(0,1)→Sink(0,2).
+ * Used for testing spinner-tile click/right-click interactions.
+ */
+const LEVEL_8: LevelDef = {
+  id: 8,
+  name: 'Spinner Test',
+  rows: 3,
+  cols: 3,
+  grid: [
+    [
+      { shape: PipeShape.Source, rotation: 0, capacity: 2, connections: [Direction.East] }, // (0,0)
+      { shape: PipeShape.SpinStraight, rotation: 90 },                                      // (0,1) E-W spinner
+      { shape: PipeShape.Sink, rotation: 0, connections: [Direction.West] },                // (0,2)
+    ],
+    [null, null, null],
+    [null, null, null],
+  ],
+  inventory: [
+    { shape: PipeShape.Straight, count: 2 },
+  ],
+};
+
+export const LEVELS: LevelDef[] = [LEVEL_1, LEVEL_2, LEVEL_3, LEVEL_4, LEVEL_5, LEVEL_6, LEVEL_7, LEVEL_8];
 
 /** All game chapters, each containing an ordered set of levels. */
 export const CHAPTERS: ChapterDef[] = [
   { id: 1, name: 'Intro', levels: [LEVEL_1, LEVEL_2] },
   { id: 2, name: 'Golden', levels: [LEVEL_3, LEVEL_4] },
   { id: 3, name: 'Icy', levels: [LEVEL_5, LEVEL_6, LEVEL_7] },
+  { id: 4, name: 'Spinner', levels: [LEVEL_8] },
 ];

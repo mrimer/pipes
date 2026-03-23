@@ -319,6 +319,8 @@ type GameTestHooks = {
   _handleCanvasClick(e: MouseEvent): void;
   _handleCanvasRightClick(e: MouseEvent): void;
   _handleCanvasWheel(e: WheelEvent): void;
+  _handleCanvasMouseDown(e: MouseEvent): void;
+  _handleCanvasMouseUp(e: MouseEvent): void;
   _handleCanvasMouseMove(e: MouseEvent): void;
   _handleDocKeyDown(e: KeyboardEvent): void;
   _handleDocKeyUp(e: KeyboardEvent): void;
@@ -2351,5 +2353,70 @@ describe('Game – level header challenge icon', () => {
 
     const levelHeaderEl = document.getElementById('level-header');
     expect(levelHeaderEl?.textContent).not.toContain('💀');
+  });
+});
+
+// ─── Tests: spinner tile interaction with inventory selected ──────────────────
+
+describe('Game – spinner tile click with inventory selected', () => {
+  it('rotates the spinner on left-click even when an inventory item is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1) with initial rotation 90
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+
+    // Select an inventory item so the drag-paint path normally runs on mouseup.
+    hooks.selectedShape = PipeShape.Straight;
+
+    // TILE_SIZE=64: col 1 → clientX 96, row 0 → clientY 32.
+    const x = 96, y = 32;
+
+    // Simulate the full left-click sequence (mousedown → mouseup → click).
+    hooks._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 0, clientX: x, clientY: y }));
+    hooks._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 0, clientX: x, clientY: y }));
+    hooks._handleCanvasClick(new MouseEvent('click', { clientX: x, clientY: y }));
+
+    // The spinner should have rotated CW (90→180) – the click must NOT have been suppressed.
+    expect(boardAccess.board.grid[0][1].rotation).toBe(180);
+    // The inventory selection must remain active (spinner cannot be placed/replaced).
+    expect(hooks.selectedShape).toBe(PipeShape.Straight);
+  });
+});
+
+describe('Game – spinner tile right-click deselects inventory', () => {
+  it('deselects the selected inventory item when right-clicking a spinner tile', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1)
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    hooks.selectedShape = PipeShape.Straight;
+
+    // TILE_SIZE=64: col 1 → clientX 96, row 0 → clientY 32.
+    const x = 96, y = 32;
+
+    // Simulate right-click on the spinner (mousedown button=2, mouseup button=2).
+    hooks._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 2, clientX: x, clientY: y }));
+    hooks._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 2, clientX: x, clientY: y }));
+
+    // Inventory selection must be cleared.
+    expect(hooks.selectedShape).toBeNull();
+    // The spinner tile itself must NOT have been removed.
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.SpinStraight);
+  });
+
+  it('deselects the selected inventory item when the contextmenu event fires on a spinner tile', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1)
+    const hooks = gameHooks(game);
+
+    hooks.selectedShape = PipeShape.Straight;
+
+    // Simulate a contextmenu event directly on the spinner tile (e.g. keyboard-triggered).
+    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    expect(hooks.selectedShape).toBeNull();
   });
 });
