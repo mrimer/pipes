@@ -200,6 +200,10 @@ export function renderLevelList(
     const campaignWaterTotal = chapterWaterTotal(allLevels, completedLevels, levelWater);
     const campaignChallengeTotal = allLevels.filter((l) => l.challenge).length;
     const campaignChallengeCompleted = allLevels.filter((l) => l.challenge && completedLevels.has(l.id)).length;
+    const campaignNonChallengeTotal = allLevels.filter((l) => !l.challenge).length;
+    const campaignNonChallengeCompleted = allLevels.filter((l) => !l.challenge && completedLevels.has(l.id)).length;
+    const allNonChallengeCompleted = campaignNonChallengeTotal > 0 &&
+      campaignNonChallengeCompleted === campaignNonChallengeTotal;
     const hasAnyCompletions = completedLevels.size > 0;
 
     if (hasAnyCompletions) {
@@ -216,14 +220,18 @@ export function renderLevelList(
       if (campaignStarTotal > 0) {
         const starEl = document.createElement('span');
         starEl.style.color = '#f0c040';
-        starEl.textContent = `⭐ ${campaignStarCollected}/${campaignStarTotal}`;
+        starEl.textContent = allNonChallengeCompleted
+          ? `⭐ ${campaignStarCollected}/${campaignStarTotal}`
+          : `⭐ ${campaignStarCollected}`;
         statsRow.appendChild(starEl);
       }
 
       if (campaignChallengeTotal > 0) {
         const challengeEl = document.createElement('span');
         challengeEl.style.color = '#e74c3c';
-        challengeEl.textContent = `💀 ${campaignChallengeCompleted}/${campaignChallengeTotal}`;
+        challengeEl.textContent = allNonChallengeCompleted
+          ? `💀 ${campaignChallengeCompleted}/${campaignChallengeTotal}`
+          : `💀 ${campaignChallengeCompleted}`;
         statsRow.appendChild(challengeEl);
       }
 

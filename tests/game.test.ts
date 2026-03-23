@@ -2327,3 +2327,29 @@ describe('Game – campaign auto-selection on startup', () => {
     expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'c1' });
   });
 });
+
+// ─── Tests: level header challenge icon ──────────────────────────────────────
+
+describe('Game – level header challenge icon', () => {
+  it('appends 💀 to the level header when the level is a challenge level', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+
+    game.startLevel(9002); // challenge level
+
+    const levelHeaderEl = document.getElementById('level-header');
+    expect(levelHeaderEl?.textContent).toContain('💀');
+  });
+
+  it('does not append 💀 to the level header for a non-challenge level', () => {
+    const { game } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+
+    game.startLevel(9001); // non-challenge level
+
+    const levelHeaderEl = document.getElementById('level-header');
+    expect(levelHeaderEl?.textContent).not.toContain('💀');
+  });
+});

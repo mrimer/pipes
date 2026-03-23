@@ -123,6 +123,12 @@ export class Game {
   /** "Next Level" button in the win modal — hidden while playtesting in the editor. */
   private readonly winNextBtnEl: HTMLButtonElement;
 
+  /** Challenge level indicator element in the win modal. */
+  private readonly winChallengeEl: HTMLElement | null;
+
+  /** Water retained display element in the win modal. */
+  private readonly winWaterEl: HTMLElement | null;
+
   /** Star count display element in the win modal. */
   private readonly winStarsEl: HTMLElement | null;
 
@@ -356,6 +362,8 @@ export class Game {
     this.redoBtnEl = redoBtnEl;
     this.exitBtnEl = exitBtnEl;
     this.winNextBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-next-btn')!;
+    this.winChallengeEl = winModalEl.querySelector<HTMLElement>('#win-challenge');
+    this.winWaterEl = winModalEl.querySelector<HTMLElement>('#win-water');
     this.winStarsEl = winModalEl.querySelector<HTMLElement>('#win-stars');
     this.winMenuBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-menu-btn')!;
     this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
@@ -754,8 +762,9 @@ export class Game {
           ? `${this._activeCampaign.name}  ·  `
           : '';
         const chapterNumber = ci + 1;
+        const challengeSuffix = level.challenge ? '  💀' : '';
         this.levelHeaderEl.textContent =
-          `${campaignPrefix}Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}`;
+          `${campaignPrefix}Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}${challengeSuffix}`;
         return;
       }
     }
@@ -763,7 +772,8 @@ export class Game {
     this.currentChapterId = 0;
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === levelId);
-    this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}` : '';
+    const challengeSuffix = level?.challenge ? '  💀' : '';
+    this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}${challengeSuffix}` : '';
   }
 
   /** Show or hide the note and hint boxes based on the current level's metadata. */
@@ -1135,9 +1145,24 @@ export class Game {
     this._flowMaxDrops = Math.max(10, pathLength * 5);
     const starsCollected = this.board.getStarsCollected();
     const waterRemaining = this.board.getCurrentWater();
+    const isChallenge = !!this.currentLevel.challenge;
     this._markLevelCompleted(this.currentLevel.id);
     this._saveStars(this.currentLevel.id, starsCollected);
     this._saveWater(this.currentLevel.id, waterRemaining);
+    // Show challenge skull icon on win modal when the completed level is a challenge level
+    if (this.winChallengeEl) {
+      if (isChallenge) {
+        this.winChallengeEl.textContent = '💀 Challenge level completed!';
+        this.winChallengeEl.style.display = 'block';
+      } else {
+        this.winChallengeEl.style.display = 'none';
+      }
+    }
+    // Show water retained on win modal (always show since water is the core resource)
+    if (this.winWaterEl) {
+      this.winWaterEl.textContent = `💧 ${waterRemaining} water retained`;
+      this.winWaterEl.style.display = 'block';
+    }
     // Show star count on win modal when at least one star was connected
     if (this.winStarsEl) {
       if (starsCollected > 0) {
