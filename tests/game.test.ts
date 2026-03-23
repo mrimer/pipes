@@ -5,7 +5,7 @@
 import { Game } from '../src/game';
 import { LevelDef, PipeShape, CampaignDef } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
-import { saveImportedCampaigns, loadActiveCampaignId } from '../src/persistence';
+import { saveImportedCampaigns, loadActiveCampaignId, saveLevelWater } from '../src/persistence';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
 jest.mock('../src/visuals/confetti', () => ({
@@ -93,7 +93,7 @@ function makeGame(): {
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>
     </div>
-    <div id="win-modal"><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
+    <div id="win-modal"><p id="win-water" style="display:none;"></p><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
 
@@ -2267,7 +2267,7 @@ function makeGameWithStorage(): Game {
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>
     </div>
-    <div id="win-modal"><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
+    <div id="win-modal"><p id="win-water" style="display:none;"></p><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
   const get = (id: string) => document.getElementById(id) as HTMLElement;
@@ -2418,5 +2418,62 @@ describe('Game – spinner tile right-click deselects inventory', () => {
     hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     expect(hooks.selectedShape).toBeNull();
+  });
+});
+
+// ─── Tests: win modal "(New Best!)" water indicator ───────────────────────────
+
+describe('Game – win modal shows "(New Best!)" for a new water record', () => {
+  /** Direct-call helper: invoke private _showWin() via a cast. */
+  function showWin(game: Game): void {
+    (game as unknown as { _showWin(): void })._showWin();
+  }
+
+  it('appends "(New Best!)" when current water exceeds the previous saved best', () => {
+    const { game } = makeGame();
+    game.startLevel(1); // sourceCapacity=6, so getCurrentWater() returns 6 on a fresh board
+
+    // Pre-save a lower previous best (campaign water is stored under 'test-campaign').
+    saveLevelWater(1, 3, 'test-campaign');
+
+    showWin(game);
+
+    const winWaterEl = document.getElementById('win-water');
+    expect(winWaterEl?.textContent).toContain('(New Best!)');
+  });
+
+  it('does not show "(New Best!)" when there is no previous water record (first completion)', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    // localStorage was cleared by makeGame(); no previous best exists.
+
+    showWin(game);
+
+    const winWaterEl = document.getElementById('win-water');
+    expect(winWaterEl?.textContent).not.toContain('(New Best!)');
+  });
+
+  it('does not show "(New Best!)" when current water does not exceed the previous best', () => {
+    const { game } = makeGame();
+    game.startLevel(1); // getCurrentWater() returns 6
+
+    // Pre-save a higher previous best that the current run cannot beat.
+    saveLevelWater(1, 100, 'test-campaign');
+
+    showWin(game);
+
+    const winWaterEl = document.getElementById('win-water');
+    expect(winWaterEl?.textContent).not.toContain('(New Best!)');
+  });
+
+  it('always includes the water value in the text regardless of new-best status', () => {
+    const { game } = makeGame();
+    game.startLevel(1); // sourceCapacity=6 → waterRemaining=6 on a fresh board
+
+    showWin(game);
+
+    const winWaterEl = document.getElementById('win-water');
+    expect(winWaterEl?.textContent).toContain('6');
+    expect(winWaterEl?.textContent).toContain('water retained');
   });
 });
