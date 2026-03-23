@@ -19,7 +19,7 @@ export function renderInventoryBar(
   board: Board,
   selectedShape: PipeShape | null,
   onItemClick: (shape: PipeShape, effectiveCount: number) => void,
-  onItemRightClick?: (shape: PipeShape) => void,
+  onItemRightClick?: () => void,
 ): void {
   inventoryBarEl.innerHTML = '<h3 class="inv-title">Inventory</h3>';
 
@@ -51,7 +51,7 @@ export function renderInventoryBar(
     el.dataset['shape'] = item.shape;
     el.addEventListener('click', () => onItemClick(item.shape, effectiveCount));
     if (onItemRightClick) {
-      el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(item.shape); });
+      el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(); });
     }
     inventoryBarEl.appendChild(el);
     renderedCount++;
@@ -81,7 +81,7 @@ export function renderInventoryBar(
     el.dataset['shape'] = bonusShape;
     el.addEventListener('click', () => onItemClick(bonusShape, bonusCount));
     if (onItemRightClick) {
-      el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(bonusShape); });
+      el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(); });
     }
     inventoryBarEl.appendChild(el);
     renderedCount++;

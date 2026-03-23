@@ -95,6 +95,21 @@ function chapterStarTotals(
   return { total, collected };
 }
 
+/** Compute the sum of water remaining across all completed levels in a set. */
+function chapterWaterTotal(
+  levels: import('./types').LevelDef[],
+  completedLevels: Set<number>,
+  levelWater: Record<number, number>,
+): number {
+  let total = 0;
+  for (const level of levels) {
+    if (completedLevels.has(level.id)) {
+      total += levelWater[level.id] ?? 0;
+    }
+  }
+  return total;
+}
+
 /**
  * Populate the level-list element with chapters (expandable/collapsible) and
  * their nested level buttons.
@@ -109,6 +124,7 @@ function chapterStarTotals(
  * @param activeCampaign - The campaign currently active for play (official or user campaign).
  * @param campaignChapters - When set, the chapters to render (from the active campaign).
  * @param levelStars - Map of level ID → stars collected for the current campaign.
+ * @param levelWater - Map of level ID → max water remaining recorded for the current campaign.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -121,6 +137,7 @@ export function renderLevelList(
   activeCampaign?: ActiveCampaignInfo,
   campaignChapters?: ChapterDef[],
   levelStars: Record<number, number> = {},
+  levelWater: Record<number, number> = {},
 ): void {
   levelListEl.innerHTML = '';
 
@@ -176,16 +193,42 @@ export function renderLevelList(
     header.appendChild(metaEl);
     header.appendChild(progressRow);
 
-    // When the campaign is 100% complete, show aggregate star tally (if any stars exist)
-    if (activeCampaign.completionPct >= 100) {
-      const allLevels = chapters.flatMap((ch) => ch.levels);
-      const { total: campaignStarTotal, collected: campaignStarCollected } =
-        chapterStarTotals(allLevels, levelStars);
+    // Campaign aggregate stats: always show water, stars, and challenge progress when available.
+    const allLevels = chapters.flatMap((ch) => ch.levels);
+    const { total: campaignStarTotal, collected: campaignStarCollected } =
+      chapterStarTotals(allLevels, levelStars);
+    const campaignWaterTotal = chapterWaterTotal(allLevels, completedLevels, levelWater);
+    const campaignChallengeTotal = allLevels.filter((l) => l.challenge).length;
+    const campaignChallengeCompleted = allLevels.filter((l) => l.challenge && completedLevels.has(l.id)).length;
+    const hasAnyCompletions = completedLevels.size > 0;
+
+    if (hasAnyCompletions) {
+      const statsRow = document.createElement('div');
+      statsRow.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;font-size:0.9rem;font-weight:bold;';
+
+      if (campaignWaterTotal > 0) {
+        const waterEl = document.createElement('span');
+        waterEl.style.color = '#4fc3f7';
+        waterEl.textContent = `💧 ${campaignWaterTotal}`;
+        statsRow.appendChild(waterEl);
+      }
+
       if (campaignStarTotal > 0) {
-        const starRow = document.createElement('div');
-        starRow.style.cssText = 'font-size:0.9rem;color:#f0c040;font-weight:bold;';
-        starRow.textContent = `⭐ ${campaignStarCollected}/${campaignStarTotal}`;
-        header.appendChild(starRow);
+        const starEl = document.createElement('span');
+        starEl.style.color = '#f0c040';
+        starEl.textContent = `⭐ ${campaignStarCollected}/${campaignStarTotal}`;
+        statsRow.appendChild(starEl);
+      }
+
+      if (campaignChallengeTotal > 0) {
+        const challengeEl = document.createElement('span');
+        challengeEl.style.color = '#e74c3c';
+        challengeEl.textContent = `💀 ${campaignChallengeCompleted}/${campaignChallengeTotal}`;
+        statsRow.appendChild(challengeEl);
+      }
+
+      if (statsRow.children.length > 0) {
+        header.appendChild(statsRow);
       }
     }
 
@@ -253,6 +296,9 @@ export function renderLevelList(
     const { total: chapterStarTotal, collected: chapterStarCollected } =
       chapterStarTotals(chapter.levels, levelStars);
 
+    // Compute sum of water remaining for completed levels in this chapter
+    const chapterWater = chapterWaterTotal(chapter.levels, completedLevels, levelWater);
+
     // ── Chapter container ──────────────────────────────────────────────────
     const chapterBox = document.createElement('div');
     chapterBox.classList.add('chapter-box');
@@ -274,6 +320,10 @@ export function renderLevelList(
 
     const lockIcon = chapterLocked ? ' 🔒' : '';
     const doneIcon = allLevelsCompleted ? ' ✅' : '';
+    // Water is shown as soon as any levels in the chapter are completed (running total),
+    // unlike stars/skulls which are only shown once the chapter is fully done.
+    const chapterWaterText = (!chapterLocked && chapterWater > 0)
+      ? `  💧 ${chapterWater}` : '';
     // When chapter is fully complete and has stars, append a ⭐ X/Y tally
     const chapterStarText = (allLevelsCompleted && chapterStarTotal > 0)
       ? `  ⭐ ${chapterStarCollected}/${chapterStarTotal}` : '';
@@ -281,7 +331,7 @@ export function renderLevelList(
     const chapterSkullText = (allLevelsCompleted && challengeInChapter > 0)
       ? `  💀 ${challengeCompleted}/${challengeInChapter}` : '';
     const progressText = (nonChallengeInChapter > 0 && !chapterLocked)
-      ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterStarText}${chapterSkullText}`
+      ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterWaterText}${chapterStarText}${chapterSkullText}`
       : '';
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
@@ -337,9 +387,11 @@ export function renderLevelList(
       const levelStarTotal = level.starCount ?? 0;
       const levelStarCollected = levelStarTotal > 0
         ? Math.min(levelStars[level.id] ?? 0, levelStarTotal) : 0;
+      const levelWaterVal = isCompleted ? (levelWater[level.id] ?? 0) : 0;
+      const levelWaterText = isCompleted && levelWaterVal > 0 ? `  💧 ${levelWaterVal}` : '';
       const levelStarText = levelStarTotal > 0
         ? `  ⭐ ${levelStarCollected}/${levelStarTotal}` : '';
-      btn.textContent = `${icon} Level ${li + 1}: ${level.name}${challengeIcon}${levelStarText}`;
+      btn.textContent = `${icon} Level ${li + 1}: ${level.name}${challengeIcon}${levelWaterText}${levelStarText}`;
       btn.disabled = isLocked;
 
       if (!isLocked) {
