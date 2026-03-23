@@ -1,7 +1,7 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
-import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
+import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
@@ -26,6 +26,7 @@ import {
   spawnBubble, renderBubbles,
   computeFlowGoodDirs,
 } from './visuals/waterParticles';
+import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;
@@ -35,6 +36,8 @@ const SPRAY_SPAWN_INTERVAL_MS = 150;
 const BUBBLE_SPAWN_INTERVAL_MS = 90;
 /** How often (ms) to spawn a win-flow drop during the won state. */
 const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
+/** How often (ms) to spawn a vortex particle over a sink tile. */
+const VORTEX_SPAWN_INTERVAL_MS = 120;
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) before spawning star sparkles over the win modal star icon. */
@@ -253,6 +256,12 @@ export class Game {
 
   /** `performance.now()` of the last bubble spawn. */
   private _lastBubbleSpawn = 0;
+
+  /** Active vortex particles rendered over the sink tile. */
+  private _vortexParticles: VortexParticle[] = [];
+
+  /** `performance.now()` of the last vortex particle spawn. */
+  private _lastVortexSpawn = 0;
 
   /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
   private _pendingSparkleShapes: Set<PipeShape> = new Set();
@@ -957,6 +966,7 @@ export class Game {
       this._tickSourceSpray();
       this._tickBubbles();
       this._tickWinFlow();
+      this._tickVortex();
     }
     requestAnimationFrame(() => this._loop());
   }
@@ -1012,6 +1022,26 @@ export class Game {
       this._lastFlowSpawn = now;
     }
     renderFlowDrops(this.ctx, this._flowDrops, this.board, WATER_COLOR, this._flowGoodDirs);
+  }
+
+  /**
+   * Spawn and render the spinning vortex particle effect over the sink tile.
+   * Runs every frame during play to give a visual cue that water flows into
+   * the sink.  Uses the sink tile's current color (filled vs unfilled).
+   */
+  private _tickVortex(): void {
+    if (!this.board) return;
+    const { sink } = this.board;
+    const sinkCx = sink.col * TILE_SIZE + TILE_SIZE / 2;
+    const sinkCy = sink.row * TILE_SIZE + TILE_SIZE / 2;
+    const isSinkFilled = this.board.isSolved();
+    const color = isSinkFilled ? SINK_WATER_COLOR : SINK_COLOR;
+    const now = performance.now();
+    if (now - this._lastVortexSpawn >= VORTEX_SPAWN_INTERVAL_MS) {
+      spawnVortexParticle(this._vortexParticles);
+      this._lastVortexSpawn = now;
+    }
+    renderVortex(this.ctx, this._vortexParticles, sinkCx, sinkCy, color);
   }
 
   private _renderBoard(): void {
@@ -1325,6 +1355,7 @@ export class Game {
     this._dryPuffs = [];
     this._flowDrops = [];
     this._bubbles = [];
+    this._vortexParticles = [];
     this._flowGoodDirs = null;
   }
 
@@ -2456,6 +2487,7 @@ export class Game {
     // Clear win-flow drops since we're no longer in a won state.
     this._flowDrops = [];
     this._bubbles = [];
+    this._vortexParticles = [];
     this._flowGoodDirs = null;
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
