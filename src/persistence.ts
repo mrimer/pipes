@@ -236,3 +236,50 @@ export function clearLevelStars(campaignId?: string): void {
     // ignore storage errors
   }
 }
+
+// ─── Water-remaining progress ──────────────────────────────────────────────────
+
+const LEVEL_WATER_KEY = 'pipes_level_water';
+
+function levelWaterStorageKey(campaignId?: string): string {
+  return campaignId ? `pipes_campaign_water_${campaignId}` : LEVEL_WATER_KEY;
+}
+
+/** Load the map of level IDs → max water remaining from localStorage. */
+export function loadLevelWater(campaignId?: string): Record<number, number> {
+  try {
+    const raw = localStorage.getItem(levelWaterStorageKey(campaignId));
+    if (raw) {
+      return JSON.parse(raw) as Record<number, number>;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return {};
+}
+
+/**
+ * Save the water remaining for a level to localStorage.
+ * Only updates the stored value when `water` exceeds the previously recorded maximum.
+ */
+export function saveLevelWater(levelId: number, water: number, campaignId?: string): void {
+  try {
+    const key = levelWaterStorageKey(campaignId);
+    const waterMap = loadLevelWater(campaignId);
+    if (water > (waterMap[levelId] ?? -Infinity)) {
+      waterMap[levelId] = water;
+      localStorage.setItem(key, JSON.stringify(waterMap));
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Clear all water-remaining progress (for a campaign or the official campaign). */
+export function clearLevelWater(campaignId?: string): void {
+  try {
+    localStorage.removeItem(levelWaterStorageKey(campaignId));
+  } catch {
+    // ignore storage errors
+  }
+}

@@ -11,6 +11,7 @@ import {
   loadActiveCampaignId, saveActiveCampaignId, clearActiveCampaignId,
   computeCampaignCompletionPct,
   loadLevelStars, saveLevelStar, clearLevelStars,
+  loadLevelWater, saveLevelWater, clearLevelWater,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './visuals/tileAnimation';
@@ -824,6 +825,7 @@ export class Game {
     const campaignChapters = this._activeCampaign?.chapters ?? [];
     const displayProgress = this._activeCampaign ? this._activeCampaignProgress : this.completedLevels;
     const levelStars = loadLevelStars(this._activeCampaign?.id);
+    const levelWater = loadLevelWater(this._activeCampaign?.id);
     let activeCampaignInfo: { name: string; author: string; completionPct: number } | undefined;
     if (this._activeCampaign) {
       const pct = computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress);
@@ -844,6 +846,7 @@ export class Game {
       activeCampaignInfo,
       campaignChapters,
       levelStars,
+      levelWater,
     );
   }
 
@@ -856,7 +859,7 @@ export class Game {
       this.board,
       this.selectedShape,
       (shape, count) => this._handleInventoryClick(shape, count),
-      (shape) => this._handleInventoryRightClick(shape),
+      () => this._handleInventoryRightClick(),
     );
     if (this._pendingSparkleShapes.size > 0) {
       for (const shape of this._pendingSparkleShapes) {
@@ -889,10 +892,10 @@ export class Game {
     this.canvas.focus();
   }
 
-  private _handleInventoryRightClick(shape: PipeShape): void {
+  private _handleInventoryRightClick(): void {
     if (this.gameState !== GameState.Playing) return;
-    // Right-clicking a selected inventory tile deselects it.
-    if (this.selectedShape === shape) {
+    // Right-clicking any inventory tile deselects the currently selected item.
+    if (this.selectedShape !== null) {
       this.selectedShape = null;
       this._renderInventoryBar();
       this.canvas.focus();
@@ -1131,8 +1134,10 @@ export class Game {
     const pathLength = this.board.getFilledPositions().size;
     this._flowMaxDrops = Math.max(10, pathLength * 5);
     const starsCollected = this.board.getStarsCollected();
+    const waterRemaining = this.board.getCurrentWater();
     this._markLevelCompleted(this.currentLevel.id);
     this._saveStars(this.currentLevel.id, starsCollected);
+    this._saveWater(this.currentLevel.id, waterRemaining);
     // Show star count on win modal when at least one star was connected
     if (this.winStarsEl) {
       if (starsCollected > 0) {
@@ -1425,6 +1430,16 @@ export class Game {
     if (!this.board) return;
 
     const pos = this._getGridPosFromEvent(e);
+
+    // Right-clicking outside the grid (including inventory bar and other UI): deselect.
+    if (pos.row < 0 || pos.row >= this.board.rows || pos.col < 0 || pos.col >= this.board.cols) {
+      if (this.selectedShape !== null) {
+        this.selectedShape = null;
+        this._renderInventoryBar();
+      }
+      return;
+    }
+
     const tile = this.board.getTile(pos);
 
     // Right-clicking an empty tile: clear any pending inventory selection.
@@ -2576,14 +2591,22 @@ export class Game {
     saveLevelStar(levelId, count, this._activeCampaign?.id);
   }
 
+  /** Save the water remaining for a level (no-op during playtesting; only records the max). */
+  private _saveWater(levelId: number, water: number): void {
+    if (this._playtestExitCallback) return; // don't persist progress during playtesting
+    saveLevelWater(levelId, water, this._activeCampaign?.id);
+  }
+
   /** Clear all level-completion progress and refresh the level list. */
   private _resetProgress(): void {
     if (this._activeCampaign) {
       clearCampaignProgress(this._activeCampaign.id, this._activeCampaignProgress);
       clearLevelStars(this._activeCampaign.id);
+      clearLevelWater(this._activeCampaign.id);
     } else {
       clearCompletedLevels(this.completedLevels);
       clearLevelStars();
+      clearLevelWater();
     }
     this._renderLevelList();
   }
