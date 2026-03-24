@@ -156,18 +156,39 @@ export function renderLevelList(
   } else {
     const h2 = document.createElement('h2');
     h2.textContent = 'Select a Level';
+    h2.style.textAlign = 'center';
     levelListEl.appendChild(h2);
   }
 
   // ── Active campaign header ─────────────────────────────────────────────────
   if (activeCampaign) {
+    // Campaign aggregate stats: compute before creating the header so the
+    // completion state can influence the box colour.
+    const allLevels = chapters.flatMap((ch) => ch.levels);
+    const { total: campaignStarTotal, collected: campaignStarCollected } =
+      chapterStarTotals(allLevels, levelStars);
+    const campaignWaterTotal = chapterWaterTotal(allLevels, completedLevels, levelWater);
+    const campaignChallengeTotal = allLevels.filter((l) => l.challenge).length;
+    const campaignChallengeCompleted = allLevels.filter((l) => l.challenge && completedLevels.has(l.id)).length;
+    const campaignNonChallengeTotal = allLevels.filter((l) => !l.challenge).length;
+    const campaignNonChallengeCompleted = allLevels.filter((l) => !l.challenge && completedLevels.has(l.id)).length;
+    const allNonChallengeCompleted = campaignNonChallengeTotal > 0 &&
+      campaignNonChallengeCompleted === campaignNonChallengeTotal;
+    const allStarsCompleted = campaignStarTotal === 0 || campaignStarCollected >= campaignStarTotal;
+    const allChallengesCompleted = campaignChallengeTotal === 0 || campaignChallengeCompleted >= campaignChallengeTotal;
+    const campaignAllComplete = allNonChallengeCompleted && allStarsCompleted && allChallengesCompleted;
+    const hasAnyCompletions = completedLevels.size > 0;
+
+    // Gold when every level, star, and challenge is done; white otherwise.
+    const headerAccentColor = campaignAllComplete ? '#f0c040' : '#ffffff';
+
     const header = document.createElement('div');
     header.style.cssText =
-      'background:#16213e;border:2px solid #f0c040;border-radius:8px;' +
+      'background:#16213e;border:2px solid ' + headerAccentColor + ';border-radius:8px;' +
       'padding:14px 16px;display:flex;flex-direction:column;gap:8px;';
 
     const titleEl = document.createElement('div');
-    titleEl.style.cssText = 'font-size:1.05rem;font-weight:bold;color:#f0c040;';
+    titleEl.style.cssText = 'font-size:1.05rem;font-weight:bold;color:' + headerAccentColor + ';';
     titleEl.textContent = `🎯 ${activeCampaign.name}`;
 
     const metaEl = document.createElement('div');
@@ -193,19 +214,6 @@ export function renderLevelList(
     header.appendChild(titleEl);
     header.appendChild(metaEl);
     header.appendChild(progressRow);
-
-    // Campaign aggregate stats: always show water, stars, and challenge progress when available.
-    const allLevels = chapters.flatMap((ch) => ch.levels);
-    const { total: campaignStarTotal, collected: campaignStarCollected } =
-      chapterStarTotals(allLevels, levelStars);
-    const campaignWaterTotal = chapterWaterTotal(allLevels, completedLevels, levelWater);
-    const campaignChallengeTotal = allLevels.filter((l) => l.challenge).length;
-    const campaignChallengeCompleted = allLevels.filter((l) => l.challenge && completedLevels.has(l.id)).length;
-    const campaignNonChallengeTotal = allLevels.filter((l) => !l.challenge).length;
-    const campaignNonChallengeCompleted = allLevels.filter((l) => !l.challenge && completedLevels.has(l.id)).length;
-    const allNonChallengeCompleted = campaignNonChallengeTotal > 0 &&
-      campaignNonChallengeCompleted === campaignNonChallengeTotal;
-    const hasAnyCompletions = completedLevels.size > 0;
 
     if (hasAnyCompletions) {
       const statsRow = document.createElement('div');
@@ -243,8 +251,25 @@ export function renderLevelList(
 
     // ── Continue button ────────────────────────────────────────────────────
     const continueId = findContinueLevelId(chapters, completedLevels, levelStars);
+
+    // Find the chapter and level number (1-based) for the continue target.
+    let continueChapterNum: number | null = null;
+    let continueLevelNum: number | null = null;
+    if (continueId !== null) {
+      for (let ci = 0; ci < chapters.length; ci++) {
+        const idx = chapters[ci].levels.findIndex((l) => l.id === continueId);
+        if (idx !== -1) {
+          continueChapterNum = ci + 1;
+          continueLevelNum = idx + 1;
+          break;
+        }
+      }
+    }
+
     const continueBtn = document.createElement('button');
-    continueBtn.textContent = '▶ Continue';
+    const continueLoc = (continueChapterNum !== null && continueLevelNum !== null)
+      ? ` (${continueChapterNum}-${continueLevelNum})` : '';
+    continueBtn.textContent = `▶ Continue${continueLoc}`;
     continueBtn.disabled = continueId === null;
     continueBtn.style.cssText =
       'padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:6px;' +
@@ -257,6 +282,9 @@ export function renderLevelList(
       continueBtn.addEventListener('click', () => startLevel(continueId));
     }
     header.appendChild(continueBtn);
+
+    // Attach the hover water-wave background animation (gold when fully complete).
+    attachChapterWaveAnimation(header, campaignAllComplete);
 
     levelListEl.appendChild(header);
   }
