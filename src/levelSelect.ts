@@ -307,11 +307,23 @@ export function renderLevelList(
     // Compute sum of water remaining for completed levels in this chapter
     const chapterWater = chapterWaterTotal(chapter.levels, completedLevels, levelWater);
 
+    // Determine chapter completion status for color coding:
+    //   Gold   – all non-challenge levels done AND all stars collected (or no stars).
+    //   Indigo – all non-challenge levels done but some stars remain.
+    const allStarsCollected = chapterStarTotal === 0 || chapterStarCollected >= chapterStarTotal;
+    const isGold   = !chapterLocked && allLevelsCompleted && allStarsCollected;
+    const isIndigo = !chapterLocked && allLevelsCompleted && !allStarsCollected;
+
+    const borderColor = chapterLocked ? '#555' : isGold ? '#f0c040' : isIndigo ? '#5c6bc0' : '#4a90d9';
+    const headerBg    = chapterLocked ? '#1e1e2e' : isGold ? '#1e1800' : isIndigo ? '#151030' : '#16213e';
+
     // ── Chapter container ──────────────────────────────────────────────────
     const chapterBox = document.createElement('div');
     chapterBox.classList.add('chapter-box');
+    if (isGold)   chapterBox.classList.add('chapter-gold');
+    if (isIndigo) chapterBox.classList.add('chapter-indigo');
     chapterBox.style.cssText =
-      'border:2px solid ' + (chapterLocked ? '#555' : '#4a90d9') + ';' +
+      'border:2px solid ' + borderColor + ';' +
       'border-radius:8px;overflow:hidden;';
 
     // ── Chapter header (click to expand/collapse) ──────────────────────────
@@ -321,7 +333,7 @@ export function renderLevelList(
     chapterHeader.style.cssText =
       'width:100%;display:flex;justify-content:space-between;align-items:center;' +
       'padding:12px 16px;font-size:1rem;font-weight:bold;' +
-      'background:' + (chapterLocked ? '#1e1e2e' : '#16213e') + ';' +
+      'background:' + headerBg + ';' +
       'color:' + (chapterLocked ? '#777' : '#eee') + ';' +
       'border:none;cursor:' + (chapterLocked ? 'default' : 'pointer') + ';' +
       'text-align:left;';
