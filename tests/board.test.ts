@@ -109,13 +109,16 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
   });
 
   it('_initFromLevel populates oneWayData from level def', () => {
+    // Use LevelDef-compatible structure cast via 'as any' since the test only
+    // exercises initialization of oneWayData and grid cell placement.
+    // The Source connections field is left out (defaults to all-4) to keep the fixture minimal.
     const level = {
       rows: 2,
       cols: 2,
       inventory: [],
       grid: [
-        [{ shape: PipeShape.Source, connections: [] as Direction[], capacity: 5 }, { shape: PipeShape.OneWay, rotation: 90 }],
-        [{ shape: PipeShape.Empty }, { shape: PipeShape.Sink, connections: [] as Direction[] }],
+        [{ shape: PipeShape.Source, capacity: 5 }, { shape: PipeShape.OneWay, rotation: 90 }],
+        [null, { shape: PipeShape.Sink }],
       ],
     };
     const board = new Board(2, 2, level as any);

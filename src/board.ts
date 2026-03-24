@@ -1824,7 +1824,6 @@ export class Board {
   }
 
   /**
-  /**
    * Check whether two adjacent tiles are mutually connected along the shared edge.
    * Returns false if a one-way tile at either position blocks flow in the travel direction.
    * @param fromPos - The position of the first tile.
