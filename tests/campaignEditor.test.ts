@@ -2563,6 +2563,15 @@ describe('getValidTileDefKeys', () => {
     expect(valid.has('dryingTime')).toBe(false);
   });
 
+  it('OneWay tile: shape + rotation valid (rotation encodes direction)', () => {
+    const tile: TileDef = { shape: PipeShape.OneWay, rotation: 90 };
+    const valid = getValidTileDefKeys(tile);
+    expect(valid.has('shape')).toBe(true);
+    expect(valid.has('rotation')).toBe(true);
+    expect(valid.has('capacity')).toBe(false);
+    expect(valid.has('dryingTime')).toBe(false);
+  });
+
   it('Cement tile: shape + dryingTime valid', () => {
     const tile: TileDef = { shape: PipeShape.Cement };
     const valid = getValidTileDefKeys(tile);
