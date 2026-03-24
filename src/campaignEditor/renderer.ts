@@ -213,6 +213,57 @@ export function renderEditorCanvas(
 
 // ─── Tile drawing ──────────────────────────────────────────────────────────────
 
+/** Draw the OneWay editor tile overlay (arrow + label + border) at canvas pixel (x, y). */
+function _drawOneWayEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, rotation: number): void {
+  const CELL = TILE_SIZE;
+  const rot = rotation as Rotation;
+  const dirs = [Direction.North, Direction.East, Direction.South, Direction.West];
+  const dir = dirs[rot / 90] ?? Direction.North;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const half = CELL / 2;
+  const angle = dir === Direction.East  ?  Math.PI / 2
+    : dir === Direction.South ?  Math.PI
+    : dir === Direction.West  ? -Math.PI / 2
+    : 0;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  const tipY      = -half * 0.72;
+  const headBaseY = -half * 0.28;
+  const botY      =  half * 0.30;
+  const headHalf  =  half * 0.62;
+  const shaftHalf =  half * 0.22;
+  ctx.beginPath();
+  ctx.moveTo(0, tipY);
+  ctx.lineTo( headHalf,  headBaseY);
+  ctx.lineTo( shaftHalf, headBaseY);
+  ctx.lineTo( shaftHalf, botY);
+  ctx.lineTo(-shaftHalf, botY);
+  ctx.lineTo(-shaftHalf, headBaseY);
+  ctx.lineTo(-headHalf,  headBaseY);
+  ctx.closePath();
+  ctx.fillStyle = ONE_WAY_ARROW_COLOR;
+  ctx.fill();
+  ctx.strokeStyle = ONE_WAY_ARROW_BORDER;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.restore();
+  // Label
+  ctx.save();
+  ctx.font = `bold ${_s(9)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  strokeFillText(ctx, 'ONE-WAY', cx, cy + half * 0.65);
+  ctx.restore();
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+}
+
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */
 export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef): void {
   const CELL = TILE_SIZE;
@@ -242,52 +293,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   // Handle OneWay: dark-red background with a direction arrow
   if (shape === PipeShape.OneWay) {
-    const rot = (def.rotation ?? 0) as Rotation;
-    const dirs = [Direction.North, Direction.East, Direction.South, Direction.West];
-    const dir = dirs[rot / 90] ?? Direction.North;
-    const cx = x + CELL / 2;
-    const cy = y + CELL / 2;
-    const half = CELL / 2;
-    const angle = dir === Direction.East  ?  Math.PI / 2
-      : dir === Direction.South ?  Math.PI
-      : dir === Direction.West  ? -Math.PI / 2
-      : 0;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(angle);
-    const tipY     = -half * 0.72;
-    const headBaseY = -half * 0.28;
-    const botY      =  half * 0.30;
-    const headHalf  =  half * 0.62;
-    const shaftHalf =  half * 0.22;
-    ctx.beginPath();
-    ctx.moveTo(0, tipY);
-    ctx.lineTo( headHalf,  headBaseY);
-    ctx.lineTo( shaftHalf, headBaseY);
-    ctx.lineTo( shaftHalf, botY);
-    ctx.lineTo(-shaftHalf, botY);
-    ctx.lineTo(-shaftHalf, headBaseY);
-    ctx.lineTo(-headHalf,  headBaseY);
-    ctx.closePath();
-    ctx.fillStyle = ONE_WAY_ARROW_COLOR;
-    ctx.fill();
-    ctx.strokeStyle = ONE_WAY_ARROW_BORDER;
-    ctx.lineWidth = _s(1.5);
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-    ctx.restore();
-    // Label
-    ctx.save();
-    ctx.font = `bold ${_s(9)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'ONE-WAY', cx, cy + half * 0.65);
-    ctx.restore();
-    ctx.strokeStyle = '#2a3a5e';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([]);
-    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    _drawOneWayEditorTile(ctx, x, y, def.rotation ?? 0);
     return;
   }
 
