@@ -37,6 +37,11 @@ export enum PipeShape {
   /** Cement – open background tile; any pipe may be placed here, but pipes placed on
    *  hardened cement (Drying Time = 0) may not be removed or rotated. */
   Cement = 'CEMENT',
+  /** One-way floor tile – background tile; pipe tiles may be placed on it.
+   *  Water flow into or out of this tile in the direction opposite to the
+   *  tile's indicated direction is prohibited.  The direction is encoded
+   *  in the tile's rotation (0°=North, 90°=East, 180°=South, 270°=West). */
+  OneWay = 'ONE_WAY',
   /** Gold space – background tile; only gold pipes may be placed here */
   GoldSpace = 'GOLD_SPACE',
   /** Gold straight pipe – behaves like Straight but may only be placed on gold spaces */

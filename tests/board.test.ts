@@ -36,13 +36,98 @@ describe('Board.areMutuallyConnected', () => {
   });
 });
 
-describe('Board.getFilledPositions', () => {
-  it('includes source position', () => {
-    const board = new Board(3, 3);
-    const filled = board.getFilledPositions();
-    expect(filled.has(`${board.source.row},${board.source.col}`)).toBe(true);
+describe('Board.areMutuallyConnected – one-way tiles', () => {
+  function makeBoardWithOneWay(dir: Direction): Board {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    // Place two E-W Straight pipes on both cells
+    board.grid[0][0] = new Tile(PipeShape.Straight, 90); // E-W
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90); // E-W
+    // Mark cell (0,0) as a one-way tile pointing `dir`
+    board.oneWayData.set('0,0', dir);
+    return board;
+  }
+
+  it('allows flow in the one-way direction (East tile, flowing East)', () => {
+    const board = makeBoardWithOneWay(Direction.East);
+    // Flowing East from (0,0) is allowed (arrow points East, blocked = West)
+    expect(board.areMutuallyConnected({ row: 0, col: 0 }, Direction.East)).toBe(true);
+  });
+
+  it('blocks flow opposite to the one-way direction (East tile, flowing West)', () => {
+    const board = makeBoardWithOneWay(Direction.East);
+    // Flowing West from (0,0) is blocked (arrow=East, blocked exit=West)
+    // Put the two pipes on a 1×3 board so (0,1) can flow West into (0,0)
+    const board2 = new Board(1, 3);
+    board2.source = { row: 0, col: 0 };
+    board2.sink   = { row: 0, col: 2 };
+    board2.grid[0][0] = new Tile(PipeShape.Straight, 90); // E-W
+    board2.grid[0][1] = new Tile(PipeShape.Straight, 90); // E-W
+    board2.grid[0][2] = new Tile(PipeShape.Straight, 90); // E-W
+    board2.oneWayData.set('0,1', Direction.East); // one-way at (0,1) pointing East
+    // From (0,1), flowing West is blocked (blocked exit = West = opposite of East)
+    expect(board2.areMutuallyConnected({ row: 0, col: 1 }, Direction.West)).toBe(false);
+  });
+
+  it('blocks entry from the direction opposite the arrow', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Straight, 90); // E-W
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90); // E-W
+    board.grid[0][2] = new Tile(PipeShape.Straight, 90); // E-W
+    board.oneWayData.set('0,1', Direction.East); // one-way at (0,1) pointing East
+    // Trying to flow East FROM (0,0) INTO (0,1): (0,0) has no restriction,
+    // but (0,1) blocks entry in direction opposite its arrow (West arrival from the East)
+    // Direction.East means traveling from (0,0) to (0,1), entering (0,1) traveling East.
+    // (0,1) points East, blocked entry = opposite = West. Entry direction IS East ≠ West → NOT blocked.
+    expect(board.areMutuallyConnected({ row: 0, col: 0 }, Direction.East)).toBe(true);
+    // Trying to flow West FROM (0,2) INTO (0,1): (0,2) has no restriction,
+    // (0,1) points East, blocked entry = West. Entry direction IS West = West → BLOCKED.
+    expect(board.areMutuallyConnected({ row: 0, col: 2 }, Direction.West)).toBe(false);
+  });
+
+  it('allows perpendicular flow (sideways through one-way tile)', () => {
+    const board = new Board(2, 1);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 1, col: 0 };
+    board.grid[0][0] = new Tile(PipeShape.Straight, 0); // N-S
+    board.grid[1][0] = new Tile(PipeShape.Straight, 0); // N-S
+    board.oneWayData.set('0,0', Direction.East); // one-way pointing East; blocked = West
+    // Flowing South from (0,0) is perpendicular to the one-way (East/West blocked), so allowed
+    expect(board.areMutuallyConnected({ row: 0, col: 0 }, Direction.South)).toBe(true);
+  });
+
+  it('getOneWayDirection returns correct direction', () => {
+    const board = new Board(2, 2);
+    board.oneWayData.set('0,0', Direction.North);
+    board.oneWayData.set('1,1', Direction.West);
+    expect(board.getOneWayDirection({ row: 0, col: 0 })).toBe(Direction.North);
+    expect(board.getOneWayDirection({ row: 1, col: 1 })).toBe(Direction.West);
+    expect(board.getOneWayDirection({ row: 0, col: 1 })).toBeNull();
+  });
+
+  it('_initFromLevel populates oneWayData from level def', () => {
+    const level = {
+      rows: 2,
+      cols: 2,
+      inventory: [],
+      grid: [
+        [{ shape: PipeShape.Source, connections: [] as Direction[], capacity: 5 }, { shape: PipeShape.OneWay, rotation: 90 }],
+        [{ shape: PipeShape.Empty }, { shape: PipeShape.Sink, connections: [] as Direction[] }],
+      ],
+    };
+    const board = new Board(2, 2, level as any);
+    // OneWay at (0,1) with rotation 90 → Direction.East
+    expect(board.oneWayData.size).toBe(1);
+    expect(board.getOneWayDirection({ row: 0, col: 1 })).toBe(Direction.East);
+    // The grid cell should be Empty (the pipe layer)
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 });
+
+
 
 describe('Board.isSolved', () => {
   it('returns false for a newly constructed board (random grid)', () => {

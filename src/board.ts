@@ -202,6 +202,14 @@ export class Board {
   inventory: InventoryItem[];
 
   /**
+   * Set of "row,col" keys that are one-way floor cells, mapped to the
+   * indicated flow direction.  Populated from the level definition.
+   * Never changes during play (pipe tiles placed on one-way cells do not
+   * alter the one-way direction).
+   */
+  oneWayData: Map<string, Direction>;
+
+  /**
    * Set of "row,col" keys that are gold space cells.
    * Populated from the level definition; never changes during play.
    */
@@ -332,6 +340,7 @@ export class Board {
     this.sink = { row: rows - 1, col: cols - 1 };
     this.sourceCapacity = 0;
     this.inventory = [];
+    this.oneWayData = new Map();
     this.goldSpaces = new Set();
     this.cementData = new Map();
 
@@ -362,6 +371,12 @@ export class Board {
         } else if (def.shape === PipeShape.GoldSpace) {
           // Gold spaces are tracked separately; the cell behaves like Empty
           this.goldSpaces.add(posKey(r, c));
+          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+        } else if (def.shape === PipeShape.OneWay) {
+          // One-way tiles are tracked separately; the cell behaves like Empty
+          const rot = (def.rotation ?? 0) as Rotation;
+          const owDir = ([Direction.North, Direction.East, Direction.South, Direction.West] as Direction[])[rot / 90];
+          this.oneWayData.set(posKey(r, c), owDir);
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else if (def.shape === PipeShape.Cement) {
           // Cement tiles are tracked separately; the cell behaves like Empty
@@ -1809,7 +1824,9 @@ export class Board {
   }
 
   /**
+  /**
    * Check whether two adjacent tiles are mutually connected along the shared edge.
+   * Returns false if a one-way tile at either position blocks flow in the travel direction.
    * @param fromPos - The position of the first tile.
    * @param dir - The direction from the first tile toward the second.
    */
@@ -1822,7 +1839,26 @@ export class Board {
     const to = this.getTile(toPos);
     if (!to) return false;
 
-    return to.connections.has(oppositeDirection(dir));
+    if (!to.connections.has(oppositeDirection(dir))) return false;
+
+    // One-way tile at fromPos: water cannot exit in the direction opposite the arrow.
+    const fromKey = posKey(fromPos.row, fromPos.col);
+    const fromOwDir = this.oneWayData.get(fromKey);
+    if (fromOwDir !== undefined && dir === oppositeDirection(fromOwDir)) return false;
+
+    // One-way tile at toPos: water cannot enter traveling in the direction opposite the arrow.
+    const toKey = posKey(toPos.row, toPos.col);
+    const toOwDir = this.oneWayData.get(toKey);
+    if (toOwDir !== undefined && dir === oppositeDirection(toOwDir)) return false;
+
+    return true;
+  }
+
+  /**
+   * Return the one-way direction of the cell at `pos`, or null if it is not a one-way tile.
+   */
+  getOneWayDirection(pos: GridPos): Direction | null {
+    return this.oneWayData.get(posKey(pos.row, pos.col)) ?? null;
   }
 
   /**

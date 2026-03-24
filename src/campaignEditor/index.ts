@@ -78,7 +78,7 @@ import { renderMinimap } from '../minimap';
 const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
-  PipeShape.GoldSpace, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
+  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
 ]);
 
@@ -1337,6 +1337,7 @@ export class CampaignEditor {
     { palette: PipeShape.Tree,      label: '🌿 Tree' },
     { palette: PipeShape.Cement,    label: '🪧 Cement' },
     { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
+    { palette: PipeShape.OneWay,    label: '→ One-Way' },
   ];
 
   /**
@@ -1474,7 +1475,7 @@ export class CampaignEditor {
     const p = this._editorPalette;
     const isChm = isChamberPalette(p);
     if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.GoldSpace ||
-        PIPE_SHAPES.has(p as PipeShape)) {
+        p === PipeShape.OneWay || PIPE_SHAPES.has(p as PipeShape)) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
       none.textContent = 'No parameters';
@@ -2437,6 +2438,7 @@ export class CampaignEditor {
 
     // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
     // GoldSpace, Granite, and Tree are connectionless background/block tiles with no rotation either.
+    // OneWay uses rotation to encode direction, so it is NOT in the noRotation set.
     const noRotation = new Set([
       PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
       PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree,

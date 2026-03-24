@@ -9,7 +9,7 @@ import { TILE_SIZE, drawSpinArrow, scalePx as _s } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES } from '../board';
-import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR } from '../colors';
+import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER } from '../colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
 
@@ -225,6 +225,8 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = chamberColor(chamberContent);
   } else if (shape === PipeShape.GoldSpace) {
     bgColor = '#b8860b';
+  } else if (shape === PipeShape.OneWay) {
+    bgColor = ONE_WAY_BG_COLOR;
   } else if (shape === PipeShape.Cement) {
     bgColor = CEMENT_FILL_COLOR;
   } else if (shape === PipeShape.Granite) {
@@ -237,6 +239,57 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   ctx.fillStyle = bgColor;
   ctx.fillRect(x, y, CELL, CELL);
+
+  // Handle OneWay: dark-red background with a direction arrow
+  if (shape === PipeShape.OneWay) {
+    const rot = (def.rotation ?? 0) as Rotation;
+    const dirs = [Direction.North, Direction.East, Direction.South, Direction.West];
+    const dir = dirs[rot / 90] ?? Direction.North;
+    const cx = x + CELL / 2;
+    const cy = y + CELL / 2;
+    const half = CELL / 2;
+    const angle = dir === Direction.East  ?  Math.PI / 2
+      : dir === Direction.South ?  Math.PI
+      : dir === Direction.West  ? -Math.PI / 2
+      : 0;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    const tipY     = -half * 0.72;
+    const headBaseY = -half * 0.28;
+    const botY      =  half * 0.30;
+    const headHalf  =  half * 0.62;
+    const shaftHalf =  half * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(0, tipY);
+    ctx.lineTo( headHalf,  headBaseY);
+    ctx.lineTo( shaftHalf, headBaseY);
+    ctx.lineTo( shaftHalf, botY);
+    ctx.lineTo(-shaftHalf, botY);
+    ctx.lineTo(-shaftHalf, headBaseY);
+    ctx.lineTo(-headHalf,  headBaseY);
+    ctx.closePath();
+    ctx.fillStyle = ONE_WAY_ARROW_COLOR;
+    ctx.fill();
+    ctx.strokeStyle = ONE_WAY_ARROW_BORDER;
+    ctx.lineWidth = _s(1.5);
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
+    // Label
+    ctx.save();
+    ctx.font = `bold ${_s(9)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'ONE-WAY', cx, cy + half * 0.65);
+    ctx.restore();
+    ctx.strokeStyle = '#2a3a5e';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    return;
+  }
 
   // Handle Cement directly (no Tile construction needed)
   if (shape === PipeShape.Cement) {
