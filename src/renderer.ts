@@ -3,7 +3,7 @@
  */
 
 import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
-import { Tile } from './tile';
+import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
@@ -35,6 +35,7 @@ import {
   STAR_COLOR, STAR_WATER_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR,
+  ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
 } from './colors';
 
 let LINE_WIDTH = 10; // pipe stroke width in px
@@ -50,6 +51,9 @@ const CEMENT_TARGET_OVERLAY = 'rgba(140,160,200,0.22)';
 
 /** Translucent gold overlay drawn over empty gold-space cells that are valid placement targets. */
 const GOLD_TARGET_OVERLAY = 'rgba(255,215,0,0.2)';
+
+/** Translucent red overlay drawn over empty one-way cells that are valid placement targets. */
+const ONE_WAY_TARGET_OVERLAY = 'rgba(220,60,60,0.22)';
 
 /** Border color used for error-highlighted sandstone tiles. */
 const ERROR_HIGHLIGHT_BORDER = '#ff2020';
@@ -353,6 +357,105 @@ function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/**
+ * Draw the one-way floor tile background: a dark-red cell with a large red
+ * directional arrow/chevron pointing in `dir`.
+ * The tile edge at pixel (x, y) is used as the top-left origin.
+ */
+function _drawOneWayBackground(ctx: CanvasRenderingContext2D, x: number, y: number, dir: Direction): void {
+  const half = TILE_SIZE / 2;
+  const cx = x + half;
+  const cy = y + half;
+
+  // Dark-red background
+  ctx.fillStyle = ONE_WAY_BG_COLOR;
+  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+
+  // Rotation angle: 0 = North (up), 90° CW = East, etc.
+  const angle = dir === Direction.East  ?  Math.PI / 2
+    : dir === Direction.South ?  Math.PI
+    : dir === Direction.West  ? -Math.PI / 2
+    : 0;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  // Arrow shape pointing "up" (North) in the local frame.
+  const tipY     = -half * 0.72;
+  const headBaseY = -half * 0.28;
+  const botY      =  half * 0.30;
+  const headHalf  =  half * 0.62;
+  const shaftHalf =  half * 0.22;
+
+  ctx.beginPath();
+  ctx.moveTo(0, tipY);
+  ctx.lineTo( headHalf,  headBaseY);
+  ctx.lineTo( shaftHalf, headBaseY);
+  ctx.lineTo( shaftHalf, botY);
+  ctx.lineTo(-shaftHalf, botY);
+  ctx.lineTo(-shaftHalf, headBaseY);
+  ctx.lineTo(-headHalf,  headBaseY);
+  ctx.closePath();
+  ctx.fillStyle = ONE_WAY_ARROW_COLOR;
+  ctx.fill();
+  ctx.strokeStyle = ONE_WAY_ARROW_BORDER;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Draw a single pipe arm from the tile centre to the tile edge in the given
+ * *absolute* direction, accounting for the tile's rotation so the line is
+ * placed correctly in the already-rotated canvas coordinate frame.
+ *
+ * Call this while the canvas is already translated to the tile centre and
+ * rotated by `tileRotation`.
+ *
+ * @param absDir      Absolute (world-space) direction of the arm.
+ * @param tileRotation The tile's rotation in degrees (0 / 90 / 180 / 270).
+ * @param half        Half the tile size in pixels.
+ * @param color       Stroke colour for this arm.
+ */
+function _drawPipeArmInRotatedFrame(
+  ctx: CanvasRenderingContext2D,
+  absDir: Direction,
+  tileRotation: number,
+  half: number,
+  color: string,
+): void {
+  // Convert the absolute direction to the local coordinate-system direction by
+  // rotating it CCW by (tileRotation / 90) steps.  The canvas coordinate frame
+  // is rotated CW by tileRotation, so we invert to find the local axis.
+  let localDir = absDir;
+  const steps = tileRotation / 90;
+  for (let i = 0; i < steps; i++) {
+    switch (localDir) {
+      case Direction.North: localDir = Direction.West;  break;
+      case Direction.West:  localDir = Direction.South; break;
+      case Direction.South: localDir = Direction.East;  break;
+      case Direction.East:  localDir = Direction.North; break;
+    }
+  }
+
+  let ex: number, ey: number;
+  switch (localDir) {
+    case Direction.North: ex =    0; ey = -half; break;
+    case Direction.South: ex =    0; ey =  half; break;
+    case Direction.East:  ex =  half; ey =    0; break;
+    default:              ex = -half; ey =    0; break; // West
+  }
+
+  ctx.strokeStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
 }
 
 /**
@@ -1078,6 +1181,7 @@ export function drawTile(
   lockedCost: number | null = null,
   lockedGain: number | null = null,
   isHovered = false,
+  blockedWaterDir: Direction | null = null,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -1094,12 +1198,24 @@ export function drawTile(
   ctx.lineWidth = LINE_WIDTH;
   ctx.lineCap = 'round';
 
+  // When a one-way tile's blocked exit direction applies and the tile has water,
+  // draw each pipe arm individually so the blocked arm can be shown without water.
+  const isBlockedPipe = blockedWaterDir !== null && isWater &&
+    (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape));
+
   if (shape === PipeShape.Empty) {
     // Draw a subtle dot so the tile is visually distinct from fixed tiles
     ctx.fillStyle = EMPTY_COLOR;
     ctx.beginPath();
     ctx.arc(0, 0, _s(4), 0, Math.PI * 2);
     ctx.fill();
+  } else if (isBlockedPipe) {
+    // Arm-by-arm drawing: blocked arm uses non-water colour; all others use water colour.
+    const dryColor = _resolveTileColor(tile, false, currentPressure);
+    for (const armDir of tile.connections) {
+      const armColor = armDir === blockedWaterDir ? dryColor : color;
+      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+    }
   } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
@@ -1429,6 +1545,8 @@ function _renderPass1Backgrounds(
       const isFocused  = focusPos.row === r && focusPos.col === c;
       const isGoldCell = board.goldSpaces.has(posKey(r, c));
       const isCementCell = board.cementData.has(posKey(r, c));
+      const oneWayDir = board.oneWayData.get(posKey(r, c));
+      const isOneWayCell = oneWayDir !== undefined;
 
       // A cell is a valid placement target when it's empty and either:
       // it's not a gold space (any pipe fits), or it IS a gold space (gold pipe required)
@@ -1443,7 +1561,24 @@ function _renderPass1Backgrounds(
         isReplaceableByShape(tile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
 
       // Tile background
-      if (isCementCell) {
+      if (isOneWayCell) {
+        // One-way cell: always show arrow background regardless of tile on top
+        _drawOneWayBackground(ctx, x, y, oneWayDir!);
+        if (isTarget) {
+          ctx.fillStyle = ONE_WAY_TARGET_OVERLAY;
+          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        }
+        if (isReplaceTarget) {
+          _drawCellTargetOverlay(ctx, x, y);
+        } else if (
+          selectedShape !== null &&
+          tile.shape !== PipeShape.Empty &&
+          tile.shape === selectedShape &&
+          tile.rotation === pendingRotation
+        ) {
+          _drawCellTargetOverlay(ctx, x, y);
+        }
+      } else if (isCementCell) {
         // Cement cell: always show cement background regardless of tile on top
         _drawCementBackground(ctx, x, y);
         if (isTarget) {
@@ -1545,10 +1680,9 @@ function _renderPass2NonPipeTiles(
       if (PIPE_SHAPES.has(tile.shape)) continue;
       const isCementCell = board.cementData.has(posKey(r, c));
 
-      // Skip drawing the empty-tile dot on cement cells – the cement background
-      // texture is already clearly visible and the label (pass 4) provides the
-      // setting-time indicator.
-      if (tile.shape === PipeShape.Empty && isCementCell) continue;
+      // Skip drawing the empty-tile dot on cement or one-way cells – their
+      // background texture/arrow is already clearly visible.
+      if (tile.shape === PipeShape.Empty && (isCementCell || board.oneWayData.has(posKey(r, c)))) continue;
 
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
@@ -1609,7 +1743,12 @@ function _renderPass3PipeTiles(
       const isWater = filled.has(posKey(r, c));
       const isHovered = r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(tile.shape);
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered);
+      // If this pipe sits on a one-way cell, derive the direction that is blocked
+      // for water rendering (the arm opposite to the one-way arrow).
+      const owDir = board.oneWayData.get(posKey(r, c));
+      const blockedWaterDir = owDir !== undefined ? oppositeDirection(owDir) : null;
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir);
     }
   }
 }

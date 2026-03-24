@@ -1786,6 +1786,11 @@ export class Game {
     if (this.board.goldSpaces.has(posKey(row, col))) {
       tooltipText += ' (gold space)';
     }
+    // Indicate one-way cell direction.
+    const oneWayDir = this.board.getOneWayDirection({ row, col });
+    if (oneWayDir !== null) {
+      tooltipText += ` (one-way ${oneWayDir})`;
+    }
     // Indicate cement cell status.
     const cementDryingTime = this.board.getCementDryingTime({ row, col });
     if (cementDryingTime !== null) {

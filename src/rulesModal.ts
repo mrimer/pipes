@@ -12,6 +12,7 @@ import {
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
   STAR_COLOR, HOT_PLATE_COLOR,
+  ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -103,6 +104,16 @@ function colorCircle(fill: string): string {
   );
 }
 
+/** Return a one-way tile icon (dark-red background with a red upward arrow) as an inline HTML string. */
+function oneWaySwatch(): string {
+  return (
+    `<svg width="28" height="28" viewBox="0 0 28 28">` +
+    `<rect x="2" y="2" width="24" height="24" rx="2" ry="2" fill="${ONE_WAY_BG_COLOR}" stroke="${ONE_WAY_ARROW_BORDER}" stroke-width="1.5"/>` +
+    `<polygon points="14,4 24,14 19,14 19,24 9,24 9,14 4,14" fill="${ONE_WAY_ARROW_COLOR}" stroke="${ONE_WAY_ARROW_BORDER}" stroke-width="1" stroke-linejoin="round"/>` +
+    `</svg>`
+  );
+}
+
 /** Controls reference table rows. */
 const CONTROL_ROWS: ControlRow[] = [
   { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
@@ -162,6 +173,11 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: cementSwatch(),
     name: 'Cement',
     description: 'Open background tile. Any pipe may be placed here. When Drying Time (T) = 0, placed pipes are hardened in cement and may not be removed or rotated. When T > 0, adjustments are allowed but decrement T by 1.',
+  },
+  {
+    iconHtml: oneWaySwatch(),
+    name: 'One-Way',
+    description: 'Open background tile — any pipe may be placed on it. Water cannot flow into or out of a pipe on this tile in the direction opposite the arrow. Perpendicular flow (sideways) is always permitted. The blocked pipe arm is displayed without water even when the tile is connected.',
   },
   {
     iconHtml: graniteSwatch(),

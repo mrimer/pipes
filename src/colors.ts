@@ -101,3 +101,9 @@ export const ANIM_POSITIVE_COLOR = '#4caf50';
 export const ANIM_NEGATIVE_COLOR = '#f44336';
 /** Colour for zero-value floating animation labels. */
 export const ANIM_ZERO_COLOR = '#9e9e9e';
+/** Dark red background for One-Way floor tiles. */
+export const ONE_WAY_BG_COLOR = '#2a0808';
+/** Red arrow fill colour for One-Way floor tiles. */
+export const ONE_WAY_ARROW_COLOR = '#c02020';
+/** Brighter red arrow border colour for One-Way floor tiles. */
+export const ONE_WAY_ARROW_BORDER = '#e84040';
