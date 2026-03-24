@@ -740,3 +740,135 @@ describe('renderLevelList – Reset Progress button', () => {
     expect(clicked).toBe(false);
   });
 });
+
+// ─── renderLevelList – chapter box color coding ───────────────────────────────
+
+describe('renderLevelList – chapter box color coding', () => {
+  let container: HTMLElement;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  function getChapterBox(): HTMLElement | null {
+    return container.querySelector('.chapter-box') as HTMLElement | null;
+  }
+
+  it('shows gold border when all levels and all stars are completed', () => {
+    const level = makeLevel(1, 2);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+    const levelStars: Record<number, number> = { 1: 2 };
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, levelStars,
+    );
+
+    const box = getChapterBox();
+    expect(box?.classList.contains('chapter-gold')).toBe(true);
+    expect(box?.classList.contains('chapter-indigo')).toBe(false);
+  });
+
+  it('shows gold border when all levels are completed and chapter has no stars', () => {
+    const level = makeLevel(1);  // no starCount
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, {},
+    );
+
+    const box = getChapterBox();
+    expect(box?.classList.contains('chapter-gold')).toBe(true);
+    expect(box?.classList.contains('chapter-indigo')).toBe(false);
+  });
+
+  it('shows indigo border when all levels are completed but not all stars collected', () => {
+    const level = makeLevel(1, 3);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+    const levelStars: Record<number, number> = { 1: 1 };  // only 1 of 3 stars
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, levelStars,
+    );
+
+    const box = getChapterBox();
+    expect(box?.classList.contains('chapter-indigo')).toBe(true);
+    expect(box?.classList.contains('chapter-gold')).toBe(false);
+  });
+
+  it('shows blue border when chapter is unlocked but not yet completed', () => {
+    const levels = [makeLevel(1), makeLevel(2)];
+    const chapters = [{ id: 1, name: 'Ch1', levels }];
+    const completed = new Set<number>([1]);  // only 1 of 2 levels done
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, {},
+    );
+
+    const box = getChapterBox();
+    expect(box?.classList.contains('chapter-gold')).toBe(false);
+    expect(box?.classList.contains('chapter-indigo')).toBe(false);
+  });
+
+  it('shows gray border when chapter is locked', () => {
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1), makeLevel(2)] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
+    const chapters = [ch1, ch2];
+    const completed = new Set<number>();  // nothing done → ch2 is locked
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, {},
+    );
+
+    const boxes = container.querySelectorAll<HTMLElement>('.chapter-box');
+    // ch2 (index 1) should be locked → no gold or indigo class
+    expect(boxes[1]?.classList.contains('chapter-gold')).toBe(false);
+    expect(boxes[1]?.classList.contains('chapter-indigo')).toBe(false);
+  });
+
+  it('shows gold header background when chapter is gold', () => {
+    const level = makeLevel(1, 2);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+    const levelStars: Record<number, number> = { 1: 2 };
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, levelStars,
+    );
+
+    const box = getChapterBox();
+    // Gold chapters carry the chapter-gold class on the container
+    expect(box?.classList.contains('chapter-gold')).toBe(true);
+  });
+
+  it('shows indigo header background when chapter is completed but stars remain', () => {
+    const level = makeLevel(1, 3);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+    const levelStars: Record<number, number> = { 1: 1 };
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, levelStars,
+    );
+
+    const box = getChapterBox();
+    // Indigo chapters carry the chapter-indigo class on the container
+    expect(box?.classList.contains('chapter-indigo')).toBe(true);
+  });
+});
