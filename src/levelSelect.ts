@@ -226,7 +226,7 @@ export function renderLevelList(
         statsRow.appendChild(waterEl);
       }
 
-      if (campaignStarTotal > 0) {
+      if (campaignStarTotal > 0 && campaignStarCollected > 0) {
         const starEl = document.createElement('span');
         starEl.style.color = '#f0c040';
         starEl.textContent = allNonChallengeCompleted
@@ -235,7 +235,7 @@ export function renderLevelList(
         statsRow.appendChild(starEl);
       }
 
-      if (campaignChallengeTotal > 0) {
+      if (campaignChallengeTotal > 0 && campaignChallengeCompleted > 0) {
         const challengeEl = document.createElement('span');
         challengeEl.style.color = '#e74c3c';
         challengeEl.textContent = allNonChallengeCompleted
