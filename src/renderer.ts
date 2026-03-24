@@ -1211,8 +1211,11 @@ export function drawTile(
     ctx.fill();
   } else if (isBlockedPipe) {
     // Arm-by-arm drawing: blocked arm uses non-water colour; all others use water colour.
+    // Draw blocked arms first so the unblocked (water) arms are painted on top at the
+    // tile centre, giving the correct visual appearance at the junction point.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
-    for (const armDir of tile.connections) {
+    const sortedArms = [...tile.connections].sort((a, b) => (a === blockedWaterDir ? -1 : b === blockedWaterDir ? 1 : 0));
+    for (const armDir of sortedArms) {
       const armColor = armDir === blockedWaterDir ? dryColor : color;
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
