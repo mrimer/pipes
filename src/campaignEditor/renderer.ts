@@ -8,7 +8,7 @@ import { PipeShape, TileDef, Direction, Rotation } from '../types';
 import { TILE_SIZE, drawSpinArrow, scalePx as _s } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
-import { PIPE_SHAPES, SPIN_PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER } from '../colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
@@ -500,29 +500,51 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     }
     drawConnectionLines(ctx, x, y, tile);
   } else {
-    // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants)
+    // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants, Leaky variants)
     const isGold = [PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross].includes(shape);
     const isSpin = SPIN_PIPE_SHAPES.has(shape);
-    ctx.fillStyle = isSpin ? '#192640' : (isGold ? '#b8860b' : '#1a2a4e');
+    const isLeaky = LEAKY_PIPE_SHAPES.has(shape);
+    ctx.fillStyle = isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
     ctx.fillRect(x, y, CELL, CELL);
     // Draw pipe lines
-    ctx.strokeStyle = isSpin ? '#7090c0' : (isGold ? '#ffd700' : '#4a90d9');
+    ctx.strokeStyle = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
     ctx.lineWidth = _s(8);
     ctx.lineCap = 'round';
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((tile.rotation * Math.PI) / 180);
     const h = CELL / 2;
-    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
+    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow) {
+    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.LeakyElbow) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee) {
+    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.LeakyTee) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-    } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross) {
+    } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross || shape === PipeShape.LeakyCross) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
+    }
+    // Draw rust spots on leaky pipes (two dots along each arm at 1/3 and 2/3)
+    if (isLeaky) {
+      ctx.fillStyle = '#7a2c10';
+      ctx.globalAlpha = 0.75;
+      const spotR = _s(3);
+      for (const dir of tile.connections) {
+        let dx = 0, dy = 0;
+        switch (dir) {
+          case Direction.North: dx =  0; dy = -1; break;
+          case Direction.South: dx =  0; dy =  1; break;
+          case Direction.East:  dx =  1; dy =  0; break;
+          case Direction.West:  dx = -1; dy =  0; break;
+        }
+        for (const frac of [0.33, 0.67]) {
+          ctx.beginPath();
+          ctx.arc(dx * h * frac, dy * h * frac, spotR, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
 

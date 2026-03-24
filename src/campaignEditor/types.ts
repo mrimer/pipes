@@ -34,6 +34,7 @@ const ROTATION_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+  PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee,
 ]);
 
 /**
@@ -157,23 +158,27 @@ export interface ValidationResult {
 // ─── Editor tile colors ────────────────────────────────────────────────────────
 
 export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
-  [PipeShape.Source]:       '#27ae60',
-  [PipeShape.Sink]:         '#2980b9',
-  [PipeShape.Straight]:     '#4a90d9',
-  [PipeShape.Elbow]:        '#4a90d9',
-  [PipeShape.Tee]:          '#4a90d9',
-  [PipeShape.Cross]:        '#4a90d9',
-  [PipeShape.Granite]:      '#636e72',
-  [PipeShape.Tree]:         '#2d6e1a',
-  [PipeShape.Cement]:       '#8090a0',
-  [PipeShape.GoldSpace]:    '#b8860b',
-  [PipeShape.GoldStraight]: '#f39c12',
-  [PipeShape.GoldElbow]:    '#f39c12',
-  [PipeShape.GoldTee]:      '#f39c12',
-  [PipeShape.GoldCross]:    '#f39c12',
-  [PipeShape.SpinStraight]: '#5a7fbf',
-  [PipeShape.SpinElbow]:    '#5a7fbf',
-  [PipeShape.SpinTee]:      '#5a7fbf',
+  [PipeShape.Source]:        '#27ae60',
+  [PipeShape.Sink]:          '#2980b9',
+  [PipeShape.Straight]:      '#4a90d9',
+  [PipeShape.Elbow]:         '#4a90d9',
+  [PipeShape.Tee]:           '#4a90d9',
+  [PipeShape.Cross]:         '#4a90d9',
+  [PipeShape.Granite]:       '#636e72',
+  [PipeShape.Tree]:          '#2d6e1a',
+  [PipeShape.Cement]:        '#8090a0',
+  [PipeShape.GoldSpace]:     '#b8860b',
+  [PipeShape.GoldStraight]:  '#f39c12',
+  [PipeShape.GoldElbow]:     '#f39c12',
+  [PipeShape.GoldTee]:       '#f39c12',
+  [PipeShape.GoldCross]:     '#f39c12',
+  [PipeShape.SpinStraight]:  '#5a7fbf',
+  [PipeShape.SpinElbow]:     '#5a7fbf',
+  [PipeShape.SpinTee]:       '#5a7fbf',
+  [PipeShape.LeakyStraight]: '#8b5c2a',
+  [PipeShape.LeakyElbow]:    '#8b5c2a',
+  [PipeShape.LeakyTee]:      '#8b5c2a',
+  [PipeShape.LeakyCross]:    '#8b5c2a',
 };
 
 export function chamberColor(content: string): string {

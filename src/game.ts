@@ -1,4 +1,4 @@
-import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR } from './colors';
@@ -19,11 +19,12 @@ import { CampaignEditor } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
 import {
-  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff,
+  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff, LeakySprayDrop,
   spawnSourceSprayDrop, renderSourceSpray,
   spawnDryPuff, renderDryPuffs,
   spawnFlowDrop, renderFlowDrops,
   spawnBubble, renderBubbles,
+  spawnLeakySprayDrop, renderLeakySpray,
   computeFlowGoodDirs,
 } from './visuals/waterParticles';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -38,6 +39,8 @@ const BUBBLE_SPAWN_INTERVAL_MS = 90;
 const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
 /** How often (ms) to spawn a vortex particle over a sink tile. */
 const VORTEX_SPAWN_INTERVAL_MS = 120;
+/** How often (ms) to spawn a leaky spray drop from connected leaky pipe tiles. */
+const LEAKY_SPRAY_SPAWN_INTERVAL_MS = 100;
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) before spawning star sparkles over the win modal star icon. */
@@ -256,6 +259,12 @@ export class Game {
 
   /** `performance.now()` of the last bubble spawn. */
   private _lastBubbleSpawn = 0;
+
+  /** Active leaky spray drops rendered over connected leaky pipe tiles. */
+  private _leakySprayDrops: LeakySprayDrop[] = [];
+
+  /** `performance.now()` of the last leaky spray drop spawn. */
+  private _lastLeakySpraySpawn = 0;
 
   /** Active vortex particles rendered over the sink tile. */
   private _vortexParticles: VortexParticle[] = [];
@@ -965,6 +974,7 @@ export class Game {
       renderAnimations(this.ctx, this._animations, this.canvas.width);
       this._tickSourceSpray();
       this._tickBubbles();
+      this._tickLeakySpray();
       this._tickWinFlow();
       this._tickVortex();
     }
@@ -1010,6 +1020,32 @@ export class Game {
       this._lastBubbleSpawn = now;
     }
     renderBubbles(this.ctx, this._bubbles, WATER_COLOR);
+  }
+
+  /**
+   * Spawn and render water-droplet spray particles from connected leaky pipe tiles.
+   * Only runs during normal play (not game-over or won state) when at least one
+   * leaky pipe is connected to the source.
+   */
+  private _tickLeakySpray(): void {
+    if (!this.board || this.gameState !== GameState.Playing) return;
+    const filledPositions = this.board.getFilledPositions();
+    // Check if any leaky pipe is in the fill path.
+    const hasLeakyPipe = [...filledPositions].some((key) => {
+      const [r, c] = parseKey(key);
+      const tile = this.board?.grid[r]?.[c];
+      return tile !== undefined && LEAKY_PIPE_SHAPES.has(tile.shape);
+    });
+    if (!hasLeakyPipe) {
+      this._leakySprayDrops = [];
+      return;
+    }
+    const now = performance.now();
+    if (now - this._lastLeakySpraySpawn >= LEAKY_SPRAY_SPAWN_INTERVAL_MS) {
+      spawnLeakySprayDrop(this._leakySprayDrops, this.board, filledPositions);
+      this._lastLeakySpraySpawn = now;
+    }
+    renderLeakySpray(this.ctx, this._leakySprayDrops, WATER_COLOR);
   }
 
   /** Spawn and render the win-flow drops (only active in the Won state). */
@@ -1355,6 +1391,7 @@ export class Game {
     this._dryPuffs = [];
     this._flowDrops = [];
     this._bubbles = [];
+    this._leakySprayDrops = [];
     this._vortexParticles = [];
     this._flowGoodDirs = null;
   }

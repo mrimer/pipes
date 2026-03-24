@@ -8,7 +8,8 @@
  *                   indicate liquid is flowing through the connected network.
  */
 
-import { Board, NEIGHBOUR_DELTA, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
+import { Board, NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
+import { oppositeDirection } from '../tile';
 import { Direction, GridPos } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
 
@@ -553,6 +554,148 @@ export function renderBubbles(
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.lineWidth = _s(0.8);
     ctx.stroke();
+    ctx.restore();
+
+    i++;
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Leaky Pipe Spray
+// ──────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A single water drop spraying outward from a rusty spot on a leaky pipe.
+ * Similar to {@link SourceSprayDrop} but anchored to a specific point along
+ * a pipe arm rather than the source tile centre.
+ */
+export interface LeakySprayDrop {
+  /** Canvas pixel X origin of the spray spot. */
+  originX: number;
+  /** Canvas pixel Y origin of the spray spot. */
+  originY: number;
+  /** Direction angle in radians (0 = right, π/2 = down, etc.). */
+  angle: number;
+  /** Current distance from the origin in pixels. */
+  distance: number;
+  /** Movement speed in pixels per frame at ~60 fps. */
+  speed: number;
+  /** Half-length (along the travel axis) of the drop ellipse, in pixels. */
+  size: number;
+}
+
+/** Distance at which a leaky spray drop is fully transparent and removed. */
+function _leakySprayMaxDist(): number { return TILE_SIZE * 0.4; }
+
+/** Maximum number of simultaneously live leaky spray drops across all leaky pipes. */
+const LEAKY_SPRAY_MAX_DROPS = 40;
+
+/**
+ * Attempt to add one new leaky spray drop originating from a rust spot on a
+ * randomly chosen connected leaky pipe arm.
+ *
+ * @param drops          Mutable array of active leaky spray drops.
+ * @param board          The current game board.
+ * @param filledPositions Pre-computed set of connected tile keys ("row,col").
+ */
+export function spawnLeakySprayDrop(
+  drops: LeakySprayDrop[],
+  board: Board,
+  filledPositions: Set<string>,
+): void {
+  if (drops.length >= LEAKY_SPRAY_MAX_DROPS) return;
+
+  // Collect candidate (position, direction) pairs: non-blocked arms of connected leaky pipes.
+  const candidates: Array<{ cx: number; cy: number; armAngle: number }> = [];
+
+  for (const key of filledPositions) {
+    const [r, c] = parseKey(key);
+    const tile = board.grid[r]?.[c];
+    if (!tile || !LEAKY_PIPE_SHAPES.has(tile.shape)) continue;
+
+    const tileCx = c * TILE_SIZE + TILE_SIZE / 2;
+    const tileCy = r * TILE_SIZE + TILE_SIZE / 2;
+    const half = TILE_SIZE / 2;
+
+    // Determine the blocked arm (if on a one-way tile).
+    const owDir = board.oneWayData.get(key);
+    const blockedDir = owDir !== undefined ? oppositeDirection(owDir) : null;
+
+    for (const dir of tile.connections) {
+      if (dir === blockedDir) continue;
+
+      let dx = 0, dy = 0, armAngle = 0;
+      switch (dir) {
+        case Direction.North: dx =  0; dy = -1; armAngle = -Math.PI / 2; break;
+        case Direction.South: dx =  0; dy =  1; armAngle =  Math.PI / 2; break;
+        case Direction.East:  dx =  1; dy =  0; armAngle =  0;           break;
+        case Direction.West:  dx = -1; dy =  0; armAngle =  Math.PI;     break;
+      }
+
+      // Two rust spots at 1/3 and 2/3 along the arm (matching _drawLeakyRustSpots).
+      for (const frac of [0.33, 0.67]) {
+        candidates.push({
+          cx: tileCx + dx * half * frac,
+          cy: tileCy + dy * half * frac,
+          armAngle,
+        });
+      }
+    }
+  }
+
+  if (candidates.length === 0) return;
+
+  const { cx, cy, armAngle } = candidates[Math.floor(Math.random() * candidates.length)];
+
+  // Spray roughly perpendicular to the arm, with some angular spread.
+  const perpAngle = armAngle + Math.PI / 2;
+  const spread = (Math.PI / 3) * (Math.random() - 0.5) * 2; // ±60°
+  drops.push({
+    originX: cx,
+    originY: cy,
+    angle: perpAngle + spread,
+    distance: 0,
+    speed: _s(0.4 + Math.random() * 0.6),
+    size: _s(2 + Math.random() * 2.5),
+  });
+}
+
+/**
+ * Advance and render all leaky spray drops, then remove expired ones.
+ *
+ * @param ctx    2D rendering context.
+ * @param drops  Mutable array of active leaky spray drops (modified in place).
+ * @param color  CSS colour string for the drops.
+ */
+export function renderLeakySpray(
+  ctx: CanvasRenderingContext2D,
+  drops: LeakySprayDrop[],
+  color: string,
+): void {
+  let i = 0;
+  const maxDist = _leakySprayMaxDist();
+  while (i < drops.length) {
+    const drop = drops[i];
+    drop.distance += drop.speed;
+    if (drop.distance >= maxDist) {
+      drops.splice(i, 1);
+      continue;
+    }
+
+    const x = drop.originX + Math.cos(drop.angle) * drop.distance;
+    const y = drop.originY + Math.sin(drop.angle) * drop.distance;
+
+    const progress = drop.distance / maxDist;
+    const alpha = 0.7 * (1 - progress);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x, y);
+    ctx.rotate(drop.angle + Math.PI / 2);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, drop.size * 0.5, drop.size, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
 
     i++;

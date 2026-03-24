@@ -32,6 +32,7 @@ import {
   STAR_COLOR,
   TREE_COLOR,
   ONE_WAY_BG_COLOR,
+  LEAKY_PIPE_COLOR,
 } from './colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
@@ -56,6 +57,11 @@ function tileColor(tile: TileDef | null): string {
     case PipeShape.SpinElbow:
     case PipeShape.SpinTee:
       return SPIN_PIPE_COLOR;
+    case PipeShape.LeakyStraight:
+    case PipeShape.LeakyElbow:
+    case PipeShape.LeakyTee:
+    case PipeShape.LeakyCross:
+      return LEAKY_PIPE_COLOR;
     case PipeShape.Source:
       return SOURCE_COLOR;
     case PipeShape.Sink:
@@ -102,6 +108,7 @@ const PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+  PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
 ]);
 
 /**
@@ -116,6 +123,10 @@ function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
   if (shape === PipeShape.SpinStraight || shape === PipeShape.SpinElbow ||
       shape === PipeShape.SpinTee) {
     return { bg: EMPTY_COLOR, line: SPIN_PIPE_COLOR };
+  }
+  if (shape === PipeShape.LeakyStraight || shape === PipeShape.LeakyElbow ||
+      shape === PipeShape.LeakyTee || shape === PipeShape.LeakyCross) {
+    return { bg: EMPTY_COLOR, line: LEAKY_PIPE_COLOR };
   }
   return { bg: EMPTY_COLOR, line: PIPE_COLOR };
 }

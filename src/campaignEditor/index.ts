@@ -46,7 +46,7 @@ const EDITOR_PANEL_BASE_CSS =
   'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
 /** CSS for the all-caps section-title label inside an editor side-panel. */
 const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
-import { Board, PIPE_SHAPES, parseKey } from '../board';
+import { Board, PIPE_SHAPES, LEAKY_PIPE_SHAPES, parseKey } from '../board';
 import {
   EditorPalette,
   EditorScreen,
@@ -78,6 +78,7 @@ import { renderMinimap } from '../minimap';
 const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+  PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
   PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
 ]);
@@ -113,6 +114,7 @@ export class CampaignEditor {
   private _editorHistory: EditorSnapshot[] = [];
   private _editorHistoryIdx = -1;
   private _goldSectionExpanded = false;
+  private _leakySectionExpanded = false;
   private _chamberSectionExpanded = false;
   private _pipesSectionExpanded = false;
   private _floorSectionExpanded = false;
@@ -1332,6 +1334,13 @@ export class CampaignEditor {
     { palette: PipeShape.GoldCross,    label: '╋ Gold Cross' },
   ];
 
+  private readonly _LEAKY_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+    { palette: PipeShape.LeakyStraight, label: '━ Leaky Straight' },
+    { palette: PipeShape.LeakyElbow,    label: '┗ Leaky Elbow' },
+    { palette: PipeShape.LeakyTee,      label: '┣ Leaky Tee' },
+    { palette: PipeShape.LeakyCross,    label: '╋ Leaky Cross' },
+  ];
+
   private readonly _FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
     { palette: PipeShape.Granite,   label: '▪ Granite' },
     { palette: PipeShape.Tree,      label: '🌿 Tree' },
@@ -1384,9 +1393,12 @@ export class CampaignEditor {
     panel.appendChild(title);
 
     const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
+    const isLeakySelected = this._LEAKY_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
     const isFloorSelected = this._FLOOR_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
     // Auto-expand the gold section if a gold item is currently selected
     if (isGoldSelected) this._goldSectionExpanded = true;
+    // Auto-expand the leaky section if a leaky item is currently selected
+    if (isLeakySelected) this._leakySectionExpanded = true;
     // Auto-expand the floor section if a floor item is currently selected
     if (isFloorSelected) this._floorSectionExpanded = true;
     // Auto-expand the chamber section if a chamber item is currently selected
@@ -1431,7 +1443,7 @@ export class CampaignEditor {
       panel.appendChild(makeItemBtn(item));
     }
 
-    // Collapsible sections: Floor, Pipes, Gold, Blocks (chambers)
+    // Collapsible sections: Floor, Pipes, Gold, Leaky, Blocks (chambers)
     this._buildCollapsibleSection(
       panel, 'Floor', this._floorSectionExpanded,
       () => { this._floorSectionExpanded = !this._floorSectionExpanded; panel.replaceWith(this._buildPalette()); },
@@ -1446,6 +1458,11 @@ export class CampaignEditor {
       panel, 'Gold', this._goldSectionExpanded,
       () => { this._goldSectionExpanded = !this._goldSectionExpanded; panel.replaceWith(this._buildPalette()); },
       '#b8860b', '#1a1400', '#ffd700', this._GOLD_PALETTE_ITEMS, makeItemBtn,
+    );
+    this._buildCollapsibleSection(
+      panel, 'Leaky', this._leakySectionExpanded,
+      () => { this._leakySectionExpanded = !this._leakySectionExpanded; panel.replaceWith(this._buildPalette()); },
+      '#7a2c10', '#1a0c08', '#b07840', this._LEAKY_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
       panel, 'Blocks', this._chamberSectionExpanded,
@@ -1643,7 +1660,8 @@ export class CampaignEditor {
       'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
       'border:1px solid #4a90d9;border-radius:4px;flex:1;';
     for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
-                       PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross]) {
+                       PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+                       PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross]) {
       const o = document.createElement('option');
       o.value = shp;
       o.textContent = shp;
@@ -1863,7 +1881,8 @@ export class CampaignEditor {
       'padding:4px 6px;font-size:0.8rem;background:#0d1a30;color:#eee;' +
       'border:1px solid #4a90d9;border-radius:4px;flex:1;';
     for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
-                       PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross]) {
+                       PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+                       PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross]) {
       const o = document.createElement('option');
       o.value = shp;
       o.textContent = shp;
