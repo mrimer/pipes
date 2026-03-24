@@ -541,27 +541,74 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
   const lineLeft = -bw + _s(4);
   const lineRight = bw - _s(4);
   const lineSpan = lineRight - lineLeft;
+  const numLines = 3;
+  const lineSpacing = _s(3.5);
+  const topY = -bh + _s(4);
   if (isCooler) {
-    // Cooler: thin horizontal wind lines near top
-    for (let i = 0; i < 3; i++) {
-      const lineY = -bh + _s(4) + i * _s(3.5);
-      const hw = (lineSpan - i * _s(5)) / 2;
+    if (isWater) {
+      // Animated: wind lines scroll downward, shrinking in width as they descend.
+      // A new line at full width appears at the top each time one exits the bottom.
+      const COOLER_SCROLL_MS = 2000;
+      const widthDelta = _s(5);
+      const offset = (Date.now() % COOLER_SCROLL_MS) / COOLER_SCROLL_MS * lineSpacing;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(-hw, lineY);
-      ctx.lineTo(hw, lineY);
-      ctx.stroke();
+      ctx.rect(lineLeft, topY - _s(1), lineSpan, (numLines - 1) * lineSpacing + _s(2));
+      ctx.clip();
+      // Draw numLines+1 lines: k=0 enters from above, k=numLines exits below.
+      for (let k = 0; k <= numLines; k++) {
+        const lineY = topY + (k - 1) * lineSpacing + offset;
+        const slotFrac = (lineY - topY) / lineSpacing;
+        const hw = (lineSpan - slotFrac * widthDelta) / 2;
+        if (hw <= 0) continue;
+        ctx.beginPath();
+        ctx.moveTo(-hw, lineY);
+        ctx.lineTo(hw, lineY);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      // Static: thin horizontal wind lines near top
+      for (let i = 0; i < numLines; i++) {
+        const lineY = topY + i * lineSpacing;
+        const hw = (lineSpan - i * _s(5)) / 2;
+        ctx.beginPath();
+        ctx.moveTo(-hw, lineY);
+        ctx.lineTo(hw, lineY);
+        ctx.stroke();
+      }
     }
   } else {
-    // Heater: 3 short, thin wavy heat lines near the top
-    for (let i = 0; i < 3; i++) {
-      const lineY = -bh + _s(4) + i * _s(3.5);
-      const xMid = 0;
-      const xQuart = lineSpan / 4;
+    const xMid = 0;
+    const xQuart = lineSpan / 4;
+    if (isWater) {
+      // Animated: wavy heat lines scroll upwards and wrap vertically within the region.
+      const HEATER_SCROLL_MS = 1500;
+      const offset = (Date.now() % HEATER_SCROLL_MS) / HEATER_SCROLL_MS * lineSpacing;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(lineLeft, lineY);
-      ctx.quadraticCurveTo(lineLeft + xQuart, lineY - _s(2.5), xMid, lineY);
-      ctx.quadraticCurveTo(xMid + xQuart, lineY + _s(2.5), lineRight, lineY);
-      ctx.stroke();
+      ctx.rect(lineLeft, topY - _s(3), lineSpan, (numLines - 1) * lineSpacing + _s(6));
+      ctx.clip();
+      // Draw numLines+1 lines so the region stays filled as lines exit the top.
+      for (let k = 0; k <= numLines; k++) {
+        const lineY = topY + k * lineSpacing - offset;
+        ctx.beginPath();
+        ctx.moveTo(lineLeft, lineY);
+        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - _s(2.5), xMid, lineY);
+        ctx.quadraticCurveTo(xMid + xQuart, lineY + _s(2.5), lineRight, lineY);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      // Static: 3 short, thin wavy heat lines near the top
+      for (let i = 0; i < numLines; i++) {
+        const lineY = topY + i * lineSpacing;
+        ctx.beginPath();
+        ctx.moveTo(lineLeft, lineY);
+        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - _s(2.5), xMid, lineY);
+        ctx.quadraticCurveTo(xMid + xQuart, lineY + _s(2.5), lineRight, lineY);
+        ctx.stroke();
+      }
     }
   }
   ctx.fillStyle = heaterBaseColor;
@@ -613,26 +660,62 @@ function _drawChamberPumpContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   if (isVacuum) {
     // Vacuum: simple vortex swirl near the top
     const swirlY = -bh + _s(9);
-    ctx.beginPath();
-    ctx.arc(0, swirlY, _s(7), 0, Math.PI * 1.5);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, swirlY, _s(3.5), Math.PI * 0.5, Math.PI * 2);
-    ctx.stroke();
+    if (isWater) {
+      // Animated: swirl arcs rotate slowly in place
+      const SWIRL_PERIOD_MS = 3000;
+      const rotAngle = (Date.now() % SWIRL_PERIOD_MS) / SWIRL_PERIOD_MS * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(0, swirlY, _s(7), rotAngle, rotAngle + Math.PI * 1.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, swirlY, _s(3.5), rotAngle + Math.PI * 0.5, rotAngle + Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // Static swirl
+      ctx.beginPath();
+      ctx.arc(0, swirlY, _s(7), 0, Math.PI * 1.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, swirlY, _s(3.5), Math.PI * 0.5, Math.PI * 2);
+      ctx.stroke();
+    }
   } else {
     // Pump: series of thin chevrons in a horizontal line near the top
     const chevY = -bh + _s(7);
     const chevH = _s(4);
     const chevSpacing = _s(7);
     const numChev = 4;
-    const chevStartX = -(numChev - 1) * chevSpacing / 2;
-    for (let i = 0; i < numChev; i++) {
-      const chx = chevStartX + i * chevSpacing;
+    if (isWater) {
+      // Animated: chevrons scroll slowly to the right and wrap horizontally within the tile
+      const PUMP_SCROLL_MS = 1500;
+      const offset = (Date.now() % PUMP_SCROLL_MS) / PUMP_SCROLL_MS * chevSpacing;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(chx - _s(2.5), chevY - chevH);
-      ctx.lineTo(chx + _s(2.5), chevY);
-      ctx.lineTo(chx - _s(2.5), chevY + chevH);
-      ctx.stroke();
+      ctx.rect(-bw + _s(2), chevY - chevH - _s(2), bw * 2 - _s(4), chevH * 2 + _s(4));
+      ctx.clip();
+      const visibleWidth = bw * 2 - _s(4);
+      const numDraw = Math.ceil(visibleWidth / chevSpacing) + 2;
+      const startX = -bw + _s(2) - chevSpacing + offset;
+      for (let i = 0; i < numDraw; i++) {
+        const chx = startX + i * chevSpacing;
+        ctx.beginPath();
+        ctx.moveTo(chx - _s(2.5), chevY - chevH);
+        ctx.lineTo(chx + _s(2.5), chevY);
+        ctx.lineTo(chx - _s(2.5), chevY + chevH);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      // Static chevrons
+      const chevStartX = -(numChev - 1) * chevSpacing / 2;
+      for (let i = 0; i < numChev; i++) {
+        const chx = chevStartX + i * chevSpacing;
+        ctx.beginPath();
+        ctx.moveTo(chx - _s(2.5), chevY - chevH);
+        ctx.lineTo(chx + _s(2.5), chevY);
+        ctx.lineTo(chx - _s(2.5), chevY + chevH);
+        ctx.stroke();
+      }
     }
   }
   ctx.fillStyle = pumpBaseColor;
