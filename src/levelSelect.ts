@@ -2,6 +2,7 @@
 
 import { ChapterDef } from './types';
 import { renderMinimap } from './minimap';
+import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -382,6 +383,8 @@ export function renderLevelList(
         levelsContainer.style.display = expanded ? 'flex' : 'none';
         chevron.textContent = expanded ? '▲' : '▼';
       });
+      // Attach the hover water-wave background animation for interactive chapters.
+      attachChapterWaveAnimation(chapterHeader, isGold);
     }
 
     // ── Level buttons ──────────────────────────────────────────────────────
