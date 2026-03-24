@@ -177,7 +177,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: oneWaySwatch(),
     name: 'One-Way',
-    description: 'Open background tile — any pipe may be placed on it. Water cannot flow into or out of a pipe on this tile in the direction opposite the arrow. Perpendicular flow (sideways) is always permitted. The blocked pipe arm is displayed without water even when the tile is connected.',
+    description: 'Open background tile — any pipe may be placed on it. Water cannot flow into or out of a pipe on this tile in the direction opposite the arrow. Perpendicular flow (sideways) is always permitted. Blocked pipe arms are displayed without water even when connected.',
   },
   {
     iconHtml: graniteSwatch(),
