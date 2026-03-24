@@ -412,7 +412,9 @@ export function renderLevelList(
         chevron.textContent = expanded ? '▲' : '▼';
       });
       // Attach the hover water-wave background animation for interactive chapters.
-      attachChapterWaveAnimation(chapterHeader, isGold);
+      // The trigger is the whole chapter box so hovering anywhere (header or
+      // levels list) activates the animation.
+      attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
     }
 
     // ── Level buttons ──────────────────────────────────────────────────────
