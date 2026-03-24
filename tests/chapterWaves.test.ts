@@ -163,6 +163,34 @@ describe('attachChapterWaveAnimation', () => {
     expect(events).toContain('mouseleave');
   });
 
+  it('attaches hover listeners to triggerEl instead of headerEl when triggerEl is provided', () => {
+    const header  = document.createElement('button');
+    const trigger = document.createElement('div');
+    const headerSpy  = jest.spyOn(header,  'addEventListener');
+    const triggerSpy = jest.spyOn(trigger, 'addEventListener');
+
+    attachChapterWaveAnimation(header, false, trigger);
+
+    const headerEvents  = headerSpy.mock.calls.map((call) => call[0]);
+    const triggerEvents = triggerSpy.mock.calls.map((call) => call[0]);
+
+    // Hover events must be on the trigger element, not the header.
+    expect(triggerEvents).toContain('mouseenter');
+    expect(triggerEvents).toContain('mouseleave');
+    expect(headerEvents).not.toContain('mouseenter');
+    expect(headerEvents).not.toContain('mouseleave');
+  });
+
+  it('appends canvas to headerEl even when triggerEl is provided', () => {
+    const header  = document.createElement('button');
+    const trigger = document.createElement('div');
+
+    attachChapterWaveAnimation(header, false, trigger);
+
+    expect(header.lastChild).toBeInstanceOf(HTMLCanvasElement);
+    expect(trigger.childElementCount).toBe(0);
+  });
+
   it('works with isGold = true without throwing', () => {
     const header = document.createElement('button');
     expect(() => attachChapterWaveAnimation(header, true)).not.toThrow();

@@ -101,10 +101,13 @@ export function _heightToRgb(h: number, isGold: boolean): [number, number, numbe
  * idle, the canvas displays the static background color so the header looks
  * identical to its original appearance.
  *
- * @param headerEl  The chapter header `<button>` element.
+ * @param headerEl  The element that receives the animated canvas as a child.
  * @param isGold    `true` when the chapter is fully completed (gold colour scheme).
+ * @param triggerEl Optional element whose hover events start/stop the animation.
+ *                  Defaults to `headerEl` when omitted.
  */
-export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolean): void {
+export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolean, triggerEl?: HTMLElement): void {
+  const hoverEl = triggerEl ?? headerEl;
   // The background colour shown while the animation is not running.
   const staticBg = isGold ? '#1e1800' : '#16213e';
 
@@ -247,13 +250,13 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   }
 
   // ── Hover handlers ──────────────────────────────────────────────────────────
-  headerEl.addEventListener('mouseenter', () => {
+  hoverEl.addEventListener('mouseenter', () => {
     if (animId === null) {
       animId = requestAnimationFrame(_frame);
     }
   });
 
-  headerEl.addEventListener('mouseleave', () => {
+  hoverEl.addEventListener('mouseleave', () => {
     if (animId !== null) {
       cancelAnimationFrame(animId);
       animId = null;
