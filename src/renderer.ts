@@ -412,13 +412,44 @@ function _drawChamberTankContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   const wy = -bh + _s(7);
   const wLeft = -bw + _s(4);
   const wRight = bw - _s(4);
-  const wMid = 0;
-  const wQuart = (wRight - wLeft) / 4;
-  ctx.beginPath();
-  ctx.moveTo(wLeft, wy);
-  ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
-  ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
-  ctx.stroke();
+  const waveWidth = wRight - wLeft;
+  if (isWater) {
+    // Animated scrolling wave when connected: scrolls horizontally and wraps around,
+    // giving the impression of water moving smoothly inside the tank.
+    const WAVE_PERIOD_MS = 2000; // one full scroll cycle in milliseconds
+    const offset = (Date.now() % WAVE_PERIOD_MS) / WAVE_PERIOD_MS * waveWidth;
+    ctx.save();
+    // Clip to the wave strip so the wrapping seam is hidden
+    ctx.beginPath();
+    ctx.rect(wLeft, wy - _s(5), waveWidth, _s(10));
+    ctx.clip();
+    // Draw enough wave periods starting at (wLeft - offset) so the visible
+    // strip [wLeft, wRight] is always fully covered regardless of scroll position.
+    // Two shifted copies suffice; one extra is included as a safety margin.
+    const WAVE_COPIES = 3;
+    const startX = wLeft - offset;
+    ctx.beginPath();
+    for (let i = 0; i < WAVE_COPIES; i++) {
+      const x0 = startX + i * waveWidth;
+      const xMid = x0 + waveWidth / 2;
+      const xEnd = x0 + waveWidth;
+      const wQuart = waveWidth / 4;
+      if (i === 0) ctx.moveTo(x0, wy);
+      ctx.quadraticCurveTo(x0 + wQuart, wy - _s(3), xMid, wy);
+      ctx.quadraticCurveTo(xMid + wQuart, wy + _s(3), xEnd, wy);
+    }
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    // Static wave when not connected
+    const wMid = 0;
+    const wQuart = waveWidth / 4;
+    ctx.beginPath();
+    ctx.moveTo(wLeft, wy);
+    ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
+    ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
+    ctx.stroke();
+  }
   // Show capacity number in tank-like color
   ctx.fillStyle = tankDecorColor;
   ctx.font = `bold ${_s(14)}px Arial`;
