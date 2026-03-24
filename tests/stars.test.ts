@@ -648,6 +648,20 @@ describe('renderLevelList – no-campaign / campaign header', () => {
     expect(h2?.textContent).toBe('Select a Level');
   });
 
+  it('"Select a Level" h2 is centered', () => {
+    const chapters = [{ id: 1, name: 'Ch1', levels: [] }];
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      { name: 'My Campaign', author: 'Author', completionPct: 0 },
+      chapters,
+    );
+
+    const h2 = container.querySelector('h2') as HTMLElement;
+    expect(h2).not.toBeNull();
+    expect(h2.style.textAlign).toBe('center');
+  });
+
   it('does not show "Select a Level" h2 when no activeCampaign is provided', () => {
     renderLevelList(
       container, new Set<number>(),
@@ -870,5 +884,170 @@ describe('renderLevelList – chapter box color coding', () => {
     const box = getChapterBox();
     // Indigo chapters carry the chapter-indigo class on the container
     expect(box?.classList.contains('chapter-indigo')).toBe(true);
+  });
+});
+
+// ─── renderLevelList – campaign summary box color ─────────────────────────────
+
+describe('renderLevelList – campaign summary box color', () => {
+  let container: HTMLElement;
+  const campaign = { name: 'My Campaign', author: 'Author', completionPct: 100 };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  function getCampaignHeader(): HTMLElement | null {
+    // The campaign header is the first div child of the container.
+    return Array.from(container.children)
+      .find((el) => el.tagName === 'DIV') as HTMLElement | null;
+  }
+
+  it('shows gold border on campaign summary when all levels, stars, and challenges are completed', () => {
+    const regular = makeLevel(1, 2);
+    const challenge = makeLevel(2, undefined, true);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [regular, challenge] }];
+    const completed = new Set<number>([1, 2]);
+    const levelStars: Record<number, number> = { 1: 2 };
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, levelStars,
+    );
+
+    const header = getCampaignHeader();
+    expect(header?.style.borderColor).toBe('rgb(240, 192, 64)'); // #f0c040
+  });
+
+  it('shows white border on campaign summary when not all levels are completed', () => {
+    const level1 = makeLevel(1);
+    const level2 = makeLevel(2);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level1, level2] }];
+    const completed = new Set<number>([1]); // level2 not done
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, {},
+    );
+
+    const header = getCampaignHeader();
+    expect(header?.style.borderColor).toBe('rgb(255, 255, 255)'); // #ffffff
+  });
+
+  it('shows white border on campaign summary when not all stars are collected', () => {
+    const level = makeLevel(1, 3);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+    const levelStars: Record<number, number> = { 1: 2 }; // missing 1 star
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, levelStars,
+    );
+
+    const header = getCampaignHeader();
+    expect(header?.style.borderColor).toBe('rgb(255, 255, 255)'); // #ffffff
+  });
+
+  it('shows white border on campaign summary when not all challenge levels are completed', () => {
+    const regular = makeLevel(1);
+    const challenge = makeLevel(2, undefined, true);
+    const chapters = [{ id: 1, name: 'Ch1', levels: [regular, challenge] }];
+    const completed = new Set<number>([1]); // challenge not done
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, {},
+    );
+
+    const header = getCampaignHeader();
+    expect(header?.style.borderColor).toBe('rgb(255, 255, 255)'); // #ffffff
+  });
+
+  it('shows gold border when all levels are completed and campaign has no stars or challenges', () => {
+    const level = makeLevel(1); // no stars, no challenges
+    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, {},
+    );
+
+    const header = getCampaignHeader();
+    expect(header?.style.borderColor).toBe('rgb(240, 192, 64)'); // #f0c040
+  });
+});
+
+// ─── renderLevelList – Continue button location text ─────────────────────────
+
+describe('renderLevelList – Continue button location text', () => {
+  let container: HTMLElement;
+  const campaign = { name: 'My Campaign', author: 'Author', completionPct: 50 };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  function getContinueBtn(): HTMLButtonElement | null {
+    return Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b.textContent?.includes('Continue')) ?? null;
+  }
+
+  it('appends chapter-level location to Continue button when there is a level to continue', () => {
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1), makeLevel(2)] };
+    const chapters = [ch1];
+    const completed = new Set<number>([1]); // level 2 is next
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, {},
+    );
+
+    const btn = getContinueBtn();
+    // Level 2 is in chapter 1 at position 2 → (1-2)
+    expect(btn?.textContent).toContain('(1-2)');
+    expect(btn?.textContent).toContain('Continue');
+  });
+
+  it('appends correct chapter-level location across multiple chapters', () => {
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1)] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(2), makeLevel(3)] };
+    const chapters = [ch1, ch2];
+    const completed = new Set<number>([1, 2]); // level 3 (ch2, pos2) is next
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, {},
+    );
+
+    const btn = getContinueBtn();
+    // Level 3 is chapter 2, level 2 → (2-2)
+    expect(btn?.textContent).toContain('(2-2)');
+  });
+
+  it('shows Continue without location when all levels are complete', () => {
+    const chapters = [{ id: 1, name: 'Ch1', levels: [makeLevel(1)] }];
+    const completed = new Set<number>([1]);
+
+    renderLevelList(
+      container, completed,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, chapters, {},
+    );
+
+    const btn = getContinueBtn();
+    // No pending level → no location appended
+    expect(btn?.textContent).toBe('▶ Continue');
+    expect(btn?.disabled).toBe(true);
   });
 });
