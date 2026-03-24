@@ -60,6 +60,9 @@ const PREVIEW_SHADOW_COLOR = '#ffff00';
 /** Blur radius (px) for the hover-preview tile glow shadow. */
 const PREVIEW_SHADOW_BLUR = 14;
 
+/** Rotation speed for the spin-arrow hover animation, in radians per millisecond (one full turn per 1.5 s). */
+const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
+
 /**
  * Scale a pixel value that was designed for BASE_TILE_SIZE to the current TILE_SIZE.
  * Use for font sizes, small offsets and decoration dimensions.
@@ -1074,6 +1077,7 @@ export function drawTile(
   currentPressure = 1,
   lockedCost: number | null = null,
   lockedGain: number | null = null,
+  isHovered = false,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -1155,9 +1159,15 @@ export function drawTile(
 
   // Rotation arrow overlay for spinnable pipes.
   // When Shift is held the arrow reflects CCW to indicate the click direction.
+  // When the mouse hovers over the tile the arrow rotates continuously in the
+  // indicated direction so the player knows the pipe is interactive.
   if (SPIN_PIPE_SHAPES.has(shape)) {
     ctx.save();
     ctx.translate(cx, cy);
+    if (isHovered) {
+      const animAngle = (Date.now() * SPIN_ANIM_SPEED) % (2 * Math.PI);
+      ctx.rotate(shiftHeld ? -animAngle : animAngle);
+    }
     drawSpinArrow(ctx, shiftHeld);
     ctx.restore();
   }
@@ -1380,7 +1390,7 @@ export function renderBoard(
 
   _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
   _renderPass2NonPipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure);
-  _renderPass3PipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure);
+  _renderPass3PipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos);
   _renderPass4CementLabels(ctx, board);
   _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater);
 }
@@ -1584,7 +1594,11 @@ function _renderPass3PipeTiles(
   shiftHeld: boolean,
   currentTemp: number,
   currentPressure: number,
+  mouseCanvasPos: { x: number; y: number } | null,
 ): void {
+  const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
+  const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
+
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
@@ -1593,8 +1607,9 @@ function _renderPass3PipeTiles(
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       const isWater = filled.has(posKey(r, c));
+      const isHovered = r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(tile.shape);
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered);
     }
   }
 }
