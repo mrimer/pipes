@@ -46,7 +46,7 @@ const EDITOR_PANEL_BASE_CSS =
   'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
 /** CSS for the all-caps section-title label inside an editor side-panel. */
 const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
-import { Board, PIPE_SHAPES, LEAKY_PIPE_SHAPES, parseKey } from '../board';
+import { Board, PIPE_SHAPES, SPIN_CEMENT_SHAPES, parseKey } from '../board';
 import {
   EditorPalette,
   EditorScreen,
@@ -81,6 +81,7 @@ const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
   PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
 ]);
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ export class CampaignEditor {
   private _chamberSectionExpanded = false;
   private _pipesSectionExpanded = false;
   private _floorSectionExpanded = false;
+  private _spinSectionExpanded = false;
   private _editorSourceErrorEl: HTMLDivElement | null = null;
   /** Drag state: set when the user is dragging a tile across the grid. */
   private _dragState: {
@@ -1309,9 +1311,15 @@ export class CampaignEditor {
     { palette: PipeShape.Elbow,        label: '┗ Elbow' },
     { palette: PipeShape.Tee,          label: '┣ Tee' },
     { palette: PipeShape.Cross,        label: '╋ Cross' },
-    { palette: PipeShape.SpinStraight, label: '↻ Spin Straight' },
-    { palette: PipeShape.SpinElbow,    label: '↻ Spin Elbow' },
-    { palette: PipeShape.SpinTee,      label: '↻ Spin Tee' },
+  ];
+
+  private readonly _SPIN_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+    { palette: PipeShape.SpinStraight,       label: '↻ Spin Straight' },
+    { palette: PipeShape.SpinElbow,          label: '↻ Spin Elbow' },
+    { palette: PipeShape.SpinTee,            label: '↻ Spin Tee' },
+    { palette: PipeShape.SpinStraightCement, label: '↻ Spin Straight (Cement)' },
+    { palette: PipeShape.SpinElbowCement,    label: '↻ Spin Elbow (Cement)' },
+    { palette: PipeShape.SpinTeeCement,      label: '↻ Spin Tee (Cement)' },
   ];
 
   private readonly _CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> = [
@@ -1405,6 +1413,8 @@ export class CampaignEditor {
     if (isChamberPalette(this._editorPalette)) this._chamberSectionExpanded = true;
     // Auto-expand the pipes section if a pipe item is currently selected
     if (this._PIPES_PALETTE_ITEMS.some(i => i.palette === this._editorPalette)) this._pipesSectionExpanded = true;
+    // Auto-expand the spin section if a spin item is currently selected
+    if (this._SPIN_PALETTE_ITEMS.some(i => i.palette === this._editorPalette)) this._spinSectionExpanded = true;
 
     const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
@@ -1443,7 +1453,7 @@ export class CampaignEditor {
       panel.appendChild(makeItemBtn(item));
     }
 
-    // Collapsible sections: Floor, Pipes, Gold, Leaky, Blocks (chambers)
+    // Collapsible sections: Floor, Pipes, Spin, Gold, Leaky, Blocks (chambers)
     this._buildCollapsibleSection(
       panel, 'Floor', this._floorSectionExpanded,
       () => { this._floorSectionExpanded = !this._floorSectionExpanded; panel.replaceWith(this._buildPalette()); },
@@ -1453,6 +1463,11 @@ export class CampaignEditor {
       panel, 'Pipes', this._pipesSectionExpanded,
       () => { this._pipesSectionExpanded = !this._pipesSectionExpanded; panel.replaceWith(this._buildPalette()); },
       '#4a90d9', '#0a1520', '#4a90d9', this._PIPES_PALETTE_ITEMS, makeItemBtn,
+    );
+    this._buildCollapsibleSection(
+      panel, 'Spin', this._spinSectionExpanded,
+      () => { this._spinSectionExpanded = !this._spinSectionExpanded; panel.replaceWith(this._buildPalette()); },
+      '#5a7fbf', '#0a1528', '#7090c0', this._SPIN_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
       panel, 'Gold', this._goldSectionExpanded,
@@ -1491,8 +1506,11 @@ export class CampaignEditor {
 
     const p = this._editorPalette;
     const isChm = isChamberPalette(p);
+    // Spin-cement shapes are in PIPE_SHAPES but do have a parameter (Drying Time), so exclude them
+    // from the "no parameters" early-return check.
+    const isParamFreePipe = PIPE_SHAPES.has(p as PipeShape) && !SPIN_CEMENT_SHAPES.has(p as PipeShape);
     if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.GoldSpace ||
-        p === PipeShape.OneWay || PIPE_SHAPES.has(p as PipeShape)) {
+        p === PipeShape.OneWay || isParamFreePipe) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
       none.textContent = 'No parameters';
@@ -1500,8 +1518,9 @@ export class CampaignEditor {
       return panel;
     }
 
-    // Cement: show only Drying Time input (no rotation)
-    if (p === PipeShape.Cement) {
+    // Cement: show only Drying Time input.
+    // Spin-cement tiles: show Drying Time; rotation is adjusted via wheel/Q/W in the editor.
+    if (p === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(p as PipeShape)) {
       panel.appendChild(this._labeledInput('Drying Time', String(this._editorParams.dryingTime), (v) => {
         this._editorParams.dryingTime = Math.max(0, parseInt(v) || 0);
         this._applyParamsToLinkedTile();
@@ -2298,7 +2317,7 @@ export class CampaignEditor {
    * reserved for Source, Sink, and Chamber tiles that expose richer settings.
    */
   private _paletteHasNonRotationParams(palette: EditorPalette): boolean {
-    return palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Cement || isChamberPalette(palette);
+    return palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(palette as PipeShape) || isChamberPalette(palette);
   }
 
   /** Set _editorParams to match all relevant fields from a TileDef. */
@@ -2453,6 +2472,13 @@ export class CampaignEditor {
     // Cement: only dryingTime param; no rotation or connections
     if (effectiveShape === PipeShape.Cement) {
       const def: TileDef = { shape: PipeShape.Cement };
+      if (p.dryingTime !== 0) def.dryingTime = p.dryingTime;
+      return def;
+    }
+
+    // Spin-cement tiles: rotation + dryingTime; no connections
+    if (SPIN_CEMENT_SHAPES.has(effectiveShape)) {
+      const def: TileDef = { shape: effectiveShape, rotation: p.rotation };
       if (p.dryingTime !== 0) def.dryingTime = p.dryingTime;
       return def;
     }

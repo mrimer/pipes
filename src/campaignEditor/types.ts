@@ -34,6 +34,7 @@ const ROTATION_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee,
   PipeShape.OneWay,
 ]);
@@ -66,6 +67,8 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
     if (cc === 'pump') valid.add('pressure');
     if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
   } else if (shape === PipeShape.Cement) {
+    valid.add('dryingTime');
+  } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
     valid.add('dryingTime');
   }
 
@@ -176,6 +179,9 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.SpinStraight]:  '#5a7fbf',
   [PipeShape.SpinElbow]:     '#5a7fbf',
   [PipeShape.SpinTee]:       '#5a7fbf',
+  [PipeShape.SpinStraightCement]: '#5a7fbf',
+  [PipeShape.SpinElbowCement]:    '#5a7fbf',
+  [PipeShape.SpinTeeCement]:      '#5a7fbf',
   [PipeShape.LeakyStraight]: '#8b5c2a',
   [PipeShape.LeakyElbow]:    '#8b5c2a',
   [PipeShape.LeakyTee]:      '#8b5c2a',

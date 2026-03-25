@@ -146,6 +146,9 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
     [PipeShape.SpinStraight]:  PipeShape.Straight,
     [PipeShape.SpinElbow]:     PipeShape.Elbow,
     [PipeShape.SpinTee]:       PipeShape.Tee,
+    [PipeShape.SpinStraightCement]: PipeShape.Straight,
+    [PipeShape.SpinElbowCement]:    PipeShape.Elbow,
+    [PipeShape.SpinTeeCement]:      PipeShape.Tee,
     [PipeShape.LeakyStraight]: PipeShape.Straight,
     [PipeShape.LeakyElbow]:    PipeShape.Elbow,
     [PipeShape.LeakyTee]:      PipeShape.Tee,
@@ -1292,18 +1295,18 @@ export function drawTile(
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, blockedWaterDir);
     }
-  } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
+  } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.SpinStraightCement) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
     ctx.stroke();
-  } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow) {
+  } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.SpinElbowCement) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, 0);
     ctx.lineTo(half, 0);
     ctx.stroke();
-  } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee) {
+  } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.SpinTeeCement) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
@@ -1435,6 +1438,9 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.SpinStraight: return 'Spin Straight';
     case PipeShape.SpinElbow:    return 'Spin Elbow';
     case PipeShape.SpinTee:      return 'Spin Tee';
+    case PipeShape.SpinStraightCement: return 'Spin Straight (Cement)';
+    case PipeShape.SpinElbowCement:    return 'Spin Elbow (Cement)';
+    case PipeShape.SpinTeeCement:      return 'Spin Tee (Cement)';
     case PipeShape.LeakyStraight: return 'Leaky Straight';
     case PipeShape.LeakyElbow:    return 'Leaky Elbow';
     case PipeShape.LeakyTee:      return 'Leaky Tee';
