@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import {
@@ -1281,8 +1281,11 @@ export function drawTile(
     ctx.fill();
   } else if (isBlockedPipe) {
     // Arm-by-arm drawing: blocked arm uses non-water colour; all others use water colour.
+    // Draw blocked arms first so the unblocked (water) arms are painted on top at the
+    // tile centre, giving the correct visual appearance at the junction point.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
-    for (const armDir of tile.connections) {
+    const sortedArms = [...tile.connections].sort((a, b) => (a === blockedWaterDir ? -1 : b === blockedWaterDir ? 1 : 0));
+    for (const armDir of sortedArms) {
       const armColor = armDir === blockedWaterDir ? dryColor : color;
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
@@ -1857,10 +1860,25 @@ function _renderPass3PipeTiles(
       const isWater = filled.has(posKey(r, c));
       const isHovered = r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(tile.shape);
 
-      // If this pipe sits on a one-way cell, derive the direction that is blocked
-      // for water rendering (the arm opposite to the one-way arrow).
+      // If this pipe sits on a one-way cell, the arm pointing opposite the arrow
+      // direction is blocked (dry) unless the neighbour in that direction is both
+      // mutually connected AND actually water-filled.  A pipe tile placed adjacent
+      // but not carrying water must not make the blocked arm appear wet.
       const owDir = board.oneWayData.get(posKey(r, c));
-      const blockedWaterDir = owDir !== undefined ? oppositeDirection(owDir) : null;
+      let blockedWaterDir: Direction | null = null;
+      if (owDir !== undefined) {
+        const antiDir = oppositeDirection(owDir);
+        const delta = NEIGHBOUR_DELTA[antiDir];
+        const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
+        // The arm carries water only when the neighbour can mutually connect AND
+        // is actually water-filled (present in the filled set).
+        if (
+          !board.areMutuallyConnected(neighborPos, owDir) ||
+          !filled.has(posKey(neighborPos.row, neighborPos.col))
+        ) {
+          blockedWaterDir = antiDir;
+        }
+      }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir);
     }

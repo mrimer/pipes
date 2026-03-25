@@ -33,6 +33,7 @@ import {
   TREE_COLOR,
   ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
+  ONE_WAY_ARROW_COLOR,
 } from './colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
@@ -110,6 +111,62 @@ const PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
 ]);
+
+/**
+ * Draws a tiny wireframe chevron (V-shape) on the minimap to indicate a
+ * one-way tile's direction.  The chevron tip points in the one-way direction.
+ * Only meaningful when px >= MIN_PX_FOR_LINES.
+ */
+function drawOneWayChevron(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  px: number,
+  rotation: Rotation,
+): void {
+  const dirs = [Direction.North, Direction.East, Direction.South, Direction.West] as const;
+  const dir = dirs[rotation / 90] ?? Direction.North;
+
+  ctx.fillStyle = ONE_WAY_BG_COLOR;
+  ctx.fillRect(x, y, px, px);
+
+  const margin = Math.max(1, Math.round(px * 0.15));
+  const cx = x + px / 2;
+  const cy = y + px / 2;
+
+  // tip = point the chevron aims toward; left/right = the two trailing corners
+  let tipX: number, tipY: number, leftX: number, leftY: number, rightX: number, rightY: number;
+  switch (dir) {
+    case Direction.North:
+      tipX = cx;                    tipY = y + margin;
+      leftX = x + margin;          leftY = y + px - margin;
+      rightX = x + px - margin;    rightY = y + px - margin;
+      break;
+    case Direction.South:
+      tipX = cx;                    tipY = y + px - margin;
+      leftX = x + px - margin;     leftY = y + margin;
+      rightX = x + margin;         rightY = y + margin;
+      break;
+    case Direction.East:
+      tipX = x + px - margin;      tipY = cy;
+      leftX = x + margin;          leftY = y + margin;
+      rightX = x + margin;         rightY = y + px - margin;
+      break;
+    default: // West
+      tipX = x + margin;           tipY = cy;
+      leftX = x + px - margin;     leftY = y + margin;
+      rightX = x + px - margin;    rightY = y + px - margin;
+      break;
+  }
+
+  ctx.strokeStyle = ONE_WAY_ARROW_COLOR;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(leftX, leftY);
+  ctx.lineTo(tipX, tipY);
+  ctx.lineTo(rightX, rightY);
+  ctx.stroke();
+}
 
 /**
  * Returns the background fill and line stroke colors for a pipe tile that will
@@ -204,6 +261,8 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
       const ty = BORDER_PX + r * px;
       if (tile && px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape)) {
         drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0) as Rotation);
+      } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay) {
+        drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0) as Rotation);
       } else {
         ctx.fillStyle = tileColor(tile);
         ctx.fillRect(tx, ty, px, px);

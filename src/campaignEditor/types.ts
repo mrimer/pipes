@@ -27,14 +27,15 @@ export const VALID_LEVEL_KEYS: ReadonlySet<string> = new Set([
 /** Valid keys for an InventoryItem record. */
 export const VALID_INVENTORY_ITEM_KEYS: ReadonlySet<string> = new Set(['shape', 'count']);
 
-/** Pipe shapes for which the `rotation` TileDef field is semantically meaningful
- *  (i.e. the shape has an asymmetric connection pattern and rotation changes which
- *  sides are open). Symmetric and connectionless shapes are excluded. */
+/** Pipe shapes for which the `rotation` TileDef field is semantically meaningful.
+ *  Includes asymmetric pipe shapes (where rotation changes which sides are open)
+ *  and OneWay tiles (where rotation encodes the allowed flow direction). */
 const ROTATION_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee,
+  PipeShape.OneWay,
 ]);
 
 /**

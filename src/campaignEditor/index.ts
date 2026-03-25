@@ -2153,8 +2153,10 @@ export class CampaignEditor {
         this._recordEditorSnapshot();
       } else if (
         this._editorPalette !== 'erase' &&
-        PIPE_SHAPES.has(this._editorPalette as PipeShape) &&
-        PIPE_SHAPES.has(tile.shape)
+        (
+          (PIPE_SHAPES.has(this._editorPalette as PipeShape) && PIPE_SHAPES.has(tile.shape)) ||
+          (this._editorPalette === PipeShape.OneWay && tile.shape === PipeShape.OneWay)
+        )
       ) {
         // Both palette and tile are pipe shapes: auto-replace; snapshot after.
         this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);

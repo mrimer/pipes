@@ -226,21 +226,27 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
   }
 
   // BFS backwards: propagate "good" directions through mutual connections.
+  // We check areMutuallyConnected from the *neighbour* going *toward* current
+  // (i.e. the forward-flow direction) rather than from current going toward
+  // the neighbour, so that one-way tiles are traversed correctly in reverse.
   while (queue.length > 0) {
     const current = queue.shift()!;
     const currentDirs = getDirs(current);
 
     for (const dirToNeighbor of Object.values(Direction)) {
-      if (!board.areMutuallyConnected(current, dirToNeighbor)) continue;
-
       const delta = NEIGHBOUR_DELTA[dirToNeighbor];
       const neighbor: GridPos = { row: current.row + delta.row, col: current.col + delta.col };
 
+      // Direction from neighbor toward current (the forward-flow direction for
+      // water to travel from neighbor to current).
+      const dirToCurrent = _oppositeDir(dirToNeighbor);
+
+      // A valid connection from neighbor to current requires areMutuallyConnected
+      // from the neighbor's perspective going toward current.
+      if (!board.areMutuallyConnected(neighbor, dirToCurrent)) continue;
+
       // Skip the sink itself – drops are removed on arrival, no need to track it.
       if (neighbor.row === board.sink.row && neighbor.col === board.sink.col) continue;
-
-      // Direction from neighbor back to current.
-      const dirToCurrent = _oppositeDir(dirToNeighbor);
 
       // Going from `neighbor` towards `current` is only useful if `current` has
       // at least one good direction that does NOT immediately return to `neighbor`
