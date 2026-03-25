@@ -264,6 +264,90 @@ function _drawOneWayEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
 }
 
+/**
+ * Draw the cement tile in the editor canvas at (x, y).
+ * Renders the cement fill, wavy-line texture, 'CEMENT' label, and drying-time counter.
+ * @param dryingTime - Current drying time value (T=N label, or T=0 shows '0').
+ */
+function _drawCementEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  ctx.strokeStyle = CEMENT_COLOR;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+  ctx.save();
+  ctx.strokeStyle = CEMENT_COLOR;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  const sq2 = Math.SQRT1_2;
+  const len = CELL * 0.5;
+  for (let i = -1; i <= 1; i++) {
+    const px = i * _s(8) * sq2;
+    const py = i * _s(8) * sq2;
+    const lx = cx + px; const ly = cy + py;
+    ctx.beginPath();
+    ctx.moveTo(lx - len * sq2, ly + len * sq2);
+    ctx.quadraticCurveTo(lx + _s(2) * sq2, ly + _s(2) * sq2, lx + len * sq2, ly - len * sq2);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.save();
+  ctx.font = `bold ${_s(10)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  strokeFillText(ctx, 'CEMENT', cx, cy - _s(7));
+  ctx.font = `${_s(9)}px Arial`;
+  strokeFillText(ctx, `T=${dryingTime}`, cx, cy + _s(6));
+  ctx.restore();
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+}
+
+/**
+ * Draw the semi-transparent cement wavy-line overlay and drying-time label on top of a
+ * spin-cement tile that has already been drawn at (x, y).
+ * @param dryingTime - Current drying time value; 0 shows 'X'.
+ */
+function _drawSpinCementOverlay(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  ctx.save();
+  ctx.strokeStyle = CEMENT_COLOR;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  ctx.globalAlpha = 0.5;
+  const sq2 = Math.SQRT1_2;
+  const len = CELL * 0.5;
+  for (let i = -1; i <= 1; i++) {
+    const px = i * _s(8) * sq2;
+    const py = i * _s(8) * sq2;
+    const lx = cx + px; const ly = cy + py;
+    ctx.beginPath();
+    ctx.moveTo(lx - len * sq2, ly + len * sq2);
+    ctx.quadraticCurveTo(lx + _s(2) * sq2, ly + _s(2) * sq2, lx + len * sq2, ly - len * sq2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  ctx.save();
+  ctx.font = `bold ${_s(8)}px Arial`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#505050';
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = _s(1.5);
+  ctx.lineJoin = 'round';
+  const label = dryingTime === 0 ? 'X' : `T=${dryingTime}`;
+  ctx.strokeText(label, x + _s(2), y + _s(2));
+  ctx.fillText(label, x + _s(2), y + _s(2));
+  ctx.restore();
+}
+
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */
 export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef): void {
   const CELL = TILE_SIZE;
@@ -301,41 +385,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   // Handle Cement directly (no Tile construction needed)
   if (shape === PipeShape.Cement) {
-    const dryingTime = def.dryingTime ?? 0;
-    const cx = x + CELL / 2;
-    const cy = y + CELL / 2;
-    ctx.strokeStyle = CEMENT_COLOR;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
-    ctx.save();
-    ctx.strokeStyle = CEMENT_COLOR;
-    ctx.lineWidth = _s(1.5);
-    ctx.lineCap = 'round';
-    const sq2 = Math.SQRT1_2;
-    const len = CELL * 0.5;
-    for (let i = -1; i <= 1; i++) {
-      const px = i * _s(8) * sq2;
-      const py = i * _s(8) * sq2;
-      const lx = cx + px; const ly = cy + py;
-      ctx.beginPath();
-      ctx.moveTo(lx - len * sq2, ly + len * sq2);
-      ctx.quadraticCurveTo(lx + _s(2) * sq2, ly + _s(2) * sq2, lx + len * sq2, ly - len * sq2);
-      ctx.stroke();
-    }
-    ctx.restore();
-    ctx.save();
-    ctx.font = `bold ${_s(10)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'CEMENT', cx, cy - _s(7));
-    ctx.font = `${_s(9)}px Arial`;
-    strokeFillText(ctx, `T=${dryingTime}`, cx, cy + _s(6));
-    ctx.restore();
-    ctx.strokeStyle = '#2a3a5e';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([]);
-    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    _drawCementEditorTile(ctx, x, y, def.dryingTime ?? 0);
     return;
   }
 
@@ -363,39 +413,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   // For spin-cement tiles, draw the cement wavy-line overlay and drying-time label on top.
   if (SPIN_CEMENT_SHAPES.has(shape)) {
-    const dryingTime = def.dryingTime ?? 0;
-    const cx = x + CELL / 2;
-    const cy = y + CELL / 2;
-    ctx.save();
-    ctx.strokeStyle = CEMENT_COLOR;
-    ctx.lineWidth = _s(1.5);
-    ctx.lineCap = 'round';
-    ctx.globalAlpha = 0.5;
-    const sq2 = Math.SQRT1_2;
-    const len = CELL * 0.5;
-    for (let i = -1; i <= 1; i++) {
-      const px = i * _s(8) * sq2;
-      const py = i * _s(8) * sq2;
-      const lx = cx + px; const ly = cy + py;
-      ctx.beginPath();
-      ctx.moveTo(lx - len * sq2, ly + len * sq2);
-      ctx.quadraticCurveTo(lx + _s(2) * sq2, ly + _s(2) * sq2, lx + len * sq2, ly - len * sq2);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    ctx.restore();
-    ctx.save();
-    ctx.font = `bold ${_s(8)}px Arial`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#505050';
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = _s(1.5);
-    ctx.lineJoin = 'round';
-    const label = dryingTime === 0 ? 'X' : `T=${dryingTime}`;
-    ctx.strokeText(label, x + _s(2), y + _s(2));
-    ctx.fillText(label, x + _s(2), y + _s(2));
-    ctx.restore();
+    _drawSpinCementOverlay(ctx, x, y, def.dryingTime ?? 0);
   }
 }
 
