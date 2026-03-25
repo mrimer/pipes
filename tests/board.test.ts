@@ -1,5 +1,5 @@
-import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE } from '../src/board';
-import { Direction, PipeShape } from '../src/types';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../src/board';
+import { Direction, LevelDef, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
 
@@ -56,8 +56,6 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
   });
 
   it('blocks flow opposite to the one-way direction (East tile, flowing West)', () => {
-    const board = makeBoardWithOneWay(Direction.East);
-    // Flowing West from (0,0) is blocked (arrow=East, blocked exit=West)
     // Put the two pipes on a 1×3 board so (0,1) can flow West into (0,0)
     const board2 = new Board(1, 3);
     board2.source = { row: 0, col: 0 };
@@ -112,7 +110,7 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
     // Use LevelDef-compatible structure cast via 'as any' since the test only
     // exercises initialization of oneWayData and grid cell placement.
     // The Source connections field is left out (defaults to all-4) to keep the fixture minimal.
-    const level = {
+    const level: Pick<LevelDef, 'rows' | 'cols' | 'inventory' | 'grid'> = {
       rows: 2,
       cols: 2,
       inventory: [],
@@ -121,7 +119,7 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
         [null, { shape: PipeShape.Sink }],
       ],
     };
-    const board = new Board(2, 2, level as any);
+    const board = new Board(2, 2, level as LevelDef);
     // OneWay at (0,1) with rotation 90 → Direction.East
     expect(board.oneWayData.size).toBe(1);
     expect(board.getOneWayDirection({ row: 0, col: 1 })).toBe(Direction.East);
@@ -4462,7 +4460,6 @@ describe('Leaky pipes', () => {
   }
 
   it('leaky pipe is in LEAKY_PIPE_SHAPES and PIPE_SHAPES', () => {
-    const { PIPE_SHAPES, LEAKY_PIPE_SHAPES } = require('../src/board');
     expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyStraight)).toBe(true);
     expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyElbow)).toBe(true);
     expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyTee)).toBe(true);
