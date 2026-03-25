@@ -1436,9 +1436,9 @@ describe('Board.initHistory / canUndo / undoMove / canRedo / redoMove', () => {
   });
 });
 
-// ─── New: discardLastMove ─────────────────────────────────────────────────────
+// ─── New: discardLastMoveFromHistory ─────────────────────────────────────────
 
-describe('Board.discardLastMove', () => {
+describe('Board.discardLastMoveFromHistory', () => {
   it('removes the most recently recorded snapshot so canUndo reflects the pre-move state', () => {
     const board = new Board(2, 2);
     board.initHistory();                     // snap0
@@ -1446,7 +1446,7 @@ describe('Board.discardLastMove', () => {
     board.recordMove();                      // snap1
     expect(board.canUndo()).toBe(true);
 
-    board.discardLastMove();                 // remove snap1
+    board.discardLastMoveFromHistory();      // remove snap1
 
     expect(board.canUndo()).toBe(false);     // back to initial snapshot only
     expect(board.canRedo()).toBe(false);     // no future states
@@ -1456,7 +1456,7 @@ describe('Board.discardLastMove', () => {
     const board = new Board(2, 2);
     board.initHistory();                     // snap0 only
 
-    board.discardLastMove();                 // should be a no-op
+    board.discardLastMoveFromHistory();      // should be a no-op
 
     expect(board.canUndo()).toBe(false);
     expect(board.canRedo()).toBe(false);
@@ -1467,7 +1467,7 @@ describe('Board.discardLastMove', () => {
     board.initHistory();                     // snap0
     board.rotateTile({ row: 0, col: 0 });
     board.recordMove();                      // snap1
-    board.discardLastMove();                 // remove snap1 → back to snap0
+    board.discardLastMoveFromHistory();      // remove snap1 → back to snap0
     board.rotateTile({ row: 0, col: 0 });
     board.recordMove();                      // new snap1
 

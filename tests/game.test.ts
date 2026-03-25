@@ -1146,8 +1146,8 @@ describe('Game – fail move does not add undo snapshot', () => {
 
 // ─── Tests: retryLevel skips history graft in fail state ─────────────────────
 
-describe('Game – retryLevel skips history graft when in GameOver state', () => {
-  it('does not graft pre-restart history when retrying from a fail state', () => {
+describe('Game – retryLevel grafts history excluding the losing move', () => {
+  it('grafts pre-restart history even when retrying from a fail state (losing move already discarded)', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
@@ -1157,13 +1157,14 @@ describe('Game – retryLevel skips history graft when in GameOver state', () =>
     boardAccess.board.recordMove();
     expect(boardAccess.board.canUndo()).toBe(true);
 
-    // Put the game in GameOver state (as _checkWinLose would)
+    // The failing move snapshot has already been discarded by discardLastMoveFromHistory()
+    // before gameState is set to GameOver; simulate that by leaving canUndo() true.
     boardAccess.gameState = GameState.GameOver;
 
     game.retryLevel();
 
-    // After restarting from fail, the new board should have no undo history
-    expect(boardAccess.board.canUndo()).toBe(false);
+    // History is grafted; player can undo back to the pre-fail state
+    expect(boardAccess.board.canUndo()).toBe(true);
   });
 
   it('grafts pre-restart history when retrying from a normal (Playing) state', () => {
