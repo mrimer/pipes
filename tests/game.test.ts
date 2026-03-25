@@ -840,28 +840,35 @@ describe('Game – undoLastMove', () => {
     expect(gameoverModalEl.style.display).toBe('flex');
   });
 
-  it('undoLastMove() restores the board grid to its pre-move state', () => {
+  it('undoLastMove() from the game-over modal restores to the last valid state, not one step further back', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
     const hooks = gameHooks(game);
     const boardAccess = game as unknown as { board: Board; gameState: GameState };
 
-    // Place a tile via keyboard (records move automatically)
+    // Place a tile at (0,1) – this is move S1 (successful, still playing)
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    // Verify the tile was placed
+    // Verify tile was placed (board is now in state S1)
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
 
-    // Simulate game-over
+    // Simulate a second (failing) move: recordMove() saves S2, then
+    // discardLastMoveFromHistory() immediately removes it (as _afterTilePlaced does
+    // when a move causes game-over).  _historyIndex now points at S1.
+    boardAccess.board.recordMove();
+    boardAccess.board.discardLastMoveFromHistory();
     boardAccess.gameState = GameState.GameOver;
+
+    expect(boardAccess.board.canUndo()).toBe(true);
 
     game.undoLastMove();
 
-    // The placed tile should be gone
-    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Empty);
+    // Should be restored to S1 (tile at 0,1 still present), NOT to S0 (empty board).
+    expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(boardAccess.gameState).toBe(GameState.Playing);
   });
 });
 

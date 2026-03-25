@@ -2558,7 +2558,14 @@ export class Game {
   performUndo(): void {
     if (!this.board || !this.board.canUndo()) return;
     const filledBefore = this.board.getFilledPositions();
-    this.board.undoMove();
+    if (this.gameState === GameState.GameOver) {
+      // discardLastMoveFromHistory() was already called when the fail was detected,
+      // so _historyIndex already points to the pre-fail snapshot.  Just restore it
+      // without decrementing the pointer further (which would skip an extra turn).
+      this.board.restoreFromCurrentSnapshot();
+    } else {
+      this.board.undoMove();
+    }
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
