@@ -1126,12 +1126,27 @@ function _drawLeakyRustSpots(
   ctx.globalAlpha = 0.75;
   const spotR = _s(4);
 
-  // For each connection that is NOT blocked, draw two rust dots at ~1/3 and 2/3 along the arm.
+  // `tile.connections` returns directions in absolute (post-rotation) space, but the
+  // canvas is already rotated by `tile.rotation`.  We must convert each absolute
+  // direction to the local (pre-rotation) frame before using it as a drawing offset,
+  // mirroring the same un-rotation logic used by _drawPipeArmInRotatedFrame.
+  const rotSteps = tile.rotation / 90;
   for (const dir of tile.connections) {
     if (dir === blockedDir) continue;
 
+    // Un-rotate the absolute direction back to local frame.
+    let localDir = dir;
+    for (let i = 0; i < rotSteps; i++) {
+      switch (localDir) {
+        case Direction.North: localDir = Direction.West;  break;
+        case Direction.West:  localDir = Direction.South; break;
+        case Direction.South: localDir = Direction.East;  break;
+        case Direction.East:  localDir = Direction.North; break;
+      }
+    }
+
     let dx = 0, dy = 0;
-    switch (dir) {
+    switch (localDir) {
       case Direction.North: dx =  0; dy = -1; break;
       case Direction.South: dx =  0; dy =  1; break;
       case Direction.East:  dx =  1; dy =  0; break;

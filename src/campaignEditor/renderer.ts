@@ -530,9 +530,22 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       ctx.fillStyle = '#7a2c10';
       ctx.globalAlpha = 0.75;
       const spotR = _s(3);
+      // `tile.connections` returns absolute (post-rotation) directions, but the
+      // canvas is already rotated. Un-rotate each direction to local frame first,
+      // mirroring the same logic used in renderer.ts _drawLeakyRustSpots.
+      const rotSteps = tile.rotation / 90;
       for (const dir of tile.connections) {
+        let localDir = dir;
+        for (let i = 0; i < rotSteps; i++) {
+          switch (localDir) {
+            case Direction.North: localDir = Direction.West;  break;
+            case Direction.West:  localDir = Direction.South; break;
+            case Direction.South: localDir = Direction.East;  break;
+            case Direction.East:  localDir = Direction.North; break;
+          }
+        }
         let dx = 0, dy = 0;
-        switch (dir) {
+        switch (localDir) {
           case Direction.North: dx =  0; dy = -1; break;
           case Direction.South: dx =  0; dy =  1; break;
           case Direction.East:  dx =  1; dy =  0; break;
