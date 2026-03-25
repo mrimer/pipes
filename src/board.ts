@@ -524,6 +524,17 @@ export class Board {
     this._historyIndex++;
   }
 
+  /**
+   * Remove the most recently recorded snapshot from the history.
+   * Used when a move is found to have caused a losing state and should not be
+   * preserved in the undo chain.
+   */
+  discardLastMove(): void {
+    if (this._historyIndex <= 0) return;
+    this._historyIndex--;
+    this._history = this._history.slice(0, this._historyIndex + 1);
+  }
+
   /** Returns true if there is a previous state to undo to. */
   canUndo(): boolean {
     return this._historyIndex > 0;

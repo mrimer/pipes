@@ -1088,7 +1088,103 @@ describe('Game – _checkWinLose: fail takes precedence', () => {
   });
 });
 
-// ─── Tests: renderInventoryBar – bonus shapes absent from board.inventory ────
+// ─── Tests: fail move does not add undo snapshot ─────────────────────────────
+
+describe('Game – fail move does not add undo snapshot', () => {
+  /**
+   * Stub board so that the next call to getCurrentWater() returns `waterValue`.
+   * Also stubs applyTurnDelta() and isSolved() to avoid side effects.
+   */
+  function stubBoardForWater(board: Board, waterValue: number): void {
+    jest.spyOn(board, 'getCurrentWater').mockReturnValue(waterValue);
+    jest.spyOn(board, 'applyTurnDelta').mockImplementation(() => {});
+    jest.spyOn(board, 'isSolved').mockReturnValue(false);
+  }
+
+  it('does not record an undo snapshot when placing a tile causes a fail state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+    const board = boardAccess.board;
+
+    // Stub so that the move will result in GameOver (water = 0)
+    stubBoardForWater(board, 0);
+
+    // Perform a tile placement via keyboard (triggers _afterTilePlaced internally)
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    // The move triggered GameOver, so no snapshot should have been added
+    expect(boardAccess.gameState).toBe(GameState.GameOver);
+    expect(board.canUndo()).toBe(false);
+  });
+
+  it('still records an undo snapshot when placing a tile does not cause a fail state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+    const board = boardAccess.board;
+
+    // Water is positive → no fail
+    jest.spyOn(board, 'getCurrentWater').mockReturnValue(5);
+    jest.spyOn(board, 'applyTurnDelta').mockImplementation(() => {});
+    jest.spyOn(board, 'isSolved').mockReturnValue(false);
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.focusPos = { row: 0, col: 1 };
+    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(boardAccess.gameState).toBe(GameState.Playing);
+    expect(board.canUndo()).toBe(true);
+  });
+});
+
+// ─── Tests: retryLevel skips history graft in fail state ─────────────────────
+
+describe('Game – retryLevel skips history graft when in GameOver state', () => {
+  it('does not graft pre-restart history when retrying from a fail state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+
+    // Simulate: player made a move before the fail, so canUndo() is true
+    boardAccess.board.recordMove();
+    expect(boardAccess.board.canUndo()).toBe(true);
+
+    // Put the game in GameOver state (as _checkWinLose would)
+    boardAccess.gameState = GameState.GameOver;
+
+    game.retryLevel();
+
+    // After restarting from fail, the new board should have no undo history
+    expect(boardAccess.board.canUndo()).toBe(false);
+  });
+
+  it('grafts pre-restart history when retrying from a normal (Playing) state', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const boardAccess = game as unknown as { board: Board; gameState: GameState };
+
+    // Simulate: player made a move, so canUndo() is true
+    boardAccess.board.recordMove();
+    expect(boardAccess.board.canUndo()).toBe(true);
+
+    // Game is still Playing (not GameOver)
+    expect(boardAccess.gameState).toBe(GameState.Playing);
+
+    game.retryLevel();
+
+    // After restarting normally, undo history should be grafted
+    expect(boardAccess.board.canUndo()).toBe(true);
+  });
+});
 
 describe('renderInventoryBar – bonus shapes not in inventory', () => {
   it('displays a bonus shape from a connected Chamber-item tile even when absent from board.inventory', () => {
