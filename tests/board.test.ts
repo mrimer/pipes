@@ -1476,6 +1476,43 @@ describe('Board.discardLastMoveFromHistory', () => {
   });
 });
 
+// ─── New: restoreFromCurrentSnapshot ─────────────────────────────────────────
+
+describe('Board.restoreFromCurrentSnapshot', () => {
+  it('restores the board to the snapshot at _historyIndex without decrementing', () => {
+    const board = new Board(2, 2);
+    board.grid[0][0] = new Tile(PipeShape.Elbow, 0);  // rotation starts at 0
+    board.initHistory();                     // snap0 (rotation=0)
+    board.rotateTile({ row: 0, col: 0 });   // rotation → 90
+    board.recordMove();                      // snap1 (rotation=90)
+    board.rotateTile({ row: 0, col: 0 });   // rotation → 180 (live board differs from snap1)
+
+    // Simulate a failing second move: recordMove() saves snap2, then
+    // discardLastMoveFromHistory() removes it (as the game does on a fail).
+    board.recordMove();                      // snap2 (rotation=180)
+    board.discardLastMoveFromHistory();      // remove snap2 → _historyIndex back to 1 (snap1)
+
+    expect(board.canUndo()).toBe(true);  // pointer still at snap1
+
+    // Live board is still at rotation=180; snap1 has rotation=90.
+    // restoreFromCurrentSnapshot() must apply snap1 without moving the pointer.
+    board.restoreFromCurrentSnapshot();
+
+    expect(board.grid[0][0].rotation).toBe(90);   // restored to snap1
+    expect(board.canUndo()).toBe(true);            // pointer unchanged (still at 1)
+    expect(board.canRedo()).toBe(false);           // no future states
+  });
+
+  it('is a no-op on a fresh board (index 0, no prior undo history)', () => {
+    const board = new Board(2, 2);
+    board.initHistory();                     // snap0 only
+
+    expect(() => board.restoreFromCurrentSnapshot()).not.toThrow();
+    expect(board.canUndo()).toBe(false);
+    expect(board.canRedo()).toBe(false);
+  });
+});
+
 // ─── New: replaceInventoryTile ────────────────────────────────────────────────
 
 describe('Board.replaceInventoryTile', () => {

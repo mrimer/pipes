@@ -535,6 +535,20 @@ export class Board {
     this._history = this._history.slice(0, this._historyIndex + 1);
   }
 
+  /**
+   * Restore the board to the snapshot at the current history index, without
+   * moving the history pointer.
+   *
+   * Called when the player presses Undo from the game-over modal: the failing
+   * move has already been removed from history by {@link discardLastMoveFromHistory},
+   * so `_historyIndex` already points to the pre-fail snapshot and we just need
+   * to apply it to the live board.
+   */
+  restoreFromCurrentSnapshot(): void {
+    if (this._historyIndex < 0 || this._historyIndex >= this._history.length) return;
+    this._restoreSnapshot(this._history[this._historyIndex]);
+  }
+
   /** Returns true if there is a previous state to undo to. */
   canUndo(): boolean {
     return this._historyIndex > 0;
