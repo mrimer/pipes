@@ -529,7 +529,7 @@ export class Board {
    * Used when a move is found to have caused a losing state and should not be
    * preserved in the undo chain.
    */
-  discardLastMove(): void {
+  discardLastMoveFromHistory(): void {
     if (this._historyIndex <= 0) return;
     this._historyIndex--;
     this._history = this._history.slice(0, this._historyIndex + 1);
