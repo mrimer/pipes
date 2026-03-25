@@ -107,3 +107,11 @@ export const ONE_WAY_BG_COLOR = '#2a0808';
 export const ONE_WAY_ARROW_COLOR = '#c02020';
 /** Brighter red arrow border colour for One-Way floor tiles. */
 export const ONE_WAY_ARROW_BORDER = '#e84040';
+/** Leaky pipe tile color (rust-brown with visible corrosion). */
+export const LEAKY_PIPE_COLOR       = '#8b5c2a';
+/** Leaky pipe tile color when water is flowing through it. */
+export const LEAKY_PIPE_WATER_COLOR = '#b07840';
+/** Rust spot overlay color for leaky pipe tiles. */
+export const LEAKY_RUST_COLOR       = '#7a2c10';
+/** Water droplet spray color for leaky pipe spray animation. */
+export const LEAKY_SPRAY_COLOR      = '#56c8e8';

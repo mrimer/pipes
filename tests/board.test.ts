@@ -1,5 +1,5 @@
-import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE } from '../src/board';
-import { Direction, PipeShape } from '../src/types';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../src/board';
+import { Direction, LevelDef, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
 
@@ -56,8 +56,6 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
   });
 
   it('blocks flow opposite to the one-way direction (East tile, flowing West)', () => {
-    const board = makeBoardWithOneWay(Direction.East);
-    // Flowing West from (0,0) is blocked (arrow=East, blocked exit=West)
     // Put the two pipes on a 1×3 board so (0,1) can flow West into (0,0)
     const board2 = new Board(1, 3);
     board2.source = { row: 0, col: 0 };
@@ -112,7 +110,7 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
     // Use LevelDef-compatible structure cast via 'as any' since the test only
     // exercises initialization of oneWayData and grid cell placement.
     // The Source connections field is left out (defaults to all-4) to keep the fixture minimal.
-    const level = {
+    const level: Pick<LevelDef, 'rows' | 'cols' | 'inventory' | 'grid'> = {
       rows: 2,
       cols: 2,
       inventory: [],
@@ -121,7 +119,7 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
         [null, { shape: PipeShape.Sink }],
       ],
     };
-    const board = new Board(2, 2, level as any);
+    const board = new Board(2, 2, level as LevelDef);
     // OneWay at (0,1) with rotation 90 → Direction.East
     expect(board.oneWayData.size).toBe(1);
     expect(board.getOneWayDirection({ row: 0, col: 1 })).toBe(Direction.East);
@@ -4437,5 +4435,219 @@ describe('Cement tile constraints', () => {
     expect(board.cementData.get('0,1')).toBe(2);
     board.redoMove();
     expect(board.cementData.get('0,1')).toBe(1);
+  });
+});
+
+
+// ─── Leaky pipes ─────────────────────────────────────────────────────────────
+
+describe('Leaky pipes', () => {
+  /**
+   * Build a minimal 1×3 board: Source – Empty – Sink.
+   * The player has 3 LeakyStraight pipes in inventory to place.
+   */
+  function makeLeakyBoard(): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.LeakyStraight, count: 3 }];
+    board.initHistory();
+    return board;
+  }
+
+  it('leaky pipe is in LEAKY_PIPE_SHAPES and PIPE_SHAPES', () => {
+    expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyStraight)).toBe(true);
+    expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyElbow)).toBe(true);
+    expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyTee)).toBe(true);
+    expect(LEAKY_PIPE_SHAPES.has(PipeShape.LeakyCross)).toBe(true);
+    expect(PIPE_SHAPES.has(PipeShape.LeakyStraight)).toBe(true);
+    expect(PIPE_SHAPES.has(PipeShape.LeakyElbow)).toBe(true);
+    expect(PIPE_SHAPES.has(PipeShape.LeakyTee)).toBe(true);
+    expect(PIPE_SHAPES.has(PipeShape.LeakyCross)).toBe(true);
+  });
+
+  it('leaky pipe connection costs 1 water on first connect (same as regular pipe)', () => {
+    const board = makeLeakyBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    // Initial connect: -1 water (same as regular pipe via PIPE_SHAPES)
+    expect(board.getCurrentWater()).toBe(9);
+    expect(board.leakyPermanentLoss).toBe(0); // no per-turn penalty yet
+  });
+
+  it('leaky pipe is solvable: isSolved() returns true when connected', () => {
+    const board = makeLeakyBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90);
+    board.applyTurnDelta();
+    expect(board.isSolved()).toBe(true);
+  });
+
+  it('leaky pipe can be placed and reclaimed like a regular pipe', () => {
+    const board = makeLeakyBoard();
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90)).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.LeakyStraight);
+    board.applyTurnDelta(); board.recordMove();
+
+    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+    const inv = board.inventory.find((it) => it.shape === PipeShape.LeakyStraight);
+    expect(inv?.count).toBe(3); // returned to inventory
+  });
+
+  it('newly placed leaky pipe only gets per-turn penalty on SUBSEQUENT turns, not the first', () => {
+    const board = makeLeakyBoard();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90);
+    board.applyTurnDelta(); board.recordMove();
+
+    // Immediately after placement: no per-turn penalty, just the initial -1
+    expect(board.leakyPermanentLoss).toBe(0);
+    expect(board.getCurrentWater()).toBe(9); // 10 - 1 (initial)
+    // lastLockedCostChanges should be empty (no per-turn change on first connect)
+    expect(board.lastLockedCostChanges).toHaveLength(0);
+  });
+
+  it('leaky pipe costs 1 additional water per subsequent turn it remains connected', () => {
+    const board = makeLeakyBoard();
+    // Turn A: place leaky pipe (locks at this turn, no penalty)
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.leakyPermanentLoss).toBe(0);
+    expect(board.getCurrentWater()).toBe(9); // 10 - 1
+
+    // Turn B: any subsequent action causes the leaky penalty
+    board.rotateTile({ row: 0, col: 1 }); // rotate leaky pipe (disconnects, so no penalty this turn)
+    board.applyTurnDelta(); board.recordMove();
+    // After rotation the leaky pipe is no longer connected (different rotation)
+    // so no penalty; water refunded
+    expect(board.leakyPermanentLoss).toBe(0);
+
+    // Re-connect by rotating back
+    board.rotateTile({ row: 0, col: 1 });
+    board.applyTurnDelta(); board.recordMove();
+    // leaky reconnected at this turn → no penalty yet
+    expect(board.leakyPermanentLoss).toBe(0);
+
+    // Next turn: leaky now costs again
+    board.placeInventoryTile({ row: 0, col: 0 }, PipeShape.LeakyStraight, 90); // dummy action
+    board.applyTurnDelta(); board.recordMove();
+    // (0,1) was connected last turn → +1 permanent penalty
+    expect(board.leakyPermanentLoss).toBe(1);
+  });
+
+  it('leakyPermanentLoss accumulates over multiple consecutive turns', () => {
+    // Use a pre-placed leaky pipe so we can count exact turns from initHistory.
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,         0, true);
+    board.grid[0][1] = new Tile(PipeShape.LeakyStraight, 90); // pre-placed
+    board.grid[0][2] = new Tile(PipeShape.Sink,           0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [];
+    board.initHistory(); // turn 1: locks leaky at (0,1), connTurn=1, loss=0
+
+    // Turn 2: first per-turn penalty
+    board.rotateTile({ row: 0, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.leakyPermanentLoss).toBe(1);
+    expect(board.getCurrentWater()).toBe(8); // 10 - 1 (locked) - 1 (permanent)
+
+    // Turn 3: second per-turn penalty
+    board.rotateTile({ row: 0, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.leakyPermanentLoss).toBe(2);
+    expect(board.getCurrentWater()).toBe(7); // 10 - 1 (locked) - 2 (permanent)
+  });
+
+  it('leakyPermanentLoss is permanent: disconnecting does NOT recover per-turn water', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,         0, true);
+    board.grid[0][1] = new Tile(PipeShape.LeakyStraight, 90); // pre-placed, fixed
+    board.grid[0][2] = new Tile(PipeShape.Sink,           0, true);
+    board.sourceCapacity = 20;
+    board.inventory = [{ shape: PipeShape.LeakyStraight, count: 1 }];
+    board.initHistory(); // turn 1: locks leaky
+
+    // Turn 2: accrues permanent loss
+    board.rotateTile({ row: 0, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.leakyPermanentLoss).toBe(1);
+
+    // Remove the leaky pipe
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta(); board.recordMove();
+    // leakyPermanentLoss stays at 1 (not recovered)
+    expect(board.leakyPermanentLoss).toBe(1);
+    // Locked impact is gone (+1 refund), but permanent loss stays (-1).
+    // Water: 20 - 0 (locked impact removed) - 1 (permanent) = 19
+    expect(board.getCurrentWater()).toBe(19);
+  });
+
+  it('leakyPermanentLoss is restored by undo/redo', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,         0, true);
+    board.grid[0][1] = new Tile(PipeShape.LeakyStraight, 90); // pre-placed
+    board.grid[0][2] = new Tile(PipeShape.Sink,           0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.LeakyStraight, count: 1 }];
+    board.initHistory(); // turn 1: locked, loss=0 still
+
+    // Turn 2: per-turn penalty → loss=1
+    board.rotateTile({ row: 0, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.leakyPermanentLoss).toBe(1);
+
+    // Undo: restores to end of turn 1 (loss=0)
+    board.undoMove();
+    expect(board.leakyPermanentLoss).toBe(0);
+
+    // Redo: restores turn-2 state (loss=1)
+    board.redoMove();
+    expect(board.leakyPermanentLoss).toBe(1);
+  });
+
+  it('leaky pipe triggers lastLockedCostChanges on subsequent turns for animation', () => {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,         0, true);
+    board.grid[0][1] = new Tile(PipeShape.LeakyStraight, 90); // pre-placed
+    board.grid[0][2] = new Tile(PipeShape.Sink,           0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.LeakyStraight, count: 1 }];
+    board.initHistory(); // turn 1: locked, no animation
+
+    // Turn 2: per-turn penalty → animation entry pushed
+    board.rotateTile({ row: 0, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.lastLockedCostChanges).toHaveLength(1);
+    expect(board.lastLockedCostChanges[0]).toEqual({ row: 0, col: 1, delta: -1 });
+  });
+
+  it('two leaky pipes each accrue their own per-turn penalty', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,         0, true);
+    board.grid[0][1] = new Tile(PipeShape.LeakyStraight, 90); // pre-placed
+    board.grid[0][2] = new Tile(PipeShape.LeakyStraight, 90); // pre-placed
+    board.grid[0][3] = new Tile(PipeShape.Sink,           0, true);
+    board.sourceCapacity = 20;
+    board.inventory = [];
+    board.initHistory(); // turn 1: both locked, loss=0
+
+    // Turn 2: both pipes penalised
+    board.rotateTile({ row: 0, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.leakyPermanentLoss).toBe(2); // 2 leaky pipes × 1 penalty each
+    expect(board.getCurrentWater()).toBe(16); // 20 - 2 (locked) - 2 (permanent)
   });
 });

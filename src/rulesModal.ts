@@ -13,6 +13,7 @@ import {
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
   STAR_COLOR, HOT_PLATE_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
+  LEAKY_PIPE_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
 
 /** A single row in the tile legend. */
@@ -114,6 +115,23 @@ function oneWaySwatch(): string {
   );
 }
 
+/** Return a leaky pipe tile icon (rust-brown pipe with rust spots) as an inline HTML string. */
+function leakyPipeSwatch(): string {
+  const S = 28;
+  const H = S / 2;
+  const sw = 4;
+  // Pipe body: a simple straight pipe icon
+  const pipeStroke = LEAKY_PIPE_COLOR;
+  const rustFill = LEAKY_RUST_COLOR;
+  return (
+    `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">` +
+    `<line x1="${H}" y1="0" x2="${H}" y2="${S}" stroke="${pipeStroke}" stroke-width="${sw}" stroke-linecap="round"/>` +
+    `<circle cx="${H}" cy="${H * 0.5}" r="3" fill="${rustFill}" opacity="0.85"/>` +
+    `<circle cx="${H}" cy="${H * 1.5}" r="3" fill="${rustFill}" opacity="0.85"/>` +
+    `</svg>`
+  );
+}
+
 /** Controls reference table rows. */
 const CONTROL_ROWS: ControlRow[] = [
   { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
@@ -198,6 +216,11 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: shapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
     name: 'Gold Pipe',
     description: 'Behaves like a normal pipe and can be placed on gold spaces.',
+  },
+  {
+    iconHtml: leakyPipeSwatch(),
+    name: 'Leaky Pipe',
+    description: 'Behaves like a normal pipe but has corroded spots. On the first turn connected it costs 1 water like a standard pipe. On every subsequent turn it remains connected, it loses 1 additional water (permanently — this water is not returned when the pipe is disconnected). An animated drip shows water escaping from the rusty spots.',
   },
   {
     iconHtml: chamberSwatch(TANK_COLOR, '~'),

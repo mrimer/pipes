@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
+import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import {
@@ -36,6 +36,7 @@ import {
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
+  LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
 
 let LINE_WIDTH = 10; // pipe stroke width in px
@@ -122,6 +123,10 @@ export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
   [PipeShape.GoldElbow]:    'El',
   [PipeShape.GoldTee]:      'Te',
   [PipeShape.GoldCross]:    'Cr',
+  [PipeShape.LeakyStraight]: 'St',
+  [PipeShape.LeakyElbow]:    'El',
+  [PipeShape.LeakyTee]:      'Te',
+  [PipeShape.LeakyCross]:    'Cr',
 };
 
 /** Return an inline SVG icon for the given pipe shape. */
@@ -132,15 +137,19 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
   const base = `width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"`;
   const line = (x1: number, y1: number, x2: number, y2: number) =>
     `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
-  // Normalize gold and spin variants to their base shape for icon rendering
+  // Normalize gold, spin, and leaky variants to their base shape for icon rendering
   const SHAPE_ICON_BASE: Partial<Record<PipeShape, PipeShape>> = {
-    [PipeShape.GoldStraight]: PipeShape.Straight,
-    [PipeShape.GoldElbow]:    PipeShape.Elbow,
-    [PipeShape.GoldTee]:      PipeShape.Tee,
-    [PipeShape.GoldCross]:    PipeShape.Cross,
-    [PipeShape.SpinStraight]: PipeShape.Straight,
-    [PipeShape.SpinElbow]:    PipeShape.Elbow,
-    [PipeShape.SpinTee]:      PipeShape.Tee,
+    [PipeShape.GoldStraight]:  PipeShape.Straight,
+    [PipeShape.GoldElbow]:     PipeShape.Elbow,
+    [PipeShape.GoldTee]:       PipeShape.Tee,
+    [PipeShape.GoldCross]:     PipeShape.Cross,
+    [PipeShape.SpinStraight]:  PipeShape.Straight,
+    [PipeShape.SpinElbow]:     PipeShape.Elbow,
+    [PipeShape.SpinTee]:       PipeShape.Tee,
+    [PipeShape.LeakyStraight]: PipeShape.Straight,
+    [PipeShape.LeakyElbow]:    PipeShape.Elbow,
+    [PipeShape.LeakyTee]:      PipeShape.Tee,
+    [PipeShape.LeakyCross]:    PipeShape.Cross,
   };
   const drawShape = SHAPE_ICON_BASE[shape] ?? shape;
   switch (drawShape) {
@@ -1096,6 +1105,66 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   }
 }
 
+/**
+ * Draw rust-colored blotches along each non-blocked arm of a leaky pipe.
+ * The blotches are drawn in the rotated tile context (origin = tile centre).
+ *
+ * @param ctx          2D rendering context (already translated + rotated to tile frame).
+ * @param tile         The leaky pipe tile being drawn.
+ * @param half         Half of the tile size in pixels (= tile centre offset).
+ * @param blockedDir   The direction whose arm is blocked by a one-way tile (no rust there),
+ *                     or null when all arms carry water.
+ */
+function _drawLeakyRustSpots(
+  ctx: CanvasRenderingContext2D,
+  tile: Tile,
+  half: number,
+  blockedDir: Direction | null,
+): void {
+  ctx.save();
+  ctx.fillStyle = LEAKY_RUST_COLOR;
+  ctx.globalAlpha = 0.75;
+  const spotR = _s(4);
+
+  // `tile.connections` returns directions in absolute (post-rotation) space, but the
+  // canvas is already rotated by `tile.rotation`.  We must convert each absolute
+  // direction to the local (pre-rotation) frame before using it as a drawing offset,
+  // mirroring the same un-rotation logic used by _drawPipeArmInRotatedFrame.
+  const rotSteps = tile.rotation / 90;
+  for (const dir of tile.connections) {
+    if (dir === blockedDir) continue;
+
+    // Un-rotate the absolute direction back to local frame.
+    let localDir = dir;
+    for (let i = 0; i < rotSteps; i++) {
+      switch (localDir) {
+        case Direction.North: localDir = Direction.West;  break;
+        case Direction.West:  localDir = Direction.South; break;
+        case Direction.South: localDir = Direction.East;  break;
+        case Direction.East:  localDir = Direction.North; break;
+      }
+    }
+
+    let dx = 0, dy = 0;
+    switch (localDir) {
+      case Direction.North: dx =  0; dy = -1; break;
+      case Direction.South: dx =  0; dy =  1; break;
+      case Direction.East:  dx =  1; dy =  0; break;
+      case Direction.West:  dx = -1; dy =  0; break;
+    }
+
+    // Two spots: one at 1/3 of the arm, one at 2/3.
+    for (const frac of [0.33, 0.67]) {
+      const sx = dx * half * frac;
+      const sy = dy * half * frac;
+      ctx.beginPath();
+      ctx.arc(sx, sy, spotR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 /** Draw a single tile at canvas position (x, y). */
 /**
  * Resolve the canvas stroke/fill color for a tile based on its shape, fill
@@ -1162,6 +1231,7 @@ function _resolveTileColor(
   if (shape === PipeShape.Granite) return GRANITE_COLOR;
   if (shape === PipeShape.Tree) return TREE_COLOR;
   if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+  if (LEAKY_PIPE_SHAPES.has(shape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
   if (SPIN_PIPE_SHAPES.has(shape)) return isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR;
   return isFixed
     ? (isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
@@ -1201,7 +1271,7 @@ export function drawTile(
   // When a one-way tile's blocked exit direction applies and the tile has water,
   // draw each pipe arm individually so the blocked arm can be shown without water.
   const isBlockedPipe = blockedWaterDir !== null && isWater &&
-    (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape));
+    (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape) || LEAKY_PIPE_SHAPES.has(shape));
 
   if (shape === PipeShape.Empty) {
     // Draw a subtle dot so the tile is visually distinct from fixed tiles
@@ -1218,6 +1288,9 @@ export function drawTile(
     for (const armDir of sortedArms) {
       const armColor = armDir === blockedWaterDir ? dryColor : color;
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+    }
+    if (LEAKY_PIPE_SHAPES.has(shape)) {
+      _drawLeakyRustSpots(ctx, tile, half, blockedWaterDir);
     }
   } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight) {
     ctx.beginPath();
@@ -1248,6 +1321,39 @@ export function drawTile(
     ctx.moveTo(-half, 0);
     ctx.lineTo(half, 0);
     ctx.stroke();
+  } else if (shape === PipeShape.LeakyStraight) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
+    ctx.stroke();
+    _drawLeakyRustSpots(ctx, tile, half, null);
+  } else if (shape === PipeShape.LeakyElbow) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    _drawLeakyRustSpots(ctx, tile, half, null);
+  } else if (shape === PipeShape.LeakyTee) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    _drawLeakyRustSpots(ctx, tile, half, null);
+  } else if (shape === PipeShape.LeakyCross) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    _drawLeakyRustSpots(ctx, tile, half, null);
   } else if (shape === PipeShape.Source || shape === PipeShape.Sink) {
     // Restore to un-rotated state so we can draw based on actual connections
     ctx.restore();
@@ -1295,15 +1401,19 @@ export function drawTile(
 /** Return a human-readable name for an inventory item shape (used inside item-container tooltips). */
 function _itemShapeDisplayName(shape: PipeShape | null): string {
   switch (shape) {
-    case PipeShape.Straight:     return 'Straight';
-    case PipeShape.Elbow:        return 'Elbow';
-    case PipeShape.Tee:          return 'Tee';
-    case PipeShape.Cross:        return 'Cross';
-    case PipeShape.GoldStraight: return 'Gold Straight';
-    case PipeShape.GoldElbow:    return 'Gold Elbow';
-    case PipeShape.GoldTee:      return 'Gold Tee';
-    case PipeShape.GoldCross:    return 'Gold Cross';
-    default:                     return 'Item';
+    case PipeShape.Straight:      return 'Straight';
+    case PipeShape.Elbow:         return 'Elbow';
+    case PipeShape.Tee:           return 'Tee';
+    case PipeShape.Cross:         return 'Cross';
+    case PipeShape.GoldStraight:  return 'Gold Straight';
+    case PipeShape.GoldElbow:     return 'Gold Elbow';
+    case PipeShape.GoldTee:       return 'Gold Tee';
+    case PipeShape.GoldCross:     return 'Gold Cross';
+    case PipeShape.LeakyStraight: return 'Leaky Straight';
+    case PipeShape.LeakyElbow:    return 'Leaky Elbow';
+    case PipeShape.LeakyTee:      return 'Leaky Tee';
+    case PipeShape.LeakyCross:    return 'Leaky Cross';
+    default:                      return 'Item';
   }
 }
 
@@ -1325,6 +1435,10 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.SpinStraight: return 'Spin Straight';
     case PipeShape.SpinElbow:    return 'Spin Elbow';
     case PipeShape.SpinTee:      return 'Spin Tee';
+    case PipeShape.LeakyStraight: return 'Leaky Straight';
+    case PipeShape.LeakyElbow:    return 'Leaky Elbow';
+    case PipeShape.LeakyTee:      return 'Leaky Tee';
+    case PipeShape.LeakyCross:    return 'Leaky Cross';
     case PipeShape.Source:       return 'Source';
     case PipeShape.Sink:         return 'Sink';
     case PipeShape.Granite:      return 'Granite';

@@ -22,6 +22,10 @@ const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.SpinStraight]: [Direction.North, Direction.South],
   [PipeShape.SpinElbow]:    [Direction.North, Direction.East],
   [PipeShape.SpinTee]:      [Direction.North, Direction.East, Direction.South],
+  [PipeShape.LeakyStraight]: [Direction.North, Direction.South],
+  [PipeShape.LeakyElbow]:    [Direction.North, Direction.East],
+  [PipeShape.LeakyTee]:      [Direction.North, Direction.East, Direction.South],
+  [PipeShape.LeakyCross]:    [Direction.North, Direction.East, Direction.South, Direction.West],
 };
 
 /**

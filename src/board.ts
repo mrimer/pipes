@@ -38,6 +38,10 @@ export const PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.SpinStraight,
   PipeShape.SpinElbow,
   PipeShape.SpinTee,
+  PipeShape.LeakyStraight,
+  PipeShape.LeakyElbow,
+  PipeShape.LeakyTee,
+  PipeShape.LeakyCross,
 ]);
 
 /** Gold pipe shapes – may only be placed on gold spaces. */
@@ -53,6 +57,14 @@ export const SPIN_PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.SpinStraight,
   PipeShape.SpinElbow,
   PipeShape.SpinTee,
+]);
+
+/** Leaky pipe shapes – cost 1 extra water on every turn they remain connected after the first. */
+export const LEAKY_PIPE_SHAPES = new Set<PipeShape>([
+  PipeShape.LeakyStraight,
+  PipeShape.LeakyElbow,
+  PipeShape.LeakyTee,
+  PipeShape.LeakyCross,
 ]);
 
 /**
@@ -170,6 +182,12 @@ type Snapshot = {
    * Included in snapshots so undo/redo restores the correct setting time.
    */
   cementData: Map<string, number>;
+  /**
+   * Total water permanently lost to leaky pipe penalties accumulated so far.
+   * Unlike frozen water (which is a display counter), this is a real capacity reduction
+   * that cannot be recovered by disconnecting the pipes.
+   */
+  leakyPermanentLoss: number;
 };
 
 /**
@@ -301,6 +319,15 @@ export class Board {
    * Not used in game logic; intended for display purposes.
    */
   frozen: number = 0;
+
+  /**
+   * Total water permanently lost to leaky pipe per-turn penalties.
+   * Each turn a leaky pipe remains connected (after its first turn), one additional
+   * water unit is consumed and added here.  Unlike the initial connection cost,
+   * this loss is permanent: disconnecting the leaky pipe does NOT recover it.
+   * Restored by undo/redo via the snapshot mechanism.
+   */
+  leakyPermanentLoss: number = 0;
 
   /**
    * Per hot_plate tile: the amount of frozen water consumed (waterGain) when that tile connected.
@@ -546,6 +573,7 @@ export class Board {
       lockedConnectTemp: new Map(this._lockedConnectTemp),
       lockedConnectPressure: new Map(this._lockedConnectPressure),
       cementData: new Map(this.cementData),
+      leakyPermanentLoss: this.leakyPermanentLoss,
     };
   }
 
@@ -569,6 +597,7 @@ export class Board {
     this._lockedConnectTemp = new Map(snap.lockedConnectTemp);
     this._lockedConnectPressure = new Map(snap.lockedConnectPressure);
     this.cementData = new Map(snap.cementData);
+    this.leakyPermanentLoss = snap.leakyPermanentLoss;
   }
 
   /**
@@ -1054,7 +1083,7 @@ export class Board {
       for (const key of filled) {
         total += this._lockedWaterImpact.get(key) ?? 0;
       }
-      return total;
+      return total - this.leakyPermanentLoss;
     }
 
     // ── Dynamic fallback (test/legacy path) ─────────────────────────────────
@@ -1099,7 +1128,7 @@ export class Board {
         }
       }
     }
-    return this.sourceCapacity - pipeCost + tankGain;
+    return this.sourceCapacity - pipeCost + tankGain - this.leakyPermanentLoss;
   }
 
   /**
@@ -1131,6 +1160,31 @@ export class Board {
       this._reEvaluateConnectedTiles(filled);
     }
     this._lockNewTiles(filled);
+    this._applyLeakyPenalties(filled);
+  }
+
+  /**
+   * Apply the per-turn water penalty for leaky pipes that were already connected
+   * before this turn (i.e. present in `_lockedWaterImpact` before `_lockNewTiles`
+   * ran and still in the fill path).  Each such tile permanently loses 1 water unit
+   * that cannot be recovered by disconnecting the pipe.
+   * Results are recorded in {@link lastLockedCostChanges} so the UI can animate
+   * the cost label.
+   */
+  private _applyLeakyPenalties(filled: Set<string>): void {
+    for (const key of filled) {
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (!tile || !LEAKY_PIPE_SHAPES.has(tile.shape)) continue;
+      // Only penalise tiles that were already locked before this turn
+      // (i.e. not brand-new connections which were just locked by _lockNewTiles).
+      // A newly-connected tile's connection turn equals the current turn number.
+      const connTurn = this._connectionTurn.get(key);
+      if (connTurn === undefined || connTurn === this._turnNumber) continue;
+
+      this.leakyPermanentLoss++;
+      this.lastLockedCostChanges.push({ row: r, col: c, delta: -1 });
+    }
   }
 
   /**

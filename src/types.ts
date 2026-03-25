@@ -58,6 +58,14 @@ export enum PipeShape {
   SpinElbow = 'SPIN_ELBOW',
   /** Spinnable T-junction – pre-placed; player can rotate it CW but cannot remove it */
   SpinTee = 'SPIN_TEE',
+  /** Leaky straight pipe – behaves like Straight but loses 1 water each turn it stays connected */
+  LeakyStraight = 'LEAKY_STRAIGHT',
+  /** Leaky elbow pipe – behaves like Elbow but loses 1 water each turn it stays connected */
+  LeakyElbow = 'LEAKY_ELBOW',
+  /** Leaky T-junction – behaves like Tee but loses 1 water each turn it stays connected */
+  LeakyTee = 'LEAKY_TEE',
+  /** Leaky cross junction – behaves like Cross but loses 1 water each turn it stays connected */
+  LeakyCross = 'LEAKY_CROSS',
 }
 
 /** The type of content housed inside a Chamber tile. */
