@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import {
@@ -1746,10 +1746,23 @@ function _renderPass3PipeTiles(
       const isWater = filled.has(posKey(r, c));
       const isHovered = r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(tile.shape);
 
-      // If this pipe sits on a one-way cell, derive the direction that is blocked
-      // for water rendering (the arm opposite to the one-way arrow).
+      // If this pipe sits on a one-way cell, the arm pointing opposite the arrow
+      // direction appears blocked (dry) only when the neighbour in that direction is
+      // NOT sending water toward this tile.  When a neighbour IS mutually connected
+      // inward (entering from the "back" side), the arm carries water and must not
+      // be shown as blocked.
       const owDir = board.oneWayData.get(posKey(r, c));
-      const blockedWaterDir = owDir !== undefined ? oppositeDirection(owDir) : null;
+      let blockedWaterDir: Direction | null = null;
+      if (owDir !== undefined) {
+        const antiDir = oppositeDirection(owDir);
+        const delta = NEIGHBOUR_DELTA[antiDir];
+        const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
+        // areMutuallyConnected(neighborPos, owDir) returns true when the neighbour
+        // in the anti-direction can send water through this tile in the arrow direction.
+        if (!board.areMutuallyConnected(neighborPos, owDir)) {
+          blockedWaterDir = antiDir;
+        }
+      }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir);
     }
