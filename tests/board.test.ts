@@ -1436,6 +1436,46 @@ describe('Board.initHistory / canUndo / undoMove / canRedo / redoMove', () => {
   });
 });
 
+// ─── New: discardLastMove ─────────────────────────────────────────────────────
+
+describe('Board.discardLastMove', () => {
+  it('removes the most recently recorded snapshot so canUndo reflects the pre-move state', () => {
+    const board = new Board(2, 2);
+    board.initHistory();                     // snap0
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();                      // snap1
+    expect(board.canUndo()).toBe(true);
+
+    board.discardLastMove();                 // remove snap1
+
+    expect(board.canUndo()).toBe(false);     // back to initial snapshot only
+    expect(board.canRedo()).toBe(false);     // no future states
+  });
+
+  it('does nothing when called on the initial snapshot (index 0)', () => {
+    const board = new Board(2, 2);
+    board.initHistory();                     // snap0 only
+
+    board.discardLastMove();                 // should be a no-op
+
+    expect(board.canUndo()).toBe(false);
+    expect(board.canRedo()).toBe(false);
+  });
+
+  it('after discard a new recordMove() can still extend the history normally', () => {
+    const board = new Board(2, 2);
+    board.initHistory();                     // snap0
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();                      // snap1
+    board.discardLastMove();                 // remove snap1 → back to snap0
+    board.rotateTile({ row: 0, col: 0 });
+    board.recordMove();                      // new snap1
+
+    expect(board.canUndo()).toBe(true);
+    expect(board.canRedo()).toBe(false);
+  });
+});
+
 // ─── New: replaceInventoryTile ────────────────────────────────────────────────
 
 describe('Board.replaceInventoryTile', () => {

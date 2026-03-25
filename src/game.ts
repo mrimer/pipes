@@ -1420,6 +1420,10 @@ export class Game {
       }
       this._refreshPlayUI();
       this._checkWinLose();
+      if (this.gameState === GameState.GameOver) {
+        this.board.discardLastMove();
+        this._updateUndoRedoButtons();
+      }
     } else if (this.board.lastError) {
       this._handleBoardError();
     }
@@ -1440,6 +1444,10 @@ export class Game {
     this._spawnCementDecrementAnimation();
     this._refreshPlayUI();
     this._checkWinLose();
+    if (this.gameState === GameState.GameOver) {
+      this.board.discardLastMove();
+      this._updateUndoRedoButtons();
+    }
   }
 
   /**
@@ -2249,6 +2257,10 @@ export class Game {
     this._deselectIfDepleted();
     this._refreshPlayUI();
     this._checkWinLose();
+    if (this.gameState === GameState.GameOver) {
+      this.board.discardLastMove();
+      this._updateUndoRedoButtons();
+    }
   }
 
   /**
@@ -2392,12 +2404,15 @@ export class Game {
     if (!this.currentLevel) return;
     const prevBoard = this.board;
     const prevDecorations = prevBoard?.ambientDecorations;
+    const wasGameOver = this.gameState === GameState.GameOver;
     this.startLevel(this.currentLevel.id, prevDecorations);
     // Graft the pre-restart history onto the new board so Undo can revert to
     // the state the player was in before restarting.
+    // Skip grafting when restarting from a fail state – the losing position
+    // should not be reachable via Undo after a restart.
     // Guard against the edge case where startLevel() returned early (level not
     // found) and this.board was not replaced with a new Board instance.
-    if (prevBoard && this.board && this.board !== prevBoard) {
+    if (!wasGameOver && prevBoard && this.board && this.board !== prevBoard) {
       this.board.graftPreRestartHistory(prevBoard);
       this._updateUndoRedoButtons();
     }
