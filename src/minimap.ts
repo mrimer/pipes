@@ -57,6 +57,9 @@ function tileColor(tile: TileDef | null): string {
     case PipeShape.SpinStraight:
     case PipeShape.SpinElbow:
     case PipeShape.SpinTee:
+    case PipeShape.SpinStraightCement:
+    case PipeShape.SpinElbowCement:
+    case PipeShape.SpinTeeCement:
       return SPIN_PIPE_COLOR;
     case PipeShape.LeakyStraight:
     case PipeShape.LeakyElbow:
@@ -109,6 +112,7 @@ const PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
 ]);
 
@@ -180,6 +184,10 @@ function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
   if (shape === PipeShape.SpinStraight || shape === PipeShape.SpinElbow ||
       shape === PipeShape.SpinTee) {
     return { bg: EMPTY_COLOR, line: SPIN_PIPE_COLOR };
+  }
+  if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement ||
+      shape === PipeShape.SpinTeeCement) {
+    return { bg: CEMENT_FILL_COLOR, line: SPIN_PIPE_COLOR };
   }
   if (shape === PipeShape.LeakyStraight || shape === PipeShape.LeakyElbow ||
       shape === PipeShape.LeakyTee || shape === PipeShape.LeakyCross) {

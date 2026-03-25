@@ -8,7 +8,7 @@ import { PipeShape, TileDef, Direction, Rotation } from '../types';
 import { TILE_SIZE, drawSpinArrow, scalePx as _s } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
-import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER } from '../colors';
 
 // ─── Overlay types ─────────────────────────────────────────────────────────────
@@ -280,6 +280,8 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = ONE_WAY_BG_COLOR;
   } else if (shape === PipeShape.Cement) {
     bgColor = CEMENT_FILL_COLOR;
+  } else if (SPIN_CEMENT_SHAPES.has(shape)) {
+    bgColor = CEMENT_FILL_COLOR;
   } else if (shape === PipeShape.Granite) {
     bgColor = '#4a5568';
   } else if (shape === PipeShape.Tree) {
@@ -358,6 +360,43 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   );
 
   drawTileOnEditor(ctx, x, y, tile);
+
+  // For spin-cement tiles, draw the cement wavy-line overlay and drying-time label on top.
+  if (SPIN_CEMENT_SHAPES.has(shape)) {
+    const dryingTime = def.dryingTime ?? 0;
+    const cx = x + CELL / 2;
+    const cy = y + CELL / 2;
+    ctx.save();
+    ctx.strokeStyle = CEMENT_COLOR;
+    ctx.lineWidth = _s(1.5);
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 0.5;
+    const sq2 = Math.SQRT1_2;
+    const len = CELL * 0.5;
+    for (let i = -1; i <= 1; i++) {
+      const px = i * _s(8) * sq2;
+      const py = i * _s(8) * sq2;
+      const lx = cx + px; const ly = cy + py;
+      ctx.beginPath();
+      ctx.moveTo(lx - len * sq2, ly + len * sq2);
+      ctx.quadraticCurveTo(lx + _s(2) * sq2, ly + _s(2) * sq2, lx + len * sq2, ly - len * sq2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    ctx.save();
+    ctx.font = `bold ${_s(8)}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#505050';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = _s(1.5);
+    ctx.lineJoin = 'round';
+    const label = dryingTime === 0 ? 'X' : `T=${dryingTime}`;
+    ctx.strokeText(label, x + _s(2), y + _s(2));
+    ctx.fillText(label, x + _s(2), y + _s(2));
+    ctx.restore();
+  }
 }
 
 /** Chamber content types whose tile label/detail text is rendered 1pt larger than the default. */
@@ -502,9 +541,10 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
   } else {
     // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants, Leaky variants)
     const isGold = [PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross].includes(shape);
+    const isSpinCement = SPIN_CEMENT_SHAPES.has(shape);
     const isSpin = SPIN_PIPE_SHAPES.has(shape);
     const isLeaky = LEAKY_PIPE_SHAPES.has(shape);
-    ctx.fillStyle = isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
+    ctx.fillStyle = isSpinCement ? CEMENT_FILL_COLOR : isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
     ctx.fillRect(x, y, CELL, CELL);
     // Draw pipe lines
     ctx.strokeStyle = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
@@ -514,11 +554,11 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.translate(cx, cy);
     ctx.rotate((tile.rotation * Math.PI) / 180);
     const h = CELL / 2;
-    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight) {
+    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight || shape === PipeShape.SpinStraightCement) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.LeakyElbow) {
+    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.LeakyElbow || shape === PipeShape.SpinElbowCement) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.LeakyTee) {
+    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.LeakyTee || shape === PipeShape.SpinTeeCement) {
       ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
     } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross || shape === PipeShape.LeakyCross) {

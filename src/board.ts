@@ -38,6 +38,9 @@ export const PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.SpinStraight,
   PipeShape.SpinElbow,
   PipeShape.SpinTee,
+  PipeShape.SpinStraightCement,
+  PipeShape.SpinElbowCement,
+  PipeShape.SpinTeeCement,
   PipeShape.LeakyStraight,
   PipeShape.LeakyElbow,
   PipeShape.LeakyTee,
@@ -57,6 +60,16 @@ export const SPIN_PIPE_SHAPES = new Set<PipeShape>([
   PipeShape.SpinStraight,
   PipeShape.SpinElbow,
   PipeShape.SpinTee,
+  PipeShape.SpinStraightCement,
+  PipeShape.SpinElbowCement,
+  PipeShape.SpinTeeCement,
+]);
+
+/** Spinnable-pipe-on-cement shapes – spin pipes that also track a cement drying time. */
+export const SPIN_CEMENT_SHAPES = new Set<PipeShape>([
+  PipeShape.SpinStraightCement,
+  PipeShape.SpinElbowCement,
+  PipeShape.SpinTeeCement,
 ]);
 
 /** Leaky pipe shapes – cost 1 extra water on every turn they remain connected after the first. */
@@ -419,6 +432,10 @@ export class Board {
           // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
           const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
           this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0);
+          // Spin-cement tiles also track cement drying time.
+          if (SPIN_CEMENT_SHAPES.has(def.shape)) {
+            this.cementData.set(posKey(r, c), def.dryingTime ?? 0);
+          }
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
           } else if (def.shape === PipeShape.Sink) {

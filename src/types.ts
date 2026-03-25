@@ -58,6 +58,12 @@ export enum PipeShape {
   SpinElbow = 'SPIN_ELBOW',
   /** Spinnable T-junction – pre-placed; player can rotate it CW but cannot remove it */
   SpinTee = 'SPIN_TEE',
+  /** Spinnable straight pipe on cement – like SpinStraight but has a drying time; each rotation decrements it; when 0 it can no longer be rotated */
+  SpinStraightCement = 'SPIN_STRAIGHT_CEMENT',
+  /** Spinnable elbow pipe on cement – like SpinElbow but has a drying time; each rotation decrements it; when 0 it can no longer be rotated */
+  SpinElbowCement = 'SPIN_ELBOW_CEMENT',
+  /** Spinnable T-junction on cement – like SpinTee but has a drying time; each rotation decrements it; when 0 it can no longer be rotated */
+  SpinTeeCement = 'SPIN_TEE_CEMENT',
   /** Leaky straight pipe – behaves like Straight but loses 1 water each turn it stays connected */
   LeakyStraight = 'LEAKY_STRAIGHT',
   /** Leaky elbow pipe – behaves like Elbow but loses 1 water each turn it stays connected */
