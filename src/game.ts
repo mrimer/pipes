@@ -773,10 +773,7 @@ export class Game {
     clearStarSparkles();
     // Reset particle arrays so stale drops from a previous level don't carry over.
     this._clearAllParticles();
-    this._prevWater = null;
-    this._prevTemp = null;
-    this._prevFrozen = null;
-    this._prevPressure = null;
+    this._resetMetricBaselines();
 
     this._updateLevelHeader(levelId);
     this._refreshPlayUI();
@@ -957,6 +954,14 @@ export class Game {
   }
 
   // ─── Water display ────────────────────────────────────────────────────────
+
+  /** Reset metric-sparkle baselines so the next {@link _updateWaterDisplay} call treats all values as initial (no sparkles fired). */
+  private _resetMetricBaselines(): void {
+    this._prevWater = null;
+    this._prevTemp = null;
+    this._prevFrozen = null;
+    this._prevPressure = null;
+  }
 
   private _updateWaterDisplay(): void {
     if (!this.board) return;
@@ -2619,10 +2624,7 @@ export class Game {
     this._closeModal(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
-    this._prevWater = null;
-    this._prevTemp = null;
-    this._prevFrozen = null;
-    this._prevPressure = null;
+    this._resetMetricBaselines();
     this._refreshPlayUI();
     this._renderBoard();
   }
@@ -2635,10 +2637,7 @@ export class Game {
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
     this._deselectIfDepleted();
-    this._prevWater = null;
-    this._prevTemp = null;
-    this._prevFrozen = null;
-    this._prevPressure = null;
+    this._resetMetricBaselines();
     this._refreshPlayUI();
     this._renderBoard();
     this._checkWinLose();
@@ -2731,10 +2730,7 @@ export class Game {
     clearStarSparkles();
     // Reset particle arrays for the playtested level.
     this._clearAllParticles();
-    this._prevWater = null;
-    this._prevTemp = null;
-    this._prevFrozen = null;
-    this._prevPressure = null;
+    this._resetMetricBaselines();
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();
