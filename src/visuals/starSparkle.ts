@@ -66,15 +66,16 @@ function _drawStarShape(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * Spawn a burst of golden sparkle particles centred at the given
- * viewport-pixel coordinates.
+ * Spawn a burst of sparkle particles centred at the given viewport-pixel coordinates.
  *
  * @param x      Viewport X (e.g. from `getBoundingClientRect().left + cx`).
  * @param y      Viewport Y.
  * @param count  Number of particles to emit (default 24).
+ * @param colors Optional array of CSS color strings to use instead of the default gold palette.
  */
-export function spawnStarSparkles(x: number, y: number, count = 24): void {
+export function spawnStarSparkles(x: number, y: number, count = 24, colors?: readonly string[]): void {
   _ensureCanvas();
+  const palette = colors ?? SPARKLE_COLORS;
   const now = performance.now();
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
@@ -90,7 +91,7 @@ export function spawnStarSparkles(x: number, y: number, count = 24): void {
       duration:  500 + Math.random() * 500,
       rotation:  Math.random() * Math.PI * 2,
       rotSpeed:  (Math.random() - 0.5) * 0.3,
-      color:     SPARKLE_COLORS[Math.floor(Math.random() * SPARKLE_COLORS.length)],
+      color:     palette[Math.floor(Math.random() * palette.length)],
     });
   }
   if (_animId === null) {

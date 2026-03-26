@@ -46,6 +46,13 @@ const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) before spawning star sparkles over the win modal star icon. */
 const MODAL_SPARKLE_DELAY_MS = 150;
 
+/** Sparkle color palette for metric increases (gold). */
+const METRIC_SPARKLE_GOLD: readonly string[] = ['#ffd700', '#ffe866', '#ffec8b', '#ffc200', '#fff0a0', '#f0c040'];
+/** Sparkle color palette for metric decreases (light blue). */
+const METRIC_SPARKLE_BLUE: readonly string[] = ['#add8e6', '#87ceeb', '#b0e0e6', '#e0f7ff', '#cce8ff', '#aed6f1'];
+/** Sparkle color palette for frozen metric decreases (red). */
+const METRIC_SPARKLE_RED:  readonly string[] = ['#ff4444', '#ff7777', '#ff9999', '#ff6666', '#ffaaaa', '#cc3333'];
+
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
   'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
@@ -299,6 +306,15 @@ export class Game {
   /** Span holding the numeric value in the pressure stat row. */
   private readonly pressureValueEl: HTMLElement;
 
+  /** Previous water count for metric sparkle detection (null before first display or after level reset). */
+  private _prevWater: number | null = null;
+  /** Previous temperature value for metric sparkle detection (null when row is hidden). */
+  private _prevTemp: number | null = null;
+  /** Previous frozen value for metric sparkle detection (null when row is hidden). */
+  private _prevFrozen: number | null = null;
+  /** Previous pressure value for metric sparkle detection (null when row is hidden). */
+  private _prevPressure: number | null = null;
+
   /** Box shown beneath the grid with level notes (when the level has a note). */
   private readonly noteBoxEl: HTMLElement;
 
@@ -534,6 +550,12 @@ export class Game {
     }
   }
 
+  /** Spawn a small burst of sparkle particles centred on a HUD stat row element. */
+  private static _spawnMetricSparkles(rowEl: HTMLElement, colors: readonly string[]): void {
+    const rect = rowEl.getBoundingClientRect();
+    spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 16, colors);
+  }
+
   /**
    * Create a standard modal overlay with a centred box, title heading, and an
    * empty actions bar at the bottom.  Appends the overlay to `document.body`.
@@ -751,6 +773,10 @@ export class Game {
     clearStarSparkles();
     // Reset particle arrays so stale drops from a previous level don't carry over.
     this._clearAllParticles();
+    this._prevWater = null;
+    this._prevTemp = null;
+    this._prevFrozen = null;
+    this._prevPressure = null;
 
     this._updateLevelHeader(levelId);
     this._refreshPlayUI();
@@ -941,15 +967,35 @@ export class Game {
     else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
     else             waterColor = WATER_COLOR;
     this.waterDisplayEl.style.color = waterColor;
+    if (this._prevWater !== null && w > this._prevWater) {
+      // Per design: water sparkles only on increase (water can't meaningfully "decrease" as a good event).
+      Game._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
+    }
+    this._prevWater = w;
 
     const tempValue = this.board.hasTempRelevantTiles() ? this.board.getCurrentTemperature() : null;
     Game._showStatRow(this.tempDisplayEl, this.tempValueEl, tempValue);
+    if (tempValue !== null && this._prevTemp !== null) {
+      if (tempValue > this._prevTemp)      Game._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_GOLD);
+      else if (tempValue < this._prevTemp) Game._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_BLUE);
+    }
+    this._prevTemp = tempValue;
 
     const frozenValue = this.board.frozen > 0 ? this.board.frozen : null;
     Game._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
+    if (frozenValue !== null && this._prevFrozen !== null) {
+      if (frozenValue > this._prevFrozen)      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+      else if (frozenValue < this._prevFrozen) Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
+    }
+    this._prevFrozen = frozenValue;
 
     const pressureValue = this.board.hasPressureRelevantTiles() ? this.board.getCurrentPressure() : null;
     Game._showStatRow(this.pressureDisplayEl, this.pressureValueEl, pressureValue);
+    if (pressureValue !== null && this._prevPressure !== null) {
+      if (pressureValue > this._prevPressure)      Game._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_GOLD);
+      else if (pressureValue < this._prevPressure) Game._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_BLUE);
+    }
+    this._prevPressure = pressureValue;
   }
 
   /**
@@ -2674,6 +2720,10 @@ export class Game {
     clearStarSparkles();
     // Reset particle arrays for the playtested level.
     this._clearAllParticles();
+    this._prevWater = null;
+    this._prevTemp = null;
+    this._prevFrozen = null;
+    this._prevPressure = null;
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._renderInventoryBar();
