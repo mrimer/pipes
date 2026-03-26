@@ -986,6 +986,9 @@ export class Game {
     if (frozenValue !== null && this._prevFrozen !== null) {
       if (frozenValue > this._prevFrozen)      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
       else if (frozenValue < this._prevFrozen) Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
+    } else if (frozenValue !== null && this._prevFrozen === null) {
+      // Row just became visible (frozen increased from 0): show sparkle.
+      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
     }
     this._prevFrozen = frozenValue;
 
@@ -2616,6 +2619,10 @@ export class Game {
     this._closeModal(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
+    this._prevWater = null;
+    this._prevTemp = null;
+    this._prevFrozen = null;
+    this._prevPressure = null;
     this._refreshPlayUI();
     this._renderBoard();
   }
@@ -2628,6 +2635,10 @@ export class Game {
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
     this._deselectIfDepleted();
+    this._prevWater = null;
+    this._prevTemp = null;
+    this._prevFrozen = null;
+    this._prevPressure = null;
     this._refreshPlayUI();
     this._renderBoard();
     this._checkWinLose();
