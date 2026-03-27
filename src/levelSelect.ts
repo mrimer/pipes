@@ -126,6 +126,11 @@ function chapterWaterTotal(
  * @param campaignChapters - When set, the chapters to render (from the active campaign).
  * @param levelStars - Map of level ID → stars collected for the current campaign.
  * @param levelWater - Map of level ID → max water remaining recorded for the current campaign.
+ * @param chapterExpandedState - Map of chapter index → expanded state from the previous visit.
+ *   When provided, a chapter's expansion is restored from this map instead of being computed
+ *   from completion status.  Only chapters absent from the map use the default rule.
+ * @param onChapterToggle - Callback invoked when the player expands or collapses a chapter,
+ *   so the caller can persist the new state across re-renders.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -139,6 +144,8 @@ export function renderLevelList(
   campaignChapters?: ChapterDef[],
   levelStars: Record<number, number> = {},
   levelWater: Record<number, number> = {},
+  chapterExpandedState?: Map<number, boolean>,
+  onChapterToggle?: (chapterIndex: number, expanded: boolean) => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -389,8 +396,11 @@ export function renderLevelList(
     const chevron = document.createElement('span');
     chevron.style.cssText = 'font-size:0.8rem;transition:transform 0.2s;';
 
-    // Default: expand if not locked and not all levels completed
-    let expanded = !chapterLocked && !allLevelsCompleted;
+    // Restore the previously saved expansion state when available; otherwise
+    // default to expanded only for unlocked, incomplete chapters.
+    let expanded = chapterExpandedState?.has(ci)
+      ? chapterExpandedState.get(ci)!
+      : !chapterLocked && !allLevelsCompleted;
     chevron.textContent = expanded ? '▲' : '▼';
 
     chapterHeader.appendChild(chapterTitle);
@@ -410,6 +420,7 @@ export function renderLevelList(
         expanded = !expanded;
         levelsContainer.style.display = expanded ? 'flex' : 'none';
         chevron.textContent = expanded ? '▲' : '▼';
+        onChapterToggle?.(ci, expanded);
       });
       // Attach the hover water-wave background animation for interactive chapters.
       // The trigger is the whole chapter box so hovering anywhere (header or
