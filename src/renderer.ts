@@ -423,6 +423,24 @@ function _drawOneWayBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
 }
 
 /**
+ * Return true when the neighbor cell at (nr, nc) is an open buildable floor —
+ * a cell where a player can place a pipe but none is currently present.
+ * Pipe arms pointing at open floor cells use round end caps (nubs); arms
+ * pointing at any other tile use flat (butt) ends so they sit flush at the
+ * tile boundary.
+ *
+ * The following background cell types are all stored as PipeShape.Empty in the
+ * runtime grid, so the single shape check below covers all of them:
+ *  - Normal empty cells
+ *  - Gold spaces               (tracked separately in board.goldSpaces)
+ *  - Cement cells without a pipe or spin pipe (tracked in board.cementData)
+ *  - One-way cells             (tracked separately in board.oneWayData)
+ */
+function _isOpenFloorCell(board: Board, nr: number, nc: number): boolean {
+  return board.grid[nr][nc].shape === PipeShape.Empty;
+}
+
+/**
  * Draw a single pipe arm from the tile center to the tile edge in the given
  * *absolute* direction, accounting for the tile's rotation so the line is
  * placed correctly in the already-rotated canvas coordinate frame.
@@ -2007,16 +2025,16 @@ function _renderPass3PipeTiles(
       // Apply any active rotation animation override for this tile.
       const rotOverride = rotationOverrides?.get(posKey(r, c));
 
-      // Determine which arm directions need a flat (butt) end cap: any arm
-      // pointing at a non-empty adjacent tile should use lineCap='butt' so
-      // the rounded nub does not stick out onto that tile.
+      // Determine which arm directions need a flat (butt) end cap: arms pointing
+      // at open floor cells (empty, gold space, cement without pipe, one-way) keep
+      // round ends so the nub blends into the open area; all other neighbor types
+      // (pipes, source, sink, chamber, granite, tree) use butt ends.
       let buttEndDirs: Set<Direction> | undefined;
       for (const dir of tile.connections) {
         const delta = NEIGHBOUR_DELTA[dir];
         const nr = r + delta.row, nc = c + delta.col;
         if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
-        const neighbor = board.grid[nr][nc];
-        if (neighbor.shape !== PipeShape.Empty) {
+        if (!_isOpenFloorCell(board, nr, nc)) {
           (buttEndDirs ??= new Set<Direction>()).add(dir);
         }
       }
