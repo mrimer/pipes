@@ -30,7 +30,7 @@ import {
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import {
   PipeRotationAnim, PipeFillAnim,
-  computeRotationOverrides, computeActiveFillKeys, computeFillEntryDirs, computeFillOrder,
+  computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
   renderFillAnims,
   FILL_ANIM_DURATION, ROTATION_ANIM_DURATION,
 } from './visuals/pipeEffects';
@@ -1156,7 +1156,6 @@ export class Game {
     // Build per-frame animation overrides for the renderer.
     const rotationOverrides = computeRotationOverrides(this._rotationAnims, now);
     const fillExclude = computeActiveFillKeys(this._fillAnims, now);
-    const fillEntryDirs = computeFillEntryDirs(this._fillAnims, now);
 
     renderBoard(
       this.ctx,
@@ -1173,7 +1172,6 @@ export class Game {
       this.hoverRotationDelta,
       rotationOverrides,
       fillExclude,
-      fillEntryDirs,
     );
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).

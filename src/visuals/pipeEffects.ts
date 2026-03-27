@@ -146,24 +146,6 @@ export function computeActiveFillKeys(
   return keys;
 }
 
-/**
- * Return a map from posKey → entry direction for all currently active (not yet
- * started or still running) fill animations.  Used by the renderer to clip the
- * entry-arm nub of dry-animated pipe tiles so the rounded cap does not bleed
- * into the adjacent already-filled tile.
- */
-export function computeFillEntryDirs(
-  anims: PipeFillAnim[],
-  now: number,
-): Map<string, Direction> {
-  const dirs = new Map<string, Direction>();
-  for (const anim of anims) {
-    if (!anim.isSink && now >= anim.startTime + FILL_ANIM_DURATION) continue;
-    dirs.set(fillAnimKey(anim), anim.entryDir);
-  }
-  return dirs;
-}
-
 // ─── BFS fill-order computation ───────────────────────────────────────────────
 
 /**
