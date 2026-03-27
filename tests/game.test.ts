@@ -2525,6 +2525,78 @@ describe('Game – spinner tile right-click deselects inventory', () => {
   });
 });
 
+// ─── Tests: spinner tile wheel rotation ───────────────────────────────────────
+
+describe('Game – spinner tile wheel rotation', () => {
+  it('rotates the spinner clockwise (90→180) when scrolling down over it', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1) with initial rotation 90
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+
+    // No inventory selected; hover over grid (row=0, col=1).
+    // TILE_SIZE=64: col 1 → x=96, row 0 → y=32.
+    hooks.selectedShape = null;
+    hooks.mouseCanvasPos = { x: 96, y: 32 };
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(180);
+  });
+
+  it('rotates the spinner counter-clockwise (90→0) when scrolling up over it', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1) with initial rotation 90
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+
+    hooks.selectedShape = null;
+    hooks.mouseCanvasPos = { x: 96, y: 32 };
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: -1 }));
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(0);
+  });
+
+  it('does NOT rotate the spinner when scrolling over a non-spinner tile', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1) with initial rotation 90
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    hooks.selectedShape = null;
+    // Hover over (row=0, col=0) which is the Source tile, not a spin pipe.
+    hooks.mouseCanvasPos = { x: 32, y: 32 };
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+
+    // Spinner at (0,1) must be unchanged.
+    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+  });
+
+  it('rotates the selected inventory piece (not the spinner) when an inventory item is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(8); // LEVEL_8: SpinStraight at (0,1) with initial rotation 90
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    // Select an inventory item and hover over the spinner.
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks.mouseCanvasPos = { x: 96, y: 32 };
+
+    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+
+    // Pending rotation advances, not the spinner.
+    expect(hooks.pendingRotation).toBe(90);
+    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+  });
+});
+
 // ─── Tests: win modal "(New Best!)" water indicator ───────────────────────────
 
 describe('Game – win modal shows "(New Best!)" for a new water record', () => {
