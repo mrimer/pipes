@@ -1,7 +1,7 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
-import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR } from './colors';
+import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
@@ -562,9 +562,10 @@ export class Game {
     }
   }
 
-  /** Spawn a small burst of sparkle particles centred on a HUD stat row element. */
+  /** Spawn a small burst of sparkle particles centred on a HUD stat value element. */
   private static _spawnMetricSparkles(rowEl: HTMLElement, colors: readonly string[]): void {
-    const rect = rowEl.getBoundingClientRect();
+    const valueEl = (rowEl.querySelector('.stat-value') as HTMLElement | null) ?? rowEl;
+    const rect = valueEl.getBoundingClientRect();
     spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 16, colors);
   }
 
@@ -1547,10 +1548,21 @@ export class Game {
     const order = computeFillOrder(this.board, filledBefore);
     if (order.length === 0) return;
     const now = performance.now();
+    const sinkKey = posKey(this.board.sink.row, this.board.sink.col);
     for (let i = 0; i < order.length; i++) {
       const { row, col, entryDir, blockedDir } = order[i];
+      const key = posKey(row, col);
+      const isSink = key === sinkKey;
+      // Resolve the water color that matches how this tile is drawn when filled.
+      const tile = this.board.getTile({ row, col });
+      let waterColor: string | undefined;
+      if (tile) {
+        if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
+        else if (LEAKY_PIPE_SHAPES.has(tile.shape)) waterColor = LEAKY_PIPE_WATER_COLOR;
+        else if (SPIN_PIPE_SHAPES.has(tile.shape) || tile.isFixed) waterColor = FIXED_PIPE_WATER_COLOR;
+      }
       this._fillAnims.push({
-        row, col, entryDir, blockedDir,
+        row, col, entryDir, blockedDir, isSink, waterColor,
         startTime: now + startDelay + i * FILL_ANIM_DURATION,
       });
     }
