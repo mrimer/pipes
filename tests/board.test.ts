@@ -1,4 +1,4 @@
-import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../src/board';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
 import { Direction, LevelDef, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
@@ -224,7 +224,61 @@ describe('Board.rotateTileBy', () => {
   });
 });
 
-// ─── New: rotateTile container-grant constraint ───────────────────────────────
+// ─── Cross pipe rotation ──────────────────────────────────────────────────────
+
+describe('CROSS_PIPE_SHAPES', () => {
+  it('contains Cross, GoldCross and LeakyCross', () => {
+    expect(CROSS_PIPE_SHAPES.has(PipeShape.Cross)).toBe(true);
+    expect(CROSS_PIPE_SHAPES.has(PipeShape.GoldCross)).toBe(true);
+    expect(CROSS_PIPE_SHAPES.has(PipeShape.LeakyCross)).toBe(true);
+  });
+
+  it('does not contain non-cross shapes', () => {
+    expect(CROSS_PIPE_SHAPES.has(PipeShape.Straight)).toBe(false);
+    expect(CROSS_PIPE_SHAPES.has(PipeShape.Elbow)).toBe(false);
+    expect(CROSS_PIPE_SHAPES.has(PipeShape.Tee)).toBe(false);
+  });
+});
+
+describe('Cross pipes are not rotatable', () => {
+  it('rotateTile returns false for Cross and does not set lastError', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Cross, 0);
+    const result = board.rotateTile({ row: 1, col: 1 });
+    expect(result).toBe(false);
+    expect(board.lastError).toBeNull();
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+
+  it('rotateTileBy returns false for Cross and does not set lastError', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.Cross, 0);
+    const result = board.rotateTileBy({ row: 1, col: 1 }, 2);
+    expect(result).toBe(false);
+    expect(board.lastError).toBeNull();
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+
+  it('rotateTile returns false for GoldCross and does not set lastError', () => {
+    const board = new Board(3, 3);
+    board.goldSpaces.add(posKey(1, 1));
+    board.grid[1][1] = new Tile(PipeShape.GoldCross, 0);
+    const result = board.rotateTile({ row: 1, col: 1 });
+    expect(result).toBe(false);
+    expect(board.lastError).toBeNull();
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+
+  it('rotateTile returns false for LeakyCross and does not set lastError', () => {
+    const board = new Board(3, 3);
+    board.grid[1][1] = new Tile(PipeShape.LeakyCross, 0);
+    const result = board.rotateTile({ row: 1, col: 1 });
+    expect(result).toBe(false);
+    expect(board.lastError).toBeNull();
+    expect(board.grid[1][1].rotation).toBe(0);
+  });
+});
+
 
 describe('Board.rotateTile (container-grant constraint)', () => {
   /**

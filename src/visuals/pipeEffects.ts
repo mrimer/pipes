@@ -59,6 +59,14 @@ export interface PipeFillAnim {
    * color so pre-placed (gold / fixed / leaky) pipes animate in their own hue.
    */
   waterColor?: string;
+  /**
+   * When true this entry is a container tile (Source or Chamber).  The tile is
+   * included in the fill-exclude set so its display is held at its pre-connected
+   * appearance until the animation reaches it, but no water overlay is drawn on
+   * top of it (the container switches directly to its connected appearance once
+   * the animation entry expires).
+   */
+  isContainer?: boolean;
 }
 
 // ─── Key helpers ─────────────────────────────────────────────────────────────
@@ -234,6 +242,9 @@ export function renderFillAnims(
   now: number,
 ): void {
   for (const anim of anims) {
+    // Container tiles have no water overlay — they switch directly to their
+    // connected appearance once the animation entry expires.
+    if (anim.isContainer) continue;
     const elapsed = now - anim.startTime;
     if (elapsed < 0) continue; // not started yet
     // Sink tile: only Phase 1 (entry arm fills to center); clamp at 0.5 so it
@@ -265,6 +276,11 @@ function _drawFillOverlay(
   const otherP = Math.max(0, (progress - 0.5) * 2);
 
   ctx.save();
+  // Clip to this tile's bounds so that the rounded line-cap nubs on Phase 2
+  // arms never extend into adjacent tiles and paint over content there.
+  ctx.beginPath();
+  ctx.rect(anim.col * TILE_SIZE, anim.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  ctx.clip();
   ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
