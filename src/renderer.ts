@@ -1642,6 +1642,7 @@ export function renderBoard(
   hoverRotationDelta = 0,
   rotationOverrides?: Map<string, number>,
   fillExclude?: Set<string>,
+  fillEntryDirs?: Map<string, Direction>,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1661,7 +1662,7 @@ export function renderBoard(
 
   _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
-  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
+  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides, fillEntryDirs);
   _renderPass4CementLabels(ctx, board);
   _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater);
 }
@@ -1976,6 +1977,7 @@ function _renderPass3PipeTiles(
   currentPressure: number,
   mouseCanvasPos: { x: number; y: number } | null,
   rotationOverrides?: Map<string, number>,
+  fillEntryDirs?: Map<string, Direction>,
 ): void {
   const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
   const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
@@ -2017,6 +2019,8 @@ function _renderPass3PipeTiles(
       //   - Arms pointing at a Source or Sink always get clipped (any fill state).
       //   - Arms pointing at a Chamber get clipped only when the pipe itself is dry,
       //     to prevent the dry-colour nub from bleeding into the chamber tile.
+      //   - The entry arm of a fill-animated (dry) tile is clipped so the dry
+      //     round-cap nub does not bleed into the adjacent already-filled tile.
       let clipNubDirs: Set<Direction> | undefined;
       for (const dir of tile.connections) {
         const delta = NEIGHBOUR_DELTA[dir];
@@ -2029,6 +2033,12 @@ function _renderPass3PipeTiles(
           (neighbor.shape === PipeShape.Chamber && !isWater)
         ) {
           (clipNubDirs ??= new Set<Direction>()).add(dir);
+        }
+      }
+      if (!isWater) {
+        const fillEntryDir = fillEntryDirs?.get(posKey(r, c));
+        if (fillEntryDir !== undefined) {
+          (clipNubDirs ??= new Set<Direction>()).add(fillEntryDir);
         }
       }
 
