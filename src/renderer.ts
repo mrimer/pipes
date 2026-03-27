@@ -1259,18 +1259,18 @@ export function drawTile(
   isHovered = false,
   blockedWaterDir: Direction | null = null,
   rotationDegOverride?: number,
-  clipNubDirs?: Set<Direction>,
+  buttEndDirs?: Set<Direction>,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
 
-  // When a rotation override is active, use it; blocked arms and nub-clip dirs are
+  // When a rotation override is active, use it; blocked arms and butt-end dirs are
   // suppressed during rotation animation because the arm directions are mid-transition.
   const effectiveRotation = rotationDegOverride ?? rotation;
   const effectiveBlockedWaterDir = rotationDegOverride !== undefined ? null : blockedWaterDir;
-  const effectiveClipNubDirs = rotationDegOverride !== undefined ? undefined : clipNubDirs;
+  const effectiveButtEndDirs = rotationDegOverride !== undefined ? undefined : buttEndDirs;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -1286,9 +1286,10 @@ export function drawTile(
   // draw each pipe arm individually so the blocked arm can be shown without water.
   const isPipeShape = PIPE_SHAPES.has(shape);
   const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater && isPipeShape;
-  // When any arm needs its nub clipped to the tile boundary (e.g. adjacent to a
-  // source/sink/chamber), draw arms individually so clipping can be applied per arm.
-  const hasNubClip = (effectiveClipNubDirs?.size ?? 0) > 0 && isPipeShape;
+  // When any arm points at a non-empty adjacent tile, draw arms individually so
+  // each arm end can use lineCap='butt' (flat) instead of round, preventing nubs
+  // from sticking out onto adjacent non-empty tiles.
+  const hasButtEnd = (effectiveButtEndDirs?.size ?? 0) > 0 && isPipeShape;
 
   if (shape === PipeShape.Empty) {
     // Draw a subtle dot so the tile is visually distinct from fixed tiles
@@ -1296,28 +1297,17 @@ export function drawTile(
     ctx.beginPath();
     ctx.arc(0, 0, _s(4), 0, Math.PI * 2);
     ctx.fill();
-  } else if (isBlockedPipe || hasNubClip) {
-    // Arm-by-arm drawing: blocked arm uses non-water color; clipped arms use a tile-boundary
-    // clip region to prevent round-cap nubs from extending into adjacent tiles.
-    // Draw blocked arms first so the unblocked (water) arms are painted on top at the
-    // tile center, giving the correct visual appearance at the junction point.
+  } else if (isBlockedPipe || hasButtEnd) {
+    // Arm-by-arm drawing: blocked arm uses non-water color; arms pointing at
+    // non-empty adjacent tiles use lineCap='butt' so the end sits flush with
+    // the tile boundary.  Draw blocked arms first so the unblocked (water) arms
+    // are painted on top at the tile center.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
     const sortedArms = [...tile.connections].sort((a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0));
-    ctx.lineCap = 'round';
     for (const armDir of sortedArms) {
       const armColor = (isBlockedPipe && armDir === effectiveBlockedWaterDir) ? dryColor : color;
-      if (effectiveClipNubDirs?.has(armDir)) {
-        // Clip this arm to the tile boundary so the round cap doesn't bleed into
-        // the adjacent source/sink/chamber tile.
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(-half, -half, half * 2, half * 2);
-        ctx.clip();
-        _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
-        ctx.restore();
-      } else {
-        _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
-      }
+      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
+      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
@@ -1644,7 +1634,6 @@ export function renderBoard(
   hoverRotationDelta = 0,
   rotationOverrides?: Map<string, number>,
   fillExclude?: Set<string>,
-  fillEntryDirs?: Map<string, Direction>,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1664,7 +1653,7 @@ export function renderBoard(
 
   _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
-  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides, fillEntryDirs);
+  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
   _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater);
 }
@@ -1966,8 +1955,10 @@ function _renderPass2NonPipeTiles(
 
 /**
  * Pass 3: Draw all pipe tile content on top of all non-pipe tile content so that
- * pipe rounded caps (from lineCap='round') are never overwritten by a neighboring
- * non-pipe tile's fill (e.g. a Chamber or Source adjacent to a pipe).
+ * pipe rounded caps (lineCap='round') on arms pointing at empty tiles are never
+ * overwritten by a neighboring empty tile's background fill drawn in pass 1/2.
+ * Arms pointing at non-empty adjacent tiles use lineCap='butt' (flat ends) so
+ * they sit flush with the tile boundary and do not bleed into adjacent tiles.
  */
 function _renderPass3PipeTiles(
   ctx: CanvasRenderingContext2D,
@@ -1979,7 +1970,6 @@ function _renderPass3PipeTiles(
   currentPressure: number,
   mouseCanvasPos: { x: number; y: number } | null,
   rotationOverrides?: Map<string, number>,
-  fillEntryDirs?: Map<string, Direction>,
 ): void {
   const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
   const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
@@ -2017,34 +2007,21 @@ function _renderPass3PipeTiles(
       // Apply any active rotation animation override for this tile.
       const rotOverride = rotationOverrides?.get(posKey(r, c));
 
-      // Determine which arm directions need their nub clipped at the tile boundary:
-      //   - Arms pointing at a Source or Sink always get clipped (any fill state).
-      //   - Arms pointing at a Chamber get clipped only when the pipe itself is dry,
-      //     to prevent the dry-colour nub from bleeding into the chamber tile.
-      //   - The entry arm of a fill-animated (dry) tile is clipped so the dry
-      //     round-cap nub does not bleed into the adjacent already-filled tile.
-      let clipNubDirs: Set<Direction> | undefined;
+      // Determine which arm directions need a flat (butt) end cap: any arm
+      // pointing at a non-empty adjacent tile should use lineCap='butt' so
+      // the rounded nub does not stick out onto that tile.
+      let buttEndDirs: Set<Direction> | undefined;
       for (const dir of tile.connections) {
         const delta = NEIGHBOUR_DELTA[dir];
         const nr = r + delta.row, nc = c + delta.col;
         if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
         const neighbor = board.grid[nr][nc];
-        if (
-          neighbor.shape === PipeShape.Source ||
-          neighbor.shape === PipeShape.Sink ||
-          (neighbor.shape === PipeShape.Chamber && !isWater)
-        ) {
-          (clipNubDirs ??= new Set<Direction>()).add(dir);
-        }
-      }
-      if (!isWater) {
-        const fillEntryDir = fillEntryDirs?.get(posKey(r, c));
-        if (fillEntryDir !== undefined) {
-          (clipNubDirs ??= new Set<Direction>()).add(fillEntryDir);
+        if (neighbor.shape !== PipeShape.Empty) {
+          (buttEndDirs ??= new Set<Direction>()).add(dir);
         }
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, clipNubDirs);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs);
     }
   }
 }
