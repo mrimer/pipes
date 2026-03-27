@@ -384,6 +384,9 @@ export class Game {
   /** Modal overlay shown when the player presses Esc to confirm abandoning the level. */
   private readonly _exitConfirmModalEl: HTMLElement;
 
+  /** Modal overlay shown when a level starts in an already-lost state (unplayable). */
+  private readonly _unplayableModalEl: HTMLElement;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -484,6 +487,9 @@ export class Game {
 
     // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
     this._exitConfirmModalEl = this._buildExitConfirmModal();
+
+    // Create the unplayable-level modal (shown when a level starts already lost)
+    this._unplayableModalEl = this._buildUnplayableModal();
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
@@ -708,6 +714,24 @@ export class Game {
     return el;
   }
 
+  /** Build and attach the unplayable-level modal (shown when a level starts in a losing state). */
+  private _buildUnplayableModal(): HTMLElement {
+    const { el, box, actionsEl } = Game._buildModalShell('⚠️ Level Unplayable');
+    const msgEl = document.createElement('p');
+    msgEl.textContent = 'This level starts in a losing position and cannot be played.';
+    box.insertBefore(msgEl, actionsEl);
+    const exitBtn = document.createElement('button');
+    exitBtn.textContent = 'Exit Level';
+    exitBtn.className = 'modal-btn primary';
+    exitBtn.type = 'button';
+    exitBtn.addEventListener('click', () => {
+      this._unplayableModalEl.style.display = 'none';
+      this.exitToMenu();
+    });
+    actionsEl.appendChild(exitBtn);
+    return el;
+  }
+
   // ─── Screen transitions ───────────────────────────────────────────────────
 
   private _showLevelSelect(): void {
@@ -721,6 +745,7 @@ export class Game {
     this._newChapterModalEl.style.display = 'none';
     this._challengeModalEl.style.display = 'none';
     this._exitConfirmModalEl.style.display = 'none';
+    this._unplayableModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     this._clearModalSparkle(this._newChapterModalEl);
@@ -797,6 +822,7 @@ export class Game {
     this._newChapterModalEl.style.display = 'none';
     this._challengeModalEl.style.display  = 'none';
     this._exitConfirmModalEl.style.display = 'none';
+    this._unplayableModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
@@ -817,6 +843,11 @@ export class Game {
       if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
         this._startErrorHighlight(this.board.lastErrorTilePositions);
       }
+    }
+
+    // If the level starts already in a losing state, show the unplayable modal.
+    if (this.board.getCurrentWater() <= 0) {
+      this._showModalWithAnimation(this._unplayableModalEl, 'sparkle-red');
     }
   }
 
@@ -2783,7 +2814,15 @@ export class Game {
    * When called from the game-over modal, also dismisses the modal and resumes play.
    */
   performUndo(): void {
-    if (!this.board || !this.board.canUndo()) return;
+    if (!this.board) return;
+    // In GameOver state, allow undo if canUndo() is true (normal case) or if the
+    // failing move was the very first move and discardLastMoveFromHistory() was
+    // already called, leaving _historyIndex at 0 with the initial snapshot available.
+    if (this.gameState === GameState.GameOver) {
+      if (!this.board.canRestoreAfterGameOver()) return;
+    } else if (!this.board.canUndo()) {
+      return;
+    }
     this._completeAnims();
     const filledBefore = this.board.getFilledPositions();
     if (this.gameState === GameState.GameOver) {
