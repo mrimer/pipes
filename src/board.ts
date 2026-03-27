@@ -81,6 +81,16 @@ export const LEAKY_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /**
+ * Cross pipe shapes – symmetric in all four directions and therefore not
+ * rotatable.  Attempting to rotate one is a no-op (returns false silently).
+ */
+export const CROSS_PIPE_SHAPES = new Set<PipeShape>([
+  PipeShape.Cross,
+  PipeShape.GoldCross,
+  PipeShape.LeakyCross,
+]);
+
+/**
  * Returns true for impassable obstacle tiles (Granite, Tree).
  * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
  */
@@ -1875,6 +1885,10 @@ export class Board {
     const tile = this.getTile(pos);
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
     if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) return false;
+
+    // Cross pipes face all four directions and rotating them is not a valid move.
+    // Fail silently (no error message) because there is nothing wrong with the board state.
+    if (CROSS_PIPE_SHAPES.has(tile.shape)) return false;
 
     // ── Cement constraint check (for player-placed pipe tiles only) ───────────
     if (this._isCementHardened(pos, tile)) return false;
