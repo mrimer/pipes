@@ -234,7 +234,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
   ctx.restore();
 }
 
-function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape): void {
+function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape, buttEndDirs?: Set<Direction>): void {
   // Filled circle
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -243,18 +243,16 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
   // Radiating lines – only for connected directions
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'round';
-  if (tile.connections.has(Direction.North)) {
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -half); ctx.stroke();
-  }
-  if (tile.connections.has(Direction.South)) {
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, half); ctx.stroke();
-  }
-  if (tile.connections.has(Direction.East)) {
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
-  }
-  if (tile.connections.has(Direction.West)) {
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-half, 0); ctx.stroke();
+  const DIRS: [Direction, number, number][] = [
+    [Direction.North, 0, -half],
+    [Direction.South, 0,  half],
+    [Direction.East,  half, 0],
+    [Direction.West, -half, 0],
+  ];
+  for (const [dir, dx, dy] of DIRS) {
+    if (!tile.connections.has(dir)) continue;
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dx, dy); ctx.stroke();
   }
   // Show capacity number on Source (drawn last so it appears on top)
   if (shape === PipeShape.Source) {
@@ -438,6 +436,30 @@ function _drawOneWayBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
  */
 function _isOpenFloorCell(board: Board, nr: number, nc: number): boolean {
   return board.grid[nr][nc].shape === PipeShape.Empty;
+}
+
+/**
+ * Compute which arm directions of the tile at (r, c) need a flat (butt) end
+ * cap.  Arms pointing at open floor cells (empty) keep round ends; all other
+ * neighbor types use butt ends.  Exception: when an arm points at a pipe tile
+ * that has no arm pointing back, the arms don't overlap, so a round nub is
+ * kept instead.
+ */
+function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction> | undefined {
+  const tile = board.grid[r][c];
+  let buttEndDirs: Set<Direction> | undefined;
+  for (const dir of tile.connections) {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nr = r + delta.row, nc = c + delta.col;
+    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
+    if (_isOpenFloorCell(board, nr, nc)) continue;
+    const neighborTile = board.grid[nr][nc];
+    // If the neighbor is a pipe tile without a reciprocal arm, the arms
+    // don't overlap – keep a round nub here.
+    if (PIPE_SHAPES.has(neighborTile.shape) && !neighborTile.connections.has(oppositeDirection(dir))) continue;
+    (buttEndDirs ??= new Set<Direction>()).add(dir);
+  }
+  return buttEndDirs;
 }
 
 /**
@@ -1408,7 +1430,7 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    _drawSourceOrSink(ctx, tile, color, half, currentWater, shape);
+    _drawSourceOrSink(ctx, tile, color, half, currentWater, shape, effectiveButtEndDirs);
   } else if (shape === PipeShape.Chamber) {
     // Chamber – a steel-blue enclosure whose interior display varies by content
     ctx.restore();
@@ -1977,7 +1999,12 @@ function _renderPass2NonPipeTiles(
         }
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
+      // For Source/Sink tiles, compute which arm directions need a butt end cap.
+      const buttEndDirs = (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink)
+        ? _computeButtEndDirs(board, r, c)
+        : undefined;
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
     }
   }
 }
@@ -2036,25 +2063,8 @@ function _renderPass3PipeTiles(
       // Apply any active rotation animation override for this tile.
       const rotOverride = rotationOverrides?.get(posKey(r, c));
 
-      // Determine which arm directions need a flat (butt) end cap: arms pointing
-      // at open floor cells (empty, gold space, cement without pipe, one-way) keep
-      // round ends so the nub blends into the open area; all other neighbor types
-      // (source, sink, chamber, granite, tree) use butt ends.
-      // Exception: when an arm points at a pipe tile that has no arm pointing back
-      // (i.e. the two tiles do not connect on this edge), the arms do not overlap,
-      // so a round nub creates no visual conflict and is kept instead.
-      let buttEndDirs: Set<Direction> | undefined;
-      for (const dir of tile.connections) {
-        const delta = NEIGHBOUR_DELTA[dir];
-        const nr = r + delta.row, nc = c + delta.col;
-        if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
-        if (_isOpenFloorCell(board, nr, nc)) continue;
-        const neighborTile = board.grid[nr][nc];
-        // If the neighbor is a pipe tile without a reciprocal arm, the arms
-        // don't overlap – keep a round nub here.
-        if (PIPE_SHAPES.has(neighborTile.shape) && !neighborTile.connections.has(oppositeDirection(dir))) continue;
-        (buttEndDirs ??= new Set<Direction>()).add(dir);
-      }
+      // Determine which arm directions need a flat (butt) end cap.
+      const buttEndDirs = _computeButtEndDirs(board, r, c);
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs);
     }
