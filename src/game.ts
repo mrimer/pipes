@@ -32,7 +32,7 @@ import {
   PipeRotationAnim, PipeFillAnim,
   computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
   renderFillAnims,
-  FILL_ANIM_DURATION,
+  FILL_ANIM_DURATION, ROTATION_ANIM_DURATION,
 } from './visuals/pipeEffects';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
@@ -1535,10 +1535,14 @@ export class Game {
    * `filledBefore` was captured.  Tiles are animated in BFS order, each one
    * starting after the previous tile's animation completes.
    *
+   * @param startDelay - Extra milliseconds to wait before the first tile begins
+   *   filling.  Pass `ROTATION_ANIM_DURATION` when a rotation animation is
+   *   playing so the fill starts only after the rotation completes.
+   *
    * Not called during undo/redo – those actions snap to the final state
    * without playing visual animations.
    */
-  private _spawnFillAnims(filledBefore: Set<string>): void {
+  private _spawnFillAnims(filledBefore: Set<string>, startDelay = 0): void {
     if (!this.board) return;
     const order = computeFillOrder(this.board, filledBefore);
     if (order.length === 0) return;
@@ -1547,7 +1551,7 @@ export class Game {
       const { row, col, entryDir, blockedDir } = order[i];
       this._fillAnims.push({
         row, col, entryDir, blockedDir,
-        startTime: now + i * FILL_ANIM_DURATION,
+        startTime: now + startDelay + i * FILL_ANIM_DURATION,
       });
     }
   }
@@ -1560,6 +1564,7 @@ export class Game {
    * @param filledBefore - Filled positions snapshot taken before the rotation.
    * @param rotationInfo - When provided, a pipe-rotation animation is spawned
    *   for the rotated tile from `oldRotation` to the tile's current rotation.
+   *   Any subsequent fill animation is delayed until after the rotation completes.
    */
   private _afterTileRotated(
     filledBefore: Set<string>,
@@ -1569,6 +1574,7 @@ export class Game {
     this._completeAnims();
     this.board.applyTurnDelta();
     this.board.recordMove();
+    let fillDelay = 0;
     if (rotationInfo) {
       const tile = this.board.getTile(rotationInfo);
       if (tile) {
@@ -1579,11 +1585,13 @@ export class Game {
           newRotation: tile.rotation,
           startTime: performance.now(),
         });
+        // Fill animations begin only after the rotation animation completes.
+        fillDelay = ROTATION_ANIM_DURATION;
       }
     }
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
-    this._spawnFillAnims(filledBefore);
+    this._spawnFillAnims(filledBefore, fillDelay);
     this._spawnLockedCostChangeAnimations();
     this._spawnCementDecrementAnimation();
     this._refreshPlayUI();

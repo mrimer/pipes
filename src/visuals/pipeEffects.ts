@@ -87,11 +87,12 @@ export function computeRotationOverrides(
     // f(t) = 4t³            for t < 0.5
     // f(t) = 1 − (−2t+2)³/2 for t ≥ 0.5
     const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    // Always animate clockwise.  When newRotation ≤ oldRotation (e.g. 270→0 or same
-    // value at wrap-around), adding 360 turns the non-positive difference into the
-    // equivalent positive CW arc (e.g. 0 − 270 = −270 → 90° CW).
+    // Animate along the shortest arc so CCW input (3 steps = 270° CW) rotates CCW
+    // rather than sweeping 270° the long way around.
+    // Normalize delta to (-180, 180]: positive = CW, negative = CCW.
     let delta = anim.newRotation - anim.oldRotation;
-    if (delta <= 0) delta += 360;
+    if (delta > 180) delta -= 360;
+    else if (delta < -180) delta += 360;
     const angle = anim.oldRotation + delta * eased;
     overrides.set(rotationAnimKey(anim), angle);
     i++;
