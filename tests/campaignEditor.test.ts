@@ -220,7 +220,7 @@ function makeEditor(userCampaigns: CampaignDef[] = []): CampaignEditor {
 /**
  * Get the text of the first button in the campaign row whose info section
  * contains a campaign with the given name.
- * Note: JSDOM normalises CSS hex colours to rgb(), so we can't use style attribute selectors.
+ * Note: JSDOM normalizes CSS hex colors to rgb(), so we can't use style attribute selectors.
  */
 function getFirstButtonTextForCampaign(name: string): string | null {
   const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
@@ -901,7 +901,7 @@ describe('CampaignEditor – import activates the campaign', () => {
     expect(playCalls[0].name).toBe('New');
   });
 
-  it('does not call onPlayCampaign when import is cancelled in version conflict dialog', () => {
+  it('does not call onPlayCampaign when import is canceled in version conflict dialog', () => {
     const existing: CampaignDef = {
       id: 'cmp_cancel', name: 'Old', author: 'A', chapters: [],
       lastUpdated: '2024-01-01T00:00:00.000Z',
@@ -1330,7 +1330,7 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
       toJSON: () => ({}),
     });
 
-    // Column 5 starts at 5 * 51.2 = 256 px; its centre is at ~281.6 px.
+    // Column 5 starts at 5 * 51.2 = 256 px; its center is at ~281.6 px.
     // With the fixed formula (rect.width * col / editCols) this is tile col=5.
     const pos = state._canvasPos(mouseAt(281, 281));
     expect(pos).not.toBeNull();

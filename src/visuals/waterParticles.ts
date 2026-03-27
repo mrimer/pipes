@@ -21,7 +21,7 @@ import { TILE_SIZE, scalePx as _s } from '../renderer';
 export interface SourceSprayDrop {
   /** Direction angle in radians (0 = right, π/2 = down, etc.). */
   angle: number;
-  /** Current distance from the tile centre in pixels. */
+  /** Current distance from the tile center in pixels. */
   distance: number;
   /** Movement speed in pixels per frame at ~60 fps. */
   speed: number;
@@ -54,9 +54,9 @@ export function spawnSourceSprayDrop(drops: SourceSprayDrop[]): void {
  *
  * @param ctx       2D rendering context.
  * @param drops     Mutable array of active spray drops (modified in place).
- * @param sourceCx  Canvas X of the source tile centre.
- * @param sourceCy  Canvas Y of the source tile centre.
- * @param color     CSS colour string for the drops.
+ * @param sourceCx  Canvas X of the source tile center.
+ * @param sourceCy  Canvas Y of the source tile center.
+ * @param color     CSS color string for the drops.
  */
 export function renderSourceSpray(
   ctx: CanvasRenderingContext2D,
@@ -78,7 +78,7 @@ export function renderSourceSpray(
     const x = sourceCx + Math.cos(drop.angle) * drop.distance;
     const y = sourceCy + Math.sin(drop.angle) * drop.distance;
 
-    // Alpha: near-opaque at the centre, fades to transparent at the tile edge.
+    // Alpha: near-opaque at the center, fades to transparent at the tile edge.
     const progress = drop.distance / maxDist;
     const alpha = 0.6 * (1 - progress);
 
@@ -106,7 +106,7 @@ export function renderSourceSpray(
 export interface DryPuff {
   /** Direction angle in radians (0 = right, π/2 = down, etc.). */
   angle: number;
-  /** Current distance from the tile centre in pixels. */
+  /** Current distance from the tile center in pixels. */
   distance: number;
   /** Movement speed in pixels per frame at ~60 fps. */
   speed: number;
@@ -136,8 +136,8 @@ export function spawnDryPuff(puffs: DryPuff[]): void {
  *
  * @param ctx       2D rendering context.
  * @param puffs     Mutable array of active puffs (modified in place).
- * @param sourceCx  Canvas X of the source tile centre.
- * @param sourceCy  Canvas Y of the source tile centre.
+ * @param sourceCx  Canvas X of the source tile center.
+ * @param sourceCy  Canvas Y of the source tile center.
  */
 export function renderDryPuffs(
   ctx: CanvasRenderingContext2D,
@@ -159,7 +159,7 @@ export function renderDryPuffs(
     const x = sourceCx + Math.cos(puff.angle) * puff.distance;
     const y = sourceCy + Math.sin(puff.angle) * puff.distance;
 
-    // Fade from opaque near the centre to transparent at the edge.
+    // Fade from opaque near the center to transparent at the edge.
     const progress = puff.distance / maxDist;
     const alpha = 0.55 * (1 - progress);
 
@@ -195,7 +195,7 @@ function _oppositeDir(dir: Direction): Direction {
  * wandering into dead-end branches.
  *
  * Algorithm: backward BFS from the sink.  A direction `d` from tile T is "good"
- * if the neighbour N reached by going in direction `d` has at least one good
+ * if the neighbor N reached by going in direction `d` has at least one good
  * outgoing direction that does not return straight back to T.
  */
 export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
@@ -226,9 +226,9 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
   }
 
   // BFS backwards: propagate "good" directions through mutual connections.
-  // We check areMutuallyConnected from the *neighbour* going *toward* current
+  // We check areMutuallyConnected from the *neighbor* going *toward* current
   // (i.e. the forward-flow direction) rather than from current going toward
-  // the neighbour, so that one-way tiles are traversed correctly in reverse.
+  // the neighbor, so that one-way tiles are traversed correctly in reverse.
   while (queue.length > 0) {
     const current = queue.shift()!;
     const currentDirs = getDirs(current);
@@ -266,7 +266,7 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
 }
 
 /**
- * Return all mutually-connected neighbour directions from `pos`, excluding the
+ * Return all mutually-connected neighbor directions from `pos`, excluding the
  * direction the drop arrived from (to prevent back-tracking), and (when
  * `goodDirs` is provided) restricted to directions that are known to lead
  * towards the sink without hitting a dead end.
@@ -296,13 +296,13 @@ export interface FlowDrop {
   /** Grid column of the tile the drop is currently leaving. */
   col: number;
   /**
-   * Fractional progress of travel from the current tile centre to the next
-   * (0 = at current centre, 1 = arrived at the next tile).
+   * Fractional progress of travel from the current tile center to the next
+   * (0 = at current center, 1 = arrived at the next tile).
    */
   progress: number;
   /** Movement speed in tile-lengths per frame at ~60 fps. */
   speed: number;
-  /** Direction the drop is currently travelling towards. */
+  /** Direction the drop is currently traveling towards. */
   direction: Direction;
   /** Direction the drop arrived from (prevents back-tracking). */
   fromDir: Direction | null;
@@ -312,7 +312,7 @@ export interface FlowDrop {
 
 /**
  * Spawn a new win-flow drop at the source tile.
- * Does nothing when the pool is full or the source has no connected neighbours.
+ * Does nothing when the pool is full or the source has no connected neighbors.
  *
  * @param drops     Mutable array of active flow drops.
  * @param board     The solved game board.
@@ -342,7 +342,7 @@ export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<str
  * @param ctx       2D rendering context.
  * @param drops     Mutable array of active flow drops (modified in place).
  * @param board     The solved game board (used for connection lookups).
- * @param color     CSS colour string for the drops.
+ * @param color     CSS color string for the drops.
  * @param goodDirs  Pre-computed good-direction set from {@link computeFlowGoodDirs}.
  */
 export function renderFlowDrops(
@@ -479,16 +479,16 @@ export function spawnBubble(
   let bx: number;
   let by: number;
 
-  // Choose: the centre junction (always valid) or one of the pipe arms.
+  // Choose: the center junction (always valid) or one of the pipe arms.
   const choice = Math.floor(Math.random() * (connectedDirs.length + 1));
   if (choice >= connectedDirs.length || connectedDirs.length === 0) {
-    // Centre junction – stay within the tube cross-section.
+    // Center junction – stay within the tube cross-section.
     bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
     by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
   } else {
     const dir = connectedDirs[choice];
     // Place the bubble somewhere along the pipe arm towards `dir`.
-    // The arm runs from the tile centre to the tile edge; the bubble is
+    // The arm runs from the tile center to the tile edge; the bubble is
     // confined within the tube width.
     switch (dir) {
       case Direction.North:
@@ -525,7 +525,7 @@ export function spawnBubble(
  *
  * @param ctx     2D rendering context.
  * @param bubbles Mutable array of active bubbles (modified in place).
- * @param color   CSS colour string used for the bubble fill.
+ * @param color   CSS color string used for the bubble fill.
  */
 export function renderBubbles(
   ctx: CanvasRenderingContext2D,
@@ -573,7 +573,7 @@ export function renderBubbles(
 /**
  * A single water drop spraying outward from a rusty spot on a leaky pipe.
  * Similar to {@link SourceSprayDrop} but anchored to a specific point along
- * a pipe arm rather than the source tile centre.
+ * a pipe arm rather than the source tile center.
  */
 export interface LeakySprayDrop {
   /** Canvas pixel X origin of the spray spot. */
@@ -671,7 +671,7 @@ export function spawnLeakySprayDrop(
  *
  * @param ctx    2D rendering context.
  * @param drops  Mutable array of active leaky spray drops (modified in place).
- * @param color  CSS colour string for the drops.
+ * @param color  CSS color string for the drops.
  */
 export function renderLeakySpray(
   ctx: CanvasRenderingContext2D,

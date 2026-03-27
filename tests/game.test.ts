@@ -665,7 +665,7 @@ describe('Game – level-select chapter numbering', () => {
 // ─── Tests: pendingRotation and placement orientation ─────────────────────────
 
 describe('Game – pending rotation', () => {
-  it('initialises pendingRotation to 0 when starting a level', () => {
+  it('initializes pendingRotation to 0 when starting a level', () => {
     const { game } = makeGame();
     game.startLevel(1);
     expect(gameHooks(game).pendingRotation).toBe(0);
@@ -1834,7 +1834,7 @@ describe('Game – performRedo spawns tile impact animations', () => {
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Reclaim the first pipe at (0,1) via right-click – disconnects both (0,1) and (0,2)
-    // (0,1) centre: clientX=96, clientY=32
+    // (0,1) center: clientX=96, clientY=32
     hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     // Undo the reclaim (restores the pipe at (0,1), reconnects (0,1) and (0,2))

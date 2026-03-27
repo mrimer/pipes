@@ -245,13 +245,13 @@ export interface AmbientDecoration {
   col: number;
   /** The kind of decoration. */
   type: AmbientDecorationType;
-  /** Sub-tile centre X as a fraction of TILE_SIZE (0–1). */
+  /** Sub-tile center X as a fraction of TILE_SIZE (0–1). */
   offsetX: number;
-  /** Sub-tile centre Y as a fraction of TILE_SIZE (0–1). */
+  /** Sub-tile center Y as a fraction of TILE_SIZE (0–1). */
   offsetY: number;
   /** Overall rotation in degrees (0–360). */
   rotation: number;
-  /** Integer variant index driving colour / shape choices (0–2). */
+  /** Integer variant index driving color / shape choices (0–2). */
   variant: number;
 }
 

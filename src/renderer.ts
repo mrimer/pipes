@@ -47,7 +47,7 @@ export let TILE_SIZE = 64; // px
 /** Base tile size used as the reference for all pixel-value scaling. */
 const BASE_TILE_SIZE = 64;
 
-/** Translucent blue-grey overlay drawn over empty cement cells that are valid placement targets. */
+/** Translucent blue-gray overlay drawn over empty cement cells that are valid placement targets. */
 const CEMENT_TARGET_OVERLAY = 'rgba(140,160,200,0.22)';
 
 /** Translucent gold overlay drawn over empty gold-space cells that are valid placement targets. */
@@ -170,11 +170,11 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
 }
 
 /**
- * Draw a curved rotation arrow with a black outline, centred at the canvas
+ * Draw a curved rotation arrow with a black outline, centered at the canvas
  * origin.  When `ccw` is false (default) the arrow points clockwise; when true
  * it points counter-clockwise.  Used to indicate the direction a spinnable
  * pipe will be rotated on click.
- * The caller is responsible for translating the context to the desired centre.
+ * The caller is responsible for translating the context to the desired center.
  */
 export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void {
   const r = _s(11);
@@ -183,7 +183,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
   const startAngle = ccw ? (30 * Math.PI) / 180 : (150 * Math.PI) / 180;
   const sweep     = (270 * Math.PI) / 180;
   const endAngle  = ccw ? startAngle - sweep : startAngle + sweep;
-  // Tip of the arrowhead: the point on the circle at endAngle (normalised to 0–2π).
+  // Tip of the arrowhead: the point on the circle at endAngle (normalized to 0–2π).
   const tipAngle = ((endAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
   const tipX = r * Math.cos(tipAngle);
   const tipY = r * Math.sin(tipAngle);
@@ -281,7 +281,7 @@ function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
   ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
 }
 
-/** Draw a 2-D top-down tree (fern/palm style) centred at the origin. */
+/** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
 function _drawTree(ctx: CanvasRenderingContext2D, half: number): void {
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
   // Main canopy – large dark-green filled circle
@@ -309,7 +309,7 @@ function _drawTree(ctx: CanvasRenderingContext2D, half: number): void {
     ctx.arc(Math.cos(angle) * dLobeOff, Math.sin(angle) * dLobeOff, dLobeR, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Small brown trunk circle in the centre
+  // Small brown trunk circle in the center
   ctx.fillStyle = TREE_TRUNK_COLOR;
   ctx.beginPath();
   ctx.arc(0, 0, half * 0.14, 0, Math.PI * 2);
@@ -422,17 +422,17 @@ function _drawOneWayBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
 }
 
 /**
- * Draw a single pipe arm from the tile centre to the tile edge in the given
+ * Draw a single pipe arm from the tile center to the tile edge in the given
  * *absolute* direction, accounting for the tile's rotation so the line is
  * placed correctly in the already-rotated canvas coordinate frame.
  *
- * Call this while the canvas is already translated to the tile centre and
+ * Call this while the canvas is already translated to the tile center and
  * rotated by `tileRotation`.
  *
  * @param absDir      Absolute (world-space) direction of the arm.
  * @param tileRotation The tile's rotation in degrees (0 / 90 / 180 / 270).
  * @param half        Half the tile size in pixels.
- * @param color       Stroke colour for this arm.
+ * @param color       Stroke color for this arm.
  */
 function _drawPipeArmInRotatedFrame(
   ctx: CanvasRenderingContext2D,
@@ -506,8 +506,8 @@ function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, d
  * hot-plate chamber tiles when they are unconnected.
  *
  * The canvas context must already have `textAlign = 'center'` and
- * `textBaseline = 'middle'` set; `fillStyle` must be the desired text colour.
- * The three lines are drawn centred on `(0, 0)` in the current coordinate system.
+ * `textBaseline = 'middle'` set; `fillStyle` must be the desired text color.
+ * The three lines are drawn centered on `(0, 0)` in the current coordinate system.
  *
  * @param tempLine - First line text, e.g. `'-3°'` or `'5°'`.
  * @param costLine - Third line text, e.g. `'4'` (the cost/mass value).
@@ -1019,7 +1019,7 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
     const loss = lockedCost ?? 0;
     ctx.font = `bold ${_s(12)}px Arial`;
     if (gain > 0 && loss > 0) {
-      // Both gain and loss: show each in its own colour, offset vertically
+      // Both gain and loss: show each in its own color, offset vertically
       ctx.fillStyle = ANIM_POSITIVE_COLOR;
       ctx.fillText(`+${gain}`, 0, -_s(6));
       ctx.fillStyle = ANIM_NEGATIVE_COLOR;
@@ -1110,11 +1110,11 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
 
 /**
  * Draw rust-colored blotches along each non-blocked arm of a leaky pipe.
- * The blotches are drawn in the rotated tile context (origin = tile centre).
+ * The blotches are drawn in the rotated tile context (origin = tile center).
  *
  * @param ctx          2D rendering context (already translated + rotated to tile frame).
  * @param tile         The leaky pipe tile being drawn.
- * @param half         Half of the tile size in pixels (= tile centre offset).
+ * @param half         Half of the tile size in pixels (= tile center offset).
  * @param blockedDir   The direction whose arm is blocked by a one-way tile (no rust there),
  *                     or null when all arms carry water.
  */
@@ -1289,9 +1289,9 @@ export function drawTile(
     ctx.arc(0, 0, _s(4), 0, Math.PI * 2);
     ctx.fill();
   } else if (isBlockedPipe) {
-    // Arm-by-arm drawing: blocked arm uses non-water colour; all others use water colour.
+    // Arm-by-arm drawing: blocked arm uses non-water color; all others use water color.
     // Draw blocked arms first so the unblocked (water) arms are painted on top at the
-    // tile centre, giving the correct visual appearance at the junction point.
+    // tile center, giving the correct visual appearance at the junction point.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
     const sortedArms = [...tile.connections].sort((a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0));
     for (const armDir of sortedArms) {
@@ -1507,31 +1507,31 @@ function isReplaceableByShape(
   );
 }
 
-// ─── Ambient decoration colours (local constants, not exported) ──────────────
+// ─── Ambient decoration colors (local constants, not exported) ──────────────
 
-/** Pebble fill colours: slightly lighter, more neutral than the tile background. */
+/** Pebble fill colors: slightly lighter, more neutral than the tile background. */
 const PEBBLE_COLORS = [
   'rgba(68,65,96,0.78)',
   'rgba(80,76,112,0.72)',
   'rgba(58,56,84,0.82)',
 ] as const;
 
-/** Flower petal colours: muted warm/cool tones that sit against the dark bg. */
+/** Flower petal colors: muted warm/cool tones that sit against the dark bg. */
 const FLOWER_PETAL_COLORS = [
   'rgba(100,65,88,0.72)',   // muted rose
   'rgba(95,85,48,0.72)',    // muted gold
   'rgba(78,65,112,0.72)',   // muted lavender
 ] as const;
 
-/** Flower centre dot colour. */
+/** Flower center dot color. */
 const FLOWER_CENTER_COLOR = 'rgba(120,104,56,0.82)';
 
-/** Grass blade colour. */
+/** Grass blade color. */
 const GRASS_COLOR = 'rgba(72,115,58,0.90)';
 
 // ─── Ambient decoration drawing helpers ──────────────────────────────────────
 
-/** Draw a small cluster of pebbles centred at the current canvas origin. */
+/** Draw a small cluster of pebbles centered at the current canvas origin. */
 function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
   const color = PEBBLE_COLORS[variant % PEBBLE_COLORS.length];
   const stones: Array<[number, number, number, number]> = [
@@ -1547,7 +1547,7 @@ function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
   }
 }
 
-/** Draw a small top-down flower centred at the current canvas origin. */
+/** Draw a small top-down flower centered at the current canvas origin. */
 function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
   const petalColor = FLOWER_PETAL_COLORS[variant % FLOWER_PETAL_COLORS.length];
   const petals = 5;
@@ -1566,7 +1566,7 @@ function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
   ctx.fill();
 }
 
-/** Draw a small tuft of grass blades centred at the current canvas origin. */
+/** Draw a small tuft of grass blades centered at the current canvas origin. */
 function _drawGrass(ctx: CanvasRenderingContext2D, variant: number): void {
   const blades = variant + 3; // 3–5 blades
   ctx.strokeStyle = GRASS_COLOR;
@@ -1661,7 +1661,7 @@ function _drawCellTargetOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
 
 /**
  * Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
- * is never covered by a neighbouring empty tile's background fill.
+ * is never covered by a neighboring empty tile's background fill.
  */
 function _renderPass1Backgrounds(
   ctx: CanvasRenderingContext2D,
@@ -1853,7 +1853,7 @@ function _renderPass2NonPipeTiles(
 
 /**
  * Pass 3: Draw all pipe tile content on top of all non-pipe tile content so that
- * pipe rounded caps (from lineCap='round') are never overwritten by a neighbouring
+ * pipe rounded caps (from lineCap='round') are never overwritten by a neighboring
  * non-pipe tile's fill (e.g. a Chamber or Source adjacent to a pipe).
  */
 function _renderPass3PipeTiles(
@@ -1881,7 +1881,7 @@ function _renderPass3PipeTiles(
       const isHovered = r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(tile.shape);
 
       // If this pipe sits on a one-way cell, the arm pointing opposite the arrow
-      // direction is blocked (dry) unless the neighbour in that direction is both
+      // direction is blocked (dry) unless the neighbor in that direction is both
       // mutually connected AND actually water-filled.  A pipe tile placed adjacent
       // but not carrying water must not make the blocked arm appear wet.
       const owDir = board.oneWayData.get(posKey(r, c));
@@ -1890,7 +1890,7 @@ function _renderPass3PipeTiles(
         const antiDir = oppositeDirection(owDir);
         const delta = NEIGHBOUR_DELTA[antiDir];
         const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
-        // The arm carries water only when the neighbour can mutually connect AND
+        // The arm carries water only when the neighbor can mutually connect AND
         // is actually water-filled (present in the filled set).
         if (
           !board.areMutuallyConnected(neighborPos, owDir) ||

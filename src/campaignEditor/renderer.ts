@@ -61,7 +61,7 @@ export function renderEditorCanvas(
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
 
   // Pass 1: Draw all open (player-fillable) spaces first so that pipe rounded
-  // caps drawn in pass 2 are never covered by a neighbouring empty cell's fill.
+  // caps drawn in pass 2 are never covered by a neighboring empty cell's fill.
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;

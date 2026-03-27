@@ -43,8 +43,8 @@ function _ensureCanvas(): void {
 }
 
 /**
- * Draw a 4-point star (diamond cross) centred at the origin.
- * `size` is the distance from centre to the tip of each point.
+ * Draw a 4-point star (diamond cross) centered at the origin.
+ * `size` is the distance from center to the tip of each point.
  */
 function _drawStarShape(ctx: CanvasRenderingContext2D, size: number): void {
   const inner = size * 0.25;
@@ -66,7 +66,7 @@ function _drawStarShape(ctx: CanvasRenderingContext2D, size: number): void {
 }
 
 /**
- * Spawn a burst of sparkle particles centred at the given viewport-pixel coordinates.
+ * Spawn a burst of sparkle particles centered at the given viewport-pixel coordinates.
  *
  * @param x      Viewport X (e.g. from `getBoundingClientRect().left + cx`).
  * @param y      Viewport Y.

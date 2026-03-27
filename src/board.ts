@@ -17,7 +17,7 @@ export function parseKey(key: string): [number, number] {
   return [parseInt(key, 10), parseInt(key.slice(comma + 1), 10)];
 }
 
-/** Neighbour offsets keyed by direction. */
+/** Neighbor offsets keyed by direction. */
 export const NEIGHBOUR_DELTA: Record<Direction, GridPos> = {
   [Direction.North]: { row: -1, col:  0 },
   [Direction.East]:  { row:  0, col:  1 },
@@ -362,7 +362,7 @@ export class Board {
 
   /** Full move history for undo/redo support. history[0] is the initial state. */
   private _history: Snapshot[] = [];
-  /** Index of the current state in _history (-1 if history is uninitialised). */
+  /** Index of the current state in _history (-1 if history is uninitialized). */
   private _historyIndex: number = -1;
 
   /**
@@ -399,7 +399,7 @@ export class Board {
 
   // ─── Level initialisation ──────────────────────────────────────────────────
 
-  /** Initialise the board from a level definition. */
+  /** Initialize the board from a level definition. */
   private _initFromLevel(level: LevelDef): void {
     this.inventory = level.inventory.map((item) => ({ ...item }));
 
@@ -450,7 +450,7 @@ export class Board {
 
   /**
    * Generate a set of ambient background decorations spread across the grid.
-   * Called once after the grid is fully initialised.  Each cell has an
+   * Called once after the grid is fully initialized.  Each cell has an
    * independent ~30 % chance of receiving one decoration.
    */
   private _generateAmbientDecorations(): AmbientDecoration[] {
@@ -479,7 +479,7 @@ export class Board {
   // ─── Undo / redo support ───────────────────────────────────────────────────
 
   /**
-   * Initialise the move history with the current board state as the starting point.
+   * Initialize the move history with the current board state as the starting point.
    * Must be called once after a level is fully set up (e.g. at the start of play).
    * Calling this resets any existing history and locks the initial water impact
    * for all tiles that are already connected at game start.
@@ -502,7 +502,7 @@ export class Board {
    * Call this AFTER each successful player action (place, rotate).
    *
    * If the player is currently at a position earlier than the end of the history
-   * (i.e. some moves were undone), the behaviour is:
+   * (i.e. some moves were undone), the behavior is:
    * - If the new state matches the next state in the existing history, advance
    *   the index without modifying the history (the redo chain is preserved).
    * - Otherwise, truncate all future states and append the new state.
@@ -1112,7 +1112,7 @@ export class Board {
    * When no turn tracking has been applied yet (e.g. in unit tests that build a
    * board directly without going through the game loop), a fully dynamic
    * computation is performed using the current temperature — identical to the
-   * pre-incremental behaviour — so that existing tests remain valid.
+   * pre-incremental behavior — so that existing tests remain valid.
    */
   getCurrentWater(): number {
     const filled = this.getFilledPositions();
@@ -1779,16 +1779,16 @@ export class Board {
         // ── Adjacent tank-like symmetry check ────────────────────────────────────
         for (const dir of Object.values(Direction)) {
           const delta = NEIGHBOUR_DELTA[dir];
-          const neighbourPos: GridPos = { row: r + delta.row, col: c + delta.col };
-          const neighbour = this.getTile(neighbourPos);
-          if (!neighbour || !isTankLike(neighbour)) continue;
+          const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
+          const neighbor = this.getTile(neighborPos);
+          if (!neighbor || !isTankLike(neighbor)) continue;
 
           const thisConnects = tile.connections.has(dir);
-          const neighbourConnects = neighbour.connections.has(oppositeDirection(dir));
+          const neighborConnects = neighbor.connections.has(oppositeDirection(dir));
 
-          if (thisConnects !== neighbourConnects) {
+          if (thisConnects !== neighborConnects) {
             errors.push(
-              `Adjacent tanks at (${r},${c}) and (${neighbourPos.row},${neighbourPos.col}) ` +
+              `Adjacent tanks at (${r},${c}) and (${neighborPos.row},${neighborPos.col}) ` +
               `have mismatched connections on the ${dir} edge.`,
             );
           }
@@ -1879,7 +1879,7 @@ export class Board {
     // ── Cement constraint check (for player-placed pipe tiles only) ───────────
     if (this._isCementHardened(pos, tile)) return false;
 
-    // Normalise to 0–3, handling both positive and negative values (e.g. -1 → 3).
+    // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return true;
     for (let i = 0; i < normalizedSteps; i++) {

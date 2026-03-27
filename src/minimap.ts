@@ -198,7 +198,7 @@ function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
 
 /**
  * Draws a tiny pipe connection-line diagram for one tile.
- * Uses 1-px-wide lines from the tile centre to each connected edge.
+ * Uses 1-px-wide lines from the tile center to each connected edge.
  * Only meaningful when px >= MIN_PX_FOR_LINES.
  */
 function drawPipeLines(
@@ -210,7 +210,7 @@ function drawPipeLines(
   rotation: Rotation,
 ): void {
   const { bg, line } = pipeLineColors(shape);
-  const halfPx = Math.floor(px / 2); // offset from tile edge to centre pixel
+  const halfPx = Math.floor(px / 2); // offset from tile edge to center pixel
   const conns = getConnections(shape, rotation);
 
   ctx.fillStyle = bg;
@@ -218,16 +218,16 @@ function drawPipeLines(
 
   ctx.fillStyle = line;
   if (conns.has(Direction.North)) {
-    ctx.fillRect(x + halfPx, y, 1, halfPx + 1);           // top edge → centre
+    ctx.fillRect(x + halfPx, y, 1, halfPx + 1);           // top edge → center
   }
   if (conns.has(Direction.South)) {
-    ctx.fillRect(x + halfPx, y + halfPx, 1, px - halfPx); // centre → bottom edge
+    ctx.fillRect(x + halfPx, y + halfPx, 1, px - halfPx); // center → bottom edge
   }
   if (conns.has(Direction.East)) {
-    ctx.fillRect(x + halfPx, y + halfPx, px - halfPx, 1); // centre → right edge
+    ctx.fillRect(x + halfPx, y + halfPx, px - halfPx, 1); // center → right edge
   }
   if (conns.has(Direction.West)) {
-    ctx.fillRect(x, y + halfPx, halfPx + 1, 1);           // left edge → centre
+    ctx.fillRect(x, y + halfPx, halfPx + 1, 1);           // left edge → center
   }
 }
 
@@ -261,7 +261,7 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, totalH);
 
-  // Draw each tile as a coloured rectangle; pipe tiles get connection-line art when large enough.
+  // Draw each tile as a colored rectangle; pipe tiles get connection-line art when large enough.
   for (let r = 0; r < level.rows; r++) {
     for (let c = 0; c < level.cols; c++) {
       const tile = (level.grid[r]?.[c]) ?? null;

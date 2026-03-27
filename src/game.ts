@@ -366,7 +366,7 @@ export class Game {
   /** Modal overlay shown when the player is about to enter a challenge level. */
   private readonly _challengeModalEl: HTMLElement;
 
-  /** Paragraph inside the challenge modal describing skip behaviour (hidden for direct selection). */
+  /** Paragraph inside the challenge modal describing skip behavior (hidden for direct selection). */
   private readonly _challengeMsgEl: HTMLElement;
 
   /** "Skip Level" button inside the challenge modal (hidden for direct selection). */
@@ -562,7 +562,7 @@ export class Game {
     }
   }
 
-  /** Spawn a small burst of sparkle particles centred on a HUD stat value element. */
+  /** Spawn a small burst of sparkle particles centered on a HUD stat value element. */
   private static _spawnMetricSparkles(rowEl: HTMLElement, colors: readonly string[]): void {
     const valueEl = (rowEl.querySelector('.stat-value') as HTMLElement | null) ?? rowEl;
     const rect = valueEl.getBoundingClientRect();
@@ -570,7 +570,7 @@ export class Game {
   }
 
   /**
-   * Create a standard modal overlay with a centred box, title heading, and an
+   * Create a standard modal overlay with a centered box, title heading, and an
    * empty actions bar at the bottom.  Appends the overlay to `document.body`.
    * @returns `{ el }` – the overlay, `box` – the inner dialog div,
    *          `actionsEl` – the pre-appended actions container for buttons.
@@ -1217,7 +1217,7 @@ export class Game {
 
   /**
    * Make a modal overlay visible with a fade-in animation, position it below
-   * the canvas, and trigger the given sparkle colour on its inner box.
+   * the canvas, and trigger the given sparkle color on its inner box.
    * Combines the three steps that always appear together for win/gameover modals.
    */
   private _showModalWithAnimation(
@@ -2171,7 +2171,7 @@ export class Game {
       } else if (tile.chamberContent === 'hot_plate') {
         ({ text, color } = this._pushHotPlateAnimLabels(tile, r, c, dir, currentTemp, cx, cy, now));
       } else if (tile.chamberContent === 'star' && dir === 'connect') {
-        // Star tile connected – spawn golden sparkle burst from the tile centre.
+        // Star tile connected – spawn golden sparkle burst from the tile center.
         const starCx = c * TILE_SIZE + TILE_SIZE / 2;
         const starCy = r * TILE_SIZE + TILE_SIZE / 2;
         const canvasRect = this.canvas.getBoundingClientRect();
