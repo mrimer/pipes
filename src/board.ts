@@ -91,6 +91,19 @@ export const CROSS_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /**
+ * Elbow pipe shapes – two-connection pipes that form a 90° corner.  When drawn
+ * arm-by-arm (e.g. because one or both arms uses a butt end cap), the corner
+ * at the tile centre needs an explicit round nub to avoid a visual gap.
+ */
+export const ELBOW_PIPE_SHAPES = new Set<PipeShape>([
+  PipeShape.Elbow,
+  PipeShape.GoldElbow,
+  PipeShape.SpinElbow,
+  PipeShape.SpinElbowCement,
+  PipeShape.LeakyElbow,
+]);
+
+/**
  * Returns true for impassable obstacle tiles (Granite, Tree).
  * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
  */
