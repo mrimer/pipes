@@ -2,7 +2,7 @@ import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAP
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR } from './colors';
-import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, LINE_WIDTH, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import {
@@ -28,6 +28,12 @@ import {
   computeFlowGoodDirs,
 } from './visuals/waterParticles';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
+import {
+  PipeRotationAnim, PipeFillAnim,
+  computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
+  renderFillAnims,
+  FILL_ANIM_DURATION,
+} from './visuals/pipeEffects';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;
@@ -232,6 +238,12 @@ export class Game {
 
   /** Active floating animation labels shown over the canvas. */
   private _animations: TileAnimation[] = [];
+
+  /** Active pipe-rotation animations (tile spinning from old to new orientation). */
+  private _rotationAnims: PipeRotationAnim[] = [];
+
+  /** Active pipe-fill animations (water filling newly-connected tiles). */
+  private _fillAnims: PipeFillAnim[] = [];
 
   /** Active source-spray water drops rendered over the source tile during play. */
   private _sourceSprayDrops: SourceSprayDrop[] = [];
@@ -1136,8 +1148,14 @@ export class Game {
 
   private _renderBoard(): void {
     if (!this.board) return;
+    const now = performance.now();
     const currentTemp = this.board.getCurrentTemperature();
     const currentPressure = this.board.getCurrentPressure();
+
+    // Build per-frame animation overrides for the renderer.
+    const rotationOverrides = computeRotationOverrides(this._rotationAnims, now);
+    const fillExclude = computeActiveFillKeys(this._fillAnims, now);
+
     renderBoard(
       this.ctx,
       this.canvas,
@@ -1151,7 +1169,22 @@ export class Game {
       currentPressure,
       this._errorHighlightKeys,
       this.hoverRotationDelta,
+      rotationOverrides,
+      fillExclude,
     );
+
+    // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
+    if (this._fillAnims.length > 0) {
+      // Build a map of connections for each animating tile.
+      const tileConnectionsMap = new Map<string, Set<Direction>>();
+      for (const anim of this._fillAnims) {
+        const tile = this.board.getTile(anim);
+        if (tile) {
+          tileConnectionsMap.set(`${anim.row},${anim.col}`, tile.connections);
+        }
+      }
+      renderFillAnims(this.ctx, this._fillAnims, tileConnectionsMap, LINE_WIDTH, now);
+    }
   }
 
   // ─── Win / game-over handling ─────────────────────────────────────────────
@@ -1448,6 +1481,8 @@ export class Game {
     this._leakySprayDrops = [];
     this._vortexParticles = [];
     this._flowGoodDirs = null;
+    this._rotationAnims = [];
+    this._fillAnims = [];
   }
 
   /**
@@ -1462,6 +1497,7 @@ export class Game {
     const hadNoSelection = this.selectedShape === null;
     const filledBefore = this.board.getFilledPositions();
     if (this.board.reclaimTile(pos)) {
+      this._completeAnims();
       this.board.applyTurnDelta();
       this.board.recordMove();
       this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, pos.row, pos.col);
@@ -1484,16 +1520,70 @@ export class Game {
   }
 
   /**
+   * Immediately complete any in-progress pipe rotation or fill animations,
+   * discarding all intermediate state.  Call this before processing a new
+   * player action so the board snaps to its final state before new animations
+   * are spawned.
+   */
+  private _completeAnims(): void {
+    this._rotationAnims = [];
+    this._fillAnims = [];
+  }
+
+  /**
+   * Spawn pipe-fill animations for all tiles that became newly connected since
+   * `filledBefore` was captured.  Tiles are animated in BFS order, each one
+   * starting after the previous tile's animation completes.
+   *
+   * Not called during undo/redo – those actions snap to the final state
+   * without playing visual animations.
+   */
+  private _spawnFillAnims(filledBefore: Set<string>): void {
+    if (!this.board) return;
+    const order = computeFillOrder(this.board, filledBefore);
+    if (order.length === 0) return;
+    const now = performance.now();
+    for (let i = 0; i < order.length; i++) {
+      const { row, col, entryDir, blockedDir } = order[i];
+      this._fillAnims.push({
+        row, col, entryDir, blockedDir,
+        startTime: now + i * FILL_ANIM_DURATION,
+      });
+    }
+  }
+
+  /**
    * Called after successfully rotating any tile (spinner or regular pipe).
    * Records the move, updates animations, and refreshes all dependent UI.
    * Shared by click, wheel, and keyboard rotation paths.
+   *
+   * @param filledBefore - Filled positions snapshot taken before the rotation.
+   * @param rotationInfo - When provided, a pipe-rotation animation is spawned
+   *   for the rotated tile from `oldRotation` to the tile's current rotation.
    */
-  private _afterTileRotated(filledBefore: Set<string>): void {
+  private _afterTileRotated(
+    filledBefore: Set<string>,
+    rotationInfo?: { row: number; col: number; oldRotation: number },
+  ): void {
     if (!this.board) return;
+    this._completeAnims();
     this.board.applyTurnDelta();
     this.board.recordMove();
+    if (rotationInfo) {
+      const tile = this.board.getTile(rotationInfo);
+      if (tile) {
+        this._rotationAnims.push({
+          row: rotationInfo.row,
+          col: rotationInfo.col,
+          oldRotation: rotationInfo.oldRotation,
+          newRotation: tile.rotation,
+          startTime: performance.now(),
+        });
+      }
+    }
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
+    this._spawnFillAnims(filledBefore);
     this._spawnLockedCostChangeAnimations();
     this._spawnCementDecrementAnimation();
     this._refreshPlayUI();
@@ -1503,6 +1593,7 @@ export class Game {
       this._updateUndoRedoButtons();
     }
   }
+
 
   /**
    * If the mouse is currently hovering a spinner tile, rotate it by `steps`
@@ -1514,8 +1605,9 @@ export class Game {
     const hTile = this.board.getTile(hPos);
     if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
     const filledBefore = this.board.getFilledPositions();
+    const oldRotation = hTile.rotation;
     if (this.board.rotateTileBy(hPos, steps)) {
-      this._afterTileRotated(filledBefore);
+      this._afterTileRotated(filledBefore, { row: hPos.row, col: hPos.col, oldRotation });
       return true;
     } else if (this.board.lastError) {
       this._handleBoardError();
@@ -1544,12 +1636,13 @@ export class Game {
       // Spinnable pipes are always rotated on click (cannot be replaced or removed).
       // Shift+click rotates CCW (3 steps); plain click rotates CW (1 step).
       const steps = e.shiftKey ? 3 : 1;
+      const oldRotation = tile.rotation;
       if (this.board.rotateTileBy(pos, steps)) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this._afterTileRotated(filledBefore);
+        this._afterTileRotated(filledBefore, { row: pos.row, col: pos.col, oldRotation });
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1566,6 +1659,7 @@ export class Game {
       // as a single game turn; otherwise fall back to a standard single 90° rotation.
       const delta = this.hoverRotationDelta;
       this.hoverRotationDelta = 0;
+      const oldRotation = tile.rotation;
       const rotated = delta > 0
         ? this.board.rotateTileBy(pos, delta)
         : e.shiftKey ? this.board.rotateTileBy(pos, 3) : this.board.rotateTile(pos);
@@ -1574,7 +1668,7 @@ export class Game {
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this._afterTileRotated(filledBefore);
+        this._afterTileRotated(filledBefore, { row: pos.row, col: pos.col, oldRotation });
       } else if (this.board.lastError) {
         this._handleBoardError();
       }
@@ -1679,9 +1773,10 @@ export class Game {
         // Spin pipes always take priority: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
         const steps = e.deltaY > 0 ? 1 : 3;
         const filledBefore = this.board.getFilledPositions();
+        const oldRotation = hTile.rotation;
         if (this.board.rotateTileBy(hPos, steps)) {
           e.preventDefault();
-          this._afterTileRotated(filledBefore);
+          this._afterTileRotated(filledBefore, { row: hPos.row, col: hPos.col, oldRotation });
         } else if (this.board.lastError) {
           this._handleBoardError();
         }
@@ -2303,10 +2398,12 @@ export class Game {
     replacedCol?: number,
   ): void {
     if (!this.board) return;
+    this._completeAnims();
     this.board.applyTurnDelta();
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore, replacedTile, replacedRow, replacedCol);
+    this._spawnFillAnims(filledBefore);
     this._spawnLockedCostChangeAnimations();
     this._spawnCementDecrementAnimation();
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
@@ -2394,9 +2491,14 @@ export class Game {
           const filledBefore = board.getFilledPositions();
           if (tile) this._tryPlaceOrReplaceSelectedAt(focusPos, tile, filledBefore);
         } else {
+          const tile = board.getTile(focusPos);
           const filledBefore = board.getFilledPositions();
+          // Capture before calling rotateTile – the rotation mutates tile.rotation in-place.
+          const oldRotation = tile?.rotation;
           if (board.rotateTile(focusPos)) {
-            this._afterTileRotated(filledBefore);
+            this._afterTileRotated(filledBefore, oldRotation !== undefined
+              ? { row: focusPos.row, col: focusPos.col, oldRotation }
+              : undefined);
           } else if (board.lastError) {
             this._handleBoardError();
           }

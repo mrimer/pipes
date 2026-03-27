@@ -39,7 +39,7 @@ import {
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
 
-let LINE_WIDTH = 10; // pipe stroke width in px
+export let LINE_WIDTH = 10; // pipe stroke width in px
 
 /** The current tile size in pixels.  64 (default) or 128 (large) depending on the viewport. */
 export let TILE_SIZE = 64; // px
@@ -1255,15 +1255,21 @@ export function drawTile(
   lockedGain: number | null = null,
   isHovered = false,
   blockedWaterDir: Direction | null = null,
+  rotationDegOverride?: number,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
 
+  // When a rotation override is active, use it; blocked arms are suppressed
+  // during rotation animation because the arm directions are mid-transition.
+  const effectiveRotation = rotationDegOverride ?? rotation;
+  const effectiveBlockedWaterDir = rotationDegOverride !== undefined ? null : blockedWaterDir;
+
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate((rotation * Math.PI) / 180);
+  ctx.rotate((effectiveRotation * Math.PI) / 180);
 
   const color = _resolveTileColor(tile, isWater, currentPressure);
 
@@ -1273,7 +1279,7 @@ export function drawTile(
 
   // When a one-way tile's blocked exit direction applies and the tile has water,
   // draw each pipe arm individually so the blocked arm can be shown without water.
-  const isBlockedPipe = blockedWaterDir !== null && isWater &&
+  const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater &&
     (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape) || LEAKY_PIPE_SHAPES.has(shape));
 
   if (shape === PipeShape.Empty) {
@@ -1287,13 +1293,13 @@ export function drawTile(
     // Draw blocked arms first so the unblocked (water) arms are painted on top at the
     // tile centre, giving the correct visual appearance at the junction point.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
-    const sortedArms = [...tile.connections].sort((a, b) => (a === blockedWaterDir ? -1 : b === blockedWaterDir ? 1 : 0));
+    const sortedArms = [...tile.connections].sort((a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0));
     for (const armDir of sortedArms) {
-      const armColor = armDir === blockedWaterDir ? dryColor : color;
+      const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
     if (LEAKY_PIPE_SHAPES.has(shape)) {
-      _drawLeakyRustSpots(ctx, tile, half, blockedWaterDir);
+      _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
     }
   } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.SpinStraightCement) {
     ctx.beginPath();
@@ -1615,11 +1621,18 @@ export function renderBoard(
   currentPressure = 1,
   highlightedPositions: Set<string> = new Set(),
   hoverRotationDelta = 0,
+  rotationOverrides?: Map<string, number>,
+  fillExclude?: Set<string>,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const filled = board.getFilledPositions();
+  // Tiles currently in a fill animation are rendered as dry so the fill overlay
+  // can draw the partial water progress on top.
+  const effectiveFilled = fillExclude && fillExclude.size > 0
+    ? new Set([...filled].filter(k => !fillExclude.has(k)))
+    : filled;
   const currentWater = board.getCurrentWater();
 
   // Shimmer phase for gold spaces (oscillates smoothly over time)
@@ -1628,8 +1641,8 @@ export function renderBoard(
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
   _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
-  _renderPass2NonPipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure);
-  _renderPass3PipeTiles(ctx, board, filled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos);
+  _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
+  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
   _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater);
 }
@@ -1852,6 +1865,7 @@ function _renderPass3PipeTiles(
   currentTemp: number,
   currentPressure: number,
   mouseCanvasPos: { x: number; y: number } | null,
+  rotationOverrides?: Map<string, number>,
 ): void {
   const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
   const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
@@ -1886,7 +1900,10 @@ function _renderPass3PipeTiles(
         }
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir);
+      // Apply any active rotation animation override for this tile.
+      const rotOverride = rotationOverrides?.get(posKey(r, c));
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride);
     }
   }
 }
