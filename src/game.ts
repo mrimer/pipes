@@ -1550,7 +1550,7 @@ export class Game {
     const now = performance.now();
     const sinkKey = posKey(this.board.sink.row, this.board.sink.col);
     for (let i = 0; i < order.length; i++) {
-      const { row, col, entryDir, blockedDir } = order[i];
+      const { row, col, entryDir, blockedDir, depth } = order[i];
       const key = posKey(row, col);
       const isSink = key === sinkKey;
       // Resolve the water color that matches how this tile is drawn when filled.
@@ -1563,7 +1563,7 @@ export class Game {
       }
       this._fillAnims.push({
         row, col, entryDir, blockedDir, isSink, waterColor,
-        startTime: now + startDelay + i * FILL_ANIM_DURATION,
+        startTime: now + startDelay + depth * FILL_ANIM_DURATION,
       });
     }
   }

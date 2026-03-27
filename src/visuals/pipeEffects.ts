@@ -145,23 +145,33 @@ export function computeActiveFillKeys(
  * source (i.e. present in the current filled set but absent in `filledBefore`).
  *
  * The returned entries are in BFS order starting from the source, with each
- * entry recording the direction from which water enters that tile and the
- * one-way-blocked arm direction (null if none).
+ * entry recording the direction from which water enters that tile, the
+ * one-way-blocked arm direction (null if none), and the animation depth.
+ *
+ * `depth` counts only newly-filled tile hops from the boundary of the
+ * already-filled network: tiles directly adjacent to any already-filled tile
+ * get depth 0, the tiles they flow into get depth 1, and so on (depth n = n
+ * hops from the already-filled boundary).  Tiles at the same depth (e.g. both
+ * branches of a tee) animate concurrently.
  */
 export function computeFillOrder(
   board: Board,
   filledBefore: Set<string>,
-): Array<{ row: number; col: number; entryDir: Direction; blockedDir: Direction | null }> {
-  const queue: Array<{ row: number; col: number }> = [];
+): Array<{ row: number; col: number; entryDir: Direction; blockedDir: Direction | null; depth: number }> {
+  // Each queue entry carries animDepth:
+  //  -1 = already-filled tile (traversed as a corridor but not animated)
+  //   0 = first newly-filled tile adjacent to an already-filled tile
+  //   n = n-th newly-filled hop from the already-filled boundary
+  const queue: Array<{ row: number; col: number; animDepth: number }> = [];
 
-  const result: Array<{ row: number; col: number; entryDir: Direction; blockedDir: Direction | null }> = [];
+  const result: Array<{ row: number; col: number; entryDir: Direction; blockedDir: Direction | null; depth: number }> = [];
 
   // Start BFS from source.  The source itself is always already-filled, so it
-  // acts as the frontier entry point.
+  // acts as the frontier entry point (animDepth = -1).
   const sourceKey = posKey(board.source.row, board.source.col);
   const bfsVisited = new Set<string>();
   bfsVisited.add(sourceKey);
-  queue.push({ row: board.source.row, col: board.source.col });
+  queue.push({ row: board.source.row, col: board.source.col, animDepth: -1 });
 
   while (queue.length > 0) {
     const cur = queue.shift()!;
@@ -173,10 +183,18 @@ export function computeFillOrder(
       const nextKey = posKey(next.row, next.col);
       if (bfsVisited.has(nextKey)) continue;
       bfsVisited.add(nextKey);
-      queue.push(next);
+
+      const nextIsNew = !filledBefore.has(nextKey);
+      // animDepth for the next tile:
+      //  already-filled tile       → -1 (continues traversal without incrementing)
+      //  newly-filled from already → 0  (first animation step)
+      //  newly-filled from newly   → cur.animDepth + 1
+      const nextAnimDepth = !nextIsNew ? -1 : cur.animDepth < 0 ? 0 : cur.animDepth + 1;
+
+      queue.push({ row: next.row, col: next.col, animDepth: nextAnimDepth });
 
       // Only record if this tile is NEWLY filled (not already filled before the move).
-      if (!filledBefore.has(nextKey)) {
+      if (nextIsNew) {
         // entryDir = direction FROM WHICH water enters next tile = opposite of travel dir.
         const entryDir = oppositeDirection(dir);
 
@@ -188,7 +206,7 @@ export function computeFillOrder(
           blockedDir = oppositeDirection(owDir);
         }
 
-        result.push({ row: next.row, col: next.col, entryDir, blockedDir });
+        result.push({ row: next.row, col: next.col, entryDir, blockedDir, depth: nextAnimDepth });
       }
     }
   }
