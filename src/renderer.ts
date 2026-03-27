@@ -706,10 +706,10 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
       const offset = (Date.now() % HEATER_SCROLL_MS) / HEATER_SCROLL_MS * lineSpacing;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(lineLeft, topY - _s(3), lineSpan, (numLines - 1) * lineSpacing + _s(6));
+      ctx.rect(lineLeft, topY - _s(3), lineSpan, numLines * lineSpacing + _s(3));
       ctx.clip();
-      // Draw numLines+1 lines so the region stays filled as lines exit the top.
-      for (let k = 0; k <= numLines; k++) {
+      // Draw numLines+2 lines so the region stays filled as lines exit the top and enter the bottom.
+      for (let k = 0; k <= numLines + 1; k++) {
         const lineY = topY + k * lineSpacing - offset;
         ctx.beginPath();
         ctx.moveTo(lineLeft, lineY);
