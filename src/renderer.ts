@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
+import { Board, ELBOW_PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
@@ -1326,6 +1326,17 @@ export function drawTile(
       const armColor = (isBlockedPipe && armDir === effectiveBlockedWaterDir) ? dryColor : color;
       ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+    }
+    // Elbow pipes form a 90° corner at the tile centre.  When one or both arms
+    // use a butt end cap the flat cap at the centre leaves a visible gap in the
+    // curve, so draw an explicit round nub there to fill it.  (Straight, tee,
+    // and cross pipes draw a straight line through the centre, so they never
+    // exhibit this gap.)
+    if (hasButtEnd && ELBOW_PIPE_SHAPES.has(shape)) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
+      ctx.fill();
     }
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
