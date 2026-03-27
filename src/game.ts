@@ -1555,6 +1555,13 @@ export class Game {
       const isSink = key === sinkKey;
       // Resolve the water color that matches how this tile is drawn when filled.
       const tile = this.board.getTile({ row, col });
+      // Container tiles (Source, Chamber) switch directly to their filled appearance
+      // without a water animation overlay — only pipe tiles and the sink get the effect.
+      const shouldAnimate = isSink || (tile !== null && (
+        PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape) ||
+        SPIN_PIPE_SHAPES.has(tile.shape) || LEAKY_PIPE_SHAPES.has(tile.shape)
+      ));
+      if (!shouldAnimate) continue;
       let waterColor: string | undefined;
       if (tile) {
         if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
