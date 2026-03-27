@@ -18,10 +18,10 @@ import { WATER_COLOR } from '../colors';
 import { TILE_SIZE } from '../renderer';
 
 /** Duration of the pipe-rotation animation in milliseconds. */
-export const ROTATION_ANIM_DURATION = 250;
+export const ROTATION_ANIM_DURATION = 300;
 
 /** Duration of the pipe-fill animation per tile in milliseconds. */
-export const FILL_ANIM_DURATION = 250;
+export const FILL_ANIM_DURATION = 300;
 
 /** One active pipe-rotation animation. */
 export interface PipeRotationAnim {
