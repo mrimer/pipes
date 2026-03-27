@@ -736,6 +736,14 @@ export class Game {
     // Reset HUD exit button label in case it was changed for playtesting.
     this.exitBtnEl.textContent = '← Menu';
     this._renderLevelList();
+    // Scroll the active level's row into view near the center of the viewport.
+    if (this.currentLevel) {
+      const levelId = this.currentLevel.id;
+      const levelRow = this.levelListEl.querySelector<HTMLElement>(`[data-level-id="${levelId}"]`);
+      if (levelRow) {
+        levelRow.scrollIntoView({ behavior: 'instant', block: 'center' });
+      }
+    }
   }
 
   /**
