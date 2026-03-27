@@ -2039,15 +2039,21 @@ function _renderPass3PipeTiles(
       // Determine which arm directions need a flat (butt) end cap: arms pointing
       // at open floor cells (empty, gold space, cement without pipe, one-way) keep
       // round ends so the nub blends into the open area; all other neighbor types
-      // (pipes, source, sink, chamber, granite, tree) use butt ends.
+      // (source, sink, chamber, granite, tree) use butt ends.
+      // Exception: when an arm points at a pipe tile that has no arm pointing back
+      // (i.e. the two tiles do not connect on this edge), the arms do not overlap,
+      // so a round nub creates no visual conflict and is kept instead.
       let buttEndDirs: Set<Direction> | undefined;
       for (const dir of tile.connections) {
         const delta = NEIGHBOUR_DELTA[dir];
         const nr = r + delta.row, nc = c + delta.col;
         if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
-        if (!_isOpenFloorCell(board, nr, nc)) {
-          (buttEndDirs ??= new Set<Direction>()).add(dir);
-        }
+        if (_isOpenFloorCell(board, nr, nc)) continue;
+        const neighborTile = board.grid[nr][nc];
+        // If the neighbor is a pipe tile without a reciprocal arm, the arms
+        // don't overlap – keep a round nub here.
+        if (PIPE_SHAPES.has(neighborTile.shape) && !neighborTile.connections.has(oppositeDirection(dir))) continue;
+        (buttEndDirs ??= new Set<Direction>()).add(dir);
       }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs);
