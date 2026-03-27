@@ -387,6 +387,13 @@ export class Board {
   private _history: Snapshot[] = [];
   /** Index of the current state in _history (-1 if history is uninitialized). */
   private _historyIndex: number = -1;
+  /**
+   * Set to true by {@link discardLastMoveFromHistory} and reset by {@link initHistory}
+   * and {@link restoreFromCurrentSnapshot}.
+   * Allows {@link canRestoreAfterGameOver} to return true even when canUndo() is false,
+   * i.e. when the very first move was discarded and _historyIndex is back at 0.
+   */
+  private _hadDiscardedMove: boolean = false;
 
   /**
    * @param rows - Number of rows.
@@ -518,6 +525,7 @@ export class Board {
     this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
+    this._hadDiscardedMove = false;
   }
 
   /**
@@ -556,6 +564,7 @@ export class Board {
     if (this._historyIndex <= 0) return;
     this._historyIndex--;
     this._history = this._history.slice(0, this._historyIndex + 1);
+    this._hadDiscardedMove = true;
   }
 
   /**
@@ -570,11 +579,21 @@ export class Board {
   restoreFromCurrentSnapshot(): void {
     if (this._historyIndex < 0 || this._historyIndex >= this._history.length) return;
     this._restoreSnapshot(this._history[this._historyIndex]);
+    this._hadDiscardedMove = false;
   }
 
   /** Returns true if there is a previous state to undo to. */
   canUndo(): boolean {
     return this._historyIndex > 0;
+  }
+
+  /**
+   * Returns true when the game-over undo can restore the board, i.e. when
+   * either a normal undo is available or the failing move was the very first
+   * move (discardLastMoveFromHistory was called and _historyIndex is back at 0).
+   */
+  canRestoreAfterGameOver(): boolean {
+    return this.canUndo() || this._hadDiscardedMove;
   }
 
   /**
