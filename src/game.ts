@@ -326,6 +326,8 @@ export class Game {
   private _prevFrozen: number | null = null;
   /** Previous pressure value for metric sparkle detection (null when row is hidden). */
   private _prevPressure: number | null = null;
+  /** When true, the next {@link _updateWaterDisplay} call skips all metric sparkles (used after undo/redo baseline reset). */
+  private _suppressNextMetricSparkles: boolean = false;
 
   /** Box shown beneath the grid with level notes (when the level has a note). */
   private readonly noteBoxEl: HTMLElement;
@@ -741,7 +743,7 @@ export class Game {
       const levelId = this.currentLevel.id;
       const levelRow = this.levelListEl.querySelector<HTMLElement>(`[data-level-id="${levelId}"]`);
       if (levelRow) {
-        levelRow.scrollIntoView({ behavior: 'instant', block: 'center' });
+        levelRow.scrollIntoView?.({ behavior: 'instant', block: 'center' });
       }
     }
   }
@@ -991,10 +993,14 @@ export class Game {
     this._prevTemp = null;
     this._prevFrozen = null;
     this._prevPressure = null;
+    this._suppressNextMetricSparkles = true;
   }
 
   private _updateWaterDisplay(): void {
     if (!this.board) return;
+    const suppressSparkles = this._suppressNextMetricSparkles;
+    this._suppressNextMetricSparkles = false;
+
     const w = this.board.getCurrentWater();
     this.waterValueEl.textContent = `${w}`;
     let waterColor: string;
@@ -1002,7 +1008,7 @@ export class Game {
     else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
     else             waterColor = WATER_COLOR;
     this.waterDisplayEl.style.color = waterColor;
-    if (this._prevWater !== null && w > this._prevWater) {
+    if (!suppressSparkles && this._prevWater !== null && w > this._prevWater) {
       // Per design: water sparkles only on increase (water can't meaningfully "decrease" as a good event).
       Game._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
     }
@@ -1010,7 +1016,7 @@ export class Game {
 
     const tempValue = this.board.hasTempRelevantTiles() ? this.board.getCurrentTemperature() : null;
     Game._showStatRow(this.tempDisplayEl, this.tempValueEl, tempValue);
-    if (tempValue !== null && this._prevTemp !== null) {
+    if (!suppressSparkles && tempValue !== null && this._prevTemp !== null) {
       if (tempValue > this._prevTemp)      Game._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_GOLD);
       else if (tempValue < this._prevTemp) Game._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_BLUE);
     }
@@ -1018,18 +1024,20 @@ export class Game {
 
     const frozenValue = this.board.frozen > 0 ? this.board.frozen : null;
     Game._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
-    if (frozenValue !== null && this._prevFrozen !== null) {
-      if (frozenValue > this._prevFrozen)      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
-      else if (frozenValue < this._prevFrozen) Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
-    } else if (frozenValue !== null && this._prevFrozen === null) {
-      // Row just became visible (frozen increased from 0): show sparkle.
-      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+    if (!suppressSparkles) {
+      if (frozenValue !== null && this._prevFrozen !== null) {
+        if (frozenValue > this._prevFrozen)      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+        else if (frozenValue < this._prevFrozen) Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
+      } else if (frozenValue !== null && this._prevFrozen === null) {
+        // Row just became visible (frozen increased from 0): show sparkle.
+        Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+      }
     }
     this._prevFrozen = frozenValue;
 
     const pressureValue = this.board.hasPressureRelevantTiles() ? this.board.getCurrentPressure() : null;
     Game._showStatRow(this.pressureDisplayEl, this.pressureValueEl, pressureValue);
-    if (pressureValue !== null && this._prevPressure !== null) {
+    if (!suppressSparkles && pressureValue !== null && this._prevPressure !== null) {
       if (pressureValue > this._prevPressure)      Game._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_GOLD);
       else if (pressureValue < this._prevPressure) Game._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_BLUE);
     }
