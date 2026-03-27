@@ -790,22 +790,18 @@ export class Game {
     return overhead;
   }
 
-  /** Start (or restart) the given level. */
-  startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[]): void {
-    // Look up the level in the active campaign; no-op if no campaign is active.
-    if (!this._activeCampaign) return;
-    let level: LevelDef | undefined;
-    for (const ch of this._activeCampaign.chapters) {
-      level = ch.levels.find((l) => l.id === levelId);
-      if (level) break;
-    }
-    if (!level) return;
 
-    this.currentLevel = level;
-    this.board = new Board(level.rows, level.cols, level, existingDecorations);
-    this.board.initHistory();
+  /**
+   * Initialize all game state and UI for entering the play screen with the given level.
+   * Assumes `this.board` has already been created and assigned for the level.
+   * Initializes board history, resets interaction state, sizes the canvas,
+   * switches to the play screen, hides all modal overlays, and clears all
+   * visual effects leftover from any previous level.
+   */
+  private _enterPlayScreenState(level: LevelDef): void {
+    this.board!.initHistory();
     this.gameState = GameState.Playing;
-    this.focusPos = { ...this.board.source };
+    this.focusPos = { ...this.board!.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
     this.hoverRotationDelta = 0;
@@ -827,16 +823,17 @@ export class Game {
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
     clearStarSparkles();
-    // Reset particle arrays so stale drops from a previous level don't carry over.
     this._clearAllParticles();
     this._resetMetricBaselines();
+  }
 
-    this._updateLevelHeader(levelId);
-    this._refreshPlayUI();
-    this._updateNoteHintBoxes(level);
-    this.canvas.focus();
-
-    // Check for invalid initial state (e.g. pre-connected negative heaters/pumps)
+  /**
+   * Check for an invalid initial board state (e.g. pre-connected tiles with
+   * negative water impact) and display an error flash and tile highlight if
+   * one is found.  Call this once immediately after a level is loaded.
+   */
+  private _checkAndShowInitialError(): void {
+    if (!this.board) return;
     const initialError = this.board.checkInitialStateErrors();
     if (initialError) {
       this._showErrorFlash(initialError);
@@ -844,6 +841,29 @@ export class Game {
         this._startErrorHighlight(this.board.lastErrorTilePositions);
       }
     }
+  }
+
+  /** Start (or restart) the given level. */
+  startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[]): void {
+    // Look up the level in the active campaign; no-op if no campaign is active.
+    if (!this._activeCampaign) return;
+    let level: LevelDef | undefined;
+    for (const ch of this._activeCampaign.chapters) {
+      level = ch.levels.find((l) => l.id === levelId);
+      if (level) break;
+    }
+    if (!level) return;
+
+    this.currentLevel = level;
+    this.board = new Board(level.rows, level.cols, level, existingDecorations);
+    this._enterPlayScreenState(level);
+
+    this._updateLevelHeader(levelId);
+    this._refreshPlayUI();
+    this._updateNoteHintBoxes(level);
+    this.canvas.focus();
+
+    this._checkAndShowInitialError();
 
     // If the level starts already in a losing state, show the unplayable modal.
     if (this.board.getCurrentWater() <= 0) {
@@ -1329,6 +1349,20 @@ export class Game {
     this._triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
   }
 
+  /**
+   * Check win/lose conditions after a player move and, if game-over was triggered,
+   * discard the losing move from history so the player cannot redo into a lost state.
+   * Call this at the end of every board-mutating player action.
+   */
+  private _checkWinLoseAfterMove(): void {
+    if (!this.board) return;
+    this._checkWinLose();
+    if (this.gameState === GameState.GameOver) {
+      this.board.discardLastMoveFromHistory();
+      this._updateUndoRedoButtons();
+    }
+  }
+
   private _checkWinLose(): void {
     if (!this.board || this.gameState !== GameState.Playing) return;
 
@@ -1572,11 +1606,7 @@ export class Game {
         this.pendingRotation = reclaimedRotation;
       }
       this._refreshPlayUI();
-      this._checkWinLose();
-      if (this.gameState === GameState.GameOver) {
-        this.board.discardLastMoveFromHistory();
-        this._updateUndoRedoButtons();
-      }
+      this._checkWinLoseAfterMove();
     } else if (this.board.lastError) {
       this._handleBoardError();
     }
@@ -1683,11 +1713,7 @@ export class Game {
     this._spawnLockedCostChangeAnimations();
     this._spawnCementDecrementAnimation();
     this._refreshPlayUI();
-    this._checkWinLose();
-    if (this.gameState === GameState.GameOver) {
-      this.board.discardLastMoveFromHistory();
-      this._updateUndoRedoButtons();
-    }
+    this._checkWinLoseAfterMove();
   }
 
 
@@ -2505,11 +2531,7 @@ export class Game {
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._refreshPlayUI();
-    this._checkWinLose();
-    if (this.gameState === GameState.GameOver) {
-      this.board.discardLastMoveFromHistory();
-      this._updateUndoRedoButtons();
-    }
+    this._checkWinLoseAfterMove();
   }
 
   /**
@@ -2803,6 +2825,15 @@ export class Game {
     // spawning fresh ones for the restored board state.
     this._completeAnims();
     this._spawnConnectionAnimations(filledBefore);
+    this._finalizeHistoryJump();
+  }
+
+  /**
+   * Finalize UI state after an undo, redo, or undo-win action:
+   * deselect any exhausted inventory shape, reset metric sparkle baselines,
+   * refresh the play HUD, and re-render the board.
+   */
+  private _finalizeHistoryJump(): void {
     this._deselectIfDepleted();
     this._resetMetricBaselines();
     this._refreshPlayUI();
@@ -2836,10 +2867,7 @@ export class Game {
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);
     this._spawnConnectionAnimations(filledBefore);
-    this._deselectIfDepleted();
-    this._resetMetricBaselines();
-    this._refreshPlayUI();
-    this._renderBoard();
+    this._finalizeHistoryJump();
   }
 
   /** Redo the last undone player action. */
@@ -2849,10 +2877,7 @@ export class Game {
     this.board.redoMove();
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
-    this._deselectIfDepleted();
-    this._resetMetricBaselines();
-    this._refreshPlayUI();
-    this._renderBoard();
+    this._finalizeHistoryJump();
     this._checkWinLose();
   }
 
@@ -2918,48 +2943,14 @@ export class Game {
   startLevelDef(level: LevelDef): void {
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level);
-    this.board.initHistory();
-    this.gameState = GameState.Playing;
-    this.focusPos = { ...this.board.source };
-    this.selectedShape = null;
-    this.pendingRotation = 0;
-    this.hoverRotationDelta = 0;
-
-    setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level)));
-    this.canvas.width  = level.cols * TILE_SIZE;
-    this.canvas.height = level.rows * TILE_SIZE;
-
-    this.screen = GameScreen.Play;
-    this.levelSelectEl.style.display = 'none';
-    this.playScreenEl.style.display  = 'flex';
-    this.winModalEl.style.display         = 'none';
-    this.gameoverModalEl.style.display    = 'none';
-    this._newChapterModalEl.style.display = 'none';
-    this._challengeModalEl.style.display  = 'none';
-    this._exitConfirmModalEl.style.display = 'none';
-    this._clearModalSparkle(this.winModalEl);
-    this._clearModalSparkle(this.gameoverModalEl);
-    clearConfetti();
-    clearStarSparkles();
-    // Reset particle arrays for the playtested level.
-    this._clearAllParticles();
-    this._resetMetricBaselines();
+    this._enterPlayScreenState(level);
     this.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
-    this._renderInventoryBar();
-    this._updateWaterDisplay();
+    this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
-    this._updateUndoRedoButtons();
     this.canvas.focus();
 
-    // Check for invalid initial state (e.g. pre-connected negative heaters/pumps)
-    const initialError = this.board.checkInitialStateErrors();
-    if (initialError) {
-      this._showErrorFlash(initialError);
-      if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
-        this._startErrorHighlight(this.board.lastErrorTilePositions);
-      }
-    }
+    this._checkAndShowInitialError();
   }
 
   // ─── Undo / redo button state ─────────────────────────────────────────────
