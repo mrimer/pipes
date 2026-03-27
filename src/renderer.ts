@@ -708,8 +708,10 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
       ctx.beginPath();
       ctx.rect(lineLeft, topY - _s(3), lineSpan, numLines * lineSpacing + _s(3));
       ctx.clip();
-      // Draw numLines+2 lines so the region stays filled as lines exit the top and enter the bottom.
-      for (let k = 0; k <= numLines + 1; k++) {
+      // Draw numLines+3 lines: k=-1 starts one lineSpacing above topY so the
+      // exiting sliver at the clip top is always present throughout the cycle
+      // (symmetric with k=numLines+1 which fills the entry gap at the bottom).
+      for (let k = -1; k <= numLines + 1; k++) {
         const lineY = topY + k * lineSpacing - offset;
         ctx.beginPath();
         ctx.moveTo(lineLeft, lineY);
