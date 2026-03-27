@@ -2,7 +2,7 @@ import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAP
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
-import { TILE_SIZE, LINE_WIDTH, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, LINE_WIDTH, renderBoard, renderContainerFillAnims, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import {
@@ -1185,6 +1185,12 @@ export class Game {
         }
       }
       renderFillAnims(this.ctx, this._fillAnims, tileConnectionsMap, LINE_WIDTH, now);
+      // Draw container (Chamber) tile reveal animations: wipe from the entry edge
+      // to the opposite edge, showing the connected state progressively.
+      renderContainerFillAnims(
+        this.ctx, this.board, this._fillAnims,
+        this.board.getCurrentWater(), this.shiftHeld, currentTemp, currentPressure, now,
+      );
     }
   }
 
@@ -2737,8 +2743,12 @@ export class Game {
     this._bubbles = [];
     this._vortexParticles = [];
     this._flowGoodDirs = null;
+    // Clear all fill animations (including the persistent sink entry) before
+    // spawning fresh ones for the restored board state.
+    this._completeAnims();
     this._spawnConnectionAnimations(filledBefore);
     this._deselectIfDepleted();
+    this._resetMetricBaselines();
     this._refreshPlayUI();
     this._renderBoard();
   }

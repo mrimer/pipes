@@ -5,6 +5,7 @@
 import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
+import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
   EMPTY_COLOR, EMPTY_TARGET_COLOR,
@@ -1256,16 +1257,18 @@ export function drawTile(
   isHovered = false,
   blockedWaterDir: Direction | null = null,
   rotationDegOverride?: number,
+  clipNubDirs?: Set<Direction>,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
 
-  // When a rotation override is active, use it; blocked arms are suppressed
-  // during rotation animation because the arm directions are mid-transition.
+  // When a rotation override is active, use it; blocked arms and nub-clip dirs are
+  // suppressed during rotation animation because the arm directions are mid-transition.
   const effectiveRotation = rotationDegOverride ?? rotation;
   const effectiveBlockedWaterDir = rotationDegOverride !== undefined ? null : blockedWaterDir;
+  const effectiveClipNubDirs = rotationDegOverride !== undefined ? undefined : clipNubDirs;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -1279,8 +1282,11 @@ export function drawTile(
 
   // When a one-way tile's blocked exit direction applies and the tile has water,
   // draw each pipe arm individually so the blocked arm can be shown without water.
-  const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater &&
-    (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape) || LEAKY_PIPE_SHAPES.has(shape));
+  const isPipeShape = PIPE_SHAPES.has(shape);
+  const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater && isPipeShape;
+  // When any arm needs its nub clipped to the tile boundary (e.g. adjacent to a
+  // source/sink/chamber), draw arms individually so clipping can be applied per arm.
+  const hasNubClip = (effectiveClipNubDirs?.size ?? 0) > 0 && isPipeShape;
 
   if (shape === PipeShape.Empty) {
     // Draw a subtle dot so the tile is visually distinct from fixed tiles
@@ -1288,15 +1294,28 @@ export function drawTile(
     ctx.beginPath();
     ctx.arc(0, 0, _s(4), 0, Math.PI * 2);
     ctx.fill();
-  } else if (isBlockedPipe) {
-    // Arm-by-arm drawing: blocked arm uses non-water color; all others use water color.
+  } else if (isBlockedPipe || hasNubClip) {
+    // Arm-by-arm drawing: blocked arm uses non-water color; clipped arms use a tile-boundary
+    // clip region to prevent round-cap nubs from extending into adjacent tiles.
     // Draw blocked arms first so the unblocked (water) arms are painted on top at the
     // tile center, giving the correct visual appearance at the junction point.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
     const sortedArms = [...tile.connections].sort((a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0));
+    ctx.lineCap = 'round';
     for (const armDir of sortedArms) {
-      const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+      const armColor = (isBlockedPipe && armDir === effectiveBlockedWaterDir) ? dryColor : color;
+      if (effectiveClipNubDirs?.has(armDir)) {
+        // Clip this arm to the tile boundary so the round cap doesn't bleed into
+        // the adjacent source/sink/chamber tile.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-half, -half, half * 2, half * 2);
+        ctx.clip();
+        _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+        ctx.restore();
+      } else {
+        _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+      }
     }
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
@@ -1648,6 +1667,97 @@ export function renderBoard(
 }
 
 /**
+ * Render container-fill reveal animations for all active container (Chamber/Sink)
+ * fill animation entries.  For each active entry the tile is redrawn in its
+ * connected (water) state inside a clip region that sweeps from the entry edge to
+ * the opposite edge, creating a smooth wipe transition from the dry appearance.
+ *
+ * Call this after {@link renderBoard} so the reveal is painted on top of the dry
+ * base tile.
+ *
+ * @param ctx          - 2D rendering context.
+ * @param board        - The current game board.
+ * @param anims        - The live fill animation array (already cleaned up by
+ *                       {@link computeActiveFillKeys}).
+ * @param currentWater - Current water count (passed to drawTile for Source labels).
+ * @param shiftHeld    - Whether the Shift key is held (affects chamber cost display).
+ * @param currentTemp  - Current effective temperature.
+ * @param currentPressure - Current effective pressure.
+ * @param now          - Current {@link performance.now()} timestamp.
+ */
+export function renderContainerFillAnims(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  anims: PipeFillAnim[],
+  currentWater: number,
+  shiftHeld: boolean,
+  currentTemp: number,
+  currentPressure: number,
+  now: number,
+): void {
+  for (const anim of anims) {
+    if (!anim.isContainer) continue;
+    const elapsed = now - anim.startTime;
+    if (elapsed < 0) continue; // not started yet
+    const progress = Math.min(1, elapsed / FILL_ANIM_DURATION);
+    if (progress <= 0) continue;
+
+    const { row, col, entryDir } = anim;
+    const x = col * TILE_SIZE;
+    const y = row * TILE_SIZE;
+    const tile = board.getTile({ row, col });
+    if (!tile) continue;
+
+    // Determine the clip rectangle that reveals connected state progressively,
+    // starting from the full entry edge and sweeping to the opposite edge.
+    let clipX = x, clipY = y, clipW = TILE_SIZE, clipH = TILE_SIZE;
+    switch (entryDir) {
+      case Direction.North: // entry at top → sweep downward
+        clipH = progress * TILE_SIZE;
+        break;
+      case Direction.South: // entry at bottom → sweep upward
+        clipY = y + (1 - progress) * TILE_SIZE;
+        clipH = progress * TILE_SIZE;
+        break;
+      case Direction.East: // entry at right → sweep leftward
+        clipX = x + (1 - progress) * TILE_SIZE;
+        clipW = progress * TILE_SIZE;
+        break;
+      case Direction.West: // entry at left → sweep rightward
+        clipW = progress * TILE_SIZE;
+        break;
+    }
+
+    // Compute locked cost/gain for chambers so the revealing tile shows the
+    // same values it will display once fully connected.
+    let lockedCost: number | null = null;
+    let lockedGain: number | null = null;
+    if (tile.shape === PipeShape.Chamber) {
+      if (tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
+        const impact = board.getLockedWaterImpact({ row, col });
+        if (impact !== null) lockedCost = Math.abs(impact);
+      } else if (tile.chamberContent === 'hot_plate') {
+        const impact = board.getLockedWaterImpact({ row, col });
+        const gain = board.getLockedHotPlateGain({ row, col });
+        if (impact !== null && gain !== null) {
+          const loss = Math.max(0, gain - impact);
+          lockedGain = gain;
+          lockedCost = loss;
+        }
+      }
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(clipX, clipY, clipW, clipH);
+    ctx.clip();
+    // Draw the tile in its connected (water) state within the clip region.
+    drawTile(ctx, x, y, tile, true, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
+    ctx.restore();
+  }
+}
+
+/**
  * Draw a semi-transparent placement-target overlay over a tile cell.
  * Used to shade cells that are valid replacement targets, or cement cells
  * with an identical piece where replacement is disallowed.
@@ -1903,7 +2013,26 @@ function _renderPass3PipeTiles(
       // Apply any active rotation animation override for this tile.
       const rotOverride = rotationOverrides?.get(posKey(r, c));
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride);
+      // Determine which arm directions need their nub clipped at the tile boundary:
+      //   - Arms pointing at a Source or Sink always get clipped (any fill state).
+      //   - Arms pointing at a Chamber get clipped only when the pipe itself is dry,
+      //     to prevent the dry-colour nub from bleeding into the chamber tile.
+      let clipNubDirs: Set<Direction> | undefined;
+      for (const dir of tile.connections) {
+        const delta = NEIGHBOUR_DELTA[dir];
+        const nr = r + delta.row, nc = c + delta.col;
+        if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
+        const neighbor = board.grid[nr][nc];
+        if (
+          neighbor.shape === PipeShape.Source ||
+          neighbor.shape === PipeShape.Sink ||
+          (neighbor.shape === PipeShape.Chamber && !isWater)
+        ) {
+          (clipNubDirs ??= new Set<Direction>()).add(dir);
+        }
+      }
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, clipNubDirs);
     }
   }
 }
