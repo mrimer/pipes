@@ -464,6 +464,7 @@ export function renderLevelList(
 
       // Wrap level button and its minimap in a flex row
       const levelRow = document.createElement('div');
+      levelRow.dataset.levelId = String(level.id);
       levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
       const minimap = renderMinimap(level);
       minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;' + (!isLocked ? 'cursor:pointer;' : '');
