@@ -48,6 +48,17 @@ export interface PipeFillAnim {
   blockedDir: Direction | null;
   /** `performance.now()` when this tile's fill animation should start. */
   startTime: number;
+  /**
+   * When true the animation only plays Phase 1 (entry arm fills to tile centre)
+   * and then persists indefinitely rather than expiring.  Used for the sink tile.
+   */
+  isSink?: boolean;
+  /**
+   * CSS color string to use for the animated water stroke.  Defaults to the
+   * standard WATER_COLOR when not provided.  Set to the tile's filled-water
+   * color so pre-placed (gold / fixed / leaky) pipes animate in their own hue.
+   */
+  waterColor?: string;
 }
 
 // ─── Key helpers ─────────────────────────────────────────────────────────────
@@ -116,11 +127,11 @@ export function computeActiveFillKeys(
   let i = 0;
   while (i < anims.length) {
     const anim = anims[i];
-    if (now >= anim.startTime + FILL_ANIM_DURATION) {
+    if (!anim.isSink && now >= anim.startTime + FILL_ANIM_DURATION) {
       anims.splice(i, 1); // expired – remove
       continue;
     }
-    // Not expired yet – add to active set even if not started yet
+    // Not expired yet (or sink – persists forever) – add to active set
     keys.add(fillAnimKey(anim));
     i++;
   }
@@ -207,10 +218,13 @@ export function renderFillAnims(
   for (const anim of anims) {
     const elapsed = now - anim.startTime;
     if (elapsed < 0) continue; // not started yet
-    const progress = Math.min(1, elapsed / FILL_ANIM_DURATION);
+    // Sink tile: only Phase 1 (entry arm fills to centre); clamp at 0.5 so it
+    // persists at the centre indefinitely once Phase 1 completes.
+    const rawProgress = elapsed / FILL_ANIM_DURATION;
+    const progress = anim.isSink ? Math.min(0.5, rawProgress) : Math.min(1, rawProgress);
     const connections = tileConnectionsMap.get(fillAnimKey(anim));
     if (!connections) continue;
-    _drawFillOverlay(ctx, anim, connections, lineWidth, progress);
+    _drawFillOverlay(ctx, anim, connections, lineWidth, progress, anim.waterColor ?? WATER_COLOR);
   }
 }
 
@@ -221,6 +235,7 @@ function _drawFillOverlay(
   connections: Set<Direction>,
   lineWidth: number,
   progress: number,
+  color: string,
 ): void {
   const cx = anim.col * TILE_SIZE + TILE_SIZE / 2;
   const cy = anim.row * TILE_SIZE + TILE_SIZE / 2;
@@ -232,7 +247,7 @@ function _drawFillOverlay(
   const otherP = Math.max(0, (progress - 0.5) * 2);
 
   ctx.save();
-  ctx.strokeStyle = WATER_COLOR;
+  ctx.strokeStyle = color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
