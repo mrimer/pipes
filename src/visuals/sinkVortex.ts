@@ -1,7 +1,7 @@
 /**
  * Spinning vortex particle effect rendered on top of sink tiles in-game.
  *
- * Particles orbit the sink centre, spiralling slowly inward, to give the
+ * Particles orbit the sink center, spiralling slowly inward, to give the
  * impression of water being drawn into the sink.  The color of each particle
  * matches the sink tile color so the effect blends naturally.
  */
@@ -14,7 +14,7 @@ import { TILE_SIZE, scalePx as _s } from '../renderer';
 
 /** A single particle in the vortex spiral around a sink tile. */
 export interface VortexParticle {
-  /** Initial orbital radius from the sink centre, in canvas pixels. */
+  /** Initial orbital radius from the sink center, in canvas pixels. */
   spawnRadius: number;
   /** Starting angle in radians (0 = right, increases clockwise). */
   startAngle: number;
@@ -75,9 +75,9 @@ export function spawnVortexParticle(particles: VortexParticle[]): void {
  *
  * @param ctx       2D rendering context of the game canvas.
  * @param particles Mutable array of active vortex particles (modified in place).
- * @param sinkCx    Canvas X-coordinate of the sink tile centre.
- * @param sinkCy    Canvas Y-coordinate of the sink tile centre.
- * @param color     CSS colour string matching the current sink tile color.
+ * @param sinkCx    Canvas X-coordinate of the sink tile center.
+ * @param sinkCy    Canvas Y-coordinate of the sink tile center.
+ * @param color     CSS color string matching the current sink tile color.
  */
 export function renderVortex(
   ctx: CanvasRenderingContext2D,
@@ -107,7 +107,7 @@ export function renderVortex(
     const angle = p.startAngle + p.angularSpeed * elapsed;
 
     // Alpha: fade in during the first 20 % of lifetime, full opacity until
-    // 70 %, then fade out so particles vanish smoothly at the centre.
+    // 70 %, then fade out so particles vanish smoothly at the center.
     let alpha: number;
     if (progress < 0.2) {
       alpha = progress / 0.2;

@@ -10,7 +10,7 @@ import { _heightToRgb, attachChapterWaveAnimation } from '../src/visuals/chapter
 
 describe('_heightToRgb', () => {
   describe('blue palette (isGold = false)', () => {
-    it('returns a dark colour for the trough (h = −1)', () => {
+    it('returns a dark color for the trough (h = −1)', () => {
       const [r, g, b] = _heightToRgb(-1, false);
       // Trough should be a dark navy – r and g are small, b is larger.
       expect(r).toBeLessThan(30);
@@ -18,7 +18,7 @@ describe('_heightToRgb', () => {
       expect(b).toBeGreaterThan(80);
     });
 
-    it('returns a bright colour for the crest (h = +1)', () => {
+    it('returns a bright color for the crest (h = +1)', () => {
       const [r, g, b] = _heightToRgb(1, false);
       // Crest should be a bright sky-blue – all channels raised.
       expect(r).toBeGreaterThan(50);
@@ -26,7 +26,7 @@ describe('_heightToRgb', () => {
       expect(b).toBeGreaterThan(200);
     });
 
-    it('returns a mid-range colour at h = 0', () => {
+    it('returns a mid-range color at h = 0', () => {
       const [r, g, b] = _heightToRgb(0, false);
       // Mid-water: between the dark and bright extremes.
       const [darkR, darkG, darkB] = _heightToRgb(-1, false);
@@ -81,7 +81,7 @@ describe('_heightToRgb', () => {
     });
   });
 
-  it('gold and blue palettes return different colours', () => {
+  it('gold and blue palettes return different colors', () => {
     const blueHi  = _heightToRgb(1, false);
     const goldHi  = _heightToRgb(1, true);
     expect(blueHi).not.toEqual(goldHi);

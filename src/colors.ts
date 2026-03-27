@@ -95,17 +95,17 @@ export const HOT_PLATE_COLOR       = '#e44';
 export const HOT_PLATE_WATER_COLOR = '#f86';
 /** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
 export const SPIN_PIPE_COLOR  = '#3a5868';
-/** Colour for positive (beneficial) floating animation labels. */
+/** Color for positive (beneficial) floating animation labels. */
 export const ANIM_POSITIVE_COLOR = '#4caf50';
-/** Colour for negative (costly) floating animation labels. */
+/** Color for negative (costly) floating animation labels. */
 export const ANIM_NEGATIVE_COLOR = '#f44336';
-/** Colour for zero-value floating animation labels. */
+/** Color for zero-value floating animation labels. */
 export const ANIM_ZERO_COLOR = '#9e9e9e';
 /** Dark red background for One-Way floor tiles. */
 export const ONE_WAY_BG_COLOR = '#2a0808';
-/** Red arrow fill colour for One-Way floor tiles. */
+/** Red arrow fill color for One-Way floor tiles. */
 export const ONE_WAY_ARROW_COLOR = '#c02020';
-/** Brighter red arrow border colour for One-Way floor tiles. */
+/** Brighter red arrow border color for One-Way floor tiles. */
 export const ONE_WAY_ARROW_BORDER = '#e84040';
 /** Leaky pipe tile color (rust-brown with visible corrosion). */
 export const LEAKY_PIPE_COLOR       = '#8b5c2a';

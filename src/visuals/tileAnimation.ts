@@ -6,13 +6,13 @@ export { ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR };
 
 /** A floating animation label drawn on the canvas. */
 export interface TileAnimation {
-  /** Canvas pixel X of the animation origin (tile centre). */
+  /** Canvas pixel X of the animation origin (tile center). */
   x: number;
-  /** Canvas pixel Y of the animation origin (tile centre). */
+  /** Canvas pixel Y of the animation origin (tile center). */
   y: number;
   /** Text to display (e.g. '+5', '-1'). */
   text: string;
-  /** CSS/canvas colour string for the label. */
+  /** CSS/canvas color string for the label. */
   color: string;
   /** `performance.now()` timestamp when the animation started. */
   startTime: number;
@@ -26,11 +26,11 @@ export const ANIM_DURATION = 900;
 /** Vertical rise in pixels over the full animation duration. */
 export const ANIM_RISE_PX = 36;
 
-/** Colour for item-grant animation labels (gold, to distinguish from generic positive). */
+/** Color for item-grant animation labels (gold, to distinguish from generic positive). */
 export const ANIM_ITEM_COLOR = '#ffd700';
 
 /**
- * Choose the animation label colour based on a numeric value.
+ * Choose the animation label color based on a numeric value.
  * Positive → green, negative → red, zero → gray.
  */
 export function animColor(value: number): string {

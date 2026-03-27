@@ -5,7 +5,7 @@
  * new orientation over ROTATION_ANIM_DURATION ms.
  *
  * Fill effect: when newly-connected tiles are filled with water, animates the
- * blue water colour filling each tile sequentially in BFS order starting from
+ * blue water color filling each tile sequentially in BFS order starting from
  * the tile adjacent to the already-connected network.  Each tile takes
  * FILL_ANIM_DURATION ms to fill, with subsequent tiles starting after the
  * previous tile is complete.  One-way-blocked arms are not filled.
@@ -49,7 +49,7 @@ export interface PipeFillAnim {
   /** `performance.now()` when this tile's fill animation should start. */
   startTime: number;
   /**
-   * When true the animation only plays Phase 1 (entry arm fills to tile centre)
+   * When true the animation only plays Phase 1 (entry arm fills to tile center)
    * and then persists indefinitely rather than expiring.  Used for the sink tile.
    */
   isSink?: boolean;
@@ -236,8 +236,8 @@ export function renderFillAnims(
   for (const anim of anims) {
     const elapsed = now - anim.startTime;
     if (elapsed < 0) continue; // not started yet
-    // Sink tile: only Phase 1 (entry arm fills to centre); clamp at 0.5 so it
-    // persists at the centre indefinitely once Phase 1 completes.
+    // Sink tile: only Phase 1 (entry arm fills to center); clamp at 0.5 so it
+    // persists at the center indefinitely once Phase 1 completes.
     const rawProgress = elapsed / FILL_ANIM_DURATION;
     const progress = anim.isSink ? Math.min(0.5, rawProgress) : Math.min(1, rawProgress);
     const connections = tileConnectionsMap.get(fillAnimKey(anim));
@@ -259,9 +259,9 @@ function _drawFillOverlay(
   const cy = anim.row * TILE_SIZE + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
 
-  // Phase 1 (0 → 0.5): entry arm fills from its edge toward the tile centre.
+  // Phase 1 (0 → 0.5): entry arm fills from its edge toward the tile center.
   const entryP = Math.min(1, progress * 2);
-  // Phase 2 (0.5 → 1): all other arms fill from the centre outward.
+  // Phase 2 (0.5 → 1): all other arms fill from the center outward.
   const otherP = Math.max(0, (progress - 0.5) * 2);
 
   ctx.save();
@@ -269,12 +269,12 @@ function _drawFillOverlay(
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
-  // Entry arm: fill from the outer edge inward toward the centre.
+  // Entry arm: fill from the outer edge inward toward the center.
   if (connections.has(anim.entryDir) && entryP > 0) {
     const dx = NEIGHBOUR_DELTA[anim.entryDir].col;
     const dy = NEIGHBOUR_DELTA[anim.entryDir].row;
     // At entryP=0: water tip is at the edge (cx + dx*half, cy + dy*half).
-    // At entryP=1: water tip reaches the centre (cx, cy).
+    // At entryP=1: water tip reaches the center (cx, cy).
     const startX = cx + dx * half;
     const startY = cy + dy * half;
     const endX = cx + dx * half * (1 - entryP);
@@ -285,7 +285,7 @@ function _drawFillOverlay(
     ctx.stroke();
   }
 
-  // Other arms: fill from the centre outward (skip entry arm and blocked arm).
+  // Other arms: fill from the center outward (skip entry arm and blocked arm).
   if (otherP > 0) {
     for (const dir of connections) {
       if (dir === anim.entryDir) continue;

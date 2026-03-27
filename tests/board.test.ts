@@ -29,7 +29,7 @@ describe('Board.areMutuallyConnected', () => {
     expect(board.areMutuallyConnected({ row: 0, col: 0 }, Direction.East)).toBe(true);
   });
 
-  it('returns false when neighbour is out of bounds', () => {
+  it('returns false when neighbor is out of bounds', () => {
     const board = new Board(3, 3);
     // North of (0,0) is out of bounds
     expect(board.areMutuallyConnected({ row: 0, col: 0 }, Direction.North)).toBe(false);
@@ -304,7 +304,7 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
 // ─── New: level loading ──────────────────────────────────────────────────────
 
 describe('Board (level mode)', () => {
-  it('initialises source capacity from source tile capacity', () => {
+  it('initializes source capacity from source tile capacity', () => {
     const level = LEVELS[0]; // Tutorial
     const board = new Board(level.rows, level.cols, level);
     expect(board.sourceCapacity).toBe(board.grid[board.source.row][board.source.col].capacity);

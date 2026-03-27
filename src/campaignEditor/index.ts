@@ -305,7 +305,7 @@ export class CampaignEditor {
    * expandable info area, and a button cluster.  Callers populate `info` and
    * `btns` with their specific content, then return `row`.
    *
-   * @param borderColor - CSS colour for the 2px solid border.
+   * @param borderColor - CSS color for the 2px solid border.
    * @param padding     - CSS padding shorthand for the outer row.
    * @param btnGap      - CSS gap for the button container (default `'8px'`).
    */
@@ -328,7 +328,7 @@ export class CampaignEditor {
   }
 
   /**
-   * Create a standard full-screen modal overlay and a centred dialog box,
+   * Create a standard full-screen modal overlay and a centered dialog box,
    * append the overlay to `_el`, and return both elements for the caller to
    * populate.
    * @param maxWidth CSS max-width for the dialog (default '460px').
@@ -353,9 +353,9 @@ export class CampaignEditor {
    * summary, or challenge badge in the non-edit level card view.
    *
    * All three box types share the same background and padding; only the border
-   * colour changes to distinguish note (blue), hint (gold), and challenge (red).
+   * color changes to distinguish note (blue), hint (gold), and challenge (red).
    *
-   * @param borderColor CSS colour for the 1 px solid border (e.g. `'#4a90d9'`).
+   * @param borderColor CSS color for the 1 px solid border (e.g. `'#4a90d9'`).
    * @param text        Content to display inside the box.
    */
   private _createInfoBox(borderColor: string, text: string): HTMLDivElement {
@@ -382,7 +382,7 @@ export class CampaignEditor {
 
   /**
    * Show an info dialog telling the user the imported campaign is the same version
-   * as the local copy. The import is cancelled.
+   * as the local copy. The import is canceled.
    */
   private _showImportSameVersionDialog(name: string, ts: string | undefined): void {
     const { overlay, dialog } = this._createDialogOverlay('460px');

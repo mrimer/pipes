@@ -163,7 +163,7 @@ export function renderLevelList(
   // ── Active campaign header ─────────────────────────────────────────────────
   if (activeCampaign) {
     // Campaign aggregate stats: compute before creating the header so the
-    // completion state can influence the box colour.
+    // completion state can influence the box color.
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const { total: campaignStarTotal, collected: campaignStarCollected } =
       chapterStarTotals(allLevels, levelStars);

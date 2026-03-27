@@ -35,7 +35,7 @@ const WAVE_SCALE = 8;
  * horizontal-band and diagonal-band components — resembling waves reflecting
  * off the four walls of a rectangular tank.
  *
- * Using fixed values (no Math.random) keeps behaviour deterministic and avoids
+ * Using fixed values (no Math.random) keeps behavior deterministic and avoids
  * re-spawning different waves each time the level list is rebuilt.
  */
 function _buildWaves(): Wave[] {
@@ -51,7 +51,7 @@ function _buildWaves(): Wave[] {
   ];
 }
 
-/** Linearly interpolate two RGB colour tuples by factor `t` ∈ [0, 1]. */
+/** Linearly interpolate two RGB color tuples by factor `t` ∈ [0, 1]. */
 function _lerpRgb(
   a: readonly [number, number, number],
   b: readonly [number, number, number],
@@ -65,7 +65,7 @@ function _lerpRgb(
 }
 
 /**
- * Map a normalised wave-height value in [−1, +1] to an RGB colour triple.
+ * Map a normalized wave-height value in [−1, +1] to an RGB color triple.
  *
  * Blue palette  (isGold = false):  dark navy → ocean blue → bright sky-blue.
  * Gold palette  (isGold = true):   dark amber → warm gold → bright sunlit gold.
@@ -102,13 +102,13 @@ export function _heightToRgb(h: number, isGold: boolean): [number, number, numbe
  * identical to its original appearance.
  *
  * @param headerEl  The element that receives the animated canvas as a child.
- * @param isGold    `true` when the chapter is fully completed (gold colour scheme).
+ * @param isGold    `true` when the chapter is fully completed (gold color scheme).
  * @param triggerEl Optional element whose hover events start/stop the animation.
  *                  Defaults to `headerEl` when omitted.
  */
 export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolean, triggerEl?: HTMLElement): void {
   const hoverEl = triggerEl ?? headerEl;
-  // The background colour shown while the animation is not running.
+  // The background color shown while the animation is not running.
   const staticBg = isGold ? '#1e1800' : '#16213e';
 
   // ── Canvas setup ────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   let offCtx: CanvasRenderingContext2D | null = null;
 
   // ── Static background helper ────────────────────────────────────────────────
-  /** Paint the idle background colour onto the canvas (used before and after animation). */
+  /** Paint the idle background color onto the canvas (used before and after animation). */
   function _drawStatic(): void {
     const w = headerEl.offsetWidth;
     const h = headerEl.offsetHeight;
@@ -210,7 +210,7 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
     }
 
     for (let py = 0; py < sh; py++) {
-      // Sample at the centre of each low-res cell.
+      // Sample at the center of each low-res cell.
       const y = (py + 0.5) * WAVE_SCALE;
       for (let px = 0; px < sw; px++) {
         const x = (px + 0.5) * WAVE_SCALE;
@@ -222,7 +222,7 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
             (x * cosA[wi] + y * sinA[wi]) * waves[wi].freq + phi[wi],
           );
         }
-        hVal /= n; // normalise to [−1, +1]
+        hVal /= n; // normalize to [−1, +1]
 
         const [r, g, b] = _heightToRgb(hVal, isGold);
         const i = (py * sw + px) << 2; // × 4
