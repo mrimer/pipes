@@ -231,6 +231,15 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
   // the neighbor, so that one-way tiles are traversed correctly in reverse.
   while (queue.length > 0) {
     const current = queue.shift()!;
+
+    // Do not propagate backward through the source.  The source's own good
+    // directions have already been recorded when it was encountered as a
+    // *neighbor* of adjacent tiles.  If we were to propagate backward here,
+    // we would incorrectly mark tiles that lead *into* the source as having
+    // a "good" direction toward the source, producing looping paths that
+    // re-enter the source before reaching the sink.
+    if (current.row === board.source.row && current.col === board.source.col) continue;
+
     const currentDirs = getDirs(current);
 
     for (const dirToNeighbor of Object.values(Direction)) {
