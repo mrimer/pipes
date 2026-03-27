@@ -1672,6 +1672,22 @@ export class Game {
   private _handleCanvasWheel(e: WheelEvent): void {
     if (this.screen !== GameScreen.Play) return;
     if (this.gameState !== GameState.Playing) return;
+    if (this.mouseCanvasPos && this.board) {
+      const hPos = this._getHoverGridPos()!;
+      const hTile = this.board.getTile(hPos);
+      if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {
+        // Spin pipes always take priority: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
+        const steps = e.deltaY > 0 ? 1 : 3;
+        const filledBefore = this.board.getFilledPositions();
+        if (this.board.rotateTileBy(hPos, steps)) {
+          e.preventDefault();
+          this._afterTileRotated(filledBefore);
+        } else if (this.board.lastError) {
+          this._handleBoardError();
+        }
+        return;
+      }
+    }
     if (this.selectedShape !== null) {
       e.preventDefault();
       // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
@@ -1681,24 +1697,10 @@ export class Game {
         this._rotatePendingCCW();
       }
     } else if (this.mouseCanvasPos && this.board) {
-      const hPos = this._getHoverGridPos()!;
-      const hTile = this.board.getTile(hPos);
-      if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {
-        // Spin pipes: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
-        const steps = e.deltaY > 0 ? 1 : 3;
-        const filledBefore = this.board.getFilledPositions();
-        if (this.board.rotateTileBy(hPos, steps)) {
-          e.preventDefault();
-          this._afterTileRotated(filledBefore);
-        } else if (this.board.lastError) {
-          this._handleBoardError();
-        }
-      } else {
-        // No inventory selected and not a spin pipe: preview rotation on hovered tile.
-        // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
-        const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
-        if (changed) e.preventDefault();
-      }
+      // No inventory selected and not a spin pipe: preview rotation on hovered tile.
+      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
+      const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
+      if (changed) e.preventDefault();
     }
   }
 

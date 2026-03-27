@@ -2578,7 +2578,7 @@ describe('Game – spinner tile wheel rotation', () => {
     expect(boardAccess.board.grid[0][1].rotation).toBe(90);
   });
 
-  it('rotates the selected inventory piece (not the spinner) when an inventory item is selected', () => {
+  it('rotates the spinner (not the pending piece) when an inventory item is selected and cursor hovers over the spinner', () => {
     const { game } = makeGame();
     game.startLevel(8); // LEVEL_8: SpinStraight at (0,1) with initial rotation 90
     const hooks = gameHooks(game);
@@ -2591,9 +2591,9 @@ describe('Game – spinner tile wheel rotation', () => {
 
     hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
 
-    // Pending rotation advances, not the spinner.
-    expect(hooks.pendingRotation).toBe(90);
-    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+    // The spinner should rotate, not the pending piece.
+    expect(boardAccess.board.grid[0][1].rotation).toBe(180);
+    expect(hooks.pendingRotation).toBe(0);
   });
 });
 
