@@ -1335,13 +1335,7 @@ export function drawTile(
   // from sticking out onto adjacent non-empty tiles.
   const hasButtEnd = (effectiveButtEndDirs?.size ?? 0) > 0 && isPipeShape;
 
-  if (shape === PipeShape.Empty) {
-    // Draw a subtle dot so the tile is visually distinct from fixed tiles
-    ctx.fillStyle = EMPTY_COLOR;
-    ctx.beginPath();
-    ctx.arc(0, 0, _s(4), 0, Math.PI * 2);
-    ctx.fill();
-  } else if (isBlockedPipe || hasButtEnd) {
+  if (isBlockedPipe || hasButtEnd) {
     // Arm-by-arm drawing: blocked arm uses non-water color; arms pointing at
     // non-empty adjacent tiles use lineCap='butt' so the end sits flush with
     // the tile boundary.  Draw blocked arms first so the unblocked (water) arms
