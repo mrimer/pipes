@@ -981,7 +981,7 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   ctx.textBaseline = 'middle';
   // When pressure > hardness, or when connected (locked cost), show the hardness number
   // in the top-left corner for reference
-  if (!isHard || lockedCost !== null) {
+  if ((!isHard && !shatterActive) || lockedCost !== null) {
     ctx.save();
     ctx.fillStyle = isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
     ctx.textAlign = 'left';
@@ -1511,14 +1511,14 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.LeakyElbow:    return 'Leaky Elbow';
     case PipeShape.LeakyTee:      return 'Leaky Tee';
     case PipeShape.LeakyCross:    return 'Leaky Cross';
-    case PipeShape.Source:       return 'Source';
-    case PipeShape.Sink:         return 'Sink';
+    case PipeShape.Source:       return `Source - Initial Capacity: ${tile.capacity}`;
+    case PipeShape.Sink:         return 'Sink - goal';
     case PipeShape.Granite:      return 'Granite';
     case PipeShape.Tree:         return 'Tree';
     case PipeShape.Cement:       return 'Cement';
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
-        case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity}` : 'Tank';
+        case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity} water` : 'Tank water';
         case 'dirt':   return `Dirt -${tile.cost}`;
         case 'item': {
           const itemName = _itemShapeDisplayName(tile.itemShape);
@@ -1539,6 +1539,7 @@ export function getTileDisplayName(tile: Tile): string {
             : `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
         }
         case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
+        case 'star':   return 'Star';
         default:       return 'Chamber';
       }
     default: return '';
