@@ -29,6 +29,9 @@ export const ANIM_RISE_PX = 36;
 /** Color for item-grant animation labels (gold, to distinguish from generic positive). */
 export const ANIM_ITEM_COLOR = '#ffd700';
 
+/** Color for negative item-grant animation labels (darker gold, to differentiate from positive). */
+export const ANIM_ITEM_NEG_COLOR = '#b8860b';
+
 /**
  * Choose the animation label color based on a numeric value.
  * Positive → green, negative → red, zero → gray.

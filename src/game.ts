@@ -14,7 +14,7 @@ import {
   loadLevelWater, saveLevelWater, clearLevelWater,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
-import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR } from './visuals/tileAnimation';
+import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR, ANIM_ITEM_NEG_COLOR } from './visuals/tileAnimation';
 import { CampaignEditor } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
@@ -296,6 +296,9 @@ export class Game {
 
   /** Shapes that should receive a red-sparkle CSS animation on the next inventory render (negative-count click). */
   private _pendingRedSparkleShapes: Set<PipeShape> = new Set();
+
+  /** Shapes that should receive a gray-sparkle CSS animation on the next inventory render (zero net change). */
+  private _pendingGraySparkleShapes: Set<PipeShape> = new Set();
 
   /** Chapter ID of the level currently being played (0 if unknown). */
   private currentChapterId = 0;
@@ -1019,6 +1022,17 @@ export class Game {
         }
       }
       this._pendingRedSparkleShapes.clear();
+    }
+    if (this._pendingGraySparkleShapes.size > 0) {
+      for (const shape of this._pendingGraySparkleShapes) {
+        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
+        if (el) {
+          el.classList.remove('sparkle-gray');
+          void el.offsetWidth; // force reflow to restart the CSS animation
+          el.classList.add('sparkle-gray');
+        }
+      }
+      this._pendingGraySparkleShapes.clear();
     }
   }
 
@@ -2253,8 +2267,16 @@ export class Game {
         if (dir === 'connect' && tile.itemShape !== null) {
           const val = tile.itemCount;
           text = val >= 0 ? `+${val}` : `${val}`;
-          color = ANIM_ITEM_COLOR;
-          this._pendingSparkleShapes.add(tile.itemShape);
+          if (val > 0) {
+            color = ANIM_ITEM_COLOR;
+            this._pendingSparkleShapes.add(tile.itemShape);
+          } else if (val < 0) {
+            color = ANIM_ITEM_NEG_COLOR;
+            this._pendingRedSparkleShapes.add(tile.itemShape);
+          } else {
+            color = ANIM_ZERO_COLOR;
+            this._pendingGraySparkleShapes.add(tile.itemShape);
+          }
         }
         // disconnect: items already granted; no reversal animation
       } else if (tile.chamberContent === 'heater') {

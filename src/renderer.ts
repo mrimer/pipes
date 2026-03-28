@@ -35,7 +35,7 @@ import {
   SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
   STAR_COLOR, STAR_WATER_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
-  ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR,
+  ANIM_POSITIVE_COLOR, ANIM_NEGATIVE_COLOR, ANIM_ZERO_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
@@ -673,16 +673,20 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
     }
     ctx.restore();
   }
-  // Draw quantity number in the inner top-left corner, white with a 1px black outline
+  // Draw quantity number in the inner top-left corner, with a 1px black outline
   if (itemCount !== 1) {
     const countLabel = String(itemCount);
+    let countColor: string;
+    if (itemCount < 0) countColor = ANIM_NEGATIVE_COLOR;
+    else if (itemCount === 0) countColor = ANIM_ZERO_COLOR;
+    else countColor = 'white';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.font = `bold ${_s(20)}px Arial`;
     ctx.strokeStyle = 'black';
     ctx.lineWidth = _s(1);
     ctx.strokeText(countLabel, -bw + _s(3), -bh + _s(2));
-    ctx.fillStyle = 'white';
+    ctx.fillStyle = countColor;
     ctx.fillText(countLabel, -bw + _s(3), -bh + _s(2));
   }
 }
