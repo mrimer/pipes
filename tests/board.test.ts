@@ -1815,6 +1815,82 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.lastError).toBeNull();
   });
 
+  it('allows replacement that connects a new negative container, making effective count more negative', () => {
+    // Source(0,0) → Straight(0,1,R=90,E-W) → Chamber(0,2, -2 Straights) → Sink(0,3)
+    //                       ↑
+    //              Chamber(1,1, -2 Straights) [south of (0,1), not connected via Straight]
+    //
+    // Straight at (0,1) bridges Source→Chamber(-2)→Sink.  Container(-2) at (0,2) is
+    // connected, so effectiveCount(Straight) = 0 + (-2) = -2.
+    //
+    // Replace Straight(0,1) with Tee(R=90, E-S-W) which:
+    //   • keeps the east connection → Chamber(-2)(0,2) remains connected
+    //   • adds a south connection   → Chamber(-2)(1,1) newly connected
+    //
+    // Net: effectiveCount(Straight) goes from -2 (original) to -3 (final), i.e. DECREASES.
+    // PR #272 alone would block this (finalEffective < originalEffective).
+    // The new allowance: no positive containers were disconnected → ALLOW.
+    const board = new Board(2, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 5);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);                                           // E-W bridge; will be replaced
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 0, PipeShape.Straight, -2, null, 'item'); // -2 penalty
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.grid[1][0] = new Tile(PipeShape.Empty,   0);
+    board.grid[1][1] = new Tile(PipeShape.Chamber,  0, true, 0, 0, PipeShape.Straight, -2, null, 'item'); // -2 penalty, south of bridge
+    board.grid[1][2] = new Tile(PipeShape.Empty,   0);
+    board.grid[1][3] = new Tile(PipeShape.Empty,   0);
+    board.sourceCapacity = 10;
+    // base 1 Straight placed → count = 0; Chamber(-2) connected → effectiveCount = -2
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }, { shape: PipeShape.Tee, count: 1 }];
+
+    // Replace Straight(0,1) with Tee(R=90, connects E-S-W).
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
+    expect(result).toBe(true);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Tee);
+    // Straight returned to inventory; Tee consumed
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Tee)!.count).toBe(0);
+    // Both negative containers now connected: effectiveCount = 1 (base) + (-4) = -3
+    const bonuses = board.getContainerBonuses();
+    expect(bonuses.get(PipeShape.Straight)).toBe(-4);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count + (bonuses.get(PipeShape.Straight) ?? 0)).toBe(-3);
+  });
+
+  it('still blocks replacement that disconnects a positive container even when a new negative one is connected', () => {
+    // Source(0,0) → Straight(0,1,R=90,E-W) → Chamber(0,2, +3 Straights) → Sink(0,3)
+    //                        ↑
+    //               Chamber(1,1, -1 Straight) [south of (0,1), newly connected by Elbow]
+    //
+    // Replacing Straight(0,1) with Elbow(R=90, S-W) disconnects Chamber(+3) at (0,2)
+    // AND connects Chamber(-1) at (1,1).  The positive grant is lost → block.
+    const board = new Board(2, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 5);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);
+    board.grid[0][2] = new Tile(PipeShape.Chamber,  0, true, 0, 0, PipeShape.Straight, 3, null, 'item'); // +3 grant
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true);
+    board.grid[1][0] = new Tile(PipeShape.Empty,   0);
+    board.grid[1][1] = new Tile(PipeShape.Chamber,  0, true, 0, 0, PipeShape.Straight, -1, null, 'item'); // -1 penalty
+    board.grid[1][2] = new Tile(PipeShape.Empty,   0);
+    board.grid[1][3] = new Tile(PipeShape.Empty,   0);
+    board.sourceCapacity = 10;
+    // 3 Straights placed using grants → count = -3; grant 3 → effectiveCount = 0 (valid)
+    board.inventory = [{ shape: PipeShape.Straight, count: -3 }, { shape: PipeShape.Elbow, count: 1 }];
+
+    // Elbow at R=90 connects South and West: (0,0)Source←W(0,1)Elbow S→(1,1)Chamber(-1)
+    // Chamber(+3) at (0,2) is no longer reachable → positive grant lost → BLOCK
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 90);
+    expect(result).toBe(false);
+    expect(board.lastError).not.toBeNull();
+    // Board must be rolled back
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-3);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count).toBe(1);
+  });
+
   it('allows replacing the bridge tile with a different-type pipe when the grant covers the new shape', () => {
     // Source → Straight(1, bridge) → Chamber(2, grants 1 GoldStraight) → Sink(3)
     // The bridge tile (1) keeps the chamber connected.  The player has used their
