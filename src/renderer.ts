@@ -1304,7 +1304,7 @@ export function drawTile(
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
-  const half = TILE_SIZE / 2;
+  const half = Math.ceil(TILE_SIZE / 2);
 
   // When a rotation override is active, use it; blocked arms and butt-end dirs are
   // suppressed during rotation animation because the arm directions are mid-transition.
