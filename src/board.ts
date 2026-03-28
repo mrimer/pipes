@@ -896,10 +896,29 @@ export class Board {
     // ── Step 3: Post-replacement state validation ──────────────────────────────
     // Check that no inventory item's effective count has gone below zero as a
     // result of reduced container-grant bonuses after the replacement.
+    // Exception: if the original effective count was already negative, the
+    // replacement is allowed as long as the effective count did not become more
+    // negative (i.e. the magnitude did not increase).
     const finalBonuses = this.getContainerBonuses();
+    const newTileRef = this.grid[pos.row][pos.col];
+    let originalBonuses: Map<PipeShape, number> | undefined;
     for (const item of this.inventory) {
       const bonus = finalBonuses.get(item.shape) ?? 0;
-      if (item.count + bonus < 0) {
+      const finalEffective = item.count + bonus;
+      if (finalEffective < 0) {
+        if (!originalBonuses) {
+          // Temporarily restore the old tile to compute bonuses as they were
+          // before this replacement, then put the new tile back.
+          this.grid[pos.row][pos.col] = tile;
+          originalBonuses = this.getContainerBonuses();
+          this.grid[pos.row][pos.col] = newTileRef;
+        }
+        const savedItem = savedInventory.find((it) => it.shape === item.shape);
+        const originalCount = savedItem?.count ?? 0;
+        const originalEffective = originalCount + (originalBonuses.get(item.shape) ?? 0);
+        if (originalEffective < 0 && finalEffective >= originalEffective) {
+          continue;
+        }
         this.lastError = ERR_CONTAINER_REPLACE;
         this.inventory = savedInventory;
         this.grid[pos.row][pos.col] = tile;
