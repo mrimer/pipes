@@ -1323,16 +1323,16 @@ export class CampaignEditor {
   ];
 
   private readonly _CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> = [
-    { palette: 'chamber:tank',     label: '💧 Tank' },
-    { palette: 'chamber:dirt',     label: '🟫 Dirt' },
-    { palette: 'chamber:item',     label: '🎁 Item' },
-    { palette: 'chamber:heater',   label: '🔥 Heater / Cooler' },
-    { palette: 'chamber:ice',      label: '🧊 Ice' },
-    { palette: 'chamber:pump',     label: '⬆ Pump / Vacuum' },
+    { palette: 'chamber:item',      label: '🎁 Item' },
+    { palette: 'chamber:tank',      label: '💧 Tank' },
+    { palette: 'chamber:heater',    label: '🔥 Heater / Cooler' },
+    { palette: 'chamber:pump',      label: '⬆ Pump / Vacuum' },
+    { palette: 'chamber:dirt',      label: '🟫 Dirt' },
+    { palette: 'chamber:ice',       label: '🧊 Ice' },
     { palette: 'chamber:snow',      label: '❄ Snow' },
     { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
-    { palette: 'chamber:star',      label: '⭐ Star' },
     { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
+    { palette: 'chamber:star',      label: '⭐ Star' },
   ];
 
   private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
