@@ -1663,7 +1663,8 @@ export class CampaignEditor {
     if (cc === 'item') {
       parent.appendChild(this._buildItemShapeSelector());
       parent.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
-        this._editorParams.itemCount = parseInt(v) || 1;
+        const parsed = parseInt(v);
+        this._editorParams.itemCount = isNaN(parsed) ? 1 : parsed;
         this._applyParamsToLinkedTile();
       }, 'number', '90px'));
     }

@@ -165,9 +165,9 @@ export function sandstoneCostFactors(
 /** Error shown when a non-gold pipe is placed on a gold space. */
 export const ERR_GOLD_SPACE = 'Only gold pipes may be placed on a gold space.';
 
-/** Error shown when removing a tile would leave placed tiles without covering container grants. */
+/** Error shown when removing a tile would disconnect a container and reduce an inventory count below zero. */
 const ERR_CONTAINER_REMOVE =
-  'Cannot remove: you have used items granted by a connected container. ' +
+  'Cannot remove: disconnecting an item container would reduce an inventory count below 0. ' +
   'Reconfigure the path first.';
 
 /** Error shown when a replacement would disconnect the container that grants the new shape. */

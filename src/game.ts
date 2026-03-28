@@ -294,6 +294,9 @@ export class Game {
   /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
   private _pendingSparkleShapes: Set<PipeShape> = new Set();
 
+  /** Shapes that should receive a red-sparkle CSS animation on the next inventory render (negative-count click). */
+  private _pendingRedSparkleShapes: Set<PipeShape> = new Set();
+
   /** Chapter ID of the level currently being played (0 if unknown). */
   private currentChapterId = 0;
 
@@ -1006,10 +1009,28 @@ export class Game {
       }
       this._pendingSparkleShapes.clear();
     }
+    if (this._pendingRedSparkleShapes.size > 0) {
+      for (const shape of this._pendingRedSparkleShapes) {
+        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
+        if (el) {
+          el.classList.remove('sparkle-red');
+          void el.offsetWidth; // force reflow to restart the CSS animation
+          el.classList.add('sparkle-red');
+        }
+      }
+      this._pendingRedSparkleShapes.clear();
+    }
   }
 
   private _handleInventoryClick(shape: PipeShape, count: number): void {
     if (this.gameState !== GameState.Playing) return;
+    if (count < 0) {
+      // Flash a red sparkle to signal the item is not selectable.
+      this._pendingRedSparkleShapes.add(shape);
+      this._renderInventoryBar();
+      this.canvas.focus();
+      return;
+    }
     if (count === 0) return;
     if (this.selectedShape === shape) {
       // Clicking the already-selected item deselects it.
@@ -2470,6 +2491,7 @@ export class Game {
 
   /**
    * Cycle to the next available (effective count > 0) inventory item.
+   * Items with a zero or negative effective count are skipped entirely.
    * Mirrors the ordering used by renderInventoryBar(): base inventory first,
    * then bonus-only shapes from connected Chamber-item tiles.
    * Wraps around; if no items are available the selection is unchanged.
@@ -2481,6 +2503,7 @@ export class Game {
 
     // Build the ordered list of selectable shapes, exactly as rendered by the
     // inventory bar, so the visual order and the cycling order agree.
+    // Shapes with a zero or negative effective count are skipped.
     const available: PipeShape[] = [];
     const seen = new Set<PipeShape>();
 
