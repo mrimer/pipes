@@ -1518,7 +1518,7 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Cement:       return 'Cement';
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
-        case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity} water` : 'Tank water';
+        case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity}` : 'Tank';
         case 'dirt':   return `Dirt -${tile.cost}`;
         case 'item': {
           const itemName = _itemShapeDisplayName(tile.itemShape);
