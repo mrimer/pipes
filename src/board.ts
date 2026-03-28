@@ -896,28 +896,54 @@ export class Board {
     // ── Step 3: Post-replacement state validation ──────────────────────────────
     // Check that no inventory item's effective count has gone below zero as a
     // result of reduced container-grant bonuses after the replacement.
-    // Exception: if the original effective count was already negative, the
-    // replacement is allowed as long as the effective count did not become more
-    // negative (i.e. the magnitude did not increase).
-    const finalBonuses = this.getContainerBonuses();
+    // Exception 1: if the original effective count was already negative, the
+    //   replacement is allowed as long as the effective count did not become more
+    //   negative (i.e. the magnitude did not increase).
+    // Exception 2: if the effective count went negative (or more negative) but
+    //   only because the replacement connected new container tiles with negative
+    //   counts — not because any previously-connected positive container was
+    //   disconnected — the replacement is also allowed.
+    const finalFilled = this.getFilledPositions();
+    const finalBonuses = this.getContainerBonuses(finalFilled);
     const newTileRef = this.grid[pos.row][pos.col];
     let originalBonuses: Map<PipeShape, number> | undefined;
+    let originalFilled: Set<string> | undefined;
     for (const item of this.inventory) {
       const bonus = finalBonuses.get(item.shape) ?? 0;
       const finalEffective = item.count + bonus;
       if (finalEffective < 0) {
         if (!originalBonuses) {
-          // Temporarily restore the old tile to compute bonuses as they were
-          // before this replacement, then put the new tile back.
+          // Temporarily restore the old tile to compute the fill and bonuses as
+          // they were before this replacement, then put the new tile back.
           this.grid[pos.row][pos.col] = tile;
-          originalBonuses = this.getContainerBonuses();
+          originalFilled = this.getFilledPositions();
+          originalBonuses = this.getContainerBonuses(originalFilled);
           this.grid[pos.row][pos.col] = newTileRef;
         }
         const savedItem = savedInventory.find((it) => it.shape === item.shape);
         const originalCount = savedItem?.count ?? 0;
         const originalEffective = originalCount + (originalBonuses.get(item.shape) ?? 0);
+        // Exception 1: was already negative and didn't get worse.
         if (originalEffective < 0 && finalEffective >= originalEffective) {
           continue;
+        }
+        // Exception 2: the drop is entirely due to newly-connected negative
+        // containers.  Allowed when no positive-count container for this item
+        // that was reachable with the old tile has become unreachable with the
+        // new tile.
+        const positiveContainerDisconnected = [...originalFilled!].some((key) => {
+          if (finalFilled.has(key)) return false; // still connected
+          const [r, c] = parseKey(key);
+          const t = this.grid[r]?.[c];
+          return (
+            t?.shape === PipeShape.Chamber &&
+            t.chamberContent === 'item' &&
+            t.itemShape === item.shape &&
+            t.itemCount > 0
+          );
+        });
+        if (!positiveContainerDisconnected) {
+          continue; // drop is from newly-connected negative containers only
         }
         this.lastError = ERR_CONTAINER_REPLACE;
         this.inventory = savedInventory;
@@ -928,7 +954,7 @@ export class Board {
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
-    const filledAfterReplace = this.getFilledPositions();
+    const filledAfterReplace = finalFilled;
     const constraintError = this._validateConstraints(filledAfterReplace);
     if (constraintError) {
       this.lastError = constraintError;
