@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, ELBOW_PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
+import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, NEIGHBOUR_DELTA } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
@@ -1347,12 +1347,14 @@ export function drawTile(
       ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
-    // Elbow pipes form a 90° corner at the tile centre.  When one or both arms
-    // use a butt end cap the flat cap at the centre leaves a visible gap in the
-    // curve, so draw an explicit round nub there to fill it.  (Straight, tee,
-    // and cross pipes draw a straight line through the centre, so they never
-    // exhibit this gap.)
-    if (hasButtEnd && ELBOW_PIPE_SHAPES.has(shape)) {
+    // When one or more arms use a butt end cap, the flat cap at the tile centre
+    // can leave a visible seam where opposing arms meet.  This happens because
+    // each arm is drawn as a separate stroke from (0,0) outward, and when the
+    // tile centre lands on a sub-pixel boundary (odd TILE_SIZE), anti-aliasing
+    // on the two butt-capped ends does not sum to full opacity.  Draw an
+    // explicit round nub at (0,0) to fill any such gap for all pipe shapes.
+    // (For elbow pipes the nub also fills the visible corner gap at the curve.)
+    if (hasButtEnd) {
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
