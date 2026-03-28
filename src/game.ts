@@ -71,7 +71,7 @@ const HINT_TEXT_STYLE =
 /** CSS style for the Ctrl-hover coordinate tooltip element. */
 const TOOLTIP_CSS =
   'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
-  'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;';
+  'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;';
 
 /** CSS style for the note box shown beneath the grid when a level has a note. */
 const NOTE_BOX_CSS =
@@ -2045,28 +2045,28 @@ export class Game {
       const lockedPressure = this.board.getLockedConnectPressure(pos) ?? 1;
       const lockedDeltaTemp = computeDeltaTemp(tile.temperature, lockedTemp);
       if (content === 'ice') {
-        return tooltipText + ` ${this._iceCostFormula(lockedDeltaTemp, tile.cost)} cost: ${lockedCost}`;
+        return tooltipText + `\n${this._iceCostFormula(lockedDeltaTemp, tile.cost)} cost: ${lockedCost}`;
       } else if (content === 'snow') {
-        return tooltipText + ` ${this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost)} cost: ${lockedCost}`;
+        return tooltipText + `\n${this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost)} cost: ${lockedCost}`;
       } else {
         // sandstone
         const shatterActive = tile.shatter > tile.hardness;
         const isShatterTriggered = shatterActive && lockedPressure >= tile.shatter;
         if (isShatterTriggered) {
-          return tooltipText + ` [${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
+          return tooltipText + `\n[${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
         }
         const lockedDeltaDamage = lockedPressure - tile.hardness;
         if (lockedDeltaDamage >= 1) {
-          return tooltipText + ` ${this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile)} cost: ${lockedCost}`;
+          return tooltipText + `\n${this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile)} cost: ${lockedCost}`;
         }
-        return tooltipText + ` cost: ${lockedCost}`;
+        return tooltipText + `\ncost: ${lockedCost}`;
       }
     } else if (content === 'hot_plate') {
       const lockedGain = this.board.getLockedHotPlateGain(pos);
       const lockedTemp = this.board.getLockedConnectTemp(pos) ?? 0;
       if (lockedGain !== null) {
         const loss = Math.max(0, lockedGain - lockedImpact);
-        return tooltipText + ` ${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
+        return tooltipText + `\n${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
       }
     }
     return tooltipText;
@@ -2083,17 +2083,17 @@ export class Game {
     let predictedCost: number | null = null;
 
     if (content === 'dirt') {
-      predictedCost = tile.cost;
+      return tooltipText + ' water';
     } else if (content === 'ice') {
       const currentTemp = this.board.getCurrentTemperature();
       const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-      tooltipText += ` ${this._iceCostFormula(deltaTemp, tile.cost)}`;
+      tooltipText += `\n${this._iceCostFormula(deltaTemp, tile.cost)}`;
       predictedCost = tile.cost * deltaTemp;
     } else if (content === 'snow') {
       const currentTemp = this.board.getCurrentTemperature();
       const currentPressure = this.board.getCurrentPressure();
       const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-      tooltipText += ` ${this._snowCostFormula(deltaTemp, currentPressure, tile.cost)}`;
+      tooltipText += `\n${this._snowCostFormula(deltaTemp, currentPressure, tile.cost)}`;
       predictedCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
     } else if (content === 'sandstone') {
       const currentTemp = this.board.getCurrentTemperature();
@@ -2101,19 +2101,19 @@ export class Game {
       const { shatterOverride, deltaDamage, costPerDeltaTemp } =
         sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
       if (shatterOverride) {
-        tooltipText += ` [${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
+        tooltipText += `\n[${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
         predictedCost = 0;
       } else if (deltaDamage <= 0) {
-        tooltipText += ` — Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
+        tooltipText += `\n— Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
       } else {
         const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-        tooltipText += ` ${this._sandstoneCostFormula(deltaTemp, currentPressure, tile)}`;
+        tooltipText += `\n${this._sandstoneCostFormula(deltaTemp, currentPressure, tile)}`;
         predictedCost = costPerDeltaTemp * deltaTemp;
       }
     } else if (content === 'hot_plate') {
       const currentTemp = this.board.getCurrentTemperature();
       const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-      tooltipText += ` ${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
+      tooltipText += `\n${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
       predictedCost = effectiveCost;
     } else {
       predictedCost = 0;
@@ -2137,7 +2137,7 @@ export class Game {
     const tile = this.board.grid[row][col];
     // Indicate a gold space regardless of the tile currently on top of it.
     if (this.board.goldSpaces.has(posKey(row, col))) {
-      tooltipText += ' (gold space)';
+      tooltipText += ' Gold Space - needs gold pipe';
     }
     // Indicate one-way cell direction.
     const oneWayDir = this.board.getOneWayDirection({ row, col });
@@ -2157,6 +2157,10 @@ export class Game {
     const tileName = getTileDisplayName(tile);
     if (tileName) {
       tooltipText += ` ${tileName}`;
+    }
+    // Pre-placed fixed pipe shapes get a "(fixed)" indicator.
+    if (tile.isFixed && PIPE_SHAPES.has(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+      tooltipText += ' (fixed)';
     }
     if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
