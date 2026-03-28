@@ -422,6 +422,37 @@ const CHAMBER_TYPES_WITH_LARGER_FONT: ReadonlySet<string> = new Set([
   'tank', 'dirt', 'heater', 'pump', 'snow', 'ice', 'star',
 ]);
 
+/** Distinct short labels for each pipe shape shown in the container item tile text. */
+const ITEM_SHAPE_LABEL: Readonly<Record<PipeShape, string>> = {
+  [PipeShape.Empty]:             'EMPT',
+  [PipeShape.Straight]:          'STR',
+  [PipeShape.Elbow]:             'ELB',
+  [PipeShape.Tee]:               'TEE',
+  [PipeShape.Cross]:             'CRO',
+  [PipeShape.Source]:            'SRC',
+  [PipeShape.Sink]:              'SNK',
+  [PipeShape.Chamber]:           'CHM',
+  [PipeShape.Granite]:           'GRN',
+  [PipeShape.Tree]:              'TRE',
+  [PipeShape.Cement]:            'CMT',
+  [PipeShape.OneWay]:            'OWY',
+  [PipeShape.GoldSpace]:         'GSP',
+  [PipeShape.GoldStraight]:      'GSTR',
+  [PipeShape.GoldElbow]:         'GELB',
+  [PipeShape.GoldTee]:           'GTEE',
+  [PipeShape.GoldCross]:         'GCRO',
+  [PipeShape.SpinStraight]:      'SSTR',
+  [PipeShape.SpinElbow]:         'SELB',
+  [PipeShape.SpinTee]:           'STEE',
+  [PipeShape.SpinStraightCement]: 'SCST',
+  [PipeShape.SpinElbowCement]:   'SCEL',
+  [PipeShape.SpinTeeCement]:     'SCTE',
+  [PipeShape.LeakyStraight]:     'LSTR',
+  [PipeShape.LeakyElbow]:        'LELB',
+  [PipeShape.LeakyTee]:          'LTEE',
+  [PipeShape.LeakyCross]:        'LCRO',
+};
+
 /** Draw text with a soft dark shadow for better visibility on the editor grid. */
 function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
   ctx.save();
@@ -553,7 +584,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       else if (cc === 'pump') strokeFillText(ctx, `${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + _s(8));
       else if (cc === 'snow') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
       else if (cc === 'hot_plate') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
-      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape?.slice(0, 3)}×${tile.itemCount}`, cx, cy + _s(8));
+      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape != null ? ITEM_SHAPE_LABEL[tile.itemShape] : '?'}×${tile.itemCount}`, cx, cy + _s(8));
     }
     drawConnectionLines(ctx, x, y, tile);
   } else {
