@@ -2826,14 +2826,14 @@ describe('Board.applyTurnDelta (re-evaluation on pump disconnect)', () => {
 import { getTileDisplayName } from '../src/renderer';
 
 describe('getTileDisplayName', () => {
-  it('returns "Tank +7" for a tank chamber with capacity 7', () => {
+  it('returns "Tank +7 water" for a tank chamber with capacity 7', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 7, 0, null, 1, null, 'tank');
-    expect(getTileDisplayName(tile)).toBe('Tank +7');
+    expect(getTileDisplayName(tile)).toBe('Tank +7 water');
   });
 
-  it('returns "Tank" for a tank chamber with capacity 0', () => {
+  it('returns "Tank water" for a tank chamber with capacity 0', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank');
-    expect(getTileDisplayName(tile)).toBe('Tank');
+    expect(getTileDisplayName(tile)).toBe('Tank water');
   });
 
   it('returns "Heater +2°" for a heater chamber with temperature 2', () => {
