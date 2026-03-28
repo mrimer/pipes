@@ -674,7 +674,7 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
     ctx.restore();
   }
   // Draw quantity number in the inner top-left corner, white with a 1px black outline
-  if (itemCount > 1) {
+  if (itemCount !== 1) {
     const countLabel = String(itemCount);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -1524,7 +1524,7 @@ export function getTileDisplayName(tile: Tile): string {
         case 'dirt':   return `Dirt -${tile.cost}`;
         case 'item': {
           const itemName = _itemShapeDisplayName(tile.itemShape);
-          return tile.itemCount > 1 ? `${tile.itemCount}× ${itemName}` : itemName;
+          return tile.itemCount !== 1 ? `${tile.itemCount}× ${itemName}` : itemName;
         }
         case 'heater':
           if (tile.temperature < 0) return `Cooler ${tile.temperature}°`;

@@ -33,9 +33,6 @@ export function renderInventoryBar(
   for (const item of board.inventory) {
     renderedShapes.add(item.shape);
     const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
-    // Gold pipe items are only shown when there is at least one available
-    if (GOLD_PIPE_SHAPES.has(item.shape) && effectiveCount <= 0) continue;
-
     const isGold = GOLD_PIPE_SHAPES.has(item.shape);
     const isLeaky = LEAKY_PIPE_SHAPES.has(item.shape);
     const el = document.createElement('div');
@@ -44,6 +41,7 @@ export function renderInventoryBar(
     if (isLeaky) el.classList.add('leaky');
     if (item.shape === selectedShape) el.classList.add('selected');
     if (effectiveCount === 0) el.classList.add('depleted');
+    else if (effectiveCount < 0) el.classList.add('negative');
 
     const iconColor = isGold ? GOLD_PIPE_COLOR : isLeaky ? LEAKY_PIPE_COLOR : '#4a90d9';
     const icon = shapeIcon(item.shape, iconColor);
@@ -68,15 +66,14 @@ export function renderInventoryBar(
 
     const isGold = GOLD_PIPE_SHAPES.has(bonusShape);
     const isLeaky = LEAKY_PIPE_SHAPES.has(bonusShape);
-    if (isGold && bonusCount <= 0) continue;
 
     const el = document.createElement('div');
     el.classList.add('inv-item');
     if (isGold) el.classList.add('gold');
     if (isLeaky) el.classList.add('leaky');
     if (bonusShape === selectedShape) el.classList.add('selected');
-    // bonusCount > 0 here: getContainerBonuses() only accumulates positive item counts,
-    // so any entry in the map is guaranteed to have a value ≥ 1 and will be usable by the player.
+    if (bonusCount === 0) el.classList.add('depleted');
+    else if (bonusCount < 0) el.classList.add('negative');
 
     const iconColor = isGold ? GOLD_PIPE_COLOR : isLeaky ? LEAKY_PIPE_COLOR : '#4a90d9';
     const icon = shapeIcon(bonusShape, iconColor);
