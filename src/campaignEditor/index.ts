@@ -14,39 +14,14 @@ import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, com
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { computeChapterMapReachable } from '../chapterMapUtils';
 
-/** Maximum CSS display size (px) for the editor canvas on either axis. */
-const MAX_EDITOR_CANVAS_PX = 512;
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
 /** Gap (px) between flex columns in the main editor layout. */
 const EDITOR_LAYOUT_GAP = 16;
-/** Border width (px) on each side of the editor canvas. */
-const EDITOR_CANVAS_BORDER = 3;
-/** Minimum allowed grid dimension (rows or cols). */
-const GRID_MIN_DIM = 1;
-/** Maximum allowed grid dimension (rows or cols). */
-const GRID_MAX_DIM = 20;
-/** Border color for the currently selected palette item button. */
-const PALETTE_ITEM_SELECTED_BORDER = '#f0c040';
-/** Border color for an unselected palette item button. */
-const PALETTE_ITEM_UNSELECTED_BORDER = '#2a3a5e';
-/** Background color for the currently selected palette item button. */
-const PALETTE_ITEM_SELECTED_BG = '#2a3a1a';
-/** Background color for an unselected palette item button. */
-const PALETTE_ITEM_UNSELECTED_BG = '#0d1a30';
-/** Text color for the currently selected palette item button. */
-const PALETTE_ITEM_SELECTED_COLOR = '#f0c040';
-/** Text color for an unselected palette item button. */
-const PALETTE_ITEM_UNSELECTED_COLOR = '#eee';
 /** CSS for a flex row that centers items and adds a small gap (used for label+input pairs). */
 const EDITOR_FLEX_ROW_CSS = 'display:flex;align-items:center;gap:8px;';
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
-/** Base CSS for a side-panel box in the level editor (background, border, radius, padding). */
-const EDITOR_PANEL_BASE_CSS =
-  'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
-/** CSS for the all-caps section-title label inside an editor side-panel. */
-const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
 import { Board, PIPE_SHAPES, SPIN_CEMENT_SHAPES, parseKey } from '../board';
 import { Tile } from '../tile';
 import {
@@ -68,23 +43,22 @@ import {
   VALID_LEVEL_KEYS,
   VALID_INVENTORY_ITEM_KEYS,
   getValidTileDefKeys,
+  MAX_EDITOR_CANVAS_PX,
+  EDITOR_CANVAS_BORDER,
+  GRID_MIN_DIM,
+  GRID_MAX_DIM,
+  PALETTE_ITEM_SELECTED_BORDER,
+  PALETTE_ITEM_UNSELECTED_BORDER,
+  PALETTE_ITEM_SELECTED_BG,
+  PALETTE_ITEM_UNSELECTED_BG,
+  PALETTE_ITEM_SELECTED_COLOR,
+  PALETTE_ITEM_UNSELECTED_COLOR,
+  EDITOR_PANEL_BASE_CSS,
+  EDITOR_PANEL_TITLE_CSS,
+  REPEATABLE_EDITOR_TILES,
 } from './types';
 import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './renderer';
 import { renderMinimap } from '../minimap';
-
-/**
- * Palette values that support paint-drag: clicking and dragging across multiple
- * empty cells places the tile on each one.  Includes all pipe shapes (regular and
- * gold), gold spaces, and granite – tile types commonly laid in bulk.
- */
-const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
-  PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
-  PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
-  PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
-  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
-  PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
-  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
-]);
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 

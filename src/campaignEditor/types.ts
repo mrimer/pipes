@@ -205,7 +205,51 @@ export function chamberColor(content: string): string {
   }
 }
 
+// ─── Shared editor UI constants ───────────────────────────────────────────────
+
+/** Maximum CSS display size (px) for the editor canvas on either axis. */
+export const MAX_EDITOR_CANVAS_PX = 512;
+/** Border width (px) on each side of the editor canvas. */
+export const EDITOR_CANVAS_BORDER = 3;
+/** Minimum allowed grid dimension (rows or cols). */
+export const GRID_MIN_DIM = 1;
+/** Maximum allowed grid dimension (rows or cols). */
+export const GRID_MAX_DIM = 20;
+/** Border color for the currently selected palette item button. */
+export const PALETTE_ITEM_SELECTED_BORDER = '#f0c040';
+/** Border color for an unselected palette item button. */
+export const PALETTE_ITEM_UNSELECTED_BORDER = '#2a3a5e';
+/** Background color for the currently selected palette item button. */
+export const PALETTE_ITEM_SELECTED_BG = '#2a3a1a';
+/** Background color for an unselected palette item button. */
+export const PALETTE_ITEM_UNSELECTED_BG = '#0d1a30';
+/** Text color for the currently selected palette item button. */
+export const PALETTE_ITEM_SELECTED_COLOR = '#f0c040';
+/** Text color for an unselected palette item button. */
+export const PALETTE_ITEM_UNSELECTED_COLOR = '#eee';
+/** Base CSS for a side-panel box in the level editor (background, border, radius, padding). */
+export const EDITOR_PANEL_BASE_CSS =
+  'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
+/** CSS for the all-caps section-title label inside an editor side-panel. */
+export const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
+
+/**
+ * Palette values that support paint-drag: clicking and dragging across multiple
+ * empty cells places the tile on each one.  Includes all pipe shapes (regular and
+ * gold), gold spaces, and granite – tile types commonly laid in bulk.
+ */
+export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
+  PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
+  PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+  PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
+  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
+  PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
+]);
+
 // ─── Helper: generate a unique ID ─────────────────────────────────────────────
+
+
 
 /** Generate a unique campaign ID. */
 export function generateCampaignId(): string {

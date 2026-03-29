@@ -721,7 +721,7 @@ export class ChapterMapEditorSection {
 
   // ─── Chapter editor undo/redo ────────────────────────────────────────────
 
-  private _recordChapterSnapshot(chapter: ChapterDef, markChanged = true): void {
+  private _recordChapterSnapshot(_chapter: ChapterDef, markChanged = true): void {
     const snapshot: EditorSnapshot = {
       grid: JSON.parse(JSON.stringify(this._chapterEditGrid)) as (TileDef | null)[][],
       rows: this._chapterEditRows,
@@ -736,7 +736,6 @@ export class ChapterMapEditorSection {
     if (markChanged) {
       this._updateChapterUndoRedoButtons();
     }
-    void chapter;
   }
 
   private _chapterUndo(campaign: CampaignDef, chapter: ChapterDef): void {
