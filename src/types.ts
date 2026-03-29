@@ -75,7 +75,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level';
 
 /**
  * Chamber content types that apply a cold (temperature-delta) water cost.
@@ -132,6 +132,7 @@ export enum GameScreen {
   LevelSelect = 'LEVEL_SELECT',
   Play = 'PLAY',
   CampaignEditor = 'CAMPAIGN_EDITOR',
+  ChapterMap = 'CHAPTER_MAP',
 }
 
 /** State of an active game level. */
@@ -197,6 +198,11 @@ export interface TileDef {
    * When provided, overrides the default (all four sides).
    */
   connections?: Direction[];
+  /**
+   * Level index (0-based, within the chapter) for Chamber tiles with chamberContent='level'.
+   * References the level that this chamber represents on the chapter map.
+   */
+  levelIdx?: number;
 }
 
 /** Complete definition of a game level. */
@@ -260,6 +266,15 @@ export interface ChapterDef {
   id: number;
   name: string;
   levels: LevelDef[];
+  /**
+   * Optional 2-D chapter map grid, stored as a row-major array.
+   * When present, the level-select screen shows a "Map" button for this chapter
+   * instead of the list of levels.  Level chambers on this grid reference
+   * chapter levels by `levelIdx` (0-based).
+   */
+  rows?: number;
+  cols?: number;
+  grid?: (TileDef | null)[][];
 }
 
 /**

@@ -146,6 +146,7 @@ export function renderLevelList(
   levelWater: Record<number, number> = {},
   chapterExpandedState?: Map<number, boolean>,
   onChapterToggle?: (chapterIndex: number, expanded: boolean) => void,
+  onChapterMap?: (chapterIdx: number) => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -428,64 +429,80 @@ export function renderLevelList(
       attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
     }
 
-    // ── Level buttons ──────────────────────────────────────────────────────
-    for (let li = 0; li < chapter.levels.length; li++) {
-      const level = chapter.levels[li];
-      const isCompleted = completedLevels.has(level.id);
+    // ── Map button (when chapter has a grid map) ──────────────────────────
+    if (!chapterLocked && chapter.grid && onChapterMap) {
+      const mapBtn = document.createElement('button');
+      mapBtn.textContent = '🗺️ Map';
+      mapBtn.style.cssText =
+        'margin:8px 12px 12px;padding:10px 20px;font-size:0.95rem;font-weight:bold;' +
+        'border-radius:6px;border:1px solid ' + (isGold ? '#f0c040' : '#4a90d9') + ';' +
+        'background:' + (isGold ? '#2a2000' : '#16213e') + ';' +
+        'color:' + (isGold ? '#f0c040' : '#7ed321') + ';cursor:pointer;width:calc(100% - 24px);';
+      mapBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onChapterMap(ci);
+      });
+      levelsContainer.appendChild(mapBtn);
+    } else {
+      // ── Level buttons ──────────────────────────────────────────────────────
+      for (let li = 0; li < chapter.levels.length; li++) {
+        const level = chapter.levels[li];
+        const isCompleted = completedLevels.has(level.id);
 
-      // Within a chapter, a level is locked if the previous non-challenge level is not yet done.
-      // Challenge levels are skipped in the chain so that non-challenge levels after a challenge
-      // level are not blocked by it.
-      const prevNonChallenge = li > 0
-        ? (chapter.levels.slice(0, li).reverse().find((l) => !l.challenge) ?? null)
-        : null;
-      const isLocked = chapterLocked || (prevNonChallenge !== null && !completedLevels.has(prevNonChallenge.id));
+        // Within a chapter, a level is locked if the previous non-challenge level is not yet done.
+        // Challenge levels are skipped in the chain so that non-challenge levels after a challenge
+        // level are not blocked by it.
+        const prevNonChallenge = li > 0
+          ? (chapter.levels.slice(0, li).reverse().find((l) => !l.challenge) ?? null)
+          : null;
+        const isLocked = chapterLocked || (prevNonChallenge !== null && !completedLevels.has(prevNonChallenge.id));
 
-      const btn = document.createElement('button');
-      btn.classList.add('level-btn');
-      if (isLocked)    btn.classList.add('locked');
-      if (isCompleted) btn.classList.add('completed');
+        const btn = document.createElement('button');
+        btn.classList.add('level-btn');
+        if (isLocked)    btn.classList.add('locked');
+        if (isCompleted) btn.classList.add('completed');
 
-      const icon = isLocked ? '🔒' : isCompleted ? '✅' : '▶';
-      const challengeIcon = level.challenge ? ' 💀' : '';
-      const levelStarTotal = level.starCount ?? 0;
-      const levelStarCollected = levelStarTotal > 0
-        ? Math.min(levelStars[level.id] ?? 0, levelStarTotal) : 0;
-      const levelWaterVal = isCompleted ? (levelWater[level.id] ?? 0) : 0;
-      const levelWaterText = isCompleted && levelWaterVal > 0 ? `  💧 ${levelWaterVal}` : '';
-      const levelStarText = levelStarTotal > 0
-        ? `  ⭐ ${levelStarCollected}/${levelStarTotal}` : '';
-      btn.textContent = `${icon} Level ${li + 1}: ${level.name}${challengeIcon}${levelWaterText}${levelStarText}`;
-      btn.disabled = isLocked;
+        const icon = isLocked ? '🔒' : isCompleted ? '✅' : '▶';
+        const challengeIcon = level.challenge ? ' 💀' : '';
+        const levelStarTotal = level.starCount ?? 0;
+        const levelStarCollected = levelStarTotal > 0
+          ? Math.min(levelStars[level.id] ?? 0, levelStarTotal) : 0;
+        const levelWaterVal = isCompleted ? (levelWater[level.id] ?? 0) : 0;
+        const levelWaterText = isCompleted && levelWaterVal > 0 ? `  💧 ${levelWaterVal}` : '';
+        const levelStarText = levelStarTotal > 0
+          ? `  ⭐ ${levelStarCollected}/${levelStarTotal}` : '';
+        btn.textContent = `${icon} Level ${li + 1}: ${level.name}${challengeIcon}${levelWaterText}${levelStarText}`;
+        btn.disabled = isLocked;
 
-      if (!isLocked) {
-        btn.addEventListener('click', () => startLevel(level.id));
+        if (!isLocked) {
+          btn.addEventListener('click', () => startLevel(level.id));
+        }
+
+        // Wrap level button and its minimap in a flex row
+        const levelRow = document.createElement('div');
+        levelRow.dataset.levelId = String(level.id);
+        levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+        const minimap = renderMinimap(level);
+        minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;' + (!isLocked ? 'cursor:pointer;' : '');
+        if (!isLocked) {
+          minimap.addEventListener('click', () => startLevel(level.id));
+        }
+        levelRow.appendChild(minimap);
+        levelRow.appendChild(btn);
+        levelsContainer.appendChild(levelRow);
+
+        // Do not reveal levels beyond the first locked one.
+        if (isLocked) break;
       }
 
-      // Wrap level button and its minimap in a flex row
-      const levelRow = document.createElement('div');
-      levelRow.dataset.levelId = String(level.id);
-      levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const minimap = renderMinimap(level);
-      minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;' + (!isLocked ? 'cursor:pointer;' : '');
-      if (!isLocked) {
-        minimap.addEventListener('click', () => startLevel(level.id));
+      if (totalInChapter === 0 && !chapterLocked) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.style.cssText = 'color:#777;font-size:0.85rem;padding:8px 12px 12px;text-align:center;';
+        emptyMsg.textContent = 'No levels yet – coming soon!';
+        levelsContainer.appendChild(emptyMsg);
+        levelsContainer.style.padding = '0';
+        levelsContainer.style.display = expanded ? 'flex' : 'none';
       }
-      levelRow.appendChild(minimap);
-      levelRow.appendChild(btn);
-      levelsContainer.appendChild(levelRow);
-
-      // Do not reveal levels beyond the first locked one.
-      if (isLocked) break;
-    }
-
-    if (totalInChapter === 0 && !chapterLocked) {
-      const emptyMsg = document.createElement('p');
-      emptyMsg.style.cssText = 'color:#777;font-size:0.85rem;padding:8px 12px 12px;text-align:center;';
-      emptyMsg.textContent = 'No levels yet – coming soon!';
-      levelsContainer.appendChild(emptyMsg);
-      levelsContainer.style.padding = '0';
-      levelsContainer.style.display = expanded ? 'flex' : 'none';
     }
 
     chapterBox.appendChild(chapterHeader);

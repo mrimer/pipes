@@ -15,7 +15,7 @@ export const VALID_CAMPAIGN_KEYS: ReadonlySet<string> = new Set([
 
 /** Valid keys for a ChapterDef record. */
 export const VALID_CHAPTER_KEYS: ReadonlySet<string> = new Set([
-  'id', 'name', 'levels',
+  'id', 'name', 'levels', 'rows', 'cols', 'grid',
 ]);
 
 /** Valid keys for a LevelDef record. */
@@ -23,7 +23,6 @@ export const VALID_LEVEL_KEYS: ReadonlySet<string> = new Set([
   'id', 'name', 'rows', 'cols', 'grid', 'inventory',
   'note', 'hints', 'starCount', 'challenge',
 ]);
-
 /** Valid keys for an InventoryItem record. */
 export const VALID_INVENTORY_ITEM_KEYS: ReadonlySet<string> = new Set(['shape', 'count']);
 
@@ -66,6 +65,7 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
     if (cc !== undefined && TEMP_RELEVANT_CONTENTS.has(cc)) valid.add('temperature');
     if (cc === 'pump') valid.add('pressure');
     if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
+    if (cc === 'level') valid.add('levelIdx');
   } else if (shape === PipeShape.Cement) {
     valid.add('dryingTime');
   } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
@@ -200,6 +200,7 @@ export function chamberColor(content: string): string {
     case 'sandstone': return '#c2a26e';
     case 'star':      return '#f0c040';
     case 'hot_plate': return '#e44';
+    case 'level':    return '#2a3a5e';
     default:         return '#b2bec3';
   }
 }
