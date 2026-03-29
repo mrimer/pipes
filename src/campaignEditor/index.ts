@@ -12,6 +12,7 @@
 import { CampaignDef, ChapterDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from '../types';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign, clearLevelStarRecord, clearLevelWaterRecord } from '../persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
+import { computeChapterMapReachable } from '../chapterMapUtils';
 
 /** Maximum CSS display size (px) for the editor canvas on either axis. */
 const MAX_EDITOR_CANVAS_PX = 512;
@@ -1639,11 +1640,7 @@ export class CampaignEditor {
     if (!sourcePos || !sinkPos) return { ok, messages: msgs };
 
     // BFS reachability check
-    const reached = new Set<string>();
-    const queue: Array<{ row: number; col: number }> = [sourcePos];
-    reached.add(`${sourcePos.row},${sourcePos.col}`);
-
-    const getConns = (def: TileDef): Set<Direction> => {
+    const getConns = (def: TileDef, _isEntry: boolean): Set<Direction> => {
       if (def.connections) return new Set(def.connections);
       // Source/Sink/Chamber default: all 4 sides
       if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
@@ -1653,39 +1650,14 @@ export class CampaignEditor {
       const t = new Tile(def.shape, (def.rotation ?? 0) as Rotation, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
       return t.connections;
     };
-    const DELTAS: Record<Direction, { dr: number; dc: number }> = {
-      [Direction.North]: { dr: -1, dc: 0 },
-      [Direction.East]:  { dr:  0, dc: 1 },
-      [Direction.South]: { dr:  1, dc: 0 },
-      [Direction.West]:  { dr:  0, dc: -1 },
-    };
-    const OPPOSITE: Record<Direction, Direction> = {
-      [Direction.North]: Direction.South,
-      [Direction.East]:  Direction.West,
-      [Direction.South]: Direction.North,
-      [Direction.West]:  Direction.East,
-    };
 
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const curDef = this._chapterEditGrid[cur.row]?.[cur.col];
-      if (!curDef) continue;
-      const curConns = getConns(curDef);
-      for (const dir of curConns) {
-        const d = DELTAS[dir];
-        const nr = cur.row + d.dr;
-        const nc = cur.col + d.dc;
-        if (nr < 0 || nr >= this._chapterEditRows || nc < 0 || nc >= this._chapterEditCols) continue;
-        const key = `${nr},${nc}`;
-        if (reached.has(key)) continue;
-        const nbDef = this._chapterEditGrid[nr]?.[nc];
-        if (!nbDef) continue;
-        const nbConns = getConns(nbDef);
-        if (!nbConns.has(OPPOSITE[dir])) continue;
-        reached.add(key);
-        queue.push({ row: nr, col: nc });
-      }
-    }
+    const reached = computeChapterMapReachable(
+      this._chapterEditGrid,
+      this._chapterEditRows,
+      this._chapterEditCols,
+      sourcePos,
+      getConns,
+    );
 
     // Check sink reachable
     const sinkKey = `${sinkPos.row},${sinkPos.col}`;

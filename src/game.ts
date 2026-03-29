@@ -5,7 +5,8 @@ import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATE
 import { TILE_SIZE, LINE_WIDTH, renderBoard, renderContainerFillAnims, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
-import { renderChapterMapCanvas } from './campaignEditor/renderer';
+import { renderChapterMapCanvas } from './visuals/chapterMap';
+import { computeChapterMapReachable } from './chapterMapUtils';
 import {
   loadCompletedLevels, markLevelCompleted, clearCompletedLevels,
   loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
@@ -1003,10 +1004,6 @@ export class Game {
     }
     if (!sourcePos) return new Set();
 
-    const reached = new Set<string>();
-    const queue: Array<{ row: number; col: number }> = [sourcePos];
-    reached.add(`${sourcePos.row},${sourcePos.col}`);
-
     const getConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
       // For completed level chambers or source/sink/pipe: all provided connections
       // For incomplete level chamber entered from water: water enters but does NOT exit
@@ -1030,42 +1027,7 @@ export class Game {
       return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
     };
 
-    const DELTAS: Record<Direction, { dr: number; dc: number }> = {
-      [Direction.North]: { dr: -1, dc: 0 },
-      [Direction.East]:  { dr:  0, dc: 1 },
-      [Direction.South]: { dr:  1, dc: 0 },
-      [Direction.West]:  { dr:  0, dc: -1 },
-    };
-    const OPPOSITE: Record<Direction, Direction> = {
-      [Direction.North]: Direction.South,
-      [Direction.East]:  Direction.West,
-      [Direction.South]: Direction.North,
-      [Direction.West]:  Direction.East,
-    };
-
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const curDef = grid[cur.row]?.[cur.col];
-      if (!curDef) continue;
-      const curConns = getConns(curDef, false);
-      for (const dir of curConns) {
-        const d = DELTAS[dir];
-        const nr = cur.row + d.dr;
-        const nc = cur.col + d.dc;
-        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-        const key = `${nr},${nc}`;
-        if (reached.has(key)) continue;
-        const nbDef = grid[nr]?.[nc];
-        if (!nbDef) continue;
-        // Neighbor must have a connection back
-        const nbConns = getConns(nbDef, true);
-        if (!nbConns.has(OPPOSITE[dir])) continue;
-        reached.add(key);
-        queue.push({ row: nr, col: nc });
-      }
-    }
-
-    return reached;
+    return computeChapterMapReachable(grid, rows, cols, sourcePos, getConns);
   }
 
   private _onChapterMapCanvasMouseMove(e: MouseEvent, chapter: ChapterDef): void {
