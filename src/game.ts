@@ -1,10 +1,11 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, TileDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderBoard, renderContainerFillAnims, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
+import { renderChapterMapCanvas } from './campaignEditor/renderer';
 import {
   loadCompletedLevels, markLevelCompleted, clearCompletedLevels,
   loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
@@ -368,6 +369,32 @@ export class Game {
    * modal (new-chapter intro or challenge-level warning).
    */
   private _pendingLevelId: number | null = null;
+
+  // ── Chapter map screen state ───────────────────────────────────────────────
+
+  /** The chapter map screen overlay element (built lazily on first use). */
+  private _chapterMapScreenEl: HTMLElement | null = null;
+
+  /** Canvas element for the chapter map screen grid. */
+  private _chapterMapCanvas: HTMLCanvasElement | null = null;
+
+  /** 2D context for the chapter map screen canvas. */
+  private _chapterMapCtx: CanvasRenderingContext2D | null = null;
+
+  /** The chapter being displayed on the chapter map screen. */
+  private _chapterMapChapter: ChapterDef | null = null;
+
+  /** Index (within campaign chapters) of the chapter on the chapter map screen. */
+  private _chapterMapChapterIdx = -1;
+
+  /** Hover position on the chapter map canvas. */
+  private _chapterMapHover: { row: number; col: number } | null = null;
+
+  /**
+   * When true, the win modal's "Level Select" button should return to the
+   * chapter map screen (rather than the regular level select).
+   */
+  private _winFromChapterMap = false;
 
   /** Modal overlay shown when the player is about to enter the first level of a new chapter. */
   private readonly _newChapterModalEl: HTMLElement;
@@ -744,6 +771,7 @@ export class Game {
     this.screen = GameScreen.LevelSelect;
     this.levelSelectEl.style.display = 'flex';
     this.playScreenEl.style.display = 'none';
+    if (this._chapterMapScreenEl) this._chapterMapScreenEl.style.display = 'none';
     // Explicitly hide all modal overlays so they cannot cover the level-select
     // screen when returning from a completed or failed level.
     this.winModalEl.style.display = 'none';
@@ -768,6 +796,7 @@ export class Game {
     this.winNextBtnEl.style.display = '';
     // Reset HUD exit button label in case it was changed for playtesting.
     this.exitBtnEl.textContent = '← Menu';
+    this._winFromChapterMap = false;
     this._renderLevelList();
     // Scroll the active level's row into view near the center of the viewport.
     if (this.currentLevel) {
@@ -778,6 +807,301 @@ export class Game {
       }
     }
   }
+
+  // ─── Chapter map screen ──────────────────────────────────────────────────────
+
+  /**
+   * Show the chapter map screen for a chapter that has a grid map.
+   * The screen shows the chapter's grid; level chambers can be clicked to start levels.
+   */
+  private _showChapterMap(chapterIdx: number): void {
+    const campaign = this._activeCampaign;
+    if (!campaign) return;
+    const chapter = campaign.chapters[chapterIdx];
+    if (!chapter?.grid) return;
+
+    this._chapterMapChapter = chapter;
+    this._chapterMapChapterIdx = chapterIdx;
+    this._chapterMapHover = null;
+
+    // Build screen lazily on first use
+    if (!this._chapterMapScreenEl) {
+      this._chapterMapScreenEl = this._buildChapterMapScreenEl();
+      document.body.appendChild(this._chapterMapScreenEl);
+    }
+
+    this._populateChapterMapScreen(campaign, chapterIdx, chapter);
+    this.levelSelectEl.style.display = 'none';
+    this.playScreenEl.style.display = 'none';
+    this._chapterMapScreenEl.style.display = 'flex';
+    this.screen = GameScreen.ChapterMap;
+  }
+
+  /** Build the chapter map screen element (done once). */
+  private _buildChapterMapScreenEl(): HTMLElement {
+    const el = document.createElement('div');
+    el.id = 'chapter-map-screen';
+    el.style.cssText =
+      'display:none;position:fixed;inset:0;background:#0a0e1a;flex-direction:column;' +
+      'align-items:center;justify-content:flex-start;overflow:auto;z-index:10;' +
+      'padding:20px;box-sizing:border-box;gap:16px;';
+    return el;
+  }
+
+  /** Populate the chapter map screen with content for the given chapter. */
+  private _populateChapterMapScreen(campaign: CampaignDef, chapterIdx: number, chapter: ChapterDef): void {
+    const el = this._chapterMapScreenEl!;
+    el.innerHTML = '';
+
+    // Header: campaign name, chapter number and name
+    const header = document.createElement('div');
+    header.style.cssText = 'text-align:center;width:100%;max-width:900px;';
+    const campaignName = document.createElement('div');
+    campaignName.style.cssText = 'font-size:0.9rem;color:#aaa;';
+    campaignName.textContent = campaign.name;
+    header.appendChild(campaignName);
+    const chapterTitle = document.createElement('h2');
+    chapterTitle.textContent = `Chapter ${chapterIdx + 1}: ${chapter.name}`;
+    chapterTitle.style.cssText = 'margin:4px 0;font-size:1.4rem;color:#f0c040;';
+    header.appendChild(chapterTitle);
+    el.appendChild(header);
+
+    // Back button
+    const backBtn = document.createElement('button');
+    backBtn.textContent = '← Level Select';
+    backBtn.style.cssText =
+      'padding:8px 16px;font-size:0.9rem;background:#16213e;color:#7ed321;' +
+      'border:1px solid #7ed321;border-radius:6px;cursor:pointer;';
+    backBtn.addEventListener('click', () => this._showLevelSelect());
+    el.appendChild(backBtn);
+
+    // Canvas container
+    const canvasWrap = document.createElement('div');
+    canvasWrap.style.cssText = 'max-width:900px;width:100%;';
+    const canvas = document.createElement('canvas');
+    this._chapterMapCanvas = canvas;
+    const ctx = canvas.getContext('2d');
+    if (ctx) this._chapterMapCtx = ctx;
+
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    setTileSize(computeTileSize(rows, cols));
+    canvas.width  = cols * TILE_SIZE;
+    canvas.height = rows * TILE_SIZE;
+    canvas.style.cssText =
+      'border:2px solid #4a90d9;border-radius:6px;cursor:pointer;' +
+      'display:block;width:100%;height:auto;';
+
+    // Mouse events for hover and click
+    canvas.addEventListener('mousemove', (e) => this._onChapterMapCanvasMouseMove(e, chapter));
+    canvas.addEventListener('mouseleave', () => {
+      this._chapterMapHover = null;
+      this._renderChapterMapScreen(chapter);
+    });
+    canvas.addEventListener('click', (e) => this._onChapterMapCanvasClick(e, campaign, chapter));
+
+    // Tooltip (title attr for hover text)
+    canvas.addEventListener('mousemove', (e) => {
+      const pos = this._chapterMapCanvasPos(e, chapter);
+      if (!pos) { canvas.title = ''; return; }
+      const def = chapter.grid![pos.row]?.[pos.col];
+      if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+        const level = chapter.levels[def.levelIdx];
+        canvas.title = level ? `${def.levelIdx + 1}: ${level.name}` : '';
+      } else {
+        canvas.title = '';
+      }
+    });
+
+    canvasWrap.appendChild(canvas);
+    el.appendChild(canvasWrap);
+
+    // Instruction text
+    const instruction = document.createElement('p');
+    instruction.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:0;';
+    instruction.textContent = 'Click on an accessible level';
+    el.appendChild(instruction);
+
+    // Render the chapter map
+    this._renderChapterMapScreen(chapter);
+  }
+
+  /** Convert a mouse event to a grid position on the chapter map canvas. */
+  private _chapterMapCanvasPos(e: MouseEvent, chapter: ChapterDef): { row: number; col: number } | null {
+    const canvas = this._chapterMapCanvas;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const col = Math.floor((e.clientX - rect.left) * cols / rect.width);
+    const row = Math.floor((e.clientY - rect.top)  * rows / rect.height);
+    if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+    return { row, col };
+  }
+
+  /** Render the chapter map screen canvas. */
+  private _renderChapterMapScreen(chapter: ChapterDef): void {
+    const ctx = this._chapterMapCtx;
+    if (!ctx || !chapter.grid) return;
+
+    const grid = chapter.grid;
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+
+    const displayProgress = this._activeCampaign ? this._activeCampaignProgress : this.completedLevels;
+    const levelStars = loadLevelStars(this._activeCampaign?.id);
+
+    // Compute which cells are reachable (BFS from source through connected tiles)
+    const filledKeys = this._computeChapterMapFilledCells(chapter, displayProgress);
+
+    // Compute accessible level indices (level chambers that are water-filled)
+    const accessibleLevelIdxs = new Set<number>();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!filledKeys.has(`${r},${c}`)) continue;
+        const def = grid[r]?.[c];
+        if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+          accessibleLevelIdxs.add(def.levelIdx);
+        }
+      }
+    }
+
+    renderChapterMapCanvas(
+      ctx,
+      grid,
+      rows,
+      cols,
+      chapter.levels,
+      filledKeys,
+      {
+        completedLevels: displayProgress,
+        levelStars,
+      },
+      this._chapterMapHover,
+      accessibleLevelIdxs,
+    );
+  }
+
+  /**
+   * Compute which grid cells are water-reachable from the source on the chapter map.
+   * Water flows through pipes and into level chambers.  Beyond a level chamber, water
+   * only continues through its outgoing connections when the level is completed.
+   */
+  private _computeChapterMapFilledCells(chapter: ChapterDef, completedLevels: Set<number>): Set<string> {
+    const grid = chapter.grid;
+    if (!grid) return new Set();
+
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+
+    // Find source
+    let sourcePos: { row: number; col: number } | null = null;
+    for (let r = 0; r < rows && !sourcePos; r++) {
+      for (let c = 0; c < cols && !sourcePos; c++) {
+        if (grid[r]?.[c]?.shape === PipeShape.Source) sourcePos = { row: r, col: c };
+      }
+    }
+    if (!sourcePos) return new Set();
+
+    const reached = new Set<string>();
+    const queue: Array<{ row: number; col: number }> = [sourcePos];
+    reached.add(`${sourcePos.row},${sourcePos.col}`);
+
+    const getConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
+      // For completed level chambers or source/sink/pipe: all provided connections
+      // For incomplete level chamber entered from water: water enters but does NOT exit
+      if (def.connections) return new Set(def.connections);
+      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink) {
+        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+      }
+      if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
+        const levelIdx = def.levelIdx ?? 0;
+        const levelId = chapter.levels[levelIdx]?.id;
+        const isCompleted = levelId !== undefined && completedLevels.has(levelId);
+        // Water enters the chamber regardless; exits only if completed
+        if (!isCompleted && !isEntry) return new Set(); // Don't propagate out
+        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+      }
+      if (PIPE_SHAPES.has(def.shape)) {
+        const rot = (def.rotation ?? 0) as Rotation;
+        const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
+        return t.connections;
+      }
+      return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+    };
+
+    const DELTAS: Record<Direction, { dr: number; dc: number }> = {
+      [Direction.North]: { dr: -1, dc: 0 },
+      [Direction.East]:  { dr:  0, dc: 1 },
+      [Direction.South]: { dr:  1, dc: 0 },
+      [Direction.West]:  { dr:  0, dc: -1 },
+    };
+    const OPPOSITE: Record<Direction, Direction> = {
+      [Direction.North]: Direction.South,
+      [Direction.East]:  Direction.West,
+      [Direction.South]: Direction.North,
+      [Direction.West]:  Direction.East,
+    };
+
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      const curDef = grid[cur.row]?.[cur.col];
+      if (!curDef) continue;
+      const curConns = getConns(curDef, false);
+      for (const dir of curConns) {
+        const d = DELTAS[dir];
+        const nr = cur.row + d.dr;
+        const nc = cur.col + d.dc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        const key = `${nr},${nc}`;
+        if (reached.has(key)) continue;
+        const nbDef = grid[nr]?.[nc];
+        if (!nbDef) continue;
+        // Neighbor must have a connection back
+        const nbConns = getConns(nbDef, true);
+        if (!nbConns.has(OPPOSITE[dir])) continue;
+        reached.add(key);
+        queue.push({ row: nr, col: nc });
+      }
+    }
+
+    return reached;
+  }
+
+  private _onChapterMapCanvasMouseMove(e: MouseEvent, chapter: ChapterDef): void {
+    this._chapterMapHover = this._chapterMapCanvasPos(e, chapter);
+    this._renderChapterMapScreen(chapter);
+  }
+
+  private _onChapterMapCanvasClick(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
+    const pos = this._chapterMapCanvasPos(e, chapter);
+    if (!pos || !chapter.grid) return;
+
+    const def = chapter.grid[pos.row]?.[pos.col];
+    if (!def || def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
+
+    const levelIdx = def.levelIdx ?? 0;
+    const levelDef = chapter.levels[levelIdx];
+    if (!levelDef) return;
+
+    // Check if this level is accessible (water-filled)
+    const displayProgress = this._activeCampaign ? this._activeCampaignProgress : this.completedLevels;
+    const filledKeys = this._computeChapterMapFilledCells(chapter, displayProgress);
+    if (!filledKeys.has(`${pos.row},${pos.col}`)) return; // not accessible
+
+    // Mark that we came from the chapter map so win modal returns here
+    this._winFromChapterMap = true;
+    this.winMenuBtnEl.textContent = 'Chapter Map';
+
+    if (levelDef.challenge) {
+      this._pendingLevelId = levelDef.id;
+      this.startLevel(levelDef.id);
+      this._showChallengeLevelModal(false);
+    } else {
+      this.startLevel(levelDef.id);
+    }
+  }
+
 
   /**
    * Estimate the total vertical pixels consumed by UI elements that appear
@@ -987,6 +1311,7 @@ export class Game {
       levelWater,
       this._chapterExpandedState,
       (ci, expanded) => { this._chapterExpandedState.set(ci, expanded); },
+      (ci) => this._showChapterMap(ci),
     );
   }
 
@@ -2770,8 +3095,19 @@ export class Game {
       nextChapter.levels[0].id === nextLevelDef.id
     ) {
       const chapterIdx = chapters.indexOf(nextChapter);
-      this.startLevel(nextLevelDef.id);
-      this._showNewChapterModal(chapterIdx, nextChapter);
+      // If the next chapter has a grid map, show the map screen instead of starting the level
+      if (nextChapter.grid) {
+        this._pendingLevelId = null;
+        this.winModalEl.style.display = 'none';
+        this._winFromChapterMap = true;
+        this.winMenuBtnEl.textContent = 'Chapter Map';
+        this._showChapterMap(chapterIdx);
+        // Show the new chapter modal on the chapter map screen
+        this._showNewChapterModal(chapterIdx, nextChapter);
+      } else {
+        this.startLevel(nextLevelDef.id);
+        this._showNewChapterModal(chapterIdx, nextChapter);
+      }
     } else if (nextLevelDef.challenge) {
       this.startLevel(nextLevelDef.id);
       this._showChallengeLevelModal(/* canSkip */ true);
@@ -2946,6 +3282,14 @@ export class Game {
       this._playtestExitCallback = null;
       this._showLevelSelect();
       cb(); // re-open the campaign editor
+    } else if (this._winFromChapterMap && this._chapterMapChapter) {
+      this._winFromChapterMap = false;
+      this._populateChapterMapScreen(this._activeCampaign!, this._chapterMapChapterIdx, this._chapterMapChapter);
+      this.levelSelectEl.style.display = 'none';
+      this.playScreenEl.style.display = 'none';
+      if (this._chapterMapScreenEl) this._chapterMapScreenEl.style.display = 'flex';
+      this.winModalEl.style.display = 'none';
+      this.screen = GameScreen.ChapterMap;
     } else {
       this._showLevelSelect();
     }
