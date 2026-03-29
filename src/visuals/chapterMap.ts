@@ -97,6 +97,23 @@ export function drawLevelChamberTile(
     ctx.restore();
   }
 
+  // Connection lines on tile edges (drawn before minimap so minimap covers the center)
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = _s(3);
+  ctx.lineCap = 'round';
+  const cy2 = y + CELL / 2;
+  for (const dir of connections) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy2);
+    if (dir === Direction.North) ctx.lineTo(cx, y);
+    else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
+    else if (dir === Direction.East) ctx.lineTo(x + CELL, cy2);
+    else if (dir === Direction.West) ctx.lineTo(x, cy2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
   // Minimap (centered in the area below the label)
   if (levelDef) {
     try {
