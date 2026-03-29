@@ -131,7 +131,7 @@ export class ChapterMapScreen {
 
     // Back button
     const backBtn = document.createElement('button');
-    backBtn.textContent = '← Level Select';
+    backBtn.textContent = '← Chapter Select';
     backBtn.style.cssText =
       'padding:8px 16px;font-size:0.9rem;background:#16213e;color:#7ed321;' +
       'border:1px solid #7ed321;border-radius:6px;cursor:pointer;';

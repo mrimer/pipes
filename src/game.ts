@@ -873,6 +873,7 @@ export class Game {
     this.screen = GameScreen.Play;
     this.levelSelectEl.style.display = 'none';
     this.playScreenEl.style.display  = 'flex';
+    if (this._chapterMapScreen) this._chapterMapScreen.screenEl.style.display = 'none';
     this.winModalEl.style.display         = 'none';
     this.gameoverModalEl.style.display    = 'none';
     this._newChapterModalEl.style.display = 'none';
