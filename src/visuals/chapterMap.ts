@@ -473,14 +473,6 @@ export function renderChapterMapCanvas(
           ctx.fillStyle = 'rgba(0,0,0,0.55)';
           ctx.fillRect(x, y, CELL, CELL);
           ctx.restore();
-        } else if (accessibleLevelIdxs?.has(levelIdx)) {
-          // Accessible: bright gold border pulse (via stroke)
-          ctx.save();
-          ctx.strokeStyle = FOCUS_COLOR;
-          ctx.lineWidth = _s(2);
-          ctx.setLineDash([]);
-          ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
-          ctx.restore();
         }
       } else if (def.shape === PipeShape.Source) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);

@@ -133,6 +133,7 @@ export class ChapterMapScreen {
     const chapter = this._chapter;
     if (!chapter) return;
     this._populate(campaign, this._chapterIdx, chapter);
+    this._startAnimLoop();
   }
 
   // ─── Private – DOM building ─────────────────────────────────────────────────

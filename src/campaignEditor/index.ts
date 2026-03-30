@@ -509,14 +509,10 @@ export class CampaignEditor {
     this._screen = EditorScreen.List;
     this._el.innerHTML = '';
 
-    const toolbar = this._buildToolbar('🗺️ Select Campaign', null);
-
-    // Close button
-    const closeBtn = this._btn('✕ Close', '#2a2a4a', '#aaa', () => {
+    const toolbar = this._buildToolbar('🗺️ Select Campaign', () => {
       this.hide();
       this._onClose();
     });
-    toolbar.appendChild(closeBtn);
 
     this._el.appendChild(toolbar);
 
