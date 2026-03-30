@@ -466,7 +466,8 @@ export class ChapterMapScreen {
     if (starsTotal > 0) parts.push(`⭐ ${starsCollected}/${starsTotal}`);
     if (challengesTotal > 0) parts.push(`💀 ${challengesDone}/${challengesTotal}`);
     if (isChapterCompleted) {
-      const isMastered = starsTotal === 0 || starsCollected >= starsTotal;
+      const allLevelsCompleted = chLevels.every(l => displayProgress.has(l.id));
+      const isMastered = allLevelsCompleted && (starsTotal === 0 || starsCollected >= starsTotal);
       parts.push(isMastered ? '🏆 Mastered!' : '✅ Complete');
     }
 
@@ -643,7 +644,7 @@ export class ChapterMapScreen {
 
     // Edge flowers – shown when the chapter is completed
     const isCompleted = this._isChapterCompleted(chapter, displayProgress);
-    const isMastered  = isCompleted && this._isChapterMastered(chapter);
+    const isMastered  = isCompleted && this._isChapterMastered(chapter, displayProgress);
     if (isCompleted) {
       if (now - this._lastFlowerSpawn >= ChapterMapScreen.FLOWER_SPAWN_INTERVAL_MS) {
         this._spawnEdgeFlower(now, rows, cols);
@@ -675,14 +676,15 @@ export class ChapterMapScreen {
     return chapter.id !== undefined && completedChapters?.has(chapter.id) === true;
   }
 
-  /** Returns true when all stars have been collected in the chapter. */
-  private _isChapterMastered(chapter: ChapterDef): boolean {
+  /** Returns true when all levels are completed and all stars have been collected in the chapter. */
+  private _isChapterMastered(chapter: ChapterDef, displayProgress: Set<number>): boolean {
     const campaignId = this._callbacks.getActiveCampaignId();
     const chapterLevelStars = loadLevelStars(campaignId ?? undefined);
     const chLevels = chapter.levels;
+    const allLevelsCompleted = chLevels.every(l => displayProgress.has(l.id));
     const starsCollected = chLevels.reduce((sum, l) => sum + Math.min(chapterLevelStars[l.id] ?? 0, l.starCount ?? 0), 0);
     const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
-    return starsTotal === 0 || starsCollected >= starsTotal;
+    return allLevelsCompleted && (starsTotal === 0 || starsCollected >= starsTotal);
   }
 
   /**
@@ -705,7 +707,7 @@ export class ChapterMapScreen {
       x,
       y,
       spawnedAt: now,
-      variant: Math.floor(Math.random() * 3),
+      variant: Math.floor(Math.random() * 8),
       baseRotation: Math.random() * Math.PI * 2,
     });
   }

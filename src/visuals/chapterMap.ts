@@ -326,7 +326,7 @@ function _drawChapterMapGranite(ctx: CanvasRenderingContext2D, x: number, y: num
   const bw = half * 0.7;
   const bh = half * 0.7;
 
-  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
+  ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
@@ -352,7 +352,7 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   const half = CELL / 2;
   const r = half * 0.75;
 
-  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
+  ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
@@ -428,6 +428,23 @@ export function renderChapterMapCanvas(
       const dec = decorations?.get(`${r},${c}`);
       if (dec) drawAmbientDecoration(ctx, dec);
     }
+  }
+
+  // Grid lines – drawn beneath tile objects so pipe/container edges render on top
+  ctx.strokeStyle = 'rgba(74,144,217,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  for (let r = 0; r <= rows; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * CELL);
+    ctx.lineTo(cols * CELL, r * CELL);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= cols; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * CELL, 0);
+    ctx.lineTo(c * CELL, rows * CELL);
+    ctx.stroke();
   }
 
   // Pass 2: non-pipe tiles (level chambers, source, sink)
@@ -522,23 +539,6 @@ export function renderChapterMapCanvas(
     }
   }
 
-  // Grid lines overlay
-  ctx.strokeStyle = 'rgba(74,144,217,0.12)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([]);
-  for (let r = 0; r <= rows; r++) {
-    ctx.beginPath();
-    ctx.moveTo(0, r * CELL);
-    ctx.lineTo(cols * CELL, r * CELL);
-    ctx.stroke();
-  }
-  for (let c = 0; c <= cols; c++) {
-    ctx.beginPath();
-    ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, rows * CELL);
-    ctx.stroke();
-  }
-
   // Hover highlight – only on level chamber tiles
   if (hoverPos) {
     const { row, col } = hoverPos;
@@ -563,6 +563,11 @@ const EDGE_FLOWER_PETAL_COLORS = [
   'rgba(220,140,190,1)',   // bright rose
   'rgba(210,190,100,1)',   // bright gold
   'rgba(170,140,240,1)',   // bright lavender
+  'rgba(255,255,255,1)',   // white
+  'rgba(100,170,255,1)',   // cornflower blue
+  'rgba(255,140,60,1)',    // orange
+  'rgba(255,100,120,1)',   // coral red
+  'rgba(120,220,160,1)',   // mint green
 ] as const;
 
 /** Bright center color for edge completion flowers. */
@@ -575,7 +580,7 @@ const EDGE_FLOWER_CENTER_COLOR = 'rgba(255,230,120,1)';
  * @param ctx         Canvas 2D context (no prior transforms expected).
  * @param x           Horizontal center in canvas pixels.
  * @param y           Vertical center in canvas pixels.
- * @param variant     Color variant 0–2.
+ * @param variant     Color variant 0–7.
  * @param scale       Scale factor 0–1 (grow-in animation).
  * @param alpha       Opacity 0–1 (fade-out animation).
  * @param swayAngle   Current sway rotation offset in radians (shared across all flowers).
