@@ -66,6 +66,12 @@ export class ChapterMapScreen {
   private _chapterIdx = -1;
   /** Currently hovered grid cell. */
   private _hover: { row: number; col: number } | null = null;
+  /** Last known mouse position in client coordinates. */
+  private _mouseClientPos: { x: number; y: number } | null = null;
+  /** Whether the Ctrl key is currently held. */
+  private _ctrlHeld = false;
+  /** Floating tooltip element shown on Ctrl+hover. */
+  private readonly _tooltipEl: HTMLElement;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   /** Ambient decorations for empty cells, keyed by "row,col". */
@@ -90,6 +96,28 @@ export class ChapterMapScreen {
     this._callbacks = callbacks;
     this.screenEl = this._buildScreenEl();
     document.body.appendChild(this.screenEl);
+
+    // Tooltip element for Ctrl+hover level name display
+    this._tooltipEl = document.createElement('div');
+    this._tooltipEl.style.cssText =
+      'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
+      'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;';
+    document.body.appendChild(this._tooltipEl);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Control' && !this._ctrlHeld && this.screenEl.style.display !== 'none') {
+        this._ctrlHeld = true;
+        if (this._mouseClientPos && this._chapter) {
+          this._showTooltip(this._mouseClientPos.x, this._mouseClientPos.y);
+        }
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      if (e.key === 'Control') {
+        this._ctrlHeld = false;
+        this._hideTooltip();
+      }
+    });
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -203,25 +231,33 @@ export class ChapterMapScreen {
       'display:block;width:100%;height:auto;';
 
     // Mouse events for hover and click
-    canvas.addEventListener('mousemove', (e) => this._onMouseMove(e, chapter));
-    canvas.addEventListener('mouseleave', () => {
-      this._hover = null;
-      this._render(chapter);
-    });
-    canvas.addEventListener('click', (e) => this._onClick(e, campaign, chapter));
-
-    // Tooltip (title attr for hover text)
     canvas.addEventListener('mousemove', (e) => {
+      this._mouseClientPos = { x: e.clientX, y: e.clientY };
+      this._onMouseMove(e, chapter);
+      // Update native title for non-Ctrl hover and custom tooltip for Ctrl+hover
       const pos = this._canvasPos(e, chapter);
-      if (!pos) { canvas.title = ''; return; }
-      const def = chapter.grid![pos.row]?.[pos.col];
-      if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-        const level = chapter.levels[def.levelIdx];
-        canvas.title = level ? `${def.levelIdx + 1}: ${level.name}` : '';
+      if (pos) {
+        const def = chapter.grid![pos.row]?.[pos.col];
+        if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+          const level = chapter.levels[def.levelIdx];
+          canvas.title = level ? `${def.levelIdx + 1}: ${level.name}` : '';
+        } else {
+          canvas.title = '';
+        }
       } else {
         canvas.title = '';
       }
+      if (this._ctrlHeld) {
+        this._showTooltip(e.clientX, e.clientY);
+      }
     });
+    canvas.addEventListener('mouseleave', () => {
+      this._mouseClientPos = null;
+      this._hover = null;
+      this._hideTooltip();
+      this._render(chapter);
+    });
+    canvas.addEventListener('click', (e) => this._onClick(e, campaign, chapter));
 
     canvasWrap.appendChild(canvas);
     el.appendChild(canvasWrap);
@@ -243,6 +279,28 @@ export class ChapterMapScreen {
   }
 
   // ─── Private – interaction ──────────────────────────────────────────────────
+
+  private _showTooltip(clientX: number, clientY: number): void {
+    const chapter = this._chapter;
+    if (!chapter?.grid || !this._hover) { this._hideTooltip(); return; }
+    const { row, col } = this._hover;
+    const def = chapter.grid[row]?.[col];
+    if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+      const level = chapter.levels[def.levelIdx];
+      if (level) {
+        this._tooltipEl.textContent = `${def.levelIdx + 1}: ${level.name}`;
+        this._tooltipEl.style.display = 'block';
+        this._tooltipEl.style.left = `${clientX + 12}px`;
+        this._tooltipEl.style.top  = `${clientY + 12}px`;
+        return;
+      }
+    }
+    this._hideTooltip();
+  }
+
+  private _hideTooltip(): void {
+    this._tooltipEl.style.display = 'none';
+  }
 
   private _canvasPos(e: MouseEvent, chapter: ChapterDef): { row: number; col: number } | null {
     const canvas = this._canvas;
