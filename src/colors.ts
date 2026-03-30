@@ -125,7 +125,5 @@ export const CHAPTER_MAP_TILE_BG    = '#1a2840';
 export const CHAPTER_MAP_EMPTY_BG   = '#0d1520';
 /** Grid border/cell outline color for chapter map tiles. */
 export const CHAPTER_MAP_BORDER_COLOR = '#2a3a5e';
-/** Border stroke color for a level chamber tile when water has reached it. */
-export const CHAPTER_MAP_FILLED_CHAMBER_COLOR = '#4a90d9';
 /** Interior fill color for a level chamber tile when water has reached it. */
 export const CHAPTER_MAP_FILLED_CHAMBER_BG    = '#1a3d60';
