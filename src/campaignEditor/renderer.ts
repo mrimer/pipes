@@ -9,7 +9,8 @@ import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecorat
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
-import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER } from '../colors';
+import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
+  WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
 import { tileDefConnections } from '../chapterMapUtils';
 
@@ -153,7 +154,8 @@ export function renderEditorCanvas(
         // Chapter map editor context: compute butt-end dirs and draw with per-arm caps
         const tileConns = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
-        _drawChapterEditorPipeTile(ctx, x, y, def, tileConns, buttEndDirs);
+        const isFilled = filledKeys.has(`${r},${c}`);
+        _drawChapterEditorPipeTile(ctx, x, y, def, tileConns, buttEndDirs, isFilled);
       } else {
         drawEditorTile(ctx, x, y, def);
       }
@@ -756,6 +758,7 @@ function _drawChapterEditorPipeTile(
   def: TileDef,
   connections: ReadonlySet<Direction>,
   buttEndDirs: ReadonlySet<Direction> | undefined,
+  isFilled = false,
 ): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
@@ -772,8 +775,11 @@ function _drawChapterEditorPipeTile(
   ctx.fillStyle = isSpinCement ? CEMENT_FILL_COLOR : isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
   ctx.fillRect(x, y, CELL, CELL);
 
-  // Pipe arm color
-  const pipeColor = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
+  // Pipe arm color – matches the gameplay chapter map colors (isFilled → water color, else dry color)
+  const pipeColor = isSpin ? (isFilled ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
+                 : isGold  ? (isFilled ? GOLD_PIPE_WATER_COLOR  : GOLD_PIPE_COLOR)
+                 : isLeaky ? (isFilled ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
+                 : (isFilled ? WATER_COLOR : PIPE_COLOR);
 
   // Draw each arm center-to-edge with per-arm linecap (butt or round)
   ctx.strokeStyle = pipeColor;
