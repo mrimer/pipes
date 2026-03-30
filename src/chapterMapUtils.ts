@@ -3,7 +3,9 @@
  * Used by both the gameplay chapter map screen and the campaign editor validation.
  */
 
-import { Direction, TileDef } from './types';
+import { Direction, TileDef, Rotation, PipeShape } from './types';
+import { Tile } from './tile';
+import { PIPE_SHAPES } from './board';
 
 /** Grid-delta for each cardinal direction. */
 export const CHAPTER_MAP_DELTAS: Record<Direction, { dr: number; dc: number }> = {
@@ -20,6 +22,37 @@ export const CHAPTER_MAP_OPPOSITE: Record<Direction, Direction> = {
   [Direction.South]: Direction.North,
   [Direction.West]:  Direction.East,
 };
+
+/**
+ * Return the structural connections for a tile definition without requiring a
+ * live Board or Tile runtime object.
+ *
+ * - Tiles with an explicit `connections` array return those connections.
+ * - Source, Sink, and Chamber tiles without an explicit `connections` array
+ *   default to all four directions (they connect to every neighbor).
+ * - Pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants,
+ *   Leaky variants) derive their connections from their shape and rotation.
+ * - All other shapes (Granite, Tree, GoldSpace, Empty, …) return an empty set –
+ *   they have no pipe connections.
+ *
+ * This is the single source of truth for "pure" (gameplay-unaware) tile
+ * connectivity.  For gameplay-aware connectivity (e.g. level chambers that
+ * only pass water when the level is completed), callers must wrap this with
+ * additional logic.
+ */
+export function tileDefConnections(def: TileDef): Set<Direction> {
+  if (def.connections) return new Set(def.connections);
+  const { shape } = def;
+  if (shape === PipeShape.Source || shape === PipeShape.Sink || shape === PipeShape.Chamber) {
+    return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+  }
+  if (PIPE_SHAPES.has(shape)) {
+    const rot = (def.rotation ?? 0) as Rotation;
+    const t = new Tile(shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
+    return t.connections;
+  }
+  return new Set();
+}
 
 /**
  * BFS from `sourcePos` through the chapter map grid.

@@ -5,10 +5,9 @@
 
 import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation } from '../types';
 import { PIPE_SHAPES } from '../board';
-import { Tile } from '../tile';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
-import { computeChapterMapReachable } from '../chapterMapUtils';
+import { computeChapterMapReachable, tileDefConnections } from '../chapterMapUtils';
 import { generateChapterMapDecorations } from '../visuals/chapterMap';
 import {
   EditorPalette,
@@ -778,8 +777,7 @@ export class ChapterMapEditorSection {
       if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
         return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
       }
-      const t = new Tile(def.shape, (def.rotation ?? 0) as Rotation, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
-      return t.connections;
+      return tileDefConnections(def);
     };
 
     return computeChapterMapReachable(
@@ -1198,8 +1196,7 @@ export class ChapterMapEditorSection {
         return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
       }
       // Pipe shapes
-      const t = new Tile(def.shape, (def.rotation ?? 0) as Rotation, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
-      return t.connections;
+      return tileDefConnections(def);
     };
 
     const reached = computeChapterMapReachable(
