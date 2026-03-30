@@ -366,8 +366,16 @@ export class ChapterMapEditorSection {
     title.textContent = 'TILE PARAMS';
     panel.appendChild(title);
 
+    const focusedTile = this._chapterFocusedTilePos
+      ? this._chapterEditGrid[this._chapterFocusedTilePos.row]?.[this._chapterFocusedTilePos.col] ?? null
+      : null;
+    const isFocusedLevelChamber =
+      focusedTile?.shape === PipeShape.Chamber && focusedTile.chamberContent === 'level';
+
     if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
       panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
+    } else if (isFocusedLevelChamber && this._chapterFocusedTilePos) {
+      panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile!, chapter, campaign));
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';
@@ -432,7 +440,68 @@ export class ChapterMapEditorSection {
     return connWrap;
   }
 
-  /** Build the grid size panel for the chapter map editor. */
+  /**
+   * Build a connections widget that reads from and writes to a focused level-chamber tile's
+   * `connections` array directly (rather than `_chapterParams`).
+   */
+  private _buildFocusedChamberConnectionsWidget(
+    replaceTarget: HTMLElement,
+    tile: TileDef,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): HTMLElement {
+    const connWrap = document.createElement('div');
+    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    const connLbl = document.createElement('div');
+    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
+    connLbl.textContent = 'Connections';
+    connWrap.appendChild(connLbl);
+
+    const connGrid = document.createElement('div');
+    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
+
+    const makeConnBtn = (dir: Direction): HTMLButtonElement => {
+      const currentConns = new Set(tile.connections ?? [Direction.North, Direction.East, Direction.South, Direction.West]);
+      const active = currentConns.has(dir);
+      const label = dir === Direction.North ? 'N' : dir === Direction.East ? 'E' : dir === Direction.South ? 'S' : 'W';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.title = `Toggle ${label} connection`;
+      b.style.cssText =
+        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
+        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
+        'color:' + (active ? '#7ed321' : '#555') + ';' +
+        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
+        'border-radius:4px;cursor:pointer;padding:0;';
+      b.addEventListener('click', () => {
+        const conns = new Set(tile.connections ?? [Direction.North, Direction.East, Direction.South, Direction.West]);
+        if (conns.has(dir)) conns.delete(dir); else conns.add(dir);
+        tile.connections = [...conns];
+        this._recordChapterSnapshot(chapter);
+        this._saveChapterGridState(chapter, campaign);
+        const newPanel = this._buildChapterTileParamsPanel(chapter, campaign);
+        replaceTarget.replaceWith(newPanel);
+        this._renderChapterCanvas();
+      });
+      return b;
+    };
+
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn(Direction.North));
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn(Direction.West));
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn(Direction.East));
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn(Direction.South));
+    connGrid.appendChild(document.createElement('span'));
+
+    connWrap.appendChild(connGrid);
+    return connWrap;
+  }
+
+
   private _buildChapterGridSizePanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
     const panel = document.createElement('div');
     panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;';
@@ -828,6 +897,7 @@ export class ChapterMapEditorSection {
       }
       if (this._chapterPalette === 'erase') {
         this._chapterEditGrid[pos.row][pos.col] = null;
+        this._rebuildChapterLevelInventory(chapter, campaign);
       } else {
         this._chapterEditGrid[pos.row][pos.col] = this._buildChapterTileDef();
       }
@@ -842,6 +912,7 @@ export class ChapterMapEditorSection {
       if (!this._chapterRightEraseDragActive) return;
       this._chapterRightEraseDragActive = false;
       this._chapterSuppressContextMenu = true;
+      this._rebuildChapterLevelInventory(chapter, campaign);
       this._recordChapterSnapshot(chapter);
       this._saveChapterGridState(chapter, campaign);
       this._renderChapterCanvas();

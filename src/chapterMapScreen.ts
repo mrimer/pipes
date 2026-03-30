@@ -288,9 +288,13 @@ export class ChapterMapScreen {
 
   // ─── Private – rendering ────────────────────────────────────────────────────
 
-  private _render(chapter: ChapterDef): void {
+  /**
+   * Render the chapter map canvas only (no DOM stats/status updates).
+   * Used by both the interactive `_render` path and the animation loop.
+   */
+  private _renderCanvas(chapter: ChapterDef): { filledKeys: Set<string>; displayProgress: Set<number> } | null {
     const ctx = this._ctx;
-    if (!ctx || !chapter.grid) return;
+    if (!ctx || !chapter.grid) return null;
 
     const grid = chapter.grid;
     const rows = chapter.rows ?? 3;
@@ -299,10 +303,8 @@ export class ChapterMapScreen {
     const displayProgress = this._callbacks.getDisplayProgress();
     const levelStars = loadLevelStars(this._callbacks.getActiveCampaignId() ?? undefined);
 
-    // Compute which cells are reachable (BFS from source through connected tiles)
     const filledKeys = this._computeFilledCells(chapter, displayProgress);
 
-    // Compute accessible level indices (level chambers that are water-filled)
     const accessibleLevelIdxs = new Set<number>();
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -321,14 +323,23 @@ export class ChapterMapScreen {
       cols,
       chapter.levels,
       filledKeys,
-      {
-        completedLevels: displayProgress,
-        levelStars,
-      },
+      { completedLevels: displayProgress, levelStars },
       this._hover,
       accessibleLevelIdxs,
       this._decorations,
     );
+
+    return { filledKeys, displayProgress };
+  }
+
+  private _render(chapter: ChapterDef): void {
+    const result = this._renderCanvas(chapter);
+    if (!result) return;
+    const { filledKeys, displayProgress } = result;
+
+    const grid = chapter.grid!;
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
 
     // Update stats
     if (this._statsEl) {
@@ -360,11 +371,9 @@ export class ChapterMapScreen {
     // Update status text ("Level Complete!" / "Click Sink to advance")
     if (this._statusEl) {
       let sinkFilled = false;
-      if (grid) {
-        for (let r = 0; r < rows && !sinkFilled; r++) {
-          for (let c = 0; c < cols && !sinkFilled; c++) {
-            if (grid[r]?.[c]?.shape === PipeShape.Sink && filledKeys.has(`${r},${c}`)) sinkFilled = true;
-          }
+      for (let r = 0; r < rows && !sinkFilled; r++) {
+        for (let c = 0; c < cols && !sinkFilled; c++) {
+          if (grid[r]?.[c]?.shape === PipeShape.Sink && filledKeys.has(`${r},${c}`)) sinkFilled = true;
         }
       }
       const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
@@ -469,8 +478,11 @@ export class ChapterMapScreen {
     const grid = chapter.grid;
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    const displayProgress = this._callbacks.getDisplayProgress();
-    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+
+    // Re-render the base canvas each frame to clear previous particle frames
+    const renderResult = this._renderCanvas(chapter);
+    if (!renderResult) return;
+    const { filledKeys } = renderResult;
 
     const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
 

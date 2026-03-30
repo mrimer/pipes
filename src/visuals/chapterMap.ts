@@ -6,7 +6,8 @@
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration, AmbientDecorationType } from '../types';
 import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration } from '../renderer';
-import { PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
+import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
@@ -15,6 +16,63 @@ import {
 } from '../colors';
 import { renderMinimap } from '../minimap';
 import { Tile } from '../tile';
+
+// ─── Butt-end helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Return the connection set for a tile definition (without a Board/Tile runtime object).
+ * Used to determine neighbor connectivity when computing butt-end directions.
+ *
+ * @param def  The tile definition to inspect.  Source, Sink, and Chamber tiles without
+ *             an explicit `connections` array default to all four directions.  Pipe
+ *             shapes derive their connections from their shape and rotation.  All other
+ *             shapes (Granite, Tree, Empty, …) return an empty set.
+ */
+function _getTileConnections(def: TileDef): Set<Direction> {
+  if (def.connections) return new Set(def.connections);
+  if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
+    return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+  }
+  if (PIPE_SHAPES.has(def.shape)) {
+    const rot = (def.rotation ?? 0) as Rotation;
+    const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
+    return t.connections;
+  }
+  return new Set();
+}
+
+/**
+ * Compute which arm directions of the tile at (r, c) should use a flat (butt)
+ * end cap.  An arm gets a butt end when the adjacent cell is non-empty AND the
+ * neighbor has a connection pointing back (so the arms visually join flush at the
+ * tile boundary).  Arms pointing into empty cells or at pipe tiles without a
+ * reciprocal arm keep their round nubs.
+ */
+function _computeChapterButtEndDirs(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  r: number,
+  c: number,
+  tileConns: Set<Direction>,
+): Set<Direction> | undefined {
+  let buttEndDirs: Set<Direction> | undefined;
+  for (const dir of tileConns) {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nr = r + delta.row, nc = c + delta.col;
+    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+    const neighbor = grid[nr]?.[nc];
+    if (!neighbor) continue; // null = empty cell → round end
+    const neighborConns = _getTileConnections(neighbor);
+    const oppDir = oppositeDirection(dir);
+    // Pipe neighbor with no reciprocal arm → arms don't overlap, keep round nub
+    if (PIPE_SHAPES.has(neighbor.shape) && !neighborConns.has(oppDir)) continue;
+    (buttEndDirs ??= new Set<Direction>()).add(dir);
+  }
+  return buttEndDirs;
+}
+
+
 
 // ─── Ambient decorations ───────────────────────────────────────────────────────
 
@@ -117,7 +175,7 @@ export function drawLevelChamberTile(
 
   // Connection stubs from box edge to tile edge (butt cap, like in-game chamber)
   ctx.strokeStyle = chamberColor;
-  ctx.lineWidth = _s(6);
+  ctx.lineWidth = LINE_WIDTH;
   ctx.lineCap = 'butt';
   if (connections.has(Direction.North)) {
     ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
@@ -222,7 +280,7 @@ export function drawLevelChamberTile(
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
 /** Draw Source tile like in-game: colored circle + radiating arms to connected edges. */
-function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, capacity?: number): void {
+function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, capacity?: number, buttEndDirs?: Set<Direction>): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
@@ -236,8 +294,8 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.translate(cx, cy);
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'round';
   for (const dir of connections) {
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     ctx.beginPath();
     ctx.moveTo(0, 0);
     if (dir === Direction.North) ctx.lineTo(0, -half);
@@ -262,7 +320,7 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
 }
 
 /** Draw Sink tile like in-game: colored circle + radiating arms. */
-function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>): void {
+function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, buttEndDirs?: Set<Direction>): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
@@ -276,8 +334,8 @@ function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.translate(cx, cy);
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'round';
   for (const dir of connections) {
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     ctx.beginPath();
     ctx.moveTo(0, 0);
     if (dir === Direction.North) ctx.lineTo(0, -half);
@@ -444,10 +502,12 @@ export function renderChapterMapCanvas(
         }
       } else if (def.shape === PipeShape.Source) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-        _drawChapterMapSource(ctx, x, y, isFilled, connections, def.capacity);
+        const buttEndDirs = _computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
+        _drawChapterMapSource(ctx, x, y, isFilled, connections, def.capacity, buttEndDirs);
       } else if (def.shape === PipeShape.Sink) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-        _drawChapterMapSink(ctx, x, y, isFilled, connections);
+        const buttEndDirs = _computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
+        _drawChapterMapSink(ctx, x, y, isFilled, connections, buttEndDirs);
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y);
       } else if (def.shape === PipeShape.Tree) {
@@ -479,11 +539,12 @@ export function renderChapterMapCanvas(
       const rot = (def.rotation ?? 0) as Rotation;
       const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
       const pipeColor = isFilled ? '#4aa0ff' : '#3a506a';
+      const buttEndDirs = _computeChapterButtEndDirs(grid, rows, cols, r, c, t.connections);
       ctx.save();
       ctx.strokeStyle = pipeColor;
       ctx.lineWidth = LINE_WIDTH;
-      ctx.lineCap = 'round';
       for (const dir of t.connections) {
+        ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         if (dir === Direction.North) ctx.lineTo(cx, y);
@@ -492,7 +553,7 @@ export function renderChapterMapCanvas(
         else if (dir === Direction.West) ctx.lineTo(x, cy);
         ctx.stroke();
       }
-      // Center junction dot
+      // Center junction dot fills the seam when butt-end arms meet at center
       ctx.fillStyle = pipeColor;
       ctx.beginPath();
       ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
