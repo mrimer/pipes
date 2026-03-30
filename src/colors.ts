@@ -115,3 +115,17 @@ export const LEAKY_PIPE_WATER_COLOR = '#b07840';
 export const LEAKY_RUST_COLOR       = '#7a2c10';
 /** Water droplet spray color for leaky pipe spray animation. */
 export const LEAKY_SPRAY_COLOR      = '#56c8e8';
+/** Success/completion green color used for completed status indicators. */
+export const SUCCESS_COLOR          = '#7ed321';
+/** Chapter map screen root background color (darker than main BG). */
+export const CHAPTER_MAP_BG         = '#0a0e1a';
+/** Background fill for chapter map tile cells (non-empty, slightly lighter than CHAPTER_MAP_BG). */
+export const CHAPTER_MAP_TILE_BG    = '#1a2840';
+/** Background fill for chapter map empty (null) cells. */
+export const CHAPTER_MAP_EMPTY_BG   = '#0d1520';
+/** Grid border/cell outline color for chapter map tiles. */
+export const CHAPTER_MAP_BORDER_COLOR = '#2a3a5e';
+/** Border stroke color for a level chamber tile when water has reached it. */
+export const CHAPTER_MAP_FILLED_CHAMBER_COLOR = '#4a90d9';
+/** Interior fill color for a level chamber tile when water has reached it. */
+export const CHAPTER_MAP_FILLED_CHAMBER_BG    = '#1a3d60';

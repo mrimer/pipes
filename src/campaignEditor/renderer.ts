@@ -11,6 +11,7 @@ import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
+import { tileDefConnections } from '../chapterMapUtils';
 
 export type { LevelProgressMap };
 
@@ -133,10 +134,9 @@ export function renderEditorCanvas(
       const y = r * CELL;
       if (filledKeys !== undefined) {
         // Chapter map editor context: compute butt-end dirs and draw with per-arm caps
-        const rot = (def.rotation ?? 0) as Rotation;
-        const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
-        const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, t.connections);
-        _drawChapterEditorPipeTile(ctx, x, y, def, t.connections, buttEndDirs);
+        const tileConns = tileDefConnections(def);
+        const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
+        _drawChapterEditorPipeTile(ctx, x, y, def, tileConns, buttEndDirs);
       } else {
         drawEditorTile(ctx, x, y, def);
       }

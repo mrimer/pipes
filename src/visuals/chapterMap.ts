@@ -4,7 +4,7 @@
  * explicit data parameters and write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration, AmbientDecorationType } from '../types';
+import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, AmbientDecorationType } from '../types';
 import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
@@ -13,34 +13,15 @@ import {
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
   CHAMBER_COLOR, CHAMBER_FILL_COLOR,
+  WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR, SUCCESS_COLOR,
+  CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG, CHAPTER_MAP_BORDER_COLOR,
+  CHAPTER_MAP_FILLED_CHAMBER_COLOR, CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
+import { tileDefConnections } from '../chapterMapUtils';
 import { renderMinimap } from '../minimap';
-import { Tile } from '../tile';
 import { FlowDrop, drawFlowDrop } from './waterParticles';
 
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
-
-/**
- * Return the connection set for a tile definition (without a Board/Tile runtime object).
- * Used to determine neighbor connectivity when computing butt-end directions.
- *
- * @param def  The tile definition to inspect.  Source, Sink, and Chamber tiles without
- *             an explicit `connections` array default to all four directions.  Pipe
- *             shapes derive their connections from their shape and rotation.  All other
- *             shapes (Granite, Tree, Empty, …) return an empty set.
- */
-function _getTileConnections(def: TileDef): Set<Direction> {
-  if (def.connections) return new Set(def.connections);
-  if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
-    return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-  }
-  if (PIPE_SHAPES.has(def.shape)) {
-    const rot = (def.rotation ?? 0) as Rotation;
-    const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
-    return t.connections;
-  }
-  return new Set();
-}
 
 /**
  * Compute which arm directions of the tile at (r, c) should use a flat (butt)
@@ -64,7 +45,7 @@ export function computeChapterButtEndDirs(
     if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
     const neighbor = grid[nr]?.[nc];
     if (!neighbor) continue; // null = empty cell → round end
-    const neighborConns = _getTileConnections(neighbor);
+    const neighborConns = tileDefConnections(neighbor);
     const oppDir = oppositeDirection(dir);
     // Pipe neighbor with no reciprocal arm → arms don't overlap, keep round nub
     if (PIPE_SHAPES.has(neighbor.shape) && !neighborConns.has(oppDir)) continue;
@@ -157,15 +138,15 @@ export function drawLevelChamberTile(
   const br = _s(3);
 
   // Background fill
-  ctx.fillStyle = '#1a2840';
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
   ctx.translate(cx, cy);
 
   // Inner chamber box – use a vivid water-blue when the tile is water-connected
-  const chamberFill  = isFilled ? '#1a3d60' : CHAMBER_FILL_COLOR;
-  const chamberColor = isFilled ? '#4a90d9' : CHAMBER_COLOR;
+  const chamberFill  = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_BG    : CHAMBER_FILL_COLOR;
+  const chamberColor = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_COLOR  : CHAMBER_COLOR;
   ctx.beginPath();
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = chamberFill;
@@ -208,7 +189,7 @@ export function drawLevelChamberTile(
   ctx.font = `bold ${_s(10)}px Arial`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = allStars ? '#f0c040' : isCompleted ? '#7ed321' : isChallenge ? '#e74c3c' : '#ddd';
+  ctx.fillStyle = allStars ? FOCUS_COLOR : isCompleted ? SUCCESS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = 3;
   ctx.fillText(`L-${levelNum}`, boxLeft + _s(3), boxTop + _s(2));
@@ -251,7 +232,7 @@ export function drawLevelChamberTile(
         ctx.shadowBlur = 4;
         const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
         ctx.font = `bold ${_s(12)}px Arial`;
-        ctx.fillStyle = '#f0c040';
+        ctx.fillStyle = FOCUS_COLOR;
         ctx.fillText(starText, cx, my + mh / 2);
         ctx.restore();
       }
@@ -288,7 +269,7 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
   const half = CELL / 2;
   const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
 
-  ctx.fillStyle = '#1a2840';
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
@@ -328,7 +309,7 @@ function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number
   const half = CELL / 2;
   const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
 
-  ctx.fillStyle = '#1a2840';
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
@@ -361,7 +342,7 @@ function _drawChapterMapGranite(ctx: CanvasRenderingContext2D, x: number, y: num
   const bw = half * 0.7;
   const bh = half * 0.7;
 
-  ctx.fillStyle = '#1a2840';
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
@@ -387,7 +368,7 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   const half = CELL / 2;
   const r = half * 0.75;
 
-  ctx.fillStyle = '#1a2840';
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
@@ -452,10 +433,10 @@ export function renderChapterMapCanvas(
       if (def !== null) continue;
       const x = c * CELL;
       const y = r * CELL;
-      ctx.fillStyle = '#0d1520';
+      ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
       ctx.fillRect(x, y, CELL, CELL);
       ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = '#1a2840';
+      ctx.strokeStyle = CHAPTER_MAP_TILE_BG;
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
       ctx.setLineDash([]);
@@ -495,7 +476,7 @@ export function renderChapterMapCanvas(
         } else if (accessibleLevelIdxs?.has(levelIdx)) {
           // Accessible: bright gold border pulse (via stroke)
           ctx.save();
-          ctx.strokeStyle = '#f0c040';
+          ctx.strokeStyle = FOCUS_COLOR;
           ctx.lineWidth = _s(2);
           ctx.setLineDash([]);
           ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
@@ -514,7 +495,7 @@ export function renderChapterMapCanvas(
       } else if (def.shape === PipeShape.Tree) {
         _drawChapterMapTree(ctx, x, y);
       }
-      ctx.strokeStyle = '#2a3a5e';
+      ctx.strokeStyle = CHAPTER_MAP_BORDER_COLOR;
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
@@ -533,18 +514,17 @@ export function renderChapterMapCanvas(
       const isFilled = filledKeys.has(`${r},${c}`);
 
       // Background
-      ctx.fillStyle = '#1a2840';
+      ctx.fillStyle = CHAPTER_MAP_TILE_BG;
       ctx.fillRect(x, y, CELL, CELL);
 
-      // Connection lines from center to open edges – same line weight as normal level
-      const rot = (def.rotation ?? 0) as Rotation;
-      const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
-      const pipeColor = isFilled ? '#4aa0ff' : '#3a506a';
-      const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, t.connections);
+      // Connection lines from center to open edges – same colors as the level screen
+      const tileConns = tileDefConnections(def);
+      const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
+      const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
       ctx.save();
       ctx.strokeStyle = pipeColor;
       ctx.lineWidth = LINE_WIDTH;
-      for (const dir of t.connections) {
+      for (const dir of tileConns) {
         ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
         ctx.beginPath();
         ctx.moveTo(cx, cy);
@@ -561,7 +541,7 @@ export function renderChapterMapCanvas(
       ctx.fill();
       ctx.restore();
 
-      ctx.strokeStyle = '#2a3a5e';
+      ctx.strokeStyle = CHAPTER_MAP_BORDER_COLOR;
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
@@ -656,7 +636,7 @@ function _chapterFlowForwardDirs(
 ): Direction[] {
   const def = grid[row]?.[col];
   if (!def) return [];
-  const conns = _getTileConnections(def);
+  const conns = tileDefConnections(def);
   const dirs: Direction[] = [];
   for (const dir of conns) {
     if (fromDir !== null && dir === fromDir) continue; // no back-tracking
@@ -668,7 +648,7 @@ function _chapterFlowForwardDirs(
     if (!filledKeys.has(key)) continue;
     const nDef = grid[nr]?.[nc];
     if (!nDef) continue;
-    const nConns = _getTileConnections(nDef);
+    const nConns = tileDefConnections(nDef);
     const entryDir = oppositeDirection(dir); // direction the neighbor is entered from
     if (!nConns.has(entryDir)) continue; // neighbor must have a reciprocal connection
     dirs.push(dir);
