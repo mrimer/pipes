@@ -24,6 +24,50 @@ export const CHAPTER_MAP_OPPOSITE: Record<Direction, Direction> = {
 };
 
 /**
+ * Find the first tile with the given shape in the grid.
+ * Returns its `{ row, col }` position, or `null` if no such tile exists.
+ *
+ * @param grid  Chapter map grid (row-major; null = empty cell).
+ * @param rows  Number of grid rows.
+ * @param cols  Number of grid columns.
+ * @param shape The `PipeShape` to search for.
+ */
+export function findChapterMapTile(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  shape: PipeShape,
+): { row: number; col: number } | null {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r]?.[c]?.shape === shape) return { row: r, col: c };
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the active connections for a tile in the chapter map editor.
+ *
+ * Source, Sink, and Chamber tiles (which gate water flow based on gameplay
+ * state in the play screen) are all treated as fully open here – water flows
+ * through them unconditionally.  This is the correct semantics for editor
+ * BFS and validation, where all chambers should be reachable regardless of
+ * whether their associated levels are completed.
+ */
+export function editorTileConns(def: TileDef): Set<Direction> {
+  if (def.connections) return new Set(def.connections);
+  if (
+    def.shape === PipeShape.Source ||
+    def.shape === PipeShape.Sink ||
+    def.shape === PipeShape.Chamber
+  ) {
+    return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+  }
+  return tileDefConnections(def);
+}
+
+/**
  * Return the structural connections for a tile definition without requiring a
  * live Board or Tile runtime object.
  *

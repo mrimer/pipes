@@ -13,7 +13,7 @@ import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
-import { computeChapterMapReachable, tileDefConnections } from './chapterMapUtils';
+import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
@@ -501,13 +501,7 @@ export class ChapterMapScreen {
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
 
-    // Find source
-    let sourcePos: { row: number; col: number } | null = null;
-    for (let r = 0; r < rows && !sourcePos; r++) {
-      for (let c = 0; c < cols && !sourcePos; c++) {
-        if (grid[r]?.[c]?.shape === PipeShape.Source) sourcePos = { row: r, col: c };
-      }
-    }
+    const sourcePos = findChapterMapTile(grid, rows, cols, PipeShape.Source);
     if (!sourcePos) return new Set();
 
     const getConns = (def: TileDef, isEntry: boolean): Set<Direction> => {

@@ -261,13 +261,20 @@ export function drawLevelChamberTile(
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
-/** Draw Source tile like in-game: colored circle + radiating arms to connected edges. */
-function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, capacity?: number, buttEndDirs?: Set<Direction>): void {
+/** Draw a Source or Sink tile: colored circle + radiating arms to connected edges. */
+function _drawChapterMapEndpoint(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  color: string,
+  connections: Set<Direction>,
+  capacity?: number,
+  buttEndDirs?: Set<Direction>,
+): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
   const half = CELL / 2;
-  const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
 
   ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
@@ -290,7 +297,6 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.beginPath();
   ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
   ctx.fill();
-  // Show capacity number on source, like in the normal level screen
   if (capacity !== undefined) {
     ctx.fillStyle = '#fff';
     ctx.font = `bold ${_s(14)}px Arial`;
@@ -301,36 +307,14 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.restore();
 }
 
+/** Draw Source tile like in-game: colored circle + radiating arms to connected edges. */
+function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, capacity?: number, buttEndDirs?: Set<Direction>): void {
+  _drawChapterMapEndpoint(ctx, x, y, isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR, connections, capacity, buttEndDirs);
+}
+
 /** Draw Sink tile like in-game: colored circle + radiating arms. */
 function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, buttEndDirs?: Set<Direction>): void {
-  const CELL = TILE_SIZE;
-  const cx = x + CELL / 2;
-  const cy = y + CELL / 2;
-  const half = CELL / 2;
-  const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
-
-  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
-  ctx.fillRect(x, y, CELL, CELL);
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH;
-  for (const dir of connections) {
-    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    if (dir === Direction.North) ctx.lineTo(0, -half);
-    else if (dir === Direction.South) ctx.lineTo(0, half);
-    else if (dir === Direction.East) ctx.lineTo(half, 0);
-    else ctx.lineTo(-half, 0);
-    ctx.stroke();
-  }
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  _drawChapterMapEndpoint(ctx, x, y, isFilled ? SINK_WATER_COLOR : SINK_COLOR, connections, undefined, buttEndDirs);
 }
 
 /** Draw Granite tile like in-game. */
@@ -462,9 +446,7 @@ export function renderChapterMapCanvas(
         const isCompleted = levelId !== undefined && progress.completedLevels.has(levelId);
         const stars = levelId !== undefined ? (progress.levelStars[levelId] ?? 0) : 0;
         const totalStars = levelDef?.starCount ?? 0;
-        const connections = def.connections ? new Set(def.connections) : new Set([
-          Direction.North, Direction.East, Direction.South, Direction.West,
-        ]);
+        const connections = tileDefConnections(def);
         drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled);
 
         // Dim inaccessible level chambers
@@ -475,11 +457,11 @@ export function renderChapterMapCanvas(
           ctx.restore();
         }
       } else if (def.shape === PipeShape.Source) {
-        const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+        const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         _drawChapterMapSource(ctx, x, y, isFilled, connections, def.capacity, buttEndDirs);
       } else if (def.shape === PipeShape.Sink) {
-        const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+        const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         _drawChapterMapSink(ctx, x, y, isFilled, connections, buttEndDirs);
       } else if (def.shape === PipeShape.Granite) {
