@@ -9,6 +9,7 @@ import { Tile } from '../tile';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { computeChapterMapReachable } from '../chapterMapUtils';
+import { generateChapterMapDecorations } from '../visuals/chapterMap';
 import {
   EditorPalette,
   TileParams,
@@ -35,7 +36,6 @@ import {
 
 export interface ChapterMapEditorCallbacks {
   buildBtn(label: string, bg: string, color: string, onClick: () => void): HTMLButtonElement;
-  buildConnectionsWidget(panel: HTMLElement): HTMLElement;
   getActiveCampaign(): CampaignDef | null;
   getActiveChapterIdx(): number;
   touchCampaign(campaign: CampaignDef): void;
@@ -71,6 +71,8 @@ export class ChapterMapEditorSection {
   private _chapterWindowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   private _chapterEditorMainLayout: HTMLDivElement = document.createElement('div');
   private _chapterFocusedTilePos: { row: number; col: number } | null = null;
+  /** Ambient decorations for empty cells in the chapter editor canvas. */
+  private _chapterDecorations: ReadonlyMap<string, import('../types').AmbientDecoration> = new Map();
 
   /** Default chapter grid dimensions. */
   private static readonly CHAPTER_DEFAULT_ROWS = 3;
@@ -126,6 +128,8 @@ export class ChapterMapEditorSection {
       this._chapterEditCols = cols;
       this._chapterEditGrid = grid;
     }
+    // Generate ambient decorations for the grid
+    this._chapterDecorations = generateChapterMapDecorations(this._chapterEditRows, this._chapterEditCols);
     // Reset chapter editor state
     this._chapterHistory = [];
     this._chapterHistoryIdx = -1;
@@ -352,7 +356,7 @@ export class ChapterMapEditorSection {
     if (existingParams) existingParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
   }
 
-  private _buildChapterTileParamsPanel(_chapter: ChapterDef, _campaign: CampaignDef): HTMLElement {
+  private _buildChapterTileParamsPanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
     const panel = document.createElement('div');
     panel.id = 'chapter-tile-params-panel';
     panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:4px;';
@@ -363,7 +367,7 @@ export class ChapterMapEditorSection {
     panel.appendChild(title);
 
     if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
-      panel.appendChild(this._callbacks.buildConnectionsWidget(panel));
+      panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';
@@ -372,6 +376,60 @@ export class ChapterMapEditorSection {
     }
 
     return panel;
+  }
+
+  /**
+   * Build a compass-layout connections widget for the chapter map editor.
+   * Reads from and writes to `_chapterParams.connections`.
+   */
+  private _buildChapterConnectionsWidget(
+    replaceTarget: HTMLElement,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): HTMLElement {
+    const connWrap = document.createElement('div');
+    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    const connLbl = document.createElement('div');
+    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
+    connLbl.textContent = 'Connections';
+    connWrap.appendChild(connLbl);
+
+    const connGrid = document.createElement('div');
+    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
+
+    const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
+      const active = this._chapterParams.connections[dir];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = dir;
+      b.title = `Toggle ${dir} connection`;
+      b.style.cssText =
+        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
+        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
+        'color:' + (active ? '#7ed321' : '#555') + ';' +
+        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
+        'border-radius:4px;cursor:pointer;padding:0;';
+      b.addEventListener('click', () => {
+        this._chapterParams.connections[dir] = !this._chapterParams.connections[dir];
+        const newPanel = this._buildChapterTileParamsPanel(chapter, campaign);
+        replaceTarget.replaceWith(newPanel);
+        this._renderChapterCanvas();
+      });
+      return b;
+    };
+
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn('N'));
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn('W'));
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn('E'));
+    connGrid.appendChild(document.createElement('span'));
+    connGrid.appendChild(makeConnBtn('S'));
+    connGrid.appendChild(document.createElement('span'));
+
+    connWrap.appendChild(connGrid);
+    return connWrap;
   }
 
   /** Build the grid size panel for the chapter map editor. */
@@ -472,6 +530,16 @@ export class ChapterMapEditorSection {
         }
         this._renderChapterCanvas();
       });
+      // Mouse wheel: rotate the hovered rotatable tile
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const pos = this._chapterCanvasPos(e);
+        if (!pos) return;
+        const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
+        if (tile && PIPE_SHAPES.has(tile.shape)) {
+          this._rotateChapterTileAt(pos, e.deltaY > 0, chapter, campaign);
+        }
+      }, { passive: false });
       if (this._chapterWindowMouseUpHandler) {
         window.removeEventListener('mouseup', this._chapterWindowMouseUpHandler);
       }
@@ -551,6 +619,9 @@ export class ChapterMapEditorSection {
     const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
     const levelDefs: LevelDef[] = chapter?.levels ?? [];
 
+    // Compute which cells are water-reachable from the source for visual feedback
+    const filledKeys = this._computeChapterEditorFilledCells();
+
     renderEditorCanvas(
       ctx,
       this._chapterEditGrid,
@@ -560,6 +631,9 @@ export class ChapterMapEditorSection {
       drag,
       null,
       levelDefs,
+      undefined,
+      filledKeys,
+      this._chapterDecorations,
     );
 
     if (this._chapterFocusedTilePos && this._chapterCtx) {
@@ -608,6 +682,86 @@ export class ChapterMapEditorSection {
         if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
         if (this._chapterEditGrid[r]?.[c]?.shape === PipeShape.Source) return true;
       }
+    }
+    return false;
+  }
+
+  /**
+   * Compute which cells are water-reachable from the source in the editor grid.
+   * For rendering purposes, all chambers and source/sink are treated as open
+   * (water flows through unconditionally, simulating an ideal path).
+   */
+  private _computeChapterEditorFilledCells(): Set<string> {
+    let sourcePos: { row: number; col: number } | null = null;
+    for (let r = 0; r < this._chapterEditRows && !sourcePos; r++) {
+      for (let c = 0; c < this._chapterEditCols && !sourcePos; c++) {
+        if (this._chapterEditGrid[r]?.[c]?.shape === PipeShape.Source) sourcePos = { row: r, col: c };
+      }
+    }
+    if (!sourcePos) return new Set();
+
+    const getConns = (def: TileDef, _isEntry: boolean): Set<Direction> => {
+      if (def.connections) return new Set(def.connections);
+      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
+        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+      }
+      const t = new Tile(def.shape, (def.rotation ?? 0) as Rotation, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
+      return t.connections;
+    };
+
+    return computeChapterMapReachable(
+      this._chapterEditGrid,
+      this._chapterEditRows,
+      this._chapterEditCols,
+      sourcePos,
+      getConns,
+    );
+  }
+
+  /**
+   * Rotate a placed pipe tile at the given position clockwise or counterclockwise.
+   * No-op if the tile at pos is not a rotatable pipe shape.
+   */
+  private _rotateChapterTileAt(
+    pos: { row: number; col: number },
+    clockwise: boolean,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): void {
+    const tile = this._chapterEditGrid[pos.row]?.[pos.col];
+    if (!tile || !PIPE_SHAPES.has(tile.shape)) return;
+    const cur = (tile.rotation ?? 0) as Rotation;
+    tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
+    this._recordChapterSnapshot(chapter);
+    this._saveChapterGridState(chapter, campaign);
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Rotate the current chapter palette's rotation param clockwise or counterclockwise.
+   * Only applies when the palette is a pipe shape.
+   */
+  private _rotateChapterPalette(clockwise: boolean): void {
+    if (!PIPE_SHAPES.has(this._chapterPalette as PipeShape)) return;
+    const cur = this._chapterParams.rotation ?? 0;
+    this._chapterParams.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Handle a keydown event for the chapter map editor.
+   * Called from the campaign editor's global keyboard handler when on the Chapter screen.
+   * Returns true if the key was handled.
+   */
+  handleChapterEditorKeyDown(e: KeyboardEvent): boolean {
+    const tag = (e.target as HTMLElement | null)?.tagName ?? '';
+    const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    if (e.ctrlKey || e.altKey || isInputFocused) return false;
+    const key = e.key.toLowerCase();
+    if (key === 'q' || key === 'w') {
+      e.preventDefault();
+      this._rotateChapterPalette(key === 'w');
+      return true;
     }
     return false;
   }
@@ -715,15 +869,10 @@ export class ChapterMapEditorSection {
       this._recordChapterSnapshot(chapter);
       this._saveChapterGridState(chapter, campaign);
     } else {
-      // Click on tile: for pipe shapes of same type, rotate; otherwise select
-      if (
-        this._chapterPalette !== 'erase' &&
-        PIPE_SHAPES.has(this._chapterPalette as PipeShape) &&
-        PIPE_SHAPES.has(tile.shape)
-      ) {
-        this._chapterEditGrid[startPos.row][startPos.col] = this._buildChapterTileDef();
-        this._recordChapterSnapshot(chapter);
-        this._saveChapterGridState(chapter, campaign);
+      // Click on a placed pipe tile: rotate it (shift = counter-clockwise)
+      if (PIPE_SHAPES.has(tile.shape)) {
+        this._rotateChapterTileAt(startPos, !e.shiftKey, chapter, campaign);
+        return; // _rotateChapterTileAt already calls _renderChapterCanvas
       }
     }
     this._renderChapterCanvas();
@@ -848,6 +997,8 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     this._chapterEditGrid = newGrid;
+    // Regenerate decorations for the new grid dimensions
+    this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
     this._recordChapterSnapshot(chapter);
     if (this._chapterCanvas) {
       setTileSize(computeTileSize(newRows, newCols));

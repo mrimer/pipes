@@ -817,6 +817,7 @@ export class Game {
         onLevelSelected: (levelDef) => {
           this._winFromChapterMap = true;
           this.winMenuBtnEl.textContent = 'Chapter Map';
+          this.exitBtnEl.textContent = '← Chapter Map';
           if (levelDef.challenge) {
             this._pendingLevelId = levelDef.id;
             this.startLevel(levelDef.id);

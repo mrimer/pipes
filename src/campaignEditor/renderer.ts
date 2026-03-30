@@ -4,8 +4,8 @@
  * write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, Rotation } from '../types';
-import { TILE_SIZE, drawSpinArrow, scalePx as _s } from '../renderer';
+import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration } from '../types';
+import { TILE_SIZE, drawSpinArrow, scalePx as _s, drawAmbientDecoration } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
@@ -52,6 +52,8 @@ export interface DragState {
  * @param linkedTilePos Optional position of the tile currently linked for live param editing.
  * @param levelDefs     Optional list of level definitions for rendering level-chamber tiles.
  * @param levelProgress Optional progress data for level-chamber display (completed, stars).
+ * @param filledKeys    Optional set of "row,col" keys water-filled from source (for chapter map editor).
+ * @param decorations   Optional ambient decorations for empty cells (for chapter map editor).
  */
 export function renderEditorCanvas(
   ctx: CanvasRenderingContext2D,
@@ -63,6 +65,8 @@ export function renderEditorCanvas(
   linkedTilePos?: { row: number; col: number } | null,
   levelDefs?: readonly LevelDef[],
   levelProgress?: LevelProgressMap,
+  filledKeys?: ReadonlySet<string>,
+  decorations?: ReadonlyMap<string, AmbientDecoration>,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -85,11 +89,17 @@ export function renderEditorCanvas(
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
       ctx.setLineDash([]);
-      // Subtle dot
-      ctx.fillStyle = '#2a3a5e';
-      ctx.beginPath();
-      ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
-      ctx.fill();
+      // Ambient decoration (chapter map editor only)
+      const dec = decorations?.get(`${r},${c}`);
+      if (dec) {
+        drawAmbientDecoration(ctx, dec);
+      } else {
+        // Subtle dot for level editor
+        ctx.fillStyle = '#2a3a5e';
+        ctx.beginPath();
+        ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
@@ -101,7 +111,8 @@ export function renderEditorCanvas(
       if (def === null || PIPE_SHAPES.has(def.shape)) continue;
       const x = c * CELL;
       const y = r * CELL;
-      _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress);
+      const isFilled = filledKeys?.has(`${r},${c}`) ?? false;
+      _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled);
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
@@ -228,6 +239,7 @@ function _drawEditorTileWithLevel(
   def: TileDef,
   levelDefs?: readonly LevelDef[],
   levelProgress?: LevelProgressMap,
+  isFilled = false,
 ): void {
   if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
     const levelIdx = def.levelIdx ?? 0;
@@ -239,7 +251,7 @@ function _drawEditorTileWithLevel(
     const connections = def.connections ? new Set(def.connections) : new Set([
       Direction.North, Direction.East, Direction.South, Direction.West,
     ]);
-    drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, starsCollected, totalStars);
+    drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, starsCollected, totalStars, isFilled);
     return;
   }
   drawEditorTile(ctx, x, y, def);

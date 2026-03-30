@@ -4,16 +4,48 @@
  * explicit data parameters and write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, Rotation } from '../types';
-import { TILE_SIZE, scalePx as _s } from '../renderer';
+import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration, AmbientDecorationType } from '../types';
+import { TILE_SIZE, scalePx as _s, drawAmbientDecoration } from '../renderer';
 import { PIPE_SHAPES } from '../board';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
+  CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
 } from '../colors';
 import { renderMinimap } from '../minimap';
 import { Tile } from '../tile';
+
+// ─── Ambient decorations ───────────────────────────────────────────────────────
+
+/**
+ * Generate a set of ambient background decorations for a chapter map grid.
+ * These are rendered on empty (null) cells to give the map a natural look.
+ * Returned as a Map keyed by "row,col" for O(1) lookup.
+ */
+export function generateChapterMapDecorations(
+  rows: number,
+  cols: number,
+): ReadonlyMap<string, AmbientDecoration> {
+  const DECORATION_DENSITY = 0.30;
+  const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass'];
+  const map = new Map<string, AmbientDecoration>();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (Math.random() >= DECORATION_DENSITY) continue;
+      map.set(`${r},${c}`, {
+        row: r,
+        col: c,
+        type: TYPES[Math.floor(Math.random() * TYPES.length)],
+        offsetX: 0.15 + Math.random() * 0.70,
+        offsetY: 0.15 + Math.random() * 0.70,
+        rotation: Math.random() * 360,
+        variant: Math.floor(Math.random() * 3),
+      });
+    }
+  }
+  return map;
+}
 
 // ─── Shared types ──────────────────────────────────────────────────────────────
 
@@ -50,27 +82,56 @@ export function drawLevelChamberTile(
   isCompleted = false,
   starsCollected = 0,
   totalStars = 0,
+  isFilled = false,
 ): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const half = CELL / 2;
 
-  // Compute background color
   const isChallenge = levelDef?.challenge ?? false;
   const allStars = totalStars > 0 && starsCollected >= totalStars;
-  let bgColor: string;
-  if (allStars) bgColor = '#7a6000';         // gold
-  else if (isCompleted) bgColor = '#2a4a3a'; // white-ish green tint
-  else if (isChallenge) bgColor = '#5a1010'; // red tint
-  else bgColor = '#1e2a4e';                  // default dark blue
 
-  ctx.fillStyle = bgColor;
+  // Draw chamber-style box (like in-game item chamber)
+  const bw = half * 0.7 + 2;
+  const bh = half * 0.7 + 2;
+  const br = _s(3);
+
+  // Background fill
+  ctx.fillStyle = '#1a2840';
   ctx.fillRect(x, y, CELL, CELL);
 
-  // Border: colored based on state
-  ctx.strokeStyle = allStars ? '#f0c040' : isCompleted ? '#7ed321' : isChallenge ? '#e74c3c' : '#4a90d9';
-  ctx.lineWidth = allStars || isCompleted || isChallenge ? _s(2) : 1;
-  ctx.setLineDash([]);
-  ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Inner chamber box
+  ctx.beginPath();
+  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
+  ctx.fillStyle = isFilled ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
+  ctx.fill();
+  const chamberColor = isFilled ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
+  ctx.strokeStyle = chamberColor;
+  ctx.lineWidth = _s(3);
+  ctx.stroke();
+
+  // Connection stubs from box edge to tile edge (butt cap, like in-game chamber)
+  ctx.strokeStyle = chamberColor;
+  ctx.lineWidth = _s(6);
+  ctx.lineCap = 'butt';
+  if (connections.has(Direction.North)) {
+    ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
+  }
+  if (connections.has(Direction.South)) {
+    ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
+  }
+  if (connections.has(Direction.West)) {
+    ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
+  }
+  if (connections.has(Direction.East)) {
+    ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+  }
+
+  ctx.restore();
 
   // Label row height (top section for L-N text)
   const labelH = _s(16);
@@ -82,7 +143,7 @@ export function drawLevelChamberTile(
   ctx.font = `bold ${_s(10)}px Arial`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = allStars ? '#f0c040' : isCompleted ? '#7ed321' : isChallenge ? '#e74c3c' : '#ddd';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = 3;
   ctx.fillText(`L-${levelNum}`, x + _s(3), y + _s(2));
@@ -100,23 +161,6 @@ export function drawLevelChamberTile(
     ctx.fillText('💀', x + CELL - _s(2), y + _s(2));
     ctx.restore();
   }
-
-  // Connection lines on tile edges (drawn before minimap so minimap covers the center)
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = _s(3);
-  ctx.lineCap = 'round';
-  const cy2 = y + CELL / 2;
-  for (const dir of connections) {
-    ctx.beginPath();
-    ctx.moveTo(cx, cy2);
-    if (dir === Direction.North) ctx.lineTo(cx, y);
-    else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
-    else if (dir === Direction.East) ctx.lineTo(x + CELL, cy2);
-    else if (dir === Direction.West) ctx.lineTo(x, cy2);
-    ctx.stroke();
-  }
-  ctx.restore();
 
   // Minimap (centered in the area below the label)
   if (levelDef) {
@@ -311,6 +355,7 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
  * @param progress             Completed levels and star data.
  * @param hoverPos             Currently hovered grid cell (for highlighting).
  * @param accessibleLevelIdxs  Set of level indices that are accessible (water reaches them).
+ * @param decorations          Optional ambient decorations for empty cells.
  */
 export function renderChapterMapCanvas(
   ctx: CanvasRenderingContext2D,
@@ -322,6 +367,7 @@ export function renderChapterMapCanvas(
   progress: LevelProgressMap,
   hoverPos?: { row: number; col: number } | null,
   accessibleLevelIdxs?: ReadonlySet<number>,
+  decorations?: ReadonlyMap<string, AmbientDecoration>,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -340,6 +386,9 @@ export function renderChapterMapCanvas(
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
       ctx.setLineDash([]);
+      // Ambient decoration on empty cells
+      const dec = decorations?.get(`${r},${c}`);
+      if (dec) drawAmbientDecoration(ctx, dec);
     }
   }
 
@@ -362,7 +411,7 @@ export function renderChapterMapCanvas(
         const connections = def.connections ? new Set(def.connections) : new Set([
           Direction.North, Direction.East, Direction.South, Direction.West,
         ]);
-        drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars);
+        drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled);
 
         // Dim inaccessible level chambers
         if (!isFilled) {

@@ -8,11 +8,11 @@
  * interface.
  */
 
-import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, Rotation } from './types';
+import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, Rotation, AmbientDecoration } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { Tile } from './tile';
-import { renderChapterMapCanvas } from './visuals/chapterMap';
+import { renderChapterMapCanvas, generateChapterMapDecorations } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable } from './chapterMapUtils';
 
@@ -66,6 +66,8 @@ export class ChapterMapScreen {
   private _hover: { row: number; col: number } | null = null;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
+  /** Ambient decorations for empty cells, keyed by "row,col". */
+  private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -89,6 +91,12 @@ export class ChapterMapScreen {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter?.grid) return;
 
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    // Regenerate decorations when showing a new chapter
+    if (this._chapter !== chapter) {
+      this._decorations = generateChapterMapDecorations(rows, cols);
+    }
     this._chapter = chapter;
     this._chapterIdx = chapterIdx;
     this._hover = null;
@@ -303,6 +311,7 @@ export class ChapterMapScreen {
       },
       this._hover,
       accessibleLevelIdxs,
+      this._decorations,
     );
 
     // Update stats
