@@ -345,6 +345,46 @@ export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<str
 }
 
 /**
+ * Draw a single flow drop at its current interpolated canvas position.
+ * Shared by both {@link renderFlowDrops} (level win animation) and the
+ * chapter-map flow animation so the visual appearance is identical.
+ *
+ * @param ctx   2D rendering context.
+ * @param drop  The drop to draw (position, direction, progress, size).
+ * @param color CSS color string for the drop ellipse fill.
+ */
+export function drawFlowDrop(
+  ctx: CanvasRenderingContext2D,
+  drop: FlowDrop,
+  color: string,
+): void {
+  const curCx = drop.col * TILE_SIZE + TILE_SIZE / 2;
+  const curCy = drop.row * TILE_SIZE + TILE_SIZE / 2;
+  const delta  = NEIGHBOUR_DELTA[drop.direction];
+  const nxtCx  = curCx + delta.col * TILE_SIZE;
+  const nxtCy  = curCy + delta.row * TILE_SIZE;
+  const px     = curCx + (nxtCx - curCx) * drop.progress;
+  const py     = curCy + (nxtCy - curCy) * drop.progress;
+
+  // Angle of travel (used to orient the teardrop ellipse).
+  const angle = Math.atan2(nxtCy - curCy, nxtCx - curCx);
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.translate(px, py);
+  // Rotate so the long axis of the ellipse points in the direction of travel.
+  ctx.rotate(angle + Math.PI / 2);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, drop.size * 0.55, drop.size, 0, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
  * Advance and render all win-flow drops, removing those that reach the sink or
  * a dead end.
  *
@@ -389,31 +429,7 @@ export function renderFlowDrops(
       drop.direction = nextDirs[Math.floor(Math.random() * nextDirs.length)];
     }
 
-    // ── Canvas-position interpolation ───────────────────────────────────────
-    const curCx = drop.col * TILE_SIZE + TILE_SIZE / 2;
-    const curCy = drop.row * TILE_SIZE + TILE_SIZE / 2;
-    const delta  = NEIGHBOUR_DELTA[drop.direction];
-    const nxtCx  = curCx + delta.col * TILE_SIZE;
-    const nxtCy  = curCy + delta.row * TILE_SIZE;
-    const px     = curCx + (nxtCx - curCx) * drop.progress;
-    const py     = curCy + (nxtCy - curCy) * drop.progress;
-
-    // Angle of travel (used to orient the teardrop ellipse).
-    const angle = Math.atan2(nxtCy - curCy, nxtCx - curCx);
-
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-    ctx.translate(px, py);
-    // Rotate so the long axis of the ellipse points in the direction of travel.
-    ctx.rotate(angle + Math.PI / 2);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, drop.size * 0.55, drop.size, 0, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = _s(2);
-    ctx.stroke();
-    ctx.restore();
+    drawFlowDrop(ctx, drop, color);
 
     i++;
   }

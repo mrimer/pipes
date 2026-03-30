@@ -16,6 +16,7 @@ import {
 } from '../colors';
 import { renderMinimap } from '../minimap';
 import { Tile } from '../tile';
+import { FlowDrop, drawFlowDrop } from './waterParticles';
 
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
 
@@ -634,29 +635,10 @@ export function findChapterMapAnimPositions(
 
 /**
  * A water drop flowing along the filled chapter map pipe connections from source
- * toward the sink.  Rendered on top of the chapter map canvas as part of the
- * win-state animation that plays when all non-challenge levels are completed and
- * the pipe network reaches the sink.
+ * toward the sink.  Same shape as {@link FlowDrop} – re-exported under this
+ * name for callers that deal only with the chapter map.
  */
-export interface ChapterMapFlowDrop {
-  /** Grid row of the tile the drop is currently leaving. */
-  row: number;
-  /** Grid column of the tile the drop is currently leaving. */
-  col: number;
-  /**
-   * Fractional progress of travel from the current tile center to the next
-   * (0 = at the current tile center, 1 = arrived at the neighbor center).
-   */
-  progress: number;
-  /** Movement speed in tile-lengths per animation frame (~60 fps). */
-  speed: number;
-  /** Direction the drop is currently traveling toward. */
-  direction: Direction;
-  /** Direction this tile was entered from (to prevent back-tracking). */
-  fromDir: Direction | null;
-  /** Half-length of the ellipse along the travel axis, in pixels. */
-  size: number;
-}
+export type ChapterMapFlowDrop = FlowDrop;
 
 /**
  * Compute the valid outgoing directions from a chapter map cell toward filled
@@ -752,7 +734,6 @@ export function renderChapterMapFlowDrops(
   filledKeys: ReadonlySet<string>,
   color: string,
 ): void {
-  const CELL = TILE_SIZE;
   let i = 0;
   while (i < drops.length) {
     const drop = drops[i];
@@ -785,31 +766,8 @@ export function renderChapterMapFlowDrops(
       drop.direction = nextDirs[Math.floor(Math.random() * nextDirs.length)];
     }
 
-    // Render the drop at its current interpolated position
-    const cx = drop.col * CELL + CELL / 2;
-    const cy = drop.row * CELL + CELL / 2;
-    let dx = 0, dy = 0;
-    if      (drop.direction === Direction.North) dy = -1;
-    else if (drop.direction === Direction.South) dy =  1;
-    else if (drop.direction === Direction.East)  dx =  1;
-    else if (drop.direction === Direction.West)  dx = -1;
-
-    const px = cx + dx * CELL * drop.progress;
-    const py = cy + dy * CELL * drop.progress;
-    const angle = Math.atan2(dy, dx);
-
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(angle + Math.PI / 2);
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, drop.size * 0.55, drop.size, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = _s(2);
-    ctx.stroke();
-    ctx.restore();
+    // Render the drop at its current interpolated position using the shared helper
+    drawFlowDrop(ctx, drop, color);
 
     i++;
   }
