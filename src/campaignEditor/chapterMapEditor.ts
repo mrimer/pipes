@@ -70,6 +70,7 @@ export class ChapterMapEditorSection {
   private _chapterSelectedLevelIdx: number | null = null;
   private _chapterWindowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   private _chapterEditorMainLayout: HTMLDivElement = document.createElement('div');
+  private _chapterFocusedTilePos: { row: number; col: number } | null = null;
 
   /** Default chapter grid dimensions. */
   private static readonly CHAPTER_DEFAULT_ROWS = 3;
@@ -183,6 +184,7 @@ export class ChapterMapEditorSection {
     const leftCol = document.createElement('div');
     leftCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:140px;';
     leftCol.appendChild(this._buildChapterPalettePanel(chapter, campaign));
+    leftCol.appendChild(this._buildChapterTileParamsPanel(chapter, campaign));
     layout.appendChild(leftCol);
 
     const midCol = document.createElement('div');
@@ -233,6 +235,8 @@ export class ChapterMapEditorSection {
     const CHAPTER_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
       { palette: PipeShape.Source,   label: '💧 Source' },
       { palette: PipeShape.Sink,     label: '🏁 Sink' },
+      { palette: PipeShape.Tree,     label: '🌳 Tree' },
+      { palette: PipeShape.Granite,  label: '🪨 Granite' },
       { palette: PipeShape.Straight, label: '━ Straight' },
       { palette: PipeShape.Elbow,    label: '┗ Elbow' },
       { palette: PipeShape.Tee,      label: '┣ Tee' },
@@ -252,19 +256,17 @@ export class ChapterMapEditorSection {
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
       btn.addEventListener('click', () => {
         this._chapterPalette = item.palette;
-        this._chapterSelectedLevelIdx = null; // Deselect level when palette item selected
+        this._chapterSelectedLevelIdx = null;
         panel.replaceWith(this._buildChapterPalettePanel(chapter, campaign));
+        const existingParams = document.getElementById('chapter-tile-params-panel');
+        if (existingParams) existingParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
         this._rebuildChapterLevelInventory(chapter, campaign);
         this._renderChapterCanvas();
       });
       panel.appendChild(btn);
     }
 
-    // Connections widget for Source/Sink
-    if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
-      panel.appendChild(this._callbacks.buildConnectionsWidget(panel));
-    }
-
+    // Connections widget for Source/Sink is now in the separate tile params panel
     return panel;
   }
 
@@ -346,6 +348,30 @@ export class ChapterMapEditorSection {
   private _rebuildChapterPalette(chapter: ChapterDef, campaign: CampaignDef): void {
     const existing = document.getElementById('chapter-palette-panel');
     if (existing) existing.replaceWith(this._buildChapterPalettePanel(chapter, campaign));
+    const existingParams = document.getElementById('chapter-tile-params-panel');
+    if (existingParams) existingParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+  }
+
+  private _buildChapterTileParamsPanel(_chapter: ChapterDef, _campaign: CampaignDef): HTMLElement {
+    const panel = document.createElement('div');
+    panel.id = 'chapter-tile-params-panel';
+    panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:4px;';
+
+    const title = document.createElement('div');
+    title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
+    title.textContent = 'TILE PARAMS';
+    panel.appendChild(title);
+
+    if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
+      panel.appendChild(this._callbacks.buildConnectionsWidget(panel));
+    } else {
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:0.78rem;color:#555;';
+      note.textContent = 'No params for this tile.';
+      panel.appendChild(note);
+    }
+
+    return panel;
   }
 
   /** Build the grid size panel for the chapter map editor. */
@@ -535,6 +561,19 @@ export class ChapterMapEditorSection {
       null,
       levelDefs,
     );
+
+    if (this._chapterFocusedTilePos && this._chapterCtx) {
+      const { row, col } = this._chapterFocusedTilePos;
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      this._chapterCtx.save();
+      this._chapterCtx.strokeStyle = '#f0c040';
+      this._chapterCtx.lineWidth = 3;
+      this._chapterCtx.setLineDash([5, 3]);
+      this._chapterCtx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      this._chapterCtx.setLineDash([]);
+      this._chapterCtx.restore();
+    }
   }
 
   /** Build a TileDef from the current chapter palette selection and params. */
@@ -553,6 +592,10 @@ export class ChapterMapEditorSection {
       if (shape === PipeShape.Source) def.capacity = p.capacity;
       if (connDirs.length < 4) def.connections = connDirs;
       return def;
+    }
+    // Tree, Granite, and other shapes with no special params
+    if (shape === PipeShape.Tree || shape === PipeShape.Granite) {
+      return { shape };
     }
     // Pipe shapes
     return { shape, rotation: p.rotation };
@@ -587,6 +630,8 @@ export class ChapterMapEditorSection {
     if (e.button !== 0) return;
     const pos = this._chapterCanvasPos(e);
     if (!pos) return;
+
+    this._chapterFocusedTilePos = pos;
 
     const existingTile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
 
@@ -664,6 +709,7 @@ export class ChapterMapEditorSection {
     this._chapterDragState = null;
 
     if (moved) {
+      this._chapterFocusedTilePos = null;
       this._chapterEditGrid[startPos.row][startPos.col] = null;
       this._chapterEditGrid[currentPos.row][currentPos.col] = tile;
       this._recordChapterSnapshot(chapter);

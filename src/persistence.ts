@@ -307,3 +307,34 @@ export function clearLevelWaterRecord(levelId: number, campaignId?: string): voi
     // ignore storage errors
   }
 }
+
+// ─── Chapter completion tracking ─────────────────────────────────────────────
+
+function campaignChaptersKey(campaignId: string): string {
+  return `pipes_campaign_chapters_${campaignId}`;
+}
+
+/** Load the set of completed chapter IDs (using chapter.id) for a campaign. */
+export function loadCompletedChapters(campaignId: string): Set<number> {
+  try {
+    const raw = localStorage.getItem(campaignChaptersKey(campaignId));
+    if (raw) return new Set(JSON.parse(raw) as number[]);
+  } catch { /* ignore */ }
+  return new Set<number>();
+}
+
+/** Mark a chapter as completed in a campaign and persist. */
+export function markChapterCompleted(campaignId: string, chapterId: number, completedChapters: Set<number>): void {
+  completedChapters.add(chapterId);
+  try {
+    localStorage.setItem(campaignChaptersKey(campaignId), JSON.stringify([...completedChapters]));
+  } catch { /* ignore */ }
+}
+
+/** Clear all chapter completion data for a campaign. */
+export function clearCompletedChapters(campaignId: string, completedChapters: Set<number>): void {
+  completedChapters.clear();
+  try {
+    localStorage.removeItem(campaignChaptersKey(campaignId));
+  } catch { /* ignore */ }
+}
