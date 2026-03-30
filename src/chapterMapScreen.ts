@@ -12,9 +12,12 @@ import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, Rotat
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { Tile } from './tile';
-import { renderChapterMapCanvas, generateChapterMapDecorations } from './visuals/chapterMap';
+import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable } from './chapterMapUtils';
+import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
+import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray } from './visuals/waterParticles';
+import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_WATER_COLOR } from './colors';
 
 // ─── Callbacks ────────────────────────────────────────────────────────────────
 
@@ -69,6 +72,15 @@ export class ChapterMapScreen {
   /** Ambient decorations for empty cells, keyed by "row,col". */
   private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
 
+  // ─── Animation state ──────────────────────────────────────────────────────
+  private _animFrameId: number | null = null;
+  private _vortexParticles: VortexParticle[] = [];
+  private _lastVortexSpawn = 0;
+  private _sourceSprayDrops: SourceSprayDrop[] = [];
+  private _lastSpraySpawn = 0;
+  private static readonly VORTEX_SPAWN_INTERVAL_MS = 80;
+  private static readonly SPRAY_SPAWN_INTERVAL_MS  = 150;
+
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
     this.screenEl = this._buildScreenEl();
@@ -96,6 +108,9 @@ export class ChapterMapScreen {
     // Regenerate decorations when showing a new chapter
     if (this._chapter !== chapter) {
       this._decorations = generateChapterMapDecorations(rows, cols);
+      // Reset animation state when switching chapters
+      this._vortexParticles = [];
+      this._sourceSprayDrops = [];
     }
     this._chapter = chapter;
     this._chapterIdx = chapterIdx;
@@ -103,6 +118,7 @@ export class ChapterMapScreen {
 
     this._populate(campaign, chapterIdx, chapter);
     this.screenEl.style.display = 'flex';
+    this._startAnimLoop();
   }
 
   /**
@@ -420,5 +436,63 @@ export class ChapterMapScreen {
     };
 
     return computeChapterMapReachable(grid, rows, cols, sourcePos, getConns);
+  }
+
+  // ─── Animation loop ──────────────────────────────────────────────────────────
+
+  /**
+   * Start (or restart) the canvas animation loop.
+   * The loop automatically stops when the screen element is hidden.
+   */
+  private _startAnimLoop(): void {
+    if (this._animFrameId !== null) return; // already running
+    const loop = (now: number) => {
+      if (this.screenEl.style.display === 'none') {
+        this._animFrameId = null;
+        return; // auto-stop when hidden
+      }
+      this._animFrameId = requestAnimationFrame(loop);
+      this._tickAnimations(now);
+    };
+    this._animFrameId = requestAnimationFrame(loop);
+  }
+
+  /**
+   * Advance and render animation particles (sink vortex, source spray) on top
+   * of the already-rendered chapter map canvas.
+   */
+  private _tickAnimations(now: number): void {
+    const ctx = this._ctx;
+    const chapter = this._chapter;
+    if (!ctx || !chapter?.grid) return;
+
+    const grid = chapter.grid;
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+
+    const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
+
+    // Sink vortex – spawn and render one vortex per sink tile
+    for (const sink of positions.sinks) {
+      if (now - this._lastVortexSpawn >= ChapterMapScreen.VORTEX_SPAWN_INTERVAL_MS) {
+        spawnVortexParticle(this._vortexParticles);
+        this._lastVortexSpawn = now;
+      }
+      const color = sink.isFilled ? SINK_WATER_COLOR : SINK_COLOR;
+      renderVortex(ctx, this._vortexParticles, sink.x, sink.y, color);
+    }
+
+    // Source spray – spawn and render water-drop spray from the source
+    if (positions.source) {
+      const src = positions.source;
+      if (now - this._lastSpraySpawn >= ChapterMapScreen.SPRAY_SPAWN_INTERVAL_MS) {
+        spawnSourceSprayDrop(this._sourceSprayDrops);
+        this._lastSpraySpawn = now;
+      }
+      const sprayColor = src.isFilled ? SOURCE_WATER_COLOR : '#27ae60';
+      renderSourceSpray(ctx, this._sourceSprayDrops, src.x, src.y, sprayColor);
+    }
   }
 }
