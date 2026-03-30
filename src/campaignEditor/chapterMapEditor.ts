@@ -31,6 +31,9 @@ import {
   isChamberPalette,
 } from './types';
 
+/** The palette entry used for level chamber tiles in the chapter map editor. */
+const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
+
 // ─── Callback interface ────────────────────────────────────────────────────────
 
 export interface ChapterMapEditorCallbacks {
@@ -236,15 +239,16 @@ export class ChapterMapEditorSection {
     panel.appendChild(title);
 
     const CHAPTER_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-      { palette: PipeShape.Source,   label: '💧 Source' },
-      { palette: PipeShape.Sink,     label: '🏁 Sink' },
-      { palette: PipeShape.Tree,     label: '🌳 Tree' },
-      { palette: PipeShape.Granite,  label: '🪨 Granite' },
-      { palette: PipeShape.Straight, label: '━ Straight' },
-      { palette: PipeShape.Elbow,    label: '┗ Elbow' },
-      { palette: PipeShape.Tee,      label: '┣ Tee' },
-      { palette: PipeShape.Cross,    label: '╋ Cross' },
-      { palette: 'erase',            label: '🗑 Erase' },
+      { palette: PipeShape.Source,       label: '💧 Source' },
+      { palette: PipeShape.Sink,         label: '🏁 Sink' },
+      { palette: LEVEL_CHAMBER_PALETTE,       label: '🚪 Level' },
+      { palette: PipeShape.Tree,         label: '🌳 Tree' },
+      { palette: PipeShape.Granite,      label: '🪨 Granite' },
+      { palette: PipeShape.Straight,     label: '━ Straight' },
+      { palette: PipeShape.Elbow,        label: '┗ Elbow' },
+      { palette: PipeShape.Tee,          label: '┣ Tee' },
+      { palette: PipeShape.Cross,        label: '╋ Cross' },
+      { palette: 'erase',                label: '🗑 Erase' },
     ];
 
     for (const item of CHAPTER_PALETTE_ITEMS) {
@@ -917,6 +921,13 @@ export class ChapterMapEditorSection {
 
     this._chapterFocusedTilePos = pos;
 
+    // Auto-select the 'Level' palette item when a level chamber is focused
+    const tileAtPos = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
+    if (tileAtPos?.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'level') {
+      this._chapterPalette = LEVEL_CHAMBER_PALETTE;
+      this._rebuildChapterPalette(chapter, campaign);
+    }
+
     // Rebuild the tile params panel so it reflects the newly focused tile
     const existingParams = document.getElementById('chapter-tile-params-panel');
     if (existingParams) existingParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
@@ -934,12 +945,26 @@ export class ChapterMapEditorSection {
           connections: [Direction.North, Direction.East, Direction.South, Direction.West],
         };
         this._chapterSelectedLevelIdx = null;
+        // Auto-select the 'Level' palette and sync params panel after placement
+        this._chapterPalette = LEVEL_CHAMBER_PALETTE;
+        this._rebuildChapterPalette(chapter, campaign);
+        const placedParams = document.getElementById('chapter-tile-params-panel');
+        if (placedParams) placedParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
         this._recordChapterSnapshot(chapter);
         this._saveChapterGridState(chapter, campaign);
         this._rebuildChapterLevelInventory(chapter, campaign);
         this._renderChapterCanvas();
       } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'level') {
         // Start dragging existing level chamber
+        this._chapterDragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+        this._renderChapterCanvas();
+      }
+      return;
+    }
+
+    // 'chamber:level' palette: only focus/drag existing tiles; never place new ones
+    if (this._chapterPalette === LEVEL_CHAMBER_PALETTE) {
+      if (existingTile !== null) {
         this._chapterDragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
         this._renderChapterCanvas();
       }
