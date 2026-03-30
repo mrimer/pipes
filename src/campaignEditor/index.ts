@@ -145,7 +145,6 @@ export class CampaignEditor {
 
     const chapterCallbacks: ChapterMapEditorCallbacks = {
       buildBtn: (l, bg, c, cb) => this._btn(l, bg, c, cb),
-      buildConnectionsWidget: (panel) => this._buildConnectionsWidget(panel),
       getActiveCampaign: () => this._getActiveCampaign(),
       getActiveChapterIdx: () => this._activeChapterIdx,
       touchCampaign: (campaign) => this._touchCampaign(campaign),
@@ -159,9 +158,15 @@ export class CampaignEditor {
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
     document.body.appendChild(this._el);
 
-    // Global keyboard handler for shortcuts (guarded to the level editor screen)
+    // Global keyboard handler for shortcuts (guarded by active screen)
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (this._screen !== EditorScreen.LevelEditor || this._el.style.display === 'none') return;
+      if (this._el.style.display === 'none') return;
+      // Chapter map editor: Q/W rotation
+      if (this._screen === EditorScreen.Chapter) {
+        this._chapterMapEditor.handleChapterEditorKeyDown(e);
+        return;
+      }
+      if (this._screen !== EditorScreen.LevelEditor) return;
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
       if (e.key === 'Escape' && this._linkedTilePos !== null) {
