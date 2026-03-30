@@ -374,11 +374,13 @@ export class ChapterMapEditorSection {
       : null;
     const isFocusedLevelChamber =
       focusedTile?.shape === PipeShape.Chamber && focusedTile.chamberContent === 'level';
+    const isFocusedSourceOrSink =
+      focusedTile?.shape === PipeShape.Source || focusedTile?.shape === PipeShape.Sink;
 
-    if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
-      panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
-    } else if (isFocusedLevelChamber && this._chapterFocusedTilePos) {
+    if ((isFocusedLevelChamber || isFocusedSourceOrSink) && this._chapterFocusedTilePos) {
       panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile!, chapter, campaign));
+    } else if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
+      panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';

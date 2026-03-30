@@ -511,7 +511,7 @@ export function renderChapterMapCanvas(
 
       // Connection lines from center to open edges – same colors as the level screen
       const tileConns = tileDefConnections(def);
-      const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
+      const pipeColor = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_COLOR : PIPE_COLOR;
       const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
       ctx.save();
       ctx.strokeStyle = pipeColor;
@@ -557,17 +557,20 @@ export function renderChapterMapCanvas(
     ctx.stroke();
   }
 
-  // Hover highlight
+  // Hover highlight – only on level chamber tiles
   if (hoverPos) {
     const { row, col } = hoverPos;
-    const x = col * CELL;
-    const y = row * CELL;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = _s(2);
-    ctx.setLineDash([]);
-    ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
-    ctx.restore();
+    const hoverDef = grid[row]?.[col] ?? null;
+    if (hoverDef?.shape === PipeShape.Chamber && hoverDef.chamberContent === 'level') {
+      const x = col * CELL;
+      const y = row * CELL;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      ctx.lineWidth = _s(2);
+      ctx.setLineDash([]);
+      ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      ctx.restore();
+    }
   }
 }
 
