@@ -65,6 +65,7 @@ export class ChapterMapScreen {
   /** Currently hovered grid cell. */
   private _hover: { row: number; col: number } | null = null;
   private _statsEl: HTMLElement | null = null;
+  private _statusEl: HTMLElement | null = null;
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -199,6 +200,12 @@ export class ChapterMapScreen {
     instruction.textContent = 'Click on an accessible level';
     el.appendChild(instruction);
 
+    // Status text (Level Complete / Click Sink to advance)
+    const statusEl = document.createElement('div');
+    statusEl.style.cssText = 'text-align:center;margin:4px 0;min-height:2.5em;';
+    this._statusEl = statusEl;
+    el.appendChild(statusEl);
+
     // Render the chapter map
     this._render(chapter);
   }
@@ -323,6 +330,41 @@ export class ChapterMapScreen {
       }
 
       this._statsEl.textContent = parts.join('  ');
+    }
+
+    // Update status text ("Level Complete!" / "Click Sink to advance")
+    if (this._statusEl) {
+      let sinkFilled = false;
+      if (grid) {
+        for (let r = 0; r < rows && !sinkFilled; r++) {
+          for (let c = 0; c < cols && !sinkFilled; c++) {
+            if (grid[r]?.[c]?.shape === PipeShape.Sink && filledKeys.has(`${r},${c}`)) sinkFilled = true;
+          }
+        }
+      }
+      const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
+      const allNonChallengeCompleted = nonChallengeLevels.length === 0 || nonChallengeLevels.every(l => displayProgress.has(l.id));
+
+      if (sinkFilled && allNonChallengeCompleted) {
+        const completedChapters = this._callbacks.getCompletedChapters?.();
+        const campaign = this._callbacks.getActiveCampaign?.();
+        const isAlreadyCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
+        if (isAlreadyCompleted) {
+          this._statusEl.innerHTML = '<span style="color:#7ed321;font-size:1rem;">✅ Chapter Complete!</span>';
+        } else {
+          let html = '<span style="color:#7ed321;font-size:1rem;font-weight:bold;">✅ Level Complete!</span>';
+          if (campaign) {
+            const chapterIdx = campaign.chapters.indexOf(chapter);
+            const nextChapter = campaign.chapters[chapterIdx + 1] ?? null;
+            if (nextChapter && !(completedChapters?.has(chapter.id))) {
+              html += '<br><span style="color:#f0c040;font-size:1.05rem;font-weight:bold;">Click the Sink to advance to the next chapter.</span>';
+            }
+          }
+          this._statusEl.innerHTML = html;
+        }
+      } else {
+        this._statusEl.innerHTML = '';
+      }
     }
   }
 
