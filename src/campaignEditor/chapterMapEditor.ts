@@ -607,6 +607,8 @@ export class ChapterMapEditorSection {
         const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
         if (tile && PIPE_SHAPES.has(tile.shape)) {
           this._rotateChapterTileAt(pos, e.deltaY > 0, chapter, campaign);
+        } else if (tile && (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink)) {
+          this._rotateChapterSourceSinkAt(pos, e.deltaY > 0, chapter, campaign);
         } else if (PIPE_SHAPES.has(this._chapterPalette as PipeShape)) {
           this._rotateChapterPalette(e.deltaY > 0);
         }
@@ -816,6 +818,68 @@ export class ChapterMapEditorSection {
     if (!PIPE_SHAPES.has(this._chapterPalette as PipeShape)) return;
     const cur = this._chapterParams.rotation ?? 0;
     this._chapterParams.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Rotate a placed Source or Sink tile at the given position by rotating its connections CW/CCW.
+   * Also updates `_chapterParams.connections` when the palette matches the tile shape,
+   * and rebuilds the Tile Params panel so it reflects the new orientation.
+   */
+  private _rotateChapterSourceSinkAt(
+    pos: { row: number; col: number },
+    clockwise: boolean,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): void {
+    const tile = this._chapterEditGrid[pos.row]?.[pos.col];
+    if (!tile || (tile.shape !== PipeShape.Source && tile.shape !== PipeShape.Sink)) return;
+
+    const allDirs: Direction[] = [Direction.North, Direction.East, Direction.South, Direction.West];
+    const currentConns = new Set(tile.connections ?? allDirs);
+
+    // Rotate each connection direction CW or CCW
+    const newConns = new Set<Direction>();
+    for (const dir of currentConns) {
+      let d = dir;
+      if (clockwise) {
+        // CW: N→E→S→W→N
+        switch (d) {
+          case Direction.North: d = Direction.East;  break;
+          case Direction.East:  d = Direction.South; break;
+          case Direction.South: d = Direction.West;  break;
+          case Direction.West:  d = Direction.North; break;
+        }
+      } else {
+        // CCW: N→W→S→E→N
+        switch (d) {
+          case Direction.North: d = Direction.West;  break;
+          case Direction.West:  d = Direction.South; break;
+          case Direction.South: d = Direction.East;  break;
+          case Direction.East:  d = Direction.North; break;
+        }
+      }
+      newConns.add(d);
+    }
+    tile.connections = [...newConns];
+
+    // Sync palette params when the palette matches the tile shape
+    if (this._chapterPalette === tile.shape) {
+      this._chapterParams.connections = {
+        N: newConns.has(Direction.North),
+        E: newConns.has(Direction.East),
+        S: newConns.has(Direction.South),
+        W: newConns.has(Direction.West),
+      };
+    }
+
+    // Update focused tile and rebuild params panel
+    this._chapterFocusedTilePos = pos;
+    const existingParams = document.getElementById('chapter-tile-params-panel');
+    if (existingParams) existingParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+
+    this._recordChapterSnapshot(chapter);
+    this._saveChapterGridState(chapter, campaign);
     this._renderChapterCanvas();
   }
 
