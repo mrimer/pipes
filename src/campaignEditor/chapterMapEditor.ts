@@ -855,6 +855,10 @@ export class ChapterMapEditorSection {
 
     this._chapterFocusedTilePos = pos;
 
+    // Rebuild the tile params panel so it reflects the newly focused tile
+    const existingParams = document.getElementById('chapter-tile-params-panel');
+    if (existingParams) existingParams.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+
     const existingTile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
 
     // If a level is selected for placement

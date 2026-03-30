@@ -610,11 +610,11 @@ export function findChapterMapAnimPositions(
   cols: number,
   filledKeys: ReadonlySet<string>,
 ): {
-  source: { x: number; y: number; isFilled: boolean } | null;
+  source: { x: number; y: number; row: number; col: number; isFilled: boolean } | null;
   sinks:  Array<{ x: number; y: number; isFilled: boolean }>;
 } {
   const CELL = TILE_SIZE;
-  let source: { x: number; y: number; isFilled: boolean } | null = null;
+  let source: { x: number; y: number; row: number; col: number; isFilled: boolean } | null = null;
   const sinks: Array<{ x: number; y: number; isFilled: boolean }> = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -623,9 +623,193 @@ export function findChapterMapAnimPositions(
       const isFilled = filledKeys.has(`${r},${c}`);
       const cx = c * CELL + CELL / 2;
       const cy = r * CELL + CELL / 2;
-      if (def.shape === PipeShape.Source) source = { x: cx, y: cy, isFilled };
+      if (def.shape === PipeShape.Source) source = { x: cx, y: cy, row: r, col: c, isFilled };
       else if (def.shape === PipeShape.Sink) sinks.push({ x: cx, y: cy, isFilled });
     }
   }
   return { source, sinks };
+}
+
+// ─── Chapter map flow drops ────────────────────────────────────────────────────
+
+/**
+ * A water drop flowing along the filled chapter map pipe connections from source
+ * toward the sink.  Rendered on top of the chapter map canvas as part of the
+ * win-state animation that plays when all non-challenge levels are completed and
+ * the pipe network reaches the sink.
+ */
+export interface ChapterMapFlowDrop {
+  /** Grid row of the tile the drop is currently leaving. */
+  row: number;
+  /** Grid column of the tile the drop is currently leaving. */
+  col: number;
+  /**
+   * Fractional progress of travel from the current tile center to the next
+   * (0 = at the current tile center, 1 = arrived at the neighbor center).
+   */
+  progress: number;
+  /** Movement speed in tile-lengths per animation frame (~60 fps). */
+  speed: number;
+  /** Direction the drop is currently traveling toward. */
+  direction: Direction;
+  /** Direction this tile was entered from (to prevent back-tracking). */
+  fromDir: Direction | null;
+  /** Half-length of the ellipse along the travel axis, in pixels. */
+  size: number;
+}
+
+/** Maximum number of simultaneously live flow drops on the chapter map. */
+const CHAPTER_FLOW_MAX_DROPS = 5;
+
+/**
+ * Compute the valid outgoing directions from a chapter map cell toward filled
+ * neighbor cells that are mutually connected.  Skips the `fromDir` direction
+ * to prevent the drop from reversing.
+ */
+function _chapterFlowForwardDirs(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: ReadonlySet<string>,
+  row: number,
+  col: number,
+  fromDir: Direction | null,
+): Direction[] {
+  const def = grid[row]?.[col];
+  if (!def) return [];
+  const conns = _getTileConnections(def);
+  const dirs: Direction[] = [];
+  for (const dir of conns) {
+    if (fromDir !== null && dir === fromDir) continue; // no back-tracking
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nr = row + delta.row;
+    const nc = col + delta.col;
+    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+    const key = `${nr},${nc}`;
+    if (!filledKeys.has(key)) continue;
+    const nDef = grid[nr]?.[nc];
+    if (!nDef) continue;
+    const nConns = _getTileConnections(nDef);
+    const entryDir = oppositeDirection(dir); // direction the neighbor is entered from
+    if (!nConns.has(entryDir)) continue; // neighbor must have a reciprocal connection
+    dirs.push(dir);
+  }
+  return dirs;
+}
+
+/**
+ * Attempt to spawn one new flow drop at the source tile.
+ * Does nothing when the pool is full or the source has no filled forward neighbors.
+ *
+ * @param drops      Mutable array of active flow drops (modified in place).
+ * @param grid       Chapter map tile grid.
+ * @param rows       Number of grid rows.
+ * @param cols       Number of grid columns.
+ * @param filledKeys Set of "row,col" keys for water-filled cells.
+ * @param sourceRow  Grid row of the source tile.
+ * @param sourceCol  Grid column of the source tile.
+ */
+export function spawnChapterMapFlowDrop(
+  drops: ChapterMapFlowDrop[],
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: ReadonlySet<string>,
+  sourceRow: number,
+  sourceCol: number,
+): void {
+  if (drops.length >= CHAPTER_FLOW_MAX_DROPS) return;
+  const dirs = _chapterFlowForwardDirs(grid, rows, cols, filledKeys, sourceRow, sourceCol, null);
+  if (dirs.length === 0) return;
+  const dir = dirs[Math.floor(Math.random() * dirs.length)];
+  drops.push({
+    row: sourceRow,
+    col: sourceCol,
+    progress: 0,
+    speed: 0.018 + Math.random() * 0.018,
+    direction: dir,
+    fromDir: null,
+    size: _s(3 + Math.random() * 3),
+  });
+}
+
+/**
+ * Advance and render all chapter map flow drops, removing those that reach the
+ * sink or a dead-end.
+ *
+ * @param ctx        2D rendering context.
+ * @param drops      Mutable array of active flow drops (modified in place).
+ * @param grid       Chapter map tile grid.
+ * @param rows       Number of grid rows.
+ * @param cols       Number of grid columns.
+ * @param filledKeys Set of "row,col" keys for water-filled cells.
+ * @param color      CSS color string for the drop ellipses.
+ */
+export function renderChapterMapFlowDrops(
+  ctx: CanvasRenderingContext2D,
+  drops: ChapterMapFlowDrop[],
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: ReadonlySet<string>,
+  color: string,
+): void {
+  const CELL = TILE_SIZE;
+  let i = 0;
+  while (i < drops.length) {
+    const drop = drops[i];
+    drop.progress += drop.speed;
+
+    if (drop.progress >= 1) {
+      // Move to the next tile
+      const delta = NEIGHBOUR_DELTA[drop.direction];
+      const nr = drop.row + delta.row;
+      const nc = drop.col + delta.col;
+
+      const nDef = grid[nr]?.[nc];
+      // Remove if out-of-bounds or reached the sink
+      if (!nDef || nDef.shape === PipeShape.Sink) {
+        drops.splice(i, 1);
+        continue;
+      }
+
+      const entryDir = oppositeDirection(drop.direction);
+      const nextDirs = _chapterFlowForwardDirs(grid, rows, cols, filledKeys, nr, nc, entryDir);
+      if (nextDirs.length === 0) {
+        drops.splice(i, 1);
+        continue;
+      }
+
+      drop.row = nr;
+      drop.col = nc;
+      drop.progress -= 1;
+      drop.fromDir = entryDir;
+      drop.direction = nextDirs[Math.floor(Math.random() * nextDirs.length)];
+    }
+
+    // Render the drop at its current interpolated position
+    const cx = drop.col * CELL + CELL / 2;
+    const cy = drop.row * CELL + CELL / 2;
+    let dx = 0, dy = 0;
+    if      (drop.direction === Direction.North) dy = -1;
+    else if (drop.direction === Direction.South) dy =  1;
+    else if (drop.direction === Direction.East)  dx =  1;
+    else if (drop.direction === Direction.West)  dx = -1;
+
+    const px = cx + dx * (CELL / 2) * drop.progress;
+    const py = cy + dy * (CELL / 2) * drop.progress;
+    const angle = Math.atan2(dy, dx);
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle + Math.PI / 2);
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, drop.size * 0.5, drop.size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    i++;
+  }
 }
