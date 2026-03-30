@@ -7,7 +7,7 @@ import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotat
 import { PIPE_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
-import { computeChapterMapReachable, tileDefConnections } from '../chapterMapUtils';
+import { computeChapterMapReachable, findChapterMapTile, editorTileConns } from '../chapterMapUtils';
 import { generateChapterMapDecorations } from '../visuals/chapterMap';
 import {
   EditorPalette,
@@ -392,68 +392,14 @@ export class ChapterMapEditorSection {
   }
 
   /**
-   * Build a compass-layout connections widget for the chapter map editor.
-   * Reads from and writes to `_chapterParams.connections`.
+   * Build a compass-layout (3×3 grid) connections toggle widget.
+   *
+   * @param getActive  Returns true when the given direction is currently active.
+   * @param onToggle   Called with the toggled direction when a button is clicked.
    */
-  private _buildChapterConnectionsWidget(
-    replaceTarget: HTMLElement,
-    chapter: ChapterDef,
-    campaign: CampaignDef,
-  ): HTMLElement {
-    const connWrap = document.createElement('div');
-    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-    const connLbl = document.createElement('div');
-    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-    connLbl.textContent = 'Connections';
-    connWrap.appendChild(connLbl);
-
-    const connGrid = document.createElement('div');
-    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
-
-    const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
-      const active = this._chapterParams.connections[dir];
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = dir;
-      b.title = `Toggle ${dir} connection`;
-      b.style.cssText =
-        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
-        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
-        'color:' + (active ? '#7ed321' : '#555') + ';' +
-        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
-        'border-radius:4px;cursor:pointer;padding:0;';
-      b.addEventListener('click', () => {
-        this._chapterParams.connections[dir] = !this._chapterParams.connections[dir];
-        const newPanel = this._buildChapterTileParamsPanel(chapter, campaign);
-        replaceTarget.replaceWith(newPanel);
-        this._renderChapterCanvas();
-      });
-      return b;
-    };
-
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('N'));
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('W'));
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('E'));
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('S'));
-    connGrid.appendChild(document.createElement('span'));
-
-    connWrap.appendChild(connGrid);
-    return connWrap;
-  }
-
-  /**
-   * Build a connections widget that reads from and writes to a focused level-chamber tile's
-   * `connections` array directly (rather than `_chapterParams`).
-   */
-  private _buildFocusedChamberConnectionsWidget(
-    replaceTarget: HTMLElement,
-    tile: TileDef,
-    chapter: ChapterDef,
-    campaign: CampaignDef,
+  private _buildCompassConnectionsWidget(
+    getActive: (dir: Direction) => boolean,
+    onToggle: (dir: Direction) => void,
   ): HTMLElement {
     const connWrap = document.createElement('div');
     connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
@@ -466,9 +412,8 @@ export class ChapterMapEditorSection {
     connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
 
     const makeConnBtn = (dir: Direction): HTMLButtonElement => {
-      const currentConns = new Set(tile.connections ?? [Direction.North, Direction.East, Direction.South, Direction.West]);
-      const active = currentConns.has(dir);
       const label = dir === Direction.North ? 'N' : dir === Direction.East ? 'E' : dir === Direction.South ? 'S' : 'W';
+      const active = getActive(dir);
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = label;
@@ -479,16 +424,7 @@ export class ChapterMapEditorSection {
         'color:' + (active ? '#7ed321' : '#555') + ';' +
         'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
         'border-radius:4px;cursor:pointer;padding:0;';
-      b.addEventListener('click', () => {
-        const conns = new Set(tile.connections ?? [Direction.North, Direction.East, Direction.South, Direction.West]);
-        if (conns.has(dir)) conns.delete(dir); else conns.add(dir);
-        tile.connections = [...conns];
-        this._recordChapterSnapshot(chapter);
-        this._saveChapterGridState(chapter, campaign);
-        const newPanel = this._buildChapterTileParamsPanel(chapter, campaign);
-        replaceTarget.replaceWith(newPanel);
-        this._renderChapterCanvas();
-      });
+      b.addEventListener('click', () => onToggle(dir));
       return b;
     };
 
@@ -504,6 +440,54 @@ export class ChapterMapEditorSection {
 
     connWrap.appendChild(connGrid);
     return connWrap;
+  }
+
+  /**
+   * Build a compass-layout connections widget for the chapter map editor.
+   * Reads from and writes to `_chapterParams.connections`.
+   */
+  private _buildChapterConnectionsWidget(
+    replaceTarget: HTMLElement,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): HTMLElement {
+    const dirToKey: Record<Direction, keyof TileParams['connections']> = {
+      [Direction.North]: 'N', [Direction.East]: 'E',
+      [Direction.South]: 'S', [Direction.West]: 'W',
+    };
+    return this._buildCompassConnectionsWidget(
+      (dir) => this._chapterParams.connections[dirToKey[dir]],
+      (dir) => {
+        this._chapterParams.connections[dirToKey[dir]] = !this._chapterParams.connections[dirToKey[dir]];
+        replaceTarget.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+        this._renderChapterCanvas();
+      },
+    );
+  }
+
+  /**
+   * Build a connections widget that reads from and writes to a focused level-chamber tile's
+   * `connections` array directly (rather than `_chapterParams`).
+   */
+  private _buildFocusedChamberConnectionsWidget(
+    replaceTarget: HTMLElement,
+    tile: TileDef,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): HTMLElement {
+    const allDirs = [Direction.North, Direction.East, Direction.South, Direction.West];
+    return this._buildCompassConnectionsWidget(
+      (dir) => new Set(tile.connections ?? allDirs).has(dir),
+      (dir) => {
+        const conns = new Set(tile.connections ?? allDirs);
+        if (conns.has(dir)) conns.delete(dir); else conns.add(dir);
+        tile.connections = [...conns];
+        this._recordChapterSnapshot(chapter);
+        this._saveChapterGridState(chapter, campaign);
+        replaceTarget.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+        this._renderChapterCanvas();
+      },
+    );
   }
 
 
@@ -770,28 +754,16 @@ export class ChapterMapEditorSection {
    * (water flows through unconditionally, simulating an ideal path).
    */
   private _computeChapterEditorFilledCells(): Set<string> {
-    let sourcePos: { row: number; col: number } | null = null;
-    for (let r = 0; r < this._chapterEditRows && !sourcePos; r++) {
-      for (let c = 0; c < this._chapterEditCols && !sourcePos; c++) {
-        if (this._chapterEditGrid[r]?.[c]?.shape === PipeShape.Source) sourcePos = { row: r, col: c };
-      }
-    }
+    const sourcePos = findChapterMapTile(
+      this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Source);
     if (!sourcePos) return new Set();
-
-    const getConns = (def: TileDef, _isEntry: boolean): Set<Direction> => {
-      if (def.connections) return new Set(def.connections);
-      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
-        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-      }
-      return tileDefConnections(def);
-    };
 
     return computeChapterMapReachable(
       this._chapterEditGrid,
       this._chapterEditRows,
       this._chapterEditCols,
       sourcePos,
-      getConns,
+      (def) => editorTileConns(def),
     );
   }
 
@@ -1099,27 +1071,16 @@ export class ChapterMapEditorSection {
 
   private _chapterUndo(campaign: CampaignDef, chapter: ChapterDef): void {
     if (this._chapterHistoryIdx <= 0) return;
-    this._chapterHistoryIdx--;
-    const snap = this._chapterHistory[this._chapterHistoryIdx];
-    this._chapterEditGrid = JSON.parse(JSON.stringify(snap.grid)) as (TileDef | null)[][];
-    this._chapterEditRows = snap.rows;
-    this._chapterEditCols = snap.cols;
-    if (this._chapterCanvas) {
-      setTileSize(computeTileSize(snap.rows, snap.cols));
-      this._chapterCanvas.width  = snap.cols * TILE_SIZE;
-      this._chapterCanvas.height = snap.rows * TILE_SIZE;
-    }
-    this._updateChapterCanvasDisplaySize();
-    this._saveChapterGridState(chapter, campaign);
-    this._rebuildChapterLevelInventory(chapter, campaign);
-    this._updateChapterUndoRedoButtons();
-    this._renderChapterCanvas();
+    this._applyChapterSnapshot(this._chapterHistory[--this._chapterHistoryIdx], chapter, campaign);
   }
 
   private _chapterRedo(campaign: CampaignDef, chapter: ChapterDef): void {
     if (this._chapterHistoryIdx >= this._chapterHistory.length - 1) return;
-    this._chapterHistoryIdx++;
-    const snap = this._chapterHistory[this._chapterHistoryIdx];
+    this._applyChapterSnapshot(this._chapterHistory[++this._chapterHistoryIdx], chapter, campaign);
+  }
+
+  /** Apply a saved snapshot: restore grid dimensions, resize canvas, save, and re-render. */
+  private _applyChapterSnapshot(snap: EditorSnapshot, chapter: ChapterDef, campaign: CampaignDef): void {
     this._chapterEditGrid = JSON.parse(JSON.stringify(snap.grid)) as (TileDef | null)[][];
     this._chapterEditRows = snap.rows;
     this._chapterEditCols = snap.cols;
@@ -1216,22 +1177,12 @@ export class ChapterMapEditorSection {
     if (!sourcePos || !sinkPos) return { ok, messages: msgs };
 
     // BFS reachability check
-    const getConns = (def: TileDef, _isEntry: boolean): Set<Direction> => {
-      if (def.connections) return new Set(def.connections);
-      // Source/Sink/Chamber default: all 4 sides
-      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Chamber) {
-        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-      }
-      // Pipe shapes
-      return tileDefConnections(def);
-    };
-
     const reached = computeChapterMapReachable(
       this._chapterEditGrid,
       this._chapterEditRows,
       this._chapterEditCols,
       sourcePos,
-      getConns,
+      (def) => editorTileConns(def),
     );
 
     // Check sink reachable
