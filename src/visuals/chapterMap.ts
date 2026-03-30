@@ -15,7 +15,7 @@ import {
   CHAMBER_COLOR, CHAMBER_FILL_COLOR,
   WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR, SUCCESS_COLOR,
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG, CHAPTER_MAP_BORDER_COLOR,
-  CHAPTER_MAP_FILLED_CHAMBER_COLOR, CHAPTER_MAP_FILLED_CHAMBER_BG,
+  CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
 import { tileDefConnections } from '../chapterMapUtils';
 import { renderMinimap } from '../minimap';
@@ -146,7 +146,7 @@ export function drawLevelChamberTile(
 
   // Inner chamber box – use a vivid water-blue when the tile is water-connected
   const chamberFill  = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_BG    : CHAMBER_FILL_COLOR;
-  const chamberColor = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_COLOR  : CHAMBER_COLOR;
+  const chamberColor = isFilled ? WATER_COLOR                         : CHAMBER_COLOR;
   ctx.beginPath();
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = chamberFill;
@@ -511,7 +511,7 @@ export function renderChapterMapCanvas(
 
       // Connection lines from center to open edges – same colors as the level screen
       const tileConns = tileDefConnections(def);
-      const pipeColor = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_COLOR : PIPE_COLOR;
+      const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
       const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
       ctx.save();
       ctx.strokeStyle = pipeColor;

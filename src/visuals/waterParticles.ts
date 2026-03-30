@@ -10,8 +10,9 @@
 
 import { Board, NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
 import { oppositeDirection } from '../tile';
-import { Direction, GridPos } from '../types';
+import { Direction, GridPos, TileDef } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
+import { tileDefConnections } from '../chapterMapUtils';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Source Spray
@@ -515,6 +516,101 @@ export function spawnBubble(
     // Place the bubble somewhere along the pipe arm towards `dir`.
     // The arm runs from the tile center to the tile edge; the bubble is
     // confined within the tube width.
+    switch (dir) {
+      case Direction.North:
+        bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
+        by = cy - Math.random() * half;
+        break;
+      case Direction.South:
+        bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
+        by = cy + Math.random() * half;
+        break;
+      case Direction.East:
+        bx = cx + Math.random() * half;
+        by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
+        break;
+      default: // West
+        bx = cx - Math.random() * half;
+        by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
+        break;
+    }
+  }
+
+  bubbles.push({
+    x: bx,
+    y: by,
+    radius: _s(1.5 + Math.random() * 2.5),
+    alpha: 0,
+    phase: 0,
+    speed: 0.025 + Math.random() * 0.035,
+  });
+}
+
+/**
+ * Attempt to spawn one new bubble inside a random connected pipe tile on the
+ * chapter map.  Works like {@link spawnBubble} but operates on the chapter
+ * map's `TileDef` grid and `filledKeys` set instead of a game `Board`.
+ *
+ * @param bubbles   Mutable array of active bubbles.
+ * @param grid      The chapter map tile grid.
+ * @param rows      Number of rows in the grid.
+ * @param cols      Number of columns in the grid.
+ * @param filledKeys Pre-computed set of water-reachable tile keys ("row,col").
+ */
+export function spawnChapterMapBubble(
+  bubbles: BubbleParticle[],
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: Set<string>,
+): void {
+  if (bubbles.length >= BUBBLE_MAX) return;
+
+  // Collect filled positions that are actual pipe tiles (not source/sink/chamber).
+  const candidates: string[] = [];
+  for (const key of filledKeys) {
+    const [r, c] = parseKey(key);
+    const def = grid[r]?.[c];
+    if (!def) continue;
+    const shape = def.shape;
+    if (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape)) {
+      candidates.push(key);
+    }
+  }
+  if (candidates.length === 0) return;
+
+  const key = candidates[Math.floor(Math.random() * candidates.length)];
+  const [row, col] = parseKey(key);
+  const def = grid[row][col]!;
+
+  // Collect directions with mutual connections to a filled neighbor.
+  const connectedDirs: Direction[] = [];
+  for (const dir of tileDefConnections(def)) {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nr = row + delta.row, nc = col + delta.col;
+    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+    if (!filledKeys.has(`${nr},${nc}`)) continue;
+    const neighborDef = grid[nr]?.[nc];
+    if (!neighborDef) continue;
+    if (tileDefConnections(neighborDef).has(oppositeDirection(dir))) {
+      connectedDirs.push(dir);
+    }
+  }
+
+  const cx = col * TILE_SIZE + TILE_SIZE / 2;
+  const cy = row * TILE_SIZE + TILE_SIZE / 2;
+  const half = TILE_SIZE / 2;
+  const tubeHalf = _s(10) / 2;
+
+  let bx: number;
+  let by: number;
+
+  const choice = Math.floor(Math.random() * (connectedDirs.length + 1));
+  if (choice >= connectedDirs.length || connectedDirs.length === 0) {
+    bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;
+    by = cy + (Math.random() - 0.5) * tubeHalf * 1.6;
+  } else {
+    const dir = connectedDirs[choice];
     switch (dir) {
       case Direction.North:
         bx = cx + (Math.random() - 0.5) * tubeHalf * 1.6;

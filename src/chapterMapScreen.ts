@@ -15,7 +15,7 @@ import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAn
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable, tileDefConnections } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
-import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray } from './visuals/waterParticles';
+import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
 
 // ─── Callbacks ────────────────────────────────────────────────────────────────
@@ -79,9 +79,12 @@ export class ChapterMapScreen {
   private _lastSpraySpawn = 0;
   private _chapterMapFlowDrops: ChapterMapFlowDrop[] = [];
   private _lastFlowSpawn = 0;
-  private static readonly VORTEX_SPAWN_INTERVAL_MS = 80;
-  private static readonly SPRAY_SPAWN_INTERVAL_MS  = 150;
-  private static readonly FLOW_SPAWN_INTERVAL_MS   = 350;
+  private _bubbles: BubbleParticle[] = [];
+  private _lastBubbleSpawn = 0;
+  private static readonly VORTEX_SPAWN_INTERVAL_MS  = 80;
+  private static readonly SPRAY_SPAWN_INTERVAL_MS   = 150;
+  private static readonly FLOW_SPAWN_INTERVAL_MS    = 350;
+  private static readonly BUBBLE_SPAWN_INTERVAL_MS  = 120;
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -114,6 +117,7 @@ export class ChapterMapScreen {
       this._vortexParticles = [];
       this._sourceSprayDrops = [];
       this._chapterMapFlowDrops = [];
+      this._bubbles = [];
     }
     this._chapter = chapter;
     this._chapterIdx = chapterIdx;
@@ -542,5 +546,12 @@ export class ChapterMapScreen {
         renderChapterMapFlowDrops(ctx, this._chapterMapFlowDrops, grid, rows, cols, filledKeys, WATER_COLOR);
       }
     }
+
+    // Pipe bubbles – fizzing particles inside connected pipe tiles.
+    if (now - this._lastBubbleSpawn >= ChapterMapScreen.BUBBLE_SPAWN_INTERVAL_MS) {
+      spawnChapterMapBubble(this._bubbles, grid, rows, cols, filledKeys);
+      this._lastBubbleSpawn = now;
+    }
+    renderBubbles(ctx, this._bubbles, WATER_COLOR);
   }
 }
