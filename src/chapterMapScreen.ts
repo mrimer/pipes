@@ -702,7 +702,28 @@ export class ChapterMapScreen {
     const x = isLeft
       ? CELL * 0.18 + jitter
       : totalW - CELL * 0.18 + jitter;
-    const y = Math.random() * totalH;
+    // Place new flower at the midpoint of the largest vertical gap among existing
+    // flowers on the same edge, so spacing is evened out over time.
+    const sideFlowerYs = this._edgeFlowers
+      .filter(f => (isLeft ? f.x < totalW / 2 : f.x >= totalW / 2))
+      .map(f => f.y)
+      .sort((a, b) => a - b);
+    let y: number;
+    if (sideFlowerYs.length === 0) {
+      y = Math.random() * totalH;
+    } else {
+      const bounds = [0, ...sideFlowerYs, totalH];
+      let bestGapStart = 0;
+      let bestGapSize = 0;
+      for (let i = 0; i < bounds.length - 1; i++) {
+        const gapSize = bounds[i + 1] - bounds[i];
+        if (gapSize > bestGapSize) {
+          bestGapSize = gapSize;
+          bestGapStart = bounds[gi];
+        }
+      }
+      y = bestGapStart + bestGapSize / 2;
+    }
     this._edgeFlowers.push({
       x,
       y,
