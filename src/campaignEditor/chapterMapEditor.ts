@@ -530,7 +530,7 @@ export class ChapterMapEditorSection {
         }
         this._renderChapterCanvas();
       });
-      // Mouse wheel: rotate the hovered rotatable tile
+      // Mouse wheel: rotate the hovered rotatable tile, or the ghost preview when hovering empty/non-pipe cells
       canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
         const pos = this._chapterCanvasPos(e);
@@ -538,6 +538,8 @@ export class ChapterMapEditorSection {
         const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
         if (tile && PIPE_SHAPES.has(tile.shape)) {
           this._rotateChapterTileAt(pos, e.deltaY > 0, chapter, campaign);
+        } else if (PIPE_SHAPES.has(this._chapterPalette as PipeShape)) {
+          this._rotateChapterPalette(e.deltaY > 0);
         }
       }, { passive: false });
       if (this._chapterWindowMouseUpHandler) {

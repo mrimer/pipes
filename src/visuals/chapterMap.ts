@@ -5,13 +5,13 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration, AmbientDecorationType } from '../types';
-import { TILE_SIZE, scalePx as _s, drawAmbientDecoration } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration } from '../renderer';
 import { PIPE_SHAPES } from '../board';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
-  CHAMBER_COLOR, CHAMBER_WATER_COLOR, CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
+  CHAMBER_COLOR, CHAMBER_FILL_COLOR,
 } from '../colors';
 import { renderMinimap } from '../minimap';
 import { Tile } from '../tile';
@@ -104,12 +104,13 @@ export function drawLevelChamberTile(
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Inner chamber box
+  // Inner chamber box – use a vivid water-blue when the tile is water-connected
+  const chamberFill  = isFilled ? '#1a3d60' : CHAMBER_FILL_COLOR;
+  const chamberColor = isFilled ? '#4a90d9' : CHAMBER_COLOR;
   ctx.beginPath();
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
-  ctx.fillStyle = isFilled ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
+  ctx.fillStyle = chamberFill;
   ctx.fill();
-  const chamberColor = isFilled ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
   ctx.strokeStyle = chamberColor;
   ctx.lineWidth = _s(3);
   ctx.stroke();
@@ -133,12 +134,17 @@ export function drawLevelChamberTile(
 
   ctx.restore();
 
-  // Label row height (top section for L-N text)
+  // Label row height (for the L-N text inside the chamber box)
   const labelH = _s(16);
-  const contentY = y + labelH;
-  const contentH = CELL - labelH;
+  // Chamber box interior top-left in absolute coordinates
+  const boxTop = cy - bh;
+  const boxLeft = cx - bw;
+  const boxRight = cx + bw;
+  // Content area below the label row, clipped to the chamber box interior
+  const contentY = boxTop + labelH;
+  const contentH = bh * 2 - labelH;
 
-  // "L-N" text at top-left
+  // "L-N" text at top-left of the chamber box interior
   ctx.save();
   ctx.font = `bold ${_s(10)}px Arial`;
   ctx.textAlign = 'left';
@@ -146,10 +152,10 @@ export function drawLevelChamberTile(
   ctx.fillStyle = allStars ? '#f0c040' : isCompleted ? '#7ed321' : isChallenge ? '#e74c3c' : '#ddd';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = 3;
-  ctx.fillText(`L-${levelNum}`, x + _s(3), y + _s(2));
+  ctx.fillText(`L-${levelNum}`, boxLeft + _s(3), boxTop + _s(2));
   ctx.restore();
 
-  // Skull icon at top-right if challenge
+  // Skull icon at top-right of the chamber box interior if challenge
   if (isChallenge) {
     ctx.save();
     ctx.font = `${_s(11)}px Arial`;
@@ -158,22 +164,22 @@ export function drawLevelChamberTile(
     ctx.fillStyle = '#fff';
     ctx.shadowColor = 'rgba(0,0,0,0.9)';
     ctx.shadowBlur = 3;
-    ctx.fillText('💀', x + CELL - _s(2), y + _s(2));
+    ctx.fillText('💀', boxRight - _s(2), boxTop + _s(2));
     ctx.restore();
   }
 
-  // Minimap (centered in the area below the label)
+  // Minimap (centered in the content area inside the chamber box)
   if (levelDef) {
     try {
       const minimap = renderMinimap(levelDef);
-      const maxW = CELL - _s(6);
+      const maxW = bw * 2 - _s(6);
       const maxH = contentH - _s(6);
       const scaleX = maxW / minimap.width;
       const scaleY = maxH / minimap.height;
       const scale = Math.min(scaleX, scaleY, 1);
       const mw = Math.round(minimap.width * scale);
       const mh = Math.round(minimap.height * scale);
-      const mx = x + Math.round((CELL - mw) / 2);
+      const mx = Math.round(cx - mw / 2);
       const my = contentY + Math.round((contentH - mh) / 2);
       ctx.drawImage(minimap, mx, my, mw, mh);
 
@@ -216,7 +222,7 @@ export function drawLevelChamberTile(
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
 /** Draw Source tile like in-game: colored circle + radiating arms to connected edges. */
-function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>): void {
+function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, capacity?: number): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
@@ -229,7 +235,7 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.save();
   ctx.translate(cx, cy);
   ctx.strokeStyle = color;
-  ctx.lineWidth = _s(6);
+  ctx.lineWidth = LINE_WIDTH;
   ctx.lineCap = 'round';
   for (const dir of connections) {
     ctx.beginPath();
@@ -244,6 +250,14 @@ function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.beginPath();
   ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
   ctx.fill();
+  // Show capacity number on source, like in the normal level screen
+  if (capacity !== undefined) {
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(capacity), 0, 0);
+  }
   ctx.restore();
 }
 
@@ -261,7 +275,7 @@ function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.save();
   ctx.translate(cx, cy);
   ctx.strokeStyle = color;
-  ctx.lineWidth = _s(6);
+  ctx.lineWidth = LINE_WIDTH;
   ctx.lineCap = 'round';
   for (const dir of connections) {
     ctx.beginPath();
@@ -430,7 +444,7 @@ export function renderChapterMapCanvas(
         }
       } else if (def.shape === PipeShape.Source) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-        _drawChapterMapSource(ctx, x, y, isFilled, connections);
+        _drawChapterMapSource(ctx, x, y, isFilled, connections, def.capacity);
       } else if (def.shape === PipeShape.Sink) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
         _drawChapterMapSink(ctx, x, y, isFilled, connections);
@@ -446,7 +460,7 @@ export function renderChapterMapCanvas(
     }
   }
 
-  // Pass 3: pipe tiles with connection lines and water fill overlay
+  // Pass 3: pipe tiles with connection lines drawn like the normal level screen
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
@@ -461,13 +475,13 @@ export function renderChapterMapCanvas(
       ctx.fillStyle = '#1a2840';
       ctx.fillRect(x, y, CELL, CELL);
 
-      // Connection lines from center to open edges
+      // Connection lines from center to open edges – same line weight as normal level
       const rot = (def.rotation ?? 0) as Rotation;
       const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
       const pipeColor = isFilled ? '#4aa0ff' : '#3a506a';
       ctx.save();
       ctx.strokeStyle = pipeColor;
-      ctx.lineWidth = _s(6);
+      ctx.lineWidth = LINE_WIDTH;
       ctx.lineCap = 'round';
       for (const dir of t.connections) {
         ctx.beginPath();
@@ -481,7 +495,7 @@ export function renderChapterMapCanvas(
       // Center junction dot
       ctx.fillStyle = pipeColor;
       ctx.beginPath();
-      ctx.arc(cx, cy, _s(3), 0, Math.PI * 2);
+      ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -521,4 +535,36 @@ export function renderChapterMapCanvas(
     ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
     ctx.restore();
   }
+}
+
+// ─── Animation overlay helpers ─────────────────────────────────────────────────
+
+/**
+ * Find the canvas pixel centres of the source and all sinks in the chapter map grid.
+ * Returns null for source if not found.
+ */
+export function findChapterMapAnimPositions(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: ReadonlySet<string>,
+): {
+  source: { x: number; y: number; isFilled: boolean } | null;
+  sinks:  Array<{ x: number; y: number; isFilled: boolean }>;
+} {
+  const CELL = TILE_SIZE;
+  let source: { x: number; y: number; isFilled: boolean } | null = null;
+  const sinks: Array<{ x: number; y: number; isFilled: boolean }> = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const def = grid[r]?.[c];
+      if (!def) continue;
+      const isFilled = filledKeys.has(`${r},${c}`);
+      const cx = c * CELL + CELL / 2;
+      const cy = r * CELL + CELL / 2;
+      if (def.shape === PipeShape.Source) source = { x: cx, y: cy, isFilled };
+      else if (def.shape === PipeShape.Sink) sinks.push({ x: cx, y: cy, isFilled });
+    }
+  }
+  return { source, sinks };
 }
