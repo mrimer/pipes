@@ -27,6 +27,7 @@ export function findContinueLevelId(
   chapters: import('./types').ChapterDef[],
   completedLevels: Set<number>,
   levelStars: Record<number, number> = {},
+  completedChapters?: ReadonlySet<number>,
 ): number | null {
   let firstNonCompleteChallenge: number | null = null;
   let firstUncollectedStar: number | null = null;
@@ -40,7 +41,12 @@ export function findContinueLevelId(
       ? prevChapter.levels.filter((l) => !l.challenge).length : 0;
     const prevCompletedCount = prevChapter
       ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
-    const chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+    let chapterLocked: boolean;
+    if (prevChapter !== null && prevChapter.grid && completedChapters !== undefined) {
+      chapterLocked = !completedChapters.has(prevChapter.id);
+    } else {
+      chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+    }
 
     if (chapterLocked) {
       if (foundLockedChapter) break;
@@ -147,6 +153,7 @@ export function renderLevelList(
   chapterExpandedState?: Map<number, boolean>,
   onChapterToggle?: (chapterIndex: number, expanded: boolean) => void,
   onChapterMap?: (chapterIdx: number) => void,
+  completedChapters?: ReadonlySet<number>,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -310,7 +317,12 @@ export function renderLevelList(
       ? prevChapter.levels.filter((l) => !l.challenge).length : 0;
     const prevCompletedCount = prevChapter
       ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
-    const chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+    let chapterLocked: boolean;
+    if (prevChapter !== null && prevChapter.grid && completedChapters !== undefined) {
+      chapterLocked = !completedChapters.has(prevChapter.id);
+    } else {
+      chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+    }
 
     // Only show one locked chapter; hide any chapters beyond the first locked one.
     if (chapterLocked) {
@@ -393,65 +405,62 @@ export function renderLevelList(
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
 
-    // Expand/collapse chevron
-    const chevron = document.createElement('span');
-    chevron.style.cssText = 'font-size:0.8rem;transition:transform 0.2s;';
-
-    // Restore the previously saved expansion state when available; otherwise
-    // default to expanded only for unlocked, incomplete chapters.
-    let expanded = chapterExpandedState?.has(ci)
-      ? chapterExpandedState.get(ci)!
-      : !chapterLocked && !allLevelsCompleted;
-    chevron.textContent = expanded ? '▲' : '▼';
-
-    chapterHeader.appendChild(chapterTitle);
-    chapterHeader.appendChild(chevron);
-
-    // ── Levels container ───────────────────────────────────────────────────
-    const levelsContainer = document.createElement('div');
-    levelsContainer.classList.add('chapter-levels');
-    levelsContainer.style.cssText =
-      'display:' + (expanded ? 'flex' : 'none') + ';' +
-      'flex-direction:column;gap:8px;padding:' +
-      (totalInChapter > 0 ? '8px 12px 12px' : '0') + ';' +
-      'background:#0d1a30;';
-
-    if (!chapterLocked) {
-      chapterHeader.addEventListener('click', () => {
-        expanded = !expanded;
-        levelsContainer.style.display = expanded ? 'flex' : 'none';
-        chevron.textContent = expanded ? '▲' : '▼';
-        onChapterToggle?.(ci, expanded);
-      });
-      // Attach the hover water-wave background animation for interactive chapters.
-      // The trigger is the whole chapter box so hovering anywhere (header or
-      // levels list) activates the animation.
-      attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
-    }
-
-    // ── Map button (when chapter has a grid map) ──────────────────────────
     if (!chapterLocked && chapter.grid && onChapterMap) {
-      const mapBtn = document.createElement('button');
-      mapBtn.textContent = '🗺️ Map';
-      mapBtn.style.cssText =
-        'margin:8px 12px 12px;padding:10px 20px;font-size:0.95rem;font-weight:bold;' +
-        'border-radius:6px;border:1px solid ' + (isGold ? '#f0c040' : '#4a90d9') + ';' +
+      // Map-mode: show a Map button in the header instead of expand/collapse
+      const mapHeaderBtn = document.createElement('button');
+      mapHeaderBtn.textContent = '🗺️ Map';
+      mapHeaderBtn.style.cssText =
+        'padding:4px 10px;font-size:0.85rem;font-weight:bold;border-radius:4px;cursor:pointer;' +
+        'border:1px solid ' + (isGold ? '#f0c040' : '#4a90d9') + ';' +
         'background:' + (isGold ? '#2a2000' : '#16213e') + ';' +
-        'color:' + (isGold ? '#f0c040' : '#7ed321') + ';cursor:pointer;width:calc(100% - 24px);';
-      mapBtn.addEventListener('click', (e) => {
+        'color:' + (isGold ? '#f0c040' : '#7ed321') + ';';
+      mapHeaderBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         onChapterMap(ci);
       });
-      levelsContainer.appendChild(mapBtn);
+
+      chapterHeader.style.cursor = 'pointer';
+      chapterHeader.appendChild(chapterTitle);
+      chapterHeader.appendChild(mapHeaderBtn);
+      chapterHeader.addEventListener('click', () => { onChapterMap(ci); });
+      attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
+      chapterBox.appendChild(chapterHeader);
     } else {
+      // Normal mode: expand/collapse chevron + levels container
+      const chevron = document.createElement('span');
+      chevron.style.cssText = 'font-size:0.8rem;transition:transform 0.2s;';
+
+      let expanded = chapterExpandedState?.has(ci)
+        ? chapterExpandedState.get(ci)!
+        : !chapterLocked && !allLevelsCompleted;
+      chevron.textContent = expanded ? '▲' : '▼';
+
+      chapterHeader.appendChild(chapterTitle);
+      chapterHeader.appendChild(chevron);
+
+      const levelsContainer = document.createElement('div');
+      levelsContainer.classList.add('chapter-levels');
+      levelsContainer.style.cssText =
+        'display:' + (expanded ? 'flex' : 'none') + ';' +
+        'flex-direction:column;gap:8px;padding:' +
+        (totalInChapter > 0 ? '8px 12px 12px' : '0') + ';' +
+        'background:#0d1a30;';
+
+      if (!chapterLocked) {
+        chapterHeader.addEventListener('click', () => {
+          expanded = !expanded;
+          levelsContainer.style.display = expanded ? 'flex' : 'none';
+          chevron.textContent = expanded ? '▲' : '▼';
+          onChapterToggle?.(ci, expanded);
+        });
+        attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
+      }
+
       // ── Level buttons ──────────────────────────────────────────────────────
       for (let li = 0; li < chapter.levels.length; li++) {
         const level = chapter.levels[li];
         const isCompleted = completedLevels.has(level.id);
 
-        // Within a chapter, a level is locked if the previous non-challenge level is not yet done.
-        // Challenge levels are skipped in the chain so that non-challenge levels after a challenge
-        // level are not blocked by it.
         const prevNonChallenge = li > 0
           ? (chapter.levels.slice(0, li).reverse().find((l) => !l.challenge) ?? null)
           : null;
@@ -478,7 +487,6 @@ export function renderLevelList(
           btn.addEventListener('click', () => startLevel(level.id));
         }
 
-        // Wrap level button and its minimap in a flex row
         const levelRow = document.createElement('div');
         levelRow.dataset.levelId = String(level.id);
         levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
@@ -491,7 +499,6 @@ export function renderLevelList(
         levelRow.appendChild(btn);
         levelsContainer.appendChild(levelRow);
 
-        // Do not reveal levels beyond the first locked one.
         if (isLocked) break;
       }
 
@@ -503,10 +510,10 @@ export function renderLevelList(
         levelsContainer.style.padding = '0';
         levelsContainer.style.display = expanded ? 'flex' : 'none';
       }
-    }
 
-    chapterBox.appendChild(chapterHeader);
-    chapterBox.appendChild(levelsContainer);
+      chapterBox.appendChild(chapterHeader);
+      chapterBox.appendChild(levelsContainer);
+    }
     levelListEl.appendChild(chapterBox);
   }
 

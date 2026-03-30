@@ -7,7 +7,11 @@
 import { PipeShape, TileDef, Direction, LevelDef, Rotation } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
 import { PIPE_SHAPES } from '../board';
-import { SOURCE_COLOR, SINK_COLOR } from '../colors';
+import {
+  SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
+  GRANITE_COLOR, GRANITE_FILL_COLOR,
+  TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
+} from '../colors';
 import { renderMinimap } from '../minimap';
 import { Tile } from '../tile';
 
@@ -167,46 +171,131 @@ export function drawLevelChamberTile(
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
-/** Draw source or sink tile at (x, y) with connection lines for the chapter map display. */
-function _drawChapterMapSourceSink(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  def: TileDef,
-): void {
+/** Draw Source tile like in-game: colored circle + radiating arms to connected edges. */
+function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
-  const isSource = def.shape === PipeShape.Source;
+  const half = CELL / 2;
+  const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
 
-  ctx.fillStyle = isSource ? SOURCE_COLOR : SINK_COLOR;
+  ctx.fillStyle = '#1a2840';
   ctx.fillRect(x, y, CELL, CELL);
 
   ctx.save();
-  ctx.fillStyle = '#fff';
-  ctx.font = `bold ${_s(10)}px Arial`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(isSource ? 'SRC' : 'SNK', cx, cy);
-  ctx.restore();
-
-  // Connection lines
-  const conns = def.connections
-    ? new Set(def.connections)
-    : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = _s(3);
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = _s(6);
   ctx.lineCap = 'round';
-  for (const dir of conns) {
+  for (const dir of connections) {
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    if (dir === Direction.North) ctx.lineTo(cx, y);
-    else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
-    else if (dir === Direction.East) ctx.lineTo(x + CELL, cy);
-    else if (dir === Direction.West) ctx.lineTo(x, cy);
+    ctx.moveTo(0, 0);
+    if (dir === Direction.North) ctx.lineTo(0, -half);
+    else if (dir === Direction.South) ctx.lineTo(0, half);
+    else if (dir === Direction.East) ctx.lineTo(half, 0);
+    else ctx.lineTo(-half, 0);
     ctx.stroke();
   }
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Draw Sink tile like in-game: colored circle + radiating arms. */
+function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const half = CELL / 2;
+  const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
+
+  ctx.fillStyle = '#1a2840';
+  ctx.fillRect(x, y, CELL, CELL);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = _s(6);
+  ctx.lineCap = 'round';
+  for (const dir of connections) {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    if (dir === Direction.North) ctx.lineTo(0, -half);
+    else if (dir === Direction.South) ctx.lineTo(0, half);
+    else if (dir === Direction.East) ctx.lineTo(half, 0);
+    else ctx.lineTo(-half, 0);
+    ctx.stroke();
+  }
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Draw Granite tile like in-game. */
+function _drawChapterMapGranite(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const half = CELL / 2;
+  const bw = half * 0.7;
+  const bh = half * 0.7;
+
+  ctx.fillStyle = '#1a2840';
+  ctx.fillRect(x, y, CELL, CELL);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = GRANITE_FILL_COLOR;
+  ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+  ctx.strokeStyle = GRANITE_COLOR;
+  ctx.lineWidth = _s(3);
+  ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
+  ctx.strokeStyle = GRANITE_COLOR;
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
+  ctx.restore();
+}
+
+/** Draw Tree tile like in-game. */
+function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const half = CELL / 2;
+  const r = half * 0.75;
+
+  ctx.fillStyle = '#1a2840';
+  ctx.fillRect(x, y, CELL, CELL);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = TREE_LEAF_COLOR;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  const lobeR = r * 0.48;
+  const lobeOff = r * 0.52;
+  ctx.fillStyle = TREE_LEAF_ALT_COLOR;
+  for (let i = 0; i < 4; i++) {
+    const angle = (i * Math.PI) / 2;
+    ctx.beginPath(); ctx.arc(Math.cos(angle) * lobeOff, Math.sin(angle) * lobeOff, lobeR, 0, Math.PI * 2); ctx.fill();
+  }
+  const dLobeR = lobeR * 0.72;
+  const dLobeOff = lobeOff * 0.88;
+  ctx.fillStyle = TREE_LEAF_COLOR;
+  for (let i = 0; i < 4; i++) {
+    const angle = Math.PI / 4 + (i * Math.PI) / 2;
+    ctx.beginPath(); ctx.arc(Math.cos(angle) * dLobeOff, Math.sin(angle) * dLobeOff, dLobeR, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = TREE_TRUNK_COLOR;
+  ctx.beginPath(); ctx.arc(0, 0, half * 0.14, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = TREE_COLOR;
+  ctx.lineWidth = _s(2);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 }
 
@@ -290,16 +379,16 @@ export function renderChapterMapCanvas(
           ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
           ctx.restore();
         }
-      } else {
-        // Source / Sink or other non-pipe tile
-        _drawChapterMapSourceSink(ctx, x, y, def);
-        // Water-fill overlay
-        if (isFilled && def.shape !== PipeShape.Source) {
-          ctx.save();
-          ctx.fillStyle = 'rgba(74,160,255,0.18)';
-          ctx.fillRect(x, y, CELL, CELL);
-          ctx.restore();
-        }
+      } else if (def.shape === PipeShape.Source) {
+        const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+        _drawChapterMapSource(ctx, x, y, isFilled, connections);
+      } else if (def.shape === PipeShape.Sink) {
+        const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+        _drawChapterMapSink(ctx, x, y, isFilled, connections);
+      } else if (def.shape === PipeShape.Granite) {
+        _drawChapterMapGranite(ctx, x, y);
+      } else if (def.shape === PipeShape.Tree) {
+        _drawChapterMapTree(ctx, x, y);
       }
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
@@ -329,7 +418,7 @@ export function renderChapterMapCanvas(
       const pipeColor = isFilled ? '#4aa0ff' : '#3a506a';
       ctx.save();
       ctx.strokeStyle = pipeColor;
-      ctx.lineWidth = _s(4);
+      ctx.lineWidth = _s(6);
       ctx.lineCap = 'round';
       for (const dir of t.connections) {
         ctx.beginPath();

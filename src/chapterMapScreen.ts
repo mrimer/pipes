@@ -13,7 +13,7 @@ import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { renderChapterMapCanvas } from './visuals/chapterMap';
-import { loadLevelStars } from './persistence';
+import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable } from './chapterMapUtils';
 
 // ─── Callbacks ────────────────────────────────────────────────────────────────
@@ -28,6 +28,12 @@ export interface ChapterMapCallbacks {
   onShowLevelSelect(): void;
   /** Called when the player clicks an accessible level chamber. */
   onLevelSelected(levelDef: LevelDef): void;
+  /** Returns the active campaign def, or null. */
+  getActiveCampaign?(): CampaignDef | null;
+  /** Called when the player clicks the water-filled Sink to complete the chapter. */
+  onChapterSinkClicked?(chapterIdx: number): void;
+  /** Returns the set of completed chapter IDs. */
+  getCompletedChapters?(): Set<number>;
 }
 
 // ─── ChapterMapScreen ─────────────────────────────────────────────────────────
@@ -58,6 +64,7 @@ export class ChapterMapScreen {
   private _chapterIdx = -1;
   /** Currently hovered grid cell. */
   private _hover: { row: number; col: number } | null = null;
+  private _statsEl: HTMLElement | null = null;
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -128,6 +135,13 @@ export class ChapterMapScreen {
     chapterTitle.style.cssText = 'margin:4px 0;font-size:1.4rem;color:#f0c040;';
     header.appendChild(chapterTitle);
     el.appendChild(header);
+
+    // Stats row
+    const statsEl = document.createElement('div');
+    statsEl.id = 'chapter-map-stats';
+    statsEl.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:0.9rem;color:#ddd;';
+    this._statsEl = statsEl;
+    el.appendChild(statsEl);
 
     // Back button
     const backBtn = document.createElement('button');
@@ -213,15 +227,29 @@ export class ChapterMapScreen {
     if (!pos || !chapter.grid) return;
 
     const def = chapter.grid[pos.row]?.[pos.col];
-    if (!def || def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
+    if (!def) return;
+
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+
+    // Handle sink click (chapter completion)
+    if (def.shape === PipeShape.Sink && filledKeys.has(`${pos.row},${pos.col}`)) {
+      const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
+      const allNonChallengeCompleted = nonChallengeLevels.length === 0 || nonChallengeLevels.every(l => displayProgress.has(l.id));
+      if (allNonChallengeCompleted) {
+        this._callbacks.onChapterSinkClicked?.(this._chapterIdx);
+        return;
+      }
+    }
+
+    // Handle level chamber click
+    if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
 
     const levelIdx = def.levelIdx ?? 0;
     const levelDef = chapter.levels[levelIdx];
     if (!levelDef) return;
 
     // Only start a level that has water reaching it
-    const displayProgress = this._callbacks.getDisplayProgress();
-    const filledKeys = this._computeFilledCells(chapter, displayProgress);
     if (!filledKeys.has(`${pos.row},${pos.col}`)) return;
 
     this._callbacks.onLevelSelected(levelDef);
@@ -269,6 +297,33 @@ export class ChapterMapScreen {
       this._hover,
       accessibleLevelIdxs,
     );
+
+    // Update stats
+    if (this._statsEl) {
+      const completedChapters = this._callbacks.getCompletedChapters?.();
+      const campaignId = this._callbacks.getActiveCampaignId();
+      const levelWater = loadLevelWater(campaignId ?? undefined);
+      const chapterLevelStars = loadLevelStars(campaignId ?? undefined);
+
+      const chLevels = chapter.levels;
+      const waterTotal = chLevels.reduce((sum, l) => sum + (displayProgress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);
+      const starsCollected = chLevels.reduce((sum, l) => sum + Math.min(chapterLevelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+      const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+      const challengesDone = chLevels.filter(l => l.challenge && displayProgress.has(l.id)).length;
+      const challengesTotal = chLevels.filter(l => l.challenge).length;
+      const isChapterCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
+
+      const parts: string[] = [];
+      if (waterTotal > 0) parts.push(`💧 ${waterTotal}`);
+      if (starsTotal > 0) parts.push(`⭐ ${starsCollected}/${starsTotal}`);
+      if (challengesTotal > 0) parts.push(`💀 ${challengesDone}/${challengesTotal}`);
+      if (isChapterCompleted) {
+        const isMastered = starsTotal === 0 || starsCollected >= starsTotal;
+        parts.push(isMastered ? '🏆 Mastered!' : '✅ Complete');
+      }
+
+      this._statsEl.textContent = parts.join('  ');
+    }
   }
 
   /**
