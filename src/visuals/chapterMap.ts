@@ -556,6 +556,66 @@ export function renderChapterMapCanvas(
   }
 }
 
+// ─── Edge completion flowers ───────────────────────────────────────────────────
+
+/** Bright petal colors for edge flowers shown on chapter completion. */
+const EDGE_FLOWER_PETAL_COLORS = [
+  'rgba(220,140,190,1)',   // bright rose
+  'rgba(210,190,100,1)',   // bright gold
+  'rgba(170,140,240,1)',   // bright lavender
+] as const;
+
+/** Bright center color for edge completion flowers. */
+const EDGE_FLOWER_CENTER_COLOR = 'rgba(255,230,120,1)';
+
+/**
+ * Draw a completion-edge flower centered at canvas coordinates (x, y).
+ * These are twice as large and brighter than the empty-tile decor flowers.
+ *
+ * @param ctx         Canvas 2D context (no prior transforms expected).
+ * @param x           Horizontal center in canvas pixels.
+ * @param y           Vertical center in canvas pixels.
+ * @param variant     Color variant 0–2.
+ * @param scale       Scale factor 0–1 (grow-in animation).
+ * @param alpha       Opacity 0–1 (fade-out animation).
+ * @param swayAngle   Current sway rotation offset in radians (shared across all flowers).
+ * @param baseRotation Static per-flower rotation offset in radians.
+ */
+export function drawEdgeFlower(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  variant: number,
+  scale: number,
+  alpha: number,
+  swayAngle: number,
+  baseRotation: number,
+): void {
+  if (alpha <= 0 || scale <= 0) return;
+  const petalColor = EDGE_FLOWER_PETAL_COLORS[variant % EDGE_FLOWER_PETAL_COLORS.length];
+  const petals = 5;
+  const petalDist = _s(9);    // 2× the decor flower (4.5)
+  const petalR    = _s(5.6);  // 2× the decor flower (2.8)
+  const centerR   = _s(4.4);  // 2× the decor flower (2.2)
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(baseRotation + swayAngle);
+  ctx.scale(scale, scale);
+  ctx.fillStyle = petalColor;
+  for (let i = 0; i < petals; i++) {
+    const angle = (i / petals) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * petalDist, Math.sin(angle) * petalDist, petalR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, centerR, 0, Math.PI * 2);
+  ctx.fillStyle = EDGE_FLOWER_CENTER_COLOR;
+  ctx.fill();
+  ctx.restore();
+}
+
 // ─── Animation overlay helpers ─────────────────────────────────────────────────
 
 /**

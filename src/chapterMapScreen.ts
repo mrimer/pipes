@@ -11,7 +11,7 @@
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
-import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops } from './visuals/chapterMap';
+import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -39,6 +39,20 @@ export interface ChapterMapCallbacks {
 }
 
 // ─── ChapterMapScreen ─────────────────────────────────────────────────────────
+
+/** A single flower displayed along the left or right edge of the chapter map on completion. */
+interface EdgeFlower {
+  /** Canvas x-coordinate of the flower center. */
+  x: number;
+  /** Canvas y-coordinate of the flower center. */
+  y: number;
+  /** Timestamp (from requestAnimationFrame `now`) when this flower was spawned. */
+  spawnedAt: number;
+  /** Color variant 0–2, matching the decor flower palette. */
+  variant: number;
+  /** Static per-flower rotation offset in radians. */
+  baseRotation: number;
+}
 
 /**
  * Manages the chapter map screen overlay (DOM, canvas, and interaction).
@@ -87,10 +101,27 @@ export class ChapterMapScreen {
   private _lastFlowSpawn = 0;
   private _bubbles: BubbleParticle[] = [];
   private _lastBubbleSpawn = 0;
+  /** Edge flowers that appear along the left/right canvas edges when the chapter is completed. */
+  private _edgeFlowers: EdgeFlower[] = [];
+  private _lastFlowerSpawn = 0;
+  /** Which edge (0 = left, 1 = right) receives the next spawned flower. */
+  private _nextFlowerSide = 0;
   private static readonly VORTEX_SPAWN_INTERVAL_MS  = 80;
   private static readonly SPRAY_SPAWN_INTERVAL_MS   = 150;
   private static readonly FLOW_SPAWN_INTERVAL_MS    = 350;
   private static readonly BUBBLE_SPAWN_INTERVAL_MS  = 120;
+  /** How often (ms) a new edge flower is spawned when the chapter is completed. */
+  private static readonly FLOWER_SPAWN_INTERVAL_MS  = 800;
+  /** Total lifespan of each edge flower in milliseconds. */
+  private static readonly FLOWER_LIFETIME_MS        = 60_000;
+  /** Duration of the fade-out at the end of a flower's life. */
+  private static readonly FLOWER_FADE_MS            = 3_000;
+  /** Duration of the grow-in animation at the start of a flower's life. */
+  private static readonly FLOWER_GROW_MS            = 1_000;
+  /** Divisor for the sway angle: sin(now/FLOWER_SWAY_PERIOD) → ~6 s full cycle. */
+  private static readonly FLOWER_SWAY_PERIOD        = 955;
+  /** Divisor for the gold border brightness oscillation: sin(now/GOLD_BORDER_PERIOD) → ~3.1 s cycle. */
+  private static readonly GOLD_BORDER_PERIOD        = 500;
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -147,6 +178,10 @@ export class ChapterMapScreen {
       this._chapterMapFlowDrops = [];
       this._bubbles = [];
     }
+    // Edge flowers always restart fresh when entering the screen
+    this._edgeFlowers = [];
+    this._lastFlowerSpawn = 0;
+    this._nextFlowerSide = 0;
     this._chapter = chapter;
     this._chapterIdx = chapterIdx;
     this._hover = null;
@@ -561,7 +596,7 @@ export class ChapterMapScreen {
     // Re-render the base canvas each frame to clear previous particle frames
     const renderResult = this._renderCanvas(chapter);
     if (!renderResult) return;
-    const { filledKeys } = renderResult;
+    const { filledKeys, displayProgress } = renderResult;
 
     const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
 
@@ -605,5 +640,96 @@ export class ChapterMapScreen {
       this._lastBubbleSpawn = now;
     }
     renderBubbles(ctx, this._bubbles, WATER_COLOR);
+
+    // Edge flowers – shown when the chapter is completed
+    const isCompleted = this._isChapterCompleted(chapter, displayProgress);
+    const isMastered  = isCompleted && this._isChapterMastered(chapter);
+    if (isCompleted) {
+      if (now - this._lastFlowerSpawn >= ChapterMapScreen.FLOWER_SPAWN_INTERVAL_MS) {
+        this._spawnEdgeFlower(now, rows, cols);
+        this._lastFlowerSpawn = now;
+      }
+      // Shared sway angle: ~25° amplitude, ~6 s period, synchronised across all flowers
+      const swayAngle = Math.sin(now / ChapterMapScreen.FLOWER_SWAY_PERIOD) * 25 * Math.PI / 180;
+      this._renderEdgeFlowers(ctx, now, swayAngle);
+    }
+
+    // Gold border – shown when the chapter is mastered
+    if (this._canvas) {
+      if (isMastered) {
+        const t = (Math.sin(now / ChapterMapScreen.GOLD_BORDER_PERIOD) + 1) / 2;  // oscillates 0→1, period ~3.1 s
+        const r = Math.round(180 + t * 75);         // 180–255
+        const g = Math.round(130 + t * 85);         // 130–215
+        this._canvas.style.borderColor = `rgb(${r},${g},0)`;
+      } else {
+        this._canvas.style.borderColor = '#4a90d9';
+      }
+    }
+  }
+
+  // ─── Edge flower helpers ───────────────────────────────────────────────────
+
+  /** Returns true if the chapter's completion flag is set. */
+  private _isChapterCompleted(chapter: ChapterDef, displayProgress: Set<number>): boolean {
+    const completedChapters = this._callbacks.getCompletedChapters?.();
+    return chapter.id !== undefined && completedChapters?.has(chapter.id) === true;
+  }
+
+  /** Returns true when all stars have been collected in the chapter. */
+  private _isChapterMastered(chapter: ChapterDef): boolean {
+    const campaignId = this._callbacks.getActiveCampaignId();
+    const chapterLevelStars = loadLevelStars(campaignId ?? undefined);
+    const chLevels = chapter.levels;
+    const starsCollected = chLevels.reduce((sum, l) => sum + Math.min(chapterLevelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+    const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+    return starsTotal === 0 || starsCollected >= starsTotal;
+  }
+
+  /**
+   * Spawn one edge flower on the next alternating side (left/right).
+   * Flowers are placed at a random vertical position with a small horizontal jitter.
+   */
+  private _spawnEdgeFlower(now: number, rows: number, cols: number): void {
+    const CELL = TILE_SIZE;
+    const totalH = rows * CELL;
+    const totalW = cols * CELL;
+    // Alternate left/right to ensure both sides fill evenly
+    const isLeft = (this._nextFlowerSide & 1) === 0;
+    this._nextFlowerSide++;
+    const jitter = (Math.random() - 0.5) * CELL * 0.3;
+    const x = isLeft
+      ? CELL * 0.18 + jitter
+      : totalW - CELL * 0.18 + jitter;
+    const y = Math.random() * totalH;
+    this._edgeFlowers.push({
+      x,
+      y,
+      spawnedAt: now,
+      variant: Math.floor(Math.random() * 3),
+      baseRotation: Math.random() * Math.PI * 2,
+    });
+  }
+
+  /**
+   * Render all live edge flowers, advancing their grow-in and fade-out animations.
+   * Expired flowers are removed from the array.
+   */
+  private _renderEdgeFlowers(ctx: CanvasRenderingContext2D, now: number, swayAngle: number): void {
+    let i = 0;
+    while (i < this._edgeFlowers.length) {
+      const f = this._edgeFlowers[i];
+      const age = now - f.spawnedAt;
+      if (age >= ChapterMapScreen.FLOWER_LIFETIME_MS) {
+        this._edgeFlowers.splice(i, 1);
+        continue;
+      }
+      const fadeStart = ChapterMapScreen.FLOWER_LIFETIME_MS - ChapterMapScreen.FLOWER_FADE_MS;
+      const alpha = age >= fadeStart
+        ? 1 - (age - fadeStart) / ChapterMapScreen.FLOWER_FADE_MS
+        : 1;
+      const scale = Math.min(1, age / ChapterMapScreen.FLOWER_GROW_MS);
+      drawEdgeFlower(ctx, f.x, f.y, f.variant, scale, alpha, swayAngle, f.baseRotation);
+      i++;
+    }
   }
 }
