@@ -12,7 +12,7 @@ import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, Rotat
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { Tile } from './tile';
-import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions } from './visuals/chapterMap';
+import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -78,8 +78,11 @@ export class ChapterMapScreen {
   private _lastVortexSpawn = 0;
   private _sourceSprayDrops: SourceSprayDrop[] = [];
   private _lastSpraySpawn = 0;
+  private _chapterMapFlowDrops: ChapterMapFlowDrop[] = [];
+  private _lastFlowSpawn = 0;
   private static readonly VORTEX_SPAWN_INTERVAL_MS = 80;
   private static readonly SPRAY_SPAWN_INTERVAL_MS  = 150;
+  private static readonly FLOW_SPAWN_INTERVAL_MS   = 350;
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -111,6 +114,7 @@ export class ChapterMapScreen {
       // Reset animation state when switching chapters
       this._vortexParticles = [];
       this._sourceSprayDrops = [];
+      this._chapterMapFlowDrops = [];
     }
     this._chapter = chapter;
     this._chapterIdx = chapterIdx;
@@ -383,8 +387,16 @@ export class ChapterMapScreen {
         const completedChapters = this._callbacks.getCompletedChapters?.();
         const campaign = this._callbacks.getActiveCampaign?.();
         const isAlreadyCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
-        if (isAlreadyCompleted) {
+        const campaignId = this._callbacks.getActiveCampaignId();
+        const levelStarsData = loadLevelStars(campaignId ?? undefined);
+        const chLevels = chapter.levels;
+        const starsCollectedStatus = chLevels.reduce((sum, l) => sum + Math.min(levelStarsData[l.id] ?? 0, l.starCount ?? 0), 0);
+        const starsTotalStatus = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+        const isMastered = starsTotalStatus === 0 || starsCollectedStatus >= starsTotalStatus;
+        if (isAlreadyCompleted && !isMastered) {
           this._statusEl.innerHTML = '<span style="color:#7ed321;font-size:1rem;">✅ Chapter Complete!</span>';
+        } else if (isAlreadyCompleted && isMastered) {
+          this._statusEl.innerHTML = ''; // "Mastered!" is already shown in the stats bar
         } else {
           let html = '<span style="color:#7ed321;font-size:1rem;font-weight:bold;">✅ Level Complete!</span>';
           if (campaign) {
@@ -505,6 +517,16 @@ export class ChapterMapScreen {
       }
       const sprayColor = src.isFilled ? SOURCE_WATER_COLOR : '#27ae60';
       renderSourceSpray(ctx, this._sourceSprayDrops, src.x, src.y, sprayColor);
+
+      // Flow drops – water drops traveling from source to sink along filled pipe path
+      const sinkFilled = positions.sinks.some(s => s.isFilled);
+      if (src.isFilled && sinkFilled) {
+        if (now - this._lastFlowSpawn >= ChapterMapScreen.FLOW_SPAWN_INTERVAL_MS) {
+          spawnChapterMapFlowDrop(this._chapterMapFlowDrops, grid, rows, cols, filledKeys, src.row, src.col);
+          this._lastFlowSpawn = now;
+        }
+        renderChapterMapFlowDrops(ctx, this._chapterMapFlowDrops, grid, rows, cols, filledKeys, SOURCE_WATER_COLOR);
+      }
     }
   }
 }

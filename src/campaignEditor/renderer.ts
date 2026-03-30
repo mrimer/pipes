@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration } from '../types';
-import { TILE_SIZE, drawSpinArrow, scalePx as _s, drawAmbientDecoration } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
@@ -650,7 +650,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillRect(x, y, CELL, CELL);
     // Draw pipe lines
     ctx.strokeStyle = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
-    ctx.lineWidth = _s(8);
+    ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
     ctx.save();
     ctx.translate(cx, cy);
