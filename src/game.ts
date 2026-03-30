@@ -922,7 +922,13 @@ export class Game {
       nextBtn.style.cssText = btnStyle + 'background:#1a3a10;border-color:#7ed321;color:#7ed321;';
       nextBtn.addEventListener('click', () => {
         modal.remove();
-        this._showChapterMap(chapterIdx + 1);
+        if (nextChapter.grid) {
+          this._showChapterMap(chapterIdx + 1);
+        } else {
+          this._showLevelSelect();
+          const chapterBoxes = this.levelListEl.querySelectorAll<HTMLElement>('.chapter-box');
+          chapterBoxes[chapterIdx + 1]?.scrollIntoView?.({ behavior: 'instant', block: 'center' });
+        }
       });
       btnRow.appendChild(nextBtn);
     }

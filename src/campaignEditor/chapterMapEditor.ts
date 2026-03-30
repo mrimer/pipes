@@ -908,6 +908,7 @@ export class ChapterMapEditorSection {
     const pos = this._chapterCanvasPos(e);
     if (!pos) return;
     this._chapterEditGrid[pos.row][pos.col] = null;
+    this._rebuildChapterLevelInventory(chapter, campaign);
     this._recordChapterSnapshot(chapter);
     this._saveChapterGridState(chapter, campaign);
     this._renderChapterCanvas();
