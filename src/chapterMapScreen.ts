@@ -521,8 +521,9 @@ export class ChapterMapScreen {
       // Flow drops – water drops traveling from source to sink along filled pipe path
       const sinkFilled = positions.sinks.some(s => s.isFilled);
       if (src.isFilled && sinkFilled) {
+        const maxDrops = Math.max(10, filledKeys.size * 5);
         if (now - this._lastFlowSpawn >= ChapterMapScreen.FLOW_SPAWN_INTERVAL_MS) {
-          spawnChapterMapFlowDrop(this._chapterMapFlowDrops, grid, rows, cols, filledKeys, src.row, src.col);
+          spawnChapterMapFlowDrop(this._chapterMapFlowDrops, grid, rows, cols, filledKeys, src.row, src.col, maxDrops);
           this._lastFlowSpawn = now;
         }
         renderChapterMapFlowDrops(ctx, this._chapterMapFlowDrops, grid, rows, cols, filledKeys, SOURCE_WATER_COLOR);

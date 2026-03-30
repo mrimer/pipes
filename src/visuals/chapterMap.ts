@@ -48,7 +48,7 @@ function _getTileConnections(def: TileDef): Set<Direction> {
  * tile boundary).  Arms pointing into empty cells or at pipe tiles without a
  * reciprocal arm keep their round nubs.
  */
-function _computeChapterButtEndDirs(
+export function computeChapterButtEndDirs(
   grid: (TileDef | null)[][],
   rows: number,
   cols: number,
@@ -502,11 +502,11 @@ export function renderChapterMapCanvas(
         }
       } else if (def.shape === PipeShape.Source) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-        const buttEndDirs = _computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
+        const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         _drawChapterMapSource(ctx, x, y, isFilled, connections, def.capacity, buttEndDirs);
       } else if (def.shape === PipeShape.Sink) {
         const connections = def.connections ? new Set(def.connections) : new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-        const buttEndDirs = _computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
+        const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         _drawChapterMapSink(ctx, x, y, isFilled, connections, buttEndDirs);
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y);
@@ -539,7 +539,7 @@ export function renderChapterMapCanvas(
       const rot = (def.rotation ?? 0) as Rotation;
       const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
       const pipeColor = isFilled ? '#4aa0ff' : '#3a506a';
-      const buttEndDirs = _computeChapterButtEndDirs(grid, rows, cols, r, c, t.connections);
+      const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, t.connections);
       ctx.save();
       ctx.strokeStyle = pipeColor;
       ctx.lineWidth = LINE_WIDTH;
@@ -658,9 +658,6 @@ export interface ChapterMapFlowDrop {
   size: number;
 }
 
-/** Maximum number of simultaneously live flow drops on the chapter map. */
-const CHAPTER_FLOW_MAX_DROPS = 5;
-
 /**
  * Compute the valid outgoing directions from a chapter map cell toward filled
  * neighbor cells that are mutually connected.  Skips the `fromDir` direction
@@ -717,8 +714,9 @@ export function spawnChapterMapFlowDrop(
   filledKeys: ReadonlySet<string>,
   sourceRow: number,
   sourceCol: number,
+  maxDrops: number,
 ): void {
-  if (drops.length >= CHAPTER_FLOW_MAX_DROPS) return;
+  if (drops.length >= maxDrops) return;
   const dirs = _chapterFlowForwardDirs(grid, rows, cols, filledKeys, sourceRow, sourceCol, null);
   if (dirs.length === 0) return;
   const dir = dirs[Math.floor(Math.random() * dirs.length)];
@@ -726,10 +724,10 @@ export function spawnChapterMapFlowDrop(
     row: sourceRow,
     col: sourceCol,
     progress: 0,
-    speed: 0.018 + Math.random() * 0.018,
+    speed: 0.035 + Math.random() * 0.025,
     direction: dir,
     fromDir: null,
-    size: _s(3 + Math.random() * 3),
+    size: _s(6) + Math.random() * _s(4),
   });
 }
 
@@ -796,18 +794,21 @@ export function renderChapterMapFlowDrops(
     else if (drop.direction === Direction.East)  dx =  1;
     else if (drop.direction === Direction.West)  dx = -1;
 
-    const px = cx + dx * (CELL / 2) * drop.progress;
-    const py = cy + dy * (CELL / 2) * drop.progress;
+    const px = cx + dx * CELL * drop.progress;
+    const py = cy + dy * CELL * drop.progress;
     const angle = Math.atan2(dy, dx);
 
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(angle + Math.PI / 2);
-    ctx.globalAlpha = 0.75;
+    ctx.globalAlpha = 0.85;
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.ellipse(0, 0, drop.size * 0.5, drop.size, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, drop.size * 0.55, drop.size, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = _s(2);
+    ctx.stroke();
     ctx.restore();
 
     i++;

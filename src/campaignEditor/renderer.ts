@@ -10,7 +10,7 @@ import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER } from '../colors';
-import { drawLevelChamberTile, LevelProgressMap } from '../visuals/chapterMap';
+import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
 
 export type { LevelProgressMap };
 
@@ -131,7 +131,15 @@ export function renderEditorCanvas(
       if (def === null || !PIPE_SHAPES.has(def.shape)) continue;
       const x = c * CELL;
       const y = r * CELL;
-      drawEditorTile(ctx, x, y, def);
+      if (filledKeys !== undefined) {
+        // Chapter map editor context: compute butt-end dirs and draw with per-arm caps
+        const rot = (def.rotation ?? 0) as Rotation;
+        const t = new Tile(def.shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
+        const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, t.connections);
+        _drawChapterEditorPipeTile(ctx, x, y, def, t.connections, buttEndDirs);
+      } else {
+        drawEditorTile(ctx, x, y, def);
+      }
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
@@ -733,4 +741,57 @@ function drawConnectionLines(ctx: CanvasRenderingContext2D, x: number, y: number
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/**
+ * Draw a pipe tile on the chapter map editor canvas using per-arm strokes
+ * with optional butt-end caps for arms connecting to adjacent non-empty tiles.
+ * Uses global (absolute) arm directions so the canvas does not need to be
+ * rotated, matching the chapter map gameplay screen rendering approach.
+ */
+function _drawChapterEditorPipeTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  def: TileDef,
+  connections: ReadonlySet<Direction>,
+  buttEndDirs: ReadonlySet<Direction> | undefined,
+): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const shape = def.shape;
+
+  const isGold = shape === PipeShape.GoldStraight || shape === PipeShape.GoldElbow ||
+                 shape === PipeShape.GoldTee || shape === PipeShape.GoldCross;
+  const isSpin = SPIN_PIPE_SHAPES.has(shape);
+  const isLeaky = LEAKY_PIPE_SHAPES.has(shape);
+  const isSpinCement = SPIN_CEMENT_SHAPES.has(shape);
+
+  // Background fill
+  ctx.fillStyle = isSpinCement ? CEMENT_FILL_COLOR : isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
+  ctx.fillRect(x, y, CELL, CELL);
+
+  // Pipe arm color
+  const pipeColor = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
+
+  // Draw each arm center-to-edge with per-arm linecap (butt or round)
+  ctx.strokeStyle = pipeColor;
+  ctx.lineWidth = LINE_WIDTH;
+  for (const dir of connections) {
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    if (dir === Direction.North) ctx.lineTo(cx, y);
+    else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
+    else if (dir === Direction.East)  ctx.lineTo(x + CELL, cy);
+    else if (dir === Direction.West)  ctx.lineTo(x, cy);
+    ctx.stroke();
+  }
+
+  // Center junction dot fills the seam between arms
+  ctx.fillStyle = pipeColor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
+  ctx.fill();
 }
