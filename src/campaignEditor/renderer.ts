@@ -72,6 +72,23 @@ export function renderEditorCanvas(
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
 
+  // Grid lines drawn first so they appear underneath all tile content
+  ctx.strokeStyle = 'rgba(74,144,217,0.15)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  for (let r = 0; r <= rows; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * CELL);
+    ctx.lineTo(cols * CELL, r * CELL);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= cols; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * CELL, 0);
+    ctx.lineTo(c * CELL, rows * CELL);
+    ctx.stroke();
+  }
+
   // Pass 1: Draw all open (player-fillable) spaces first so that pipe rounded
   // caps drawn in pass 2 are never covered by a neighboring empty cell's fill.
   for (let r = 0; r < rows; r++) {
@@ -146,23 +163,6 @@ export function renderEditorCanvas(
       ctx.setLineDash([]);
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
     }
-  }
-
-  // Grid lines overlay
-  ctx.strokeStyle = 'rgba(74,144,217,0.15)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([]);
-  for (let r = 0; r <= rows; r++) {
-    ctx.beginPath();
-    ctx.moveTo(0, r * CELL);
-    ctx.lineTo(cols * CELL, r * CELL);
-    ctx.stroke();
-  }
-  for (let c = 0; c <= cols; c++) {
-    ctx.beginPath();
-    ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, rows * CELL);
-    ctx.stroke();
   }
 
   // Drag tile drawn at destination (opaque with a slight glow border)
