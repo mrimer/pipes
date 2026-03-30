@@ -751,19 +751,16 @@ export class ChapterMapEditorSection {
   /**
    * Handle a keydown event for the chapter map editor.
    * Called from the campaign editor's global keyboard handler when on the Chapter screen.
-   * Returns true if the key was handled.
    */
-  handleChapterEditorKeyDown(e: KeyboardEvent): boolean {
+  handleChapterEditorKeyDown(e: KeyboardEvent): void {
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    if (e.ctrlKey || e.altKey || isInputFocused) return false;
+    if (e.ctrlKey || e.altKey || isInputFocused) return;
     const key = e.key.toLowerCase();
     if (key === 'q' || key === 'w') {
       e.preventDefault();
       this._rotateChapterPalette(key === 'w');
-      return true;
     }
-    return false;
   }
 
   // ─── Chapter canvas mouse events ──────────────────────────────────────────
