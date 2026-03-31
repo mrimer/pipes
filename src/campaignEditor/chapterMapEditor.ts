@@ -773,8 +773,10 @@ export class ChapterMapEditorSection {
     if (!this._chapterCanvas) return;
     const intrinsicW = this._chapterEditCols * TILE_SIZE;
     const intrinsicH = this._chapterEditRows * TILE_SIZE;
-    let maxPx = MAX_EDITOR_CANVAS_PX;
+    let maxW = MAX_EDITOR_CANVAS_PX;
+    let maxH = MAX_EDITOR_CANVAS_PX;
     if (this._chapterEditorMainLayout) {
+      // ── Width constraint: available horizontal space after side panels ──
       const layoutW = this._chapterEditorMainLayout.clientWidth;
       let otherW = 0;
       let colCount = 0;
@@ -785,9 +787,29 @@ export class ChapterMapEditorSection {
         }
       }
       const availW = layoutW - otherW - colCount * 12 - 2 * EDITOR_CANVAS_BORDER;
-      if (availW > 0) maxPx = availW;
+      if (availW > 0) maxW = availW;
+
+      // ── Height constraint: available vertical space in the viewport ──
+      // Walk up the offsetParent chain to find the canvas's absolute top in the
+      // document.  When the canvas is not yet in the DOM its offsetParent is null
+      // and absTop stays 0, which skips the height constraint gracefully (the
+      // requestAnimationFrame call in _showChapterEditor will re-run with the
+      // canvas properly positioned).
+      let absTop = 0;
+      let el: HTMLElement | null = this._chapterCanvas;
+      while (el) {
+        absTop += el.offsetTop;
+        el = el.offsetParent as HTMLElement | null;
+      }
+      if (absTop > 0) {
+        // Remaining viewport height below the canvas top, accounting for scroll.
+        // Subtract a small bottom margin so the canvas doesn't touch the viewport edge.
+        const BOTTOM_MARGIN = 16;
+        const availH = window.innerHeight + window.scrollY - absTop - 2 * EDITOR_CANVAS_BORDER - BOTTOM_MARGIN;
+        if (availH > 0) maxH = availH;
+      }
     }
-    const scale = Math.min(1, maxPx / Math.max(intrinsicW, intrinsicH));
+    const scale = Math.min(1, maxW / intrinsicW, maxH / intrinsicH);
     this._chapterCanvas.style.width  = Math.round(intrinsicW * scale) + 'px';
     this._chapterCanvas.style.height = Math.round(intrinsicH * scale) + 'px';
   }
