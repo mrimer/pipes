@@ -596,10 +596,12 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = '#fff';
     // In chapter map editor, capacity is not used; only show SOURCE label
     const lines: string[] = ['SOURCE'];
-    if (!isChapterMap) lines.push(`cap:${tile.capacity}`);
-    // Show temp/pressure params only when non-zero (level editor only)
-    if (!isChapterMap && tile.temperature !== 0) lines.push(`${tile.temperature}°`);
-    if (!isChapterMap && tile.pressure !== 0) lines.push(`${tile.pressure}P`);
+    if (!isChapterMap) {
+      lines.push(`cap:${tile.capacity}`);
+      // Show temp/pressure params only when non-zero
+      if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
+      if (tile.pressure !== 0) lines.push(`${tile.pressure}P`);
+    }
     const lineHeight = _s(12);
     const totalH = (lines.length - 1) * lineHeight;
     let lineY = cy - totalH / 2;
