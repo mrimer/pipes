@@ -624,7 +624,76 @@ export class ChapterMapEditorSection {
       this._resizeChapterGrid(rVal, cVal, campaign, chapter);
     }));
 
+    // ── Slide buttons (N/E/S/W compass layout) ──
+    const slideTitle = document.createElement('div');
+    slideTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
+    slideTitle.textContent = 'Slide tiles:';
+    panel.appendChild(slideTitle);
+
+    const compass = document.createElement('div');
+    compass.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;justify-self:start;';
+
+    const arrowBtnStyle =
+      'width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center;' +
+      'background:#0d1a30;color:#7ed321;border:1px solid #4a90d9;border-radius:4px;cursor:pointer;padding:0;';
+
+    const makeArrow = (icon: string, dir: 'N' | 'E' | 'S' | 'W'): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = icon;
+      b.title = `Slide all tiles ${dir === 'N' ? 'North (up)' : dir === 'E' ? 'East (right)' : dir === 'S' ? 'South (down)' : 'West (left)'}`;
+      b.style.cssText = arrowBtnStyle;
+      b.addEventListener('click', () => this._slideChapterGrid(dir, chapter));
+      return b;
+    };
+
+    // Row 1: [empty] [↑] [empty]
+    compass.appendChild(document.createElement('span')); // placeholder
+    compass.appendChild(makeArrow('↑', 'N'));
+    compass.appendChild(document.createElement('span')); // placeholder
+    // Row 2: [←] [empty] [→]
+    compass.appendChild(makeArrow('←', 'W'));
+    compass.appendChild(document.createElement('span')); // center placeholder
+    compass.appendChild(makeArrow('→', 'E'));
+    // Row 3: [empty] [↓] [empty]
+    compass.appendChild(document.createElement('span')); // placeholder
+    compass.appendChild(makeArrow('↓', 'S'));
+    compass.appendChild(document.createElement('span')); // placeholder
+
+    panel.appendChild(compass);
+
     return panel;
+  }
+
+  /**
+   * Slide all chapter map tiles one cell in the given direction.  Tiles that
+   * would fall off the edge of the grid are discarded.  The operation is
+   * recorded as an undo snapshot.
+   */
+  private _slideChapterGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void {
+    const newGrid: (TileDef | null)[][] = Array.from(
+      { length: this._chapterEditRows },
+      () => Array(this._chapterEditCols).fill(null) as null[],
+    );
+    for (let r = 0; r < this._chapterEditRows; r++) {
+      for (let c = 0; c < this._chapterEditCols; c++) {
+        const tile = this._chapterEditGrid[r]?.[c] ?? null;
+        if (tile === null) continue;
+        let nr = r;
+        let nc = c;
+        if (dir === 'N') nr = r - 1;
+        else if (dir === 'S') nr = r + 1;
+        else if (dir === 'W') nc = c - 1;
+        else nc = c + 1; // E
+        if (nr >= 0 && nr < this._chapterEditRows && nc >= 0 && nc < this._chapterEditCols) {
+          newGrid[nr][nc] = tile;
+        }
+        // Tiles that go out of bounds are simply dropped.
+      }
+    }
+    this._chapterEditGrid = newGrid;
+    this._recordChapterSnapshot(chapter);
+    this._renderChapterCanvas();
   }
 
   /**
@@ -716,7 +785,7 @@ export class ChapterMapEditorSection {
         }
       }
       const availW = layoutW - otherW - colCount * 12 - 2 * EDITOR_CANVAS_BORDER;
-      if (availW > maxPx) maxPx = availW;
+      if (availW > 0) maxPx = availW;
     }
     const scale = Math.min(1, maxPx / Math.max(intrinsicW, intrinsicH));
     this._chapterCanvas.style.width  = Math.round(intrinsicW * scale) + 'px';
