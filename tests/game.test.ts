@@ -89,6 +89,7 @@ function makeGame(): {
       <div id="level-header"></div>
       <div id="water-display" class="stat-row"><span class="stat-label">💧 Water</span><span class="stat-value"></span></div>
       <div id="inventory-bar"></div>
+      <div id="best-score-box"><div id="best-score-title">Best Score</div></div>
       <button id="undo-btn"></button>
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>
@@ -2367,6 +2368,7 @@ function makeGameWithStorage(): Game {
       <div id="level-header"></div>
       <div id="water-display" class="stat-row"><span class="stat-label">💧 Water</span><span class="stat-value"></span></div>
       <div id="inventory-bar"></div>
+      <div id="best-score-box"><div id="best-score-title">Best Score</div></div>
       <button id="undo-btn"></button>
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>

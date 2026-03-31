@@ -333,7 +333,7 @@ export class ChapterMapEditorSection {
             ? 'border:1px solid #f0c040;background:#2a2a10;color:#f0c040;cursor:pointer;'
             : 'border:1px solid #4a90d9;background:#0a1520;color:#7ed321;cursor:pointer;') ;
       if (!isPlaced) {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('mousedown', () => {
           if (this._chapterSelectedLevelIdx === li) {
             this._chapterSelectedLevelIdx = null;
           } else {

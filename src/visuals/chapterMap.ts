@@ -244,17 +244,26 @@ export function drawLevelChamberTile(
       const my = contentY + Math.round((contentH - mh) / 2);
       ctx.drawImage(minimap, mx, my, mw, mh);
 
-      // Star icon centered on minimap
-      if (starsCollected > 0) {
+      // Star overlays: filled stars for collected, hollow star for uncollected (on completed levels)
+      const showFilledStar = starsCollected > 0;
+      const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
+      if (showFilledStar || showHollowStar) {
         ctx.save();
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
         ctx.shadowColor = 'rgba(0,0,0,0.9)';
         ctx.shadowBlur = 4;
-        const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
-        ctx.font = `bold ${_s(12)}px Arial`;
         ctx.fillStyle = FOCUS_COLOR;
-        ctx.fillText(starText, cx, my + mh / 2);
+        if (showFilledStar) {
+          ctx.textBaseline = 'middle';
+          ctx.font = `bold ${_s(12)}px Arial`;
+          const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
+          ctx.fillText(starText, cx, my + mh / 2);
+        }
+        if (showHollowStar) {
+          ctx.textBaseline = 'bottom';
+          ctx.font = `bold ${_s(10)}px Arial`;
+          ctx.fillText('☆', cx, my + mh);
+        }
         ctx.restore();
       }
     } catch {
