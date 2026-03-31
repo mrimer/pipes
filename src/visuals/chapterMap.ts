@@ -523,10 +523,6 @@ export function renderChapterMapCanvas(
       } else if (def.shape === PipeShape.Tree) {
         _drawChapterMapTree(ctx, x, y);
       }
-      ctx.strokeStyle = CHAPTER_MAP_BORDER_COLOR;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
     }
   }
 
@@ -568,11 +564,6 @@ export function renderChapterMapCanvas(
       ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-
-      ctx.strokeStyle = CHAPTER_MAP_BORDER_COLOR;
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
     }
   }
 

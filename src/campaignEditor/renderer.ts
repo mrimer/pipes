@@ -211,7 +211,7 @@ export function renderEditorCanvas(
         ctx.stroke();
       } else {
         ctx.globalAlpha = overlay.alpha;
-        drawEditorTile(ctx, x, y, overlay.def);
+        drawEditorTile(ctx, x, y, overlay.def, filledKeys !== undefined);
         ctx.globalAlpha = Math.min(1, overlay.alpha + 0.3);
         ctx.strokeStyle = '#f0c040';
         ctx.lineWidth = 2;
