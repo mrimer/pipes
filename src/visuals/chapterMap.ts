@@ -107,11 +107,10 @@ export interface LevelProgressMap {
  * Renders:
  *  • Background: red (challenge), gold (all stars obtained), white (completed),
  *    or the default dark-blue.
- *  • "L-N" label at top-left.
+ *  • Level number at top-left (white, or gold when all stars collected), followed
+ *    by a star icon (⭐/⭐×N for collected stars, ☆ when stars remain uncollected).
  *  • Skull icon 💀 at top-right when the level is a challenge level.
  *  • The level's minimap, centered in the area below the label row.
- *  • A star icon ⭐ (with "×N" when > 1) centered on the minimap when stars
- *    have been collected.
  *  • Connection lines on the edges defined by `connections`.
  */
 export function drawLevelChamberTile(
@@ -179,7 +178,7 @@ export function drawLevelChamberTile(
 
   ctx.restore();
 
-  // Label row height (for the L-N text inside the chamber box)
+  // Label row height (for the level number text inside the chamber box)
   const labelH = _s(16);
   // Chamber box interior top-left in absolute coordinates
   const boxTop = cy - bh;
@@ -189,22 +188,41 @@ export function drawLevelChamberTile(
   const contentY = boxTop + labelH;
   const contentH = bh * 2 - labelH;
 
-  // "L-N" text, optional water score, and optional skull icon in the label row.
+  // Level number, optional star icon, optional water score, and optional skull icon in the label row.
   // Reduce font size when multiple elements need to share the horizontal space.
   const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
   const labelFontSize = showWater && isChallenge ? _s(8) : _s(10);
-  const labelColor = allStars ? FOCUS_COLOR : isCompleted ? SUCCESS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
+  const labelColor = allStars ? FOCUS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
+
+  // Star display: empty star takes priority; only show filled star when empty star is not shown.
+  const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
+  const showFilledStar = starsCollected > 0 && !showHollowStar;
 
   ctx.save();
   ctx.textBaseline = 'top';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = 3;
 
-  // "L-N" at top-left
+  // Level number at top-left (no "L-" prefix)
   ctx.font = `bold ${labelFontSize}px Arial`;
   ctx.textAlign = 'left';
   ctx.fillStyle = labelColor;
-  ctx.fillText(`L-${levelNum}`, boxLeft + _s(2), boxTop + _s(2));
+  const numText = `${levelNum}`;
+  ctx.fillText(numText, boxLeft + _s(2), boxTop + _s(2));
+
+  // Star icon inline after the level number
+  if (showFilledStar || showHollowStar) {
+    const numWidth = ctx.measureText(numText).width;
+    ctx.font = `bold ${_s(9)}px Arial`;
+    if (showHollowStar) {
+      ctx.fillStyle = '#ddd';
+      ctx.fillText('☆', boxLeft + _s(2) + numWidth + _s(1), boxTop + _s(2));
+    } else {
+      ctx.fillStyle = FOCUS_COLOR;
+      const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
+      ctx.fillText(starText, boxLeft + _s(2) + numWidth + _s(1), boxTop + _s(2));
+    }
+  }
 
   // Water score "💧N" – center when skull present, right-aligned otherwise
   if (showWater) {
@@ -243,29 +261,6 @@ export function drawLevelChamberTile(
       const mx = Math.round(cx - mw / 2);
       const my = contentY + Math.round((contentH - mh) / 2);
       ctx.drawImage(minimap, mx, my, mw, mh);
-
-      // Star overlays: filled stars for collected, hollow star for uncollected (on completed levels)
-      const showFilledStar = starsCollected > 0;
-      const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
-      if (showFilledStar || showHollowStar) {
-        ctx.save();
-        ctx.textAlign = 'center';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)';
-        ctx.shadowBlur = 4;
-        ctx.fillStyle = FOCUS_COLOR;
-        if (showFilledStar) {
-          ctx.textBaseline = 'middle';
-          ctx.font = `bold ${_s(12)}px Arial`;
-          const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
-          ctx.fillText(starText, cx, my + mh / 2);
-        }
-        if (showHollowStar) {
-          ctx.textBaseline = 'bottom';
-          ctx.font = `bold ${_s(10)}px Arial`;
-          ctx.fillText('☆', cx, my + mh);
-        }
-        ctx.restore();
-      }
     } catch {
       // If minimap rendering fails, show a placeholder
       ctx.save();
