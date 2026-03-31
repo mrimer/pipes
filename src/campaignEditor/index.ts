@@ -9,7 +9,7 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from '../types';
+import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from '../types';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign, clearLevelStarRecord, clearLevelWaterRecord } from '../persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
@@ -23,7 +23,6 @@ const EDITOR_FLEX_ROW_CSS = 'display:flex;align-items:center;gap:8px;';
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
 import { Board, PIPE_SHAPES, SPIN_CEMENT_SHAPES, parseKey } from '../board';
-import { Tile } from '../tile';
 import {
   EditorPalette,
   EditorScreen,
