@@ -189,25 +189,60 @@ export function drawLevelChamberTile(
   const contentH = bh * 2 - labelH;
 
   // Level number, optional star icon, optional water score, and optional skull icon in the label row.
-  // Reduce font size when multiple elements need to share the horizontal space.
   const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
-  const labelFontSize = showWater && isChallenge ? _s(8) : _s(10);
   const labelColor = allStars ? FOCUS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
 
   // Star display: empty star takes priority; only show filled star when empty star is not shown.
   const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
   const showFilledStar = starsCollected > 0 && !showHollowStar;
 
+  // Level number text (no "L-" prefix)
+  const numText = `${levelNum}`;
+
+  // Determine label and water font sizes.
+  // Start with the larger default sizes and reduce only when necessary to fit all elements in the box.
+  let labelFontSize = _s(10);
+  let waterFontSize = _s(8);
+  if (showWater || isChallenge) {
+    ctx.font = `bold ${labelFontSize}px Arial`;
+    const numW = ctx.measureText(numText).width;
+    let leftW = numW;
+    if (showFilledStar || showHollowStar) {
+      ctx.font = `bold ${_s(9)}px Arial`;
+      const starText = showHollowStar ? '☆' : (starsCollected > 1 ? `⭐×${starsCollected}` : '⭐');
+      leftW += _s(1) + ctx.measureText(starText).width;
+    }
+    let fits = true;
+    if (isChallenge && showWater) {
+      ctx.font = `${waterFontSize}px Arial`;
+      const halfWaterW = ctx.measureText(`💧${waterScored}`).width / 2;
+      ctx.font = `${labelFontSize}px Arial`;
+      const skullW = ctx.measureText('💀').width;
+      fits = leftW <= bw - _s(2) - halfWaterW && halfWaterW + skullW <= bw - _s(2);
+    } else if (isChallenge) {
+      ctx.font = `${labelFontSize}px Arial`;
+      const skullW = ctx.measureText('💀').width;
+      fits = leftW + skullW <= bw * 2 - _s(6);
+    } else if (showWater) {
+      ctx.font = `${waterFontSize}px Arial`;
+      const waterW = ctx.measureText(`💧${waterScored}`).width;
+      fits = leftW + waterW <= bw * 2 - _s(6);
+    }
+    if (!fits) {
+      labelFontSize = _s(8);
+      waterFontSize = _s(7);
+    }
+  }
+
   ctx.save();
   ctx.textBaseline = 'top';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = 3;
 
-  // Level number at top-left (no "L-" prefix)
+  // Level number at top-left
   ctx.font = `bold ${labelFontSize}px Arial`;
   ctx.textAlign = 'left';
   ctx.fillStyle = labelColor;
-  const numText = `${levelNum}`;
   ctx.fillText(numText, boxLeft + _s(2), boxTop + _s(2));
 
   // Star icon inline after the level number
@@ -226,7 +261,7 @@ export function drawLevelChamberTile(
 
   // Water score "💧N" – center when skull present, right-aligned otherwise
   if (showWater) {
-    ctx.font = `${isChallenge ? _s(7) : _s(8)}px Arial`;
+    ctx.font = `${waterFontSize}px Arial`;
     ctx.fillStyle = '#7ec8e3';
     if (isChallenge) {
       ctx.textAlign = 'center';
