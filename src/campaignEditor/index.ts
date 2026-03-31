@@ -43,6 +43,7 @@ import {
   VALID_LEVEL_KEYS,
   VALID_INVENTORY_ITEM_KEYS,
   getValidTileDefKeys,
+  getValidChapterMapTileDefKeys,
   MAX_EDITOR_CANVAS_PX,
   EDITOR_CANVAS_BORDER,
   GRID_MIN_DIM,
@@ -2927,7 +2928,7 @@ export class CampaignEditor {
             if (!tile) continue;
             checkKeys(
               tile as unknown as Record<string, unknown>,
-              getValidTileDefKeys(tile),
+              getValidChapterMapTileDefKeys(tile),
               'ChapterMapTile',
             );
           }

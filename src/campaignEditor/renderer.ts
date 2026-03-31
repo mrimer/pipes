@@ -131,7 +131,7 @@ export function renderEditorCanvas(
       const x = c * CELL;
       const y = r * CELL;
       const isFilled = filledKeys?.has(`${r},${c}`) ?? false;
-      _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled);
+      _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined);
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
@@ -250,6 +250,7 @@ function _drawEditorTileWithLevel(
   levelDefs?: readonly LevelDef[],
   levelProgress?: LevelProgressMap,
   isFilled = false,
+  isChapterMap = false,
 ): void {
   if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
     const levelIdx = def.levelIdx ?? 0;
@@ -264,7 +265,7 @@ function _drawEditorTileWithLevel(
     drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, starsCollected, totalStars, isFilled);
     return;
   }
-  drawEditorTile(ctx, x, y, def);
+  drawEditorTile(ctx, x, y, def, isChapterMap);
 }
 
 /** Draw the OneWay editor tile overlay (arrow + label + border) at canvas pixel (x, y). */
@@ -403,7 +404,7 @@ function _drawSpinCementOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
 }
 
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */
-export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef): void {
+export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef, isChapterMap = false): void {
   const CELL = TILE_SIZE;
   const { shape } = def;
   const chamberContent = def.chamberContent ?? 'tank';
@@ -472,7 +473,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     def.shatter ?? 0,
   );
 
-  drawTileOnEditor(ctx, x, y, tile);
+  drawTileOnEditor(ctx, x, y, tile, def, isChapterMap);
 
   // For spin-cement tiles, draw the cement wavy-line overlay and drying-time label on top.
   if (SPIN_CEMENT_SHAPES.has(shape)) {
@@ -526,7 +527,7 @@ function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, 
 }
 
 /** Simplified tile drawing for the editor canvas. */
-function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile): void {
+function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
@@ -593,11 +594,12 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = SOURCE_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
-    // Count how many lines we need to center them vertically
-    const lines: string[] = ['SOURCE', `cap:${tile.capacity}`];
-    // Show temp/pressure params only when non-zero
-    if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
-    if (tile.pressure !== 0) lines.push(`${tile.pressure}P`);
+    // In chapter map editor, capacity is not used; only show SOURCE label
+    const lines: string[] = ['SOURCE'];
+    if (!isChapterMap) lines.push(`cap:${tile.capacity}`);
+    // Show temp/pressure params only when non-zero (level editor only)
+    if (!isChapterMap && tile.temperature !== 0) lines.push(`${tile.temperature}°`);
+    if (!isChapterMap && tile.pressure !== 0) lines.push(`${tile.pressure}P`);
     const lineHeight = _s(12);
     const totalH = (lines.length - 1) * lineHeight;
     let lineY = cy - totalH / 2;
@@ -613,8 +615,17 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = SINK_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
     ctx.fillStyle = '#fff';
-    ctx.font = `bold ${_s(12)}px Arial`;
-    strokeFillText(ctx, 'SINK', cx, cy);
+    // In chapter map editor, show SINK label and completion value (if set)
+    const completionVal = def?.completion;
+    if (isChapterMap && completionVal !== undefined && completionVal > 0) {
+      ctx.font = `bold ${_s(12)}px Arial`;
+      strokeFillText(ctx, 'SINK', cx, cy - _s(6));
+      ctx.font = `${_s(10)}px Arial`;
+      strokeFillText(ctx, `comp:${completionVal}`, cx, cy + _s(6));
+    } else {
+      ctx.font = `bold ${_s(12)}px Arial`;
+      strokeFillText(ctx, 'SINK', cx, cy);
+    }
     drawConnectionLines(ctx, x, y, tile);
   } else if (shape === PipeShape.Chamber) {
     const cc = tile.chamberContent ?? 'tank';

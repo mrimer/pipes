@@ -75,6 +75,36 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
   return valid;
 }
 
+/**
+ * Return the set of valid TileDef field names for the given tile definition
+ * on a **chapter map** grid.  Chapter map tiles use a more restricted field
+ * set than level tiles (e.g. Source has no capacity; Sink has completion).
+ */
+export function getValidChapterMapTileDefKeys(tile: TileDef): ReadonlySet<string> {
+  const valid = new Set<string>(['shape']);
+  const shape = tile.shape;
+
+  if (ROTATION_SHAPES.has(shape)) valid.add('rotation');
+
+  if (shape === PipeShape.Source) {
+    // Chapter map Source: connections only – no capacity, temperature or pressure
+    valid.add('connections');
+  } else if (shape === PipeShape.Sink) {
+    valid.add('connections');
+    valid.add('completion');
+  } else if (shape === PipeShape.Chamber) {
+    valid.add('chamberContent');
+    valid.add('connections');
+    if (tile.chamberContent === 'level') valid.add('levelIdx');
+  } else if (shape === PipeShape.Cement) {
+    valid.add('dryingTime');
+  } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
+    valid.add('dryingTime');
+  }
+
+  return valid;
+}
+
 // ─── Editor navigation ────────────────────────────────────────────────────────
 
 /** Top-level screens within the Campaign Editor UI. */
@@ -126,6 +156,8 @@ export interface TileParams {
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };
   /** Drying Time for Cement tiles – number of adjustments allowed before hardening. */
   dryingTime: number;
+  /** Completion threshold for Sink tiles on chapter maps (≥ 0). */
+  completion: number;
 }
 
 export const DEFAULT_PARAMS: TileParams = {
@@ -141,6 +173,7 @@ export const DEFAULT_PARAMS: TileParams = {
   itemCount: 1,
   connections: { N: true, E: true, S: true, W: true },
   dryingTime: 0,
+  completion: 0,
 };
 
 // ─── Editor snapshot for undo/redo ───────────────────────────────────────────
