@@ -508,6 +508,7 @@ export class ChapterMapScreen {
 
     const displayProgress = this._callbacks.getDisplayProgress();
     const levelStars = loadLevelStars(this._callbacks.getActiveCampaignId() ?? undefined);
+    const levelWater = loadLevelWater(this._callbacks.getActiveCampaignId() ?? undefined);
 
     const filledKeys = this._computeFilledCells(chapter, displayProgress);
 
@@ -529,7 +530,7 @@ export class ChapterMapScreen {
       cols,
       chapter.levels,
       filledKeys,
-      { completedLevels: displayProgress, levelStars },
+      { completedLevels: displayProgress, levelStars, levelWater },
       this._hover,
       accessibleLevelIdxs,
       this._decorations,

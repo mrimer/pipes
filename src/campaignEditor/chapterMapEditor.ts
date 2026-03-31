@@ -139,6 +139,7 @@ export class ChapterMapEditorSection {
     this._chapterDragState = null;
     this._chapterPaintDragActive = false;
     this._chapterRightEraseDragActive = false;
+    this._chapterFocusedTilePos = null;
     this._recordChapterSnapshot(chapter, false);
   }
 
@@ -742,7 +743,11 @@ export class ChapterMapEditorSection {
         const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
         if (tile && PIPE_SHAPES.has(tile.shape)) {
           this._rotateChapterTileAt(pos, e.deltaY > 0, chapter, campaign);
-        } else if (tile && (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink)) {
+        } else if (tile && (
+          tile.shape === PipeShape.Source ||
+          tile.shape === PipeShape.Sink ||
+          (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level')
+        )) {
           this._rotateChapterSourceSinkAt(pos, e.deltaY > 0, chapter, campaign);
         } else if (PIPE_SHAPES.has(this._chapterPalette as PipeShape)) {
           this._rotateChapterPalette(e.deltaY > 0);
@@ -833,15 +838,22 @@ export class ChapterMapEditorSection {
         const isEmpty = (this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null) === null;
         overlay = { pos: this._chapterHover, def: null, alpha: isEmpty ? 0.2 : 1 };
       } else if (this._chapterSelectedLevelIdx !== null) {
-        // Preview: level chamber placeholder
-        const levelDef: TileDef = {
-          shape: PipeShape.Chamber,
-          chamberContent: 'level',
-          levelIdx: this._chapterSelectedLevelIdx,
-        };
-        overlay = { pos: this._chapterHover, def: levelDef, alpha: 0.55 };
+        // Preview: level chamber placeholder – only on empty cells
+        const isEmpty = (this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null) === null;
+        if (isEmpty) {
+          const levelDef: TileDef = {
+            shape: PipeShape.Chamber,
+            chamberContent: 'level',
+            levelIdx: this._chapterSelectedLevelIdx,
+          };
+          overlay = { pos: this._chapterHover, def: levelDef, alpha: 0.55 };
+        }
       } else {
-        overlay = { pos: this._chapterHover, def: this._buildChapterTileDef(), alpha: 0.55 };
+        // Only show placement ghost on empty cells; occupied cells cannot be overwritten
+        const isEmpty = (this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null) === null;
+        if (isEmpty) {
+          overlay = { pos: this._chapterHover, def: this._buildChapterTileDef(), alpha: 0.55 };
+        }
       }
     }
 
@@ -989,7 +1001,12 @@ export class ChapterMapEditorSection {
     campaign: CampaignDef,
   ): void {
     const tile = this._chapterEditGrid[pos.row]?.[pos.col];
-    if (!tile || (tile.shape !== PipeShape.Source && tile.shape !== PipeShape.Sink)) return;
+    if (!tile) return;
+    const isConnectable =
+      tile.shape === PipeShape.Source ||
+      tile.shape === PipeShape.Sink ||
+      (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level');
+    if (!isConnectable) return;
 
     const allDirs: Direction[] = [Direction.North, Direction.East, Direction.South, Direction.West];
     const currentConns = new Set(tile.connections ?? allDirs);
@@ -1050,7 +1067,29 @@ export class ChapterMapEditorSection {
     const key = e.key.toLowerCase();
     if (key === 'q' || key === 'w') {
       e.preventDefault();
-      this._rotateChapterPalette(key === 'w');
+      const clockwise = key === 'w';
+      // If hovering over a tile with connections, rotate it; otherwise rotate the palette ghost
+      if (this._chapterHover) {
+        const tile = this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null;
+        if (tile) {
+          const campaign = this._callbacks.getActiveCampaign();
+          const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
+          if (campaign && chapter) {
+            if (PIPE_SHAPES.has(tile.shape)) {
+              this._rotateChapterTileAt(this._chapterHover, clockwise, chapter, campaign);
+              return;
+            } else if (
+              tile.shape === PipeShape.Source ||
+              tile.shape === PipeShape.Sink ||
+              (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level')
+            ) {
+              this._rotateChapterSourceSinkAt(this._chapterHover, clockwise, chapter, campaign);
+              return;
+            }
+          }
+        }
+      }
+      this._rotateChapterPalette(clockwise);
     }
   }
 

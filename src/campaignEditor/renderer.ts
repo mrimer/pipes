@@ -175,7 +175,7 @@ export function renderEditorCanvas(
       const y = row * CELL;
       ctx.save();
       ctx.globalAlpha = 0.9;
-      drawEditorTile(ctx, x, y, drag.tile);
+      drawEditorTile(ctx, x, y, drag.tile, filledKeys !== undefined);
       ctx.globalAlpha = 1;
       ctx.strokeStyle = '#f0c040';
       ctx.lineWidth = 2;
