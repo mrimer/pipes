@@ -96,9 +96,7 @@ export function getValidChapterMapTileDefKeys(tile: TileDef): ReadonlySet<string
     valid.add('chamberContent');
     valid.add('connections');
     if (tile.chamberContent === 'level') valid.add('levelIdx');
-  } else if (shape === PipeShape.Cement) {
-    valid.add('dryingTime');
-  } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
+  } else if (shape === PipeShape.Cement || shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
     valid.add('dryingTime');
   }
 
