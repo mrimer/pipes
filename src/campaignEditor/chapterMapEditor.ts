@@ -379,8 +379,16 @@ export class ChapterMapEditorSection {
 
     if ((isFocusedLevelChamber || isFocusedSourceOrSink) && this._chapterFocusedTilePos) {
       panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile!, chapter, campaign));
+      // For focused Sink tile, also show completion param editor
+      if (focusedTile?.shape === PipeShape.Sink) {
+        panel.appendChild(this._buildFocusedSinkCompletionWidget(panel, focusedTile, chapter, campaign));
+      }
     } else if (this._chapterPalette === PipeShape.Source || this._chapterPalette === PipeShape.Sink) {
       panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
+      // For Sink palette, also show completion param
+      if (this._chapterPalette === PipeShape.Sink) {
+        panel.appendChild(this._buildSinkCompletionParamWidget(panel, chapter, campaign));
+      }
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';
@@ -389,6 +397,76 @@ export class ChapterMapEditorSection {
     }
 
     return panel;
+  }
+
+  /**
+   * Build a number input widget for the Sink palette's completion parameter.
+   * Reads from and writes to `_chapterParams.completion`.
+   */
+  private _buildSinkCompletionParamWidget(
+    replaceTarget: HTMLElement,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): HTMLElement {
+    return this._buildCompletionInputWidget(
+      () => this._chapterParams.completion,
+      (val) => {
+        this._chapterParams.completion = val;
+        replaceTarget.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+        this._renderChapterCanvas();
+      },
+    );
+  }
+
+  /**
+   * Build a number input widget for the completion param of a focused Sink tile.
+   * Reads from and writes to the tile's `completion` property directly.
+   */
+  private _buildFocusedSinkCompletionWidget(
+    replaceTarget: HTMLElement,
+    tile: TileDef,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+  ): HTMLElement {
+    return this._buildCompletionInputWidget(
+      () => tile.completion ?? 0,
+      (val) => {
+        tile.completion = val > 0 ? val : undefined;
+        this._recordChapterSnapshot(chapter);
+        this._saveChapterGridState(chapter, campaign);
+        replaceTarget.replaceWith(this._buildChapterTileParamsPanel(chapter, campaign));
+        this._renderChapterCanvas();
+      },
+    );
+  }
+
+  /**
+   * Build a labeled number input for a Completion threshold value (≥ 0).
+   */
+  private _buildCompletionInputWidget(
+    getValue: () => number,
+    setValue: (val: number) => void,
+  ): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px;';
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
+    lbl.textContent = 'Completion';
+    wrap.appendChild(lbl);
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.min = '0';
+    inp.step = '1';
+    inp.value = String(getValue());
+    inp.style.cssText =
+      'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
+    inp.addEventListener('change', () => {
+      const v = Math.max(0, Math.round(parseFloat(inp.value) || 0));
+      inp.value = String(v);
+      setValue(v);
+    });
+    wrap.appendChild(inp);
+    return wrap;
   }
 
   /**
@@ -725,7 +803,8 @@ export class ChapterMapEditorSection {
       if (p.connections.S) connDirs.push(Direction.South);
       if (p.connections.W) connDirs.push(Direction.West);
       const def: TileDef = { shape };
-      if (shape === PipeShape.Source) def.capacity = p.capacity;
+      // Sink can have an optional completion threshold; Source no longer uses capacity on chapter maps
+      if (shape === PipeShape.Sink && p.completion > 0) def.completion = p.completion;
       if (connDirs.length < 4) def.connections = connDirs;
       return def;
     }

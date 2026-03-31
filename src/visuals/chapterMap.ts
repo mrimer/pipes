@@ -268,7 +268,8 @@ function _drawChapterMapEndpoint(
   y: number,
   color: string,
   connections: Set<Direction>,
-  capacity?: number,
+  centerText?: string,
+  centerTextColor?: string,
   buttEndDirs?: Set<Direction>,
 ): void {
   const CELL = TILE_SIZE;
@@ -297,24 +298,55 @@ function _drawChapterMapEndpoint(
   ctx.beginPath();
   ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
   ctx.fill();
-  if (capacity !== undefined) {
-    ctx.fillStyle = '#fff';
+  if (centerText !== undefined) {
+    ctx.fillStyle = centerTextColor ?? '#fff';
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(capacity), 0, 0);
+    ctx.fillText(centerText, 0, 0);
   }
   ctx.restore();
 }
 
-/** Draw Source tile like in-game: colored circle + radiating arms to connected edges. */
-function _drawChapterMapSource(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, capacity?: number, buttEndDirs?: Set<Direction>): void {
-  _drawChapterMapEndpoint(ctx, x, y, isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR, connections, capacity, buttEndDirs);
+/** Draw Source tile: shows the number of completed chapter levels in the center. */
+function _drawChapterMapSource(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  isFilled: boolean,
+  connections: Set<Direction>,
+  completedLevelCount: number,
+  buttEndDirs?: Set<Direction>,
+): void {
+  _drawChapterMapEndpoint(
+    ctx, x, y,
+    isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR,
+    connections,
+    String(completedLevelCount),
+    undefined,
+    buttEndDirs,
+  );
 }
 
-/** Draw Sink tile like in-game: colored circle + radiating arms. */
-function _drawChapterMapSink(ctx: CanvasRenderingContext2D, x: number, y: number, isFilled: boolean, connections: Set<Direction>, buttEndDirs?: Set<Direction>): void {
-  _drawChapterMapEndpoint(ctx, x, y, isFilled ? SINK_WATER_COLOR : SINK_COLOR, connections, undefined, buttEndDirs);
+/** Draw Sink tile: shows remaining completion value, or a star when complete and connected. */
+function _drawChapterMapSink(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  isFilled: boolean,
+  connections: Set<Direction>,
+  remaining: number,
+  buttEndDirs?: Set<Direction>,
+): void {
+  const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
+  if (remaining === 0 && isFilled) {
+    // Star icon indicates the chapter can be completed by clicking the sink
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, '★', '#f0c040', buttEndDirs);
+  } else if (remaining > 0) {
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, String(remaining), undefined, buttEndDirs);
+  } else {
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, undefined, undefined, buttEndDirs);
+  }
 }
 
 /** Draw Granite tile like in-game. */
@@ -410,6 +442,26 @@ export function renderChapterMapCanvas(
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
 
+  // Count how many of this chapter's levels the player has completed
+  const completedLevelCount = levelDefs.filter(l => progress.completedLevels.has(l.id)).length;
+
+  // Grid lines – drawn first so they are beneath all tile objects
+  ctx.strokeStyle = 'rgba(74,144,217,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  for (let r = 0; r <= rows; r++) {
+    ctx.beginPath();
+    ctx.moveTo(0, r * CELL);
+    ctx.lineTo(cols * CELL, r * CELL);
+    ctx.stroke();
+  }
+  for (let c = 0; c <= cols; c++) {
+    ctx.beginPath();
+    ctx.moveTo(c * CELL, 0);
+    ctx.lineTo(c * CELL, rows * CELL);
+    ctx.stroke();
+  }
+
   // Pass 1: background cells
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -428,23 +480,6 @@ export function renderChapterMapCanvas(
       const dec = decorations?.get(`${r},${c}`);
       if (dec) drawAmbientDecoration(ctx, dec);
     }
-  }
-
-  // Grid lines – drawn beneath tile objects so pipe/container edges render on top
-  ctx.strokeStyle = 'rgba(74,144,217,0.12)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([]);
-  for (let r = 0; r <= rows; r++) {
-    ctx.beginPath();
-    ctx.moveTo(0, r * CELL);
-    ctx.lineTo(cols * CELL, r * CELL);
-    ctx.stroke();
-  }
-  for (let c = 0; c <= cols; c++) {
-    ctx.beginPath();
-    ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, rows * CELL);
-    ctx.stroke();
   }
 
   // Pass 2: non-pipe tiles (level chambers, source, sink)
@@ -476,11 +511,12 @@ export function renderChapterMapCanvas(
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
-        _drawChapterMapSource(ctx, x, y, isFilled, connections, def.capacity, buttEndDirs);
+        _drawChapterMapSource(ctx, x, y, isFilled, connections, completedLevelCount, buttEndDirs);
       } else if (def.shape === PipeShape.Sink) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
-        _drawChapterMapSink(ctx, x, y, isFilled, connections, buttEndDirs);
+        const remaining = Math.max(0, (def.completion ?? 0) - completedLevelCount);
+        _drawChapterMapSink(ctx, x, y, isFilled, connections, remaining, buttEndDirs);
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y);
       } else if (def.shape === PipeShape.Tree) {

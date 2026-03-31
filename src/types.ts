@@ -203,6 +203,13 @@ export interface TileDef {
    * References the level that this chamber represents on the chapter map.
    */
   levelIdx?: number;
+  /**
+   * Completion threshold for Sink tiles on chapter maps.
+   * The sink's displayed value = max(0, completion − completedLevels).
+   * When this value reaches 0 and the sink is water-connected, the chapter can be completed.
+   * Defaults to 0 (always satisfiable once the sink is connected).
+   */
+  completion?: number;
 }
 
 /** Complete definition of a game level. */

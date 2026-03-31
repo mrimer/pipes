@@ -88,6 +88,9 @@ export class ChapterMapScreen {
   private readonly _tooltipEl: HTMLElement;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
+  /** Temporary error message element shown when a sink click is rejected. */
+  private _errorEl: HTMLElement | null = null;
+  private _errorTimeout: ReturnType<typeof setTimeout> | null = null;
   /** Ambient decorations for empty cells, keyed by "row,col". */
   private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
 
@@ -273,9 +276,24 @@ export class ChapterMapScreen {
       const pos = this._canvasPos(e, chapter);
       if (pos) {
         const def = chapter.grid![pos.row]?.[pos.col];
+        const displayProgress = this._callbacks.getDisplayProgress();
         if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
           const level = chapter.levels[def.levelIdx];
           canvas.title = level ? `${def.levelIdx + 1}: ${level.name}` : '';
+        } else if (def?.shape === PipeShape.Source) {
+          const completedLevelCount = chapter.levels.filter(l => displayProgress.has(l.id)).length;
+          canvas.title = `${completedLevelCount} completed level${completedLevelCount === 1 ? '' : 's'}`;
+        } else if (def?.shape === PipeShape.Sink) {
+          const filledKeys = this._computeFilledCells(chapter, displayProgress);
+          const remaining = this._sinkRemaining(def, chapter, displayProgress);
+          const isFilled = filledKeys.has(`${pos.row},${pos.col}`);
+          if (remaining > 0) {
+            canvas.title = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
+          } else if (isFilled) {
+            canvas.title = 'Next Chapter Unlocked!';
+          } else {
+            canvas.title = 'Connect to unlock next chapter';
+          }
         } else {
           canvas.title = '';
         }
@@ -309,17 +327,46 @@ export class ChapterMapScreen {
     this._statusEl = statusEl;
     el.appendChild(statusEl);
 
+    // Error text (shown temporarily when sink is clicked but conditions not met)
+    const errorEl = document.createElement('div');
+    errorEl.style.cssText = 'text-align:center;margin:2px 0;min-height:1.5em;font-size:0.9rem;color:#f44;';
+    this._errorEl = errorEl;
+    el.appendChild(errorEl);
+
     // Render the chapter map
     this._render(chapter);
   }
 
   // ─── Private – interaction ──────────────────────────────────────────────────
 
+  /**
+   * Compute the sink's remaining completion value: max(0, completion − completedLevelCount).
+   * Returns 0 when the sink has no completion threshold set.
+   */
+  private _sinkRemaining(def: TileDef, chapter: ChapterDef, displayProgress: Set<number>): number {
+    const completedLevelCount = chapter.levels.filter(l => displayProgress.has(l.id)).length;
+    return Math.max(0, (def.completion ?? 0) - completedLevelCount);
+  }
+
+  /** Show a temporary error message below the chapter map canvas. */
+  private _showError(msg: string): void {
+    if (!this._errorEl) return;
+    this._errorEl.textContent = msg;
+    if (this._errorTimeout !== null) clearTimeout(this._errorTimeout);
+    this._errorTimeout = setTimeout(() => {
+      if (this._errorEl) this._errorEl.textContent = '';
+      this._errorTimeout = null;
+    }, 3000);
+  }
+
   private _showTooltip(clientX: number, clientY: number): void {
     const chapter = this._chapter;
     if (!chapter?.grid || !this._hover) { this._hideTooltip(); return; }
     const { row, col } = this._hover;
     const def = chapter.grid[row]?.[col];
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+
     if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
       const level = chapter.levels[def.levelIdx];
       if (level) {
@@ -329,6 +376,29 @@ export class ChapterMapScreen {
         this._tooltipEl.style.top  = `${clientY + 12}px`;
         return;
       }
+    } else if (def?.shape === PipeShape.Source) {
+      const completedLevelCount = chapter.levels.filter(l => displayProgress.has(l.id)).length;
+      this._tooltipEl.textContent = `${completedLevelCount} completed level${completedLevelCount === 1 ? '' : 's'}`;
+      this._tooltipEl.style.display = 'block';
+      this._tooltipEl.style.left = `${clientX + 12}px`;
+      this._tooltipEl.style.top  = `${clientY + 12}px`;
+      return;
+    } else if (def?.shape === PipeShape.Sink) {
+      const remaining = this._sinkRemaining(def, chapter, displayProgress);
+      const isFilled = filledKeys.has(`${row},${col}`);
+      let text: string;
+      if (remaining > 0) {
+        text = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
+      } else if (isFilled) {
+        text = 'Next Chapter Unlocked!';
+      } else {
+        text = 'Connect to unlock next chapter';
+      }
+      this._tooltipEl.textContent = text;
+      this._tooltipEl.style.display = 'block';
+      this._tooltipEl.style.left = `${clientX + 12}px`;
+      this._tooltipEl.style.top  = `${clientY + 12}px`;
+      return;
     }
     this._hideTooltip();
   }
@@ -368,8 +438,13 @@ export class ChapterMapScreen {
     if (def.shape === PipeShape.Sink && filledKeys.has(`${pos.row},${pos.col}`)) {
       const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
       const allNonChallengeCompleted = nonChallengeLevels.length === 0 || nonChallengeLevels.every(l => displayProgress.has(l.id));
-      if (allNonChallengeCompleted) {
+      const remaining = this._sinkRemaining(def, chapter, displayProgress);
+      if (allNonChallengeCompleted && remaining <= 0) {
         this._callbacks.onChapterSinkClicked?.(this._chapterIdx);
+        return;
+      }
+      if (remaining > 0) {
+        this._showError(`Finish ${remaining} more level${remaining === 1 ? '' : 's'} to complete the chapter.`);
         return;
       }
     }
@@ -485,17 +560,26 @@ export class ChapterMapScreen {
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
 
-    // Check whether the sink has water reaching it
+    // Find sink tile and check if it has water reaching it
     let sinkFilled = false;
-    for (let r = 0; r < rows && !sinkFilled; r++) {
-      for (let c = 0; c < cols && !sinkFilled; c++) {
-        if (grid[r]?.[c]?.shape === PipeShape.Sink && filledKeys.has(`${r},${c}`)) sinkFilled = true;
+    let sinkRemaining = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const tileDef = grid[r]?.[c];
+        if (tileDef?.shape === PipeShape.Sink) {
+          if (filledKeys.has(`${r},${c}`)) {
+            sinkFilled = true;
+            sinkRemaining = this._sinkRemaining(tileDef, chapter, displayProgress);
+          }
+          break;
+        }
       }
+      if (sinkFilled) break;
     }
     const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
     const allNonChallengeCompleted = nonChallengeLevels.length === 0 || nonChallengeLevels.every(l => displayProgress.has(l.id));
 
-    if (sinkFilled && allNonChallengeCompleted) {
+    if (sinkFilled && allNonChallengeCompleted && sinkRemaining <= 0) {
       const completedChapters = this._callbacks.getCompletedChapters?.();
       const campaign = this._callbacks.getActiveCampaign?.();
       const isAlreadyCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
@@ -719,7 +803,7 @@ export class ChapterMapScreen {
         const gapSize = bounds[i + 1] - bounds[i];
         if (gapSize > bestGapSize) {
           bestGapSize = gapSize;
-          bestGapStart = bounds[gi];
+          bestGapStart = bounds[i];
         }
       }
       y = bestGapStart + bestGapSize / 2;
