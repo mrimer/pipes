@@ -296,7 +296,7 @@ export class ChapterMapScreen {
     canvas.height = rows * TILE_SIZE;
     canvas.style.cssText =
       'border:2px solid #4a90d9;border-radius:6px;cursor:pointer;' +
-      'display:block;width:100%;height:auto;';
+      'display:block;max-width:100%;height:auto;margin:0 auto;';
 
     // Mouse events for hover and click
     canvas.addEventListener('mousemove', (e) => {
