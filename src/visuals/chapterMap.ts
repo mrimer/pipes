@@ -342,10 +342,11 @@ function _drawChapterMapSink(
   if (remaining === 0 && isFilled) {
     // Star icon indicates the chapter can be completed by clicking the sink
     _drawChapterMapEndpoint(ctx, x, y, color, connections, '★', '#f0c040', buttEndDirs);
-  } else if (remaining > 0) {
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, String(remaining), undefined, buttEndDirs);
+  } else if (remaining === 0) {
+    // Not yet connected but requirement already met: show "0"
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, '0', undefined, buttEndDirs);
   } else {
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, undefined, undefined, buttEndDirs);
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, String(remaining), undefined, buttEndDirs);
   }
 }
 
