@@ -18,7 +18,37 @@ import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sin
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
 
-// ─── Callbacks ────────────────────────────────────────────────────────────────
+// ─── Layout overhead constants ────────────────────────────────────────────────
+// Estimated heights of UI elements that appear above/below the chapter map
+// canvas, used to compute the vertical overhead passed to computeTileSize so
+// the canvas fits on-screen without scrolling.
+
+/** Estimated height (px) of the chapter-map header (campaign name + chapter title h2). */
+const CHAPTER_MAP_HEADER_H = 50;
+/** Estimated height (px) of the stats row. */
+const CHAPTER_MAP_STATS_H = 22;
+/** Estimated height (px) of the back button. */
+const CHAPTER_MAP_BACK_BTN_H = 32;
+/** Estimated height (px) of the instruction text line. */
+const CHAPTER_MAP_INSTRUCTION_H = 20;
+/** Estimated height (px) of the status element (has min-height: 2.5em). */
+const CHAPTER_MAP_STATUS_H = 40;
+/** Estimated height (px) of the error element (has min-height: 1.5em). */
+const CHAPTER_MAP_ERROR_H = 24;
+/** Gap (px) between flex children of the chapter-map screen. */
+const CHAPTER_MAP_GAP = 16;
+/** Top + bottom padding (px) of the chapter-map screen container. */
+const CHAPTER_MAP_PADDING = 40;
+
+/**
+ * Total estimated vertical overhead (px) consumed by all chapter-map UI
+ * elements other than the canvas itself.
+ */
+const CHAPTER_MAP_GRID_OVERHEAD =
+  CHAPTER_MAP_HEADER_H + CHAPTER_MAP_STATS_H + CHAPTER_MAP_BACK_BTN_H +
+  CHAPTER_MAP_INSTRUCTION_H + CHAPTER_MAP_STATUS_H + CHAPTER_MAP_ERROR_H +
+  6 * CHAPTER_MAP_GAP + CHAPTER_MAP_PADDING;
+
 
 /** Callbacks that the chapter map screen uses to interact with the rest of the game. */
 export interface ChapterMapCallbacks {
@@ -261,7 +291,7 @@ export class ChapterMapScreen {
 
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    setTileSize(computeTileSize(rows, cols));
+    setTileSize(computeTileSize(rows, cols, CHAPTER_MAP_GRID_OVERHEAD));
     canvas.width  = cols * TILE_SIZE;
     canvas.height = rows * TILE_SIZE;
     canvas.style.cssText =
@@ -727,7 +757,7 @@ export class ChapterMapScreen {
     renderBubbles(ctx, this._bubbles, WATER_COLOR);
 
     // Edge flowers – shown when the chapter is completed
-    const isCompleted = this._isChapterCompleted(chapter, displayProgress);
+    const isCompleted = this._isChapterCompleted(chapter);
     const isMastered  = isCompleted && this._isChapterMastered(chapter, displayProgress);
     if (isCompleted) {
       if (now - this._lastFlowerSpawn >= ChapterMapScreen.FLOWER_SPAWN_INTERVAL_MS) {
@@ -755,7 +785,7 @@ export class ChapterMapScreen {
   // ─── Edge flower helpers ───────────────────────────────────────────────────
 
   /** Returns true if the chapter's completion flag is set. */
-  private _isChapterCompleted(chapter: ChapterDef, displayProgress: Set<number>): boolean {
+  private _isChapterCompleted(chapter: ChapterDef): boolean {
     const completedChapters = this._callbacks.getCompletedChapters?.();
     return chapter.id !== undefined && completedChapters?.has(chapter.id) === true;
   }

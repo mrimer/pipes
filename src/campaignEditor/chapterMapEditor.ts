@@ -28,7 +28,6 @@ import {
   EDITOR_CANVAS_BORDER,
   MAX_EDITOR_CANVAS_PX,
   REPEATABLE_EDITOR_TILES,
-  isChamberPalette,
 } from './types';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
@@ -322,7 +321,7 @@ export class ChapterMapEditorSection {
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = `L-${li + 1}: ${level.name}${isPlaced ? ' ✓' : ''}`;
+      btn.textContent = `L-${li + 1}: ${level.name}${level.challenge ? ' ☠' : ''}${isPlaced ? ' ✓' : ''}`;
       btn.title = isPlaced ? 'Already placed on the map' : `Select to place L-${li + 1}`;
       btn.disabled = isPlaced;
       btn.style.cssText =
@@ -647,7 +646,7 @@ export class ChapterMapEditorSection {
 
     if (!readOnly) {
       canvas.addEventListener('mousedown', (e) => this._onChapterCanvasMouseDown(e, campaign, chapter));
-      canvas.addEventListener('mousemove', (e) => this._onChapterCanvasMouseMove(e, campaign, chapter));
+      canvas.addEventListener('mousemove', (e) => this._onChapterCanvasMouseMove(e));
       canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (this._chapterSuppressContextMenu) { this._chapterSuppressContextMenu = false; return; }
@@ -846,6 +845,13 @@ export class ChapterMapEditorSection {
     );
   }
 
+  /** Clear the focus tile if it matches the given position. */
+  private _clearFocusIfAt(pos: { row: number; col: number }): void {
+    if (this._chapterFocusedTilePos?.row === pos.row && this._chapterFocusedTilePos?.col === pos.col) {
+      this._chapterFocusedTilePos = null;
+    }
+  }
+
   /**
    * Rotate a placed pipe tile at the given position clockwise or counterclockwise.
    * No-op if the tile at pos is not a rotatable pipe shape.
@@ -860,6 +866,10 @@ export class ChapterMapEditorSection {
     if (!tile || !PIPE_SHAPES.has(tile.shape)) return;
     const cur = (tile.rotation ?? 0) as Rotation;
     tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
+    // When the palette matches the rotated tile's shape, keep the ghost preview in sync
+    if (this._chapterPalette === tile.shape) {
+      this._chapterParams.rotation = tile.rotation;
+    }
     this._recordChapterSnapshot(chapter);
     this._saveChapterGridState(chapter, campaign);
     this._renderChapterCanvas();
@@ -964,6 +974,7 @@ export class ChapterMapEditorSection {
       const existingTile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
       if (existingTile !== null) {
         this._chapterEditGrid[pos.row][pos.col] = null;
+        this._clearFocusIfAt(pos);
         this._renderChapterCanvas();
       }
       return;
@@ -1041,6 +1052,7 @@ export class ChapterMapEditorSection {
       }
       if (this._chapterPalette === 'erase') {
         this._chapterEditGrid[pos.row][pos.col] = null;
+        this._clearFocusIfAt(pos);
         this._rebuildChapterLevelInventory(chapter, campaign);
       } else {
         this._chapterEditGrid[pos.row][pos.col] = this._buildChapterTileDef();
@@ -1092,7 +1104,7 @@ export class ChapterMapEditorSection {
     this._renderChapterCanvas();
   }
 
-  private _onChapterCanvasMouseMove(e: MouseEvent, _campaign: CampaignDef, _chapter: ChapterDef): void {
+  private _onChapterCanvasMouseMove(e: MouseEvent): void {
     const pos = this._chapterCanvasPos(e);
     this._chapterHover = pos;
 
@@ -1103,6 +1115,7 @@ export class ChapterMapEditorSection {
     } else if (this._chapterRightEraseDragActive && pos) {
       if ((this._chapterEditGrid[pos.row]?.[pos.col] ?? null) !== null) {
         this._chapterEditGrid[pos.row][pos.col] = null;
+        this._clearFocusIfAt(pos);
       }
     } else if (this._chapterDragState && pos) {
       const { startPos, currentPos } = this._chapterDragState;
@@ -1123,6 +1136,7 @@ export class ChapterMapEditorSection {
     const pos = this._chapterCanvasPos(e);
     if (!pos) return;
     this._chapterEditGrid[pos.row][pos.col] = null;
+    this._clearFocusIfAt(pos);
     this._rebuildChapterLevelInventory(chapter, campaign);
     this._recordChapterSnapshot(chapter);
     this._saveChapterGridState(chapter, campaign);
