@@ -132,6 +132,17 @@ export class Game {
   private readonly gameoverModalEl: HTMLElement;
   private readonly gameoverMsgEl: HTMLElement;
 
+  /** Best score box element (shown below inventory when the level has been completed before). */
+  private readonly _bestScoreBoxEl: HTMLElement;
+  /** Water row inside the best score box. */
+  private readonly _bestScoreWaterRowEl: HTMLElement;
+  /** Value span for the best water score. */
+  private readonly _bestScoreWaterValueEl: HTMLElement;
+  /** Stars row inside the best score box (hidden when no stars). */
+  private readonly _bestScoreStarsRowEl: HTMLElement;
+  /** Value span for the best stars count. */
+  private readonly _bestScoreStarsValueEl: HTMLElement;
+
   /** Undo button in the play-screen HUD. */
   private readonly undoBtnEl: HTMLButtonElement;
 
@@ -471,6 +482,16 @@ export class Game {
     ({ rowEl: this.pressureDisplayEl, valueEl: this.pressureValueEl } =
       Game._createStatRow('🔧 Pressure', '#a8e063'));
     this.tempDisplayEl.insertAdjacentElement('afterend', this.pressureDisplayEl);
+
+    // Wire up the best-score box elements (the box itself is in the HTML; rows are created here)
+    this._bestScoreBoxEl = document.getElementById('best-score-box') as HTMLElement;
+    ({ rowEl: this._bestScoreWaterRowEl, valueEl: this._bestScoreWaterValueEl } =
+      Game._createStatRow('💧', '#4fc3f7'));
+    this._bestScoreBoxEl.appendChild(this._bestScoreWaterRowEl);
+    this._bestScoreWaterRowEl.style.display = 'flex';
+    ({ rowEl: this._bestScoreStarsRowEl, valueEl: this._bestScoreStarsValueEl } =
+      Game._createStatRow('⭐', '#f0c040'));
+    this._bestScoreBoxEl.appendChild(this._bestScoreStarsRowEl);
 
     // Create the note box (appended to the play screen, shown beneath the grid)
     this.noteBoxEl = document.createElement('div');
@@ -1031,6 +1052,7 @@ export class Game {
     this._updateLevelHeader(levelId);
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
+    this._updateBestScoreBox(levelId);
     this.canvas.focus();
 
     this._checkAndShowInitialError();
@@ -3192,6 +3214,7 @@ export class Game {
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
+    this._bestScoreBoxEl.style.display = 'none';
     this.canvas.focus();
 
     this._checkAndShowInitialError();
@@ -3208,6 +3231,25 @@ export class Game {
   }
 
   // ─── Persistence helpers ──────────────────────────────────────────────────
+
+  /**
+   * Update the best-score box below the inventory bar.
+   * Shows the box when the level has been previously completed (has a best water score).
+   * Shows a stars row when at least one star has been obtained.
+   */
+  private _updateBestScoreBox(levelId: number): void {
+    const levelWater = loadLevelWater(this._activeCampaign?.id);
+    const bestWater = levelWater[levelId] as number | undefined;
+    if (bestWater === undefined) {
+      this._bestScoreBoxEl.style.display = 'none';
+      return;
+    }
+    this._bestScoreBoxEl.style.display = 'flex';
+    this._bestScoreWaterValueEl.textContent = `${bestWater}`;
+    const levelStars = loadLevelStars(this._activeCampaign?.id);
+    const stars = levelStars[levelId] ?? 0;
+    Game._showStatRow(this._bestScoreStarsRowEl, this._bestScoreStarsValueEl, stars > 0 ? stars : null);
+  }
 
   private _markLevelCompleted(levelId: number): void {
     if (this._playtestExitCallback) return; // don't persist progress during playtesting

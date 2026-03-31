@@ -406,22 +406,9 @@ export function renderLevelList(
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
 
     if (!chapterLocked && chapter.grid && onChapterMap) {
-      // Map-mode: show a Map button in the header instead of expand/collapse
-      const mapHeaderBtn = document.createElement('button');
-      mapHeaderBtn.textContent = '🗺️ Map';
-      mapHeaderBtn.style.cssText =
-        'padding:4px 10px;font-size:0.85rem;font-weight:bold;border-radius:4px;cursor:pointer;' +
-        'border:1px solid ' + (isGold ? '#f0c040' : '#4a90d9') + ';' +
-        'background:' + (isGold ? '#2a2000' : '#16213e') + ';' +
-        'color:' + (isGold ? '#f0c040' : '#7ed321') + ';';
-      mapHeaderBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onChapterMap(ci);
-      });
-
+      // Map-mode: clicking the chapter header navigates to the chapter map
       chapterHeader.style.cursor = 'pointer';
       chapterHeader.appendChild(chapterTitle);
-      chapterHeader.appendChild(mapHeaderBtn);
       chapterHeader.addEventListener('click', () => { onChapterMap(ci); });
       attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
       chapterBox.appendChild(chapterHeader);
