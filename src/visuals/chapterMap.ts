@@ -91,11 +91,13 @@ export function generateChapterMapDecorations(
 
 /**
  * Per-level progress data used to determine level-chamber visual state
- * (completion, star collection) when rendering the chapter map grid.
+ * (completion, star collection, water scored) when rendering the chapter map grid.
  */
 export interface LevelProgressMap {
   completedLevels: ReadonlySet<number>;
   levelStars: Readonly<Record<number, number>>;
+  /** Maximum water scored per level id (from persistence). Optional. */
+  levelWater?: Readonly<Record<number, number>>;
 }
 
 // ─── Level chamber tile ────────────────────────────────────────────────────────
@@ -123,6 +125,7 @@ export function drawLevelChamberTile(
   starsCollected = 0,
   totalStars = 0,
   isFilled = false,
+  waterScored?: number,
 ): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
@@ -144,9 +147,11 @@ export function drawLevelChamberTile(
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Inner chamber box – use a vivid water-blue when the tile is water-connected
+  // Inner chamber box – use a vivid water-blue when the tile is water-connected;
+  // use white when connected but not yet completed, to visually differentiate
+  // from a fully completed chamber tile.
   const chamberFill  = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_BG    : CHAMBER_FILL_COLOR;
-  const chamberColor = isFilled ? WATER_COLOR                         : CHAMBER_COLOR;
+  const chamberColor = isFilled ? (isCompleted ? WATER_COLOR : '#ffffff') : CHAMBER_COLOR;
   ctx.beginPath();
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = chamberFill;
@@ -184,29 +189,45 @@ export function drawLevelChamberTile(
   const contentY = boxTop + labelH;
   const contentH = bh * 2 - labelH;
 
-  // "L-N" text at top-left of the chamber box interior
+  // "L-N" text, optional water score, and optional skull icon in the label row.
+  // Reduce font size when multiple elements need to share the horizontal space.
+  const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
+  const labelFontSize = showWater && isChallenge ? _s(8) : _s(10);
+  const labelColor = allStars ? FOCUS_COLOR : isCompleted ? SUCCESS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
+
   ctx.save();
-  ctx.font = `bold ${_s(10)}px Arial`;
-  ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillStyle = allStars ? FOCUS_COLOR : isCompleted ? SUCCESS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
   ctx.shadowBlur = 3;
-  ctx.fillText(`L-${levelNum}`, boxLeft + _s(3), boxTop + _s(2));
-  ctx.restore();
 
-  // Skull icon at top-right of the chamber box interior if challenge
-  if (isChallenge) {
-    ctx.save();
-    ctx.font = `${_s(11)}px Arial`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur = 3;
-    ctx.fillText('💀', boxRight - _s(2), boxTop + _s(2));
-    ctx.restore();
+  // "L-N" at top-left
+  ctx.font = `bold ${labelFontSize}px Arial`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = labelColor;
+  ctx.fillText(`L-${levelNum}`, boxLeft + _s(2), boxTop + _s(2));
+
+  // Water score "💧N" – center when skull present, right-aligned otherwise
+  if (showWater) {
+    ctx.font = `${isChallenge ? _s(7) : _s(8)}px Arial`;
+    ctx.fillStyle = '#7ec8e3';
+    if (isChallenge) {
+      ctx.textAlign = 'center';
+      ctx.fillText(`💧${waterScored}`, cx, boxTop + _s(2));
+    } else {
+      ctx.textAlign = 'right';
+      ctx.fillText(`💧${waterScored}`, boxRight - _s(2), boxTop + _s(2));
+    }
   }
+
+  // Skull icon at top-right for challenge levels
+  if (isChallenge) {
+    ctx.font = `${labelFontSize}px Arial`;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('💀', boxRight - _s(2), boxTop + _s(2));
+  }
+
+  ctx.restore();
 
   // Minimap (centered in the content area inside the chamber box)
   if (levelDef) {
@@ -499,8 +520,9 @@ export function renderChapterMapCanvas(
         const isCompleted = levelId !== undefined && progress.completedLevels.has(levelId);
         const stars = levelId !== undefined ? (progress.levelStars[levelId] ?? 0) : 0;
         const totalStars = levelDef?.starCount ?? 0;
+        const waterScored = levelId !== undefined ? (progress.levelWater?.[levelId] ?? 0) : 0;
         const connections = tileDefConnections(def);
-        drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled);
+        drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled, waterScored || undefined);
 
         // Dim inaccessible level chambers
         if (!isFilled) {
