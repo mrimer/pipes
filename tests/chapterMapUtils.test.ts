@@ -329,6 +329,69 @@ describe('computeChapterMapReachable', () => {
     expect(reached.has('0,1')).toBe(false); // N-S pipe has no West connection
   });
 
+  it('level chamber with explicit connections blocks exit when uncompleted', () => {
+    // Source → E-W pipe → level chamber (E+W conns, uncompleted) → E-W pipe → sink
+    // Water should reach the level chamber but NOT flow past it (exit blocked).
+    // This tests the fix for the bug where `def.connections` short-circuited the
+    // completion check: the level-chamber check must come before the connections check.
+    const levelChamber: TileDef = {
+      shape: PipeShape.Chamber,
+      chamberContent: 'level',
+      connections: [Direction.East, Direction.West], // explicit (non-default) connections
+    };
+    const grid: (TileDef | null)[][] = [[
+      { shape: PipeShape.Source },                         // (0,0) source
+      { shape: PipeShape.Straight, rotation: 90 },        // (0,1) E-W pipe
+      levelChamber,                                        // (0,2) level chamber
+      { shape: PipeShape.Straight, rotation: 90 },        // (0,3) E-W pipe
+      { shape: PipeShape.Sink },                          // (0,4) sink
+    ]];
+    const isCompleted = false;
+    const levelAwareConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
+      // Replicate the fixed getConns logic from chapterMapScreen._computeFilledCells
+      if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
+        if (!isCompleted && !isEntry) return new Set();
+        if (def.connections) return new Set(def.connections);
+        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+      }
+      return editorConns(def, isEntry);
+    };
+    const reached = computeChapterMapReachable(grid, 1, 5, { row: 0, col: 0 }, levelAwareConns);
+    expect(reached.has('0,0')).toBe(true);  // source reached
+    expect(reached.has('0,1')).toBe(true);  // pipe reached
+    expect(reached.has('0,2')).toBe(true);  // level chamber reached (water enters)
+    expect(reached.has('0,3')).toBe(false); // pipe after chamber NOT reached (exit blocked)
+    expect(reached.has('0,4')).toBe(false); // sink NOT reached
+  });
+
+  it('level chamber with explicit connections allows exit when completed', () => {
+    const levelChamber: TileDef = {
+      shape: PipeShape.Chamber,
+      chamberContent: 'level',
+      connections: [Direction.East, Direction.West],
+    };
+    const grid: (TileDef | null)[][] = [[
+      { shape: PipeShape.Source },
+      { shape: PipeShape.Straight, rotation: 90 },
+      levelChamber,
+      { shape: PipeShape.Straight, rotation: 90 },
+      { shape: PipeShape.Sink },
+    ]];
+    const isCompleted = true;
+    const levelAwareConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
+      if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
+        if (!isCompleted && !isEntry) return new Set();
+        if (def.connections) return new Set(def.connections);
+        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+      }
+      return editorConns(def, isEntry);
+    };
+    const reached = computeChapterMapReachable(grid, 1, 5, { row: 0, col: 0 }, levelAwareConns);
+    expect(reached.has('0,2')).toBe(true); // level chamber reached
+    expect(reached.has('0,3')).toBe(true); // pipe after chamber reached
+    expect(reached.has('0,4')).toBe(true); // sink reached
+  });
+
   it('BFS explores a 2D path via corners', () => {
     // L-shaped path: (0,0)→E (0,1)→S (1,1)
     const grid: (TileDef | null)[][] = [
