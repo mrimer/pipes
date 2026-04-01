@@ -308,8 +308,10 @@ export class ChapterMapScreen {
         const def = chapter.grid![pos.row]?.[pos.col];
         const displayProgress = this._callbacks.getDisplayProgress();
         if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+          const filledKeys = this._computeFilledCells(chapter, displayProgress);
+          const isFilled = filledKeys.has(`${pos.row},${pos.col}`);
           const level = chapter.levels[def.levelIdx];
-          canvas.title = level ? `${def.levelIdx + 1}: ${level.name}` : '';
+          canvas.title = isFilled && level ? `${def.levelIdx + 1}: ${level.name}` : '???';
         } else if (def?.shape === PipeShape.Source) {
           const completedLevelCount = chapter.levels.filter(l => displayProgress.has(l.id)).length;
           canvas.title = `${completedLevelCount} completed level${completedLevelCount === 1 ? '' : 's'}`;
@@ -398,6 +400,14 @@ export class ChapterMapScreen {
     const filledKeys = this._computeFilledCells(chapter, displayProgress);
 
     if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+      const isFilled = filledKeys.has(`${row},${col}`);
+      if (!isFilled) {
+        this._tooltipEl.textContent = '???';
+        this._tooltipEl.style.display = 'block';
+        this._tooltipEl.style.left = `${clientX + 12}px`;
+        this._tooltipEl.style.top  = `${clientY + 12}px`;
+        return;
+      }
       const level = chapter.levels[def.levelIdx];
       if (level) {
         this._tooltipEl.textContent = `${def.levelIdx + 1}: ${level.name}`;
