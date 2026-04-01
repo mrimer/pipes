@@ -12,8 +12,8 @@ import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
-  CHAMBER_COLOR, CHAMBER_FILL_COLOR,
-  WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR, SUCCESS_COLOR,
+  CHAMBER_FILL_COLOR,
+  WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR,
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
@@ -150,7 +150,7 @@ export function drawLevelChamberTile(
   // use white when connected but not yet completed, to visually differentiate
   // from a fully completed chamber tile.
   const chamberFill  = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_BG    : CHAMBER_FILL_COLOR;
-  const chamberColor = isFilled ? (isCompleted ? WATER_COLOR : '#ffffff') : CHAMBER_COLOR;
+  const chamberColor = isFilled ? (isCompleted ? WATER_COLOR : '#ffffff') : PIPE_COLOR;
   ctx.beginPath();
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = chamberFill;

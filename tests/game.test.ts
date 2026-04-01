@@ -891,7 +891,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
 
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const waterAnims = hooks._animations.filter((a) => a.text === '-1');
+    const waterAnims = hooks._animations.filter((a) => a.text === '-1💧');
     expect(waterAnims.length).toBeGreaterThanOrEqual(1);
     expect(waterAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
   });
@@ -920,7 +920,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The Chamber-tank at (3,0) should now be newly connected → +5 animation
-    const tankAnims = hooks._animations.filter((a) => a.text === '+5');
+    const tankAnims = hooks._animations.filter((a) => a.text === '+5💧');
     expect(tankAnims.length).toBeGreaterThanOrEqual(1);
     expect(tankAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -948,7 +948,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 2, col: 0 };
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const tankAnims = hooks._animations.filter((a) => a.text === '+0');
+    const tankAnims = hooks._animations.filter((a) => a.text === '+0💧');
     expect(tankAnims.length).toBeGreaterThanOrEqual(1);
     expect(tankAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
@@ -969,7 +969,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 0, col: 1 };
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const dirtAnims = hooks._animations.filter((a) => a.text === '-0');
+    const dirtAnims = hooks._animations.filter((a) => a.text === '-0💧');
     expect(dirtAnims.length).toBeGreaterThanOrEqual(1);
     expect(dirtAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
@@ -997,7 +997,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 0, col: 2 };
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const iceAnims = hooks._animations.filter((a) => a.text === '-0');
+    const iceAnims = hooks._animations.filter((a) => a.text === '-0💧');
     expect(iceAnims.length).toBeGreaterThanOrEqual(1);
     expect(iceAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
@@ -1696,7 +1696,7 @@ describe('Game – disconnection animations after reclaimTile', () => {
     // Reclaim it via right-click
     hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -1720,7 +1720,7 @@ describe('Game – disconnection animations after reclaimTile', () => {
     hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 160 }));
 
     // No animation since the pipe was not in the fill path
-    expect(hooks._animations.filter((a) => a.text === '+1').length).toBe(0);
+    expect(hooks._animations.filter((a) => a.text === '+1💧').length).toBe(0);
   });
 });
 
@@ -1755,7 +1755,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Expect a "+1" disconnection animation for the now-disconnected pipe at (0,2)
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -1783,7 +1783,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
 
     // The replaced position (0,1) was in the fill path before and is not after,
     // so a "+1" disconnection animation is shown for the old tile's water cost reversal.
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -1810,7 +1810,7 @@ describe('Game – performRedo spawns tile impact animations', () => {
     // Redo – should respawn the connection animation ("-1" for the pipe)
     game.performRedo();
 
-    const minusOneAnims = hooks._animations.filter((a) => a.text === '-1');
+    const minusOneAnims = hooks._animations.filter((a) => a.text === '-1💧');
     expect(minusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(minusOneAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
   });
@@ -1847,7 +1847,7 @@ describe('Game – performRedo spawns tile impact animations', () => {
     game.performRedo();
 
     // (0,2) is still in the grid and was disconnected → "+1" disconnection animation
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1');
+    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
