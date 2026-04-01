@@ -6,7 +6,7 @@
 
 import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
-import { LevelDef, PipeShape, Direction } from '../src/types';
+import { LevelDef, TileDef, PipeShape, Direction } from '../src/types';
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 
@@ -388,7 +388,7 @@ describe('renderLevelList – challenge levels', () => {
     const ch1 = {
       id: 1, name: 'Ch1',
       levels: [makeLevel(1)],
-      grid: [[null]] as (import('../src/types').TileDef | null)[][],
+      grid: [[null]] as (TileDef | null)[][],
       rows: 1,
       cols: 1,
     };
