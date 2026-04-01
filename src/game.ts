@@ -1097,7 +1097,7 @@ export class Game {
   private _updateNoteHintBoxes(level: LevelDef): void {
     // Note box
     if (level.note) {
-      this.noteBoxEl.textContent = '!\u20DD  ' + level.note;
+      this.noteBoxEl.textContent = '\u2755  ' + level.note;
       this.noteBoxEl.style.display = 'block';
     } else {
       this.noteBoxEl.style.display = 'none';
