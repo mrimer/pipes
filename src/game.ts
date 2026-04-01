@@ -366,13 +366,6 @@ export class Game {
   private _activeCampaignCompletedChapters: Set<number> = new Set();
 
   /**
-   * Persists the user's manual expand/collapse state for each chapter on the
-   * level select screen.  Keyed by chapter index within the active campaign.
-   * Reset whenever the active campaign changes so fresh defaults are applied.
-   */
-  private _chapterExpandedState: Map<number, boolean> = new Map();
-
-  /**
    * Optional callback invoked instead of `_showLevelSelect()` when exiting play mode.
    * Used when a level was launched for playtesting from the campaign editor.
    */
@@ -1181,8 +1174,6 @@ export class Game {
       campaignChapters,
       levelStars,
       levelWater,
-      this._chapterExpandedState,
-      (ci, expanded) => { this._chapterExpandedState.set(ci, expanded); },
       (ci) => this._showChapterMap(ci),
       this._activeCampaignCompletedChapters,
     );
@@ -3334,7 +3325,6 @@ export class Game {
     this._activeCampaign = campaign;
     this._activeCampaignProgress = loadCampaignProgress(campaign.id);
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
-    this._chapterExpandedState = new Map();
     saveActiveCampaignId(campaign.id);
     this._showLevelSelect();
   }
@@ -3343,7 +3333,6 @@ export class Game {
   private _deactivateCampaign(): void {
     this._activeCampaign = null;
     this._activeCampaignProgress = new Set();
-    this._chapterExpandedState = new Map();
     clearActiveCampaignId();
     this._showLevelSelect();
   }

@@ -136,54 +136,6 @@ describe('renderLevelList star display', () => {
     container = makeLevelListEl();
   });
 
-  it('shows ⭐ X/Y on a level button when the level has stars', () => {
-    const level = makeLevel(1, 2);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-    const completed = new Set<number>([1]);
-    const levelStars: Record<number, number> = { 1: 1 };
-
-    renderLevelList(
-      container, completed,
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters, levelStars,
-    );
-
-    const btn = container.querySelector('button.level-btn');
-    expect(btn?.textContent).toContain('⭐');
-    expect(btn?.textContent).toContain('1/2');
-  });
-
-  it('does not show ⭐ on a level button when the level has no stars', () => {
-    const level = makeLevel(1);   // starCount undefined
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-
-    renderLevelList(
-      container, new Set<number>([1]),
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters, {},
-    );
-
-    const btn = container.querySelector('button.level-btn');
-    expect(btn?.textContent).not.toContain('⭐');
-  });
-
-  it('caps displayed collected stars at the total', () => {
-    const level = makeLevel(1, 2);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-    // levelStars reports more than possible (e.g. after level edit)
-    const levelStars: Record<number, number> = { 1: 99 };
-
-    renderLevelList(
-      container, new Set<number>([1]),
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters, levelStars,
-    );
-
-    const btn = container.querySelector('button.level-btn');
-    expect(btn?.textContent).toContain('2/2');
-    expect(btn?.textContent).not.toContain('99');
-  });
-
   it('shows ⭐ X/Y in chapter header when all levels are complete and chapter has stars', () => {
     const level = makeLevel(1, 3);
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
@@ -259,34 +211,6 @@ describe('renderLevelList – challenge levels', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     container = makeLevelListEl();
-  });
-
-  it('shows 💀 icon on the button for a challenge level', () => {
-    const level = makeLevel(1, undefined, true);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-
-    renderLevelList(
-      container, new Set<number>(),
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters,
-    );
-
-    const btn = container.querySelector('.level-btn');
-    expect(btn?.textContent).toContain('💀');
-  });
-
-  it('does NOT show 💀 icon on a regular (non-challenge) level', () => {
-    const level = makeLevel(1);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-
-    renderLevelList(
-      container, new Set<number>(),
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters,
-    );
-
-    const btn = container.querySelector('.level-btn');
-    expect(btn?.textContent).not.toContain('💀');
   });
 
   it('unlocks next chapter when enough levels are completed, including a challenge level substituting for a non-challenge one', () => {
@@ -382,27 +306,6 @@ describe('renderLevelList – challenge levels', () => {
     expect(chapterHeaders[1]?.classList.contains('locked')).toBe(true);
   });
 
-  it('does not lock a non-challenge level behind an incomplete challenge level', () => {
-    // Levels: [L1 (regular, completed), L2 (challenge, not done), L3 (regular)]
-    // L3 should be accessible even though L2 is not done.
-    const ch1 = {
-      id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3)],
-    };
-    const chapters = [ch1];
-    const completed = new Set<number>([1]);
-
-    renderLevelList(
-      container, completed,
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters,
-    );
-
-    const levelBtns = container.querySelectorAll('.level-btn');
-    // L3 is the 3rd button (index 2)
-    expect(levelBtns[2]?.classList.contains('locked')).toBe(false);
-  });
-
   it('shows 💀 X/Y in chapter header when chapter is complete and has challenge levels', () => {
     // 1 regular level (id=1) + 2 challenge levels (id=2, id=3). All completed.
     const ch1 = {
@@ -481,27 +384,44 @@ describe('renderLevelList – challenge levels', () => {
     expect(chapterTitle?.textContent).not.toMatch(/💀\s+\d+\/\d+/);
   });
 
-  it('hides levels after the first locked level in a chapter', () => {
-    // Levels: [L1 (regular, not done), L2 (challenge), L3 (regular)]
-    // L2 is locked because L1 is not done.  L3 should not be shown at all
-    // (levels after the first locked one are hidden to reveal them incrementally).
+  it('calls onChapterMap with the chapter index when a chapter with a grid is clicked', () => {
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3)],
+      levels: [makeLevel(1)],
+      grid: [[null]] as (import('../src/types').TileDef | null)[][],
+      rows: 1,
+      cols: 1,
     };
     const chapters = [ch1];
-    const completed = new Set<number>();
+    let calledWithIdx = -1;
 
     renderLevelList(
-      container, completed,
+      container, new Set<number>(),
       () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters,
+      undefined, chapters, {}, {}, (idx) => { calledWithIdx = idx; },
     );
 
-    const levelBtns = container.querySelectorAll('.level-btn');
-    // Only L1 (unlocked) and L2 (first locked) should be rendered; L3 is hidden.
-    expect(levelBtns.length).toBe(2);
-    expect(levelBtns[1]?.classList.contains('locked')).toBe(true);
+    const header = container.querySelector('.chapter-header') as HTMLElement;
+    header.click();
+    expect(calledWithIdx).toBe(0);
+  });
+
+  it('shows an error message when a chapter without a grid is clicked', () => {
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1)] };
+    const chapters = [ch1];
+
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, chapters, {}, {}, () => {},
+    );
+
+    const header = container.querySelector('.chapter-header') as HTMLElement;
+    const errorEl = container.querySelector('.chapter-no-map-error') as HTMLElement;
+    expect(errorEl).not.toBeNull();
+    expect(errorEl.style.display).toBe('none');
+    header.click();
+    expect(errorEl.style.display).not.toBe('none');
   });
 });
 

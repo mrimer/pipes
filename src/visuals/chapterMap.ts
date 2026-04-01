@@ -499,6 +499,7 @@ export function renderChapterMapCanvas(
   hoverPos?: { row: number; col: number } | null,
   accessibleLevelIdxs?: ReadonlySet<number>,
   decorations?: ReadonlyMap<string, AmbientDecoration>,
+  jitterCell?: { row: number; col: number; dx: number; dy: number },
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -561,7 +562,13 @@ export function renderChapterMapCanvas(
         const totalStars = levelDef?.starCount ?? 0;
         const waterScored = levelId !== undefined ? (progress.levelWater?.[levelId] ?? 0) : 0;
         const connections = tileDefConnections(def);
+        const isJittered = jitterCell?.row === r && jitterCell?.col === c;
+        if (isJittered) {
+          ctx.save();
+          ctx.translate(jitterCell!.dx, jitterCell!.dy);
+        }
         drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled, waterScored || undefined);
+        if (isJittered) ctx.restore();
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);

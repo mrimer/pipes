@@ -137,52 +137,6 @@ describe('renderLevelList water display', () => {
     container = makeLevelListEl();
   });
 
-  it('shows 💧 N on a completed level button when water is recorded', () => {
-    const level = makeLevel(1);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-    const completed = new Set<number>([1]);
-    const levelWater: Record<number, number> = { 1: 6 };
-
-    renderLevelList(
-      container, completed,
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters, {}, levelWater,
-    );
-
-    const btn = container.querySelector('button.level-btn');
-    expect(btn?.textContent).toContain('💧');
-    expect(btn?.textContent).toContain('6');
-  });
-
-  it('does not show 💧 on a level button when no water is recorded', () => {
-    const level = makeLevel(1);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-
-    renderLevelList(
-      container, new Set<number>([1]),
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters, {}, {},
-    );
-
-    const btn = container.querySelector('button.level-btn');
-    expect(btn?.textContent).not.toContain('💧');
-  });
-
-  it('does not show 💧 on a level button when level is not completed', () => {
-    const level = makeLevel(1);
-    const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
-    const levelWater: Record<number, number> = { 1: 6 };
-
-    renderLevelList(
-      container, new Set<number>(), // not completed
-      () => {}, () => {}, () => {}, () => {}, () => {},
-      undefined, chapters, {}, levelWater,
-    );
-
-    const btn = container.querySelector('button.level-btn');
-    expect(btn?.textContent).not.toContain('💧');
-  });
-
   it('shows 💧 N in chapter header when completed levels have water', () => {
     const level = makeLevel(1);
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
