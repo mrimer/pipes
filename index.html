@@ -127,14 +127,14 @@
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
     }
-    .inv-item:hover:not(.depleted):not(.negative) { border-color: #4a90d9; background: #1e2a4a; }
+    .inv-item:hover:not(.depleted):not(.negative):not(.selected) { border-color: #4a90d9; background: #1e2a4a; }
     .inv-item.selected  { border-color: #f0c040; background: #2a3a1a; }
     .inv-item.depleted  { opacity: 0.4; cursor: default; }
     .inv-item.negative  { border-color: #8b1a1a; }
     .inv-item.negative:hover { border-color: #e74c3c; background: #2a0a0a; }
     .inv-item.negative .inv-count { color: #e74c3c; }
     .inv-item.gold      { border-color: #b8860b; background: #1e1600; }
-    .inv-item.gold:hover:not(.depleted):not(.negative) { border-color: #ffd700; background: #2a2000; }
+    .inv-item.gold:hover:not(.depleted):not(.negative):not(.selected) { border-color: #ffd700; background: #2a2000; }
     .inv-item.gold.selected { border-color: #f0c040; background: #2a2000; }
 
     @keyframes inv-sparkle {
