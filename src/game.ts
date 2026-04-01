@@ -1,7 +1,7 @@
 import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
-import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
+import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderBoard, renderContainerFillAnims, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
@@ -30,6 +30,7 @@ import {
   computeFlowGoodDirs,
 } from './visuals/waterParticles';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
+import { spawnRingEffect, clearRingEffects } from './visuals/ringEffect';
 import {
   PipeRotationAnim, PipeFillAnim,
   computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
@@ -1014,6 +1015,7 @@ export class Game {
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
     clearStarSparkles();
+    clearRingEffects();
     this._clearAllParticles();
     this._resetMetricBaselines();
   }
@@ -1045,6 +1047,10 @@ export class Game {
     }
     if (!level) return;
 
+    // Show the intro ring effect only when navigating to a different level,
+    // not when restarting the same level.
+    const isNewLevel = !this.currentLevel || this.currentLevel.id !== levelId;
+
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
@@ -1056,6 +1062,10 @@ export class Game {
     this.canvas.focus();
 
     this._checkAndShowInitialError();
+
+    if (isNewLevel) {
+      this._spawnLevelIntroRings();
+    }
 
     // If the level starts already in a losing state, show the unplayable modal.
     if (this.board.getCurrentWater() <= 0) {
@@ -1444,6 +1454,24 @@ export class Game {
       this._lastVortexSpawn = now;
     }
     renderVortex(this.ctx, this._vortexParticles, sinkCx, sinkCy, color);
+  }
+
+  /**
+   * Spawn the level-intro shrinking ring effects: first on the source tile,
+   * then (after the source ring completes) on the sink tile.  Called once
+   * when a new level is started for the first time (not on restart).
+   */
+  private _spawnLevelIntroRings(): void {
+    if (!this.board) return;
+    const { source, sink, cols, rows } = this.board;
+    const canvas = this.canvas;
+
+    const spawnSinkRing = () => {
+      if (!this.board) return;
+      spawnRingEffect(canvas, sink.col, sink.row, cols, rows, SINK_COLOR);
+    };
+
+    spawnRingEffect(canvas, source.col, source.row, cols, rows, SOURCE_COLOR, spawnSinkRing);
   }
 
   private _renderBoard(): void {
@@ -2441,19 +2469,19 @@ export class Game {
 
     if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
       // Each pipe costs 1 water when connected; removal returns it.
-      text = dir === 'connect' ? '-1' : '+1';
+      text = dir === 'connect' ? '-1💧' : '+1💧';
       color = dir === 'connect' ? ANIM_NEGATIVE_COLOR : ANIM_POSITIVE_COLOR;
     } else if (tile.shape === PipeShape.Chamber) {
       if (tile.chamberContent === 'tank') {
         // Tank adds capacity on connect, removes it on disconnect.
         const val = dir === 'connect' ? tile.capacity : -tile.capacity;
-        text = val >= 0 ? `+${val}` : `${val}`;
+        text = val >= 0 ? `+${val}💧` : `${val}💧`;
         color = animColor(val);
       } else if (tile.chamberContent === 'dirt') {
         // Dirt consumes water on connect; removal returns it.
         const val = dir === 'connect' ? -tile.cost : tile.cost;
         const prefix = val > 0 ? '+' : '';
-        text = val !== 0 ? `${prefix}${val}` : (dir === 'connect' ? '-0' : '+0');
+        text = val !== 0 ? `${prefix}${val}💧` : (dir === 'connect' ? '-0💧' : '+0💧');
         color = animColor(val);
       } else if (tile.chamberContent === 'item') {
         if (dir === 'connect' && tile.itemShape !== null) {
@@ -2522,9 +2550,9 @@ export class Game {
   private _formatWaterCostLabel(raw: number, dir: 'connect' | 'disconnect'): { text: string; color: string } {
     if (dir === 'connect') {
       const val = -raw;
-      return { text: val < 0 ? `${val}` : '-0', color: val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR };
+      return { text: val < 0 ? `${val}💧` : '-0💧', color: val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR };
     } else {
-      return { text: raw > 0 ? `+${raw}` : '+0', color: raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR };
+      return { text: raw > 0 ? `+${raw}💧` : '+0💧', color: raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR };
     }
   }
 
@@ -2552,15 +2580,15 @@ export class Game {
         const loss = Math.max(0, lockedGain - lockedImpact);
         if (lockedGain > 0 && loss > 0) {
           // Both gain and loss: spawn two separate labels offset above/below.
-          this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-          this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${loss}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+          this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${lockedGain}💧`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+          this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${loss}💧`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
           return { text: null, color: ANIM_ZERO_COLOR }; // outer push skipped
         } else if (lockedGain > 0) {
-          return { text: `+${lockedGain}`, color: ANIM_POSITIVE_COLOR };
+          return { text: `+${lockedGain}💧`, color: ANIM_POSITIVE_COLOR };
         } else if (loss > 0) {
-          return { text: `-${loss}`, color: ANIM_NEGATIVE_COLOR };
+          return { text: `-${loss}💧`, color: ANIM_NEGATIVE_COLOR };
         } else {
-          return { text: '+0', color: ANIM_ZERO_COLOR };
+          return { text: '+0💧', color: ANIM_ZERO_COLOR };
         }
       }
       return { text: null, color: ANIM_ZERO_COLOR };
@@ -2571,15 +2599,15 @@ export class Game {
       const waterGain = Math.min(this.board.frozen, effectiveCost);
       const waterLoss = Math.max(0, effectiveCost - waterGain);
       if (waterLoss > 0 && waterGain > 0) {
-        this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-        this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+        this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}💧`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
+        this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}💧`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
         return { text: null, color: ANIM_ZERO_COLOR }; // outer push skipped
       } else if (waterLoss > 0) {
-        return { text: `+${waterLoss}`, color: ANIM_POSITIVE_COLOR };
+        return { text: `+${waterLoss}💧`, color: ANIM_POSITIVE_COLOR };
       } else if (waterGain > 0) {
-        return { text: `-${waterGain}`, color: ANIM_NEGATIVE_COLOR };
+        return { text: `-${waterGain}💧`, color: ANIM_NEGATIVE_COLOR };
       } else {
-        return { text: '-0', color: ANIM_ZERO_COLOR };
+        return { text: '-0💧', color: ANIM_ZERO_COLOR };
       }
     }
   }
@@ -2663,7 +2691,7 @@ export class Game {
     for (const { row: r, col: c, delta } of changes) {
       const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
       const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
-      const text = delta > 0 ? `+${delta}` : `${delta}`;
+      const text = delta > 0 ? `+${delta}💧` : `${delta}💧`;
       const color = animColor(delta);
       this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
     }
@@ -3218,6 +3246,7 @@ export class Game {
     this.canvas.focus();
 
     this._checkAndShowInitialError();
+    this._spawnLevelIntroRings();
   }
 
   // ─── Undo / redo button state ─────────────────────────────────────────────
