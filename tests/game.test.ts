@@ -1988,7 +1988,7 @@ describe('Game – note and hint boxes', () => {
     game.startLevel(1);
     const { noteBoxEl } = getBoxEls(game);
     expect(noteBoxEl.style.display).toBe('block');
-    expect(noteBoxEl.textContent).toBe('!\u20DD  Connect the pipes!');
+    expect(noteBoxEl.textContent).toBe('\u2755  Connect the pipes!');
     level.note = origNote; // restore
   });
 
