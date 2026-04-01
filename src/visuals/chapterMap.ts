@@ -562,14 +562,6 @@ export function renderChapterMapCanvas(
         const waterScored = levelId !== undefined ? (progress.levelWater?.[levelId] ?? 0) : 0;
         const connections = tileDefConnections(def);
         drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled, waterScored || undefined);
-
-        // Dim inaccessible level chambers
-        if (!isFilled) {
-          ctx.save();
-          ctx.fillStyle = 'rgba(0,0,0,0.55)';
-          ctx.fillRect(x, y, CELL, CELL);
-          ctx.restore();
-        }
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
