@@ -275,6 +275,9 @@ export class CampaignEditor {
    * `items`.  Each button swaps adjacent items, touches the campaign, saves,
    * and calls `onRefresh` to re-render.  No button is appended when the move
    * would be out of bounds.
+   *
+   * @param afterSwap - Optional callback invoked immediately after the swap,
+   *   before saving.  Receives the two indices that were exchanged (a < b).
    */
   private _appendReorderButtons<T>(
     btns: HTMLElement,
@@ -282,10 +285,12 @@ export class CampaignEditor {
     idx: number,
     campaign: CampaignDef,
     onRefresh: () => void,
+    afterSwap?: (a: number, b: number) => void,
   ): void {
     if (idx > 0) {
       btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
         [items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
+        afterSwap?.(idx - 1, idx);
         this._touchCampaign(campaign);
         this._saveCampaigns();
         onRefresh();
@@ -294,6 +299,7 @@ export class CampaignEditor {
     if (idx < items.length - 1) {
       btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
         [items[idx], items[idx + 1]] = [items[idx + 1], items[idx]];
+        afterSwap?.(idx, idx + 1);
         this._touchCampaign(campaign);
         this._saveCampaigns();
         onRefresh();
@@ -879,7 +885,17 @@ export class CampaignEditor {
         this._showChapterDetail();
       }));
 
-      this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail());
+      this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail(), (a, b) => {
+        if (!chapter.grid) return;
+        for (const row of chapter.grid) {
+          for (const tile of row) {
+            if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level') {
+              if (tile.levelIdx === a) tile.levelIdx = b;
+              else if (tile.levelIdx === b) tile.levelIdx = a;
+            }
+          }
+        }
+      });
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete level "${level.name}"?`)) {
           chapter.levels.splice(levelIdx, 1);
