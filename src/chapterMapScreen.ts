@@ -466,17 +466,13 @@ export class ChapterMapScreen {
 
     // Handle sink click (chapter completion)
     if (def.shape === PipeShape.Sink && filledKeys.has(`${pos.row},${pos.col}`)) {
-      const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
-      const allNonChallengeCompleted = nonChallengeLevels.length === 0 || nonChallengeLevels.every(l => displayProgress.has(l.id));
       const remaining = this._sinkRemaining(def, chapter, displayProgress);
-      if (allNonChallengeCompleted && remaining <= 0) {
+      if (remaining <= 0) {
         this._callbacks.onChapterSinkClicked?.(this._chapterIdx);
         return;
       }
-      if (remaining > 0) {
-        this._showError(`Finish ${remaining} more level${remaining === 1 ? '' : 's'} to complete the chapter.`);
-        return;
-      }
+      this._showError(`Finish ${remaining} more level${remaining === 1 ? '' : 's'} to complete the chapter.`);
+      return;
     }
 
     // Handle level chamber click
@@ -582,7 +578,7 @@ export class ChapterMapScreen {
 
   /**
    * Update the status line below the canvas ("Level Complete!" / "Click the Sink…").
-   * The status is cleared when the sink is not yet filled or all levels are not complete.
+   * The status is cleared when the sink is not yet filled or its completion requirement is not yet met.
    */
   private _updateStatus(chapter: ChapterDef, displayProgress: Set<number>, filledKeys: Set<string>): void {
     if (!this._statusEl) return;
@@ -607,10 +603,8 @@ export class ChapterMapScreen {
       }
       if (sinkFilled) break;
     }
-    const nonChallengeLevels = chapter.levels.filter(l => !l.challenge);
-    const allNonChallengeCompleted = nonChallengeLevels.length === 0 || nonChallengeLevels.every(l => displayProgress.has(l.id));
 
-    if (sinkFilled && allNonChallengeCompleted && sinkRemaining <= 0) {
+    if (sinkFilled && sinkRemaining <= 0) {
       const completedChapters = this._callbacks.getCompletedChapters?.();
       const campaign = this._callbacks.getActiveCampaign?.();
       const isAlreadyCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
