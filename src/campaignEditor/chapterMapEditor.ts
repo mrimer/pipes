@@ -1240,6 +1240,19 @@ export class ChapterMapEditorSection {
     const pos = this._chapterCanvasPos(e);
     this._chapterHover = pos;
 
+    // Update the native browser tooltip with the level name when hovering a level chamber tile.
+    if (this._chapterCanvas) {
+      const tile = pos ? (this._chapterEditGrid[pos.row]?.[pos.col] ?? null) : null;
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined) {
+        const campaign = this._callbacks.getActiveCampaign();
+        const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
+        const level = chapter?.levels[tile.levelIdx];
+        this._chapterCanvas.title = level ? `${tile.levelIdx + 1}: ${level.name}` : `Level ${tile.levelIdx + 1}`;
+      } else {
+        this._chapterCanvas.title = '';
+      }
+    }
+
     if (this._chapterPaintDragActive && pos) {
       if ((this._chapterEditGrid[pos.row]?.[pos.col] ?? null) === null) {
         this._chapterEditGrid[pos.row][pos.col] = this._buildChapterTileDef();
