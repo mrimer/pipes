@@ -139,6 +139,11 @@ export class ChapterMapScreen {
   private _lastFlowerSpawn = 0;
   /** Which edge (0 = left, 1 = right) receives the next spawned flower. */
   private _nextFlowerSide = 0;
+  /**
+   * Active jitter animations for unconnected-chamber click feedback.
+   * Each entry records which cell is jittering and when the animation started.
+   */
+  private _jitterAnims: Array<{ row: number; col: number; startedAt: number }> = [];
   private static readonly VORTEX_SPAWN_INTERVAL_MS  = 80;
   private static readonly SPRAY_SPAWN_INTERVAL_MS   = 150;
   private static readonly FLOW_SPAWN_INTERVAL_MS    = 350;
@@ -155,6 +160,12 @@ export class ChapterMapScreen {
   private static readonly FLOWER_SWAY_PERIOD        = 955;
   /** Divisor for the gold border brightness oscillation: sin(now/GOLD_BORDER_PERIOD) → ~3.1 s cycle. */
   private static readonly GOLD_BORDER_PERIOD        = 500;
+  /** Total duration (ms) of the jitter animation for an unconnected chamber click. */
+  private static readonly JITTER_DURATION_MS        = 400;
+  /** Peak displacement (px) for the jitter oscillation. */
+  private static readonly JITTER_AMPLITUDE          = 6;
+  /** Number of oscillation cycles in the jitter duration. */
+  private static readonly JITTER_CYCLES             = 4;
 
   constructor(callbacks: ChapterMapCallbacks) {
     this._callbacks = callbacks;
@@ -493,7 +504,11 @@ export class ChapterMapScreen {
     if (!levelDef) return;
 
     // Only start a level that has water reaching it
-    if (!filledKeys.has(`${pos.row},${pos.col}`)) return;
+    if (!filledKeys.has(`${pos.row},${pos.col}`)) {
+      // Trigger a brief jitter animation to indicate the tile cannot be accessed
+      this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
+      return;
+    }
 
     this._callbacks.onLevelSelected(levelDef);
   }
@@ -529,6 +544,18 @@ export class ChapterMapScreen {
       }
     }
 
+    // Compute jitter offset for the most recently activated cell, if still active
+    const now = performance.now();
+    this._jitterAnims = this._jitterAnims.filter(j => now - j.startedAt < ChapterMapScreen.JITTER_DURATION_MS);
+    let jitterCell: { row: number; col: number; dx: number; dy: number } | undefined;
+    if (this._jitterAnims.length > 0) {
+      const anim = this._jitterAnims[this._jitterAnims.length - 1];
+      const t = (now - anim.startedAt) / ChapterMapScreen.JITTER_DURATION_MS;
+      const amp = ChapterMapScreen.JITTER_AMPLITUDE * (1 - t);
+      const dx = Math.round(amp * Math.sin(t * ChapterMapScreen.JITTER_CYCLES * 2 * Math.PI));
+      jitterCell = { row: anim.row, col: anim.col, dx, dy: 0 };
+    }
+
     renderChapterMapCanvas(
       ctx,
       grid,
@@ -540,6 +567,7 @@ export class ChapterMapScreen {
       this._hover,
       accessibleLevelIdxs,
       this._decorations,
+      jitterCell,
     );
 
     return { filledKeys, displayProgress };

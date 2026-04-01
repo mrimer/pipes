@@ -1,7 +1,6 @@
 /** Helpers for rendering the level-selection screen. */
 
 import { ChapterDef } from './types';
-import { renderMinimap } from './minimap';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
@@ -150,8 +149,6 @@ export function renderLevelList(
   campaignChapters?: ChapterDef[],
   levelStars: Record<number, number> = {},
   levelWater: Record<number, number> = {},
-  chapterExpandedState?: Map<number, boolean>,
-  onChapterToggle?: (chapterIndex: number, expanded: boolean) => void,
   onChapterMap?: (chapterIdx: number) => void,
   completedChapters?: ReadonlySet<number>,
 ): void {
@@ -405,102 +402,35 @@ export function renderLevelList(
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
 
-    if (!chapterLocked && chapter.grid && onChapterMap) {
-      // Map-mode: clicking the chapter header navigates to the chapter map
+    chapterHeader.appendChild(chapterTitle);
+
+    if (!chapterLocked) {
       chapterHeader.style.cursor = 'pointer';
-      chapterHeader.appendChild(chapterTitle);
-      chapterHeader.addEventListener('click', () => { onChapterMap(ci); });
-      attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
-      chapterBox.appendChild(chapterHeader);
-    } else {
-      // Normal mode: expand/collapse chevron + levels container
-      const chevron = document.createElement('span');
-      chevron.style.cssText = 'font-size:0.8rem;transition:transform 0.2s;';
-
-      let expanded = chapterExpandedState?.has(ci)
-        ? chapterExpandedState.get(ci)!
-        : !chapterLocked && !allLevelsCompleted;
-      chevron.textContent = expanded ? '▲' : '▼';
-
-      chapterHeader.appendChild(chapterTitle);
-      chapterHeader.appendChild(chevron);
-
-      const levelsContainer = document.createElement('div');
-      levelsContainer.classList.add('chapter-levels');
-      levelsContainer.style.cssText =
-        'display:' + (expanded ? 'flex' : 'none') + ';' +
-        'flex-direction:column;gap:8px;padding:' +
-        (totalInChapter > 0 ? '8px 12px 12px' : '0') + ';' +
-        'background:#0d1a30;';
-
-      if (!chapterLocked) {
+      if (chapter.grid && onChapterMap) {
+        // Chapter has a map: clicking navigates to the chapter map screen
+        chapterHeader.addEventListener('click', () => { onChapterMap(ci); });
+      } else {
+        // Chapter has no map: show a temporary error message when clicked
+        const noMapError = document.createElement('p');
+        noMapError.classList.add('chapter-no-map-error');
+        noMapError.style.cssText =
+          'color:#e74c3c;font-size:0.85rem;padding:4px 16px;margin:0;display:none;';
+        noMapError.textContent = 'Error: This chapter has no map.';
+        let noMapErrorTimeout: ReturnType<typeof setTimeout> | null = null;
         chapterHeader.addEventListener('click', () => {
-          expanded = !expanded;
-          levelsContainer.style.display = expanded ? 'flex' : 'none';
-          chevron.textContent = expanded ? '▲' : '▼';
-          onChapterToggle?.(ci, expanded);
+          noMapError.style.display = '';
+          if (noMapErrorTimeout !== null) clearTimeout(noMapErrorTimeout);
+          noMapErrorTimeout = setTimeout(() => {
+            noMapError.style.display = 'none';
+            noMapErrorTimeout = null;
+          }, 3000);
         });
-        attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
+        chapterBox.appendChild(noMapError);
       }
-
-      // ── Level buttons ──────────────────────────────────────────────────────
-      for (let li = 0; li < chapter.levels.length; li++) {
-        const level = chapter.levels[li];
-        const isCompleted = completedLevels.has(level.id);
-
-        const prevNonChallenge = li > 0
-          ? (chapter.levels.slice(0, li).reverse().find((l) => !l.challenge) ?? null)
-          : null;
-        const isLocked = chapterLocked || (prevNonChallenge !== null && !completedLevels.has(prevNonChallenge.id));
-
-        const btn = document.createElement('button');
-        btn.classList.add('level-btn');
-        if (isLocked)    btn.classList.add('locked');
-        if (isCompleted) btn.classList.add('completed');
-
-        const icon = isLocked ? '🔒' : isCompleted ? '✅' : '▶';
-        const challengeIcon = level.challenge ? ' 💀' : '';
-        const levelStarTotal = level.starCount ?? 0;
-        const levelStarCollected = levelStarTotal > 0
-          ? Math.min(levelStars[level.id] ?? 0, levelStarTotal) : 0;
-        const levelWaterVal = isCompleted ? (levelWater[level.id] ?? 0) : 0;
-        const levelWaterText = isCompleted && levelWaterVal > 0 ? `  💧 ${levelWaterVal}` : '';
-        const levelStarText = levelStarTotal > 0
-          ? `  ⭐ ${levelStarCollected}/${levelStarTotal}` : '';
-        btn.textContent = `${icon} Level ${li + 1}: ${level.name}${challengeIcon}${levelWaterText}${levelStarText}`;
-        btn.disabled = isLocked;
-
-        if (!isLocked) {
-          btn.addEventListener('click', () => startLevel(level.id));
-        }
-
-        const levelRow = document.createElement('div');
-        levelRow.dataset.levelId = String(level.id);
-        levelRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
-        const minimap = renderMinimap(level);
-        minimap.style.cssText = 'flex-shrink:0;image-rendering:pixelated;' + (!isLocked ? 'cursor:pointer;' : '');
-        if (!isLocked) {
-          minimap.addEventListener('click', () => startLevel(level.id));
-        }
-        levelRow.appendChild(minimap);
-        levelRow.appendChild(btn);
-        levelsContainer.appendChild(levelRow);
-
-        if (isLocked) break;
-      }
-
-      if (totalInChapter === 0 && !chapterLocked) {
-        const emptyMsg = document.createElement('p');
-        emptyMsg.style.cssText = 'color:#777;font-size:0.85rem;padding:8px 12px 12px;text-align:center;';
-        emptyMsg.textContent = 'No levels yet – coming soon!';
-        levelsContainer.appendChild(emptyMsg);
-        levelsContainer.style.padding = '0';
-        levelsContainer.style.display = expanded ? 'flex' : 'none';
-      }
-
-      chapterBox.appendChild(chapterHeader);
-      chapterBox.appendChild(levelsContainer);
+      attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
     }
+
+    chapterBox.appendChild(chapterHeader);
     levelListEl.appendChild(chapterBox);
   }
 

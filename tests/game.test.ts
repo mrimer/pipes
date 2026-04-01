@@ -641,9 +641,9 @@ describe('Game – reset progress', () => {
 
     // Campaign progress should be cleared
     expect(hooks._activeCampaignProgress.size).toBe(0);
-    // The first level button should no longer have the 'completed' class
-    const firstLevelBtn = levelListEl.querySelector('.level-btn');
-    expect(firstLevelBtn?.classList.contains('completed')).toBe(false);
+    // The chapter header should no longer show a completion indicator
+    const chapterHeader = levelListEl.querySelector('.chapter-header span');
+    expect(chapterHeader?.textContent).not.toContain('✅');
   });
 });
 
