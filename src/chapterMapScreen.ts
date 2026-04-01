@@ -656,16 +656,17 @@ export class ChapterMapScreen {
     if (!sourcePos) return new Set();
 
     const getConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
-      if (def.connections) return new Set(def.connections);
-      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink) {
-        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-      }
       if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
         const levelIdx = def.levelIdx ?? 0;
         const levelId = chapter.levels[levelIdx]?.id;
         const isCompleted = levelId !== undefined && completedLevels.has(levelId);
         // Water enters the chamber regardless; exits only if completed
         if (!isCompleted && !isEntry) return new Set();
+        if (def.connections) return new Set(def.connections);
+        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+      }
+      if (def.connections) return new Set(def.connections);
+      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink) {
         return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
       }
       if (PIPE_SHAPES.has(def.shape)) {
