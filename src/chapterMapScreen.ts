@@ -652,10 +652,8 @@ export class ChapterMapScreen {
       const starsCollectedStatus = chLevels.reduce((sum, l) => sum + Math.min(levelStarsData[l.id] ?? 0, l.starCount ?? 0), 0);
       const starsTotalStatus = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
       const isMastered = starsTotalStatus === 0 || starsCollectedStatus >= starsTotalStatus;
-      if (isAlreadyCompleted && !isMastered) {
-        this._statusEl.innerHTML = `<span style="color:${SUCCESS_COLOR};font-size:1rem;">✅ Chapter Complete!</span>`;
-      } else if (isAlreadyCompleted && isMastered) {
-        this._statusEl.innerHTML = ''; // "Mastered!" is already shown in the stats bar
+      if (isAlreadyCompleted) {
+        this._statusEl.innerHTML = ''; // "Complete"/"Mastered!" is already shown in the stats bar
       } else {
         let html = `<span style="color:${SUCCESS_COLOR};font-size:1rem;font-weight:bold;">✅ Level Complete!</span>`;
         if (campaign) {
