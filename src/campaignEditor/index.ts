@@ -149,6 +149,14 @@ export class CampaignEditor {
       getActiveChapterIdx: () => this._activeChapterIdx,
       touchCampaign: (campaign) => this._touchCampaign(campaign),
       saveCampaigns: () => this._saveCampaigns(),
+      openLevelEditor: (levelIdx, readOnly) => {
+        const campaign = this._getActiveCampaign();
+        const chapter = campaign?.chapters[this._activeChapterIdx];
+        const level = chapter?.levels[levelIdx];
+        if (!level) return;
+        this._activeLevelIdx = levelIdx;
+        this._openLevelEditor(level, readOnly);
+      },
     };
     this._chapterMapEditor = new ChapterMapEditorSection(chapterCallbacks);
 

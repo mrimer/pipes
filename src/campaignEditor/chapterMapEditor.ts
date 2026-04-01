@@ -41,6 +41,7 @@ export interface ChapterMapEditorCallbacks {
   getActiveChapterIdx(): number;
   touchCampaign(campaign: CampaignDef): void;
   saveCampaigns(): void;
+  openLevelEditor(levelIdx: number, readOnly: boolean): void;
 }
 
 // ─── ChapterMapEditorSection ───────────────────────────────────────────────────
@@ -717,6 +718,7 @@ export class ChapterMapEditorSection {
     if (!readOnly) {
       canvas.addEventListener('mousedown', (e) => this._onChapterCanvasMouseDown(e, campaign, chapter));
       canvas.addEventListener('mousemove', (e) => this._onChapterCanvasMouseMove(e));
+      canvas.addEventListener('dblclick', (e) => this._onChapterCanvasDblClick(e));
       canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (this._chapterSuppressContextMenu) { this._chapterSuppressContextMenu = false; return; }
@@ -1136,7 +1138,7 @@ export class ChapterMapEditorSection {
           shape: PipeShape.Chamber,
           chamberContent: 'level',
           levelIdx: this._chapterSelectedLevelIdx,
-          connections: [Direction.North, Direction.East, Direction.South, Direction.West],
+          connections: [Direction.East, Direction.West],
         };
         this._chapterSelectedLevelIdx = null;
         // Auto-select the 'Level' palette and sync params panel after placement
@@ -1271,6 +1273,15 @@ export class ChapterMapEditorSection {
     this._recordChapterSnapshot(chapter);
     this._saveChapterGridState(chapter, campaign);
     this._renderChapterCanvas();
+  }
+
+  private _onChapterCanvasDblClick(e: MouseEvent): void {
+    const pos = this._chapterCanvasPos(e);
+    if (!pos) return;
+    const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
+    if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) return;
+    const readOnly = this._callbacks.getActiveCampaign()?.official === true;
+    this._callbacks.openLevelEditor(tile.levelIdx, readOnly);
   }
 
   // ─── Chapter editor undo/redo ────────────────────────────────────────────

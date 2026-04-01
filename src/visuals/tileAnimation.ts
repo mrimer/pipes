@@ -53,14 +53,20 @@ export function animColor(value: number): string {
  *   When provided, each label's x position is shifted left as needed so the
  *   full text stays within the canvas.
  */
+/** The water droplet emoji used in animation labels. */
+const DROPLET_CHAR = '💧';
+
 export function renderAnimations(
   ctx: CanvasRenderingContext2D,
   animations: TileAnimation[],
   canvasWidth?: number,
 ): void {
   const now = performance.now();
-  // Set constant text properties once before the loop.
-  ctx.font = `bold ${Math.round(30 * TILE_SIZE / 64)}px Arial`;
+  const mainFontSize = Math.round(30 * TILE_SIZE / 64);
+  const dropletFontSize = Math.round(18 * TILE_SIZE / 64);
+  const mainFont = `bold ${mainFontSize}px Arial`;
+  const dropletFont = `bold ${dropletFontSize}px Arial`;
+  ctx.font = mainFont;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const riseAmount = ANIM_RISE_PX * TILE_SIZE / 64;
@@ -76,23 +82,57 @@ export function renderAnimations(
     // Remain fully visible for the first 50% of the duration, then fade out.
     const alpha = progress < 0.5 ? 1 : (1 - progress) * 2;
     const yOffset = -riseAmount * progress;
+    const y = anim.y + yOffset;
 
-    // Clamp x so the label doesn't overflow the right edge of the canvas.
-    let x = anim.x;
-    if (canvasWidth !== undefined) {
-      const halfW = ctx.measureText(anim.text).width / 2;
-      if (x + halfW > canvasWidth) {
-        x = canvasWidth - halfW;
-      }
-    }
+    // Split off the trailing droplet character, if present, to render it
+    // at a smaller font size so it doesn't crowd adjacent tiles.
+    const dropletIdx = anim.text.indexOf(DROPLET_CHAR);
+    const hasDroplet = dropletIdx !== -1;
 
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 2;
-    ctx.strokeText(anim.text, x, anim.y + yOffset);
-    ctx.fillStyle = anim.color;
-    ctx.fillText(anim.text, x, anim.y + yOffset);
+
+    if (!hasDroplet) {
+      // No droplet – render as a single centered label.
+      ctx.font = mainFont;
+      let x = anim.x;
+      if (canvasWidth !== undefined) {
+        const halfW = ctx.measureText(anim.text).width / 2;
+        if (x + halfW > canvasWidth) x = canvasWidth - halfW;
+      }
+      ctx.strokeText(anim.text, x, y);
+      ctx.fillStyle = anim.color;
+      ctx.fillText(anim.text, x, y);
+    } else {
+      // Render the numeric part at full size, droplet at reduced size, side
+      // by side so the combined label is centered at anim.x.
+      const numPart = anim.text.slice(0, dropletIdx);
+      ctx.font = mainFont;
+      const numWidth = numPart ? ctx.measureText(numPart).width : 0;
+      ctx.font = dropletFont;
+      const dropWidth = ctx.measureText(DROPLET_CHAR).width;
+      const halfTotal = (numWidth + dropWidth) / 2;
+      let cx = anim.x;
+      if (canvasWidth !== undefined && cx + halfTotal > canvasWidth) {
+        cx = canvasWidth - halfTotal;
+      }
+      ctx.textAlign = 'center';
+      if (numPart) {
+        ctx.font = mainFont;
+        const numCx = cx - dropWidth / 2;
+        ctx.strokeText(numPart, numCx, y);
+        ctx.fillStyle = anim.color;
+        ctx.fillText(numPart, numCx, y);
+      }
+      ctx.font = dropletFont;
+      const dropCx = cx + numWidth / 2;
+      ctx.strokeText(DROPLET_CHAR, dropCx, y);
+      ctx.fillStyle = anim.color;
+      ctx.fillText(DROPLET_CHAR, dropCx, y);
+    }
+
     ctx.restore();
 
     i++;
