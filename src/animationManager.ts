@@ -68,7 +68,13 @@ export interface AnimSparkleCallbacks {
  * sparkles) remain in Game as UI concerns.
  */
 export class AnimationManager {
-  /** Active floating animation labels shown over the canvas. */
+  /**
+   * Active floating animation labels shown over the canvas.
+   *
+   * The array reference is readonly (external code cannot reassign it), but the
+   * array contents are intentionally mutable: AnimationManager pushes into it
+   * internally, and tests are expected to inspect and clear it via `.length = 0`.
+   */
   readonly animations: TileAnimation[] = [];
 
   private _rotationAnims: PipeRotationAnim[] = [];
