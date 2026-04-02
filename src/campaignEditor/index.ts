@@ -9,7 +9,7 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS } from '../types';
+import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, TEMP_CHAMBER_CONTENTS } from '../types';
 import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign, clearLevelStarRecord, clearLevelWaterRecord } from '../persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
@@ -59,6 +59,45 @@ import {
 } from './types';
 import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './renderer';
 import { renderMinimap } from '../minimap';
+
+// ─── Chamber parameter descriptors ───────────────────────────────────────────
+
+/** A single numeric parameter shown in the tile-params panel for a Chamber tile. */
+interface ChamberParamDescriptor {
+  /** Label text rendered to the left of the input. */
+  label: string;
+  /** Which field of {@link TileParams} this input controls. */
+  field: keyof Pick<TileParams, 'temperature' | 'cost' | 'pressure' | 'hardness' | 'shatter'>;
+  /**
+   * When provided, the input value is clamped to this minimum (via `Math.max`).
+   * When omitted, the raw `parseInt` result is used (allowing negative values).
+   */
+  clampMin?: number;
+}
+
+/**
+ * Declarative map from Chamber content type → ordered list of numeric param inputs.
+ * Drives {@link CampaignEditor._buildChamberContentParams} so each new content
+ * type only needs an entry here rather than a new `if` branch.
+ *
+ * Content types with no numeric params (tank, star) are omitted – the method
+ * is a no-op for them.  The `item` type is handled separately (it has a shape
+ * selector in addition to a numeric count field).
+ */
+const CHAMBER_PARAM_DESCRIPTORS: Partial<Record<ChamberContent, ChamberParamDescriptor[]>> = {
+  dirt:      [{ label: 'Mass',      field: 'cost' }],
+  heater:    [{ label: 'Temp',      field: 'temperature' }],
+  ice:       [{ label: 'Temp °',    field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
+  snow:      [{ label: 'Temp °',    field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
+  sandstone: [
+    { label: 'Temp °',   field: 'temperature', clampMin: 0 },
+    { label: 'Mass',     field: 'cost',        clampMin: 0 },
+    { label: 'Hardness', field: 'hardness',    clampMin: 0 },
+    { label: 'Shatter',  field: 'shatter',     clampMin: 0 },
+  ],
+  pump:      [{ label: 'Pressure',  field: 'pressure' }],
+  hot_plate: [{ label: 'Boiling °', field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
+};
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -1639,53 +1678,15 @@ export class CampaignEditor {
    * Chamber tool), so `cc` is always the concrete content type.
    */
   private _buildChamberContentParams(parent: HTMLElement, cc: ChamberContent): void {
-    if (cc === 'dirt') {
-      parent.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-        this._editorParams.cost = parseInt(v) || 0;
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-    }
-    if (cc === 'heater') {
-      parent.appendChild(this._labeledInput('Temp', String(this._editorParams.temperature), (v) => {
-        this._editorParams.temperature = parseInt(v) || 0;
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-    }
-    if (COLD_CHAMBER_CONTENTS.has(cc)) {
-      parent.appendChild(this._labeledInput('Temp °', String(this._editorParams.temperature), (v) => {
-        this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-      parent.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-        this._editorParams.cost = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-    }
-    if (cc === 'sandstone') {
-      parent.appendChild(this._labeledInput('Hardness', String(this._editorParams.hardness), (v) => {
-        this._editorParams.hardness = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-      parent.appendChild(this._labeledInput('Shatter', String(this._editorParams.shatter), (v) => {
-        this._editorParams.shatter = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-    }
-    if (cc === 'pump') {
-      parent.appendChild(this._labeledInput('Pressure', String(this._editorParams.pressure), (v) => {
-        this._editorParams.pressure = parseInt(v) || 0;
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-    }
-    if (cc === 'hot_plate') {
-      parent.appendChild(this._labeledInput('Boiling °', String(this._editorParams.temperature), (v) => {
-        this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
-      parent.appendChild(this._labeledInput('Mass', String(this._editorParams.cost), (v) => {
-        this._editorParams.cost = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
-      }, 'number', '90px'));
+    const descriptors = CHAMBER_PARAM_DESCRIPTORS[cc];
+    if (descriptors) {
+      for (const { label, field, clampMin } of descriptors) {
+        parent.appendChild(this._labeledInput(label, String(this._editorParams[field]), (v) => {
+          const parsed = parseInt(v) || 0;
+          this._editorParams[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
+          this._applyParamsToLinkedTile();
+        }, 'number', '90px'));
+      }
     }
     if (cc === 'item') {
       parent.appendChild(this._buildItemShapeSelector());

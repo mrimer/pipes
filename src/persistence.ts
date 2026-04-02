@@ -195,79 +195,99 @@ export function clearActiveCampaignId(): void {
   }
 }
 
+// ─── Per-level record store factory ──────────────────────────────────────────
+
+/**
+ * Factory for per-level score record stores backed by localStorage.
+ * Creates load / save / clear / clearRecord helpers for a given key scheme.
+ *
+ * @param keyFn        - Maps an optional campaign ID to a localStorage key.
+ * @param shouldUpdate - Optional predicate controlling when a new value replaces
+ *                       the stored one.  Receives `(newVal, existingVal)` where
+ *                       `existingVal` defaults to `-Infinity` when no record exists.
+ *                       When omitted, every call to `save` unconditionally overwrites.
+ */
+function _makeLevelRecordStore(
+  keyFn: (campaignId?: string) => string,
+  shouldUpdate?: (newVal: number, existing: number) => boolean,
+): {
+  load: (campaignId?: string) => Record<number, number>;
+  save: (levelId: number, value: number, campaignId?: string) => void;
+  clear: (campaignId?: string) => void;
+  clearRecord: (levelId: number, campaignId?: string) => void;
+} {
+  function load(campaignId?: string): Record<number, number> {
+    try {
+      const raw = localStorage.getItem(keyFn(campaignId));
+      if (raw) return JSON.parse(raw) as Record<number, number>;
+    } catch { /* ignore parse errors */ }
+    return {};
+  }
+
+  function save(levelId: number, value: number, campaignId?: string): void {
+    try {
+      const record = load(campaignId);
+      if (!shouldUpdate || shouldUpdate(value, record[levelId] ?? -Infinity)) {
+        record[levelId] = value;
+        localStorage.setItem(keyFn(campaignId), JSON.stringify(record));
+      }
+    } catch { /* ignore storage errors */ }
+  }
+
+  function clear(campaignId?: string): void {
+    try {
+      localStorage.removeItem(keyFn(campaignId));
+    } catch { /* ignore storage errors */ }
+  }
+
+  function clearRecord(levelId: number, campaignId?: string): void {
+    try {
+      const record = load(campaignId);
+      if (!(levelId in record)) return;
+      delete record[levelId];
+      localStorage.setItem(keyFn(campaignId), JSON.stringify(record));
+    } catch { /* ignore storage errors */ }
+  }
+
+  return { load, save, clear, clearRecord };
+}
+
 // ─── Star progress ────────────────────────────────────────────────────────────
 
-const LEVEL_STARS_KEY = 'pipes_level_stars';
-
-function levelStarsStorageKey(campaignId?: string): string {
-  return campaignId ? `pipes_campaign_stars_${campaignId}` : LEVEL_STARS_KEY;
-}
+const _starsStore = _makeLevelRecordStore(
+  (campaignId?) => campaignId ? `pipes_campaign_stars_${campaignId}` : 'pipes_level_stars',
+);
 
 /** Load the map of level IDs → stars collected from localStorage. */
 export function loadLevelStars(campaignId?: string): Record<number, number> {
-  try {
-    const raw = localStorage.getItem(levelStarsStorageKey(campaignId));
-    if (raw) {
-      return JSON.parse(raw) as Record<number, number>;
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return {};
+  return _starsStore.load(campaignId);
 }
 
 /** Save the star count collected for a specific level to localStorage. */
 export function saveLevelStar(levelId: number, count: number, campaignId?: string): void {
-  try {
-    const key = levelStarsStorageKey(campaignId);
-    const stars = loadLevelStars(campaignId);
-    stars[levelId] = count;
-    localStorage.setItem(key, JSON.stringify(stars));
-  } catch {
-    // ignore storage errors
-  }
+  _starsStore.save(levelId, count, campaignId);
 }
 
 /** Clear all star progress (for a campaign or the official campaign). */
 export function clearLevelStars(campaignId?: string): void {
-  try {
-    localStorage.removeItem(levelStarsStorageKey(campaignId));
-  } catch {
-    // ignore storage errors
-  }
+  _starsStore.clear(campaignId);
 }
 
 /** Clear the star record for a single level (for a campaign or the official campaign). */
 export function clearLevelStarRecord(levelId: number, campaignId?: string): void {
-  try {
-    const stars = loadLevelStars(campaignId);
-    if (!(levelId in stars)) return;
-    delete stars[levelId];
-    localStorage.setItem(levelStarsStorageKey(campaignId), JSON.stringify(stars));
-  } catch {
-    // ignore storage errors
-  }
+  _starsStore.clearRecord(levelId, campaignId);
 }
 
 // ─── Water-remaining progress ──────────────────────────────────────────────────
 
-const LEVEL_WATER_KEY = 'pipes_level_water';
-
-function levelWaterStorageKey(campaignId?: string): string {
-  return campaignId ? `pipes_campaign_water_${campaignId}` : LEVEL_WATER_KEY;
-}
+const _waterStore = _makeLevelRecordStore(
+  (campaignId?) => campaignId ? `pipes_campaign_water_${campaignId}` : 'pipes_level_water',
+  (newVal, existing) => newVal > existing,
+);
 
 /** Load the map of level IDs → max water remaining from localStorage. */
 export function loadLevelWater(campaignId?: string): Record<number, number> {
-  try {
-    const raw = localStorage.getItem(levelWaterStorageKey(campaignId));
-    if (raw) {
-      return JSON.parse(raw) as Record<number, number>;
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return {};
+  return _waterStore.load(campaignId);
 }
 
 /**
@@ -275,37 +295,17 @@ export function loadLevelWater(campaignId?: string): Record<number, number> {
  * Only updates the stored value when `water` exceeds the previously recorded maximum.
  */
 export function saveLevelWater(levelId: number, water: number, campaignId?: string): void {
-  try {
-    const key = levelWaterStorageKey(campaignId);
-    const waterMap = loadLevelWater(campaignId);
-    if (water > (waterMap[levelId] ?? -Infinity)) {
-      waterMap[levelId] = water;
-      localStorage.setItem(key, JSON.stringify(waterMap));
-    }
-  } catch {
-    // ignore storage errors
-  }
+  _waterStore.save(levelId, water, campaignId);
 }
 
 /** Clear all water-remaining progress (for a campaign or the official campaign). */
 export function clearLevelWater(campaignId?: string): void {
-  try {
-    localStorage.removeItem(levelWaterStorageKey(campaignId));
-  } catch {
-    // ignore storage errors
-  }
+  _waterStore.clear(campaignId);
 }
 
 /** Clear the water record for a single level (for a campaign or the official campaign). */
 export function clearLevelWaterRecord(levelId: number, campaignId?: string): void {
-  try {
-    const waterMap = loadLevelWater(campaignId);
-    if (!(levelId in waterMap)) return;
-    delete waterMap[levelId];
-    localStorage.setItem(levelWaterStorageKey(campaignId), JSON.stringify(waterMap));
-  } catch {
-    // ignore storage errors
-  }
+  _waterStore.clearRecord(levelId, campaignId);
 }
 
 // ─── Chapter completion tracking ─────────────────────────────────────────────
