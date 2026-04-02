@@ -1,6 +1,7 @@
 import { Board, MoveResult, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
+import { InputCallbacks, InputHandler } from './inputHandler';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderBoard, renderContainerFillAnims, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
@@ -122,9 +123,12 @@ const PLAY_HINT_PANEL_H = 37;
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
  * Handles both the level-selection menu and the active play screen.
  */
-export class Game {
+export class Game implements InputCallbacks {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
+
+  /** Input handler that owns all event listeners and input state. */
+  private readonly _input: InputHandler;
 
   // Screens / overlays (managed by DOM, not canvas)
   private readonly levelSelectEl: HTMLElement;
@@ -186,48 +190,6 @@ export class Game {
 
   /** Rotation that will be applied when the pending inventory item is placed. */
   private pendingRotation: Rotation = 0;
-
-  /**
-   * When no inventory item is selected, the number of accumulated 90°-CW rotation steps
-   * being previewed on the hovered tile (0 = no preview active).
-   */
-  private hoverRotationDelta: number = 0;
-
-  /** Last-used placement rotation per pipe shape, so the same orientation is reused next time. */
-  private readonly lastPlacedRotations = new Map<PipeShape, Rotation>();
-
-  /** Most-recent mouse position over the canvas in canvas-pixel coordinates. */
-  private mouseCanvasPos: { x: number; y: number } | null = null;
-
-  /** True while the left mouse button is held on the canvas with a shape selected. */
-  private _isDragging = false;
-
-  /** Grid position of the tile the drag gesture is currently over. */
-  private _dragLastTile: GridPos | null = null;
-
-  /**
-   * True when the drag gesture moved to at least one new tile and already handled
-   * placement, so the subsequent click event (if it fires) should be suppressed.
-   */
-  private _suppressNextClick = false;
-
-  /** True while the right mouse button is held on the canvas (drag-erase). */
-  private _isRightDragging = false;
-
-  /** Grid position of the tile the right-drag gesture is currently over. */
-  private _rightDragLastTile: GridPos | null = null;
-
-  /**
-   * True when the right-drag gesture already handled removal, so the subsequent
-   * contextmenu event (if it fires) should be suppressed.
-   */
-  private _suppressNextContextMenu = false;
-
-  /** Whether the Ctrl key is currently held. */
-  private ctrlHeld = false;
-
-  /** Whether the Shift key is currently held (used for adjusted ice/snow display). */
-  private shiftHeld = false;
 
   /** Tooltip element for displaying grid coordinates under Ctrl. */
   private readonly tooltipEl: HTMLElement;
@@ -557,23 +519,8 @@ export class Game {
       this._autoSelectCampaign();
     }
 
-    canvas.addEventListener('mousedown',    (e) => this._handleCanvasMouseDown(e));
-    canvas.addEventListener('click',        (e) => this._handleCanvasClick(e));
-    canvas.addEventListener('mousemove',    (e) => this._handleCanvasMouseMove(e));
-    canvas.addEventListener('mouseleave',   ()  => { this._cancelDrag(); this._cancelRightDrag(); this._hideTooltip(); this.hoverRotationDelta = 0; this.mouseCanvasPos = null; });
-    // Capture mouseup and contextmenu on window so a release (or the contextmenu event that
-    // follows) outside the canvas still ends the drag and suppresses the browser context menu.
-    // This is necessary because a right-click that triggers a fail-state causes the game-over
-    // modal to appear before the contextmenu event fires, making the modal the event target
-    // rather than the canvas.  Listening on window ensures preventDefault() is always called.
-    // Game is a singleton for the lifetime of the page, so these listeners are never removed
-    // (same pattern as the document keydown/keyup listeners below).
-    window.addEventListener('mouseup',      (e) => this._handleCanvasMouseUp(e));
-    window.addEventListener('contextmenu',  (e) => this._handleCanvasRightClick(e));
-    canvas.addEventListener('keydown',      (e) => this._handleKey(e));
-    canvas.addEventListener('wheel',        (e) => this._handleCanvasWheel(e), { passive: false });
-    document.addEventListener('keydown',    (e) => this._handleDocKeyDown(e));
-    document.addEventListener('keyup',      (e) => this._handleDocKeyUp(e));
+    // Create the input handler – registers all event listeners on canvas/window/document.
+    this._input = new InputHandler(canvas, this);
 
     this._showLevelSelect();
     this._loop();
@@ -843,7 +790,7 @@ export class Game {
     this.focusPos = { ...this.board!.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
-    this.hoverRotationDelta = 0;
+    this._input.hoverRotationDelta = 0;
 
     setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level)));
     this.canvas.width  = level.cols * TILE_SIZE;
@@ -1042,8 +989,8 @@ export class Game {
       this.inventoryBarEl,
       this.board,
       this.selectedShape,
-      (shape, count) => this._handleInventoryClick(shape, count),
-      () => this._handleInventoryRightClick(),
+      (shape, count) => this._input.handleInventoryClick(shape, count),
+      () => this._input.handleInventoryRightClick(),
     );
     if (this._pendingSparkleShapes.size > 0) {
       for (const shape of this._pendingSparkleShapes) {
@@ -1077,41 +1024,6 @@ export class Game {
         }
       }
       this._pendingGraySparkleShapes.clear();
-    }
-  }
-
-  private _handleInventoryClick(shape: PipeShape, count: number): void {
-    if (this.gameState !== GameState.Playing) return;
-    if (count < 0) {
-      // Flash a red sparkle to signal the item is not selectable.
-      this._pendingRedSparkleShapes.add(shape);
-      this._renderInventoryBar();
-      this.canvas.focus();
-      return;
-    }
-    if (count === 0) return;
-    if (this.selectedShape === shape) {
-      // Clicking the already-selected item deselects it.
-      this.selectedShape = null;
-      this._renderInventoryBar();
-      this.canvas.focus();
-      return;
-    }
-    this.selectedShape = shape;
-    this.pendingRotation = this.lastPlacedRotations.get(shape) ?? 0;
-    this._renderInventoryBar();
-    // Return focus to the canvas so Q/W rotation keys work immediately after
-    // selecting an inventory piece without requiring a click on the board.
-    this.canvas.focus();
-  }
-
-  private _handleInventoryRightClick(): void {
-    if (this.gameState !== GameState.Playing) return;
-    // Right-clicking any inventory tile deselects the currently selected item.
-    if (this.selectedShape !== null) {
-      this.selectedShape = null;
-      this._renderInventoryBar();
-      this.canvas.focus();
     }
   }
 
@@ -1182,6 +1094,10 @@ export class Game {
    * Call this instead of the three individual methods whenever all three need to be
    * updated together (which is the common case).
    */
+  refreshUI(): void {
+    this._refreshPlayUI();
+  }
+
   private _refreshPlayUI(): void {
     this._renderInventoryBar();
     this._updateWaterDisplay();
@@ -1337,12 +1253,12 @@ export class Game {
       this.focusPos,
       this.selectedShape,
       this.pendingRotation,
-      this.mouseCanvasPos,
-      this.shiftHeld,
+      this._input.mouseCanvasPos,
+      this._input.shiftHeld,
       currentTemp,
       currentPressure,
       this._errorHighlightKeys,
-      this.hoverRotationDelta,
+      this._input.hoverRotationDelta,
       rotationOverrides,
       fillExclude,
     );
@@ -1362,7 +1278,7 @@ export class Game {
       // to the opposite edge, showing the connected state progressively.
       renderContainerFillAnims(
         this.ctx, this.board, this._fillAnims,
-        this.board.getCurrentWater(), this.shiftHeld, currentTemp, currentPressure, now,
+        this.board.getCurrentWater(), this._input.shiftHeld, currentTemp, currentPressure, now,
       );
     }
   }
@@ -1543,125 +1459,6 @@ export class Game {
     });
   }
 
-  // ─── Input handlers ────────────────────────────────────────────────────────
-
-  /**
-   * Convert a mouse event's client coordinates into a grid {@link GridPos} using
-   * the current canvas bounding rectangle and tile size.
-   */
-  private _getGridPosFromEvent(e: MouseEvent): GridPos {
-    const rect = this.canvas.getBoundingClientRect();
-    return {
-      row: Math.floor((e.clientY - rect.top)  / TILE_SIZE),
-      col: Math.floor((e.clientX - rect.left) / TILE_SIZE),
-    };
-  }
-
-  /**
-   * Convert the current {@link mouseCanvasPos} into a grid {@link GridPos}.
-   * Returns `null` when no mouse position is available.
-   */
-  private _getHoverGridPos(): GridPos | null {
-    if (!this.mouseCanvasPos) return null;
-    return {
-      row: Math.floor(this.mouseCanvasPos.y / TILE_SIZE),
-      col: Math.floor(this.mouseCanvasPos.x / TILE_SIZE),
-    };
-  }
-
-  private _handleCanvasMouseDown(e: MouseEvent): void {
-    if (e.button === 2) {
-      if (this.screen !== GameScreen.Play) return;
-      if (this.gameState !== GameState.Playing) return;
-      if (!this.board) return;
-      const { row, col } = this._getGridPosFromEvent(e);
-      this._isRightDragging = true;
-      this._rightDragLastTile = { row, col };
-      this._suppressNextContextMenu = false;
-      return;
-    }
-    if (e.button !== 0) return;
-    if (this.screen !== GameScreen.Play) return;
-    if (this.gameState !== GameState.Playing) return;
-    if (this.selectedShape === null) return; // No shape selected; click/rotation handled separately
-
-    const { row, col } = this._getGridPosFromEvent(e);
-    this._isDragging = true;
-    this._dragLastTile = { row, col };
-    this._suppressNextClick = false;
-  }
-
-  private _handleCanvasMouseUp(e: MouseEvent): void {
-    if (e.button === 2) {
-      if (!this._isRightDragging) return;
-      // Remove the tile at the final (current) position and suppress the contextmenu event.
-      if (this._rightDragLastTile && this.board &&
-          this.gameState === GameState.Playing && this.screen === GameScreen.Play) {
-        const tile = this.board.getTile(this._rightDragLastTile);
-        if (!tile || tile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(tile.shape)) {
-          // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
-          if (this.selectedShape !== null) {
-            this.selectedShape = null;
-            this._renderInventoryBar();
-          }
-        } else {
-          this._reclaimTileAt(this._rightDragLastTile);
-        }
-      }
-      this._suppressNextContextMenu = true;
-      this._cancelRightDrag();
-      return;
-    }
-    if (e.button !== 0) return;
-    if (!this._isDragging) return;
-
-    // If the drag moved to at least one new tile the final hovered tile is still
-    // a "pending preview" – place it now and suppress the click event that follows.
-    if (this._dragLastTile && this.selectedShape !== null &&
-        this.board && this.gameState === GameState.Playing &&
-        this.screen === GameScreen.Play) {
-      const pos = this._dragLastTile;
-      const tile = this.board.getTile(pos);
-      // Spinner tiles cannot be replaced; skip placement so the click event can rotate them.
-      if (tile && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-        const filledBefore = this.board.getFilledPositions();
-        if (this._tryPlaceOrReplaceSelectedAt(pos, tile, filledBefore)) {
-          this._suppressNextClick = true;
-        }
-      }
-    }
-
-    this._cancelDrag();
-  }
-
-  /** Resets left-drag-paint state. */
-  private _cancelDrag(): void {
-    this._isDragging = false;
-    this._dragLastTile = null;
-  }
-
-  /** Resets right-drag-erase state. */
-  private _cancelRightDrag(): void {
-    this._isRightDragging = false;
-    this._rightDragLastTile = null;
-  }
-
-  /**
-   * Returns the tile currently under the mouse cursor if it is eligible for
-   * hover-rotation preview (non-fixed, non-empty, non-spin pipe), otherwise null.
-   * Also bumps hoverRotationDelta by `steps` (±1) when a valid tile is found.
-   */
-  private _tryAdjustHoverRotation(steps: 1 | -1): boolean {
-    if (!this.mouseCanvasPos || !this.board) return false;
-    const hPos = this._getHoverGridPos()!;
-    const hTile = this.board.getTile(hPos);
-    if (!hTile || hTile.isFixed || hTile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(hTile.shape)) {
-      return false;
-    }
-    this.hoverRotationDelta = ((this.hoverRotationDelta + steps + 4) % 4);
-    return true;
-  }
-
   /**
    * Reset all per-level particle arrays to empty.
    * Call whenever a new level begins or when returning to the level-select
@@ -1683,7 +1480,7 @@ export class Game {
    * Reclaims (removes) the tile at pos, records the move, and updates UI.
    * Shared by both single right-click and right-drag-erase.
    */
-  private _reclaimTileAt(pos: GridPos): void {
+  reclaimTileAt(pos: GridPos): void {
     if (!this.board) return;
     const tileBeforeReclaim = this.board.grid[pos.row]?.[pos.col];
     const reclaimedShape = tileBeforeReclaim?.shape;
@@ -1706,7 +1503,7 @@ export class Game {
       this._refreshPlayUI();
       this._checkWinLoseAfterMove();
     } else if (result.error) {
-      this._handleBoardError(result);
+      this.handleBoardError(result);
     }
   }
 
@@ -1774,15 +1571,15 @@ export class Game {
 
   /**
    * Called after successfully rotating any tile (spinner or regular pipe).
-   * Records the move, updates animations, and refreshes all dependent UI.
-   * Shared by click, wheel, and keyboard rotation paths.
+   * Records the move and updates animations.  The caller (InputHandler) is
+   * responsible for invoking {@link refreshUI} and {@link checkWinLose} afterwards.
    *
    * @param filledBefore - Filled positions snapshot taken before the rotation.
    * @param rotationInfo - When provided, a pipe-rotation animation is spawned
    *   for the rotated tile from `oldRotation` to the tile's current rotation.
    *   Any subsequent fill animation is delayed until after the rotation completes.
    */
-  private _afterTileRotated(
+  afterTileRotated(
     filledBefore: Set<string>,
     result: MoveResult,
     rotationInfo?: { row: number; col: number; oldRotation: number },
@@ -1811,263 +1608,8 @@ export class Game {
     this._spawnFillAnims(filledBefore, fillDelay);
     this._spawnLockedCostChangeAnimations(changes);
     this._spawnCementDecrementAnimation(result.cementDecrement);
-    this._refreshPlayUI();
-    this._checkWinLoseAfterMove();
   }
 
-
-  /**
-   * If the mouse is currently hovering a spinner tile, rotate it by `steps`
-   * clockwise quarter-turns and update the UI.  Returns true on success.
-   */
-  private _tryRotateHoverSpinner(steps: number): boolean {
-    if (!this.mouseCanvasPos || !this.board) return false;
-    const hPos = this._getHoverGridPos()!;
-    const hTile = this.board.getTile(hPos);
-    if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
-    const filledBefore = this.board.getFilledPositions();
-    const oldRotation = hTile.rotation;
-    const result = this.board.rotateTileBy(hPos, steps);
-    if (result.success) {
-      this._afterTileRotated(filledBefore, result, { row: hPos.row, col: hPos.col, oldRotation });
-      return true;
-    } else if (result.error) {
-      this._handleBoardError(result);
-    }
-    return false;
-  }
-
-  private _handleCanvasClick(e: MouseEvent): void {
-    if (this.screen !== GameScreen.Play) return;
-    if (this.gameState !== GameState.Playing) return;
-    if (!this.board) return;
-
-    // The drag gesture already handled placement; swallow the click event.
-    if (this._suppressNextClick) {
-      this._suppressNextClick = false;
-      return;
-    }
-
-    const pos = this._getGridPosFromEvent(e);
-    const tile = this.board.getTile(pos);
-    if (!tile) return;
-
-    const filledBefore = this.board.getFilledPositions();
-
-    if (SPIN_PIPE_SHAPES.has(tile.shape)) {
-      // Spinnable pipes are always rotated on click (cannot be replaced or removed).
-      // Shift+click rotates CCW (3 steps); plain click rotates CW (1 step).
-      const steps = e.shiftKey ? 3 : 1;
-      const oldRotation = tile.rotation;
-      const spinResult = this.board.rotateTileBy(pos, steps);
-      if (spinResult.success) {
-        // Sync the pending placement rotation so the ghost image stays aligned.
-        if (this.selectedShape === tile.shape) {
-          this.pendingRotation = tile.rotation as Rotation;
-        }
-        this._afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
-      } else if (spinResult.error) {
-        this._handleBoardError(spinResult);
-      }
-    } else if (this.selectedShape !== null &&
-               (tile.shape === PipeShape.Empty ||
-                tile.shape !== this.selectedShape ||
-                tile.rotation !== this.pendingRotation)) {
-      // Place on an empty cell or replace a tile with a different shape/rotation.
-      // When tile already matches exactly (same shape+rotation), fall through to rotate.
-      this._tryPlaceOrReplaceSelectedAt(pos, tile, filledBefore);
-    } else if (tile.shape !== PipeShape.Empty) {
-      // Rotate existing pipe (no inventory item selected, or same shape+rotation as selected).
-      // If the user has previewed multiple rotations via Q/W/wheel, apply all of them
-      // as a single game turn; otherwise fall back to a standard single 90° rotation.
-      const delta = this.hoverRotationDelta;
-      this.hoverRotationDelta = 0;
-      const oldRotation = tile.rotation;
-      const rotResult = delta > 0
-        ? this.board.rotateTileBy(pos, delta)
-        : e.shiftKey ? this.board.rotateTileBy(pos, 3) : this.board.rotateTile(pos);
-      if (rotResult.success) {
-        // Sync the pending placement rotation so the ghost image stays aligned.
-        if (this.selectedShape === tile.shape) {
-          this.pendingRotation = tile.rotation as Rotation;
-        }
-        this._afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
-      } else if (rotResult.error) {
-        this._handleBoardError(rotResult);
-      }
-    }
-  }
-
-  private _handleCanvasRightClick(e: MouseEvent): void {
-    e.preventDefault();
-    // Suppress if the right-drag gesture already handled the removal.
-    if (this._suppressNextContextMenu) {
-      this._suppressNextContextMenu = false;
-      return;
-    }
-    if (this.screen !== GameScreen.Play) return;
-    if (this.gameState !== GameState.Playing) return;
-    if (!this.board) return;
-
-    const pos = this._getGridPosFromEvent(e);
-
-    // Right-clicking outside the grid (including inventory bar and other UI): deselect.
-    if (pos.row < 0 || pos.row >= this.board.rows || pos.col < 0 || pos.col >= this.board.cols) {
-      if (this.selectedShape !== null) {
-        this.selectedShape = null;
-        this._renderInventoryBar();
-      }
-      return;
-    }
-
-    const tile = this.board.getTile(pos);
-
-    // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
-    if (tile && (tile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(tile.shape))) {
-      if (this.selectedShape !== null) {
-        this.selectedShape = null;
-        this._renderInventoryBar();
-      }
-      return;
-    }
-
-    this._reclaimTileAt(pos);
-  }
-
-  private _handleCanvasMouseMove(e: MouseEvent): void {
-    const rect = this.canvas.getBoundingClientRect();
-    const prevPos = this._getHoverGridPos();
-    this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    const newPos = this._getHoverGridPos()!;
-    if (newPos.row !== prevPos?.row || newPos.col !== prevPos?.col) {
-      this.hoverRotationDelta = 0;
-    }
-    if (this.ctrlHeld && this.gameState === GameState.Playing) {
-      this._showTooltip(e.clientX, e.clientY);
-    }
-
-    // Drag-paint: place at the OLD tile each time the cursor enters a new grid cell.
-    if (this._isDragging && this.selectedShape !== null &&
-        this.board && this.screen === GameScreen.Play &&
-        this.gameState === GameState.Playing) {
-      const { row, col } = newPos;
-      const last = this._dragLastTile;
-      if (last && (row !== last.row || col !== last.col)) {
-        // Moved to a new tile: place at the tile we just left.
-        const oldTile = this.board.getTile(last);
-        if (oldTile) {
-          const filledBefore = this.board.getFilledPositions();
-          this._tryPlaceOrReplaceSelectedAt(last, oldTile, filledBefore);
-        }
-        this._dragLastTile = { row, col };
-      }
-    }
-
-    // Drag-erase: reclaim the OLD tile each time the cursor enters a new grid cell.
-    if (this._isRightDragging && this.board && this.screen === GameScreen.Play &&
-        this.gameState === GameState.Playing) {
-      const { row, col } = newPos;
-      const last = this._rightDragLastTile;
-      if (last && (row !== last.row || col !== last.col)) {
-        // Moved to a new tile: reclaim the tile we just left.
-        this._reclaimTileAt(last);
-        this._rightDragLastTile = { row, col };
-      }
-    }
-  }
-
-  /** Rotate `pendingRotation` 90° clockwise (for wheel/keyboard placement rotation). */
-  private _rotatePendingCW(): void {
-    this.pendingRotation = ((this.pendingRotation + 90) % 360) as Rotation;
-  }
-
-  /** Rotate `pendingRotation` 90° counter-clockwise (for wheel/keyboard placement rotation). */
-  private _rotatePendingCCW(): void {
-    this.pendingRotation = ((this.pendingRotation - 90 + 360) % 360) as Rotation;
-  }
-
-  private _handleCanvasWheel(e: WheelEvent): void {
-    if (this.screen !== GameScreen.Play) return;
-    if (this.gameState !== GameState.Playing) return;
-    if (this.mouseCanvasPos && this.board) {
-      const hPos = this._getHoverGridPos()!;
-      const hTile = this.board.getTile(hPos);
-      if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {
-        // Spin pipes always take priority: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
-        const steps = e.deltaY > 0 ? 1 : 3;
-        const filledBefore = this.board.getFilledPositions();
-        const oldRotation = hTile.rotation;
-        const wheelResult = this.board.rotateTileBy(hPos, steps);
-        if (wheelResult.success) {
-          e.preventDefault();
-          this._afterTileRotated(filledBefore, wheelResult, { row: hPos.row, col: hPos.col, oldRotation });
-        } else if (wheelResult.error) {
-          this._handleBoardError(wheelResult);
-        }
-        return;
-      }
-    }
-    if (this.selectedShape !== null) {
-      e.preventDefault();
-      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
-      if (e.deltaY > 0) {
-        this._rotatePendingCW();
-      } else {
-        this._rotatePendingCCW();
-      }
-    } else if (this.mouseCanvasPos && this.board) {
-      // No inventory selected and not a spin pipe: preview rotation on hovered tile.
-      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
-      const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
-      if (changed) e.preventDefault();
-    }
-  }
-
-  private _handleDocKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Escape' && this._rulesModalEl.style.display !== 'none') {
-      this._rulesModalEl.style.display = 'none';
-      this.canvas.focus();
-      return;
-    }
-    if (e.key === 'Control' && !this.ctrlHeld) {
-      this.ctrlHeld = true;
-      if (this.gameState === GameState.Playing && this.mouseCanvasPos) {
-        const rect = this.canvas.getBoundingClientRect();
-        this._showTooltip(
-          this.mouseCanvasPos.x + rect.left,
-          this.mouseCanvasPos.y + rect.top,
-        );
-      }
-    }
-    if (e.key === 'Shift' && !this.shiftHeld) {
-      this.shiftHeld = true;
-      if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
-        this._selectNextAvailableInventory();
-      }
-    }
-    if (e.ctrlKey && e.key === 'z' && this.screen === GameScreen.Play) {
-      e.preventDefault();
-      if (this.gameState === GameState.Playing) this.performUndo();
-    }
-    if (e.ctrlKey && e.key === 'y' && this.screen === GameScreen.Play) {
-      e.preventDefault();
-      if (this.gameState === GameState.Playing) this.performRedo();
-    }
-    if (e.key === 'Backspace' && this.screen === GameScreen.Play) {
-      e.preventDefault();
-      if (this.gameState === GameState.Playing || this.gameState === GameState.GameOver || this.gameState === GameState.Won) this.performUndo();
-    }
-  }
-
-  private _handleDocKeyUp(e: KeyboardEvent): void {
-    if (e.key === 'Control') {
-      this.ctrlHeld = false;
-      this._hideTooltip();
-    }
-    if (e.key === 'Shift') {
-      this.shiftHeld = false;
-    }
-  }
 
   /** Returns the formula text "(deltaTemp° x cost)" for ice tile tooltips. */
   private _iceCostFormula(deltaTemp: number, cost: number): string {
@@ -2192,11 +1734,13 @@ export class Game {
     return tooltipText;
   }
 
-  private _showTooltip(clientX: number, clientY: number): void {
-    if (this.screen !== GameScreen.Play || !this.mouseCanvasPos) return;
-    const { row, col } = this._getHoverGridPos()!;
+  showTooltip(clientX: number, clientY: number): void {
+    if (this.screen !== GameScreen.Play || !this._input.mouseCanvasPos) return;
+    const mousePos = this._input.mouseCanvasPos;
+    const row = Math.floor(mousePos.y / TILE_SIZE);
+    const col = Math.floor(mousePos.x / TILE_SIZE);
     if (!this.board || row < 0 || row >= this.board.rows || col < 0 || col >= this.board.cols) {
-      this._hideTooltip();
+      this.hideTooltip();
       return;
     }
     // Display as (row, col) to match the GridPos convention used throughout the codebase.
@@ -2248,7 +1792,7 @@ export class Game {
     this.tooltipEl.style.top  = `${clientY + 12}px`;
   }
 
-  private _hideTooltip(): void {
+  hideTooltip(): void {
     this.tooltipEl.style.display = 'none';
   }
 
@@ -2281,7 +1825,7 @@ export class Game {
    * errorTilePositions is set, temporarily highlight those tiles.
    * Call this whenever a board operation fails.
    */
-  private _handleBoardError(result: MoveResult): void {
+  handleBoardError(result: MoveResult): void {
     if (!result.error) return;
     this._showErrorFlash(result.error);
     if (result.errorTilePositions && result.errorTilePositions.length > 0) {
@@ -2589,7 +2133,7 @@ export class Game {
    * then bonus-only shapes from connected Chamber-item tiles.
    * Wraps around; if no items are available the selection is unchanged.
    */
-  private _selectNextAvailableInventory(): void {
+  selectNextAvailableInventory(): void {
     if (!this.board) return;
 
     const bonuses = this.board.getContainerBonuses();
@@ -2618,7 +2162,7 @@ export class Game {
     const nextShape = available[(currentIdx + 1) % available.length];
 
     this.selectedShape = nextShape;
-    this.pendingRotation = this.lastPlacedRotations.get(nextShape) ?? 0;
+    this.pendingRotation = this._input.lastPlacedRotations.get(nextShape) ?? 0;
     this._renderInventoryBar();
     this.canvas.focus();
   }
@@ -2628,7 +2172,7 @@ export class Game {
    * Records the move, updates last-used rotation, deselects the shape when
    * inventory is exhausted, and refreshes all affected UI elements.
    */
-  private _afterTilePlaced(
+  afterTilePlaced(
     placedShape: PipeShape,
     result: MoveResult,
     filledBefore: Set<string>,
@@ -2645,7 +2189,7 @@ export class Game {
     this._spawnFillAnims(filledBefore);
     this._spawnLockedCostChangeAnimations(changes);
     this._spawnCementDecrementAnimation(result.cementDecrement);
-    this.lastPlacedRotations.set(placedShape, this.pendingRotation);
+    this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._refreshPlayUI();
     this._checkWinLoseAfterMove();
@@ -2661,13 +2205,13 @@ export class Game {
    *   is a no-op (returns `false`) so the caller can fall through to another
    *   action (e.g. rotation).
    *
-   * On success, calls `_afterTilePlaced` (which includes the cement-decrement
-   * animation).  On board error, calls `_handleBoardError`.
+   * On success, calls {@link afterTilePlaced} (which includes the cement-decrement
+   * animation).  On board error, calls {@link handleBoardError}.
    *
    * @returns `true` when a board operation was attempted (whether it succeeded
    *   or failed with an error), `false` when the tile already matched (no-op).
    */
-  private _tryPlaceOrReplaceSelectedAt(
+  tryPlaceOrReplace(
     pos: GridPos,
     currentTile: Tile,
     filledBefore: Set<string>,
@@ -2684,106 +2228,54 @@ export class Game {
       return false; // tile already has the selected shape+rotation – no action
     }
     if (result.success) {
-      this._afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
+      this.afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
     } else if (result.error) {
-      this._handleBoardError(result);
+      this.handleBoardError(result);
     }
     return true; // a board operation was attempted
   }
 
+  // ─── InputCallbacks implementation ────────────────────────────────────────
+
+  getBoard(): Board | null { return this.board; }
+  getGameState(): GameState { return this.gameState; }
+  getScreen(): GameScreen { return this.screen; }
+  getSelectedShape(): PipeShape | null { return this.selectedShape; }
+  setSelectedShape(shape: PipeShape | null): void { this.selectedShape = shape; }
+  getPendingRotation(): Rotation { return this.pendingRotation; }
+  setPendingRotation(r: Rotation): void { this.pendingRotation = r; }
+  getFocusPos(): GridPos { return this.focusPos; }
+  setFocusPos(pos: GridPos): void { this.focusPos = pos; }
+
+  renderInventoryBar(): void { this._renderInventoryBar(); }
+
+  /** Flash a red "unavailable" sparkle on the given inventory item, then re-render. */
+  flashInventoryItemError(shape: PipeShape): void {
+    this._pendingRedSparkleShapes.add(shape);
+    this._renderInventoryBar();
+  }
+
   /**
-   * Move the keyboard focus position by one step along the given axis.
-   * Clamps to the board boundaries and calls `e.preventDefault()` to
-   * suppress scroll.
+   * Handle the Escape key: close the rules modal if open, toggle the exit-
+   * confirm modal during play, or exit to the menu otherwise.
    */
-  private _moveFocusPos(e: KeyboardEvent, axis: 'row' | 'col', delta: -1 | 1): void {
-    if (!this.board) return;
-    e.preventDefault();
-    const cur = this.focusPos[axis];
-    const max = axis === 'row' ? this.board.rows : this.board.cols;
-    const next = cur + delta;
-    if (next >= 0 && next < max) {
-      this.focusPos = { ...this.focusPos, [axis]: next };
+  handleEscapeKey(): void {
+    if (this._rulesModalEl.style.display !== 'none') {
+      this._rulesModalEl.style.display = 'none';
+      this.canvas.focus();
+    } else if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
+      if (this._exitConfirmModalEl.style.display !== 'none') {
+        this._exitConfirmModalEl.style.display = 'none';
+        this.canvas.focus();
+      } else {
+        this._exitConfirmModalEl.style.display = 'flex';
+      }
+    } else {
+      this.exitToMenu();
     }
   }
 
-  private _handleKey(e: KeyboardEvent): void {
-    if (this.screen !== GameScreen.Play) return;
-    if (!this.board) return;
-    const { focusPos, board } = this;
-
-    switch (e.key) {
-      case 'ArrowUp':    this._moveFocusPos(e, 'row', -1); break;
-      case 'ArrowDown':  this._moveFocusPos(e, 'row',  1); break;
-      case 'ArrowLeft':  this._moveFocusPos(e, 'col', -1); break;
-      case 'ArrowRight': this._moveFocusPos(e, 'col',  1); break;
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        if (this.gameState !== GameState.Playing) break;
-        if (this.selectedShape !== null) {
-          const tile = board.getTile(focusPos);
-          const filledBefore = board.getFilledPositions();
-          if (tile) this._tryPlaceOrReplaceSelectedAt(focusPos, tile, filledBefore);
-        } else {
-          const tile = board.getTile(focusPos);
-          const filledBefore = board.getFilledPositions();
-          // Capture before calling rotateTile – the rotation mutates tile.rotation in-place.
-          const oldRotation = tile?.rotation;
-          const rotResult = board.rotateTile(focusPos);
-          if (rotResult.success) {
-            this._afterTileRotated(filledBefore, rotResult, oldRotation !== undefined
-              ? { row: focusPos.row, col: focusPos.col, oldRotation }
-              : undefined);
-          } else if (rotResult.error) {
-            this._handleBoardError(rotResult);
-          }
-        }
-        break;
-      case 'q':
-      case 'Q':
-        e.preventDefault();
-        if (this.gameState !== GameState.Playing) break;
-        if (this.selectedShape !== null) {
-          this._rotatePendingCCW();
-        } else if (!this._tryRotateHoverSpinner(3)) {
-          // 3 CW steps = 1 CCW step
-          this._tryAdjustHoverRotation(-1);
-        }
-        break;
-      case 'w':
-      case 'W':
-        e.preventDefault();
-        if (this.gameState !== GameState.Playing) break;
-        if (this.selectedShape !== null) {
-          this._rotatePendingCW();
-        } else if (!this._tryRotateHoverSpinner(1)) {
-          this._tryAdjustHoverRotation(1);
-        }
-        break;
-      case 'Escape':
-        if (this._rulesModalEl.style.display !== 'none') {
-          // Close the rules modal first if it is open.
-          this._rulesModalEl.style.display = 'none';
-          this.canvas.focus();
-        } else if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
-          // If the exit-confirm modal is already showing, dismiss it (toggle).
-          if (this._exitConfirmModalEl.style.display !== 'none') {
-            this._exitConfirmModalEl.style.display = 'none';
-            this.canvas.focus();
-          } else {
-            this._exitConfirmModalEl.style.display = 'flex';
-          }
-        } else {
-          this.exitToMenu();
-        }
-        break;
-      case 'r':
-      case 'R':
-        if (this.gameState === GameState.Playing) this.retryLevel();
-        break;
-    }
-  }
+  checkWinLose(): void { this._checkWinLoseAfterMove(); }
 
   // ─── Public API called by main.ts button handlers ─────────────────────────
 
