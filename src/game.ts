@@ -37,6 +37,10 @@ import {
   renderFillAnims,
   FILL_ANIM_DURATION, ROTATION_ANIM_DURATION,
 } from './visuals/pipeEffects';
+import {
+  buildResetModal, buildNewChapterModal, buildChallengeModal,
+  buildExitConfirmModal, buildUnplayableModal,
+} from './gameModals';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;
@@ -503,28 +507,39 @@ export class Game {
     document.body.appendChild(this.errorFlashEl);
 
     // Create the reset-progress confirmation modal
-    this.resetConfirmModalEl = this._buildResetModal();
+    this.resetConfirmModalEl = buildResetModal(
+      () => { this._resetProgress(); this._closeModal(this.resetConfirmModalEl); },
+      () => { this._closeModal(this.resetConfirmModalEl); },
+    );
 
     // Create the game-rules modal (appends itself to document.body)
     this._rulesModalEl = createGameRulesModal();
 
     // Create the new-chapter intro modal
-    const newChapterModal = this._buildNewChapterModal();
+    const newChapterModal = buildNewChapterModal(() => this.startChapterLevel());
     this._newChapterModalEl = newChapterModal.el;
     this._newChapterNumberEl = newChapterModal.numberEl;
     this._newChapterNameEl = newChapterModal.nameEl;
 
     // Create the challenge-level warning modal
-    const challengeModal = this._buildChallengeModal();
+    const challengeModal = buildChallengeModal(
+      () => this.playChallengeLevel(),
+      () => this.skipChallengeLevel(),
+    );
     this._challengeModalEl = challengeModal.el;
     this._challengeMsgEl = challengeModal.msgEl;
     this._challengeSkipBtnEl = challengeModal.skipBtnEl;
 
     // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
-    this._exitConfirmModalEl = this._buildExitConfirmModal();
+    this._exitConfirmModalEl = buildExitConfirmModal(
+      () => { this._closeModal(this._exitConfirmModalEl); this.exitToMenu(); },
+      () => { this._closeModal(this._exitConfirmModalEl); this.canvas.focus(); },
+    );
 
     // Create the unplayable-level modal (shown when a level starts already lost)
-    this._unplayableModalEl = this._buildUnplayableModal();
+    this._unplayableModalEl = buildUnplayableModal(
+      () => { this._closeModal(this._unplayableModalEl); this.exitToMenu(); },
+    );
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
@@ -567,18 +582,6 @@ export class Game {
   // ─── Modal helpers ────────────────────────────────────────────────────────
 
   /**
-   * Create a standard full-screen modal overlay element (hidden by default).
-   * @param backgroundAlpha - Opacity of the dark backdrop (default 0.5).
-   */
-  private static _createModalOverlay(backgroundAlpha = 0.5): HTMLDivElement {
-    const el = document.createElement('div');
-    el.style.cssText =
-      `display:none;position:fixed;inset:0;background:rgba(0,0,0,${backgroundAlpha});` +
-      'justify-content:center;align-items:center;z-index:100;';
-    return el;
-  }
-
-  /**
    * Create a stats-box row element (hidden by default) with a label and value span.
    * @param labelText - Emoji + text for the label span.
    * @param color     - CSS color applied to the whole row.
@@ -617,154 +620,6 @@ export class Game {
     const valueEl = (rowEl.querySelector('.stat-value') as HTMLElement | null) ?? rowEl;
     const rect = valueEl.getBoundingClientRect();
     spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 16, colors);
-  }
-
-  /**
-   * Create a standard modal overlay with a centered box, title heading, and an
-   * empty actions bar at the bottom.  Appends the overlay to `document.body`.
-   * @returns `{ el }` – the overlay, `box` – the inner dialog div,
-   *          `actionsEl` – the pre-appended actions container for buttons.
-   */
-  private static _buildModalShell(
-    title: string,
-  ): { el: HTMLDivElement; box: HTMLDivElement; actionsEl: HTMLDivElement } {
-    const el = Game._createModalOverlay();
-    const box = document.createElement('div');
-    box.className = 'modal-box';
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = title;
-    box.appendChild(titleEl);
-    const actionsEl = document.createElement('div');
-    actionsEl.className = 'modal-actions';
-    box.appendChild(actionsEl);
-    el.appendChild(box);
-    document.body.appendChild(el);
-    return { el, box, actionsEl };
-  }
-
-  /** Build and attach the reset-progress confirmation modal. */
-  private _buildResetModal(): HTMLElement {
-    const el = Game._createModalOverlay(0.7);
-    const box = document.createElement('div');
-    box.style.cssText =
-      'background:#16213e;border:3px solid #e74c3c;border-radius:10px;' +
-      'padding:32px 40px;text-align:center;display:flex;flex-direction:column;' +
-      'gap:16px;min-width:280px;';
-    const title = document.createElement('h2');
-    title.textContent = '⚠️ Reset Progress?';
-    const msg = document.createElement('p');
-    msg.style.cssText = 'font-size:0.95rem;color:#aaa;';
-    msg.textContent = 'This will remove all level completion data. Are you sure?';
-    const actions = document.createElement('div');
-    actions.style.cssText = 'display:flex;gap:12px;justify-content:center;';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.style.cssText =
-      'padding:10px 24px;font-size:1rem;background:#2a2a4a;color:#aaa;' +
-      'border:1px solid #555;border-radius:6px;cursor:pointer;';
-    cancelBtn.addEventListener('click', () => { this.resetConfirmModalEl.style.display = 'none'; });
-    const confirmBtn = document.createElement('button');
-    confirmBtn.textContent = 'Reset';
-    confirmBtn.style.cssText =
-      'padding:10px 24px;font-size:1rem;background:#e74c3c;color:#fff;' +
-      'border:none;border-radius:6px;cursor:pointer;';
-    confirmBtn.addEventListener('click', () => {
-      this._resetProgress();
-      this.resetConfirmModalEl.style.display = 'none';
-    });
-    actions.appendChild(cancelBtn);
-    actions.appendChild(confirmBtn);
-    box.appendChild(title);
-    box.appendChild(msg);
-    box.appendChild(actions);
-    el.appendChild(box);
-    document.body.appendChild(el);
-    return el;
-  }
-
-  /** Build and attach the new-chapter intro modal; returns the overlay and its mutable sub-elements. */
-  private _buildNewChapterModal(): { el: HTMLElement; numberEl: HTMLElement; nameEl: HTMLElement } {
-    const { el, box, actionsEl } = Game._buildModalShell('✨ New Chapter');
-    const numberEl = document.createElement('p');
-    numberEl.style.cssText = 'font-size:1.2rem;font-weight:bold;color:#74b9ff;';
-    const nameEl = document.createElement('p');
-    nameEl.style.cssText = 'font-size:1.5rem;font-weight:bold;color:#eee;';
-    box.insertBefore(numberEl, actionsEl);
-    box.insertBefore(nameEl, actionsEl);
-    const startBtn = document.createElement('button');
-    startBtn.textContent = 'Start Level';
-    startBtn.className = 'modal-btn primary';
-    startBtn.type = 'button';
-    startBtn.addEventListener('click', () => this.startChapterLevel());
-    actionsEl.appendChild(startBtn);
-    return { el, numberEl, nameEl };
-  }
-
-  /** Build and attach the challenge-level warning modal; returns the overlay and its mutable sub-elements. */
-  private _buildChallengeModal(): { el: HTMLElement; msgEl: HTMLElement; skipBtnEl: HTMLButtonElement } {
-    const { el, box, actionsEl } = Game._buildModalShell('☠️ Challenge Level ☠️');
-    const msgEl = document.createElement('p');
-    msgEl.style.cssText = 'font-size:0.95rem;color:#aaa;';
-    msgEl.textContent = 'This is an optional challenge level. You may skip it without affecting your progress.';
-    box.insertBefore(msgEl, actionsEl);
-    const playBtn = document.createElement('button');
-    playBtn.textContent = 'Play Level';
-    playBtn.className = 'modal-btn primary';
-    playBtn.type = 'button';
-    playBtn.addEventListener('click', () => this.playChallengeLevel());
-    const skipBtnEl = document.createElement('button');
-    skipBtnEl.textContent = 'Skip Level';
-    skipBtnEl.className = 'modal-btn secondary';
-    skipBtnEl.type = 'button';
-    skipBtnEl.addEventListener('click', () => this.skipChallengeLevel());
-    actionsEl.appendChild(playBtn);
-    actionsEl.appendChild(skipBtnEl);
-    return { el, msgEl, skipBtnEl };
-  }
-
-  /** Build and attach the exit-confirmation modal (shown when the player presses Esc mid-level). */
-  private _buildExitConfirmModal(): HTMLElement {
-    const { el, box, actionsEl } = Game._buildModalShell('🚪 Abandon Level?');
-    const msgEl = document.createElement('p');
-    msgEl.textContent = 'Your progress on this level will be lost.';
-    box.insertBefore(msgEl, actionsEl);
-    const exitBtn = document.createElement('button');
-    exitBtn.textContent = 'Exit Level';
-    exitBtn.className = 'modal-btn primary';
-    exitBtn.type = 'button';
-    exitBtn.addEventListener('click', () => {
-      this._exitConfirmModalEl.style.display = 'none';
-      this.exitToMenu();
-    });
-    const continueBtn = document.createElement('button');
-    continueBtn.textContent = 'Continue';
-    continueBtn.className = 'modal-btn secondary';
-    continueBtn.type = 'button';
-    continueBtn.addEventListener('click', () => {
-      this._exitConfirmModalEl.style.display = 'none';
-      this.canvas.focus();
-    });
-    actionsEl.appendChild(exitBtn);
-    actionsEl.appendChild(continueBtn);
-    return el;
-  }
-
-  /** Build and attach the unplayable-level modal (shown when a level starts in a losing state). */
-  private _buildUnplayableModal(): HTMLElement {
-    const { el, box, actionsEl } = Game._buildModalShell('⚠️ Level Unplayable');
-    const msgEl = document.createElement('p');
-    msgEl.textContent = 'This level starts in a losing position and cannot be played.';
-    box.insertBefore(msgEl, actionsEl);
-    const exitBtn = document.createElement('button');
-    exitBtn.textContent = 'Exit Level';
-    exitBtn.className = 'modal-btn primary';
-    exitBtn.type = 'button';
-    exitBtn.addEventListener('click', () => {
-      this._unplayableModalEl.style.display = 'none';
-      this.exitToMenu();
-    });
-    actionsEl.appendChild(exitBtn);
-    return el;
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
