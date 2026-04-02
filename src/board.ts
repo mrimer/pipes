@@ -1,5 +1,12 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, ENV_MODIFIER_CONTENTS } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation, COLD_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS } from './types';
+import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
+import { CementSystem } from './cementSystem';
+import { ConstraintValidator } from './constraintValidator';
+import { TurnStateManager, TurnStateSnapshot } from './turnStateManager';
+
+// Re-export cost helpers so existing consumers (game.ts, renderer.ts) need no import changes.
+export { computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 
 /**
  * Encode a grid row/col pair into the canonical string key used by all internal
@@ -111,53 +118,6 @@ export function isObstacleTile(shape: PipeShape): boolean {
   return shape === PipeShape.Granite || shape === PipeShape.Tree;
 }
 
-// ── Ice / snow / sandstone cost-calculation helpers ──────────────────────────
-// These formulas appear in getCurrentWater(), _lockNewTiles(), and
-// _reEvaluateConnectedTiles() in board.ts, and in _pushTileAnimLabels() in
-// game.ts.  Centralising them here avoids copy-paste bugs and makes the
-// cost model easier to understand.
-
-/**
- * Compute how much colder a tile is than the current environment temperature.
- * Returns 0 if the tile is warmer than (or at) the current temperature.
- * Used as the per-deltaTemp multiplier for ice/snow/sandstone/hot_plate costs.
- */
-export function computeDeltaTemp(tileTemperature: number, currentTemp: number): number {
-  return Math.max(0, tileTemperature - currentTemp);
-}
-
-/**
- * Compute the pressure-adjusted cost per deltaTemp unit for a snow tile.
- * When pressure ≥ 1 the cost is divided by pressure (rounded up); otherwise
- * the full cost applies.
- */
-export function snowCostPerDeltaTemp(tileCost: number, pressure: number): number {
-  return pressure >= 1 ? Math.ceil(tileCost / pressure) : tileCost;
-}
-
-/**
- * Determine the sandstone cost factors based on the current pressure.
- *
- * - `shatterOverride`: pressure meets or exceeds the shatter threshold, so the
- *   tile is shattered and costs **zero** water regardless of temperature.
- * - `deltaDamage`: `pressure − hardness`.  Values < 1 indicate an invalid play
- *   state (caller must apply a failure penalty; see {@link Board.sourceCapacity}).
- * - `costPerDeltaTemp`: water cost per deltaTemp unit when `deltaDamage ≥ 1`.
- *   Falls back to `tileCost` for the failure case so callers can still display
- *   a readable label (e.g. in animation tooltips).
- */
-export function sandstoneCostFactors(
-  tileCost: number,
-  hardness: number,
-  shatter: number,
-  pressure: number,
-): { shatterOverride: boolean; deltaDamage: number; costPerDeltaTemp: number } {
-  const shatterOverride = shatter > hardness && pressure >= shatter;
-  const deltaDamage = pressure - hardness;
-  const costPerDeltaTemp = deltaDamage >= 1 ? Math.ceil(tileCost / deltaDamage) : tileCost;
-  return { shatterOverride, deltaDamage, costPerDeltaTemp };
-}
-
 // ── Error message constants ────────────────────────────────────────────────
 // Centralised here so changes propagate automatically and tests can reference
 // the same strings without hard-coding them again.
@@ -189,54 +149,30 @@ const ERR_CONTAINER_ROTATE =
 type Snapshot = {
   grid: Tile[][];
   inventory: InventoryItem[];
-  lockedWaterImpact: Map<string, number>;
-  frozen: number;
-  /** The turn number at the moment this snapshot was captured. */
-  turnNumber: number;
-  /**
-   * The turn number on which each tile was first connected, keyed by "row,col".
-   * Used to re-evaluate ice/snow costs when beneficial tiles (heaters, pumps) disconnect.
-   */
-  connectionTurn: Map<string, number>;
-  /**
-   * Per hot_plate tile: the amount of frozen water consumed (waterGain) when that tile connected.
-   * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
-   */
-  hotPlateWaterGain: Map<string, number>;
-  /**
-   * The board temperature at the time each tile first connected, keyed by "row,col".
-   * Used to reconstruct the calculation text in the tile tooltip for connected tiles.
-   */
-  lockedConnectTemp: Map<string, number>;
-  /**
-   * The board pressure at the time each tile first connected, keyed by "row,col".
-   * Used to reconstruct the calculation text in the tile tooltip for connected tiles.
-   */
-  lockedConnectPressure: Map<string, number>;
-  /**
-   * Cement setting-time values keyed by "row,col".
-   * Included in snapshots so undo/redo restores the correct setting time.
-   */
+  turnState: TurnStateSnapshot;
   cementData: Map<string, number>;
-  /**
-   * Total water permanently lost to leaky pipe penalties accumulated so far.
-   * Unlike frozen water (which is a display counter), this is a real capacity reduction
-   * that cannot be recovered by disconnecting the pipes.
-   */
-  leakyPermanentLoss: number;
 };
 
 /**
- * Result of {@link Board._computeColdChamberImpact} for an ice, snow, or sandstone tile.
- *  - `frozen`  – normal case: the tile freezes `frozenCost` water; impact = -frozenCost.
- *  - `zero`    – sandstone shatter override: the tile costs zero water.
- *  - `failure` – sandstone with deltaDamage ≤ 0: caller must apply the drain-all penalty
- *                and skip any frozen-counter update.
+ * The result of a mutating board operation (place, reclaim, replace, rotate).
+ *
+ * Replaces the mutable `lastError` / `lastErrorTilePositions` / `lastCementDecrement`
+ * pattern with a proper return value so display-driven state no longer leaks into
+ * the game model.
  */
-type ColdChamberImpact =
-  | { kind: 'frozen'; frozenCost: number }
-  | { kind: 'zero' }
-  | { kind: 'failure' };
+export type MoveResult = {
+  /** Whether the operation succeeded. */
+  success: boolean;
+  /** Human-readable error message when `success` is false, if applicable. */
+  error?: string;
+  /** Grid positions of the tiles that caused the error, if any. */
+  errorTilePositions?: GridPos[];
+  /**
+   * Position of the cement cell whose setting time was decremented by this
+   * operation.  Present only when a successful operation decremented a cell.
+   */
+  cementDecrement?: GridPos;
+};
 
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
@@ -272,18 +208,11 @@ export class Board {
   /**
    * Cement setting-time values keyed by "row,col".
    * Populated from the level definition (where Cement tiles appear).
-   * Values are decremented when a player removes or rotates a pipe placed on that cell.
-   * When the value is 0 the cell is "hardened" and placed pipes may not be adjusted.
+   * Exposed as a getter backed by {@link _cement}.
    */
-  cementData: Map<string, number>;
-
-  /**
-   * Set to the position of the cement cell whose setting time was just decremented
-   * by a successful {@link reclaimTile}, {@link rotateTile}, or {@link replaceInventoryTile}
-   * call.  Cleared to null at the start of each such call.
-   * Used by the UI to spawn a floating "-1" animation.
-   */
-  lastCementDecrement: GridPos | null = null;
+  get cementData(): Map<string, number> {
+    return this._cement.data;
+  }
 
   /**
    * Ambient background decorations (pebbles, flowers, grass tufts) generated
@@ -299,89 +228,30 @@ export class Board {
   readonly ambientDecorationMap: ReadonlyMap<string, AmbientDecoration>;
 
   /**
-   * Set to a human-readable reason after any failed reclaim attempt, so callers
-   * can display an appropriate error message.  Cleared on each new attempt.
-   */
-  lastError: string | null = null;
-
-  /**
-   * Grid positions of tiles that caused the last validation error, if any.
-   * Populated alongside {@link lastError} so the UI can highlight the offending tiles.
-   * Cleared when lastError is cleared.
-   */
-  lastErrorTilePositions: GridPos[] | null = null;
-
-  /**
-   * Tiles whose locked water impact changed during the most recent
-   * {@link applyTurnDelta} call because a beneficial tile (heater/pump) was
-   * disconnected and the remaining costs were re-evaluated.
-   * Each entry records the grid position and the numeric delta
-   * (newImpact − oldImpact); negative means the tile now costs more water,
-   * positive means it costs less.  Cleared at the start of each
-   * {@link applyTurnDelta} call.
-   */
-  lastLockedCostChanges: Array<{ row: number; col: number; delta: number }> = [];
-
-  /**
-   * Per-tile locked water impact, keyed by "row,col".
-   * A negative value represents a water cost; a positive value represents a gain.
-   * Populated by {@link applyTurnDelta} after each player action and by
-   * {@link initHistory} for the initial board state.
-   * When this map is empty (before {@link initHistory} is called), {@link getCurrentWater}
-   * falls back to dynamic computation so that tests that bypass the turn
-   * mechanism continue to work unchanged.
-   */
-  private _lockedWaterImpact: Map<string, number> = new Map();
-
-  /**
-   * The turn number of the most recent {@link applyTurnDelta} call.
-   * Starts at 0 and is incremented to 1 by the first {@link applyTurnDelta} call
-   * inside {@link initHistory}.
-   */
-  private _turnNumber: number = 0;
-
-  /**
-   * The turn number on which each tile was first added to the fill path,
-   * keyed by "row,col".  Used when a beneficial tile (heater, pump) disconnects:
-   * ice/snow tiles still connected are re-evaluated using only the
-   * heaters/pumps that were connected on or before each ice tile's own connection turn.
-   */
-  private _connectionTurn: Map<string, number> = new Map();
-
-  /**
    * Total water units that have been frozen by ice blocks during play.
-   * Incremented by {@link applyTurnDelta} each time a newly-connected ice tile
-   * subtracts water units.  Restored by undo/redo via the snapshot mechanism.
    * Not used in game logic; intended for display purposes.
+   * Backed by {@link _turnState}.
    */
-  frozen: number = 0;
+  get frozen(): number {
+    return this._turnState.frozen;
+  }
 
   /**
    * Total water permanently lost to leaky pipe per-turn penalties.
    * Each turn a leaky pipe remains connected (after its first turn), one additional
    * water unit is consumed and added here.  Unlike the initial connection cost,
    * this loss is permanent: disconnecting the leaky pipe does NOT recover it.
-   * Restored by undo/redo via the snapshot mechanism.
+   * Backed by {@link _turnState}.
    */
-  leakyPermanentLoss: number = 0;
+  get leakyPermanentLoss(): number {
+    return this._turnState.leakyPermanentLoss;
+  }
 
-  /**
-   * Per hot_plate tile: the amount of frozen water consumed (waterGain) when that tile connected.
-   * Keyed by "row,col". Used to restore the frozen counter when a hot_plate tile disconnects.
-   */
-  private _hotPlateWaterGain: Map<string, number> = new Map();
-
-  /**
-   * The board temperature recorded when each tile first connected, keyed by "row,col".
-   * Used to reconstruct the locked calculation text shown in tile tooltips.
-   */
-  private _lockedConnectTemp: Map<string, number> = new Map();
-
-  /**
-   * The board pressure recorded when each tile first connected, keyed by "row,col".
-   * Used to reconstruct the locked calculation text shown in tile tooltips.
-   */
-  private _lockedConnectPressure: Map<string, number> = new Map();
+  /** @private Sub-modules for extracted concerns. */
+  private readonly _thermo: ThermoSimulator;
+  private readonly _cement: CementSystem;
+  private readonly _validator: ConstraintValidator;
+  private readonly _turnState: TurnStateManager;
 
   /** Full move history for undo/redo support. history[0] is the initial state. */
   private _history: Snapshot[] = [];
@@ -412,8 +282,9 @@ export class Board {
     this.inventory = [];
     this.oneWayData = new Map();
     this.goldSpaces = new Set();
-    this.cementData = new Map();
 
+    // Initialise sub-modules (cement must be created before _initFromLevel populates it).
+    this._cement = new CementSystem(new Map());
     if (level) {
       this.grid = this._emptyGrid();
       this._initFromLevel(level);
@@ -425,6 +296,10 @@ export class Board {
     this.ambientDecorationMap = new Map(
       this.ambientDecorations.map((dec) => [posKey(dec.row, dec.col), dec]),
     );
+    // Create remaining sub-modules after the grid and source are fully set up.
+    this._thermo = new ThermoSimulator(this.grid, () => this.source);
+    this._validator = new ConstraintValidator(this.grid, this._thermo);
+    this._turnState = new TurnStateManager(this.grid, this._thermo, () => this.sourceCapacity);
   }
 
   // ─── Level initialisation ──────────────────────────────────────────────────
@@ -450,7 +325,7 @@ export class Board {
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else if (def.shape === PipeShape.Cement) {
           // Cement tiles are tracked separately; the cell behaves like Empty
-          this.cementData.set(posKey(r, c), def.dryingTime ?? 0);
+          this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
@@ -464,7 +339,7 @@ export class Board {
           this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0);
           // Spin-cement tiles also track cement drying time.
           if (SPIN_CEMENT_SHAPES.has(def.shape)) {
-            this.cementData.set(posKey(r, c), def.dryingTime ?? 0);
+            this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
           }
           if (def.shape === PipeShape.Source) {
             this.source = { row: r, col: c };
@@ -515,13 +390,7 @@ export class Board {
    * for all tiles that are already connected at game start.
    */
   initHistory(): void {
-    this._lockedWaterImpact = new Map();
-    this.frozen = 0;
-    this._turnNumber = 0;
-    this._connectionTurn = new Map();
-    this._hotPlateWaterGain = new Map();
-    this._lockedConnectTemp = new Map();
-    this._lockedConnectPressure = new Map();
+    this._turnState.reset();
     this.applyTurnDelta();
     this._history = [this._captureSnapshot()];
     this._historyIndex = 0;
@@ -649,15 +518,8 @@ export class Board {
     return {
       grid: this.grid.map((row) => row.map((tile) => tile.clone())),
       inventory: this.inventory.map((item) => ({ ...item })),
-      lockedWaterImpact: new Map(this._lockedWaterImpact),
-      frozen: this.frozen,
-      turnNumber: this._turnNumber,
-      connectionTurn: new Map(this._connectionTurn),
-      hotPlateWaterGain: new Map(this._hotPlateWaterGain),
-      lockedConnectTemp: new Map(this._lockedConnectTemp),
-      lockedConnectPressure: new Map(this._lockedConnectPressure),
-      cementData: new Map(this.cementData),
-      leakyPermanentLoss: this.leakyPermanentLoss,
+      turnState: this._turnState.captureSnapshot(),
+      cementData: this._cement.captureSnapshot(),
     };
   }
 
@@ -670,18 +532,9 @@ export class Board {
         this.grid[r][c] = snap.grid[r][c].clone();
       }
     }
-    // InventoryItem only contains primitive fields (shape + count), so spread is a full copy –
-    // consistent with the spread used in _captureSnapshot.
     this.inventory = snap.inventory.map((item) => ({ ...item }));
-    this._lockedWaterImpact = new Map(snap.lockedWaterImpact);
-    this.frozen = snap.frozen;
-    this._turnNumber = snap.turnNumber;
-    this._connectionTurn = new Map(snap.connectionTurn);
-    this._hotPlateWaterGain = new Map(snap.hotPlateWaterGain);
-    this._lockedConnectTemp = new Map(snap.lockedConnectTemp);
-    this._lockedConnectPressure = new Map(snap.lockedConnectPressure);
-    this.cementData = new Map(snap.cementData);
-    this.leakyPermanentLoss = snap.leakyPermanentLoss;
+    this._turnState.restoreSnapshot(snap.turnState);
+    this._cement.restoreSnapshot(snap.cementData);
   }
 
   /**
@@ -704,32 +557,21 @@ export class Board {
   }
 
   /**
-   * Clear all error/action state fields at the start of each mutating operation.
-   * Called by {@link reclaimTile}, {@link placeInventoryTile},
-   * {@link replaceInventoryTile}, {@link rotateTile}, and {@link rotateTileBy}
-   * before performing any validation.
-   */
-  private _clearLastError(): void {
-    this.lastError = null;
-    this.lastErrorTilePositions = null;
-    this.lastCementDecrement = null;
-  }
-
-  /**
    * Return a player-placed pipe tile back to the inventory.
    * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross and their gold
    * variants) can be reclaimed.
-   * Returns false (and sets {@link lastError}) if reclaiming would reduce an
+   * Returns a failing {@link MoveResult} if reclaiming would reduce an
    * inventory value below zero due to lost ItemContainer grants.
-   * @returns true if the tile was successfully reclaimed.
    */
-  reclaimTile(pos: GridPos): boolean {
-    this._clearLastError();
+  reclaimTile(pos: GridPos): MoveResult {
     const tile = this.getTile(pos);
-    if (!this._isReplaceableTile(tile)) return false;
+    if (!this._isReplaceableTile(tile)) return { success: false };
 
     // ── Cement constraint check ───────────────────────────────────────────────
-    if (this._isCementHardened(pos)) return false;
+    const cementCheck = this._cement.isHardened(pos);
+    if (cementCheck.blocked) {
+      return { success: false, error: cementCheck.error, errorTilePositions: cementCheck.positions };
+    }
 
     // ── Container-grant constraint check ─────────────────────────────────────
     // Simulate tile removal and verify no inventory count would go below zero.
@@ -747,8 +589,7 @@ export class Board {
         // count would be `baseCount + newBonus`; block if that would go below zero.
         const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
         if (baseCount + newBonus < 0) {
-          this.lastError = ERR_CONTAINER_REMOVE;
-          return false;
+          return { success: false, error: ERR_CONTAINER_REMOVE };
         }
       }
     }
@@ -759,17 +600,16 @@ export class Board {
     {
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       const filledAfter = this.getFilledPositions();
-      const constraintError = this._validateConstraints(filledAfter);
+      const { error, positions } = this._validateConstraints(filledAfter);
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
-      if (constraintError) {
-        this.lastError = constraintError;
-        return false;
+      if (error) {
+        return { success: false, error, errorTilePositions: positions ?? undefined };
       }
     }
 
     this._reclaimInventory(tile.shape);
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
-    return true;
+    return { success: true };
   }
 
   /**
@@ -777,20 +617,17 @@ export class Board {
    * The effective inventory count (base + ItemContainer grants) must be positive.
    * Gold spaces only accept gold pipes; gold pipes may be placed on any empty cell.
    * @param rotation - Initial rotation to apply to the placed tile (default 0).
-   * @returns true if the placement succeeded.
    */
-  placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): boolean {
-    this._clearLastError();
+  placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): MoveResult {
     const tile = this.getTile(pos);
-    if (!tile || tile.shape !== PipeShape.Empty) return false;
+    if (!tile || tile.shape !== PipeShape.Empty) return { success: false };
 
     const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
 
     // Gold spaces only accept gold pipes; regular pipes may not go on gold spaces
     if (isGoldSpace && !isGoldPipe) {
-      this.lastError = ERR_GOLD_SPACE;
-      return false;
+      return { success: false, error: ERR_GOLD_SPACE };
     }
 
     const existing = this.inventory.find((it) => it.shape === shape);
@@ -798,7 +635,7 @@ export class Board {
 
     const bonuses = this.getContainerBonuses();
     const effectiveCount = baseCount + (bonuses.get(shape) ?? 0);
-    if (effectiveCount <= 0) return false;
+    if (effectiveCount <= 0) return { success: false };
 
     this._spendInventory(shape);
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
@@ -806,19 +643,18 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
-    const constraintError = this._validateConstraints(filled);
-    if (constraintError) {
+    const { error, positions } = this._validateConstraints(filled);
+    if (error) {
       // Roll back placement.
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       this._unspendInventory(shape);
-      this.lastError = constraintError;
-      return false;
+      return { success: false, error, errorTilePositions: positions ?? undefined };
     }
 
-    // Decrement cement setting time after successful placement
-    this._applyCementDecrement(pos);
+    // Decrement cement setting time after successful placement.
+    const cementDecrement = this._cement.applyDecrement(pos);
 
-    return true;
+    return { success: true, cementDecrement };
   }
 
   /**
@@ -836,25 +672,24 @@ export class Board {
    *    tile has been returned.
    *  - Gold spaces only accept gold pipes (same constraint as fresh placement);
    *    gold pipes may replace regular pipes on non-gold spaces and vice versa.
-   *
-   * @returns true on success; false on failure (lastError is set when relevant).
    */
-  replaceInventoryTile(pos: GridPos, newShape: PipeShape, rotation: Rotation = 0): boolean {
-    this._clearLastError();
+  replaceInventoryTile(pos: GridPos, newShape: PipeShape, rotation: Rotation = 0): MoveResult {
     const tile = this.getTile(pos);
 
     // Must be a replaceable tile (same guard as reclaimTile)
-    if (!this._isReplaceableTile(tile)) return false;
+    if (!this._isReplaceableTile(tile)) return { success: false };
 
     // ── Cement constraint check ───────────────────────────────────────────────
-    if (this._isCementHardened(pos)) return false;
+    const cementCheck = this._cement.isHardened(pos);
+    if (cementCheck.blocked) {
+      return { success: false, error: cementCheck.error, errorTilePositions: cementCheck.positions };
+    }
 
     // Gold-space / gold-pipe constraint for the incoming shape
     const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
     if (isGoldSpace && !isGoldPipe) {
-      this.lastError = ERR_GOLD_SPACE;
-      return false;
+      return { success: false, error: ERR_GOLD_SPACE };
     }
 
     // Save inventory snapshot so we can roll back cleanly on failure
@@ -882,12 +717,10 @@ export class Board {
       this.grid[pos.row][pos.col] = tile; // temporarily restore old tile for bonus check
       const originalBonuses = this.getContainerBonuses();
       const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
-      if (originalEffective > 0) {
-        this.lastError = ERR_CONTAINER_DISCONNECT;
-      }
+      const errorMsg = originalEffective > 0 ? ERR_CONTAINER_DISCONNECT : undefined;
       this.inventory = savedInventory;
       // grid[pos.row][pos.col] is already restored to the old tile above
-      return false;
+      return { success: false, error: errorMsg };
     }
 
     this._spendInventory(newShape);
@@ -945,28 +778,26 @@ export class Board {
         if (!positiveContainerDisconnected) {
           continue; // drop is from newly-connected negative containers only
         }
-        this.lastError = ERR_CONTAINER_REPLACE;
         this.inventory = savedInventory;
         this.grid[pos.row][pos.col] = tile;
-        return false;
+        return { success: false, error: ERR_CONTAINER_REPLACE };
       }
     }
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
-    const filledAfterReplace = finalFilled;
-    const constraintError = this._validateConstraints(filledAfterReplace);
+    const { error: constraintError, positions: constraintPositions } =
+      this._validateConstraints(finalFilled);
     if (constraintError) {
-      this.lastError = constraintError;
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile;
-      return false;
+      return { success: false, error: constraintError, errorTilePositions: constraintPositions ?? undefined };
     }
 
-    // Decrement cement setting time after successful replace
-    this._applyCementDecrement(pos);
+    // Decrement cement setting time after successful replace.
+    const cementDecrement = this._cement.applyDecrement(pos);
 
-    return true;
+    return { success: true, cementDecrement };
   }
 
   // ─── Water tracking ────────────────────────────────────────────────────────
@@ -1053,44 +884,7 @@ export class Board {
    */
   getCurrentTemperature(filled?: Set<string>): number {
     const filledSet = filled ?? this.getFilledPositions();
-    return this._computeTemperatureFromFilled(filledSet);
-  }
-
-  /**
-   * Generic helper: sum an environment stat (temperature or pressure) over a fill set.
-   *
-   * Starting from the source tile's base value, it adds the bonus from every
-   * connected Chamber whose `chamberContent` matches `content` ('heater' for
-   * temperature, 'pump' for pressure).
-   *
-   * When `maxTurn` is provided, only modifier tiles whose connection turn is ≤
-   * `maxTurn` contribute.  This enforces the historical-lock rule used during
-   * re-evaluation: a cost tile must not receive a retroactive benefit from a
-   * heater or pump that connected *after* it did.
-   */
-  private _aggregateEnvStat(
-    filled: Set<string>,
-    content: 'heater' | 'pump',
-    maxTurn?: number,
-  ): number {
-    const sourceTile = this.grid[this.source.row][this.source.col];
-    const isTemp = content === 'heater';
-    let total = isTemp ? sourceTile.temperature : sourceTile.pressure;
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === content) {
-        if (maxTurn === undefined || (this._connectionTurn.get(key) ?? Infinity) <= maxTurn) {
-          total += isTemp ? tile.temperature : tile.pressure;
-        }
-      }
-    }
-    return total;
-  }
-
-  /** Internal helper: compute temperature from a pre-computed fill set. */
-  private _computeTemperatureFromFilled(filled: Set<string>): number {
-    return this._aggregateEnvStat(filled, 'heater');
+    return this._thermo.computeTemperature(filledSet, this._turnState.connectionTurn);
   }
 
   /**
@@ -1100,92 +894,7 @@ export class Board {
    */
   getCurrentPressure(filled?: Set<string>): number {
     const filledSet = filled ?? this.getFilledPositions();
-    return this._computePressureFromFilled(filledSet);
-  }
-
-  /** Internal helper: compute pressure from a pre-computed fill set. */
-  private _computePressureFromFilled(filled: Set<string>): number {
-    return this._aggregateEnvStat(filled, 'pump');
-  }
-
-  /**
-   * Compute the effective source temperature for a specific ice tile, counting
-   * only heaters whose connection turn is ≤ {@link iceConnectedTurn}.
-   *
-   * This is used during re-evaluation when a heater disconnects: the ice tile
-   * must not receive benefit from heaters that connected after it did.
-   */
-  private _computeTemperatureForIce(filled: Set<string>, iceConnectedTurn: number): number {
-    return this._aggregateEnvStat(filled, 'heater', iceConnectedTurn);
-  }
-
-  /**
-   * Compute the effective pressure for a specific ice tile, counting only pumps
-   * (and the source) whose connection turn is ≤ {@link iceConnectedTurn}.
-   *
-   * Used symmetrically with {@link _computeTemperatureForIce} during re-evaluation.
-   */
-  private _computePressureForIce(filled: Set<string>, iceConnectedTurn: number): number {
-    // The source is always connected first, so its pressure always counts for any ice tile.
-    return this._aggregateEnvStat(filled, 'pump', iceConnectedTurn);
-  }
-
-  /**
-   * A water impact large enough to drain the entire source and force an immediate
-   * game-over.  Used as the penalty for sandstone tiles that become unpowered
-   * (deltaDamage ≤ 0) after their initial connection — an illegal board state
-   * that must be resolved immediately.
-   */
-  private get _drainAllImpact(): number {
-    return -(this.sourceCapacity + 1);
-  }
-
-  /**
-   * Compute the water impact for a cold Chamber tile (ice, snow, or sandstone)
-   * at the given environment temperature and pressure.
-   *
-   * Returns one of three variants:
-   *  - `frozen`  – normal case; the tile freezes water equal to `frozenCost`;
-   *                `impact = -frozenCost`.
-   *  - `zero`    – sandstone shatter override; the tile costs zero water.
-   *  - `failure` – sandstone with deltaDamage ≤ 0; the caller must apply
-   *                {@link _drainAllImpact} and skip frozen-counter updates.
-   */
-  private _computeColdChamberImpact(tile: Tile, temp: number, pressure: number): ColdChamberImpact {
-    const deltaTemp = computeDeltaTemp(tile.temperature, temp);
-
-    if (tile.chamberContent === 'ice') {
-      return { kind: 'frozen', frozenCost: tile.cost * deltaTemp };
-    }
-    if (tile.chamberContent === 'snow') {
-      return { kind: 'frozen', frozenCost: snowCostPerDeltaTemp(tile.cost, pressure) * deltaTemp };
-    }
-    // sandstone
-    const { shatterOverride, deltaDamage, costPerDeltaTemp } =
-      sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, pressure);
-    if (shatterOverride) return { kind: 'zero' };
-    if (deltaDamage >= 1) return { kind: 'frozen', frozenCost: costPerDeltaTemp * deltaTemp };
-    return { kind: 'failure' };
-  }
-
-  /**
-   * Compute the net water impact of a hot-plate tile given its effective heat cost
-   * and the amount of frozen water available to absorb it.
-   *
-   * The hot plate first melts frozen water (water gain), then consumes regular water
-   * for any remaining cost (water loss).  The net impact is gain − loss.
-   *
-   * @param effectiveCost  - The total heat cost: `tile.cost × (tile.temperature + envTemp)`.
-   * @param availableFrozen - How much frozen water is available to melt.
-   * @returns `{ waterGain, impact }` where `impact = waterGain − waterLoss`.
-   */
-  private _computeHotPlateWaterEffect(
-    effectiveCost: number,
-    availableFrozen: number,
-  ): { waterGain: number; impact: number } {
-    const waterGain = Math.min(availableFrozen, effectiveCost);
-    const waterLoss = Math.max(0, effectiveCost - waterGain);
-    return { waterGain, impact: waterGain - waterLoss };
+    return this._thermo.computePressure(filledSet, this._turnState.connectionTurn);
   }
 
   /**
@@ -1203,21 +912,23 @@ export class Board {
    */
   getCurrentWater(): number {
     const filled = this.getFilledPositions();
+    const lockedWaterImpact = this._turnState.lockedWaterImpact;
 
     // ── Incremental path (normal gameplay) ──────────────────────────────────
-    // _lockedWaterImpact is non-empty once applyTurnDelta() has been called
+    // lockedWaterImpact is non-empty once applyTurnDelta() has been called
     // (at minimum the source tile is always present).
-    if (this._lockedWaterImpact.size > 0) {
+    if (lockedWaterImpact.size > 0) {
       let total = this.sourceCapacity;
       for (const key of filled) {
-        total += this._lockedWaterImpact.get(key) ?? 0;
+        total += lockedWaterImpact.get(key) ?? 0;
       }
-      return total - this.leakyPermanentLoss;
+      return total - this._turnState.leakyPermanentLoss;
     }
 
     // ── Dynamic fallback (test/legacy path) ─────────────────────────────────
-    const currentTemp = this._computeTemperatureFromFilled(filled);
-    const currentPressure = this._computePressureFromFilled(filled);
+    const connectionTurn = this._turnState.connectionTurn;
+    const currentTemp = this._thermo.computeTemperature(filled, connectionTurn);
+    const currentPressure = this._thermo.computePressure(filled, connectionTurn);
     let pipeCost = 0;
     let tankGain = 0;
 
@@ -1250,14 +961,14 @@ export class Board {
           }
         } else if (tile.chamberContent === 'hot_plate') {
           const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          const waterGain = Math.min(this.frozen, effectiveCost);
+          const waterGain = Math.min(this._turnState.frozen, effectiveCost);
           const waterLoss = Math.max(0, effectiveCost - waterGain);
           // Net effect: gain from frozen minus direct water loss
           pipeCost += waterLoss - waterGain;
         }
       }
     }
-    return this.sourceCapacity - pipeCost + tankGain - this.leakyPermanentLoss;
+    return this.sourceCapacity - pipeCost + tankGain - this._turnState.leakyPermanentLoss;
   }
 
   /**
@@ -1265,265 +976,14 @@ export class Board {
    * the current board state.  Must be called after every player action that may
    * change the fill path (place, rotate, reclaim).
    *
-   * - Previously-evaluated tiles keep their locked impact unchanged, so an ice
-   *   tile's cost is never retroactively altered by a heater connected later.
-   * - When a beneficial tile (heater or pump) is removed from the fill path,
-   *   any still-connected ice/snow tiles are re-evaluated.  Re-evaluation
-   *   only considers heaters/pumps whose own connection turn is ≤ the ice tile's
-   *   original connection turn, so no ice tile ever gains a retroactive benefit
-   *   from a heater that connected after it.
-   * - Tiles removed from the fill path lose their lock; if they reconnect on a
-   *   future move they are re-evaluated at the temperature current at that time.
+   * Delegates to {@link TurnStateManager.applyTurnDelta} which owns the
+   * ordering invariant (detect → cleanup → increment → re-evaluate → lock → leaky).
    *
-   * Ice-tile costs are computed from the current source temperature (source base
-   * plus all heaters that are already in the fill set when this method runs),
-   * which is the "state of the board" at the moment the turn is applied.
+   * @returns The list of locked-cost changes for UI animation.
    */
-  applyTurnDelta(): void {
-    this.lastLockedCostChanges = [];
+  applyTurnDelta(): Array<{ row: number; col: number; delta: number }> {
     const filled = this.getFilledPositions();
-    const beneficialDisconnected = this._detectBeneficialDisconnect(filled);
-    this._cleanupDisconnectedTiles(filled);
-    this._turnNumber++;
-    if (beneficialDisconnected) {
-      this._reEvaluateConnectedTiles(filled);
-    }
-    this._lockNewTiles(filled);
-    this._applyLeakyPenalties(filled);
-  }
-
-  /**
-   * Apply the per-turn water penalty for leaky pipes that were already connected
-   * before this turn (i.e. present in `_lockedWaterImpact` before `_lockNewTiles`
-   * ran and still in the fill path).  Each such tile permanently loses 1 water unit
-   * that cannot be recovered by disconnecting the pipe.
-   * Results are recorded in {@link lastLockedCostChanges} so the UI can animate
-   * the cost label.
-   */
-  private _applyLeakyPenalties(filled: Set<string>): void {
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (!tile || !LEAKY_PIPE_SHAPES.has(tile.shape)) continue;
-      // Only penalise tiles that were already locked before this turn
-      // (i.e. not brand-new connections which were just locked by _lockNewTiles).
-      // A newly-connected tile's connection turn equals the current turn number.
-      const connTurn = this._connectionTurn.get(key);
-      if (connTurn === undefined || connTurn === this._turnNumber) continue;
-
-      this.leakyPermanentLoss++;
-      this.lastLockedCostChanges.push({ row: r, col: c, delta: -1 });
-    }
-  }
-
-  /**
-   * Returns true when any heater or pump that was previously connected is no
-   * longer in the current fill set.  When true, still-connected cost tiles
-   * must be re-evaluated to reflect the loss of the beneficial tile.
-   */
-  private _detectBeneficialDisconnect(filled: Set<string>): boolean {
-    for (const key of this._lockedWaterImpact.keys()) {
-      if (!filled.has(key)) {
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (
-          tile?.shape === PipeShape.Chamber &&
-          ENV_MODIFIER_CONTENTS.has(tile.chamberContent!)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Remove locked impacts for tiles that are no longer in the fill path.
-   * Adjusts the frozen counter for ice/snow/sandstone and hot_plate tiles
-   * so the resource accounting stays correct after disconnection.
-   */
-  private _cleanupDisconnectedTiles(filled: Set<string>): void {
-    for (const key of this._lockedWaterImpact.keys()) {
-      if (!filled.has(key)) {
-        const impact = this._lockedWaterImpact.get(key)!;
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (tile?.shape === PipeShape.Chamber) {
-          if (
-            tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent) &&
-            impact < 0
-          ) {
-            // impact is negative (a cost); subtract it back out of frozen.
-            this.frozen += impact;
-          } else if (tile.chamberContent === 'hot_plate') {
-            // Restore the frozen water that was consumed when this hot_plate connected.
-            const waterGain = this._hotPlateWaterGain.get(key) ?? 0;
-            this.frozen += waterGain;
-            this._hotPlateWaterGain.delete(key);
-          }
-        }
-        this._lockedWaterImpact.delete(key);
-        this._connectionTurn.delete(key);
-        this._lockedConnectTemp.delete(key);
-        this._lockedConnectPressure.delete(key);
-      }
-    }
-  }
-
-  /**
-   * Re-evaluate the locked water impact of still-connected cost tiles
-   * (ice, snow, sandstone, hot_plate) after a beneficial tile (heater or
-   * pump) was disconnected this turn.
-   *
-   * Re-computation uses historically-limited temperature and pressure so
-   * no tile ever gains a retroactive benefit from a heater or pump that
-   * connected after it did.
-   */
-  private _reEvaluateConnectedTiles(filled: Set<string>): void {
-    for (const key of filled) {
-      if (!this._lockedWaterImpact.has(key)) continue; // Newly connecting – handled below.
-
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (!tile || tile.shape !== PipeShape.Chamber) continue;
-      if (tile.chamberContent === null || !TEMP_CHAMBER_CONTENTS.has(tile.chamberContent)) continue;
-
-      const tileConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
-      const effectiveTemp = this._computeTemperatureForIce(filled, tileConnectedTurn);
-      const effectivePressure = this._computePressureForIce(filled, tileConnectedTurn);
-
-      const oldImpact = this._lockedWaterImpact.get(key)!;
-
-      if (tile.chamberContent === 'hot_plate') {
-        // Re-evaluate using historically-limited temperature at connection time.
-        const newEffectiveCost = tile.cost * (tile.temperature + effectiveTemp);
-        const oldWaterGain = this._hotPlateWaterGain.get(key) ?? 0;
-        // Restore the frozen water consumed at lock time, then re-apply with the
-        // new effective cost so the frozen counter stays accurate.
-        const restoredFrozen = this.frozen + oldWaterGain;
-        const { waterGain: newWaterGain, impact: hotPlateImpact } =
-          this._computeHotPlateWaterEffect(newEffectiveCost, restoredFrozen);
-        if (hotPlateImpact !== oldImpact) {
-          this.frozen = restoredFrozen - newWaterGain;
-          this._hotPlateWaterGain.set(key, newWaterGain);
-          this._lockedWaterImpact.set(key, hotPlateImpact);
-          this.lastLockedCostChanges.push({ row: r, col: c, delta: hotPlateImpact - oldImpact });
-        }
-        // Always update the locked stats so the tooltip formula stays consistent with the cost.
-        this._lockedConnectTemp.set(key, effectiveTemp);
-        this._lockedConnectPressure.set(key, effectivePressure);
-        continue; // Frozen and impact already updated above.
-      }
-
-      // ice, snow, or sandstone: use historically-limited temp/pressure so no tile
-      // benefits retroactively from a heater or pump that connected after it did.
-      const result = this._computeColdChamberImpact(tile, effectiveTemp, effectivePressure);
-      if (result.kind === 'failure') {
-        // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
-        // connection time are now gone.  Force immediate failure.
-        // Skip the frozen counter – this impact has no ice-accounting meaning.
-        const failureImpact = this._drainAllImpact;
-        if (failureImpact !== oldImpact) {
-          this._lockedWaterImpact.set(key, failureImpact);
-          this.lastLockedCostChanges.push({ row: r, col: c, delta: failureImpact - oldImpact });
-        }
-        continue;
-      }
-      const newImpact = result.kind === 'frozen' ? -result.frozenCost : 0;
-
-      if (newImpact !== oldImpact) {
-        // Adjust the frozen-water display counter by the change in cost.
-        this.frozen += oldImpact - newImpact;
-        this._lockedWaterImpact.set(key, newImpact);
-        this.lastLockedCostChanges.push({ row: r, col: c, delta: newImpact - oldImpact });
-      }
-      // Always update the locked stats so the tooltip formula stays consistent with the cost.
-      this._lockedConnectTemp.set(key, effectiveTemp);
-      this._lockedConnectPressure.set(key, effectivePressure);
-    }
-  }
-
-  /**
-   * Lock the water impact for each tile that is newly connected this turn.
-   * Uses the current temperature and pressure at the moment this method runs.
-   *
-   * Two-pass approach: ice/snow/sandstone tiles are processed before hot_plate
-   * tiles so that any water frozen this turn is visible to hot_plate tiles
-   * connected on the same turn, regardless of BFS discovery order.
-   */
-  private _lockNewTiles(filled: Set<string>): void {
-    const currentTemp = this._computeTemperatureFromFilled(filled);
-    const currentPressure = this._computePressureFromFilled(filled);
-
-    // First pass: all newly-connected tiles except hot_plate.
-    const newHotPlateKeys: string[] = [];
-    for (const key of filled) {
-      if (this._lockedWaterImpact.has(key)) continue; // Already evaluated.
-
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (!tile) continue;
-
-      // Defer hot_plate tiles to the second pass.
-      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'hot_plate') {
-        newHotPlateKeys.push(key);
-        continue;
-      }
-
-      let impact = 0;
-      if (PIPE_SHAPES.has(tile.shape)) {
-        impact = -1;
-      } else if (tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'tank') {
-          impact = tile.capacity;
-        } else if (tile.chamberContent === 'dirt') {
-          impact = -tile.cost;
-        } else if (tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
-          // ice, snow, or sandstone: freeze water proportional to the cold delta
-          const result = this._computeColdChamberImpact(tile, currentTemp, currentPressure);
-          if (result.kind === 'frozen') {
-            impact = -result.frozenCost;
-            this.frozen += result.frozenCost;
-          } else if (result.kind === 'failure') {
-            // deltaDamage ≤ 0: invalid play state – drain all water to force immediate failure.
-            impact = this._drainAllImpact;
-          }
-          // 'zero' (sandstone shatter): impact stays 0, no frozen water consumed.
-        }
-        // 'heater', 'pump', and 'item': no direct water impact (impact stays 0).
-      }
-      // Source, Sink, Empty, Granite, Tree: no water impact (impact stays 0).
-
-      this._recordLockedTileState(key, impact, currentTemp, currentPressure);
-    }
-
-    // Second pass: lock hot_plate tiles after all ice/snow/sandstone have updated frozen,
-    // so newly-frozen water this turn counts toward what the hot_plate can re-melt.
-    for (const key of newHotPlateKeys) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (!tile) continue;
-      // effectiveCost = mass × (temp + playerTemp)
-      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-      const { waterGain, impact } = this._computeHotPlateWaterEffect(effectiveCost, this.frozen);
-      this.frozen -= waterGain;
-      this._hotPlateWaterGain.set(key, waterGain);
-
-      this._recordLockedTileState(key, impact, currentTemp, currentPressure);
-    }
-  }
-
-  /**
-   * Record the locked water impact and connection stats for a newly-connected tile.
-   * Called once per tile from {@link _lockNewTiles} when the impact has been computed.
-   * The temperature and pressure are stored so that the tooltip can reconstruct the
-   * formula used at connection time, even if conditions change later.
-   */
-  private _recordLockedTileState(key: string, impact: number, temp: number, pressure: number): void {
-    this._lockedWaterImpact.set(key, impact);
-    this._connectionTurn.set(key, this._turnNumber);
-    this._lockedConnectTemp.set(key, temp);
-    this._lockedConnectPressure.set(key, pressure);
+    return this._turnState.applyTurnDelta(filled);
   }
 
   /**
@@ -1533,9 +993,7 @@ export class Board {
    * Used by the UI to display the actual locked cost of an ice tile in the tooltip.
    */
   getLockedWaterImpact(pos: GridPos): number | null {
-    const key = posKey(pos.row, pos.col);
-    const val = this._lockedWaterImpact.get(key);
-    return val !== undefined ? val : null;
+    return this._turnState.getLockedWaterImpact(pos);
   }
 
   /**
@@ -1544,9 +1002,7 @@ export class Board {
    * Used by the UI to display the gain/loss breakdown for hot_plate tiles.
    */
   getLockedHotPlateGain(pos: GridPos): number | null {
-    const key = posKey(pos.row, pos.col);
-    const val = this._hotPlateWaterGain.get(key);
-    return val !== undefined ? val : null;
+    return this._turnState.getLockedHotPlateGain(pos);
   }
 
   /**
@@ -1555,9 +1011,7 @@ export class Board {
    * Used by the UI to reconstruct the locked calculation text in tile tooltips.
    */
   getLockedConnectTemp(pos: GridPos): number | null {
-    const key = posKey(pos.row, pos.col);
-    const val = this._lockedConnectTemp.get(key);
-    return val !== undefined ? val : null;
+    return this._turnState.getLockedConnectTemp(pos);
   }
 
   /**
@@ -1566,9 +1020,7 @@ export class Board {
    * Used by the UI to reconstruct the locked calculation text in tile tooltips.
    */
   getLockedConnectPressure(pos: GridPos): number | null {
-    const key = posKey(pos.row, pos.col);
-    const val = this._lockedConnectPressure.get(key);
-    return val !== undefined ? val : null;
+    return this._turnState.getLockedConnectPressure(pos);
   }
 
   /**
@@ -1577,46 +1029,7 @@ export class Board {
    * and to render the appropriate background / shadow effect.
    */
   getCementDryingTime(pos: GridPos): number | null {
-    const key = posKey(pos.row, pos.col);
-    const val = this.cementData.get(key);
-    return val !== undefined ? val : null;
-  }
-
-  /**
-   * Check whether the cement at `pos` prevents an adjustment operation (T = 0).
-   * When `tile` is provided the check only applies to player-placed pipe tiles
-   * (regular or gold); omit or pass `null` to apply the check unconditionally.
-   * Sets {@link lastError} / {@link lastErrorTilePositions} when blocked.
-   * @returns `true` if the operation is blocked by hardened cement, `false` otherwise.
-   */
-  private _isCementHardened(pos: GridPos, tile?: Tile | null): boolean {
-    const key = posKey(pos.row, pos.col);
-    if (!this.cementData.has(key)) return false;
-    if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) return false;
-    if (this.cementData.get(key)! === 0) {
-      this.lastError = 'Items placed in hardened cement may not be adjusted.';
-      this.lastErrorTilePositions = [pos];
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Decrement the setting time of a cement cell at `pos` after a successful
-   * adjustment operation (reclaim, replace, or rotate).
-   * When `tile` is provided the decrement only applies to player-placed pipe tiles
-   * (regular or gold); omit or pass `null` to apply unconditionally.
-   * Sets {@link lastCementDecrement} to `pos` when a decrement occurs.
-   */
-  private _applyCementDecrement(pos: GridPos, tile?: Tile | null): void {
-    const key = posKey(pos.row, pos.col);
-    if (!this.cementData.has(key)) return;
-    if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) return;
-    const dryingTime = this.cementData.get(key)!;
-    if (dryingTime > 0) {
-      this.cementData.set(key, dryingTime - 1);
-      this.lastCementDecrement = { row: pos.row, col: pos.col };
-    }
+    return this._cement.getDryingTime(pos);
   }
 
   /**
@@ -1628,18 +1041,20 @@ export class Board {
    * @param filled - Current fill set (after the board mutation).
    * @returns The first error message found, or `null` if all constraints pass.
    */
-  private _validateConstraints(filled: Set<string>): string | null {
-    const sandstoneError = this._checkSandstoneConstraints(filled);
-    const heaterError = sandstoneError ? null : this._checkHeaterConstraints(filled);
-    const pumpError = (sandstoneError || heaterError) ? null : this._checkPumpConstraints(filled);
-    return sandstoneError ?? heaterError ?? pumpError;
+  private _validateConstraints(filled: Set<string>): { error: string | null; positions: GridPos[] | null } {
+    return this._validator.validate(
+      filled,
+      this._turnState.lockedWaterImpact,
+      this._turnState.connectionTurn,
+      this._turnState.turnNumber,
+      this.sourceCapacity,
+    );
   }
 
   /**
    * Returns `true` when the tile at the given position can be reclaimed or
    * replaced by the player.  A tile passes this check when it is non-fixed,
    * non-empty, and is not a Source, Sink, Chamber, obstacle, or spinner pipe.
-   * Setting `lastError` / `lastErrorTilePositions` is the caller's responsibility.
    */
   private _isReplaceableTile(tile: Tile | null | undefined): tile is Tile {
     if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
@@ -1700,133 +1115,20 @@ export class Board {
   }
 
   /**
-   * Check whether any sandstone tile currently in the fill path has deltaDamage ≤ 0.
-   * Checks both newly-connected tiles (not yet in the locked map) and already-connected
-   * tiles (in case pressure dropped after a pump was disconnected).
-   * Sets {@link lastErrorTilePositions} to the offending tile(s) when a violation is found.
-   * @param filled - Current fill set (after the board mutation).
-   * @returns An error message string if a violation is found, or `null` if valid.
-   */
-  private _checkSandstoneConstraints(filled: Set<string>): string | null {
-    const currentPressure = this._computePressureFromFilled(filled);
-    const violating: GridPos[] = [];
-    const violatingHistoricalLock: GridPos[] = [];
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
-        if (this._lockedWaterImpact.has(key)) {
-          // For already-connected sandstone, check the historically-limited pressure to
-          // prevent disconnecting a pump that was required to make this tile viable at
-          // connection time (i.e. a pump connected before the sandstone tile itself).
-          const sandstoneConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
-          const historicalPressure = this._computePressureForIce(filled, sandstoneConnectedTurn);
-          if (historicalPressure - tile.hardness <= 0) {
-            violatingHistoricalLock.push({ row: r, col: c });
-          }
-        } else {
-          // For a newly-connecting tile, use the current pressure.
-          const deltaDamage = currentPressure - tile.hardness;
-          if (deltaDamage <= 0) {
-            violating.push({ row: r, col: c });
-          }
-        }
-      }
-    }
-    if (violatingHistoricalLock.length > 0) {
-      this.lastErrorTilePositions = violatingHistoricalLock;
-      return 'Cannot disconnect pressure tiles that were necessary in connecting these sandstone blocks.';
-    }
-    if (violating.length > 0) {
-      const tile = this.grid[violating[0].row]?.[violating[0].col];
-      const hardnessForMsg = tile?.hardness ?? 0;
-      this.lastErrorTilePositions = violating;
-      return `Pressure must exceed Sandstone hardness to connect. (Pressure: ${currentPressure}, Hardness: ${hardnessForMsg})`;
-    }
-    return null;
-  }
-
-  /**
-   * Shared helper for {@link _checkHeaterConstraints} and {@link _checkPumpConstraints}.
-   *
-   * Checks whether the given environment stat value (temperature or pressure) has
-   * gone negative after a board mutation.  When it has, collects all connected
-   * Chamber tiles of type `content` whose contributing stat field is negative
-   * (i.e. the tiles actually responsible for the negative value) and records them
-   * in {@link lastErrorTilePositions}.
-   *
-   * @param filled       - Current fill set (after the board mutation).
-   * @param content      - Chamber content type to blame: `'heater'` or `'pump'`.
-   * @param currentValue - Pre-computed current value of the stat (temp or pressure).
-   * @param constraintName - Human-readable name of the negative variant (e.g. `'Cooler'`).
-   * @param statLabel    - Human-readable stat label for the error message (e.g. `'Temperature'`).
-   * @returns An error message string if the stat is negative, or `null` if valid.
-   */
-  private _checkEnvStatConstraint(
-    filled: Set<string>,
-    content: 'heater' | 'pump',
-    currentValue: number,
-    constraintName: string,
-    statLabel: string,
-  ): string | null {
-    if (currentValue >= 0) return null;
-    const isTemp = content === 'heater';
-    const violating: GridPos[] = [];
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === content) {
-        const stat = isTemp ? tile.temperature : tile.pressure;
-        if (stat < 0) violating.push({ row: r, col: c });
-      }
-    }
-    if (violating.length > 0) {
-      this.lastErrorTilePositions = violating;
-    }
-    return `Connecting this ${constraintName} would reduce ${statLabel.toLowerCase()} below 0. (${statLabel}: ${currentValue})`;
-  }
-
-  /**
-   * Check whether the current temperature (based on the fill set) is below 0.
-   * A negative-temperature Heater (Cooler) that would bring the temperature below 0
-   * must not be connected.  Similarly, disconnecting a positive Heater when the
-   * resulting temperature would be negative is also invalid.
-   * Sets {@link lastErrorTilePositions} to the offending Cooler tile(s).
-   * @param filled - Current fill set (after the board mutation).
-   * @returns An error message string if a violation is found, or `null` if valid.
-   */
-  private _checkHeaterConstraints(filled: Set<string>): string | null {
-    return this._checkEnvStatConstraint(
-      filled, 'heater', this._computeTemperatureFromFilled(filled), 'Cooler', 'Temperature',
-    );
-  }
-
-  /**
-   * Check whether the current pressure (based on the fill set) is below 0.
-   * A negative-pressure Pump (Vacuum) that would bring the pressure below 0
-   * must not be connected.  Similarly, disconnecting a positive Pump when the
-   * resulting pressure would be negative is also invalid.
-   * Sets {@link lastErrorTilePositions} to the offending Vacuum tile(s).
-   * @param filled - Current fill set (after the board mutation).
-   * @returns An error message string if a violation is found, or `null` if valid.
-   */
-  private _checkPumpConstraints(filled: Set<string>): string | null {
-    return this._checkEnvStatConstraint(
-      filled, 'pump', this._computePressureFromFilled(filled), 'Vacuum', 'Pressure',
-    );
-  }
-
-  /**
    * Check for invalid temperature or pressure state caused by pre-connected
    * Heater/Pump tiles with negative values at level start.
    * Call this after {@link initHistory} to detect design-time errors.
-   * @returns An error message string if a violation exists, or `null` if valid.
+   * @returns `{ error, positions }` where `error` is null if the state is valid.
    */
-  checkInitialStateErrors(): string | null {
+  checkInitialStateErrors(): { error: string | null; positions: GridPos[] | null } {
     const filled = this.getFilledPositions();
-    const heaterError = this._checkHeaterConstraints(filled);
-    if (heaterError) return heaterError;
-    return this._checkPumpConstraints(filled);
+    return this._validator.validate(
+      filled,
+      this._turnState.lockedWaterImpact,
+      this._turnState.connectionTurn,
+      this._turnState.turnNumber,
+      this.sourceCapacity,
+    );
   }
 
   // ─── Grid validation ───────────────────────────────────────────────────────
@@ -1942,12 +1244,8 @@ export class Board {
   /**
    * Rotate the tile at the given position 90° clockwise.
    * Convenience wrapper around {@link rotateTileBy} with `steps = 1`.
-   * Returns false (and sets {@link lastError} / {@link lastErrorTilePositions}) if the
-   * tile is fixed/empty or if the rotation would violate any game constraint.
-   * @param pos - Grid coordinate.
-   * @returns true if the rotation succeeded; false if it was blocked.
    */
-  rotateTile(pos: GridPos): boolean {
+  rotateTile(pos: GridPos): MoveResult {
     return this.rotateTileBy(pos, 1);
   }
 
@@ -1955,37 +1253,39 @@ export class Board {
    * Rotates the tile at `pos` clockwise by `steps × 90°` as a single game operation.
    * The sandstone constraint is validated only against the final rotation, so the
    * entire multi-step rotation either succeeds or is fully reverted.
-   * Returns false if the tile is fixed/empty or if the final state violates constraints.
    */
-  rotateTileBy(pos: GridPos, steps: number): boolean {
-    this._clearLastError();
+  rotateTileBy(pos: GridPos, steps: number): MoveResult {
     const tile = this.getTile(pos);
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
-    if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) return false;
+    if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) {
+      return { success: false };
+    }
 
     // Cross pipes face all four directions and rotating them is not a valid move.
     // Fail silently (no error message) because there is nothing wrong with the board state.
-    if (CROSS_PIPE_SHAPES.has(tile.shape)) return false;
+    if (CROSS_PIPE_SHAPES.has(tile.shape)) return { success: false };
 
     // ── Cement constraint check (for player-placed pipe tiles only) ───────────
-    if (this._isCementHardened(pos, tile)) return false;
+    const cementCheck = this._cement.isHardened(pos, tile);
+    if (cementCheck.blocked) {
+      return { success: false, error: cementCheck.error, errorTilePositions: cementCheck.positions };
+    }
 
     // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
-    if (normalizedSteps === 0) return true;
+    if (normalizedSteps === 0) return { success: true };
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
     }
     // Validate the final state.
     const filled = this.getFilledPositions();
-    const constraintError = this._validateConstraints(filled);
+    const { error: constraintError, positions: constraintPositions } = this._validateConstraints(filled);
     if (constraintError) {
       // Revert by rotating the remaining steps to complete a full 360°.
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
-      this.lastError = constraintError;
-      return false;
+      return { success: false, error: constraintError, errorTilePositions: constraintPositions ?? undefined };
     }
 
     // Validate container-grant constraints: rotation may disconnect a container from
@@ -1998,16 +1298,15 @@ export class Board {
           for (let i = 0; i < 4 - normalizedSteps; i++) {
             tile.rotate();
           }
-          this.lastError = ERR_CONTAINER_ROTATE;
-          return false;
+          return { success: false, error: ERR_CONTAINER_ROTATE };
         }
       }
     }
 
-    // Decrement cement setting time after successful rotation
-    this._applyCementDecrement(pos, tile);
+    // Decrement cement setting time after successful rotation.
+    const cementDecrement = this._cement.applyDecrement(pos, tile);
 
-    return true;
+    return { success: true, cementDecrement };
   }
 
   /**

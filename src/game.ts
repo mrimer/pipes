@@ -1,4 +1,4 @@
-import { Board, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, MoveResult, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
@@ -875,11 +875,11 @@ export class Game {
    */
   private _checkAndShowInitialError(): void {
     if (!this.board) return;
-    const initialError = this.board.checkInitialStateErrors();
+    const { error: initialError, positions } = this.board.checkInitialStateErrors();
     if (initialError) {
       this._showErrorFlash(initialError);
-      if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
-        this._startErrorHighlight(this.board.lastErrorTilePositions);
+      if (positions && positions.length > 0) {
+        this._startErrorHighlight(positions);
       }
     }
   }
@@ -1690,13 +1690,14 @@ export class Game {
     const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
     const hadNoSelection = this.selectedShape === null;
     const filledBefore = this.board.getFilledPositions();
-    if (this.board.reclaimTile(pos)) {
+    const result = this.board.reclaimTile(pos);
+    if (result.success) {
       this._completeAnims();
-      this.board.applyTurnDelta();
+      const changes = this.board.applyTurnDelta();
       this.board.recordMove();
       this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, pos.row, pos.col);
-      this._spawnLockedCostChangeAnimations();
-      this._spawnCementDecrementAnimation();
+      this._spawnLockedCostChangeAnimations(changes);
+      this._spawnCementDecrementAnimation(result.cementDecrement);
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
         this.selectedShape = reclaimedShape;
@@ -1704,8 +1705,8 @@ export class Game {
       }
       this._refreshPlayUI();
       this._checkWinLoseAfterMove();
-    } else if (this.board.lastError) {
-      this._handleBoardError();
+    } else if (result.error) {
+      this._handleBoardError(result);
     }
   }
 
@@ -1783,11 +1784,12 @@ export class Game {
    */
   private _afterTileRotated(
     filledBefore: Set<string>,
+    result: MoveResult,
     rotationInfo?: { row: number; col: number; oldRotation: number },
   ): void {
     if (!this.board) return;
     this._completeAnims();
-    this.board.applyTurnDelta();
+    const changes = this.board.applyTurnDelta();
     this.board.recordMove();
     let fillDelay = 0;
     if (rotationInfo) {
@@ -1807,8 +1809,8 @@ export class Game {
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore);
     this._spawnFillAnims(filledBefore, fillDelay);
-    this._spawnLockedCostChangeAnimations();
-    this._spawnCementDecrementAnimation();
+    this._spawnLockedCostChangeAnimations(changes);
+    this._spawnCementDecrementAnimation(result.cementDecrement);
     this._refreshPlayUI();
     this._checkWinLoseAfterMove();
   }
@@ -1825,11 +1827,12 @@ export class Game {
     if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
     const filledBefore = this.board.getFilledPositions();
     const oldRotation = hTile.rotation;
-    if (this.board.rotateTileBy(hPos, steps)) {
-      this._afterTileRotated(filledBefore, { row: hPos.row, col: hPos.col, oldRotation });
+    const result = this.board.rotateTileBy(hPos, steps);
+    if (result.success) {
+      this._afterTileRotated(filledBefore, result, { row: hPos.row, col: hPos.col, oldRotation });
       return true;
-    } else if (this.board.lastError) {
-      this._handleBoardError();
+    } else if (result.error) {
+      this._handleBoardError(result);
     }
     return false;
   }
@@ -1856,14 +1859,15 @@ export class Game {
       // Shift+click rotates CCW (3 steps); plain click rotates CW (1 step).
       const steps = e.shiftKey ? 3 : 1;
       const oldRotation = tile.rotation;
-      if (this.board.rotateTileBy(pos, steps)) {
+      const spinResult = this.board.rotateTileBy(pos, steps);
+      if (spinResult.success) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this._afterTileRotated(filledBefore, { row: pos.row, col: pos.col, oldRotation });
-      } else if (this.board.lastError) {
-        this._handleBoardError();
+        this._afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
+      } else if (spinResult.error) {
+        this._handleBoardError(spinResult);
       }
     } else if (this.selectedShape !== null &&
                (tile.shape === PipeShape.Empty ||
@@ -1879,17 +1883,17 @@ export class Game {
       const delta = this.hoverRotationDelta;
       this.hoverRotationDelta = 0;
       const oldRotation = tile.rotation;
-      const rotated = delta > 0
+      const rotResult = delta > 0
         ? this.board.rotateTileBy(pos, delta)
         : e.shiftKey ? this.board.rotateTileBy(pos, 3) : this.board.rotateTile(pos);
-      if (rotated) {
+      if (rotResult.success) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this.selectedShape === tile.shape) {
           this.pendingRotation = tile.rotation as Rotation;
         }
-        this._afterTileRotated(filledBefore, { row: pos.row, col: pos.col, oldRotation });
-      } else if (this.board.lastError) {
-        this._handleBoardError();
+        this._afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
+      } else if (rotResult.error) {
+        this._handleBoardError(rotResult);
       }
     }
   }
@@ -1993,11 +1997,12 @@ export class Game {
         const steps = e.deltaY > 0 ? 1 : 3;
         const filledBefore = this.board.getFilledPositions();
         const oldRotation = hTile.rotation;
-        if (this.board.rotateTileBy(hPos, steps)) {
+        const wheelResult = this.board.rotateTileBy(hPos, steps);
+        if (wheelResult.success) {
           e.preventDefault();
-          this._afterTileRotated(filledBefore, { row: hPos.row, col: hPos.col, oldRotation });
-        } else if (this.board.lastError) {
-          this._handleBoardError();
+          this._afterTileRotated(filledBefore, wheelResult, { row: hPos.row, col: hPos.col, oldRotation });
+        } else if (wheelResult.error) {
+          this._handleBoardError(wheelResult);
         }
         return;
       }
@@ -2272,14 +2277,15 @@ export class Game {
   }
 
   /**
-   * Show the board's lastError as a flash message and, if lastErrorTilePositions is set,
-   * temporarily highlight those tiles.  Call this whenever a board operation fails.
+   * Show the error from a failed board operation as a flash message, and if
+   * errorTilePositions is set, temporarily highlight those tiles.
+   * Call this whenever a board operation fails.
    */
-  private _handleBoardError(): void {
-    if (!this.board?.lastError) return;
-    this._showErrorFlash(this.board.lastError);
-    if (this.board.lastErrorTilePositions && this.board.lastErrorTilePositions.length > 0) {
-      this._startErrorHighlight(this.board.lastErrorTilePositions);
+  private _handleBoardError(result: MoveResult): void {
+    if (!result.error) return;
+    this._showErrorFlash(result.error);
+    if (result.errorTilePositions && result.errorTilePositions.length > 0) {
+      this._startErrorHighlight(result.errorTilePositions);
     }
   }
 
@@ -2528,9 +2534,9 @@ export class Game {
    * (shown in green).  This matches the appearance of the connection-time cost
    * animations so players can immediately see what changed.
    */
-  private _spawnLockedCostChangeAnimations(): void {
-    if (!this.board) return;
-    const changes = this.board.lastLockedCostChanges;
+  private _spawnLockedCostChangeAnimations(
+    changes: Array<{ row: number; col: number; delta: number }>,
+  ): void {
     if (changes.length === 0) return;
     const now = performance.now();
 
@@ -2547,9 +2553,9 @@ export class Game {
    * If the most recent board operation decremented a cement cell's setting time,
    * spawn a floating gray "-1" animation above that cell.
    */
-  private _spawnCementDecrementAnimation(): void {
-    if (!this.board?.lastCementDecrement) return;
-    const { row: r, col: c } = this.board.lastCementDecrement;
+  private _spawnCementDecrementAnimation(cementDecrement?: GridPos): void {
+    if (!cementDecrement) return;
+    const { row: r, col: c } = cementDecrement;
     const cx = c * TILE_SIZE + TILE_SIZE / 4;
     const cy = r * TILE_SIZE + TILE_SIZE / 4;
     this._animations.push({
@@ -2559,7 +2565,6 @@ export class Game {
       startTime: performance.now(),
       duration: ANIM_DURATION,
     });
-    this.board.lastCementDecrement = null;
   }
 
   /**
@@ -2625,6 +2630,7 @@ export class Game {
    */
   private _afterTilePlaced(
     placedShape: PipeShape,
+    result: MoveResult,
     filledBefore: Set<string>,
     replacedTile?: Tile,
     replacedRow?: number,
@@ -2632,13 +2638,13 @@ export class Game {
   ): void {
     if (!this.board) return;
     this._completeAnims();
-    this.board.applyTurnDelta();
+    const changes = this.board.applyTurnDelta();
     this.board.recordMove();
     this._spawnConnectionAnimations(filledBefore);
     this._spawnDisconnectionAnimations(filledBefore, replacedTile, replacedRow, replacedCol);
     this._spawnFillAnims(filledBefore);
-    this._spawnLockedCostChangeAnimations();
-    this._spawnCementDecrementAnimation();
+    this._spawnLockedCostChangeAnimations(changes);
+    this._spawnCementDecrementAnimation(result.cementDecrement);
     this.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._refreshPlayUI();
@@ -2668,19 +2674,19 @@ export class Game {
   ): boolean {
     if (!this.board || this.selectedShape === null) return false;
     let replacedTile: Tile | undefined;
-    let placed: boolean;
+    let result: MoveResult;
     if (currentTile.shape === PipeShape.Empty) {
-      placed = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
+      result = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
     } else if (currentTile.shape !== this.selectedShape || currentTile.rotation !== this.pendingRotation) {
       replacedTile = currentTile;
-      placed = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
+      result = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
     } else {
       return false; // tile already has the selected shape+rotation – no action
     }
-    if (placed) {
-      this._afterTilePlaced(this.selectedShape, filledBefore, replacedTile, pos.row, pos.col);
-    } else if (this.board.lastError) {
-      this._handleBoardError();
+    if (result.success) {
+      this._afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
+    } else if (result.error) {
+      this._handleBoardError(result);
     }
     return true; // a board operation was attempted
   }
@@ -2724,12 +2730,13 @@ export class Game {
           const filledBefore = board.getFilledPositions();
           // Capture before calling rotateTile – the rotation mutates tile.rotation in-place.
           const oldRotation = tile?.rotation;
-          if (board.rotateTile(focusPos)) {
-            this._afterTileRotated(filledBefore, oldRotation !== undefined
+          const rotResult = board.rotateTile(focusPos);
+          if (rotResult.success) {
+            this._afterTileRotated(filledBefore, rotResult, oldRotation !== undefined
               ? { row: focusPos.row, col: focusPos.col, oldRotation }
               : undefined);
-          } else if (board.lastError) {
-            this._handleBoardError();
+          } else if (rotResult.error) {
+            this._handleBoardError(rotResult);
           }
         }
         break;
