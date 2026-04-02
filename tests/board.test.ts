@@ -171,55 +171,55 @@ describe('Board.rotateTileBy', () => {
   it('rotates a tile by 1 step (90°)', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(true);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 1).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(90);
   });
 
   it('rotates a tile by 2 steps (180°) in one operation', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 2)).toBe(true);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 2).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(180);
   });
 
   it('rotates a tile by 3 steps (270°) in one operation', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 3)).toBe(true);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 3).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(270);
   });
 
   it('0 steps is a no-op and returns true', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 0)).toBe(true);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 0).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
   it('4 steps is a full rotation: leaves rotation unchanged and returns true', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 90);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 4)).toBe(true);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 4).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(90);
   });
 
   it('returns false for a fixed tile', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 0, true /* isFixed */);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(false);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 1).success).toBe(false);
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
   it('returns false for an empty tile', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Empty, 0);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, 1)).toBe(false);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, 1).success).toBe(false);
   });
 
   it('negative steps rotate counter-clockwise (-1 → 270°)', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Elbow, 0);
-    expect(board.rotateTileBy({ row: 1, col: 1 }, -1)).toBe(true);
+    expect(board.rotateTileBy({ row: 1, col: 1 }, -1).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(270);
   });
 });
@@ -241,40 +241,40 @@ describe('CROSS_PIPE_SHAPES', () => {
 });
 
 describe('Cross pipes are not rotatable', () => {
-  it('rotateTile returns false for Cross and does not set lastError', () => {
+  it('rotateTile returns false for Cross and does not report error', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Cross, 0);
     const result = board.rotateTile({ row: 1, col: 1 });
-    expect(result).toBe(false);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeUndefined();
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
-  it('rotateTileBy returns false for Cross and does not set lastError', () => {
+  it('rotateTileBy returns false for Cross and does not report error', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.Cross, 0);
     const result = board.rotateTileBy({ row: 1, col: 1 }, 2);
-    expect(result).toBe(false);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeUndefined();
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
-  it('rotateTile returns false for GoldCross and does not set lastError', () => {
+  it('rotateTile returns false for GoldCross and does not report error', () => {
     const board = new Board(3, 3);
     board.goldSpaces.add(posKey(1, 1));
     board.grid[1][1] = new Tile(PipeShape.GoldCross, 0);
     const result = board.rotateTile({ row: 1, col: 1 });
-    expect(result).toBe(false);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeUndefined();
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
-  it('rotateTile returns false for LeakyCross and does not set lastError', () => {
+  it('rotateTile returns false for LeakyCross and does not report error', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.LeakyCross, 0);
     const result = board.rotateTile({ row: 1, col: 1 });
-    expect(result).toBe(false);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeUndefined();
     expect(board.grid[1][1].rotation).toBe(0);
   });
 });
@@ -310,8 +310,8 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     // Straight at (0,1) rotates 90°→180° (E-W → N-S), disconnecting source↔chamber.
     // After rotation: grant = 0 → base(-1) + grant(0) = -1 < 0 → blocked.
     const result = board.rotateTile({ row: 0, col: 1 });
-    expect(result).toBe(false);
-    expect(board.lastError).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
     // Tile must be restored to original rotation (90°).
     expect(board.grid[0][1].rotation).toBe(90);
   });
@@ -324,8 +324,8 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     // Rotating Straight(0,1) E-W → N-S disconnects the container, but since
     // no grant was over-used (count ≥ 0), the rotation is permitted.
     const result = board.rotateTile({ row: 0, col: 1 });
-    expect(result).toBe(true);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
   });
 });
 
@@ -348,8 +348,8 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
     const board = makeRotateByConstraintBoard();
     // 1 step: 90°→180° (E-W → N-S), disconnects source↔chamber → blocked.
     const result = board.rotateTileBy({ row: 0, col: 1 }, 1);
-    expect(result).toBe(false);
-    expect(board.lastError).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
     // Tile must be restored to original rotation (90°).
     expect(board.grid[0][1].rotation).toBe(90);
   });
@@ -445,7 +445,7 @@ describe('Board.placeInventoryTile', () => {
     const board = makeLevel1Board();
     const before = board.inventory.find((i) => i.shape === PipeShape.Straight)!.count;
     const placed = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(placed).toBe(true);
+    expect(placed.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(before - 1);
   });
@@ -454,7 +454,7 @@ describe('Board.placeInventoryTile', () => {
     const board = makeLevel1Board();
     // (0,0) is Source (fixed) – cannot place on it
     const result = board.placeInventoryTile({ row: 0, col: 0 }, PipeShape.Straight);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('returns false when inventory of that shape is empty', () => {
@@ -463,7 +463,7 @@ describe('Board.placeInventoryTile', () => {
     const item = board.inventory.find((i) => i.shape === PipeShape.Straight)!;
     item.count = 0;
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
   });
 });
 
@@ -480,26 +480,26 @@ describe('Board.reclaimTile', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
     const before = board.inventory.find((i) => i.shape === PipeShape.Straight)!.count;
     const result = board.reclaimTile({ row: 0, col: 1 });
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(before + 1);
   });
 
   it('returns false for an empty cell', () => {
     const board = makeLevel1Board();
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 
   it('returns false for a fixed tile', () => {
     const board = makeLevel1Board();
     // (0,0) is Source fixed
-    expect(board.reclaimTile({ row: 0, col: 0 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 0 }).success).toBe(false);
   });
 
   it('returns false for a fixed pipe tile', () => {
     const board = makeLevel1Board();
     // (1,0) is Elbow fixed
-    expect(board.reclaimTile({ row: 1, col: 0 })).toBe(false);
+    expect(board.reclaimTile({ row: 1, col: 0 }).success).toBe(false);
   });
 
   it('returns false for Source / Sink / Chamber even if not marked fixed', () => {
@@ -507,9 +507,9 @@ describe('Board.reclaimTile', () => {
     board.grid[0][0] = new Tile(PipeShape.Source,  0, false);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 5, 0, null, 1, null, 'tank');
     board.grid[0][2] = new Tile(PipeShape.Sink,    0, false);
-    expect(board.reclaimTile({ row: 0, col: 0 })).toBe(false);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
-    expect(board.reclaimTile({ row: 0, col: 2 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 0 }).success).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 2 }).success).toBe(false);
   });
 });
 
@@ -636,7 +636,7 @@ describe('Chamber tile (dirt content)', () => {
   it('is not reclaimable', () => {
     const board = new Board(1, 3);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 3, null, 1, null, 'dirt');
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 });
 
@@ -698,7 +698,7 @@ describe('Chamber tile (item content)', () => {
   it('is not reclaimable', () => {
     const board = new Board(1, 3);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 0, PipeShape.Straight, 1, null, 'item');
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 
   it('does not affect water cost', () => {
@@ -780,7 +780,7 @@ describe('Board.placeInventoryTile (with container grants)', () => {
     // Chamber is reachable (fill: source → chamber via mutual all-dir connections)
     // Base count is 0 but grant is 1 → effective = 1 → allow placement
     const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][2].shape).toBe(PipeShape.Straight);
     // Base count goes to -1 (using grant)
     expect(board.inventory[0].count).toBe(-1);
@@ -793,7 +793,7 @@ describe('Board.placeInventoryTile (with container grants)', () => {
     board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
     board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
     board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
-    expect(board.placeInventoryTile({ row: 0, col: 0 }, PipeShape.Straight)).toBe(false);
+    expect(board.placeInventoryTile({ row: 0, col: 0 }, PipeShape.Straight).success).toBe(false);
   });
 });
 
@@ -822,8 +822,9 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     // Place Straight at col 2 using the chamber grant
     board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight);
     // Chamber is still in fill path, so reclaiming col 2 is safe
-    expect(board.reclaimTile({ row: 0, col: 2 })).toBe(true);
-    expect(board.lastError).toBeNull();
+    const reclaimResult = board.reclaimTile({ row: 0, col: 2 });
+    expect(reclaimResult.success).toBe(true);
+    expect(reclaimResult.error).toBeUndefined();
   });
 
   it('blocks reclaiming when it would remove a chamber from the fill path and inventory would go below 0', () => {
@@ -844,8 +845,8 @@ describe('Board.reclaimTile (inventory constraint)', () => {
 
     // Try to reclaim col 1: this would disconnect the chamber → base(-1) + newGrant(0) = -1 < 0
     const result = board.reclaimTile({ row: 0, col: 1 });
-    expect(result).toBe(false);
-    expect(board.lastError).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
     // The tile must still be in place
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
@@ -866,17 +867,17 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     // Chamber is still reachable via col 1 even after col 3 is removed.
     // base(-1) + newGrant(1) = 0 >= 0 → allowed.
     const result = board.reclaimTile({ row: 0, col: 3 });
-    expect(result).toBe(true);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
     // inventory goes from -1 to 0 (reclaim gives +1)
     expect(board.inventory[0].count).toBe(0);
   });
 
-  it('sets lastError to null on a successful reclaim', () => {
+  it('does not report an error on successful reclaim', () => {
     const board = makeConstraintBoard();
     board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight);
-    board.reclaimTile({ row: 0, col: 2 });
-    expect(board.lastError).toBeNull();
+    const reclaimResult = board.reclaimTile({ row: 0, col: 2 });
+    expect(reclaimResult.error).toBeUndefined();
   });
 });
 
@@ -930,8 +931,8 @@ describe('Level 3 (Mountain Stream)', () => {
 
     // Reclaiming (0,1) would disconnect the container; base GoldStraight = -1, newGrant = 0 → blocked
     const result = board.reclaimTile({ row: 0, col: 1 });
-    expect(result).toBe(false);
-    expect(board.lastError).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
   });
 });
 
@@ -1043,7 +1044,7 @@ describe('Chamber tile', () => {
     board.grid[0][0] = new Tile(PipeShape.Source,  0, true);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 0, null, 1, null, 'tank');
     board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 
   it('tank content in validateGrid reports error when facing off-grid', () => {
@@ -1079,13 +1080,13 @@ describe('Granite tile', () => {
     board.grid[0][1] = new Tile(PipeShape.Granite, 0, true);
     board.grid[0][2] = new Tile(PipeShape.Sink,    0, true);
     board.inventory  = [{ shape: PipeShape.Straight, count: 5 }];
-    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight).success).toBe(false);
   });
 
   it('cannot be reclaimed even when not marked fixed', () => {
     const board = new Board(1, 3);
     board.grid[0][1] = new Tile(PipeShape.Granite, 0, false);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 
   it('is preset in levels as an immovable obstacle', () => {
@@ -1117,13 +1118,13 @@ describe('Tree tile', () => {
     board.grid[0][1] = new Tile(PipeShape.Tree,   0, true);
     board.grid[0][2] = new Tile(PipeShape.Sink,   0, true);
     board.inventory  = [{ shape: PipeShape.Straight, count: 5 }];
-    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight).success).toBe(false);
   });
 
   it('cannot be reclaimed even when not marked fixed', () => {
     const board = new Board(1, 3);
     board.grid[0][1] = new Tile(PipeShape.Tree, 0, false);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 });
 
@@ -1149,39 +1150,39 @@ describe('Gold pipes and gold spaces', () => {
   it('allows gold pipe placement on a gold space', () => {
     const board = makeGoldSpaceBoard();
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
   });
 
   it('blocks regular pipe placement on a gold space', () => {
     const board = makeGoldSpaceBoard();
-    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight).success).toBe(false);
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 
-  it('sets lastError when placing a regular pipe on a gold space', () => {
+  it('sets error when placing a regular pipe on a gold space', () => {
     const board = makeGoldSpaceBoard();
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(board.lastError).toBe(ERR_GOLD_SPACE);
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(result.error).toBe(ERR_GOLD_SPACE);
   });
 
-  it('clears lastError on successful placement', () => {
+  it('does not report error on successful placement', () => {
     const board = makeGoldSpaceBoard();
     // Trigger an error first
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(board.lastError).not.toBeNull();
+    const result1 = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(result1.error).toBeDefined();
     // Now place a valid gold pipe
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
-    expect(board.lastError).toBeNull();
+    const result2 = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
+    expect(result2.error).toBeUndefined();
   });
 
-  it('sets lastError in replaceInventoryTile when replacing with a non-gold pipe on a gold space', () => {
+  it('sets error in replaceInventoryTile when replacing with a non-gold pipe on a gold space', () => {
     const board = makeGoldSpaceBoard();
     // Place a gold pipe first so we have something to replace
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
     board.inventory.push({ shape: PipeShape.Straight, count: 1 });
-    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    expect(board.lastError).toBe(ERR_GOLD_SPACE);
+    const replaceResult = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
+    expect(replaceResult.error).toBe(ERR_GOLD_SPACE);
     // Tile should remain unchanged
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
   });
@@ -1191,7 +1192,7 @@ describe('Gold pipes and gold spaces', () => {
     board.inventory = [{ shape: PipeShape.GoldStraight, count: 1 }];
     board.grid[0][1] = new Tile(PipeShape.Empty, 0);
     // (0,1) is NOT in goldSpaces → gold pipe should now be allowed
-    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(true);
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight).success).toBe(true);
   });
 
   it('gold pipe carries water and counts as a pipe cost', () => {
@@ -1208,7 +1209,7 @@ describe('Gold pipes and gold spaces', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
     const result = board.reclaimTile({ row: 0, col: 1 });
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
     // GoldStraight returned to inventory
     const inv = board.inventory.find((it) => it.shape === PipeShape.GoldStraight);
@@ -1596,7 +1597,7 @@ describe('Board.replaceInventoryTile', () => {
 
     // Replace the Straight with an Elbow
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Elbow);
     // Old tile (Straight) returned → count goes up by 1
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(straightBefore + 1);
@@ -1614,7 +1615,7 @@ describe('Board.replaceInventoryTile', () => {
   it('returns false when the target tile is empty', () => {
     const board = makeSimpleBoard();
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 
@@ -1622,7 +1623,7 @@ describe('Board.replaceInventoryTile', () => {
     const board = makeSimpleBoard();
     // (0,0) is Source and fixed
     const result = board.replaceInventoryTile({ row: 0, col: 0 }, PipeShape.Elbow);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
   });
 
   it('returns false for non-replaceable special tiles (Source, Sink, Chamber, Granite)', () => {
@@ -1632,10 +1633,10 @@ describe('Board.replaceInventoryTile', () => {
     board.grid[0][2] = new Tile(PipeShape.Chamber, 0, false, 5, 0, null, 1, null, 'tank');
     board.grid[0][3] = new Tile(PipeShape.Granite, 0, false);
     board.inventory = [{ shape: PipeShape.Straight, count: 5 }];
-    expect(board.replaceInventoryTile({ row: 0, col: 0 }, PipeShape.Straight)).toBe(false);
-    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight)).toBe(false);
-    expect(board.replaceInventoryTile({ row: 0, col: 2 }, PipeShape.Straight)).toBe(false);
-    expect(board.replaceInventoryTile({ row: 0, col: 3 }, PipeShape.Straight)).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 0 }, PipeShape.Straight).success).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight).success).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 2 }, PipeShape.Straight).success).toBe(false);
+    expect(board.replaceInventoryTile({ row: 0, col: 3 }, PipeShape.Straight).success).toBe(false);
   });
 
   it('returns false when the new shape has no available inventory', () => {
@@ -1643,7 +1644,7 @@ describe('Board.replaceInventoryTile', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
     board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count = 0;
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
     // Old tile should be unchanged
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
@@ -1669,7 +1670,7 @@ describe('Board.replaceInventoryTile', () => {
     board.grid[0][2] = new Tile(PipeShape.Sink,     0, true);
     board.inventory  = [{ shape: PipeShape.GoldStraight, count: 1 }];
     // Gold pipe can now go on a non-gold space
-    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight)).toBe(true);
+    expect(board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight).success).toBe(true);
   });
 
   it('blocks regular pipe from replacing gold pipe on a gold space (replaceInventoryTile)', () => {
@@ -1685,7 +1686,7 @@ describe('Board.replaceInventoryTile', () => {
       { shape: PipeShape.Straight,     count: 1 },
     ];
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
     // Board state is unchanged
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
     expect(board.inventory.find((i) => i.shape === PipeShape.GoldStraight)!.count).toBe(0);
@@ -1705,7 +1706,7 @@ describe('Board.replaceInventoryTile', () => {
       { shape: PipeShape.GoldStraight, count: 1 },
     ];
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
     // Regular pipe returned to inventory
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
@@ -1713,7 +1714,7 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.inventory.find((i) => i.shape === PipeShape.GoldStraight)!.count).toBe(0);
   });
 
-  it('sets lastError and rolls back when post-replacement constraint check fails', () => {
+  it('sets error and rolls back when post-replacement constraint check fails', () => {
     // Source → Straight(1, connector) → Chamber(2, grants 2 Straights) → Straight(3) → Straight(4) → Sink(5)
     // inventory = [{Straight, count: -2}] — both Straights at (3) and (4) placed using grants,
     // plus the connector at (1) placed from the original base stock of 1.
@@ -1737,8 +1738,8 @@ describe('Board.replaceInventoryTile', () => {
 
     // Replacing Straight(1) with Elbow breaks the chamber connection
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
-    expect(result).toBe(false);
-    expect(board.lastError).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
     // Board and inventory must be fully rolled back
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-2);
@@ -1766,16 +1767,16 @@ describe('Board.replaceInventoryTile', () => {
 
     // Replacing Straight(1) with Straight(R=0, N-S) breaks the E-W path to the chamber
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 0);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
     // A user-visible error must be set (grant invalidation)
-    expect(board.lastError).not.toBeNull();
+    expect(result.error).toBeDefined();
     // Board and inventory must be fully rolled back
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.grid[0][1].rotation).toBe(90);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-2);
   });
 
-  it('sets lastError when replacing would disconnect the container that grants the new shape', () => {
+  it('sets error when replacing would disconnect the container that grants the new shape', () => {
     // Source → Straight(1,R=90,E-W) → Chamber(2, grants 1 Elbow) → Sink(3)
     // inventory = [{Straight:0, Elbow:-1+grant1=0}]: player has used the granted Elbow somewhere else
     // ... simpler: player has 0 base Elbows, 1 granted via connected container.
@@ -1797,22 +1798,23 @@ describe('Board.replaceInventoryTile', () => {
     // Try to replace the E-W Straight with an Elbow (R=0, N-S connects N-S, not E-W)
     // An Elbow at R=0 connects North and East, not West-East, so it breaks the E-W chain.
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 0);
-    expect(result).toBe(false);
+    expect(result.success).toBe(false);
     // Must set a user-visible error (inventory grant invalidation)
-    expect(board.lastError).not.toBeNull();
+    expect(result.error).toBeDefined();
     // Board must be rolled back
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(0);
     expect(board.inventory.find((i) => i.shape === PipeShape.Elbow)!.count).toBe(0);
   });
 
-  it('clears lastError on success', () => {
+  it('does not report an error on success', () => {
     const board = makeSimpleBoard();
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
     // Force a prior error
-    board.lastError = 'previous error';
-    board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
-    expect(board.lastError).toBeNull();
+
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
   });
 
   it('allows replacement that connects a new negative container, making effective count more negative', () => {
@@ -1847,7 +1849,7 @@ describe('Board.replaceInventoryTile', () => {
 
     // Replace Straight(0,1) with Tee(R=90, connects E-S-W).
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Tee, 90);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Tee);
     // Straight returned to inventory; Tee consumed
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
@@ -1883,8 +1885,8 @@ describe('Board.replaceInventoryTile', () => {
     // Elbow at R=90 connects South and West: (0,0)Source←W(0,1)Elbow S→(1,1)Chamber(-1)
     // Chamber(+3) at (0,2) is no longer reachable → positive grant lost → BLOCK
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 90);
-    expect(result).toBe(false);
-    expect(board.lastError).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
     // Board must be rolled back
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-3);
@@ -1916,7 +1918,7 @@ describe('Board.replaceInventoryTile', () => {
     board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
 
     const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.GoldStraight, 90);
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.GoldStraight);
     // Straight returned to inventory
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(1);
@@ -2022,7 +2024,7 @@ describe('Chamber tile (heater content)', () => {
   it('is not reclaimable', () => {
     const board = new Board(1, 3);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 0, null, 1, null, 'heater', 5);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 
   it('does not affect water capacity directly', () => {
@@ -2101,7 +2103,7 @@ describe('Chamber tile (ice content)', () => {
   it('is not reclaimable', () => {
     const board = new Board(1, 3);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, false, 0, 2, null, 1, null, 'ice', 10);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
   });
 });
 
@@ -3184,9 +3186,9 @@ describe('Chamber tile (sandstone content)', () => {
     b.initHistory();
 
     const result = b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(false);
-    expect(b.lastError).toMatch(/Pressure must exceed Sandstone hardness/);
-    expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 2 }]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Pressure must exceed Sandstone hardness/);
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
     // Rollback: inventory and grid unchanged
     expect(b.inventory[0].count).toBe(2);
     expect(b.grid[0][1].shape).toBe(PipeShape.Empty);
@@ -3205,8 +3207,9 @@ describe('Chamber tile (sandstone content)', () => {
     b.inventory = [{ shape: PipeShape.Straight, count: 1 }];
     b.initHistory();
 
-    expect(b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90)).toBe(true);
-    expect(b.lastError).toBeNull();
+    const placeResult = b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(placeResult.success).toBe(true);
+    expect(placeResult.error).toBeUndefined();
   });
 
   it('applyTurnDelta sets failure impact (−(sourceCapacity+1)) when sandstone deltaDamage ≤ 0', () => {
@@ -3277,7 +3280,7 @@ describe('Chamber tile (sandstone content)', () => {
 
     // Step 2: Connect sandstone via E-W pipe at (0,1) — deltaDamage=2-1=1 > 0, valid
     const placed = b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(placed).toBe(true);
+    expect(placed.success).toBe(true);
     b.applyTurnDelta();
     b.recordMove();
     // Sandstone locked at deltaDamage=1: impact = -(ceil(3/1)*5) = -15
@@ -3285,9 +3288,9 @@ describe('Chamber tile (sandstone content)', () => {
 
     // Step 3: Try to reclaim pump connector → pressure drops to 1, deltaDamage=0 → blocked
     const result = b.reclaimTile({ row: 1, col: 0 });
-    expect(result).toBe(false);
-    expect(b.lastError).toMatch(/Cannot disconnect pressure tiles/);
-    expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 2 }]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
     expect(b.grid[1][0].shape).toBe(PipeShape.Straight);
   });
 
@@ -3311,8 +3314,8 @@ describe('Chamber tile (sandstone content)', () => {
 
     // Step 3: Reclaim pump connector → pressure drops to 1, deltaDamage=1 > 0 → allowed
     const result = b.reclaimTile({ row: 1, col: 0 });
-    expect(result).toBe(true);
-    expect(b.lastError).toBeNull();
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
 
     b.applyTurnDelta();
     b.recordMove();
@@ -3387,9 +3390,9 @@ describe('Chamber tile (sandstone content)', () => {
     // at turn ≤ 3: P1 is gone from filled, P2 was connected at turn 4 > 3 → excluded.
     // effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → must be blocked.
     const result = b.reclaimTile({ row: 1, col: 2 });
-    expect(result).toBe(false);
-    expect(b.lastError).toMatch(/Cannot disconnect pressure tiles/);
-    expect(b.lastErrorTilePositions).toEqual([{ row: 0, col: 4 }]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 4 }]);
     // Tile should be restored
     expect(b.grid[1][2].shape).toBe(PipeShape.Straight);
     // Sandstone impact should be unchanged
@@ -3466,8 +3469,8 @@ describe('Chamber tile (sandstone content)', () => {
     // P1 gone from filled; P2 was connected at turn 4 > 3 → excluded. effectivePressure=1 (source only).
     // deltaDamage=1-0=1 > 0 → allowed (historical pressure still sufficient with hardness=0).
     const result = b.reclaimTile({ row: 1, col: 2 });
-    expect(result).toBe(true);
-    expect(b.lastError).toBeNull();
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
 
     b.applyTurnDelta();
     b.recordMove();
@@ -3588,8 +3591,8 @@ describe('Chamber tile (sandstone shatter)', () => {
 
     // Attempt reclaim (1,0): historical pressure → 1, deltaDamage=1-1=0 → blocked
     const result = b.reclaimTile({ row: 1, col: 0 });
-    expect(result).toBe(false);
-    expect(b.lastError).toMatch(/Cannot disconnect pressure tiles/);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
     expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(0);
   });
 
@@ -3635,7 +3638,7 @@ describe('Chamber tile (sandstone shatter)', () => {
 
     // Reclaim (1,0): pressure drops to 1 < shatter=3; deltaDamage=1-0=1 > 0 → allowed
     const result = b.reclaimTile({ row: 1, col: 0 });
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
     b.applyTurnDelta();
     b.recordMove();
 
@@ -3862,7 +3865,7 @@ describe('Spinnable pipes: isFixed and rotation', () => {
   it('SpinStraight can be rotated by rotateTile', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
-    expect(board.rotateTile({ row: 1, col: 1 })).toBe(true);
+    expect(board.rotateTile({ row: 1, col: 1 }).success).toBe(true);
     expect(board.grid[1][1].rotation).toBe(90);
   });
 
@@ -3884,22 +3887,22 @@ describe('Spinnable pipes: cannot be reclaimed or replaced', () => {
   it('reclaimTile returns false for a SpinStraight tile', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
-    expect(board.reclaimTile({ row: 1, col: 1 })).toBe(false);
+    expect(board.reclaimTile({ row: 1, col: 1 }).success).toBe(false);
   });
 
   it('reclaimTile returns false for SpinElbow and SpinTee', () => {
     const board = new Board(3, 3);
     board.grid[0][1] = new Tile(PipeShape.SpinElbow, 0, false);
     board.grid[0][2] = new Tile(PipeShape.SpinTee, 0, false);
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(false);
-    expect(board.reclaimTile({ row: 0, col: 2 })).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(false);
+    expect(board.reclaimTile({ row: 0, col: 2 }).success).toBe(false);
   });
 
   it('replaceInventoryTile returns false when target is SpinStraight', () => {
     const board = new Board(3, 3);
     board.grid[1][1] = new Tile(PipeShape.SpinStraight, 0, false);
     board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
-    expect(board.replaceInventoryTile({ row: 1, col: 1 }, PipeShape.Straight)).toBe(false);
+    expect(board.replaceInventoryTile({ row: 1, col: 1 }, PipeShape.Straight).success).toBe(false);
   });
 });
 
@@ -4032,8 +4035,8 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
 
     // Rotation 90 = East-West Straight
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(false);
-    expect(board.lastError).toMatch(/temperature below 0/i);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/temperature below 0/i);
   });
 
   it('placeInventoryTile allows move that connects a Cooler when temp stays >= 0', () => {
@@ -4051,8 +4054,8 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
 
     // Rotation 90 = East-West Straight
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(true);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
     expect(board.getCurrentTemperature()).toBe(10);
   });
 
@@ -4079,23 +4082,23 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
 
     // Remove (0,2): positive heater disconnects, temp = 5 + (-10) = -5 < 0 → BLOCKED
     const result = board.reclaimTile({ row: 0, col: 2 });
-    expect(result).toBe(false);
-    expect(board.lastError).toMatch(/temperature below 0/i);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/temperature below 0/i);
   });
 
   it('checkInitialStateErrors returns an error when pre-connected cooler causes temp < 0', () => {
     const board = makeCoolerBoard(5, -10); // temp = 5 + (-10) = -5
     board.initHistory();
     const error = board.checkInitialStateErrors();
-    expect(error).not.toBeNull();
-    expect(error).toMatch(/temperature below 0/i);
+    expect(error.error).not.toBeNull();
+    expect(error.error).toMatch(/temperature below 0/i);
   });
 
   it('checkInitialStateErrors returns null when initial temperature is valid', () => {
     const board = makeCoolerBoard(15, -5); // temp = 15 + (-5) = 10 >= 0
     board.initHistory();
     const error = board.checkInitialStateErrors();
-    expect(error).toBeNull();
+    expect(error.error).toBeNull();
   });
 
   it('checkInitialStateErrors returns null when no cooler tiles are present', () => {
@@ -4109,7 +4112,7 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
     board.sourceCapacity = 5;
     board.initHistory();
     const error = board.checkInitialStateErrors();
-    expect(error).toBeNull();
+    expect(error.error).toBeNull();
   });
 });
 
@@ -4153,8 +4156,8 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
 
     // Rotation 90 = East-West Straight
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(false);
-    expect(board.lastError).toMatch(/pressure below 0/i);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/pressure below 0/i);
   });
 
   it('placeInventoryTile allows move that connects a Vacuum when pressure stays >= 0', () => {
@@ -4172,8 +4175,8 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
 
     // Rotation 90 = East-West Straight
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result).toBe(true);
-    expect(board.lastError).toBeNull();
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
     expect(board.getCurrentPressure()).toBe(5);
   });
 
@@ -4200,23 +4203,23 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
 
     // Remove (0,2): positive pump disconnects, pressure = 5 + (-10) = -5 < 0 → BLOCKED
     const result = board.reclaimTile({ row: 0, col: 2 });
-    expect(result).toBe(false);
-    expect(board.lastError).toMatch(/pressure below 0/i);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/pressure below 0/i);
   });
 
   it('checkInitialStateErrors returns an error when pre-connected vacuum causes pressure < 0', () => {
     const board = makeVacuumBoard(5, -10); // pressure = 5 + (-10) = -5
     board.initHistory();
     const error = board.checkInitialStateErrors();
-    expect(error).not.toBeNull();
-    expect(error).toMatch(/pressure below 0/i);
+    expect(error.error).not.toBeNull();
+    expect(error.error).toMatch(/pressure below 0/i);
   });
 
   it('checkInitialStateErrors returns null when initial pressure is valid', () => {
     const board = makeVacuumBoard(15, -5); // pressure = 15 + (-5) = 10 >= 0
     board.initHistory();
     const error = board.checkInitialStateErrors();
-    expect(error).toBeNull();
+    expect(error.error).toBeNull();
   });
 
   it('checkInitialStateErrors returns null when no vacuum tiles are present', () => {
@@ -4230,7 +4233,7 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
     board.sourceCapacity = 10;
     board.initHistory();
     const error = board.checkInitialStateErrors();
-    expect(error).toBeNull();
+    expect(error.error).toBeNull();
   });
 });
 
@@ -4251,7 +4254,7 @@ describe('Chamber tile (hot_plate content)', () => {
     board.grid[0][0] = new Tile(PipeShape.Source,  0, true, cap, 0, null, 1, null, null, sourceTemp, 1);
     board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, mass, null, 1, null, 'hot_plate', temp);
     board.grid[0][2] = new Tile(PipeShape.Sink, 0, true);
-    board.frozen = frozenAmt;
+    (board as any)._turnState.frozen = frozenAmt;
     return board;
   }
 
@@ -4530,7 +4533,7 @@ describe('Chamber tile (hot_plate content)', () => {
 
     // Reclaim (1,0): Heater disconnects; HotPlate remains connected via (0,1) pipe.
     const result = board.reclaimTile({ row: 1, col: 0 });
-    expect(result).toBe(true);
+    expect(result.success).toBe(true);
 
     board.applyTurnDelta();
     board.recordMove();
@@ -4561,19 +4564,19 @@ describe('Cement tile constraints', () => {
   it('allows placing a pipe on a cement cell and decrements Drying Time when T > 0', () => {
     const board = makeCementBoard(3);
     const placed = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(placed).toBe(true);
+    expect(placed.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.cementData.get('0,1')).toBe(2);
-    expect(board.lastCementDecrement).toEqual({ row: 0, col: 1 });
+    expect(placed.cementDecrement).toEqual({ row: 0, col: 1 });
   });
 
   it('allows placing a pipe on a cement cell when T = 0 (no decrement)', () => {
     const board = makeCementBoard(0);
     const placed = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(placed).toBe(true);
+    expect(placed.success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
     expect(board.cementData.get('0,1')).toBe(0);
-    expect(board.lastCementDecrement).toBeNull();
+    expect(placed.cementDecrement).toBeUndefined();
   });
 
   it('blocks removal when Drying Time = 0 (hardened)', () => {
@@ -4581,8 +4584,8 @@ describe('Cement tile constraints', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();
     const removed = board.reclaimTile({ row: 0, col: 1 });
-    expect(removed).toBe(false);
-    expect(board.lastError).toContain('hardened cement');
+    expect(removed.success).toBe(false);
+    expect(removed.error).toContain('hardened cement');
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 
@@ -4591,8 +4594,8 @@ describe('Cement tile constraints', () => {
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.applyTurnDelta(); board.recordMove();
     const rotated = board.rotateTile({ row: 0, col: 1 });
-    expect(rotated).toBe(false);
-    expect(board.lastError).toContain('hardened cement');
+    expect(rotated.success).toBe(false);
+    expect(rotated.error).toContain('hardened cement');
   });
 
   it('allows removal when T > 0 without decrementing', () => {
@@ -4602,10 +4605,10 @@ describe('Cement tile constraints', () => {
     // Drying time decremented on place: 3 → 2
     expect(board.cementData.get('0,1')).toBe(2);
     const removed = board.reclaimTile({ row: 0, col: 1 });
-    expect(removed).toBe(true);
+    expect(removed.success).toBe(true);
     // No decrement on removal
     expect(board.cementData.get('0,1')).toBe(2);
-    expect(board.lastCementDecrement).toBeNull();
+    expect(removed.cementDecrement).toBeUndefined();
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
   });
 
@@ -4616,10 +4619,10 @@ describe('Cement tile constraints', () => {
     // Drying time decremented on place: 2 → 1
     expect(board.cementData.get('0,1')).toBe(1);
     const rotated = board.rotateTile({ row: 0, col: 1 });
-    expect(rotated).toBe(true);
+    expect(rotated.success).toBe(true);
     // Drying time decremented on rotate: 1 → 0
     expect(board.cementData.get('0,1')).toBe(0);
-    expect(board.lastCementDecrement).toEqual({ row: 0, col: 1 });
+    expect(rotated.cementDecrement).toEqual({ row: 0, col: 1 });
   });
 
   it('getCementDryingTime returns null for non-cement cell', () => {
@@ -4695,11 +4698,11 @@ describe('Leaky pipes', () => {
 
   it('leaky pipe can be placed and reclaimed like a regular pipe', () => {
     const board = makeLeakyBoard();
-    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90)).toBe(true);
+    expect(board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90).success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.LeakyStraight);
     board.applyTurnDelta(); board.recordMove();
 
-    expect(board.reclaimTile({ row: 0, col: 1 })).toBe(true);
+    expect(board.reclaimTile({ row: 0, col: 1 }).success).toBe(true);
     expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
     const inv = board.inventory.find((it) => it.shape === PipeShape.LeakyStraight);
     expect(inv?.count).toBe(3); // returned to inventory
@@ -4708,13 +4711,13 @@ describe('Leaky pipes', () => {
   it('newly placed leaky pipe only gets per-turn penalty on SUBSEQUENT turns, not the first', () => {
     const board = makeLeakyBoard();
     board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.LeakyStraight, 90);
-    board.applyTurnDelta(); board.recordMove();
+    const changes = board.applyTurnDelta(); board.recordMove();
 
     // Immediately after placement: no per-turn penalty, just the initial -1
     expect(board.leakyPermanentLoss).toBe(0);
     expect(board.getCurrentWater()).toBe(9); // 10 - 1 (initial)
     // lastLockedCostChanges should be empty (no per-turn change on first connect)
-    expect(board.lastLockedCostChanges).toHaveLength(0);
+    expect(changes).toHaveLength(0);
   });
 
   it('leaky pipe costs 1 additional water per subsequent turn it remains connected', () => {
@@ -4834,9 +4837,9 @@ describe('Leaky pipes', () => {
 
     // Turn 2: per-turn penalty → animation entry pushed
     board.rotateTile({ row: 0, col: 0 });
-    board.applyTurnDelta(); board.recordMove();
-    expect(board.lastLockedCostChanges).toHaveLength(1);
-    expect(board.lastLockedCostChanges[0]).toEqual({ row: 0, col: 1, delta: -1 });
+    const animChanges = board.applyTurnDelta(); board.recordMove();
+    expect(animChanges).toHaveLength(1);
+    expect(animChanges[0]).toEqual({ row: 0, col: 1, delta: -1 });
   });
 
   it('two leaky pipes each accrue their own per-turn penalty', () => {
