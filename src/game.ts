@@ -193,7 +193,10 @@ export class Game implements InputCallbacks {
 
   /**
    * Proxy giving tests direct access to the active floating label animations.
-   * @internal for testing only
+   * The underscore prefix is intentional – it signals that this getter exists
+   * solely for test backward compatibility and should not be used by production
+   * code outside of Game.
+   * @internal
    */
   get _animations() { return this._animMgr.animations; }
 
