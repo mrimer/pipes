@@ -1105,7 +1105,7 @@ describe('Game – fail move does not add undo snapshot', () => {
    */
   function stubBoardForWater(board: Board, waterValue: number): void {
     jest.spyOn(board, 'getCurrentWater').mockReturnValue(waterValue);
-    jest.spyOn(board, 'applyTurnDelta').mockImplementation(() => {});
+    jest.spyOn(board, 'applyTurnDelta').mockImplementation(() => []);
     jest.spyOn(board, 'isSolved').mockReturnValue(false);
   }
 
@@ -1139,7 +1139,7 @@ describe('Game – fail move does not add undo snapshot', () => {
 
     // Water is positive → no fail
     jest.spyOn(board, 'getCurrentWater').mockReturnValue(5);
-    jest.spyOn(board, 'applyTurnDelta').mockImplementation(() => {});
+    jest.spyOn(board, 'applyTurnDelta').mockImplementation(() => []);
     jest.spyOn(board, 'isSolved').mockReturnValue(false);
 
     const hooks = gameHooks(game);
