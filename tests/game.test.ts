@@ -296,7 +296,6 @@ describe('Game – undoWinningMove', () => {
 type GameTestHooks = {
   selectedShape: PipeShape | null;
   pendingRotation: number;
-  lastPlacedRotations: Map<PipeShape, number>;
   focusPos: { row: number; col: number };
   completedLevels: Set<number>;
   resetConfirmModalEl: HTMLElement;
@@ -312,20 +311,23 @@ type GameTestHooks = {
   _playtestExitCallback: (() => void) | null;
   _activeCampaign: unknown;
   _activeCampaignProgress: Set<number>;
-  ctrlHeld: boolean;
-  shiftHeld: boolean;
-  mouseCanvasPos: { x: number; y: number } | null;
   tooltipEl: HTMLElement;
-  _handleKey(e: KeyboardEvent): void;
-  _handleCanvasClick(e: MouseEvent): void;
-  _handleCanvasRightClick(e: MouseEvent): void;
-  _handleCanvasWheel(e: WheelEvent): void;
-  _handleCanvasMouseDown(e: MouseEvent): void;
-  _handleCanvasMouseUp(e: MouseEvent): void;
-  _handleCanvasMouseMove(e: MouseEvent): void;
-  _handleDocKeyDown(e: KeyboardEvent): void;
-  _handleDocKeyUp(e: KeyboardEvent): void;
-  _handleInventoryClick(shape: PipeShape, count: number): void;
+  _input: {
+    handleInventoryClick(shape: PipeShape, count: number): void;
+    _handleKey(e: KeyboardEvent): void;
+    _handleCanvasClick(e: MouseEvent): void;
+    _handleCanvasRightClick(e: MouseEvent): void;
+    _handleCanvasWheel(e: WheelEvent): void;
+    _handleCanvasMouseDown(e: MouseEvent): void;
+    _handleCanvasMouseUp(e: MouseEvent): void;
+    _handleCanvasMouseMove(e: MouseEvent): void;
+    _handleDocKeyDown(e: KeyboardEvent): void;
+    _handleDocKeyUp(e: KeyboardEvent): void;
+    ctrlHeld: boolean;
+    shiftHeld: boolean;
+    mouseCanvasPos: { x: number; y: number } | null;
+    lastPlacedRotations: Map<PipeShape, number>;
+  };
   _markLevelCompleted(levelId: number): void;
   _renderLevelList(): void;
   _playtestLevel(level: LevelDef): void;
@@ -350,7 +352,7 @@ describe('Game – inventory selection kept when stock remains', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // 3 Straight pipes remain → selection should be kept
     expect(hooks.selectedShape).toBe(PipeShape.Straight);
@@ -366,7 +368,7 @@ describe('Game – inventory selection kept when stock remains', () => {
     hooks.selectedShape = PipeShape.Tee;
     hooks.focusPos = { row: 0, col: 1 };
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // 0 Tee pipes remain → selection should be cleared
     expect(hooks.selectedShape).toBeNull();
@@ -386,7 +388,7 @@ describe('Game – deselect when effective count drops to zero after reclaim', (
     // granting GoldStraight (effectiveCount: 0 base + 1 bonus = 1)
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Select GoldStraight – it is now available via the container bonus
     hooks.selectedShape = PipeShape.GoldStraight;
@@ -394,7 +396,7 @@ describe('Game – deselect when effective count drops to zero after reclaim', (
     // Right-click at (0,1) to reclaim the Straight; this disconnects the container,
     // so GoldStraight's effective count drops back to 0.
     // TILE_SIZE=64: col 1 → clientX 96, row 0 → clientY 32.
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     // GoldStraight effective count is now 0 → selection must be cleared
     expect(hooks.selectedShape).toBeNull();
@@ -412,7 +414,7 @@ describe('Game – inventory bar re-renders on tile rotation', () => {
     // a non-fixed tile to rotate.
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 1, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const renderSpy = jest.spyOn(game as unknown as { _renderInventoryBar(): void }, '_renderInventoryBar');
 
@@ -421,7 +423,7 @@ describe('Game – inventory bar re-renders on tile rotation', () => {
     hooks.focusPos = { row: 1, col: 0 };
 
     // Enter with no selected shape rotates the focused tile
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(renderSpy).toHaveBeenCalled();
   });
@@ -441,14 +443,14 @@ describe('Game – pendingRotation syncs when rotating a tile whose shape is sel
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Now select Straight again with pendingRotation=0 matching the placed tile.
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
 
     // TILE_SIZE=64: col 1 → clientX 96, row 0 → clientY 32.
-    hooks._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
 
     // The tile rotated from 0→90, so pendingRotation must follow.
     expect(hooks.pendingRotation).toBe(90);
@@ -464,14 +466,14 @@ describe('Game – pendingRotation syncs when rotating a tile whose shape is sel
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Now deselect the inventory item.
     hooks.selectedShape = null;
     hooks.pendingRotation = 0;
 
     // Click the placed Straight at (0,1) to rotate it (no inventory item selected).
-    hooks._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
 
     // pendingRotation must remain 0 (selectedShape is null, no sync).
     expect(hooks.pendingRotation).toBe(0);
@@ -483,8 +485,8 @@ describe('Game – pendingRotation syncs when rotating a tile whose shape is sel
 describe('Game – Shift key cycles to next available inventory item', () => {
   function pressShift(hooks: GameTestHooks): void {
     // Simulate a fresh keydown (shiftHeld starts false so the cycle fires).
-    hooks.shiftHeld = false;
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Shift' }));
+    hooks._input.shiftHeld = false;
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Shift' }));
   }
 
   it('selects the first available item when nothing is selected', () => {
@@ -531,7 +533,7 @@ describe('Game – Shift key cycles to next available inventory item', () => {
     // Exhaust Elbow by placing it (only ×1 available).
     hooks.selectedShape = PipeShape.Elbow;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
     // Elbow is now depleted; selection was auto-cleared.
     expect(hooks.selectedShape).toBeNull();
 
@@ -678,16 +680,16 @@ describe('Game – pending rotation', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Straight;
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(90);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(180);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(270);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
@@ -697,16 +699,16 @@ describe('Game – pending rotation', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Straight;
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
     expect(hooks.pendingRotation).toBe(270);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
     expect(hooks.pendingRotation).toBe(180);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
     expect(hooks.pendingRotation).toBe(90);
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
@@ -715,7 +717,7 @@ describe('Game – pending rotation', () => {
     game.startLevel(1);
     const hooks = gameHooks(game);
     hooks.selectedShape = null;
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
@@ -724,7 +726,7 @@ describe('Game – pending rotation', () => {
     game.startLevel(1);
     const hooks = gameHooks(game);
     hooks.selectedShape = null;
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
@@ -734,7 +736,7 @@ describe('Game – pending rotation', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Elbow;
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
     expect(hooks.pendingRotation).toBe(90);
   });
 
@@ -744,7 +746,7 @@ describe('Game – pending rotation', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Elbow;
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: -1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: -1 }));
     expect(hooks.pendingRotation).toBe(270);
   });
 
@@ -754,7 +756,7 @@ describe('Game – pending rotation', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = null;
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
     expect(hooks.pendingRotation).toBe(0);
   });
 
@@ -767,14 +769,14 @@ describe('Game – pending rotation', () => {
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Placed tile should have rotation 90
     const placedGame = game as unknown as { board: { grid: { rotation: number }[][] } };
     expect(placedGame.board.grid[0][1].rotation).toBe(90);
 
     // lastPlacedRotations should record 90 for Straight
-    expect(hooks.lastPlacedRotations.get(PipeShape.Straight)).toBe(90);
+    expect(hooks._input.lastPlacedRotations.get(PipeShape.Straight)).toBe(90);
   });
 
   it('restores lastPlacedRotations when re-selecting a shape', () => {
@@ -783,13 +785,13 @@ describe('Game – pending rotation', () => {
     const hooks = gameHooks(game);
 
     // Manually set a remembered rotation
-    hooks.lastPlacedRotations.set(PipeShape.Elbow, 180);
+    hooks._input.lastPlacedRotations.set(PipeShape.Elbow, 180);
 
     // Select Elbow from inventory (simulate what _handleInventoryClick does)
     hooks.selectedShape = null;
     // Use the inventory bar click mechanism by directly calling the method via hooks
-    (game as unknown as { _handleInventoryClick(s: PipeShape, n: number): void })
-      ._handleInventoryClick(PipeShape.Elbow, 2);
+    (game as unknown as { _input: { handleInventoryClick(s: PipeShape, n: number): void } })
+      ._input.handleInventoryClick(PipeShape.Elbow, 2);
 
     expect(hooks.selectedShape).toBe(PipeShape.Elbow);
     expect(hooks.pendingRotation).toBe(180);
@@ -851,7 +853,7 @@ describe('Game – undoLastMove', () => {
     // Place a tile at (0,1) – this is move S1 (successful, still playing)
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Verify tile was placed (board is now in state S1)
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
@@ -889,7 +891,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.pendingRotation = 0;       // N-S orientation
     hooks.focusPos = { row: 1, col: 0 };
 
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const waterAnims = hooks._animations.filter((a) => a.text === '-1💧');
     expect(waterAnims.length).toBeGreaterThanOrEqual(1);
@@ -909,7 +911,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 1, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations from step 1 so we can inspect only step 2 results
     hooks._animations.length = 0;
@@ -917,7 +919,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 2, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The Chamber-tank at (3,0) should now be newly connected → +5 animation
     const tankAnims = hooks._animations.filter((a) => a.text === '+5💧');
@@ -939,14 +941,14 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 1, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     hooks._animations.length = 0;
 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 2, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const tankAnims = hooks._animations.filter((a) => a.text === '+0💧');
     expect(tankAnims.length).toBeGreaterThanOrEqual(1);
@@ -967,7 +969,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90; // E-W
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const dirtAnims = hooks._animations.filter((a) => a.text === '-0💧');
     expect(dirtAnims.length).toBeGreaterThanOrEqual(1);
@@ -987,7 +989,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Tee;
     hooks.pendingRotation = 90; // E-S-W
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     hooks._animations.length = 0;
 
@@ -995,7 +997,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Tee;
     hooks.pendingRotation = 90; // E-S-W
     hooks.focusPos = { row: 0, col: 2 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const iceAnims = hooks._animations.filter((a) => a.text === '-0💧');
     expect(iceAnims.length).toBeGreaterThanOrEqual(1);
@@ -1011,7 +1013,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 1, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const animCountAfterFirstPlacement = hooks._animations.length;
 
@@ -1019,7 +1021,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     // No new tiles become connected, so no new animations should be created.
     hooks.selectedShape = null;
     hooks.focusPos = { row: 0, col: 0 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The animation list should not have grown (no new tiles entered the fill path)
     expect(hooks._animations.length).toBeLessThanOrEqual(animCountAfterFirstPlacement);
@@ -1123,7 +1125,7 @@ describe('Game – fail move does not add undo snapshot', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The move triggered GameOver, so no snapshot should have been added
     expect(boardAccess.gameState).toBe(GameState.GameOver);
@@ -1145,7 +1147,7 @@ describe('Game – fail move does not add undo snapshot', () => {
     const hooks = gameHooks(game);
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(boardAccess.gameState).toBe(GameState.Playing);
     expect(board.canUndo()).toBe(true);
@@ -1328,11 +1330,11 @@ describe('Game – auto-select reclaimed tile when no shape is selected', () => 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
     hooks.selectedShape = null;
 
     // Right-click at (0,1): TILE_SIZE=64 → col 1 → clientX 96, row 0 → clientY 32
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     expect(hooks.selectedShape).toBe(PipeShape.Straight);
   });
@@ -1346,10 +1348,10 @@ describe('Game – auto-select reclaimed tile when no shape is selected', () => 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
     hooks.selectedShape = null;
 
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     expect(hooks.pendingRotation).toBe(90);
   });
@@ -1363,13 +1365,13 @@ describe('Game – auto-select reclaimed tile when no shape is selected', () => 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Now select Elbow instead
     hooks.selectedShape = PipeShape.Elbow;
 
     // Right-click at (0,1) to reclaim the Straight
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     // Should still be Elbow, not Straight
     expect(hooks.selectedShape).toBe(PipeShape.Elbow);
@@ -1385,7 +1387,7 @@ describe('Game – inventory click on already-selected item', () => {
     const hooks = gameHooks(game);
 
     hooks.selectedShape = PipeShape.Straight;
-    hooks._handleInventoryClick(PipeShape.Straight, 4);
+    hooks._input.handleInventoryClick(PipeShape.Straight, 4);
 
     expect(hooks.selectedShape).toBeNull();
   });
@@ -1396,7 +1398,7 @@ describe('Game – inventory click on already-selected item', () => {
     const hooks = gameHooks(game);
 
     hooks.selectedShape = PipeShape.Straight;
-    hooks._handleInventoryClick(PipeShape.Elbow, 2);
+    hooks._input.handleInventoryClick(PipeShape.Elbow, 2);
 
     expect(hooks.selectedShape).toBe(PipeShape.Elbow);
   });
@@ -1413,10 +1415,10 @@ describe('Game – R key resets the level', () => {
     // Place a tile to dirty the board state
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const startLevelSpy = jest.spyOn(game, 'startLevel');
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
 
     expect(startLevelSpy).toHaveBeenCalledWith(1, expect.anything());
   });
@@ -1426,7 +1428,7 @@ describe('Game – R key resets the level', () => {
     game.startLevel(1);
 
     const startLevelSpy = jest.spyOn(game, 'startLevel');
-    gameHooks(game)._handleKey(new KeyboardEvent('keydown', { key: 'r' }));
+    gameHooks(game)._input._handleKey(new KeyboardEvent('keydown', { key: 'r' }));
 
     expect(startLevelSpy).toHaveBeenCalledWith(1, expect.anything());
   });
@@ -1441,7 +1443,7 @@ describe('Game – Escape key returns to level select', () => {
 
     const exitSpy = jest.spyOn(game, 'exitToMenu');
     const hooks = gameHooks(game);
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
 
     // Esc during active play now shows the confirm modal; exitToMenu is NOT called immediately.
     expect(exitSpy).not.toHaveBeenCalled();
@@ -1454,11 +1456,11 @@ describe('Game – Escape key returns to level select', () => {
 
     const hooks = gameHooks(game);
     // First Esc: show modal
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
 
     // Second Esc: hide modal
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(hooks._exitConfirmModalEl.style.display).toBe('none');
   });
 
@@ -1470,7 +1472,7 @@ describe('Game – Escape key returns to level select', () => {
     // Simulate opening the rules modal
     hooks._rulesModalEl.style.display = 'flex';
 
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(hooks._rulesModalEl.style.display).toBe('none');
   });
 
@@ -1481,7 +1483,7 @@ describe('Game – Escape key returns to level select', () => {
     const exitSpy = jest.spyOn(game, 'exitToMenu');
 
     hooks._rulesModalEl.style.display = 'flex';
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
 
     expect(exitSpy).not.toHaveBeenCalled();
     expect(hooks._rulesModalEl.style.display).toBe('none');
@@ -1531,11 +1533,11 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     const hooks = gameHooks(game);
 
     // Simulate mouse position on canvas
-    hooks.mouseCanvasPos = { x: 50, y: 50 };
+    hooks._input.mouseCanvasPos = { x: 50, y: 50 };
 
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
 
-    expect(hooks.ctrlHeld).toBe(true);
+    expect(hooks._input.ctrlHeld).toBe(true);
     expect(hooks.tooltipEl.style.display).toBe('block');
   });
 
@@ -1545,11 +1547,11 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     const hooks = gameHooks(game);
 
     hooks.gameState = GameState.Won;
-    hooks.mouseCanvasPos = { x: 50, y: 50 };
+    hooks._input.mouseCanvasPos = { x: 50, y: 50 };
 
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
 
-    expect(hooks.ctrlHeld).toBe(true);
+    expect(hooks._input.ctrlHeld).toBe(true);
     expect(hooks.tooltipEl.style.display).not.toBe('block');
   });
 
@@ -1559,11 +1561,11 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     const hooks = gameHooks(game);
 
     hooks.gameState = GameState.GameOver;
-    hooks.mouseCanvasPos = { x: 50, y: 50 };
+    hooks._input.mouseCanvasPos = { x: 50, y: 50 };
 
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
 
-    expect(hooks.ctrlHeld).toBe(true);
+    expect(hooks._input.ctrlHeld).toBe(true);
     expect(hooks.tooltipEl.style.display).not.toBe('block');
   });
 
@@ -1573,9 +1575,9 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     const hooks = gameHooks(game);
 
     hooks.gameState = GameState.Won;
-    hooks.ctrlHeld = true;
+    hooks._input.ctrlHeld = true;
 
-    hooks._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+    hooks._input._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
 
     expect(hooks.tooltipEl.style.display).not.toBe('block');
   });
@@ -1586,9 +1588,9 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     const hooks = gameHooks(game);
 
     hooks.gameState = GameState.GameOver;
-    hooks.ctrlHeld = true;
+    hooks._input.ctrlHeld = true;
 
-    hooks._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+    hooks._input._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
 
     expect(hooks.tooltipEl.style.display).not.toBe('block');
   });
@@ -1598,9 +1600,9 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     game.startLevel(1);
     const hooks = gameHooks(game);
 
-    hooks.ctrlHeld = true;
+    hooks._input.ctrlHeld = true;
 
-    hooks._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
+    hooks._input._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
 
     expect(hooks.tooltipEl.style.display).toBe('block');
   });
@@ -1618,14 +1620,14 @@ describe('Game – reclaimTile records a move in the undo history', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear the undo history snapshot from placement, then verify reclaim adds one
     const boardAccess = game as unknown as { board: Board };
     const historyLenAfterPlace = (boardAccess.board as unknown as { _history: unknown[] })._history.length;
 
     // Right-click at (0,1): TILE_SIZE=64 → col 1 clientX=96, row 0 clientY=32
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     const historyLenAfterReclaim = (boardAccess.board as unknown as { _history: unknown[] })._history.length;
     expect(historyLenAfterReclaim).toBe(historyLenAfterPlace + 1);
@@ -1642,11 +1644,11 @@ describe('Game – reclaimTile records a move in the undo history', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
 
     // Reclaim it via right-click
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Empty);
 
     // Undo the reclaim → tile should be back
@@ -1670,7 +1672,7 @@ describe('Game – contextmenu suppressed when game-over modal is showing', () =
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     const preventDefaultSpy = jest.spyOn(event, 'preventDefault');
 
-    hooks._handleCanvasRightClick(event);
+    hooks._input._handleCanvasRightClick(event);
 
     expect(preventDefaultSpy).toHaveBeenCalled();
   });
@@ -1688,13 +1690,13 @@ describe('Game – disconnection animations after reclaimTile', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations from placement
     hooks._animations.length = 0;
 
     // Reclaim it via right-click
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
@@ -1717,7 +1719,7 @@ describe('Game – disconnection animations after reclaimTile', () => {
     hooks._animations.length = 0;
 
     // Right-click at (row=2, col=1): clientX = col*TILE_SIZE+32 = 1*64+32=96, clientY = row*TILE_SIZE+32 = 2*64+32=160
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 160 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 160 }));
 
     // No animation since the pipe was not in the fill path
     expect(hooks._animations.filter((a) => a.text === '+1💧').length).toBe(0);
@@ -1736,13 +1738,13 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Place Straight E-W at (0,2) – extends the chain via (0,1)
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 2 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations from the placements above
     hooks._animations.length = 0;
@@ -1752,7 +1754,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Expect a "+1" disconnection animation for the now-disconnected pipe at (0,2)
     const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
@@ -1769,7 +1771,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations
     hooks._animations.length = 0;
@@ -1779,7 +1781,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The replaced position (0,1) was in the fill path before and is not after,
     // so a "+1" disconnection animation is shown for the old tile's water cost reversal.
@@ -1801,7 +1803,7 @@ describe('Game – performRedo spawns tile impact animations', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Undo the placement
     game.performUndo();
@@ -1826,17 +1828,17 @@ describe('Game – performRedo spawns tile impact animations', () => {
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Place E-W Straight at (0,2) – extends the chain; also newly connected
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 90;
     hooks.focusPos = { row: 0, col: 2 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Reclaim the first pipe at (0,1) via right-click – disconnects both (0,1) and (0,2)
     // (0,1) center: clientX=96, clientY=32
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     // Undo the reclaim (restores the pipe at (0,1), reconnects (0,1) and (0,2))
     game.performUndo();
@@ -1865,10 +1867,10 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
     // Place a tile so there is something to undo
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const undoSpy = jest.spyOn(game, 'performUndo');
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
 
     expect(undoSpy).toHaveBeenCalled();
   });
@@ -1881,11 +1883,11 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
     // Place a tile, undo it, then redo via Ctrl-Y
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
     game.performUndo();
 
     const redoSpy = jest.spyOn(game, 'performRedo');
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'y', ctrlKey: true }));
 
     expect(redoSpy).toHaveBeenCalled();
   });
@@ -1895,7 +1897,7 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
     // game starts on level-select screen
     const hooks = gameHooks(game);
     const undoSpy = jest.spyOn(game, 'performUndo');
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true }));
     expect(undoSpy).not.toHaveBeenCalled();
   });
 });
@@ -1911,10 +1913,10 @@ describe('Game – Backspace key undo shortcut', () => {
     // Place a tile so there is something to undo
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     const undoSpy = jest.spyOn(game, 'performUndo');
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
 
     expect(undoSpy).toHaveBeenCalled();
   });
@@ -1927,12 +1929,12 @@ describe('Game – Backspace key undo shortcut', () => {
     // Place a tile to create undo history, then simulate game-over state
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
     hooks.gameState = 'GAME_OVER';
     gameoverModalEl.style.display = 'flex';
 
     const undoSpy = jest.spyOn(game, 'performUndo');
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
 
     expect(undoSpy).toHaveBeenCalled();
     expect(gameoverModalEl.style.display).toBe('none');
@@ -1943,7 +1945,7 @@ describe('Game – Backspace key undo shortcut', () => {
     // game starts on level-select screen
     const hooks = gameHooks(game);
     const undoSpy = jest.spyOn(game, 'performUndo');
-    hooks._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
     expect(undoSpy).not.toHaveBeenCalled();
   });
 });
@@ -2055,7 +2057,7 @@ describe('Game – retryLevel preserves undo history', () => {
     // Make a move so there is something to undo
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Sanity: undo button should be enabled after the move
     expect(undoBtn.disabled).toBe(false);
@@ -2077,7 +2079,7 @@ describe('Game – retryLevel preserves undo history', () => {
     // Place a Straight at (0,1) so the board differs from the initial state
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Capture the shape at (0,1) before restart (should be Straight)
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
@@ -2114,10 +2116,10 @@ describe('Game – retryLevel preserves undo history', () => {
     // Place a tile so there is pre-restart history
     hooks.selectedShape = PipeShape.Straight;
     hooks.focusPos = { row: 0, col: 1 };
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Press R to restart
-    hooks._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
 
     // Undo button should be enabled and pressing it restores pre-restart state
     expect(undoBtn.disabled).toBe(false);
@@ -2480,9 +2482,9 @@ describe('Game – spinner tile click with inventory selected', () => {
     const x = 96, y = 32;
 
     // Simulate the full left-click sequence (mousedown → mouseup → click).
-    hooks._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 0, clientX: x, clientY: y }));
-    hooks._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 0, clientX: x, clientY: y }));
-    hooks._handleCanvasClick(new MouseEvent('click', { clientX: x, clientY: y }));
+    hooks._input._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 0, clientX: x, clientY: y }));
+    hooks._input._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 0, clientX: x, clientY: y }));
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: x, clientY: y }));
 
     // The spinner should have rotated CW (90→180) – the click must NOT have been suppressed.
     expect(boardAccess.board.grid[0][1].rotation).toBe(180);
@@ -2504,8 +2506,8 @@ describe('Game – spinner tile right-click deselects inventory', () => {
     const x = 96, y = 32;
 
     // Simulate right-click on the spinner (mousedown button=2, mouseup button=2).
-    hooks._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 2, clientX: x, clientY: y }));
-    hooks._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 2, clientX: x, clientY: y }));
+    hooks._input._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 2, clientX: x, clientY: y }));
+    hooks._input._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 2, clientX: x, clientY: y }));
 
     // Inventory selection must be cleared.
     expect(hooks.selectedShape).toBeNull();
@@ -2521,7 +2523,7 @@ describe('Game – spinner tile right-click deselects inventory', () => {
     hooks.selectedShape = PipeShape.Straight;
 
     // Simulate a contextmenu event directly on the spinner tile (e.g. keyboard-triggered).
-    hooks._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
     expect(hooks.selectedShape).toBeNull();
   });
@@ -2541,9 +2543,9 @@ describe('Game – spinner tile wheel rotation', () => {
     // No inventory selected; hover over grid (row=0, col=1).
     // TILE_SIZE=64: col 1 → x=96, row 0 → y=32.
     hooks.selectedShape = null;
-    hooks.mouseCanvasPos = { x: 96, y: 32 };
+    hooks._input.mouseCanvasPos = { x: 96, y: 32 };
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
 
     expect(boardAccess.board.grid[0][1].rotation).toBe(180);
   });
@@ -2557,9 +2559,9 @@ describe('Game – spinner tile wheel rotation', () => {
     expect(boardAccess.board.grid[0][1].rotation).toBe(90);
 
     hooks.selectedShape = null;
-    hooks.mouseCanvasPos = { x: 96, y: 32 };
+    hooks._input.mouseCanvasPos = { x: 96, y: 32 };
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: -1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: -1 }));
 
     expect(boardAccess.board.grid[0][1].rotation).toBe(0);
   });
@@ -2572,9 +2574,9 @@ describe('Game – spinner tile wheel rotation', () => {
 
     hooks.selectedShape = null;
     // Hover over (row=0, col=0) which is the Source tile, not a spin pipe.
-    hooks.mouseCanvasPos = { x: 32, y: 32 };
+    hooks._input.mouseCanvasPos = { x: 32, y: 32 };
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
 
     // Spinner at (0,1) must be unchanged.
     expect(boardAccess.board.grid[0][1].rotation).toBe(90);
@@ -2589,9 +2591,9 @@ describe('Game – spinner tile wheel rotation', () => {
     // Select an inventory item and hover over the spinner.
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
-    hooks.mouseCanvasPos = { x: 96, y: 32 };
+    hooks._input.mouseCanvasPos = { x: 96, y: 32 };
 
-    hooks._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
+    hooks._input._handleCanvasWheel(new WheelEvent('wheel', { deltaY: 1 }));
 
     // The spinner should rotate, not the pending piece.
     expect(boardAccess.board.grid[0][1].rotation).toBe(180);
