@@ -14,9 +14,10 @@
 
 /**
  * Create a standard full-screen modal overlay element (hidden by default).
+ * Internal helper used by all builder functions in this module.
  * @param backgroundAlpha - Opacity of the dark backdrop (default 0.5).
  */
-export function createModalOverlay(backgroundAlpha = 0.5): HTMLDivElement {
+function createModalOverlay(backgroundAlpha = 0.5): HTMLDivElement {
   const el = document.createElement('div');
   el.style.cssText =
     `display:none;position:fixed;inset:0;background:rgba(0,0,0,${backgroundAlpha});` +
