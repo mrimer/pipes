@@ -1,9 +1,9 @@
-import { Board, MoveResult, PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, MoveResult, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Direction, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
-import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR, GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR } from './colors';
-import { TILE_SIZE, LINE_WIDTH, renderBoard, renderContainerFillAnims, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
+import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
+import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { renderLevelList } from './levelSelect';
 import { ChapterMapScreen } from './chapterMapScreen';
@@ -17,44 +17,16 @@ import {
   loadCompletedChapters, markChapterCompleted, clearCompletedChapters,
 } from './persistence';
 import { createGameRulesModal } from './rulesModal';
-import { TileAnimation, renderAnimations, animColor, ANIM_DURATION, ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR, ANIM_ITEM_COLOR, ANIM_ITEM_NEG_COLOR } from './visuals/tileAnimation';
 import { CampaignEditor } from './campaignEditor';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
-import {
-  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff, LeakySprayDrop,
-  spawnSourceSprayDrop, renderSourceSpray,
-  spawnDryPuff, renderDryPuffs,
-  spawnFlowDrop, renderFlowDrops,
-  spawnBubble, renderBubbles,
-  spawnLeakySprayDrop, renderLeakySpray,
-  computeFlowGoodDirs,
-} from './visuals/waterParticles';
-import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
-import { spawnRingEffect, clearRingEffects } from './visuals/ringEffect';
-import {
-  PipeRotationAnim, PipeFillAnim,
-  computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
-  renderFillAnims,
-  FILL_ANIM_DURATION, ROTATION_ANIM_DURATION,
-} from './visuals/pipeEffects';
+import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
 import {
   buildResetModal, buildNewChapterModal, buildChallengeModal,
   buildExitConfirmModal, buildUnplayableModal,
 } from './gameModals';
+import { AnimationManager, AnimSparkleCallbacks } from './animationManager';
 
-/** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
-const DRY_PUFF_SPAWN_INTERVAL_MS = 200;
-/** How often (ms) to spawn a water-spray drop from the source during normal play. */
-const SPRAY_SPAWN_INTERVAL_MS = 150;
-/** How often (ms) to spawn a fizzing bubble particle inside connected pipes. */
-const BUBBLE_SPAWN_INTERVAL_MS = 90;
-/** How often (ms) to spawn a win-flow drop during the won state. */
-const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
-/** How often (ms) to spawn a vortex particle over a sink tile. */
-const VORTEX_SPAWN_INTERVAL_MS = 120;
-/** How often (ms) to spawn a leaky spray drop from connected leaky pipe tiles. */
-const LEAKY_SPRAY_SPAWN_INTERVAL_MS = 100;
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) before spawning star sparkles over the win modal star icon. */
@@ -216,60 +188,14 @@ export class Game implements InputCallbacks {
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
 
-  /** Active floating animation labels shown over the canvas. */
-  private _animations: TileAnimation[] = [];
-
-  /** Active pipe-rotation animations (tile spinning from old to new orientation). */
-  private _rotationAnims: PipeRotationAnim[] = [];
-
-  /** Active pipe-fill animations (water filling newly-connected tiles). */
-  private _fillAnims: PipeFillAnim[] = [];
-
-  /** Active source-spray water drops rendered over the source tile during play. */
-  private _sourceSprayDrops: SourceSprayDrop[] = [];
-
-  /** `performance.now()` of the last source spray drop spawn. */
-  private _lastSpraySpawn = 0;
-
-  /** Active dry-air puffs rendered over the source tile when the tank runs dry. */
-  private _dryPuffs: DryPuff[] = [];
-
-  /** Active win-flow water drops following connected pipes from source to sink. */
-  private _flowDrops: FlowDrop[] = [];
+  /** Manages all canvas-based visual effects (particles, fill/rotation animations, labels, rings). */
+  private readonly _animMgr: AnimationManager;
 
   /**
-   * Pre-computed "good" directions at each tile for the win-flow animation –
-   * only directions that lead towards the sink without entering dead-end branches.
-   * Computed once when the board is solved; cleared when leaving the Won state.
+   * Proxy giving tests direct access to the active floating label animations.
+   * @internal for testing only
    */
-  private _flowGoodDirs: Map<string, Set<Direction>> | null = null;
-
-  /**
-   * Maximum number of simultaneously live win-flow drops – set on win to
-   * ~5 drops per tile in the solution path.
-   */
-  private _flowMaxDrops = 25;
-
-  /** `performance.now()` of the last win-flow drop spawn. */
-  private _lastFlowSpawn = 0;
-
-  /** Active fizzing bubble particles rendered inside connected pipe tiles. */
-  private _bubbles: BubbleParticle[] = [];
-
-  /** `performance.now()` of the last bubble spawn. */
-  private _lastBubbleSpawn = 0;
-
-  /** Active leaky spray drops rendered over connected leaky pipe tiles. */
-  private _leakySprayDrops: LeakySprayDrop[] = [];
-
-  /** `performance.now()` of the last leaky spray drop spawn. */
-  private _lastLeakySpraySpawn = 0;
-
-  /** Active vortex particles rendered over the sink tile. */
-  private _vortexParticles: VortexParticle[] = [];
-
-  /** `performance.now()` of the last vortex particle spawn. */
-  private _lastVortexSpawn = 0;
+  get _animations() { return this._animMgr.animations; }
 
   /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
   private _pendingSparkleShapes: Set<PipeShape> = new Set();
@@ -397,6 +323,7 @@ export class Game implements InputCallbacks {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get 2D rendering context');
     this.ctx = ctx;
+    this._animMgr = new AnimationManager(canvas, ctx);
 
     this.levelSelectEl = levelSelectEl;
     this.levelListEl = levelListEl;
@@ -592,7 +519,7 @@ export class Game implements InputCallbacks {
     clearConfetti();
     clearStarSparkles();
     // Clear particle arrays so stale drops don't persist on the level-select screen.
-    this._clearAllParticles();
+    this._animMgr.clearAll();
     // Reset modal menu button labels in case they were changed for playtesting.
     this.winMenuBtnEl.textContent = 'Level Select';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
@@ -810,8 +737,8 @@ export class Game implements InputCallbacks {
     this._clearModalSparkle(this.gameoverModalEl);
     clearConfetti();
     clearStarSparkles();
-    clearRingEffects();
-    this._clearAllParticles();
+    this._animMgr.clearRings();
+    this._animMgr.clearAll();
     this._resetMetricBaselines();
   }
 
@@ -859,7 +786,7 @@ export class Game implements InputCallbacks {
     this._checkAndShowInitialError();
 
     if (isNewLevel) {
-      this._spawnLevelIntroRings();
+      this._animMgr.spawnLevelIntroRings(this.board);
     }
 
     // If the level starts already in a losing state, show the unplayable modal.
@@ -1029,6 +956,18 @@ export class Game implements InputCallbacks {
 
   // ─── Water display ────────────────────────────────────────────────────────
 
+  /**
+   * Build a callbacks object that wires CSS-based inventory sparkle side effects
+   * into the AnimationManager's spawn methods.
+   */
+  private _sparkleCallbacks(): AnimSparkleCallbacks {
+    return {
+      positive: (shape) => this._pendingSparkleShapes.add(shape),
+      negative: (shape) => this._pendingRedSparkleShapes.add(shape),
+      zero: (shape) => this._pendingGraySparkleShapes.add(shape),
+    };
+  }
+
   /** Reset metric-sparkle baselines so the next {@link _updateWaterDisplay} call treats all values as initial (no sparkles fired). */
   private _resetMetricBaselines(): void {
     this._prevWater = null;
@@ -1109,131 +1048,9 @@ export class Game implements InputCallbacks {
   private _loop(): void {
     if (this.screen === GameScreen.Play) {
       this._renderBoard();
-      renderAnimations(this.ctx, this._animations, this.canvas.width);
-      this._tickSourceSpray();
-      this._tickBubbles();
-      this._tickLeakySpray();
-      this._tickWinFlow();
-      this._tickVortex();
+      this._animMgr.tick(this.board, this.gameState);
     }
     requestAnimationFrame(() => this._loop());
-  }
-
-  /** Spawn and render the source spray drops (runs every frame during play). */
-  private _tickSourceSpray(): void {
-    if (!this.board) return;
-    const now = performance.now();
-    const sx = this.board.source.col * TILE_SIZE + TILE_SIZE / 2;
-    const sy = this.board.source.row * TILE_SIZE + TILE_SIZE / 2;
-    if (this.gameState === GameState.GameOver) {
-      // Tank ran dry: show puffs of dry air bursting from the source.
-      if (now - this._lastSpraySpawn >= DRY_PUFF_SPAWN_INTERVAL_MS) {
-        spawnDryPuff(this._dryPuffs);
-        this._lastSpraySpawn = now;
-      }
-      renderDryPuffs(this.ctx, this._dryPuffs, sx, sy);
-    } else {
-      // Normal play: show water drops spraying from the source.
-      if (now - this._lastSpraySpawn >= SPRAY_SPAWN_INTERVAL_MS) {
-        spawnSourceSprayDrop(this._sourceSprayDrops);
-        this._lastSpraySpawn = now;
-      }
-      renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
-    }
-  }
-
-  /**
-   * Spawn and render fizzing bubble particles inside connected pipe tiles.
-   * Runs every frame during play to give a sense of liquid flowing in the pipes.
-   */
-  private _tickBubbles(): void {
-    if (!this.board) return;
-    const filledPositions = this.board.getFilledPositions();
-    // Only show bubbles when at least one regular pipe tile is in the fill path.
-    if (filledPositions.size <= 2) return; // source + sink only → nothing to show
-    const now = performance.now();
-    // Spawn a new bubble roughly every 90 ms (~11 per second).
-    if (now - this._lastBubbleSpawn >= BUBBLE_SPAWN_INTERVAL_MS) {
-      spawnBubble(this._bubbles, this.board, filledPositions);
-      this._lastBubbleSpawn = now;
-    }
-    renderBubbles(this.ctx, this._bubbles, WATER_COLOR);
-  }
-
-  /**
-   * Spawn and render water-droplet spray particles from connected leaky pipe tiles.
-   * Only runs during normal play (not game-over or won state) when at least one
-   * leaky pipe is connected to the source.
-   */
-  private _tickLeakySpray(): void {
-    if (!this.board || this.gameState !== GameState.Playing) return;
-    const filledPositions = this.board.getFilledPositions();
-    // Check if any leaky pipe is in the fill path.
-    const hasLeakyPipe = [...filledPositions].some((key) => {
-      const [r, c] = parseKey(key);
-      const tile = this.board?.grid[r]?.[c];
-      return tile !== undefined && LEAKY_PIPE_SHAPES.has(tile.shape);
-    });
-    if (!hasLeakyPipe) {
-      this._leakySprayDrops = [];
-      return;
-    }
-    const now = performance.now();
-    if (now - this._lastLeakySpraySpawn >= LEAKY_SPRAY_SPAWN_INTERVAL_MS) {
-      spawnLeakySprayDrop(this._leakySprayDrops, this.board, filledPositions);
-      this._lastLeakySpraySpawn = now;
-    }
-    renderLeakySpray(this.ctx, this._leakySprayDrops, WATER_COLOR);
-  }
-
-  /** Spawn and render the win-flow drops (only active in the Won state). */
-  private _tickWinFlow(): void {
-    if (this.gameState !== GameState.Won || !this.board || !this._flowGoodDirs) return;
-    const now = performance.now();
-    // Spawn a new drop roughly every 70 ms to maintain ~5 drops per tile at steady state.
-    if (now - this._lastFlowSpawn >= WIN_FLOW_SPAWN_INTERVAL_MS) {
-      spawnFlowDrop(this._flowDrops, this.board, this._flowGoodDirs, this._flowMaxDrops);
-      this._lastFlowSpawn = now;
-    }
-    renderFlowDrops(this.ctx, this._flowDrops, this.board, WATER_COLOR, this._flowGoodDirs);
-  }
-
-  /**
-   * Spawn and render the spinning vortex particle effect over the sink tile.
-   * Runs every frame during play to give a visual cue that water flows into
-   * the sink.  Uses the sink tile's current color (filled vs unfilled).
-   */
-  private _tickVortex(): void {
-    if (!this.board) return;
-    const { sink } = this.board;
-    const sinkCx = sink.col * TILE_SIZE + TILE_SIZE / 2;
-    const sinkCy = sink.row * TILE_SIZE + TILE_SIZE / 2;
-    const isSinkFilled = this.board.isSolved();
-    const color = isSinkFilled ? SINK_WATER_COLOR : SINK_COLOR;
-    const now = performance.now();
-    if (now - this._lastVortexSpawn >= VORTEX_SPAWN_INTERVAL_MS) {
-      spawnVortexParticle(this._vortexParticles);
-      this._lastVortexSpawn = now;
-    }
-    renderVortex(this.ctx, this._vortexParticles, sinkCx, sinkCy, color);
-  }
-
-  /**
-   * Spawn the level-intro shrinking ring effects: first on the source tile,
-   * then (after the source ring completes) on the sink tile.  Called once
-   * when a new level is started for the first time (not on restart).
-   */
-  private _spawnLevelIntroRings(): void {
-    if (!this.board) return;
-    const { source, sink, cols, rows } = this.board;
-    const canvas = this.canvas;
-
-    const spawnSinkRing = () => {
-      if (!this.board) return;
-      spawnRingEffect(canvas, sink.col, sink.row, cols, rows, SINK_COLOR);
-    };
-
-    spawnRingEffect(canvas, source.col, source.row, cols, rows, SOURCE_COLOR, spawnSinkRing);
   }
 
   private _renderBoard(): void {
@@ -1243,8 +1060,8 @@ export class Game implements InputCallbacks {
     const currentPressure = this.board.getCurrentPressure();
 
     // Build per-frame animation overrides for the renderer.
-    const rotationOverrides = computeRotationOverrides(this._rotationAnims, now);
-    const fillExclude = computeActiveFillKeys(this._fillAnims, now);
+    const rotationOverrides = this._animMgr.getRotationOverrides(now);
+    const fillExclude = this._animMgr.getFillExclude(now);
 
     renderBoard(
       this.ctx,
@@ -1264,23 +1081,14 @@ export class Game implements InputCallbacks {
     );
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
-    if (this._fillAnims.length > 0) {
-      // Build a map of connections for each animating tile.
-      const tileConnectionsMap = new Map<string, Set<Direction>>();
-      for (const anim of this._fillAnims) {
-        const tile = this.board.getTile(anim);
-        if (tile) {
-          tileConnectionsMap.set(`${anim.row},${anim.col}`, tile.connections);
-        }
-      }
-      renderFillAnims(this.ctx, this._fillAnims, tileConnectionsMap, LINE_WIDTH, now);
-      // Draw container (Chamber) tile reveal animations: wipe from the entry edge
-      // to the opposite edge, showing the connected state progressively.
-      renderContainerFillAnims(
-        this.ctx, this.board, this._fillAnims,
-        this.board.getCurrentWater(), this._input.shiftHeld, currentTemp, currentPressure, now,
-      );
-    }
+    this._animMgr.renderFillEffects(
+      this.board,
+      this.board.getCurrentWater(),
+      this._input.shiftHeld,
+      currentTemp,
+      currentPressure,
+      now,
+    );
   }
 
   // ─── Win / game-over handling ─────────────────────────────────────────────
@@ -1402,10 +1210,7 @@ export class Game implements InputCallbacks {
   private _showWin(): void {
     if (!this.board || !this.currentLevel) return;
     this.gameState = GameState.Won;
-    this._flowGoodDirs = computeFlowGoodDirs(this.board);
-    // Scale max drops to ~5 per tile in the solution path (min 10).
-    const pathLength = this.board.getFilledPositions().size;
-    this._flowMaxDrops = Math.max(10, pathLength * 5);
+    this._animMgr.initWinFlow(this.board);
     const starsCollected = this.board.getStarsCollected();
     const waterRemaining = this.board.getCurrentWater();
     const isChallenge = !!this.currentLevel.challenge;
@@ -1460,23 +1265,6 @@ export class Game implements InputCallbacks {
   }
 
   /**
-   * Reset all per-level particle arrays to empty.
-   * Call whenever a new level begins or when returning to the level-select
-   * screen so stale particles from a previous session don't carry over.
-   */
-  private _clearAllParticles(): void {
-    this._sourceSprayDrops = [];
-    this._dryPuffs = [];
-    this._flowDrops = [];
-    this._bubbles = [];
-    this._leakySprayDrops = [];
-    this._vortexParticles = [];
-    this._flowGoodDirs = null;
-    this._rotationAnims = [];
-    this._fillAnims = [];
-  }
-
-  /**
    * Reclaims (removes) the tile at pos, records the move, and updates UI.
    * Shared by both single right-click and right-drag-erase.
    */
@@ -1489,12 +1277,13 @@ export class Game implements InputCallbacks {
     const filledBefore = this.board.getFilledPositions();
     const result = this.board.reclaimTile(pos);
     if (result.success) {
-      this._completeAnims();
+      this._animMgr.completeAnims();
       const changes = this.board.applyTurnDelta();
       this.board.recordMove();
-      this._spawnDisconnectionAnimations(filledBefore, tileBeforeReclaim, pos.row, pos.col);
-      this._spawnLockedCostChangeAnimations(changes);
-      this._spawnCementDecrementAnimation(result.cementDecrement);
+      const sparkle = this._sparkleCallbacks();
+      this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col);
+      this._animMgr.spawnLockedCostChangeAnimations(changes);
+      this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
         this.selectedShape = reclaimedShape;
@@ -1504,68 +1293,6 @@ export class Game implements InputCallbacks {
       this._checkWinLoseAfterMove();
     } else if (result.error) {
       this.handleBoardError(result);
-    }
-  }
-
-  /**
-   * Immediately complete any in-progress pipe rotation or fill animations,
-   * discarding all intermediate state.  Call this before processing a new
-   * player action so the board snaps to its final state before new animations
-   * are spawned.
-   */
-  private _completeAnims(): void {
-    this._rotationAnims = [];
-    this._fillAnims = [];
-  }
-
-  /**
-   * Spawn pipe-fill animations for all tiles that became newly connected since
-   * `filledBefore` was captured.  Tiles are animated in BFS order, each one
-   * starting after the previous tile's animation completes.
-   *
-   * @param startDelay - Extra milliseconds to wait before the first tile begins
-   *   filling.  Pass `ROTATION_ANIM_DURATION` when a rotation animation is
-   *   playing so the fill starts only after the rotation completes.
-   *
-   * Not called during undo/redo – those actions snap to the final state
-   * without playing visual animations.
-   */
-  private _spawnFillAnims(filledBefore: Set<string>, startDelay = 0): void {
-    if (!this.board) return;
-    const order = computeFillOrder(this.board, filledBefore);
-    if (order.length === 0) return;
-    const now = performance.now();
-    const sinkKey = posKey(this.board.sink.row, this.board.sink.col);
-    for (let i = 0; i < order.length; i++) {
-      const { row, col, entryDir, blockedDir, depth } = order[i];
-      const key = posKey(row, col);
-      const isSink = key === sinkKey;
-      // Resolve the water color that matches how this tile is drawn when filled.
-      const tile = this.board.getTile({ row, col });
-      // Container tiles (Source, Chamber) are included in the animation so their
-      // display is held at the pre-connected appearance (via fillExclude) until the
-      // water-flow wave reaches them.  No water overlay is drawn on top of them;
-      // they simply switch to their connected appearance once the entry expires.
-      const isContainer = tile !== null && !isSink &&
-        !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape) &&
-        !SPIN_PIPE_SHAPES.has(tile.shape) && !LEAKY_PIPE_SHAPES.has(tile.shape);
-      if (isContainer) {
-        this._fillAnims.push({
-          row, col, entryDir, blockedDir, isContainer: true,
-          startTime: now + startDelay + depth * FILL_ANIM_DURATION,
-        });
-        continue;
-      }
-      let waterColor: string | undefined;
-      if (tile) {
-        if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
-        else if (LEAKY_PIPE_SHAPES.has(tile.shape)) waterColor = LEAKY_PIPE_WATER_COLOR;
-        else if (SPIN_PIPE_SHAPES.has(tile.shape) || tile.isFixed) waterColor = FIXED_PIPE_WATER_COLOR;
-      }
-      this._fillAnims.push({
-        row, col, entryDir, blockedDir, isSink, waterColor,
-        startTime: now + startDelay + depth * FILL_ANIM_DURATION,
-      });
     }
   }
 
@@ -1585,29 +1312,27 @@ export class Game implements InputCallbacks {
     rotationInfo?: { row: number; col: number; oldRotation: number },
   ): void {
     if (!this.board) return;
-    this._completeAnims();
+    this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
     this.board.recordMove();
     let fillDelay = 0;
     if (rotationInfo) {
       const tile = this.board.getTile(rotationInfo);
       if (tile) {
-        this._rotationAnims.push({
-          row: rotationInfo.row,
-          col: rotationInfo.col,
-          oldRotation: rotationInfo.oldRotation,
-          newRotation: tile.rotation,
-          startTime: performance.now(),
-        });
+        this._animMgr.spawnRotationAnim(
+          rotationInfo.row, rotationInfo.col,
+          rotationInfo.oldRotation, tile.rotation,
+        );
         // Fill animations begin only after the rotation animation completes.
         fillDelay = ROTATION_ANIM_DURATION;
       }
     }
-    this._spawnConnectionAnimations(filledBefore);
-    this._spawnDisconnectionAnimations(filledBefore);
-    this._spawnFillAnims(filledBefore, fillDelay);
-    this._spawnLockedCostChangeAnimations(changes);
-    this._spawnCementDecrementAnimation(result.cementDecrement);
+    const sparkle = this._sparkleCallbacks();
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
+    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle);
+    this._animMgr.spawnFillAnims(this.board, filledBefore, fillDelay);
+    this._animMgr.spawnLockedCostChangeAnimations(changes);
+    this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
   }
 
 
@@ -1833,283 +1558,6 @@ export class Game implements InputCallbacks {
     }
   }
 
-  /**
-   * Compute and push floating animation label(s) for a single tile that has
-   * just entered (`dir === 'connect'`) or left (`dir === 'disconnect'`) the fill
-   * path.
-   *
-   * On connect the label shows the water impact of gaining this tile; on
-   * disconnect it shows the reversal (the mirror-image effect).  Multi-label
-   * tiles (hot-plate with both gain and loss) push their labels directly to
-   * `_animations` and leave `text` null so the outer push is skipped.
-   * Side effects: may add to `_pendingSparkleShapes` (item connect) or trigger
-   * star sparkle particles (star connect).
-   */
-  private _pushTileAnimLabels(
-    tile: Tile,
-    r: number,
-    c: number,
-    dir: 'connect' | 'disconnect',
-    currentTemp: number,
-    currentPressure: number,
-    now: number,
-  ): void {
-    if (!this.board) return;
-
-    // Lower-right quadrant (avoids drawing over the pipe image)
-    const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
-    const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
-
-    let text: string | null = null;
-    let color: string = dir === 'connect' ? ANIM_NEGATIVE_COLOR : ANIM_POSITIVE_COLOR;
-
-    if (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) {
-      // Each pipe costs 1 water when connected; removal returns it.
-      text = dir === 'connect' ? '-1💧' : '+1💧';
-      color = dir === 'connect' ? ANIM_NEGATIVE_COLOR : ANIM_POSITIVE_COLOR;
-    } else if (tile.shape === PipeShape.Chamber) {
-      if (tile.chamberContent === 'tank') {
-        // Tank adds capacity on connect, removes it on disconnect.
-        const val = dir === 'connect' ? tile.capacity : -tile.capacity;
-        text = val >= 0 ? `+${val}💧` : `${val}💧`;
-        color = animColor(val);
-      } else if (tile.chamberContent === 'dirt') {
-        // Dirt consumes water on connect; removal returns it.
-        const val = dir === 'connect' ? -tile.cost : tile.cost;
-        const prefix = val > 0 ? '+' : '';
-        text = val !== 0 ? `${prefix}${val}💧` : (dir === 'connect' ? '-0💧' : '+0💧');
-        color = animColor(val);
-      } else if (tile.chamberContent === 'item') {
-        if (dir === 'connect' && tile.itemShape !== null) {
-          const val = tile.itemCount;
-          text = val >= 0 ? `+${val}` : `${val}`;
-          if (val > 0) {
-            color = ANIM_ITEM_COLOR;
-            this._pendingSparkleShapes.add(tile.itemShape);
-          } else if (val < 0) {
-            color = ANIM_ITEM_NEG_COLOR;
-            this._pendingRedSparkleShapes.add(tile.itemShape);
-          } else {
-            color = ANIM_ZERO_COLOR;
-            this._pendingGraySparkleShapes.add(tile.itemShape);
-          }
-        }
-        // disconnect: items already granted; no reversal animation
-      } else if (tile.chamberContent === 'heater') {
-        // Heater raises temperature on connect, lowers it on disconnect.
-        const val = dir === 'connect' ? tile.temperature : -tile.temperature;
-        text = val >= 0 ? `+${val}°` : `${val}°`;
-        color = animColor(val);
-      } else if (tile.chamberContent === 'ice') {
-        const raw = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
-        ({ text, color } = this._formatWaterCostLabel(raw, dir));
-      } else if (tile.chamberContent === 'pump') {
-        // Pump raises pressure on connect, lowers it on disconnect.
-        const val = dir === 'connect' ? tile.pressure : -tile.pressure;
-        text = val >= 0 ? `+${val}P` : `${val}P`;
-        color = animColor(val);
-      } else if (tile.chamberContent === 'snow') {
-        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-        const raw = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
-        ({ text, color } = this._formatWaterCostLabel(raw, dir));
-      } else if (tile.chamberContent === 'sandstone') {
-        const { shatterOverride, costPerDeltaTemp } =
-          sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-        if (shatterOverride) {
-          text = dir === 'connect' ? '-0' : '+0';
-          color = ANIM_ZERO_COLOR;
-        } else {
-          const raw = costPerDeltaTemp * computeDeltaTemp(tile.temperature, currentTemp);
-          ({ text, color } = this._formatWaterCostLabel(raw, dir));
-        }
-      } else if (tile.chamberContent === 'hot_plate') {
-        ({ text, color } = this._pushHotPlateAnimLabels(tile, r, c, dir, currentTemp, cx, cy, now));
-      } else if (tile.chamberContent === 'star' && dir === 'connect') {
-        // Star tile connected – spawn golden sparkle burst from the tile center.
-        const starCx = c * TILE_SIZE + TILE_SIZE / 2;
-        const starCy = r * TILE_SIZE + TILE_SIZE / 2;
-        const canvasRect = this.canvas.getBoundingClientRect();
-        spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
-      }
-    }
-
-    if (text !== null) {
-      this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
-    }
-  }
-
-  /**
-   * Format the water-cost animation label for tiles (ice/snow/sandstone) whose
-   * cost is expressed as a raw positive number.  On connect the label is shown
-   * as a negative cost; on disconnect as a positive refund.
-   */
-  private _formatWaterCostLabel(raw: number, dir: 'connect' | 'disconnect'): { text: string; color: string } {
-    if (dir === 'connect') {
-      const val = -raw;
-      return { text: val < 0 ? `${val}💧` : '-0💧', color: val < 0 ? ANIM_NEGATIVE_COLOR : ANIM_ZERO_COLOR };
-    } else {
-      return { text: raw > 0 ? `+${raw}💧` : '+0💧', color: raw > 0 ? ANIM_POSITIVE_COLOR : ANIM_ZERO_COLOR };
-    }
-  }
-
-  /**
-   * Compute and push the animation label(s) for a hot-plate tile.
-   * Returns `{ text, color }` for a single-label result, or `{ text: null, color }` if
-   * two separate labels were pushed directly to `_animations` (dual gain+loss case).
-   */
-  private _pushHotPlateAnimLabels(
-    tile: Tile,
-    r: number,
-    c: number,
-    dir: 'connect' | 'disconnect',
-    currentTemp: number,
-    cx: number,
-    cy: number,
-    now: number,
-  ): { text: string | null; color: string } {
-    if (!this.board) return { text: null, color: ANIM_ZERO_COLOR };
-    if (dir === 'connect') {
-      // Use the locked values computed by applyTurnDelta.
-      const lockedImpact = this.board.getLockedWaterImpact({ row: r, col: c });
-      const lockedGain = this.board.getLockedHotPlateGain({ row: r, col: c });
-      if (lockedImpact !== null && lockedGain !== null) {
-        const loss = Math.max(0, lockedGain - lockedImpact);
-        if (lockedGain > 0 && loss > 0) {
-          // Both gain and loss: spawn two separate labels offset above/below.
-          this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${lockedGain}💧`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-          this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${loss}💧`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-          return { text: null, color: ANIM_ZERO_COLOR }; // outer push skipped
-        } else if (lockedGain > 0) {
-          return { text: `+${lockedGain}💧`, color: ANIM_POSITIVE_COLOR };
-        } else if (loss > 0) {
-          return { text: `-${loss}💧`, color: ANIM_NEGATIVE_COLOR };
-        } else {
-          return { text: '+0💧', color: ANIM_ZERO_COLOR };
-        }
-      }
-      return { text: null, color: ANIM_ZERO_COLOR };
-    } else {
-      // Disconnecting: reverse the hot plate's effects.
-      // gain (from frozen) is lost; water loss is recovered.
-      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-      const waterGain = Math.min(this.board.frozen, effectiveCost);
-      const waterLoss = Math.max(0, effectiveCost - waterGain);
-      if (waterLoss > 0 && waterGain > 0) {
-        this._animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}💧`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-        this._animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}💧`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });
-        return { text: null, color: ANIM_ZERO_COLOR }; // outer push skipped
-      } else if (waterLoss > 0) {
-        return { text: `+${waterLoss}💧`, color: ANIM_POSITIVE_COLOR };
-      } else if (waterGain > 0) {
-        return { text: `-${waterGain}💧`, color: ANIM_NEGATIVE_COLOR };
-      } else {
-        return { text: '-0💧', color: ANIM_ZERO_COLOR };
-      }
-    }
-  }
-
-  /**
-   * Spawn floating animation labels for all tiles that became newly connected to
-   * the fill path since `filledBefore` was captured.  Called after every player
-   * action that may change the fill state (place, replace, rotate, undo, redo).
-   */
-  private _spawnConnectionAnimations(filledBefore: Set<string>): void {
-    if (!this.board) return;
-    const filledAfter = this.board.getFilledPositions();
-    const now = performance.now();
-    const currentTemp = this.board.getCurrentTemperature(filledAfter);
-    const currentPressure = this.board.getCurrentPressure(filledAfter);
-
-    for (const key of filledAfter) {
-      if (filledBefore.has(key)) continue; // was already filled – skip
-      const [r, c] = parseKey(key);
-      const tile = this.board.grid[r]?.[c];
-      if (!tile) continue;
-      this._pushTileAnimLabels(tile, r, c, 'connect', currentTemp, currentPressure, now);
-    }
-  }
-
-  /**
-   * Spawn floating animation labels for tiles that have just **lost** their fill
-   * (present in `filledBefore`, absent after the action).  The label shows the
-   * reversal of each disconnected tile's water contribution.
-   *
-   * When called after a tile reclaim, `reclaimedTile` / `reclaimedRow` /
-   * `reclaimedCol` must be supplied because the reclaimed grid cell has already
-   * been replaced with an Empty tile by the time this method is called.
-   * When called after a rotation (where all tiles remain on the grid), these
-   * parameters may be omitted.
-   */
-  private _spawnDisconnectionAnimations(
-    filledBefore: Set<string>,
-    reclaimedTile?: Tile,
-    reclaimedRow?: number,
-    reclaimedCol?: number,
-  ): void {
-    if (!this.board) return;
-    const filledAfter = this.board.getFilledPositions();
-    const now = performance.now();
-    const currentTemp = this.board.getCurrentTemperature(filledAfter);
-    const currentPressure = this.board.getCurrentPressure(filledAfter);
-
-    for (const key of filledBefore) {
-      if (filledAfter.has(key)) continue; // still filled – skip
-      const [r, c] = parseKey(key);
-
-      // When a tile was reclaimed its cell is now Empty in the grid; use the
-      // captured tile data instead.  For rotation moves all tiles remain on the
-      // grid so we always fall through to the grid lookup.
-      const tile = (reclaimedRow !== undefined && reclaimedCol !== undefined &&
-                    r === reclaimedRow && c === reclaimedCol)
-        ? reclaimedTile
-        : this.board.grid[r]?.[c];
-      if (!tile) continue;
-      this._pushTileAnimLabels(tile, r, c, 'disconnect', currentTemp, currentPressure, now);
-    }
-  }
-
-  /**
-   * Spawn floating animation labels for tiles whose **locked** water impact
-   * changed because a beneficial tile (heater or pump) was disconnected and
-   * still-connected cost tiles were re-evaluated by {@link Board.applyTurnDelta}.
-   *
-   * The label shows the signed delta (newImpact − oldImpact): negative means
-   * the tile now costs more water (shown in red), positive means it costs less
-   * (shown in green).  This matches the appearance of the connection-time cost
-   * animations so players can immediately see what changed.
-   */
-  private _spawnLockedCostChangeAnimations(
-    changes: Array<{ row: number; col: number; delta: number }>,
-  ): void {
-    if (changes.length === 0) return;
-    const now = performance.now();
-
-    for (const { row: r, col: c, delta } of changes) {
-      const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
-      const cy = r * TILE_SIZE + TILE_SIZE * 3 / 4;
-      const text = delta > 0 ? `+${delta}💧` : `${delta}💧`;
-      const color = animColor(delta);
-      this._animations.push({ x: cx, y: cy, text, color, startTime: now, duration: ANIM_DURATION });
-    }
-  }
-
-  /**
-   * If the most recent board operation decremented a cement cell's setting time,
-   * spawn a floating gray "-1" animation above that cell.
-   */
-  private _spawnCementDecrementAnimation(cementDecrement?: GridPos): void {
-    if (!cementDecrement) return;
-    const { row: r, col: c } = cementDecrement;
-    const cx = c * TILE_SIZE + TILE_SIZE / 4;
-    const cy = r * TILE_SIZE + TILE_SIZE / 4;
-    this._animations.push({
-      x: cx, y: cy,
-      text: '-1',
-      color: ANIM_ZERO_COLOR,
-      startTime: performance.now(),
-      duration: ANIM_DURATION,
-    });
-  }
 
   /**
    * Deselects the current shape if the effective count of that shape
@@ -2181,14 +1629,15 @@ export class Game implements InputCallbacks {
     replacedCol?: number,
   ): void {
     if (!this.board) return;
-    this._completeAnims();
+    this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
     this.board.recordMove();
-    this._spawnConnectionAnimations(filledBefore);
-    this._spawnDisconnectionAnimations(filledBefore, replacedTile, replacedRow, replacedCol);
-    this._spawnFillAnims(filledBefore);
-    this._spawnLockedCostChangeAnimations(changes);
-    this._spawnCementDecrementAnimation(result.cementDecrement);
+    const sparkle = this._sparkleCallbacks();
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
+    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol);
+    this._animMgr.spawnFillAnims(this.board, filledBefore);
+    this._animMgr.spawnLockedCostChangeAnimations(changes);
+    this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._refreshPlayUI();
@@ -2448,14 +1897,11 @@ export class Game implements InputCallbacks {
     clearConfetti();
     clearStarSparkles();
     // Clear win-flow drops since we're no longer in a won state.
-    this._flowDrops = [];
-    this._bubbles = [];
-    this._vortexParticles = [];
-    this._flowGoodDirs = null;
+    this._animMgr.clearWinFlow();
     // Clear all fill animations (including the persistent sink entry) before
     // spawning fresh ones for the restored board state.
-    this._completeAnims();
-    this._spawnConnectionAnimations(filledBefore);
+    this._animMgr.completeAnims();
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._sparkleCallbacks());
     this._finalizeHistoryJump();
   }
 
@@ -2485,7 +1931,7 @@ export class Game implements InputCallbacks {
     } else if (!this.board.canUndo()) {
       return;
     }
-    this._completeAnims();
+    this._animMgr.completeAnims();
     const filledBefore = this.board.getFilledPositions();
     if (this.gameState === GameState.GameOver) {
       // discardLastMoveFromHistory() was already called when the fail was detected,
@@ -2497,7 +1943,7 @@ export class Game implements InputCallbacks {
     }
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);
-    this._spawnConnectionAnimations(filledBefore);
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._sparkleCallbacks());
     this._finalizeHistoryJump();
   }
 
@@ -2506,8 +1952,9 @@ export class Game implements InputCallbacks {
     if (!this.board || !this.board.canRedo()) return;
     const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
-    this._spawnConnectionAnimations(filledBefore);
-    this._spawnDisconnectionAnimations(filledBefore);
+    const sparkle = this._sparkleCallbacks();
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
+    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle);
     this._finalizeHistoryJump();
     this._checkWinLose();
   }
@@ -2591,7 +2038,7 @@ export class Game implements InputCallbacks {
     this.canvas.focus();
 
     this._checkAndShowInitialError();
-    this._spawnLevelIntroRings();
+    this._animMgr.spawnLevelIntroRings(this.board);
   }
 
   // ─── Undo / redo button state ─────────────────────────────────────────────
