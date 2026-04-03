@@ -2,9 +2,7 @@ import { Board, MoveResult } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
-import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
-import { renderInventoryBar } from './inventoryRenderer';
 import { loadCompletedLevels } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
@@ -16,20 +14,14 @@ import {
   buildResetModal,
   buildExitConfirmModal, buildUnplayableModal,
 } from './gameModals';
-import { AnimationManager, AnimSparkleCallbacks } from './animationManager';
+import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
+import { MetricsDisplay } from './metricsDisplay';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) before spawning star sparkles over the win modal star icon. */
 const MODAL_SPARKLE_DELAY_MS = 150;
-
-/** Sparkle color palette for metric increases (gold). */
-const METRIC_SPARKLE_GOLD: readonly string[] = ['#ffd700', '#ffe866', '#ffec8b', '#ffc200', '#fff0a0', '#f0c040'];
-/** Sparkle color palette for metric decreases (light blue). */
-const METRIC_SPARKLE_BLUE: readonly string[] = ['#add8e6', '#87ceeb', '#b0e0e6', '#e0f7ff', '#cce8ff', '#aed6f1'];
-/** Sparkle color palette for frozen metric decreases (red). */
-const METRIC_SPARKLE_RED:  readonly string[] = ['#ff4444', '#ff7777', '#ff9999', '#ff6666', '#ffaaaa', '#cc3333'];
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -94,22 +86,9 @@ export class Game implements InputCallbacks {
   private readonly levelListEl: HTMLElement;
   private readonly playScreenEl: HTMLElement;
   private readonly levelHeaderEl: HTMLElement;
-  private readonly inventoryBarEl: HTMLElement;
-  private readonly waterDisplayEl: HTMLElement;
   private readonly winModalEl: HTMLElement;
   private readonly gameoverModalEl: HTMLElement;
   private readonly gameoverMsgEl: HTMLElement;
-
-  /** Best score box element (shown below inventory when the level has been completed before). */
-  private readonly _bestScoreBoxEl: HTMLElement;
-  /** Water row inside the best score box. */
-  private readonly _bestScoreWaterRowEl: HTMLElement;
-  /** Value span for the best water score. */
-  private readonly _bestScoreWaterValueEl: HTMLElement;
-  /** Stars row inside the best score box (hidden when no stars). */
-  private readonly _bestScoreStarsRowEl: HTMLElement;
-  /** Value span for the best stars count. */
-  private readonly _bestScoreStarsValueEl: HTMLElement;
 
   /** Undo button in the play-screen HUD. */
   private readonly undoBtnEl: HTMLButtonElement;
@@ -194,46 +173,8 @@ export class Game implements InputCallbacks {
    */
   get tooltipEl() { return this._tooltip.el; }
 
-  /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
-  private _pendingSparkleShapes: Set<PipeShape> = new Set();
-
-  /** Shapes that should receive a red-sparkle CSS animation on the next inventory render (negative-count click). */
-  private _pendingRedSparkleShapes: Set<PipeShape> = new Set();
-
-  /** Shapes that should receive a gray-sparkle CSS animation on the next inventory render (zero net change). */
-  private _pendingGraySparkleShapes: Set<PipeShape> = new Set();
-
-  /** Element showing the current source temperature (shown for Chapter 2+ levels). */
-  private readonly tempDisplayEl: HTMLElement;
-
-  /** Element showing the total water frozen by ice blocks (shown when frozen > 0). */
-  private readonly frozenDisplayEl: HTMLElement;
-
-  /** Element showing the current game Pressure (shown when pressure-relevant tiles are present). */
-  private readonly pressureDisplayEl: HTMLElement;
-
-  /** Span holding the numeric value in the water stat row. */
-  private readonly waterValueEl: HTMLElement;
-
-  /** Span holding the numeric value in the temperature stat row. */
-  private readonly tempValueEl: HTMLElement;
-
-  /** Span holding the numeric value in the frozen stat row. */
-  private readonly frozenValueEl: HTMLElement;
-
-  /** Span holding the numeric value in the pressure stat row. */
-  private readonly pressureValueEl: HTMLElement;
-
-  /** Previous water count for metric sparkle detection (null before first display or after level reset). */
-  private _prevWater: number | null = null;
-  /** Previous temperature value for metric sparkle detection (null when row is hidden). */
-  private _prevTemp: number | null = null;
-  /** Previous frozen value for metric sparkle detection (null when row is hidden). */
-  private _prevFrozen: number | null = null;
-  /** Previous pressure value for metric sparkle detection (null when row is hidden). */
-  private _prevPressure: number | null = null;
-  /** When true, the next {@link _updateWaterDisplay} call skips all metric sparkles (used after undo/redo baseline reset). */
-  private _suppressNextMetricSparkles: boolean = false;
+  /** Manages the play-screen HUD metrics, inventory bar, and best-score box. */
+  private readonly _metrics: MetricsDisplay;
 
   /** Box shown beneath the grid with level notes (when the level has a note). */
   private readonly noteBoxEl: HTMLElement;
@@ -275,8 +216,6 @@ export class Game implements InputCallbacks {
     this.levelListEl = levelListEl;
     this.playScreenEl = playScreenEl;
     this.levelHeaderEl = levelHeaderEl;
-    this.inventoryBarEl = inventoryBarEl;
-    this.waterDisplayEl = waterDisplayEl;
     this.winModalEl = winModalEl;
     this.gameoverModalEl = gameoverModalEl;
     this.gameoverMsgEl = gameoverMsgEl;
@@ -296,33 +235,9 @@ export class Game implements InputCallbacks {
     // Create the tooltip manager for Ctrl+hover grid coordinates
     this._tooltip = TooltipManager.create();
 
-    // Grab the value span from the water stat row (its second child span)
-    this.waterValueEl = this.waterDisplayEl.querySelector('.stat-value') as HTMLElement;
-
-    // Create the frozen stat row (inserted into the stats box after water display)
-    ({ rowEl: this.frozenDisplayEl, valueEl: this.frozenValueEl } =
-      Game._createStatRow('❄️ Frozen', '#a8d8ea'));
-    this.waterDisplayEl.insertAdjacentElement('afterend', this.frozenDisplayEl);
-
-    // Create the temperature stat row (inserted into the stats box after frozen display)
-    ({ rowEl: this.tempDisplayEl, valueEl: this.tempValueEl } =
-      Game._createStatRow('🌡️ Temp °', '#74b9ff'));
-    this.frozenDisplayEl.insertAdjacentElement('afterend', this.tempDisplayEl);
-
-    // Create the pressure stat row (inserted into the stats box after temp display)
-    ({ rowEl: this.pressureDisplayEl, valueEl: this.pressureValueEl } =
-      Game._createStatRow('🔧 Pressure', '#a8e063'));
-    this.tempDisplayEl.insertAdjacentElement('afterend', this.pressureDisplayEl);
-
-    // Wire up the best-score box elements (the box itself is in the HTML; rows are created here)
-    this._bestScoreBoxEl = document.getElementById('best-score-box') as HTMLElement;
-    ({ rowEl: this._bestScoreWaterRowEl, valueEl: this._bestScoreWaterValueEl } =
-      Game._createStatRow('💧', '#4fc3f7'));
-    this._bestScoreBoxEl.appendChild(this._bestScoreWaterRowEl);
-    this._bestScoreWaterRowEl.style.display = 'flex';
-    ({ rowEl: this._bestScoreStarsRowEl, valueEl: this._bestScoreStarsValueEl } =
-      Game._createStatRow('⭐', '#f0c040'));
-    this._bestScoreBoxEl.appendChild(this._bestScoreStarsRowEl);
+    // Create the metrics display manager (HUD stats, inventory bar, best-score box)
+    const bestScoreBoxEl = document.getElementById('best-score-box') as HTMLElement;
+    this._metrics = new MetricsDisplay(waterDisplayEl, inventoryBarEl, bestScoreBoxEl);
 
     // Create the note box (appended to the play screen, shown beneath the grid)
     this.noteBoxEl = document.createElement('div');
@@ -396,49 +311,6 @@ export class Game implements InputCallbacks {
 
     this._showLevelSelect();
     this._loop();
-  }
-
-  // ─── Modal helpers ────────────────────────────────────────────────────────
-
-  /**
-   * Create a stats-box row element (hidden by default) with a label and value span.
-   * @param labelText - Emoji + text for the label span.
-   * @param color     - CSS color applied to the whole row.
-   * @returns `{ rowEl, valueEl }` – caller inserts `rowEl` and updates `valueEl`.
-   */
-  private static _createStatRow(labelText: string, color: string): { rowEl: HTMLDivElement; valueEl: HTMLElement } {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'stat-row';
-    rowEl.style.cssText = `display:none;color:${color};`;
-    const labelEl = document.createElement('span');
-    labelEl.className = 'stat-label';
-    labelEl.textContent = labelText;
-    const valueEl = document.createElement('span');
-    valueEl.className = 'stat-value';
-    rowEl.appendChild(labelEl);
-    rowEl.appendChild(valueEl);
-    return { rowEl, valueEl };
-  }
-
-  /**
-   * Show or hide a stats-box row based on whether a value is available.
-   * When `value` is not null, updates `valueEl.textContent` and sets `rowEl` to flex;
-   * when null, hides `rowEl`.
-   */
-  private static _showStatRow(rowEl: HTMLElement, valueEl: HTMLElement, value: number | null): void {
-    if (value !== null) {
-      valueEl.textContent = `${value}`;
-      rowEl.style.display = 'flex';
-    } else {
-      rowEl.style.display = 'none';
-    }
-  }
-
-  /** Spawn a small burst of sparkle particles centered on a HUD stat value element. */
-  private static _spawnMetricSparkles(rowEl: HTMLElement, colors: readonly string[]): void {
-    const valueEl = (rowEl.querySelector('.stat-value') as HTMLElement | null) ?? rowEl;
-    const rect = valueEl.getBoundingClientRect();
-    spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 16, colors);
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
@@ -534,7 +406,7 @@ export class Game implements InputCallbacks {
     clearStarSparkles();
     this._animMgr.clearRings();
     this._animMgr.clearAll();
-    this._resetMetricBaselines();
+    this._metrics.resetBaselines();
   }
 
   /**
@@ -575,7 +447,7 @@ export class Game implements InputCallbacks {
     this._campaign.updateLevelHeader(levelId);
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
-    this._updateBestScoreBox(levelId);
+    this._metrics.updateBestScore(levelId, this._campaign);
     this.canvas.focus();
 
     this._checkAndShowInitialError();
@@ -650,118 +522,15 @@ export class Game implements InputCallbacks {
 
   private _renderInventoryBar(): void {
     if (!this.board) return;
-    renderInventoryBar(
-      this.inventoryBarEl,
+    this._metrics.renderInventoryBar(
       this.board,
       this.selectedShape,
       (shape, count) => this._input.handleInventoryClick(shape, count),
       () => this._input.handleInventoryRightClick(),
     );
-    if (this._pendingSparkleShapes.size > 0) {
-      for (const shape of this._pendingSparkleShapes) {
-        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
-        if (el) {
-          el.classList.remove('sparkle');
-          void el.offsetWidth; // force reflow to restart the CSS animation
-          el.classList.add('sparkle');
-        }
-      }
-      this._pendingSparkleShapes.clear();
-    }
-    if (this._pendingRedSparkleShapes.size > 0) {
-      for (const shape of this._pendingRedSparkleShapes) {
-        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
-        if (el) {
-          el.classList.remove('sparkle-red');
-          void el.offsetWidth; // force reflow to restart the CSS animation
-          el.classList.add('sparkle-red');
-        }
-      }
-      this._pendingRedSparkleShapes.clear();
-    }
-    if (this._pendingGraySparkleShapes.size > 0) {
-      for (const shape of this._pendingGraySparkleShapes) {
-        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
-        if (el) {
-          el.classList.remove('sparkle-gray');
-          void el.offsetWidth; // force reflow to restart the CSS animation
-          el.classList.add('sparkle-gray');
-        }
-      }
-      this._pendingGraySparkleShapes.clear();
-    }
   }
 
   // ─── Water display ────────────────────────────────────────────────────────
-
-  /**
-   * Build a callbacks object that wires CSS-based inventory sparkle side effects
-   * into the AnimationManager's spawn methods.
-   */
-  private _sparkleCallbacks(): AnimSparkleCallbacks {
-    return {
-      positive: (shape) => this._pendingSparkleShapes.add(shape),
-      negative: (shape) => this._pendingRedSparkleShapes.add(shape),
-      zero: (shape) => this._pendingGraySparkleShapes.add(shape),
-    };
-  }
-
-  /** Reset metric-sparkle baselines so the next {@link _updateWaterDisplay} call treats all values as initial (no sparkles fired). */
-  private _resetMetricBaselines(): void {
-    this._prevWater = null;
-    this._prevTemp = null;
-    this._prevFrozen = null;
-    this._prevPressure = null;
-    this._suppressNextMetricSparkles = true;
-  }
-
-  private _updateWaterDisplay(): void {
-    if (!this.board) return;
-    const suppressSparkles = this._suppressNextMetricSparkles;
-    this._suppressNextMetricSparkles = false;
-
-    const w = this.board.getCurrentWater();
-    this.waterValueEl.textContent = `${w}`;
-    let waterColor: string;
-    if (w <= 0)      waterColor = LOW_WATER_COLOR;
-    else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
-    else             waterColor = WATER_COLOR;
-    this.waterDisplayEl.style.color = waterColor;
-    if (!suppressSparkles && this._prevWater !== null && w > this._prevWater) {
-      // Per design: water sparkles only on increase (water can't meaningfully "decrease" as a good event).
-      Game._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
-    }
-    this._prevWater = w;
-
-    const tempValue = this.board.hasTempRelevantTiles() ? this.board.getCurrentTemperature() : null;
-    Game._showStatRow(this.tempDisplayEl, this.tempValueEl, tempValue);
-    if (!suppressSparkles && tempValue !== null && this._prevTemp !== null) {
-      if (tempValue > this._prevTemp)      Game._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_GOLD);
-      else if (tempValue < this._prevTemp) Game._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_BLUE);
-    }
-    this._prevTemp = tempValue;
-
-    const frozenValue = this.board.frozen > 0 ? this.board.frozen : null;
-    Game._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
-    if (!suppressSparkles) {
-      if (frozenValue !== null && this._prevFrozen !== null) {
-        if (frozenValue > this._prevFrozen)      Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
-        else if (frozenValue < this._prevFrozen) Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
-      } else if (frozenValue !== null && this._prevFrozen === null) {
-        // Row just became visible (frozen increased from 0): show sparkle.
-        Game._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
-      }
-    }
-    this._prevFrozen = frozenValue;
-
-    const pressureValue = this.board.hasPressureRelevantTiles() ? this.board.getCurrentPressure() : null;
-    Game._showStatRow(this.pressureDisplayEl, this.pressureValueEl, pressureValue);
-    if (!suppressSparkles && pressureValue !== null && this._prevPressure !== null) {
-      if (pressureValue > this._prevPressure)      Game._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_GOLD);
-      else if (pressureValue < this._prevPressure) Game._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_BLUE);
-    }
-    this._prevPressure = pressureValue;
-  }
 
   /**
    * Refresh the three HUD elements that must stay in sync after every board mutation
@@ -777,7 +546,7 @@ export class Game implements InputCallbacks {
 
   private _refreshPlayUI(): void {
     this._renderInventoryBar();
-    this._updateWaterDisplay();
+    if (this.board) this._metrics.updateWaterDisplay(this.board);
     this._updateUndoRedoButtons();
   }
 
@@ -999,7 +768,7 @@ export class Game implements InputCallbacks {
       this._animMgr.completeAnims();
       const changes = this.board.applyTurnDelta();
       this.board.recordMove();
-      const sparkle = this._sparkleCallbacks();
+      const sparkle = this._metrics.sparkleCallbacks();
       this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col);
       this._animMgr.spawnLockedCostChangeAnimations(changes);
       this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
@@ -1046,7 +815,7 @@ export class Game implements InputCallbacks {
         fillDelay = ROTATION_ANIM_DURATION;
       }
     }
-    const sparkle = this._sparkleCallbacks();
+    const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnFillAnims(this.board, filledBefore, fillDelay);
@@ -1175,7 +944,7 @@ export class Game implements InputCallbacks {
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
     this.board.recordMove();
-    const sparkle = this._sparkleCallbacks();
+    const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol);
     this._animMgr.spawnFillAnims(this.board, filledBefore);
@@ -1243,7 +1012,7 @@ export class Game implements InputCallbacks {
 
   /** Flash a red "unavailable" sparkle on the given inventory item, then re-render. */
   flashInventoryItemError(shape: PipeShape): void {
-    this._pendingRedSparkleShapes.add(shape);
+    this._metrics.pendingRedSparkleShapes.add(shape);
     this._renderInventoryBar();
   }
 
@@ -1352,7 +1121,7 @@ export class Game implements InputCallbacks {
     // Clear all fill animations (including the persistent sink entry) before
     // spawning fresh ones for the restored board state.
     this._animMgr.completeAnims();
-    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._sparkleCallbacks());
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._metrics.sparkleCallbacks());
     this._finalizeHistoryJump();
   }
 
@@ -1363,7 +1132,7 @@ export class Game implements InputCallbacks {
    */
   private _finalizeHistoryJump(): void {
     this._deselectIfDepleted();
-    this._resetMetricBaselines();
+    this._metrics.resetBaselines();
     this._refreshPlayUI();
     this._renderBoard();
   }
@@ -1394,7 +1163,7 @@ export class Game implements InputCallbacks {
     }
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);
-    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._sparkleCallbacks());
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._metrics.sparkleCallbacks());
     this._finalizeHistoryJump();
   }
 
@@ -1403,7 +1172,7 @@ export class Game implements InputCallbacks {
     if (!this.board || !this.board.canRedo()) return;
     const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
-    const sparkle = this._sparkleCallbacks();
+    const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle);
     this._finalizeHistoryJump();
@@ -1461,7 +1230,7 @@ export class Game implements InputCallbacks {
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
-    this._bestScoreBoxEl.style.display = 'none';
+    this._metrics.hideBestScore();
     this.canvas.focus();
 
     this._checkAndShowInitialError();
@@ -1476,26 +1245,6 @@ export class Game implements InputCallbacks {
     const canRedo = !!(this.board?.canRedo());
     this.undoBtnEl.disabled = !canUndo;
     this.redoBtnEl.disabled = !canRedo;
-  }
-
-  // ─── Persistence helpers ──────────────────────────────────────────────────
-
-  /**
-   * Update the best-score box below the inventory bar.
-   * Shows the box when the level has been previously completed (has a best water score).
-   * Shows a stars row when at least one star has been obtained.
-   */
-  private _updateBestScoreBox(levelId: number): void {
-    const bestWater = this._campaign.loadBestWater(levelId);
-    if (bestWater === null) {
-      this._bestScoreBoxEl.style.display = 'none';
-      return;
-    }
-    this._bestScoreBoxEl.style.display = 'flex';
-    this._bestScoreWaterValueEl.textContent = `${bestWater}`;
-    const levelStars = this._campaign.loadBestStars();
-    const stars = levelStars[levelId] ?? 0;
-    Game._showStatRow(this._bestScoreStarsRowEl, this._bestScoreStarsValueEl, stars > 0 ? stars : null);
   }
 
   // ─── Campaign management delegates ────────────────────────────────────────
