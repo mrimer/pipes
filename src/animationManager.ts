@@ -32,7 +32,7 @@ import {
   computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
   renderFillAnims, FILL_ANIM_DURATION,
 } from './visuals/pipeEffects';
-import { spawnStarSparkles } from './visuals/starSparkle';
+import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;

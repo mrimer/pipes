@@ -7,6 +7,12 @@ interface StarSparkleParticle {
   vy: number;
   /** Half-size of the 4-point star shape in pixels. */
   size: number;
+  /**
+   * When set, the particle is a stationary twinkle: `size` is animated from 0
+   * up to `maxSize` and back to 0 over the particle's lifetime (a pulse).
+   * When undefined, the particle is a flying sparkle that fades out.
+   */
+  maxSize?: number;
   alpha: number;
   startTime: number;
   duration: number;
@@ -119,11 +125,18 @@ function _tick(timestamp: number): void {
       continue;
     }
     const progress = elapsed / p.duration;
-    p.alpha = 1 - progress;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-    // Slight upward drift for a magical float
-    p.vy -= 30 * dt;
+    if (p.maxSize !== undefined) {
+      // Twinkle mode: stationary, scale up then back down (sine pulse).
+      p.size = p.maxSize * Math.sin(progress * Math.PI);
+      p.alpha = 1;
+    } else {
+      // Sparkle mode: flying particle that fades out.
+      p.alpha = 1 - progress;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      // Slight upward drift for a magical float
+      p.vy -= 30 * dt;
+    }
     p.rotation += p.rotSpeed;
 
     const ctx = _ctx;
@@ -142,6 +155,43 @@ function _tick(timestamp: number): void {
   } else {
     _animId = null;
     _lastTickTime = null;
+  }
+}
+
+/**
+ * Spawn a single stationary twinkle star at the given viewport-pixel coordinates.
+ *
+ * The star scales up from nothing to full size and back to nothing over its
+ * brief lifetime (a pulse), optionally rotating.  Unlike {@link spawnStarSparkles},
+ * the particle does not move.
+ *
+ * @param x      Viewport X.
+ * @param y      Viewport Y.
+ * @param colors Optional array of CSS color strings to use instead of the default gold palette.
+ */
+export function spawnStarTwinkle(x: number, y: number, colors?: readonly string[]): void {
+  _ensureCanvas();
+  const palette = colors ?? SPARKLE_COLORS;
+  const now = performance.now();
+  const maxSize = 6 + Math.random() * 6;
+  const shouldRotate = Math.random() < 0.5;
+  _particles.push({
+    x,
+    y,
+    vx:        0,
+    vy:        0,
+    size:      0,
+    maxSize,
+    alpha:     1,
+    startTime: now,
+    duration:  400 + Math.random() * 300,
+    rotation:  Math.random() * Math.PI * 2,
+    rotSpeed:  shouldRotate ? (Math.random() - 0.5) * 0.15 : 0,
+    color:     palette[Math.floor(Math.random() * palette.length)],
+  });
+  if (_animId === null) {
+    _lastTickTime = null;
+    _animId = requestAnimationFrame(_tick);
   }
 }
 
