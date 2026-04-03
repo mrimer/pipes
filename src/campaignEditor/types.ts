@@ -261,6 +261,8 @@ export const EDITOR_PANEL_BASE_CSS =
   'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
 /** CSS for the all-caps section-title label inside an editor side-panel. */
 export const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
+/** CSS for a flex row that centers items and adds a small gap (used for label+input pairs). */
+export const EDITOR_FLEX_ROW_CSS = 'display:flex;align-items:center;gap:8px;';
 
 /**
  * Palette values that support paint-drag: clicking and dragging across multiple
