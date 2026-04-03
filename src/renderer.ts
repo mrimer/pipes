@@ -1100,8 +1100,8 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
  */
 function _drawChamberFrostHalo(ctx: CanvasRenderingContext2D, color: string, bw: number, bh: number, br: number): void {
   // Gradient radius: reach the box edge so the frost is most visible at the border.
-  const outerR = Math.min(bw, bh);
-  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerR);
+  const frostRadius = Math.min(bw, bh);
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, frostRadius);
   gradient.addColorStop(0,    color + '00'); // fully transparent at centre
   gradient.addColorStop(0.35, color + '00'); // stay clear in the inner area (cost number zone)
   gradient.addColorStop(1,    color + '40'); // ~25% opaque at the box edge (75% transparent)
