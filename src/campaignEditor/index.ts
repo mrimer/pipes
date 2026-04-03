@@ -51,9 +51,9 @@ import {
   PALETTE_ITEM_UNSELECTED_COLOR,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
-  REPEATABLE_EDITOR_TILES,
 } from './types';
 import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './renderer';
+import { EditorInputHandler } from './editorInputHandler';
 import { renderMinimap } from '../minimap';
 
 // ─── Chamber parameter descriptors ───────────────────────────────────────────
@@ -127,24 +127,8 @@ export class CampaignEditor {
   private _editorSourceErrorEl: HTMLDivElement | null = null;
   /** The outermost flex container of the level editor layout, used to measure available canvas space. */
   private _editorMainLayout: HTMLElement | null = null;
-  /** Drag state: set when the user is dragging a tile across the grid. */
-  private _dragState: {
-    startPos: { row: number; col: number };
-    tile: TileDef;
-    currentPos: { row: number; col: number };
-    moved: boolean;
-  } | null = null;
-  /** Bound window mouseup handler for drag completion; stored so it can be removed. */
-  private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
-  /** True while a paint-drag is active (repeatable palette, dragging over empty cells). */
-  private _paintDragActive = false;
-  /** True while a right-button erase-drag is active. */
-  private _rightEraseDragActive = false;
-  /**
-   * True when the right-drag gesture already handled removal, so the subsequent
-   * contextmenu event (if it fires) should be suppressed.
-   */
-  private _suppressNextContextMenu = false;
+  /** Canvas input handler: owns all gesture state and event listeners. */
+  private _editorInput: EditorInputHandler | null = null;
   /** Palette section expand flags (UI-only). */
   private _goldSectionExpanded = false;
   private _leakySectionExpanded = false;
@@ -792,6 +776,8 @@ export class CampaignEditor {
   // ─── Screen: Chapter detail ───────────────────────────────────────────────
 
   private _showChapterDetail(): void {
+    this._editorInput?.detach();
+    this._editorInput = null;
     this._screen = EditorScreen.Chapter;
     this._el.innerHTML = '';
 
@@ -952,6 +938,9 @@ export class CampaignEditor {
   }
 
   private _showLevelEditor(readOnly: boolean): void {
+    // Clean up any existing input handler before building a new one.
+    this._editorInput?.detach();
+    this._editorInput = null;
     this._screen = EditorScreen.LevelEditor;
     this._el.innerHTML = '';
 
@@ -1143,42 +1132,14 @@ export class CampaignEditor {
     if (ctx) this._editorCtx = ctx;
 
     if (!readOnly) {
-      canvas.addEventListener('mousedown',   (e) => this._onEditorMouseDown(e));
-      canvas.addEventListener('mousemove',   (e) => this._onEditorCanvasMouseMove(e));
-      canvas.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (this._suppressNextContextMenu) {
-          this._suppressNextContextMenu = false;
-          return;
-        }
-        this._onEditorCanvasRightClick(e);
+      this._editorInput = new EditorInputHandler(canvas, {
+        getState: () => this._state,
+        renderCanvas: () => this._renderEditorCanvas(),
+        refreshPaletteUI: () => this._refreshPaletteUI(),
+        updateUndoRedoButtons: () => this._updateEditorUndoRedoButtons(),
+        showSourceError: () => this._showSourceError(),
       });
-      canvas.addEventListener('mouseleave',  () => {
-        this._state.hover = null;
-        // Cancel any active drag when the mouse leaves the canvas.
-        if (this._dragState) {
-          this._dragState = null;
-        }
-        if (this._paintDragActive) {
-          this._paintDragActive = false;
-          this._state.recordSnapshot();
-          this._updateEditorUndoRedoButtons();
-        }
-        if (this._rightEraseDragActive) {
-          this._rightEraseDragActive = false;
-          this._state.recordSnapshot();
-          this._updateEditorUndoRedoButtons();
-        }
-        this._renderEditorCanvas();
-      });
-      canvas.addEventListener('wheel', (e) => this._onEditorCanvasWheel(e), { passive: false });
-      // Listen on window so mouseup is captured even when released outside the canvas.
-      // Remove any previous handler to avoid duplicates when the level editor is re-opened.
-      if (this._windowMouseUpHandler) {
-        window.removeEventListener('mouseup', this._windowMouseUpHandler);
-      }
-      this._windowMouseUpHandler = (e: MouseEvent) => this._onEditorMouseUp(e);
-      window.addEventListener('mouseup', this._windowMouseUpHandler);
+      this._editorInput.attach();
     }
 
     if (!readOnly) {
@@ -1994,16 +1955,9 @@ export class CampaignEditor {
     if (!ctx) return;
 
     let overlay: HoverOverlay | null = null;
-    let drag: DragState | null = null;
+    const drag: DragState | null = this._editorInput?.dragState ?? null;
 
-    if (this._dragState) {
-      // Show the dragged tile at its current position
-      drag = {
-        fromPos: this._dragState.startPos,
-        toPos: this._dragState.currentPos,
-        tile: this._dragState.tile,
-      };
-    } else if (this._state.hover) {
+    if (!drag && this._state.hover) {
       if (this._state.palette === 'erase') {
         const isEmptyCell = (this._state.grid[this._state.hover.row]?.[this._state.hover.col] ?? null) === null;
         overlay = { pos: this._state.hover, def: null, alpha: isEmptyCell ? 0.2 : 1 };
@@ -2027,222 +1981,20 @@ export class CampaignEditor {
     setTimeout(() => { el.style.display = 'none'; }, 2000);
   }
 
-  /**
-   * Places the current palette tile on the given grid cell.
-   */
-  private _paintEditorCell(pos: { row: number; col: number }): void {
-    this._state.grid[pos.row][pos.col] = this._state.buildTileDef();
-    // Only link tiles that have parameters beyond rotation (Source, Sink, Chamber).
-    if (this._state.paletteHasNonRotationParams()) {
-      this._state.linkTile(pos);
-    }
-  }
+  // ─── Backward-compat proxies for test access ──────────────────────────────
+  // Tests cast CampaignEditor to typed interfaces and call these methods directly.
+  // They delegate to _editorInput so that gesture logic stays in EditorInputHandler.
 
-  private _onEditorMouseDown(e: MouseEvent): void {
-    if (e.button === 2) {
-      const pos = this._canvasPos(e);
-      if (!pos) return;
-      // Start a right-button erase-drag: erase the first cell immediately.
-      this._rightEraseDragActive = true;
-      this._suppressNextContextMenu = false;
-      if (this._state.grid[pos.row][pos.col] !== null) {
-        this._state.grid[pos.row][pos.col] = null;
-        this._state.clearLinkAt(pos);
-        this._renderEditorCanvas();
-      }
-      return;
-    }
-    if (e.button !== 0) return; // left button only
-    const pos = this._canvasPos(e);
-    if (!pos) return;
-
-    const existingTile = this._state.grid[pos.row][pos.col];
-
-    // Repeatable tile on an empty cell: start a paint-drag session.
-    if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._state.palette)) {
-      this._paintDragActive = true;
-      this._paintEditorCell(pos);
-      this._renderEditorCanvas();
-      return;
-    }
-
-    if (existingTile !== null && this._state.palette !== 'erase') {
-      // Start a drag: track the tile but don't modify the grid yet
-      this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-      this._renderEditorCanvas();
-    } else {
-      // Guard: only one Source tile is allowed per level.
-      if (this._state.palette === PipeShape.Source && this._state.hasSourceElsewhere()) {
-        this._showSourceError();
-        return;
-      }
-      // Paint / erase immediately; snapshot recorded after the change so that
-      // the placed/erased tile is captured in the new history entry.
-      if (this._state.palette === 'erase') {
-        this._state.grid[pos.row][pos.col] = null;
-        // Clear the link if the erased tile was linked
-        this._state.clearLinkAt(pos);
-      } else {
-        this._state.grid[pos.row][pos.col] = this._state.buildTileDef();
-        // Only link the newly placed tile for live param editing if it has
-        // parameters beyond rotation (Source, Sink, Chamber).
-        if (this._state.paletteHasNonRotationParams()) {
-          this._state.linkTile(pos);
-        }
-      }
-      this._state.recordSnapshot();
-      this._updateEditorUndoRedoButtons();
-      this._renderEditorCanvas();
-    }
-  }
-
-  private _onEditorMouseUp(e: MouseEvent): void {
-    if (e.button === 2) {
-      if (!this._rightEraseDragActive) return;
-      // End right-erase-drag: record the undo snapshot now (PR #101 pattern).
-      this._rightEraseDragActive = false;
-      this._suppressNextContextMenu = true;
-      this._state.recordSnapshot();
-      this._updateEditorUndoRedoButtons();
-      this._renderEditorCanvas();
-      return;
-    }
-    if (e.button !== 0) return; // left button only
-
-    // End paint-drag session.
-    if (this._paintDragActive) {
-      this._paintDragActive = false;
-      this._state.recordSnapshot();
-      this._updateEditorUndoRedoButtons();
-      this._renderEditorCanvas();
-      return;
-    }
-
-    if (!this._dragState) return;
-
-    const { startPos, tile, currentPos, moved } = this._dragState;
-    this._dragState = null;
-
-    if (moved) {
-      // Commit the drag: move tile from startPos to currentPos; snapshot after.
-      this._state.grid[startPos.row][startPos.col] = null;
-      this._state.grid[currentPos.row][currentPos.col] = tile;
-      // Only link the moved tile if it has parameters beyond rotation.
-      if (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink || tile.shape === PipeShape.Chamber) {
-        this._state.linkTile(currentPos);
-      }
-      this._state.recordSnapshot();
-      this._updateEditorUndoRedoButtons();
-    } else {
-      // It was a click on a non-empty tile (no movement occurred)
-      if (e.ctrlKey) {
-        // Guard: only one Source tile is allowed per level.
-        if (this._state.palette === PipeShape.Source && this._state.hasSourceElsewhere(startPos)) {
-          this._showSourceError();
-          return;
-        }
-        // Ctrl+click: force-overwrite; snapshot recorded after the change.
-        if (this._state.palette === 'erase') {
-          this._state.grid[startPos.row][startPos.col] = null;
-          // Clear the link if the erased tile was linked
-          this._state.clearLinkAt(startPos);
-        } else {
-          this._state.grid[startPos.row][startPos.col] = this._state.buildTileDef();
-          // Only link the overwritten tile if it has parameters beyond rotation.
-          if (this._state.paletteHasNonRotationParams()) {
-            this._state.linkTile(startPos);
-          }
-        }
-        this._state.recordSnapshot();
-        this._updateEditorUndoRedoButtons();
-      } else if (
-        this._state.palette !== 'erase' &&
-        (
-          (PIPE_SHAPES.has(this._state.palette as PipeShape) && PIPE_SHAPES.has(tile.shape)) ||
-          (this._state.palette === PipeShape.OneWay && tile.shape === PipeShape.OneWay)
-        )
-      ) {
-        // Both palette and tile are pipe shapes: auto-replace; snapshot after.
-        this._state.grid[startPos.row][startPos.col] = this._state.buildTileDef();
-        // Only link if the new tile has parameters beyond rotation.
-        if (this._state.paletteHasNonRotationParams()) {
-          this._state.linkTile(startPos);
-        }
-        this._state.recordSnapshot();
-        this._updateEditorUndoRedoButtons();
-      } else {
-        // Select the clicked tile in the palette and populate Tile Params
-        this._state.selectTileFromDef(tile, startPos);
-        this._refreshPaletteUI();
-      }
-    }
-    this._renderEditorCanvas();
-  }
-
-  private _onEditorCanvasRightClick(e: MouseEvent): void {
-    const pos = this._canvasPos(e);
-    if (!pos) return;
-    this._state.recordSnapshot();
-    this._updateEditorUndoRedoButtons();
-    this._state.grid[pos.row][pos.col] = null;
-    // Clear the link if the erased tile was linked
-    this._state.clearLinkAt(pos);
-    this._renderEditorCanvas();
-  }
-
-  private _onEditorCanvasMouseMove(e: MouseEvent): void {
-    const pos = this._canvasPos(e);
-    this._state.hover = pos;
-
-    if (this._paintDragActive && pos) {
-      // Paint each new empty cell the cursor enters during a paint-drag.
-      if (this._state.grid[pos.row][pos.col] === null) {
-        this._paintEditorCell(pos);
-      }
-    } else if (this._rightEraseDragActive && pos) {
-      // Erase each non-empty cell the cursor enters during a right-erase-drag.
-      if (this._state.grid[pos.row][pos.col] !== null) {
-        this._state.grid[pos.row][pos.col] = null;
-        this._state.clearLinkAt(pos);
-      }
-    } else if (this._dragState && pos) {
-      const { startPos, currentPos } = this._dragState;
-      const atCurrent = pos.row === currentPos.row && pos.col === currentPos.col;
-      if (!atCurrent) {
-        if (pos.row === startPos.row && pos.col === startPos.col) {
-          // Moved back to start: cancel the move
-          this._dragState.currentPos = pos;
-          this._dragState.moved = false;
-        } else if (this._state.grid[pos.row][pos.col] === null) {
-          // Empty cell: move tile here
-          this._dragState.currentPos = pos;
-          this._dragState.moved = true;
-        }
-        // Non-empty cell (other than start): tile stays at currentPos
-      }
-    }
-
-    this._renderEditorCanvas();
-  }
-
-  // ─── Mouse wheel: rotate tile or connections ──────────────────────────────
-
-  private _onEditorCanvasWheel(e: WheelEvent): void {
-    e.preventDefault();
-    const clockwise = e.deltaY > 0;
-    this._state.rotatePalette(clockwise);
-
-    // Only write the rotation/connection change back to the linked tile when the
-    // cursor is hovering directly over it.  When the cursor is elsewhere the
-    // wheel only updates the pending-placement params (the ghost preview).
-    const hover = this._state.hover;
-    const linked = this._state.linkedTilePos;
-    if (linked && hover && hover.row === linked.row && hover.col === linked.col) {
-      this._state.applyParamsToLinkedTile();
-      this._updateEditorUndoRedoButtons();
-    }
-    this._refreshPaletteUI();
-    this._renderEditorCanvas();
+  private _onEditorMouseDown(e: MouseEvent): void { this._editorInput?._onMouseDown(e); }
+  private _onEditorMouseUp(e: MouseEvent): void { this._editorInput?._onMouseUp(e); }
+  private _onEditorCanvasMouseMove(e: MouseEvent): void { this._editorInput?._onMouseMove(e); }
+  private _onEditorCanvasWheel(e: WheelEvent): void { this._editorInput?._onWheel(e); }
+  private _onEditorCanvasRightClick(e: MouseEvent): void { this._editorInput?._onRightClick(e); }
+  private get _paintDragActive(): boolean { return this._editorInput?.paintDragActive ?? false; }
+  private get _rightEraseDragActive(): boolean { return this._editorInput?.rightEraseDragActive ?? false; }
+  private get _suppressNextContextMenu(): boolean { return this._editorInput?.suppressNextContextMenu ?? false; }
+  private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
+    return this._editorInput?._canvasPos(e) ?? null;
   }
 
   /** Rebuild and replace the palette and param panels in the DOM. */
@@ -2257,15 +2009,6 @@ export class CampaignEditor {
       newParam.id = 'editor-param-panel';
       paramPanel.replaceWith(newParam);
     }
-  }
-
-  private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
-    if (!this._editorCanvas) return null;
-    const rect = this._editorCanvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) * this._state.cols / rect.width);
-    const row = Math.floor((e.clientY - rect.top)  * this._state.rows / rect.height);
-    if (row < 0 || row >= this._state.rows || col < 0 || col >= this._state.cols) return null;
-    return { row, col };
   }
 
   /** Set the canvas CSS display size so the grid fills available space up to its intrinsic size.
