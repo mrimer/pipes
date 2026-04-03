@@ -18,6 +18,9 @@ export const METRIC_SPARKLE_RED:  readonly string[] = ['#ff4444', '#ff7777', '#f
 /**
  * Manages the play-screen HUD metric displays (water, temperature, frozen, pressure),
  * the best-score box, and the inventory bar (including pending CSS sparkle sets).
+ *
+ * Note: This class renders the inventory bar but does not manage inventory state;
+ * item counts and the active selection are maintained by the Board and Game classes.
  */
 export class MetricsDisplay {
   /** The water stat row element (always visible during play). */
@@ -187,6 +190,14 @@ export class MetricsDisplay {
 
   /**
    * Re-render the inventory bar with pending CSS sparkle effects applied.
+   * After calling {@link renderInventoryBar} from inventoryRenderer, applies and
+   * clears any pending sparkle CSS classes (gold, red, gray) on the matching
+   * inventory item elements.
+   *
+   * @param board - The active board (provides inventory counts and container bonuses).
+   * @param selectedShape - The pipe shape currently selected by the player, or null.
+   * @param onItemClick - Callback invoked when the player left-clicks an inventory item.
+   * @param onItemRightClick - Callback invoked when the player right-clicks an inventory item.
    */
   renderInventoryBar(
     board: Board,
@@ -236,9 +247,12 @@ export class MetricsDisplay {
     }
   }
 
-  /** Update the water/temp/frozen/pressure stat rows based on current board state. */
-  updateWaterDisplay(board: Board): void {
-    const suppressSparkles = this._suppressNextMetricSparkles;
+  /**
+   * Update all HUD metric stat rows (water, temperature, frozen, pressure) based on
+   * current board state. Spawns metric sparkles when values change (suppressed after
+   * undo/redo until {@link resetBaselines} is called).
+   */
+  updateWaterDisplay(board: Board): void {    const suppressSparkles = this._suppressNextMetricSparkles;
     this._suppressNextMetricSparkles = false;
 
     const w = board.getCurrentWater();
