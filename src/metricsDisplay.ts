@@ -1,6 +1,6 @@
 /** Metrics display component for the play-screen HUD stats and best-score box. */
 
-import { Board } from './board';
+import { Board, GOLD_PIPE_SHAPES } from './board';
 import { PipeShape } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { renderInventoryBar } from './inventoryRenderer';
@@ -88,6 +88,9 @@ export class MetricsDisplay {
 
   /** Shapes that should receive a gray-sparkle CSS animation on the next inventory render (zero net change). */
   readonly pendingGraySparkleShapes: Set<PipeShape> = new Set();
+
+  /** `performance.now()` after which the next golden-inventory-item twinkle may fire. */
+  private _nextInventoryTwinkle = 0;
 
   constructor(
     waterDisplayEl: HTMLElement,
@@ -319,5 +322,27 @@ export class MetricsDisplay {
   /** Hide the best-score box (called when starting a playtest level). */
   hideBestScore(): void {
     this._bestScoreBoxEl.style.display = 'none';
+  }
+
+  /**
+   * Occasionally spawn a small golden star sparkle over a random golden pipe
+   * item in the inventory bar whose effective count is greater than zero.
+   * Call this every animation frame while the play screen is active.
+   */
+  tickGoldenInventoryTwinkle(): void {
+    const now = performance.now();
+    if (now < this._nextInventoryTwinkle) return;
+    // Re-arm with a random interval of 3–7 s (offset from the board twinkle timer).
+    this._nextInventoryTwinkle = now + 3000 + Math.random() * 4000;
+
+    // Find all gold inventory items whose count is > 0.
+    const goldItems = Array.from(
+      this.inventoryBarEl.querySelectorAll<HTMLElement>('.inv-item.gold:not(.depleted):not(.negative)'),
+    );
+    if (goldItems.length === 0) return;
+
+    const el = goldItems[Math.floor(Math.random() * goldItems.length)];
+    const rect = el.getBoundingClientRect();
+    spawnStarSparkles(rect.left + Math.random() * rect.width, rect.top + Math.random() * rect.height, 5);
   }
 }

@@ -1420,7 +1420,7 @@ describe('Game – R key resets the level', () => {
     const startLevelSpy = jest.spyOn(game, 'startLevel');
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'R' }));
 
-    expect(startLevelSpy).toHaveBeenCalledWith(1, expect.anything());
+    expect(startLevelSpy).toHaveBeenCalledWith(1, expect.anything(), true);
   });
 
   it('also resets when lowercase r is pressed', () => {
@@ -1430,7 +1430,7 @@ describe('Game – R key resets the level', () => {
     const startLevelSpy = jest.spyOn(game, 'startLevel');
     gameHooks(game)._input._handleKey(new KeyboardEvent('keydown', { key: 'r' }));
 
-    expect(startLevelSpy).toHaveBeenCalledWith(1, expect.anything());
+    expect(startLevelSpy).toHaveBeenCalledWith(1, expect.anything(), true);
   });
 });
 
