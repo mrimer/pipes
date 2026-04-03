@@ -5,13 +5,11 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, AmbientDecorationType } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
-  GRANITE_COLOR, GRANITE_FILL_COLOR,
-  TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
   CHAMBER_FILL_COLOR,
   WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR,
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
@@ -413,64 +411,22 @@ function _drawChapterMapSink(
 /** Draw Granite tile like in-game. */
 function _drawChapterMapGranite(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   const CELL = TILE_SIZE;
-  const cx = x + CELL / 2;
-  const cy = y + CELL / 2;
-  const half = CELL / 2;
-  const bw = half * 0.7;
-  const bh = half * 0.7;
-
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.fillStyle = GRANITE_FILL_COLOR;
-  ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-  ctx.strokeStyle = GRANITE_COLOR;
-  ctx.lineWidth = _s(3);
-  ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
-  ctx.strokeStyle = GRANITE_COLOR;
-  ctx.lineWidth = _s(1.5);
-  ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawGranite(ctx, CELL / 2);
   ctx.restore();
 }
 
 /** Draw Tree tile like in-game. */
 function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number): void {
   const CELL = TILE_SIZE;
-  const cx = x + CELL / 2;
-  const cy = y + CELL / 2;
-  const half = CELL / 2;
-  const r = half * 0.75;
-
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.fillStyle = TREE_LEAF_COLOR;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-  const lobeR = r * 0.48;
-  const lobeOff = r * 0.52;
-  ctx.fillStyle = TREE_LEAF_ALT_COLOR;
-  for (let i = 0; i < 4; i++) {
-    const angle = (i * Math.PI) / 2;
-    ctx.beginPath(); ctx.arc(Math.cos(angle) * lobeOff, Math.sin(angle) * lobeOff, lobeR, 0, Math.PI * 2); ctx.fill();
-  }
-  const dLobeR = lobeR * 0.72;
-  const dLobeOff = lobeOff * 0.88;
-  ctx.fillStyle = TREE_LEAF_COLOR;
-  for (let i = 0; i < 4; i++) {
-    const angle = Math.PI / 4 + (i * Math.PI) / 2;
-    ctx.beginPath(); ctx.arc(Math.cos(angle) * dLobeOff, Math.sin(angle) * dLobeOff, dLobeR, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.fillStyle = TREE_TRUNK_COLOR;
-  ctx.beginPath(); ctx.arc(0, 0, half * 0.14, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = TREE_COLOR;
-  ctx.lineWidth = _s(2);
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawTree(ctx, CELL / 2);
   ctx.restore();
 }
 
