@@ -10,9 +10,10 @@
  */
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, TEMP_CHAMBER_CONTENTS } from '../types';
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, migrateCampaign, clearLevelStarRecord, clearLevelWaterRecord } from '../persistence';
+import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from '../persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
+import { CampaignService, ImportResult } from './campaignService';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
@@ -32,17 +33,11 @@ import {
   DEFAULT_PARAMS,
   EditorSnapshot,
   ValidationResult,
-  generateCampaignId,
   generateLevelId,
   isChamberPalette,
   chamberPaletteContent,
   ungzipBlob,
-  VALID_CAMPAIGN_KEYS,
-  VALID_CHAPTER_KEYS,
-  VALID_LEVEL_KEYS,
-  VALID_INVENTORY_ITEM_KEYS,
   getValidTileDefKeys,
-  getValidChapterMapTileDefKeys,
   MAX_EDITOR_CANVAS_PX,
   EDITOR_CANVAS_BORDER,
   GRID_MIN_DIM,
@@ -104,8 +99,17 @@ const CHAMBER_PARAM_DESCRIPTORS: Partial<Record<ChamberContent, ChamberParamDesc
 export class CampaignEditor {
   private readonly _el: HTMLElement;
 
-  /** All user-created / imported campaigns (not including Official). */
-  private _campaigns: CampaignDef[];
+  /** Service that owns all campaign/chapter/level data state and persistence. */
+  private _service: CampaignService;
+
+  /**
+   * Backward-compat accessor so that tests (which cast the editor to a plain
+   * object type) can still read `_campaigns` directly.  All editor code should
+   * use `_service.*` instead.
+   */
+  private get _campaigns(): readonly CampaignDef[] {
+    return this._service.campaigns;
+  }
 
   // ── Navigation state ──────────────────────────────────────────────────────
   private _screen: EditorScreen = EditorScreen.List;
@@ -180,7 +184,7 @@ export class CampaignEditor {
     this._onClose = onClose;
     this._onPlaytest = onPlaytest;
     this._onPlayCampaign = onPlayCampaign;
-    this._campaigns = loadImportedCampaigns();
+    this._service = new CampaignService();
 
     const chapterCallbacks: ChapterMapEditorCallbacks = {
       buildBtn: (l, bg, c, cb) => this._btn(l, bg, c, cb),
@@ -416,7 +420,7 @@ export class CampaignEditor {
 
   /** Set the campaign's lastUpdated timestamp to the current time. */
   private _touchCampaign(campaign: CampaignDef): void {
-    campaign.lastUpdated = new Date().toISOString();
+    this._service.touch(campaign);
   }
 
   /** Format an ISO timestamp for display, or return a fallback string if absent. */
@@ -586,7 +590,7 @@ export class CampaignEditor {
     content.appendChild(actionBar);
 
     // Campaign list
-    const allCampaigns: CampaignDef[] = [...this._campaigns];
+    const allCampaigns = this._service.getAllCampaigns();
     for (const campaign of allCampaigns) {
       content.appendChild(this._buildCampaignRow(campaign));
     }
@@ -661,7 +665,7 @@ export class CampaignEditor {
   // ─── Screen: Campaign detail ──────────────────────────────────────────────
 
   private _getActiveCampaign(): CampaignDef | null {
-    return this._campaigns.find((c) => c.id === this._activeCampaignId) ?? null;
+    return this._service.getCampaign(this._activeCampaignId ?? '');
   }
 
   private _showCampaignDetail(): void {
@@ -672,7 +676,7 @@ export class CampaignEditor {
     if (!campaign) { this._showCampaignList(); return; }
     const isOfficial = campaign.official === true;
     // Determine whether this is a user campaign that can have its official flag toggled
-    const isUserCampaign = this._campaigns.some((c) => c === campaign);
+    const isUserCampaign = this._service.campaigns.includes(campaign);
 
     const toolbar = this._buildToolbar(
       isOfficial ? `📋 ${campaign.name} (read-only)` : `✏️ Edit Campaign: ${campaign.name}`,
@@ -705,9 +709,7 @@ export class CampaignEditor {
       toggleLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
       toggleLbl.textContent = 'Dev – Official Campaign';
       toggleCb.addEventListener('change', () => {
-        campaign.official = toggleCb.checked ? true : undefined;
-        this._touchCampaign(campaign);
-        this._saveCampaigns();
+        this._service.updateCampaignField(campaign, 'official', toggleCb.checked);
         // Re-render to update read-only state
         this._showCampaignDetail();
       });
@@ -724,14 +726,10 @@ export class CampaignEditor {
         'display:flex;flex-direction:column;gap:10px;';
 
       fields.appendChild(this._labeledInput('Name', campaign.name, (v) => {
-        campaign.name = v;
-        this._touchCampaign(campaign);
-        this._saveCampaigns();
+        this._service.updateCampaignField(campaign, 'name', v);
       }));
       fields.appendChild(this._labeledInput('Author', campaign.author, (v) => {
-        campaign.author = v;
-        this._touchCampaign(campaign);
-        this._saveCampaigns();
+        this._service.updateCampaignField(campaign, 'author', v);
       }));
       content.appendChild(fields);
     }
@@ -793,9 +791,7 @@ export class CampaignEditor {
       this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail());
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
-          campaign.chapters.splice(chapterIdx, 1);
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
+          this._service.deleteChapter(campaign, chapterIdx);
           this._showCampaignDetail();
         }
       }));
@@ -836,9 +832,7 @@ export class CampaignEditor {
       nameWrap.style.cssText =
         'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:16px;';
       nameWrap.appendChild(this._labeledInput('Chapter Name', chapter.name, (v) => {
-        chapter.name = v;
-        this._touchCampaign(campaign);
-        this._saveCampaigns();
+        this._service.renameChapter(campaign, this._activeChapterIdx, v);
       }));
       content.appendChild(nameWrap);
     }
@@ -913,14 +907,7 @@ export class CampaignEditor {
 
     if (!readOnly) {
       btns.appendChild(this._btn('📋 Duplicate', '#16213e', '#aaa', () => {
-        const copy: LevelDef = {
-          ...JSON.parse(JSON.stringify(level)) as LevelDef,
-          id: generateLevelId(),
-          name: level.name + ' (copy)',
-        };
-        chapter.levels.splice(levelIdx + 1, 0, copy);
-        this._touchCampaign(campaign);
-        this._saveCampaigns();
+        this._service.duplicateLevel(campaign, chapterIdx, levelIdx);
         this._showChapterDetail();
       }));
 
@@ -937,9 +924,7 @@ export class CampaignEditor {
       });
       btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
         if (confirm(`Delete level "${level.name}"?`)) {
-          chapter.levels.splice(levelIdx, 1);
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
+          this._service.deleteLevel(campaign, chapterIdx, levelIdx);
           this._showChapterDetail();
         }
       }));
@@ -966,11 +951,10 @@ export class CampaignEditor {
         sel.addEventListener('change', () => {
           const targetIdx = parseInt(sel.value, 10);
           if (isNaN(targetIdx)) return;
-          const [movedLevel] = chapter.levels.splice(levelIdx, 1);
-          if (movedLevel === undefined) return;
-          campaign.chapters[targetIdx].levels.push(movedLevel);
-          this._touchCampaign(campaign);
-          this._saveCampaigns();
+          this._service.moveLevel(
+            campaign, chapterIdx, levelIdx,
+            targetIdx, campaign.chapters[targetIdx].levels.length,
+          );
           this._showChapterDetail();
         });
         btns.appendChild(sel);
@@ -2817,21 +2801,8 @@ export class CampaignEditor {
   // ─── Save level ────────────────────────────────────────────────────────────
 
   private _saveLevel(campaign: CampaignDef, chapterIdx: number, levelIdx: number): void {
-    const chapter = campaign.chapters[chapterIdx];
-    if (!chapter) return;
-
     const newLevel = this._buildCurrentLevelDef();
-    if (levelIdx >= 0 && levelIdx < chapter.levels.length) {
-      // Updating an existing level – clear any stored player progress for it so
-      // the player must replay the new version to record a new score.
-      clearLevelStarRecord(newLevel.id, campaign.id);
-      clearLevelWaterRecord(newLevel.id, campaign.id);
-      chapter.levels[levelIdx] = newLevel;
-    } else {
-      chapter.levels.push(newLevel);
-    }
-    this._touchCampaign(campaign);
-    this._saveCampaigns();
+    this._service.saveLevel(campaign, chapterIdx, levelIdx, newLevel);
     this._editorUnsavedChanges = false;
     this._editorSavedHistoryIdx = this._editorHistoryIdx;
 
@@ -2850,25 +2821,14 @@ export class CampaignEditor {
     const name = prompt('Campaign name:');
     if (!name?.trim()) return;
     const author = prompt('Author name:') ?? '';
-    const campaign: CampaignDef = {
-      id: generateCampaignId(),
-      name: name.trim(),
-      author: author.trim(),
-      chapters: [],
-      lastUpdated: new Date().toISOString(),
-    };
-    this._campaigns.push(campaign);
-    this._saveCampaigns();
+    this._service.createCampaign(name.trim(), author);
     this._showCampaignList();
   }
 
   private _addChapter(campaign: CampaignDef): void {
     const name = prompt('Chapter name:');
     if (!name?.trim()) return;
-    const newId = campaign.chapters.reduce((mx, ch) => Math.max(mx, ch.id), 0) + 1;
-    campaign.chapters.push({ id: newId, name: name.trim(), levels: [] });
-    this._touchCampaign(campaign);
-    this._saveCampaigns();
+    this._service.addChapter(campaign, name.trim());
     this._showCampaignDetail();
   }
 
@@ -2877,113 +2837,31 @@ export class CampaignEditor {
     if (!chapter) return;
     const name = prompt('Level name:', 'New Level');
     if (!name?.trim()) return;
-    // Default 6×6 empty grid
-    const grid: (TileDef | null)[][] = Array.from({ length: 6 }, () => Array(6).fill(null) as null[]);
-    const newLevel: LevelDef = {
-      id: generateLevelId(),
-      name: name.trim(),
-      rows: 6,
-      cols: 6,
-      grid,
-      inventory: [],
-    };
-    chapter.levels.push(newLevel);
-    this._touchCampaign(campaign);
-    this._saveCampaigns();
+    const newLevel = this._service.addLevel(campaign, chapterIdx, name.trim());
     // Open the level editor immediately
     this._activeLevelIdx = chapter.levels.length - 1;
     this._openLevelEditor(newLevel, false);
   }
 
   private _deleteCampaign(campaignId: string): void {
-    const campaign = this._campaigns.find((c) => c.id === campaignId);
+    const campaign = this._service.getCampaign(campaignId);
     if (!campaign) return;
     if (!confirm(`Delete campaign "${campaign.name}"? This cannot be undone.`)) return;
-    this._campaigns = this._campaigns.filter((c) => c.id !== campaignId);
-    this._saveCampaigns();
+    this._service.deleteCampaign(campaignId);
     this._showCampaignList();
   }
 
   // ─── Dev: Data validation ─────────────────────────────────────────────────
 
   /**
-   * Scan a campaign for unrecognized field names, optionally removing them
-   * in place (clean-up pass when dryRun is false).
-   *
-   * @param campaign  The campaign to scan (may be modified in place when dryRun is false).
-   * @param dryRun    When true, only tallies issues without modifying data.
-   * @returns Map from record-type label to a Map of { fieldName → occurrence count }.
+   * Delegate to {@link CampaignService.scanData} for backward compatibility.
+   * All validation logic lives in the service.
    */
   private _scanCampaignData(
     campaign: CampaignDef,
     dryRun: boolean,
   ): Map<string, Map<string, number>> {
-    const issues = new Map<string, Map<string, number>>();
-
-    const tally = (recordType: string, field: string): void => {
-      if (!issues.has(recordType)) issues.set(recordType, new Map());
-      const m = issues.get(recordType)!;
-      m.set(field, (m.get(field) ?? 0) + 1);
-    };
-
-    const checkKeys = (
-      obj: Record<string, unknown>,
-      validKeys: ReadonlySet<string>,
-      recordType: string,
-    ): void => {
-      for (const key of Object.keys(obj)) {
-        if (!validKeys.has(key)) {
-          tally(recordType, key);
-          if (!dryRun) delete obj[key];
-        }
-      }
-    };
-
-    // Campaign-level fields
-    checkKeys(campaign as unknown as Record<string, unknown>, VALID_CAMPAIGN_KEYS, 'Campaign');
-
-    for (const chapter of campaign.chapters) {
-      checkKeys(chapter as unknown as Record<string, unknown>, VALID_CHAPTER_KEYS, 'Chapter');
-
-      // Validate chapter map grid tiles if present
-      if (chapter.grid) {
-        for (const row of chapter.grid) {
-          for (const tile of row) {
-            if (!tile) continue;
-            checkKeys(
-              tile as unknown as Record<string, unknown>,
-              getValidChapterMapTileDefKeys(tile),
-              'ChapterMapTile',
-            );
-          }
-        }
-      }
-
-      for (const level of chapter.levels) {
-        checkKeys(level as unknown as Record<string, unknown>, VALID_LEVEL_KEYS, 'Level');
-
-        for (const row of level.grid) {
-          for (const tile of row) {
-            if (!tile) continue;
-            checkKeys(
-              tile as unknown as Record<string, unknown>,
-              getValidTileDefKeys(tile),
-              'Tile',
-            );
-          }
-        }
-
-        for (const item of level.inventory) {
-          checkKeys(
-            item as unknown as Record<string, unknown>,
-            VALID_INVENTORY_ITEM_KEYS,
-            'InventoryItem',
-          );
-        }
-      }
-    }
-
-    return issues;
+    return this._service.scanData(campaign, dryRun);
   }
 
   /**
@@ -3086,9 +2964,9 @@ export class CampaignEditor {
 
     if (totalIssues > 0 && !cleanupDone) {
       const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {
-        const cleanIssues = this._scanCampaignData(campaign, false);
-        this._touchCampaign(campaign);
-        this._saveCampaigns();
+        const cleanIssues = this._service.scanData(campaign, false);
+        this._service.touch(campaign);
+        this._service.save();
         this._renderValidateDataContent(overlay, campaign, cleanIssues, true);
       });
       btnRow.appendChild(cleanupBtn);
@@ -3119,10 +2997,7 @@ export class CampaignEditor {
   /** Export a campaign by triggering a JSON file download.
    *  Unrecognized fields are stripped from the output via a clean pass. */
   private _exportCampaign(campaign: CampaignDef): void {
-    // Deep-clone and strip any unrecognized fields before serializing.
-    const clean = JSON.parse(JSON.stringify(campaign)) as CampaignDef;
-    this._scanCampaignData(clean, false);
-    const json = JSON.stringify(clean, null, 2);
+    const json = this._service.exportToJson(campaign);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -3142,52 +3017,35 @@ export class CampaignEditor {
       if (!file) return;
       const isGzip = file.name.endsWith('.gz');
       const processText = (text: string) => {
+        let result: ImportResult;
         try {
-          const data = migrateCampaign(JSON.parse(text) as CampaignDef);
-          if (!data.id || !data.name || !Array.isArray(data.chapters)) {
-            alert('Invalid campaign file format.');
-            return;
-          }
-          // Ensure we don't clobber the official campaign
-          if (data.id === 'official') {
-            data.id = generateCampaignId();
-            alert(`Note: this file has the reserved "official" ID. A new unique ID has been assigned to the imported campaign.`);
-          }
-          // Clear the official flag on import to prevent imported campaigns from
-          // automatically gaining read-only/official status.
-          if (data.official) {
-            data.official = undefined;
-          }
-          // Check for a matching campaign ID in the local library.
-          const existingIdx = this._campaigns.findIndex((c) => c.id === data.id);
-          if (existingIdx !== -1) {
-            const existing = this._campaigns[existingIdx];
-            const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
-            const importedTime = data.lastUpdated ? new Date(data.lastUpdated).getTime() : 0;
-            if (existingTime === importedTime) {
-              // Same version: inform the user and cancel the import.
-              this._showImportSameVersionDialog(data.name, data.lastUpdated);
-              return;
-            }
-            const isNewer = importedTime > existingTime;
-            this._showImportVersionConflictDialog(data, existing, isNewer, () => {
-              // Replace the campaign record while retaining player progress (keyed by ID).
-              this._campaigns[existingIdx] = data;
-              this._saveCampaigns();
-              alert(`Campaign "${data.name}" imported successfully.`);
-              this.hide();
-              this._onPlayCampaign(data);
-            });
-            return;
-          }
-          this._campaigns.push(data);
-          this._saveCampaigns();
-          alert(`Campaign "${data.name}" imported successfully.`);
-          this.hide();
-          this._onPlayCampaign(data);
+          result = this._service.parseImport(text);
         } catch {
           alert('Failed to parse campaign file. Please check the format.');
+          return;
         }
+
+        if (result.conflict === 'same_version') {
+          this._showImportSameVersionDialog(result.campaign.name, result.campaign.lastUpdated);
+          return;
+        }
+
+        if (result.conflict === 'version_conflict') {
+          this._showImportVersionConflictDialog(result.campaign, result.existing!, result.isNewer!, () => {
+            // Replace the campaign record while retaining player progress (keyed by ID).
+            this._service.acceptImport(result);
+            alert(`Campaign "${result.campaign.name}" imported successfully.`);
+            this.hide();
+            this._onPlayCampaign(result.campaign);
+          });
+          return;
+        }
+
+        // No conflict – add the new campaign directly.
+        this._service.acceptImport(result);
+        alert(`Campaign "${result.campaign.name}" imported successfully.`);
+        this.hide();
+        this._onPlayCampaign(result.campaign);
       };
       if (isGzip) {
         ungzipBlob(file).then(processText).catch(() => {
@@ -3205,16 +3063,19 @@ export class CampaignEditor {
   // ─── Persistence ──────────────────────────────────────────────────────────
 
   private _saveCampaigns(): void {
-    saveImportedCampaigns(this._campaigns);
+    this._service.save();
   }
 
   /** Return all campaigns (user campaigns) for external use (e.g. campaign select screen). */
   getAllCampaigns(): CampaignDef[] {
-    return [...this._campaigns];
+    return this._service.getAllCampaigns();
   }
 
   /** Reload campaigns from storage (called after an import or external change). */
   reloadCampaigns(): void {
-    this._campaigns = loadImportedCampaigns();
+    this._service.reload();
   }
 }
+
+// ─── Re-exports from sub-modules ────────────────────────────────────────────
+export { CampaignService, ImportResult } from './campaignService';
