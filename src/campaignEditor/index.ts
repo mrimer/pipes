@@ -848,7 +848,7 @@ export class CampaignEditor {
     // Validate
     toolbar.appendChild(this._btn('✔ Validate', '#16213e', '#7ed321', () => {
       const levelDef = this._buildCurrentLevelDef();
-      const result = validateLevel(levelDef);
+      const result = this._validateLevel(levelDef);
       const icon = result.ok ? '✅' : '❌';
       alert(`${icon} Validation\n\n${result.messages.join('\n')}`);
     }));
@@ -856,7 +856,7 @@ export class CampaignEditor {
     // Playtest
     toolbar.appendChild(this._btn('▶ Playtest', '#16213e', '#f0c040', () => {
       const levelDef = this._buildCurrentLevelDef();
-      const result = validateLevel(levelDef);
+      const result = this._validateLevel(levelDef);
       if (!result.ok) {
         alert(`❌ Validation\n\n${result.messages.join('\n')}`);
         return;
@@ -1128,6 +1128,12 @@ export class CampaignEditor {
     this._state.slide(dir);
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
+  }
+
+  // ─── Validate level ────────────────────────────────────────────────────────
+
+  private _validateLevel(levelDef: LevelDef): { ok: boolean; messages: string[] } {
+    return validateLevel(levelDef);
   }
 
   // ─── Build LevelDef from editor state ────────────────────────────────────
