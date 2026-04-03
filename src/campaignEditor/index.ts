@@ -9,91 +9,38 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape, Direction, Rotation, TEMP_CHAMBER_CONTENTS } from '../types';
+import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape } from '../types';
 import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from '../persistence';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
 import { LevelEditorState } from './levelEditorState';
+import { TileParamsPanel } from './tileParamsPanel';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
 /** Gap (px) between flex columns in the main editor layout. */
 const EDITOR_LAYOUT_GAP = 16;
-/** CSS for a flex row that centers items and adds a small gap (used for label+input pairs). */
-const EDITOR_FLEX_ROW_CSS = 'display:flex;align-items:center;gap:8px;';
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
-import { Board, PIPE_SHAPES, SPIN_CEMENT_SHAPES, parseKey } from '../board';
+import { Board, parseKey } from '../board';
 import {
-  EditorPalette,
   EditorScreen,
-  ChamberPalette,
-  ChamberContent,
-  TileParams,
-  DEFAULT_PARAMS,
-  EditorSnapshot,
   ValidationResult,
   generateLevelId,
-  isChamberPalette,
-  chamberPaletteContent,
   ungzipBlob,
   getValidTileDefKeys,
   MAX_EDITOR_CANVAS_PX,
   EDITOR_CANVAS_BORDER,
   GRID_MIN_DIM,
   GRID_MAX_DIM,
-  PALETTE_ITEM_SELECTED_BORDER,
-  PALETTE_ITEM_UNSELECTED_BORDER,
-  PALETTE_ITEM_SELECTED_BG,
-  PALETTE_ITEM_UNSELECTED_BG,
-  PALETTE_ITEM_SELECTED_COLOR,
-  PALETTE_ITEM_UNSELECTED_COLOR,
+  EDITOR_FLEX_ROW_CSS,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
 } from './types';
-import { renderEditorCanvas, drawEditorTile, HoverOverlay, DragState } from './renderer';
+import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { EditorInputHandler } from './editorInputHandler';
 import { renderMinimap } from '../minimap';
-
-// ─── Chamber parameter descriptors ───────────────────────────────────────────
-
-/** A single numeric parameter shown in the tile-params panel for a Chamber tile. */
-interface ChamberParamDescriptor {
-  /** Label text rendered to the left of the input. */
-  label: string;
-  /** Which field of {@link TileParams} this input controls. */
-  field: keyof Pick<TileParams, 'temperature' | 'cost' | 'pressure' | 'hardness' | 'shatter'>;
-  /**
-   * When provided, the input value is clamped to this minimum (via `Math.max`).
-   * When omitted, the raw `parseInt` result is used (allowing negative values).
-   */
-  clampMin?: number;
-}
-
-/**
- * Declarative map from Chamber content type → ordered list of numeric param inputs.
- * Drives {@link CampaignEditor._buildChamberContentParams} so each new content
- * type only needs an entry here rather than a new `if` branch.
- *
- * Content types with no numeric params (tank, star) are omitted – the method
- * is a no-op for them.  The `item` type is handled separately (it has a shape
- * selector in addition to a numeric count field).
- */
-const CHAMBER_PARAM_DESCRIPTORS: Partial<Record<ChamberContent, ChamberParamDescriptor[]>> = {
-  dirt:      [{ label: 'Mass',      field: 'cost' }],
-  heater:    [{ label: 'Temp',      field: 'temperature' }],
-  ice:       [{ label: 'Temp °',    field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
-  snow:      [{ label: 'Temp °',    field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
-  sandstone: [
-    { label: 'Temp °',   field: 'temperature', clampMin: 0 },
-    { label: 'Mass',     field: 'cost',        clampMin: 0 },
-    { label: 'Hardness', field: 'hardness',    clampMin: 0 },
-    { label: 'Shatter',  field: 'shatter',     clampMin: 0 },
-  ],
-  pump:      [{ label: 'Pressure',  field: 'pressure' }],
-  hot_plate: [{ label: 'Boiling °', field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
-};
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -129,13 +76,8 @@ export class CampaignEditor {
   private _editorMainLayout: HTMLElement | null = null;
   /** Canvas input handler: owns all gesture state and event listeners. */
   private _editorInput: EditorInputHandler | null = null;
-  /** Palette section expand flags (UI-only). */
-  private _goldSectionExpanded = false;
-  private _leakySectionExpanded = false;
-  private _chamberSectionExpanded = false;
-  private _pipesSectionExpanded = false;
-  private _floorSectionExpanded = false;
-  private _spinSectionExpanded = false;
+  /** Tile palette + parameter panel component. */
+  private readonly _paramsPanel: TileParamsPanel;
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
@@ -170,6 +112,12 @@ export class CampaignEditor {
       },
     };
     this._chapterMapEditor = new ChapterMapEditorSection(chapterCallbacks);
+
+    this._paramsPanel = new TileParamsPanel({
+      getState: () => this._state,
+      renderCanvas: () => this._renderEditorCanvas(),
+      updateUndoRedoButtons: () => this._updateEditorUndoRedoButtons(),
+    });
 
     this._el = document.createElement('div');
     this._el.style.cssText =
@@ -515,22 +463,7 @@ export class CampaignEditor {
   }
 
   private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = EDITOR_FLEX_ROW_CSS;
-    const lbl = document.createElement('label');
-    lbl.textContent = labelText;
-    lbl.style.cssText = 'font-size:0.85rem;color:#aaa;min-width:80px;';
-    const inp = document.createElement('input');
-    inp.type = type;
-    inp.value = value;
-    inp.style.cssText =
-      'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;' +
-      (inputWidth ? `width:${inputWidth};` : 'flex:1;');
-    inp.addEventListener('input', () => onInput(inp.value));
-    wrap.appendChild(lbl);
-    wrap.appendChild(inp);
-    return wrap;
+    return this._paramsPanel.labeledInput(labelText, value, onInput, type, inputWidth);
   }
 
   // ─── Screen: Campaign list ────────────────────────────────────────────────
@@ -980,7 +913,7 @@ export class CampaignEditor {
       'display:flex;flex-direction:column;gap:12px;min-width:220px;';
 
     if (!readOnly) {
-      leftCol.appendChild(this._buildPalette());
+      leftCol.appendChild(this._paramsPanel.buildPalette());
     }
 
     // ── Middle column: canvas + metadata ──────────────────────────────────
@@ -992,7 +925,7 @@ export class CampaignEditor {
 
     if (!readOnly) {
       rightCol.appendChild(this._buildInventoryEditor());
-      rightCol.appendChild(this._buildParamPanel());
+      rightCol.appendChild(this._paramsPanel.buildParamPanel());
       rightCol.appendChild(this._buildGridSizePanel());
     } else {
       rightCol.appendChild(this._buildInventoryReadonly());
@@ -1275,451 +1208,25 @@ export class CampaignEditor {
   }
 
 
-  // ─── Palette panel ────────────────────────────────────────────────────────
+  // ─── Palette panel – backward-compat proxies ─────────────────────────────
+  // Tests cast CampaignEditor to typed interfaces and access these directly.
+  // They delegate to _paramsPanel so that palette logic stays in TileParamsPanel.
 
-  private readonly _PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.Source,   label: '💧 Source' },
-    { palette: PipeShape.Sink,     label: '🏁 Sink' },
-  ];
+  private _buildPalette(): HTMLElement { return this._paramsPanel.buildPalette(); }
+  private _buildParamPanel(): HTMLElement { return this._paramsPanel.buildParamPanel(); }
 
-  private readonly _PIPES_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.Straight,     label: '━ Straight' },
-    { palette: PipeShape.Elbow,        label: '┗ Elbow' },
-    { palette: PipeShape.Tee,          label: '┣ Tee' },
-    { palette: PipeShape.Cross,        label: '╋ Cross' },
-  ];
-
-  private readonly _SPIN_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.SpinStraight,       label: '↻ Spin Straight' },
-    { palette: PipeShape.SpinElbow,          label: '↻ Spin Elbow' },
-    { palette: PipeShape.SpinTee,            label: '↻ Spin Tee' },
-    { palette: PipeShape.SpinStraightCement, label: '↻ Spin Straight (Cement)' },
-    { palette: PipeShape.SpinElbowCement,    label: '↻ Spin Elbow (Cement)' },
-    { palette: PipeShape.SpinTeeCement,      label: '↻ Spin Tee (Cement)' },
-  ];
-
-  private readonly _CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> = [
-    { palette: 'chamber:item',      label: '🎁 Item' },
-    { palette: 'chamber:tank',      label: '💧 Tank' },
-    { palette: 'chamber:heater',    label: '🔥 Heater / Cooler' },
-    { palette: 'chamber:pump',      label: '⬆ Pump / Vacuum' },
-    { palette: 'chamber:dirt',      label: '🟫 Dirt' },
-    { palette: 'chamber:ice',       label: '🧊 Ice' },
-    { palette: 'chamber:snow',      label: '❄ Snow' },
-    { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
-    { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
-    { palette: 'chamber:star',      label: '⭐ Star' },
-  ];
-
-  private readonly _GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.GoldStraight, label: '━ Gold Straight' },
-    { palette: PipeShape.GoldElbow,    label: '┗ Gold Elbow' },
-    { palette: PipeShape.GoldTee,      label: '┣ Gold Tee' },
-    { palette: PipeShape.GoldCross,    label: '╋ Gold Cross' },
-  ];
-
-  private readonly _LEAKY_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.LeakyStraight, label: '━ Leaky Straight' },
-    { palette: PipeShape.LeakyElbow,    label: '┗ Leaky Elbow' },
-    { palette: PipeShape.LeakyTee,      label: '┣ Leaky Tee' },
-    { palette: PipeShape.LeakyCross,    label: '╋ Leaky Cross' },
-  ];
-
-  private readonly _FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-    { palette: PipeShape.Granite,   label: '▪ Granite' },
-    { palette: PipeShape.Tree,      label: '🌿 Tree' },
-    { palette: PipeShape.Cement,    label: '🪧 Cement' },
-    { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
-    { palette: PipeShape.OneWay,    label: '→ One-Way' },
-  ];
-
-  /**
-   * Build a collapsible section toggle button plus its items and append both to
-   * `parent`.  The toggle button uses the supplied `borderColor`/`bgColor`/`textColor`
-   * for its visual style.  When expanded, each item is added via `makeItemBtn`.
-   */
-  private _buildCollapsibleSection(
-    parent: HTMLElement,
-    label: string,
-    expanded: boolean,
-    onToggle: () => void,
-    borderColor: string,
-    bgColor: string,
-    textColor: string,
-    items: { palette: EditorPalette; label: string }[],
-    makeItemBtn: (item: { palette: EditorPalette; label: string }, indent?: boolean) => HTMLButtonElement,
-  ): void {
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.textContent = (expanded ? '▾' : '▸') + ' ' + label;
-    toggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-      `border:1px solid ${borderColor};background:${bgColor};color:${textColor};font-weight:bold;margin-top:2px;`;
-    toggle.addEventListener('click', onToggle);
-    parent.appendChild(toggle);
-
-    if (expanded) {
-      for (const item of items) {
-        parent.appendChild(makeItemBtn(item, true));
-      }
-    }
-  }
-
-  private _buildPalette(): HTMLElement {
-    const panel = document.createElement('div');
-    panel.id = 'editor-palette-panel';
-    panel.style.cssText =
-      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:4px;';
-
-    const title = document.createElement('div');
-    title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'TILE PALETTE';
-    panel.appendChild(title);
-
-    const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._state.palette);
-    const isLeakySelected = this._LEAKY_PALETTE_ITEMS.some(i => i.palette === this._state.palette);
-    const isFloorSelected = this._FLOOR_PALETTE_ITEMS.some(i => i.palette === this._state.palette);
-    // Auto-expand the gold section if a gold item is currently selected
-    if (isGoldSelected) this._goldSectionExpanded = true;
-    // Auto-expand the leaky section if a leaky item is currently selected
-    if (isLeakySelected) this._leakySectionExpanded = true;
-    // Auto-expand the floor section if a floor item is currently selected
-    if (isFloorSelected) this._floorSectionExpanded = true;
-    // Auto-expand the chamber section if a chamber item is currently selected
-    if (isChamberPalette(this._state.palette)) this._chamberSectionExpanded = true;
-    // Auto-expand the pipes section if a pipe item is currently selected
-    if (this._PIPES_PALETTE_ITEMS.some(i => i.palette === this._state.palette)) this._pipesSectionExpanded = true;
-    // Auto-expand the spin section if a spin item is currently selected
-    if (this._SPIN_PALETTE_ITEMS.some(i => i.palette === this._state.palette)) this._spinSectionExpanded = true;
-
-    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = item.label;
-      btn.dataset['palette'] = String(item.palette);
-      const isSelected = this._state.palette === item.palette;
-      btn.style.cssText =
-        'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
-        (indent ? 'margin-left:12px;' : '') +
-        'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
-        'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
-        'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
-
-      btn.addEventListener('click', () => {
-        this._state.palette = item.palette;
-        this._state.clearLink();
-        if (isChamberPalette(item.palette)) {
-          this._state.params.chamberContent = chamberPaletteContent(item.palette);
-        }
-        const newPanel = this._buildPalette();
-        panel.replaceWith(newPanel);
-        const paramPanel = document.getElementById('editor-param-panel');
-        if (paramPanel) {
-          const newParam = this._buildParamPanel();
-          newParam.id = 'editor-param-panel';
-          paramPanel.replaceWith(newParam);
-        }
-        this._renderEditorCanvas();
-      });
-      return btn;
-    };
-
-    for (const item of this._PALETTE_ITEMS) {
-      panel.appendChild(makeItemBtn(item));
-    }
-
-    // Collapsible sections: Floor, Pipes, Spin, Gold, Leaky, Blocks (chambers)
-    this._buildCollapsibleSection(
-      panel, 'Floor', this._floorSectionExpanded,
-      () => { this._floorSectionExpanded = !this._floorSectionExpanded; panel.replaceWith(this._buildPalette()); },
-      '#888', '#1a1a1a', '#ccc', this._FLOOR_PALETTE_ITEMS, makeItemBtn,
-    );
-    this._buildCollapsibleSection(
-      panel, 'Pipes', this._pipesSectionExpanded,
-      () => { this._pipesSectionExpanded = !this._pipesSectionExpanded; panel.replaceWith(this._buildPalette()); },
-      '#4a90d9', '#0a1520', '#4a90d9', this._PIPES_PALETTE_ITEMS, makeItemBtn,
-    );
-    this._buildCollapsibleSection(
-      panel, 'Spin', this._spinSectionExpanded,
-      () => { this._spinSectionExpanded = !this._spinSectionExpanded; panel.replaceWith(this._buildPalette()); },
-      '#5a7fbf', '#0a1528', '#7090c0', this._SPIN_PALETTE_ITEMS, makeItemBtn,
-    );
-    this._buildCollapsibleSection(
-      panel, 'Gold', this._goldSectionExpanded,
-      () => { this._goldSectionExpanded = !this._goldSectionExpanded; panel.replaceWith(this._buildPalette()); },
-      '#b8860b', '#1a1400', '#ffd700', this._GOLD_PALETTE_ITEMS, makeItemBtn,
-    );
-    this._buildCollapsibleSection(
-      panel, 'Leaky', this._leakySectionExpanded,
-      () => { this._leakySectionExpanded = !this._leakySectionExpanded; panel.replaceWith(this._buildPalette()); },
-      '#7a2c10', '#1a0c08', '#b07840', this._LEAKY_PALETTE_ITEMS, makeItemBtn,
-    );
-    this._buildCollapsibleSection(
-      panel, 'Blocks', this._chamberSectionExpanded,
-      () => { this._chamberSectionExpanded = !this._chamberSectionExpanded; panel.replaceWith(this._buildPalette()); },
-      '#74b9ff', '#0a1520', '#74b9ff', this._CHAMBER_PALETTE_ITEMS, makeItemBtn,
-    );
-
-    // Erase at the end of the palette
-    panel.appendChild(makeItemBtn({ palette: 'erase', label: '🗑 Erase (→ Empty)' }));
-
-    return panel;
-  }
-
-  // ─── Tile parameter panel ─────────────────────────────────────────────────
-
-  private _buildParamPanel(): HTMLElement {
-    const panel = document.createElement('div');
-    panel.id = 'editor-param-panel';
-    panel.style.cssText =
-      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;';
-
-    const title = document.createElement('div');
-    title.style.cssText = EDITOR_PANEL_TITLE_CSS;
-    title.textContent = 'TILE PARAMS';
-    panel.appendChild(title);
-
-    const p = this._state.palette;
-    const isChm = isChamberPalette(p);
-    // Spin-cement shapes are in PIPE_SHAPES but do have a parameter (Drying Time), so exclude them
-    // from the "no parameters" early-return check.
-    const isParamFreePipe = PIPE_SHAPES.has(p as PipeShape) && !SPIN_CEMENT_SHAPES.has(p as PipeShape);
-    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.GoldSpace ||
-        p === PipeShape.OneWay || isParamFreePipe) {
-      const none = document.createElement('div');
-      none.style.cssText = 'font-size:0.8rem;color:#555;';
-      none.textContent = 'No parameters';
-      panel.appendChild(none);
-      return panel;
-    }
-
-    // Cement: show only Drying Time input.
-    // Spin-cement tiles: show Drying Time; rotation is adjusted via wheel/Q/W in the editor.
-    if (p === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(p as PipeShape)) {
-      panel.appendChild(this._labeledInput('Drying Time', String(this._state.params.dryingTime), (v) => {
-        this._state.params.dryingTime = Math.max(0, parseInt(v) || 0);
-        this._state.applyParamsToLinkedTile();
-        this._updateEditorUndoRedoButtons();
-        this._renderEditorCanvas();
-      }, 'number', '90px'));
-      return panel;
-    }
-
-    // Source/Chamber(tank): capacity
-    const cc = isChm ? chamberPaletteContent(p as ChamberPalette) : null;
-    if (p === PipeShape.Source || cc === 'tank') {
-      panel.appendChild(this._labeledInput('Capacity', String(this._state.params.capacity), (v) => {
-        this._state.params.capacity = Math.max(0, parseInt(v) || 0);
-        this._state.applyParamsToLinkedTile();
-        this._updateEditorUndoRedoButtons();
-        this._renderEditorCanvas();
-      }, 'number', '90px'));
-    }
-
-    // Source: temperature and pressure
-    if (p === PipeShape.Source) {
-      panel.appendChild(this._labeledInput('Base Temp', String(this._state.params.temperature), (v) => {
-        this._state.params.temperature = Math.max(0, parseInt(v) || 0);
-        this._state.applyParamsToLinkedTile();
-        this._updateEditorUndoRedoButtons();
-        this._renderEditorCanvas();
-      }, 'number', '90px'));
-      panel.appendChild(this._labeledInput('Base Pressure', String(this._state.params.pressure), (v) => {
-        this._state.params.pressure = Math.max(0, parseInt(v) || 0);
-        this._state.applyParamsToLinkedTile();
-        this._updateEditorUndoRedoButtons();
-        this._renderEditorCanvas();
-      }, 'number', '90px'));
-    }
-
-    // Chamber: content type selector + content-specific param inputs
-    if (p === PipeShape.Chamber) {
-      panel.appendChild(this._buildChamberContentSelector(panel));
-    }
-    if (isChm) {
-      this._buildChamberContentParams(panel, chamberPaletteContent(p as ChamberPalette));
-    }
-
-    // Connections (Source, Sink, Chamber) – positional compass layout
-    if (p === PipeShape.Source || p === PipeShape.Sink || isChm) {
-      panel.appendChild(this._buildConnectionsWidget(panel));
-    }
-
-    return panel;
-  }
-
-  /**
-   * Build the chamber content-type `<select>` element (shown only when the
-   * palette selection is the generic Chamber tool, not a specific content type).
-   * When the selection changes the param panel rebuilds itself.
-   */
-  private _buildChamberContentSelector(panel: HTMLElement): HTMLElement {
-    const sel = document.createElement('select');
-    sel.style.cssText =
-      'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-    const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
-      tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
-      ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
-    };
-    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate']) {
-      const o = document.createElement('option');
-      o.value = opt;
-      o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
-      if (this._state.params.chamberContent === opt) o.selected = true;
-      sel.appendChild(o);
-    }
-    sel.addEventListener('change', () => {
-      this._state.params.chamberContent = sel.value as TileParams['chamberContent'];
-      if ((TEMP_CHAMBER_CONTENTS as ReadonlySet<string>).has(sel.value)) {
-        if (this._state.params.temperature === 0) this._state.params.temperature = 1;
-      }
-      this._state.applyParamsToLinkedTile();
-      this._updateEditorUndoRedoButtons();
-      this._renderEditorCanvas();
-      const newPanel = this._buildParamPanel();
-      newPanel.id = 'editor-param-panel';
-      panel.replaceWith(newPanel);
-    });
-    const selWrap = document.createElement('div');
-    selWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
-    const selLbl = document.createElement('span');
-    selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-    selLbl.textContent = 'Content:';
-    selWrap.appendChild(selLbl);
-    selWrap.appendChild(sel);
-    return selWrap;
-  }
-
-  /**
-   * Append content-type-specific parameter inputs for a Chamber tile to `parent`.
-   * Called when the active palette is a `ChamberPalette` entry (not the generic
-   * Chamber tool), so `cc` is always the concrete content type.
-   */
-  private _buildChamberContentParams(parent: HTMLElement, cc: ChamberContent): void {
-    const descriptors = CHAMBER_PARAM_DESCRIPTORS[cc];
-    if (descriptors) {
-      for (const { label, field, clampMin } of descriptors) {
-        parent.appendChild(this._labeledInput(label, String(this._state.params[field]), (v) => {
-          const parsed = parseInt(v) || 0;
-          this._state.params[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
-          this._state.applyParamsToLinkedTile();
-          this._updateEditorUndoRedoButtons();
-          this._renderEditorCanvas();
-        }, 'number', '90px'));
-      }
-    }
-    if (cc === 'item') {
-      parent.appendChild(this._buildItemShapeSelector());
-      parent.appendChild(this._labeledInput('Count', String(this._state.params.itemCount), (v) => {
-        const parsed = parseInt(v);
-        this._state.params.itemCount = isNaN(parsed) ? 1 : parsed;
-        this._state.applyParamsToLinkedTile();
-        this._updateEditorUndoRedoButtons();
-        this._renderEditorCanvas();
-      }, 'number', '90px'));
-    }
-  }
-
-  /**
-   * Build the item-shape `<select>` widget for Chamber-item tiles.
-   * Extracted to keep {@link _buildChamberContentParams} focused.
-   */
-  private _buildItemShapeSelector(): HTMLElement {
-    const itemSel = document.createElement('select');
-    itemSel.style.cssText =
-      'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-    for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
-                       PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
-                       PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross]) {
-      const o = document.createElement('option');
-      o.value = shp;
-      o.textContent = shp;
-      if (this._state.params.itemShape === shp) o.selected = true;
-      itemSel.appendChild(o);
-    }
-    itemSel.addEventListener('change', () => {
-      this._state.params.itemShape = itemSel.value as PipeShape;
-      this._state.applyParamsToLinkedTile();
-      this._updateEditorUndoRedoButtons();
-      this._renderEditorCanvas();
-    });
-    const itemSelWrap = document.createElement('div');
-    itemSelWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
-    const itemLbl = document.createElement('span');
-    itemLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-    itemLbl.textContent = 'Shape:';
-    itemSelWrap.appendChild(itemLbl);
-    itemSelWrap.appendChild(itemSel);
-    return itemSelWrap;
-  }
-
-  /**
-   * Build the compass-layout connections widget for Source, Sink, and Chamber tiles.
-   * Each direction button toggles the connection and rebuilds the param panel when clicked.
-   * @param replaceTarget - The outer param panel element that connection-change rebuilds replace.
-   */
-  private _buildConnectionsWidget(replaceTarget: HTMLElement): HTMLElement {
-    const connWrap = document.createElement('div');
-    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-    const connLbl = document.createElement('div');
-    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-    connLbl.textContent = 'Connections';
-    connWrap.appendChild(connLbl);
-
-    // Compass grid: [empty][N][empty] / [W][tile][E] / [empty][S][empty]
-    const connGrid = document.createElement('div');
-    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
-
-    const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
-      const active = this._state.params.connections[dir];
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = dir;
-      b.title = `Toggle ${dir} connection`;
-      b.style.cssText =
-        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
-        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
-        'color:' + (active ? '#7ed321' : '#555') + ';' +
-        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
-        'border-radius:4px;cursor:pointer;padding:0;';
-      b.addEventListener('click', () => {
-        this._state.params.connections[dir] = !this._state.params.connections[dir];
-        this._state.applyParamsToLinkedTile();
-        this._updateEditorUndoRedoButtons();
-        this._renderEditorCanvas();
-        const newPanel = this._buildParamPanel();
-        newPanel.id = 'editor-param-panel';
-        replaceTarget.replaceWith(newPanel);
-      });
-      return b;
-    };
-
-    // Row 1: [empty] [N] [empty]
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('N'));
-    connGrid.appendChild(document.createElement('span'));
-    // Row 2: [W] [tile preview] [E]
-    connGrid.appendChild(makeConnBtn('W'));
-    const previewCanvas = document.createElement('canvas');
-    previewCanvas.width = TILE_SIZE;
-    previewCanvas.height = TILE_SIZE;
-    previewCanvas.style.cssText = 'width:28px;height:28px;border:1px solid #4a90d9;border-radius:4px;';
-    const previewCtx = previewCanvas.getContext('2d');
-    if (previewCtx) {
-      drawEditorTile(previewCtx, 0, 0, this._state.buildTileDef());
-    }
-    connGrid.appendChild(previewCanvas);
-    connGrid.appendChild(makeConnBtn('E'));
-    // Row 3: [empty] [S] [empty]
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('S'));
-    connGrid.appendChild(document.createElement('span'));
-
-    connWrap.appendChild(connGrid);
-    return connWrap;
-  }
+  private get _goldSectionExpanded(): boolean { return this._paramsPanel.goldSectionExpanded; }
+  private set _goldSectionExpanded(v: boolean) { this._paramsPanel.goldSectionExpanded = v; }
+  private get _leakySectionExpanded(): boolean { return this._paramsPanel.leakySectionExpanded; }
+  private set _leakySectionExpanded(v: boolean) { this._paramsPanel.leakySectionExpanded = v; }
+  private get _chamberSectionExpanded(): boolean { return this._paramsPanel.chamberSectionExpanded; }
+  private set _chamberSectionExpanded(v: boolean) { this._paramsPanel.chamberSectionExpanded = v; }
+  private get _pipesSectionExpanded(): boolean { return this._paramsPanel.pipesSectionExpanded; }
+  private set _pipesSectionExpanded(v: boolean) { this._paramsPanel.pipesSectionExpanded = v; }
+  private get _floorSectionExpanded(): boolean { return this._paramsPanel.floorSectionExpanded; }
+  private set _floorSectionExpanded(v: boolean) { this._paramsPanel.floorSectionExpanded = v; }
+  private get _spinSectionExpanded(): boolean { return this._paramsPanel.spinSectionExpanded; }
+  private set _spinSectionExpanded(v: boolean) { this._paramsPanel.spinSectionExpanded = v; }
 
   // ─── Grid size panel ──────────────────────────────────────────────────────
 
@@ -1999,16 +1506,7 @@ export class CampaignEditor {
 
   /** Rebuild and replace the palette and param panels in the DOM. */
   private _refreshPaletteUI(): void {
-    const palettePanel = document.getElementById('editor-palette-panel');
-    if (palettePanel) {
-      palettePanel.replaceWith(this._buildPalette());
-    }
-    const paramPanel = document.getElementById('editor-param-panel');
-    if (paramPanel) {
-      const newParam = this._buildParamPanel();
-      newParam.id = 'editor-param-panel';
-      paramPanel.replaceWith(newParam);
-    }
+    this._paramsPanel.refresh();
   }
 
   /** Set the canvas CSS display size so the grid fills available space up to its intrinsic size.
