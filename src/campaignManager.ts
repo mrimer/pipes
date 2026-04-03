@@ -580,8 +580,6 @@ export class CampaignManager {
   get _pendingLevelIdInternal(): number | null { return this._pendingLevelId; }
   /** @internal */
   get _playtestExitCallbackInternal(): (() => void) | null { return this._playtestExitCallback; }
-  /** @internal */
-  get _activeCampaignProgressInternal(): Set<number> { return this._activeCampaignProgress; }
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
