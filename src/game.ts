@@ -1,9 +1,9 @@
-import { Board, MoveResult, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, MoveResult } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
-import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
 import { loadCompletedLevels } from './persistence';
 import { createGameRulesModal } from './rulesModal';
@@ -17,6 +17,7 @@ import {
   buildExitConfirmModal, buildUnplayableModal,
 } from './gameModals';
 import { AnimationManager, AnimSparkleCallbacks } from './animationManager';
+import { TooltipManager } from './tooltipManager';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -38,11 +39,6 @@ const HINT_TOGGLE_BTN_STYLE =
 /** CSS style for the collapsible text area of each hint in the hint box. */
 const HINT_TEXT_STYLE =
   'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
-
-/** CSS style for the Ctrl-hover coordinate tooltip element. */
-const TOOLTIP_CSS =
-  'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
-  'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;';
 
 /** CSS style for the note box shown beneath the grid when a level has a note. */
 const NOTE_BOX_CSS =
@@ -154,8 +150,8 @@ export class Game implements InputCallbacks {
   /** Rotation that will be applied when the pending inventory item is placed. */
   private pendingRotation: Rotation = 0;
 
-  /** Tooltip element for displaying grid coordinates under Ctrl. */
-  private readonly tooltipEl: HTMLElement;
+  /** Tooltip manager for displaying grid coordinates and tile info under Ctrl. */
+  private readonly _tooltip: TooltipManager;
 
   /** Floating error message element shown briefly when an action is blocked. */
   private readonly errorFlashEl: HTMLElement;
@@ -190,6 +186,13 @@ export class Game implements InputCallbacks {
    * @internal
    */
   get _animations() { return this._animMgr.animations; }
+
+  /**
+   * Proxy giving tests direct access to the tooltip DOM element.
+   * Exists solely for test backward compatibility.
+   * @internal
+   */
+  get tooltipEl() { return this._tooltip.el; }
 
   /** Shapes that should receive a sparkle CSS animation on the next inventory render. */
   private _pendingSparkleShapes: Set<PipeShape> = new Set();
@@ -290,10 +293,8 @@ export class Game implements InputCallbacks {
     // Load persisted completions
     this.completedLevels = loadCompletedLevels();
 
-    // Create the tooltip element for Ctrl+hover grid coordinates
-    this.tooltipEl = document.createElement('div');
-    this.tooltipEl.style.cssText = TOOLTIP_CSS;
-    document.body.appendChild(this.tooltipEl);
+    // Create the tooltip manager for Ctrl+hover grid coordinates
+    this._tooltip = TooltipManager.create();
 
     // Grab the value span from the water stat row (its second child span)
     this.waterValueEl = this.waterDisplayEl.querySelector('.stat-value') as HTMLElement;
@@ -1054,189 +1055,13 @@ export class Game implements InputCallbacks {
   }
 
 
-  /** Returns the formula text "(deltaTemp° x cost)" for ice tile tooltips. */
-  private _iceCostFormula(deltaTemp: number, cost: number): string {
-    return `(${deltaTemp}° x ${cost})`;
-  }
-
-  /** Returns the formula text "(deltaTemp° x ⌈cost/pressureP⌉=effectiveCost)" for snow tile tooltips. */
-  private _snowCostFormula(deltaTemp: number, pressure: number, cost: number): string {
-    const effectiveCost = pressure >= 1 ? Math.ceil(cost / pressure) : cost;
-    return `(${deltaTemp}° x ⌈${cost}/${pressure}P⌉=${effectiveCost})`;
-  }
-
-  /** Returns the formula text "(deltaTemp° x ⌈cost/(pressure-hardness)P⌉=effectiveCost)" for sandstone tile tooltips.
-   * Requires (pressure - tile.hardness) >= 1; callers must check this precondition. */
-  private _sandstoneCostFormula(deltaTemp: number, pressure: number, tile: Tile): string {
-    const deltaDamage = pressure - tile.hardness;
-    const effectiveCost = deltaDamage >= 1 ? Math.ceil(tile.cost / deltaDamage) : 0;
-    return `(${deltaTemp}° x ⌈${tile.cost}/(${pressure}-${tile.hardness})P⌉=${effectiveCost})`;
-  }
-
-  /** Returns the formula text "(tileTemp+envTemp° x cost)" for hot plate tile tooltips. */
-  private _hotPlateCostFormula(tileTemp: number, envTemp: number, cost: number): string {
-    return `(${tileTemp}+${envTemp}° x ${cost})`;
-  }
-
-  /**
-   * Append cost-related tooltip text for a chamber tile that is **already connected**
-   * (locked-in values are used).
-   * @returns The updated tooltip string.
-   */
-  private _tooltipForConnectedChamber(
-    tooltipText: string,
-    tile: Tile,
-    pos: { row: number; col: number },
-    lockedImpact: number,
-  ): string {
-    if (!this.board) return tooltipText;
-    const lockedCost = Math.abs(lockedImpact);
-    const content = tile.chamberContent;
-    if (content !== null && COLD_CHAMBER_CONTENTS.has(content)) {
-      const lockedTemp = this.board.getLockedConnectTemp(pos) ?? 0;
-      const lockedPressure = this.board.getLockedConnectPressure(pos) ?? 1;
-      const lockedDeltaTemp = computeDeltaTemp(tile.temperature, lockedTemp);
-      if (content === 'ice') {
-        return tooltipText + `\n${this._iceCostFormula(lockedDeltaTemp, tile.cost)} cost: ${lockedCost}`;
-      } else if (content === 'snow') {
-        return tooltipText + `\n${this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost)} cost: ${lockedCost}`;
-      } else {
-        // sandstone
-        const shatterActive = tile.shatter > tile.hardness;
-        const isShatterTriggered = shatterActive && lockedPressure >= tile.shatter;
-        if (isShatterTriggered) {
-          return tooltipText + `\n[${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
-        }
-        const lockedDeltaDamage = lockedPressure - tile.hardness;
-        if (lockedDeltaDamage >= 1) {
-          return tooltipText + `\n${this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile)} cost: ${lockedCost}`;
-        }
-        return tooltipText + `\ncost: ${lockedCost}`;
-      }
-    } else if (content === 'hot_plate') {
-      const lockedGain = this.board.getLockedHotPlateGain(pos);
-      const lockedTemp = this.board.getLockedConnectTemp(pos) ?? 0;
-      if (lockedGain !== null) {
-        const loss = Math.max(0, lockedGain - lockedImpact);
-        return tooltipText + `\n${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
-      }
-    }
-    return tooltipText;
-  }
-
-  /**
-   * Append cost-related tooltip text for a chamber tile that is **not yet connected**
-   * (predicted cost using current live stats).
-   * @returns The updated tooltip string, with predicted cost appended if non-zero.
-   */
-  private _tooltipForUnconnectedChamber(tooltipText: string, tile: Tile): string {
-    if (!this.board) return tooltipText;
-    const content = tile.chamberContent;
-    let predictedCost: number | null = null;
-
-    if (content === 'dirt') {
-      return tooltipText + ' water';
-    } else if (content === 'ice') {
-      const currentTemp = this.board.getCurrentTemperature();
-      const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-      tooltipText += `\n${this._iceCostFormula(deltaTemp, tile.cost)}`;
-      predictedCost = tile.cost * deltaTemp;
-    } else if (content === 'snow') {
-      const currentTemp = this.board.getCurrentTemperature();
-      const currentPressure = this.board.getCurrentPressure();
-      const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-      tooltipText += `\n${this._snowCostFormula(deltaTemp, currentPressure, tile.cost)}`;
-      predictedCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
-    } else if (content === 'sandstone') {
-      const currentTemp = this.board.getCurrentTemperature();
-      const currentPressure = this.board.getCurrentPressure();
-      const { shatterOverride, deltaDamage, costPerDeltaTemp } =
-        sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-      if (shatterOverride) {
-        tooltipText += `\n[${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
-        predictedCost = 0;
-      } else if (deltaDamage <= 0) {
-        tooltipText += `\n— Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
-      } else {
-        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-        tooltipText += `\n${this._sandstoneCostFormula(deltaTemp, currentPressure, tile)}`;
-        predictedCost = costPerDeltaTemp * deltaTemp;
-      }
-    } else if (content === 'hot_plate') {
-      const currentTemp = this.board.getCurrentTemperature();
-      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-      tooltipText += `\n${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
-      predictedCost = effectiveCost;
-    } else {
-      predictedCost = 0;
-    }
-
-    if (predictedCost !== null && predictedCost !== 0) {
-      tooltipText += ` cost: ${predictedCost}`;
-    }
-    return tooltipText;
-  }
-
   showTooltip(clientX: number, clientY: number): void {
-    if (this.screen !== GameScreen.Play || !this._input.mouseCanvasPos) return;
-    const mousePos = this._input.mouseCanvasPos;
-    const row = Math.floor(mousePos.y / TILE_SIZE);
-    const col = Math.floor(mousePos.x / TILE_SIZE);
-    if (!this.board || row < 0 || row >= this.board.rows || col < 0 || col >= this.board.cols) {
-      this.hideTooltip();
-      return;
-    }
-    // Display as (row, col) to match the GridPos convention used throughout the codebase.
-    let tooltipText = `(${row}, ${col})`;
-    const tile = this.board.grid[row][col];
-    // Indicate a gold space regardless of the tile currently on top of it.
-    if (this.board.goldSpaces.has(posKey(row, col))) {
-      tooltipText += ' Gold Space - needs gold pipe';
-    }
-    // Indicate one-way cell direction.
-    const oneWayDir = this.board.getOneWayDirection({ row, col });
-    if (oneWayDir !== null) {
-      tooltipText += ` (one-way ${oneWayDir})`;
-    }
-    // Indicate cement cell status.
-    const cementDryingTime = this.board.getCementDryingTime({ row, col });
-    if (cementDryingTime !== null) {
-      if (cementDryingTime === 0 && tile.shape !== PipeShape.Empty) {
-        tooltipText += ' Cement (Hardened)';
-      } else {
-        tooltipText += ` Cement T=${cementDryingTime}`;
-      }
-    }
-    // Show a human-readable tile name derived from its shape and chamber content.
-    const tileName = getTileDisplayName(tile);
-    if (tileName) {
-      tooltipText += ` ${tileName}`;
-    }
-    // Pre-placed fixed pipe shapes get a "(fixed)" indicator.
-    if (tile.isFixed && PIPE_SHAPES.has(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-      tooltipText += ' (fixed)';
-    }
-    if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
-      // Only show a predicted cost for tiles that are NOT yet in the fill path.
-      // Once a tile is connected its cost is already reflected in the water display;
-      // for ice/snow/sandstone/hot_plate show the locked-in effective cost value.
-      const lockedImpact = this.board.getLockedWaterImpact({ row, col });
-      const isConnected = lockedImpact !== null;
-      const pos = { row, col };
-      if (isConnected) {
-        tooltipText = this._tooltipForConnectedChamber(tooltipText, tile, pos, lockedImpact);
-      } else {
-        tooltipText = this._tooltipForUnconnectedChamber(tooltipText, tile);
-      }
-    }
-    this.tooltipEl.textContent = tooltipText;
-    this.tooltipEl.style.display = 'block';
-    this.tooltipEl.style.left = `${clientX + 12}px`;
-    this.tooltipEl.style.top  = `${clientY + 12}px`;
+    if (!this._input.mouseCanvasPos || !this.board) return;
+    this._tooltip.show(clientX, clientY, this.board, this._input.mouseCanvasPos, this.screen);
   }
 
   hideTooltip(): void {
-    this.tooltipEl.style.display = 'none';
+    this._tooltip.hide();
   }
 
   /** Show a brief error message that auto-dismisses after ~2 seconds. */
