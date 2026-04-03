@@ -486,7 +486,7 @@ export function spawnBubble(
     const shape = board.grid[r][c].shape;
     const eligible = shapesFilter
       ? shapesFilter.has(shape)
-      : PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape);
+      : (PIPE_SHAPES.has(shape) && !GOLD_PIPE_SHAPES.has(shape)) || SPIN_PIPE_SHAPES.has(shape);
     if (eligible) {
       candidates.push(key);
     }

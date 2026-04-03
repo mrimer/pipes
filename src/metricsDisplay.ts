@@ -332,8 +332,8 @@ export class MetricsDisplay {
   tickGoldenInventoryTwinkle(): void {
     const now = performance.now();
     if (now < this._nextInventoryTwinkle) return;
-    // Re-arm with a random interval of 3–7 s (offset from the board twinkle timer).
-    this._nextInventoryTwinkle = now + 3000 + Math.random() * 4000;
+    // Re-arm with a random interval of 2.25–5.25 s (offset from the board twinkle timer).
+    this._nextInventoryTwinkle = now + 2250 + Math.random() * 3000;
 
     // Find all gold inventory items whose count is > 0.
     const goldItems = Array.from(

@@ -529,8 +529,8 @@ export class AnimationManager {
   private _tickGoldenTwinkles(board: Board): void {
     const now = performance.now();
     if (now < this._nextGoldenTwinkle) return;
-    // Re-arm with a random interval of 2–5 s.
-    this._nextGoldenTwinkle = now + 2000 + Math.random() * 3000;
+    // Re-arm with a random interval of 1.5–3.75 s.
+    this._nextGoldenTwinkle = now + 1500 + Math.random() * 2250;
 
     // Collect all golden pipe tile positions on the board.
     const goldPositions: Array<{ r: number; c: number }> = [];
