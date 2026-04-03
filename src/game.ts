@@ -351,9 +351,6 @@ export class Game implements InputCallbacks {
     }
   }
 
-  // ─── Chapter map screen ──────────────────────────────────────────────────────
-  // (Owned by CampaignManager; showChapterMap delegates to this._campaign.showChapterMap)
-
   /**
    * Estimate the total vertical pixels consumed by UI elements that appear
    * alongside the grid while playing (page title, level header, HUD buttons,
