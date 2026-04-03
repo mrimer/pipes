@@ -1159,23 +1159,39 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   ctx.restore(); // Remove clip so round-end stubs can extend beyond the tile boundary.
 
   // Phase 2: Connection stubs that face empty tiles or pipes without a reciprocating
-  // arm use a round end cap, matching the nub style used by plain pipe arms.  These
-  // are drawn outside the clip so the round cap protrudes slightly beyond the tile edge.
+  // arm use a round end cap at the outer tip only, matching the nub style used by plain
+  // pipe arms.  These are drawn outside the clip so the round cap protrudes slightly
+  // beyond the tile edge.  A per-stub clip masks the inner end of each stroke (where it
+  // meets the chamber box) so only the outer tip gets a round cap; the inner junction
+  // retains a flat (butt) appearance.
   if (buttEndDirs !== undefined) {
     ctx.strokeStyle = color;
     ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
+    const capR = LINE_WIDTH / 2;
     if (tile.connections.has(Direction.North) && !buttEndDirs.has(Direction.North)) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(-half, -(half + capR), half * 2, half + capR - bh); ctx.clip();
       ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
+      ctx.restore();
     }
     if (tile.connections.has(Direction.South) && !buttEndDirs.has(Direction.South)) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(-half, bh, half * 2, half + capR - bh); ctx.clip();
       ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
+      ctx.restore();
     }
     if (tile.connections.has(Direction.West) && !buttEndDirs.has(Direction.West)) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(-(half + capR), -half, half + capR - bw, half * 2); ctx.clip();
       ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
+      ctx.restore();
     }
     if (tile.connections.has(Direction.East) && !buttEndDirs.has(Direction.East)) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(bw, -half, half + capR - bw, half * 2); ctx.clip();
       ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+      ctx.restore();
     }
   }
 }
