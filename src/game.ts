@@ -1,28 +1,19 @@
 import { Board, MoveResult, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, ChapterDef, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration, COLD_CHAMBER_CONTENTS } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { TILE_SIZE, renderBoard, getTileDisplayName, setTileSize, computeTileSize } from './renderer';
 import { renderInventoryBar } from './inventoryRenderer';
-import { renderLevelList } from './levelSelect';
-import { ChapterMapScreen } from './chapterMapScreen';
-import {
-  loadCompletedLevels, markLevelCompleted, clearCompletedLevels,
-  loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
-  loadActiveCampaignId, saveActiveCampaignId, clearActiveCampaignId,
-  computeCampaignCompletionPct,
-  loadLevelStars, saveLevelStar, clearLevelStars,
-  loadLevelWater, saveLevelWater, clearLevelWater,
-  loadCompletedChapters, markChapterCompleted, clearCompletedChapters,
-} from './persistence';
+import { loadCompletedLevels } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
+import { CampaignManager, CampaignCallbacks } from './campaignManager';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
 import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
 import {
-  buildResetModal, buildNewChapterModal, buildChallengeModal,
+  buildResetModal,
   buildExitConfirmModal, buildUnplayableModal,
 } from './gameModals';
 import { AnimationManager, AnimSparkleCallbacks } from './animationManager';
@@ -176,14 +167,14 @@ export class Game implements InputCallbacks {
   /** Timer ID for clearing the sandstone highlight. */
   private _errorHighlightTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Modal overlay for confirming a progress reset. */
-  private readonly resetConfirmModalEl: HTMLElement;
-
   /** Modal overlay showing game rules and tile legend. */
   private readonly _rulesModalEl: HTMLElement;
 
   /** Campaign editor overlay (manages its own DOM). */
   private readonly campaignEditor: CampaignEditor;
+
+  /** Manages campaign lifecycle, chapter map, modals, and campaign persistence. */
+  private readonly _campaign: CampaignManager;
 
   /** Levels that have been successfully completed (persisted in localStorage). */
   private completedLevels: Set<number>;
@@ -208,9 +199,6 @@ export class Game implements InputCallbacks {
 
   /** Shapes that should receive a gray-sparkle CSS animation on the next inventory render (zero net change). */
   private _pendingGraySparkleShapes: Set<PipeShape> = new Set();
-
-  /** Chapter ID of the level currently being played (0 if unknown). */
-  private currentChapterId = 0;
 
   /** Element showing the current source temperature (shown for Chapter 2+ levels). */
   private readonly tempDisplayEl: HTMLElement;
@@ -250,56 +238,8 @@ export class Game implements InputCallbacks {
   /** Collapsible box shown beneath the grid with the level hints (when the level has hints). */
   private readonly hintBoxEl: HTMLElement;
 
-  /**
-   * The non-official campaign currently activated for play, or null when playing
-   * the built-in official campaign.
-   */
-  private _activeCampaign: CampaignDef | null = null;
-
-  /** Completion progress for the active campaign (level IDs that have been completed). */
-  private _activeCampaignProgress: Set<number> = new Set();
-  private _activeCampaignCompletedChapters: Set<number> = new Set();
-
-  /**
-   * Optional callback invoked instead of `_showLevelSelect()` when exiting play mode.
-   * Used when a level was launched for playtesting from the campaign editor.
-   */
-  private _playtestExitCallback: (() => void) | null = null;
-
-  /**
-   * Level ID that is queued to start after the player dismisses an intermediate
-   * modal (new-chapter intro or challenge-level warning).
-   */
-  private _pendingLevelId: number | null = null;
-
-  // ── Chapter map screen state ───────────────────────────────────────────────
-
-  /** Chapter map screen (built lazily on first use). */
-  private _chapterMapScreen: ChapterMapScreen | null = null;
-
-  /**
-   * When true, the win modal's "Level Select" button should return to the
-   * chapter map screen (rather than the regular level select).
-   */
-  private _winFromChapterMap = false;
-
-  /** Modal overlay shown when the player is about to enter the first level of a new chapter. */
-  private readonly _newChapterModalEl: HTMLElement;
-
-  /** Element inside the new-chapter modal that displays the chapter number. */
-  private readonly _newChapterNumberEl: HTMLElement;
-
-  /** Element inside the new-chapter modal that displays the chapter name. */
-  private readonly _newChapterNameEl: HTMLElement;
-
-  /** Modal overlay shown when the player is about to enter a challenge level. */
-  private readonly _challengeModalEl: HTMLElement;
-
-  /** Paragraph inside the challenge modal describing skip behavior (hidden for direct selection). */
-  private readonly _challengeMsgEl: HTMLElement;
-
-  /** "Skip Level" button inside the challenge modal (hidden for direct selection). */
-  private readonly _challengeSkipBtnEl: HTMLButtonElement;
+  /** Modal overlay for confirming a progress reset. */
+  private readonly resetConfirmModalEl: HTMLElement;
 
   /** Modal overlay shown when the player presses Esc to confirm abandoning the level. */
   private readonly _exitConfirmModalEl: HTMLElement;
@@ -400,27 +340,12 @@ export class Game implements InputCallbacks {
 
     // Create the reset-progress confirmation modal
     this.resetConfirmModalEl = buildResetModal(
-      () => { this._resetProgress(); this._closeModal(this.resetConfirmModalEl); },
+      () => { this._campaign.resetProgress(); this._closeModal(this.resetConfirmModalEl); },
       () => { this._closeModal(this.resetConfirmModalEl); },
     );
 
     // Create the game-rules modal (appends itself to document.body)
     this._rulesModalEl = createGameRulesModal();
-
-    // Create the new-chapter intro modal
-    const newChapterModal = buildNewChapterModal(() => this.startChapterLevel());
-    this._newChapterModalEl = newChapterModal.el;
-    this._newChapterNumberEl = newChapterModal.numberEl;
-    this._newChapterNameEl = newChapterModal.nameEl;
-
-    // Create the challenge-level warning modal
-    const challengeModal = buildChallengeModal(
-      () => this.playChallengeLevel(),
-      () => this.skipChallengeLevel(),
-    );
-    this._challengeModalEl = challengeModal.el;
-    this._challengeMsgEl = challengeModal.msgEl;
-    this._challengeSkipBtnEl = challengeModal.skipBtnEl;
 
     // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
     this._exitConfirmModalEl = buildExitConfirmModal(
@@ -435,19 +360,35 @@ export class Game implements InputCallbacks {
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
-      () => this._showLevelSelect(),         // onClose: return to level select
-      (level) => this._playtestLevel(level), // onPlaytest: start the level in play mode
-      (campaign) => this._activateCampaign(campaign), // onPlayCampaign: activate campaign for play
+      () => this._showLevelSelect(),              // onClose: return to level select
+      (level) => this._campaign.playtestLevel(level), // onPlaytest: start the level in play mode
+      (campaign) => this._campaign.activate(campaign), // onPlayCampaign: activate campaign for play
     );
 
-    // Restore active campaign from localStorage (needs campaign editor to resolve the ID)
-    const savedCampaignId = loadActiveCampaignId();
-    if (savedCampaignId) {
-      this._restoreActiveCampaign(savedCampaignId);
-    } else {
-      // No saved campaign – pick one from the available list, preferring official ones.
-      this._autoSelectCampaign();
-    }
+    // Create the campaign manager and restore persisted campaign state
+    const campaignCallbacks: CampaignCallbacks = {
+      startLevel: (id) => this.startLevel(id),
+      startLevelDef: (level) => this.startLevelDef(level),
+      showLevelSelect: () => this._showLevelSelect(),
+      exitToMenu: () => this.exitToMenu(),
+      closeModal: (el) => this._closeModal(el),
+      triggerModalSparkle: (el, cls) => this._triggerModalSparkle(el, cls),
+      setScreen: (s) => { this.screen = s; },
+      setLevelSelectVisible: (v) => { this.levelSelectEl.style.display = v ? 'flex' : 'none'; },
+      setPlayScreenVisible: (v) => { this.playScreenEl.style.display = v ? 'flex' : 'none'; },
+      levelHeaderEl: this.levelHeaderEl,
+      levelListEl: this.levelListEl,
+      winModalEl: this.winModalEl,
+      winMenuBtnEl: this.winMenuBtnEl,
+      winNextBtnEl: this.winNextBtnEl,
+      exitBtnEl: this.exitBtnEl,
+      gameoverMenuBtnEl: this.gameoverMenuBtnEl,
+      completedLevels: this.completedLevels,
+      showResetConfirmModal: () => { this.resetConfirmModalEl.style.display = 'flex'; },
+      showRules: () => { this._rulesModalEl.style.display = 'flex'; },
+    };
+    this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
+    this._campaign.restoreFromPersistence();
 
     // Create the input handler – registers all event listeners on canvas/window/document.
     this._input = new InputHandler(canvas, this);
@@ -505,20 +446,16 @@ export class Game implements InputCallbacks {
     this.screen = GameScreen.LevelSelect;
     this.levelSelectEl.style.display = 'flex';
     this.playScreenEl.style.display = 'none';
-    if (this._chapterMapScreen) this._chapterMapScreen.screenEl.style.display = 'none';
+    // Hide the chapter map screen and reset campaign transient state.
+    this._campaign.prepareForLevelSelect();
     // Explicitly hide all modal overlays so they cannot cover the level-select
     // screen when returning from a completed or failed level.
     this.winModalEl.style.display = 'none';
     this.gameoverModalEl.style.display = 'none';
-    this._newChapterModalEl.style.display = 'none';
-    this._challengeModalEl.style.display = 'none';
     this._exitConfirmModalEl.style.display = 'none';
     this._unplayableModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
     this._clearModalSparkle(this.gameoverModalEl);
-    this._clearModalSparkle(this._newChapterModalEl);
-    this._clearModalSparkle(this._challengeModalEl);
-    this._pendingLevelId = null;
     clearConfetti();
     clearStarSparkles();
     // Clear particle arrays so stale drops don't persist on the level-select screen.
@@ -530,8 +467,7 @@ export class Game implements InputCallbacks {
     this.winNextBtnEl.style.display = '';
     // Reset HUD exit button label in case it was changed for playtesting.
     this.exitBtnEl.textContent = '← Menu';
-    this._winFromChapterMap = false;
-    this._renderLevelList();
+    this._campaign.renderLevelList();
     // Scroll the active level's row into view near the center of the viewport.
     if (this.currentLevel) {
       const levelId = this.currentLevel.id;
@@ -543,151 +479,7 @@ export class Game implements InputCallbacks {
   }
 
   // ─── Chapter map screen ──────────────────────────────────────────────────────
-
-  /**
-   * Show the chapter map screen for a chapter that has a grid map.
-   * The screen shows the chapter's grid; level chambers can be clicked to start levels.
-   */
-  private _showChapterMap(chapterIdx: number): void {
-    const campaign = this._activeCampaign;
-    if (!campaign) return;
-    const chapter = campaign.chapters[chapterIdx];
-    if (!chapter?.grid) return;
-
-    // Build the chapter map screen lazily on first use
-    if (!this._chapterMapScreen) {
-      this._chapterMapScreen = new ChapterMapScreen({
-        getDisplayProgress: () =>
-          this._activeCampaign ? this._activeCampaignProgress : this.completedLevels,
-        getActiveCampaignId: () => this._activeCampaign?.id ?? null,
-        onShowLevelSelect: () => this._showLevelSelect(),
-        onLevelSelected: (levelDef) => {
-          this._winFromChapterMap = true;
-          this.winMenuBtnEl.textContent = 'Chapter Map';
-          this.exitBtnEl.textContent = '← Chapter Map';
-          if (levelDef.challenge) {
-            this._pendingLevelId = levelDef.id;
-            this.startLevel(levelDef.id);
-            this._showChallengeLevelModal(false);
-          } else {
-            this.startLevel(levelDef.id);
-          }
-        },
-        getActiveCampaign: () => this._activeCampaign,
-        getCompletedChapters: () => this._activeCampaignCompletedChapters,
-        onChapterSinkClicked: (chapterIdx) => this._onChapterSinkClicked(chapterIdx),
-      });
-    }
-
-    this._chapterMapScreen.show(campaign, chapterIdx);
-    this.levelSelectEl.style.display = 'none';
-    this.playScreenEl.style.display = 'none';
-    this.screen = GameScreen.ChapterMap;
-  }
-
-  private _onChapterSinkClicked(chapterIdx: number): void {
-    const campaign = this._activeCampaign;
-    if (!campaign) return;
-    const chapter = campaign.chapters[chapterIdx];
-    if (!chapter) return;
-
-    markChapterCompleted(campaign.id, chapter.id, this._activeCampaignCompletedChapters);
-    this._showChapterCompleteModal(chapterIdx, campaign);
-  }
-
-  private _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void {
-    const existingModal = document.getElementById('chapter-complete-modal');
-    if (existingModal) existingModal.remove();
-
-    const chapter = campaign.chapters[chapterIdx];
-    const nextChapter = campaign.chapters[chapterIdx + 1] ?? null;
-
-    const progress = this._activeCampaign ? this._activeCampaignProgress : this.completedLevels;
-    const levelStars = loadLevelStars(campaign.id);
-    const levelWater = loadLevelWater(campaign.id);
-
-    const chLevels = chapter.levels;
-    const waterTotal = chLevels.reduce((sum, l) => sum + (progress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);
-    const starsCollected = chLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
-    const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
-    const challengesDone = chLevels.filter(l => l.challenge && progress.has(l.id)).length;
-    const challengesTotal = chLevels.filter(l => l.challenge).length;
-    const isMastered = (starsTotal === 0 || starsCollected >= starsTotal) && (challengesTotal === 0 || challengesDone >= challengesTotal);
-
-    const modal = document.createElement('div');
-    modal.id = 'chapter-complete-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100;';
-
-    const box = document.createElement('div');
-    box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:400px;width:90%;text-align:center;';
-
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = isMastered ? '🏆 Chapter Mastered!' : '🎉 Chapter Complete!';
-    titleEl.style.cssText = 'color:' + (isMastered ? '#f0c040' : '#7ed321') + ';margin:0 0 16px;font-size:1.5rem;';
-    box.appendChild(titleEl);
-
-    const statsDiv = document.createElement('div');
-    statsDiv.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:1rem;margin-bottom:16px;';
-    if (waterTotal > 0) {
-      const w = document.createElement('span');
-      w.style.color = '#4fc3f7';
-      w.textContent = `💧 ${waterTotal}`;
-      statsDiv.appendChild(w);
-    }
-    if (starsTotal > 0) {
-      const s = document.createElement('span');
-      s.style.color = '#f0c040';
-      s.textContent = `⭐ ${starsCollected}/${starsTotal}`;
-      statsDiv.appendChild(s);
-    }
-    if (challengesTotal > 0) {
-      const c = document.createElement('span');
-      c.style.color = '#e74c3c';
-      c.textContent = `💀 ${challengesDone}/${challengesTotal}`;
-      statsDiv.appendChild(c);
-    }
-    if (statsDiv.children.length > 0) box.appendChild(statsDiv);
-
-    const btnStyle = 'padding:10px 20px;font-size:0.9rem;border-radius:6px;cursor:pointer;border:1px solid;margin:4px;';
-
-    const remainBtn = document.createElement('button');
-    remainBtn.textContent = 'Remain here';
-    remainBtn.style.cssText = btnStyle + 'background:#16213e;border-color:#4a90d9;color:#7ed321;';
-    remainBtn.addEventListener('click', () => { modal.remove(); });
-
-    const menuBtn = document.createElement('button');
-    menuBtn.textContent = 'Main Menu';
-    menuBtn.style.cssText = btnStyle + 'background:#16213e;border-color:#4a90d9;color:#aaa;';
-    menuBtn.addEventListener('click', () => { modal.remove(); this._showLevelSelect(); });
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;margin-top:16px;gap:8px;';
-
-    if (nextChapter) {
-      const nextBtn = document.createElement('button');
-      nextBtn.textContent = 'Next Chapter →';
-      nextBtn.style.cssText = btnStyle + 'background:#1a3a10;border-color:#7ed321;color:#7ed321;';
-      nextBtn.addEventListener('click', () => {
-        modal.remove();
-        if (nextChapter.grid) {
-          this._showChapterMap(chapterIdx + 1);
-        } else {
-          this._showLevelSelect();
-          const chapterBoxes = this.levelListEl.querySelectorAll<HTMLElement>('.chapter-box');
-          chapterBoxes[chapterIdx + 1]?.scrollIntoView?.({ behavior: 'instant', block: 'center' });
-        }
-      });
-      btnRow.appendChild(nextBtn);
-    }
-    btnRow.appendChild(menuBtn);
-    btnRow.appendChild(remainBtn);
-
-    box.appendChild(btnRow);
-    modal.appendChild(box);
-    document.body.appendChild(modal);
-
-    spawnConfetti(() => {});
-  }
+  // (Owned by CampaignManager; showChapterMap delegates to this._campaign.showChapterMap)
 
   /**
    * Estimate the total vertical pixels consumed by UI elements that appear
@@ -729,11 +521,10 @@ export class Game implements InputCallbacks {
     this.screen = GameScreen.Play;
     this.levelSelectEl.style.display = 'none';
     this.playScreenEl.style.display  = 'flex';
-    if (this._chapterMapScreen) this._chapterMapScreen.screenEl.style.display = 'none';
+    this._campaign.hideChapterMap();
     this.winModalEl.style.display         = 'none';
     this.gameoverModalEl.style.display    = 'none';
-    this._newChapterModalEl.style.display = 'none';
-    this._challengeModalEl.style.display  = 'none';
+    this._campaign.hideCampaignModals();
     this._exitConfirmModalEl.style.display = 'none';
     this._unplayableModalEl.style.display = 'none';
     this._clearModalSparkle(this.winModalEl);
@@ -764,9 +555,9 @@ export class Game implements InputCallbacks {
   /** Start (or restart) the given level. */
   startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[]): void {
     // Look up the level in the active campaign; no-op if no campaign is active.
-    if (!this._activeCampaign) return;
+    if (!this._campaign.activeCampaign) return;
     let level: LevelDef | undefined;
-    for (const ch of this._activeCampaign.chapters) {
+    for (const ch of this._campaign.activeCampaign.chapters) {
       level = ch.levels.find((l) => l.id === levelId);
       if (level) break;
     }
@@ -780,7 +571,7 @@ export class Game implements InputCallbacks {
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
 
-    this._updateLevelHeader(levelId);
+    this._campaign.updateLevelHeader(levelId);
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
     this._updateBestScoreBox(levelId);
@@ -798,34 +589,10 @@ export class Game implements InputCallbacks {
     }
   }
 
-  /** Update the level-header element with the current chapter, level number and name. */
-  private _updateLevelHeader(levelId: number): void {
-    const chapters = this._activeCampaign?.chapters ?? [];
-    for (let ci = 0; ci < chapters.length; ci++) {
-      const chapter = chapters[ci];
-      const idx = chapter.levels.findIndex((l) => l.id === levelId);
-      if (idx !== -1) {
-        this.currentChapterId = chapter.id;
-        const level = chapter.levels[idx];
-        const campaignPrefix = this._activeCampaign
-          ? `${this._activeCampaign.name}  ·  `
-          : '';
-        const chapterNumber = ci + 1;
-        const challengeSuffix = level.challenge ? '  💀' : '';
-        this.levelHeaderEl.textContent =
-          `${campaignPrefix}Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}${challengeSuffix}`;
-        return;
-      }
-    }
-    // Fallback if level isn't in any chapter
-    this.currentChapterId = 0;
-    const allLevels = chapters.flatMap((ch) => ch.levels);
-    const level = allLevels.find((l) => l.id === levelId);
-    const challengeSuffix = level?.challenge ? '  💀' : '';
-    this.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}${challengeSuffix}` : '';
-  }
+  // ─── Level-select rendering ───────────────────────────────────────────────
+  // Delegated to CampaignManager. Private proxy kept for test backward compatibility.
 
-  /** Show or hide the note and hint boxes based on the current level's metadata. */
+  private _renderLevelList(): void { this._campaign.renderLevelList(); }
   private _updateNoteHintBoxes(level: LevelDef): void {
     // Note box
     if (level.note) {
@@ -876,39 +643,6 @@ export class Game implements InputCallbacks {
       // Next hint is nested inside this hint's text element
       containerEl = textEl;
     });
-  }
-
-  // ─── Level-select rendering ───────────────────────────────────────────────
-
-  private _renderLevelList(): void {
-    const campaignChapters = this._activeCampaign?.chapters ?? [];
-    const displayProgress = this._activeCampaign ? this._activeCampaignProgress : this.completedLevels;
-    const levelStars = loadLevelStars(this._activeCampaign?.id);
-    const levelWater = loadLevelWater(this._activeCampaign?.id);
-    let activeCampaignInfo: { name: string; author: string; completionPct: number } | undefined;
-    if (this._activeCampaign) {
-      const pct = computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress);
-      activeCampaignInfo = {
-        name: this._activeCampaign.name,
-        author: this._activeCampaign.author,
-        completionPct: pct,
-      };
-    }
-    renderLevelList(
-      this.levelListEl,
-      displayProgress,
-      (id) => this.requestLevel(id),
-      () => { this.resetConfirmModalEl.style.display = 'flex'; },
-      () => { this._rulesModalEl.style.display = 'flex'; },
-      () => { this._openCampaignEditor(); },
-      () => { this._unlockAll(); },
-      activeCampaignInfo,
-      campaignChapters,
-      levelStars,
-      levelWater,
-      (ci) => this._showChapterMap(ci),
-      this._activeCampaignCompletedChapters,
-    );
   }
 
   // ─── Inventory bar rendering ──────────────────────────────────────────────
@@ -1154,25 +888,6 @@ export class Game implements InputCallbacks {
     this._clearModalSparkle(modalEl);
   }
 
-  /** Show the new-chapter intro modal for the given chapter (by 0-based index). */
-  private _showNewChapterModal(chapterIdx: number, chapter: ChapterDef): void {
-    this._newChapterNumberEl.textContent = `Chapter ${chapterIdx + 1}`;
-    this._newChapterNameEl.textContent = chapter.name;
-    this._newChapterModalEl.style.display = 'flex';
-    this._triggerModalSparkle(this._newChapterModalEl, 'sparkle-blue');
-  }
-
-  /** Show the challenge-level warning modal.
-   * @param canSkip When true, show the skip button and skip description (sequential flow).
-   *                When false, hide them (player directly selected this level).
-   */
-  private _showChallengeLevelModal(canSkip: boolean): void {
-    this._challengeMsgEl.style.display    = canSkip ? '' : 'none';
-    this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
-    this._challengeModalEl.style.display = 'flex';
-    this._triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
-  }
-
   /**
    * Check win/lose conditions after a player move and, if game-over was triggered,
    * discard the losing move from history so the player cannot redo into a lost state.
@@ -1217,15 +932,15 @@ export class Game implements InputCallbacks {
     const starsCollected = this.board.getStarsCollected();
     const waterRemaining = this.board.getCurrentWater();
     const isChallenge = !!this.currentLevel.challenge;
-    this._markLevelCompleted(this.currentLevel.id);
-    this._saveStars(this.currentLevel.id, starsCollected);
+    this._campaign.markLevelCompleted(this.currentLevel.id);
+    this._campaign.saveStars(this.currentLevel.id, starsCollected);
     // Load previous best before saving so we can detect a new personal record.
     // Skip the comparison during playtesting (data isn't persisted in that mode).
     let previousBest: number | undefined;
-    if (!this._playtestExitCallback) {
-      previousBest = loadLevelWater(this._activeCampaign?.id)[this.currentLevel.id] as number | undefined;
+    if (!this._campaign.isPlaytesting) {
+      previousBest = this._campaign.loadBestWater(this.currentLevel.id) ?? undefined;
     }
-    this._saveWater(this.currentLevel.id, waterRemaining);
+    this._campaign.saveWater(this.currentLevel.id, waterRemaining);
     // Show challenge skull icon on win modal when the completed level is a challenge level
     if (this.winChallengeEl) {
       if (isChallenge) {
@@ -1758,61 +1473,7 @@ export class Game implements InputCallbacks {
   /** Advance to the next level in the campaign/chapter sequence. */
   nextLevel(): void {
     if (!this.currentLevel) return;
-    if (!this._activeCampaign) { this.exitToMenu(); return; }
-    const chapters = this._activeCampaign.chapters;
-    // Collect all levels in order
-    const allLevels = chapters.flatMap((ch) => ch.levels);
-    const idx = allLevels.findIndex((l) => l.id === this.currentLevel!.id);
-    if (idx === -1 || idx + 1 >= allLevels.length) {
-      // No next level – go back to the level-select menu
-      this.exitToMenu();
-      return;
-    }
-
-    const nextLevelDef = allLevels[idx + 1];
-    this._pendingLevelId = nextLevelDef.id;
-
-    // Detect if this transition crosses a chapter boundary into a new chapter's first level
-    const currentChapter = chapters.find((ch) => ch.levels.some((l) => l.id === this.currentLevel!.id));
-    const nextChapter = chapters.find((ch) => ch.levels.some((l) => l.id === nextLevelDef.id));
-
-    // If we just completed the last level of a grid-map chapter, go back to the chapter map
-    if (currentChapter?.grid && nextChapter && currentChapter !== nextChapter) {
-      this._pendingLevelId = null;
-      this.winModalEl.style.display = 'none';
-      this._winFromChapterMap = true;
-      this.winMenuBtnEl.textContent = 'Chapter Map';
-      this._showChapterMap(chapters.indexOf(currentChapter));
-      return;
-    }
-
-    if (
-      currentChapter !== undefined &&
-      nextChapter !== undefined &&
-      currentChapter !== nextChapter &&
-      nextChapter.levels[0].id === nextLevelDef.id
-    ) {
-      const chapterIdx = chapters.indexOf(nextChapter);
-      // If the next chapter has a grid map, show the map screen instead of starting the level
-      if (nextChapter.grid) {
-        this._pendingLevelId = null;
-        this.winModalEl.style.display = 'none';
-        this._winFromChapterMap = true;
-        this.winMenuBtnEl.textContent = 'Chapter Map';
-        this._showChapterMap(chapterIdx);
-        // Show the new chapter modal on the chapter map screen
-        this._showNewChapterModal(chapterIdx, nextChapter);
-      } else {
-        this.startLevel(nextLevelDef.id);
-        this._showNewChapterModal(chapterIdx, nextChapter);
-      }
-    } else if (nextLevelDef.challenge) {
-      this.startLevel(nextLevelDef.id);
-      this._showChallengeLevelModal(/* canSkip */ true);
-    } else {
-      this._pendingLevelId = null;
-      this.startLevel(nextLevelDef.id);
-    }
+    this._campaign.nextLevelFrom(this.currentLevel.id);
   }
 
   /**
@@ -1821,17 +1482,7 @@ export class Game implements InputCallbacks {
    * Use this instead of `startLevel()` when navigating from the level-select screen.
    */
   requestLevel(levelId: number): void {
-    if (!this._activeCampaign) return;
-    const chapters = this._activeCampaign.chapters;
-    const allLevels = chapters.flatMap((ch) => ch.levels);
-    const level = allLevels.find((l) => l.id === levelId);
-    if (level?.challenge) {
-      this._pendingLevelId = levelId;
-      this.startLevel(levelId);
-      this._showChallengeLevelModal(/* canSkip */ false);
-    } else {
-      this.startLevel(levelId);
-    }
+    this._campaign.requestLevel(levelId);
   }
 
   /**
@@ -1840,19 +1491,7 @@ export class Game implements InputCallbacks {
    * challenge-level modal when the pending level is a challenge.
    */
   startChapterLevel(): void {
-    this._closeModal(this._newChapterModalEl);
-    if (this._pendingLevelId === null) return;
-
-    const chapters = this._activeCampaign?.chapters ?? [];
-    const allLevels = chapters.flatMap((ch) => ch.levels);
-    const level = allLevels.find((l) => l.id === this._pendingLevelId);
-    if (level?.challenge) {
-      this._showChallengeLevelModal(/* canSkip */ true);
-    } else {
-      const id = this._pendingLevelId;
-      this._pendingLevelId = null;
-      this.startLevel(id);
-    }
+    this._campaign.startChapterLevel();
   }
 
   /**
@@ -1860,11 +1499,7 @@ export class Game implements InputCallbacks {
    * Dismisses the challenge modal and starts the pending level.
    */
   playChallengeLevel(): void {
-    this._closeModal(this._challengeModalEl);
-    if (this._pendingLevelId === null) return;
-    const id = this._pendingLevelId;
-    this._pendingLevelId = null;
-    this.startLevel(id);
+    this._campaign.playChallengeLevel();
   }
 
   /**
@@ -1872,19 +1507,7 @@ export class Game implements InputCallbacks {
    * Dismisses the challenge modal and advances to the next level after the challenge.
    */
   skipChallengeLevel(): void {
-    this._closeModal(this._challengeModalEl);
-    if (this._pendingLevelId === null) { this.exitToMenu(); return; }
-
-    const chapters = this._activeCampaign?.chapters ?? [];
-    const allLevels = chapters.flatMap((ch) => ch.levels);
-    const idx = allLevels.findIndex((l) => l.id === this._pendingLevelId);
-    this._pendingLevelId = null;
-
-    if (idx !== -1 && idx + 1 < allLevels.length) {
-      this.startLevel(allLevels[idx + 1].id);
-    } else {
-      this.exitToMenu();
-    }
+    this._campaign.skipChallengeLevel();
   }
 
   /**
@@ -1973,17 +1596,16 @@ export class Game implements InputCallbacks {
 
   /** Exit to the level-selection screen. */
   exitToMenu(): void {
-    if (this._playtestExitCallback) {
-      const cb = this._playtestExitCallback;
-      this._playtestExitCallback = null;
+    if (this._campaign.isPlaytesting) {
+      const cb = this._campaign.takePlaytestCallback()!;
       this._showLevelSelect();
       cb(); // re-open the campaign editor
-    } else if (this._winFromChapterMap && this._chapterMapScreen?.chapter) {
-      this._winFromChapterMap = false;
-      this._chapterMapScreen.repopulate(this._activeCampaign!);
+    } else if (this._campaign.winFromChapterMap && this._campaign.chapterMapScreen?.chapter) {
+      this._campaign.winFromChapterMap = false;
+      this._campaign.repopulateChapterMap();
       this.levelSelectEl.style.display = 'none';
       this.playScreenEl.style.display = 'none';
-      this._chapterMapScreen.screenEl.style.display = 'flex';
+      this._campaign.chapterMapScreen.screenEl.style.display = 'flex';
       this.winModalEl.style.display = 'none';
       this.screen = GameScreen.ChapterMap;
     } else {
@@ -1997,33 +1619,10 @@ export class Game implements InputCallbacks {
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────
+  // Delegated to CampaignManager. Private proxy kept for test backward compatibility.
 
-  /** Open the campaign editor overlay (hides the level-select screen first). */
-  private _openCampaignEditor(): void {
-    this.screen = GameScreen.CampaignEditor;
-    this.levelSelectEl.style.display = 'none';
-    this.campaignEditor.show();
-  }
-
-  /**
-   * Start a level in play-mode for playtesting from the campaign editor.
-   * When the player exits, the campaign editor is re-opened.
-   */
-  private _playtestLevel(level: LevelDef): void {
-    this.campaignEditor.hide();
-    this._playtestExitCallback = () => {
-      this.levelSelectEl.style.display = 'none';
-      this.campaignEditor.showAndRestore();
-    };
-    // Update modal menu buttons so they say "Return to Editor" instead of "Level Select".
-    this.winMenuBtnEl.textContent = '↩ Return to Editor';
-    this.gameoverMenuBtnEl.textContent = '↩ Return to Editor';
-    // Hide the "Next Level" button — it makes no sense when playtesting a single level.
-    this.winNextBtnEl.style.display = 'none';
-    // Update HUD exit button so it says "Edit" instead of "Menu".
-    this.exitBtnEl.textContent = '← Edit';
-    this.startLevelDef(level);
-  }
+  private _openCampaignEditor(): void { this._campaign.openCampaignEditor(); }
+  private _playtestLevel(level: LevelDef): void { this._campaign.playtestLevel(level); }
 
   /**
    * Start any given LevelDef in play mode.
@@ -2033,7 +1632,7 @@ export class Game implements InputCallbacks {
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level);
     this._enterPlayScreenState(level);
-    this.currentChapterId = 0;
+    this._campaign.currentChapterId = 0;
     this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
@@ -2062,117 +1661,80 @@ export class Game implements InputCallbacks {
    * Shows a stars row when at least one star has been obtained.
    */
   private _updateBestScoreBox(levelId: number): void {
-    const levelWater = loadLevelWater(this._activeCampaign?.id);
-    const bestWater = levelWater[levelId] as number | undefined;
-    if (bestWater === undefined) {
+    const bestWater = this._campaign.loadBestWater(levelId);
+    if (bestWater === null) {
       this._bestScoreBoxEl.style.display = 'none';
       return;
     }
     this._bestScoreBoxEl.style.display = 'flex';
     this._bestScoreWaterValueEl.textContent = `${bestWater}`;
-    const levelStars = loadLevelStars(this._activeCampaign?.id);
+    const levelStars = this._campaign.loadBestStars();
     const stars = levelStars[levelId] ?? 0;
     Game._showStatRow(this._bestScoreStarsRowEl, this._bestScoreStarsValueEl, stars > 0 ? stars : null);
   }
 
-  private _markLevelCompleted(levelId: number): void {
-    if (this._playtestExitCallback) return; // don't persist progress during playtesting
-    if (this._activeCampaign) {
-      markCampaignLevelCompleted(this._activeCampaign.id, levelId, this._activeCampaignProgress);
-    } else {
-      markLevelCompleted(this.completedLevels, levelId);
-    }
-  }
+  // ─── Campaign management delegates ────────────────────────────────────────
+  // Private delegates kept for test backward compatibility (tests access these
+  // via `game as unknown as GameTestHooks`).
 
-  /** Save the number of stars collected for a level (no-op during playtesting). */
-  private _saveStars(levelId: number, count: number): void {
-    if (this._playtestExitCallback) return; // don't persist progress during playtesting
-    saveLevelStar(levelId, count, this._activeCampaign?.id);
-  }
+  private _markLevelCompleted(levelId: number): void { this._campaign.markLevelCompleted(levelId); }
+  private _saveStars(levelId: number, count: number): void { this._campaign.saveStars(levelId, count); }
+  private _saveWater(levelId: number, water: number): void { this._campaign.saveWater(levelId, water); }
+  private _resetProgress(): void { this._campaign.resetProgress(); }
+  private _unlockAll(): void { this._campaign.unlockAll(); }
+  private _activateCampaign(campaign: CampaignDef): void { this._campaign.activate(campaign); }
+  private _deactivateCampaign(): void { this._campaign.deactivate(); }
 
-  /** Save the water remaining for a level (no-op during playtesting; only records the max). */
-  private _saveWater(levelId: number, water: number): void {
-    if (this._playtestExitCallback) return; // don't persist progress during playtesting
-    saveLevelWater(levelId, water, this._activeCampaign?.id);
-  }
-
-  /** Clear all level-completion progress and refresh the level list. */
-  private _resetProgress(): void {
-    if (this._activeCampaign) {
-      clearCampaignProgress(this._activeCampaign.id, this._activeCampaignProgress);
-      clearLevelStars(this._activeCampaign.id);
-      clearLevelWater(this._activeCampaign.id);
-      clearCompletedChapters(this._activeCampaign.id, this._activeCampaignCompletedChapters);
-    } else {
-      clearCompletedLevels(this.completedLevels);
-      clearLevelStars();
-      clearLevelWater();
-    }
-    this._renderLevelList();
-  }
-
-  /** Dev cheat: mark all levels completed and refresh the level list. */
-  private _unlockAll(): void {
-    if (this._activeCampaign) {
-      const allIds = this._activeCampaign.chapters.flatMap((ch) => ch.levels.map((l) => l.id));
-      for (const id of allIds) {
-        markCampaignLevelCompleted(this._activeCampaign.id, id, this._activeCampaignProgress);
-      }
-    }
-    this._renderLevelList();
-  }
-
-  // ─── Active campaign management ───────────────────────────────────────────
-
-  /** Activate a campaign for play on the main menu. */
-  private _activateCampaign(campaign: CampaignDef): void {
-    this._activeCampaign = campaign;
-    this._activeCampaignProgress = loadCampaignProgress(campaign.id);
-    this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
-    saveActiveCampaignId(campaign.id);
-    this._showLevelSelect();
-  }
-
-  /** Deactivate the current campaign and return to the official campaign. */
-  private _deactivateCampaign(): void {
-    this._activeCampaign = null;
-    this._activeCampaignProgress = new Set();
-    clearActiveCampaignId();
-    this._showLevelSelect();
-  }
+  // ─── Backward-compat proxy getters for test hooks ─────────────────────────
+  // Tests cast Game to GameTestHooks and access these private members directly.
 
   /**
-   * Auto-select a campaign when none is saved.
-   * Prefers the first official campaign; falls back to the first available campaign.
-   * Called during construction when no active campaign ID is stored.
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the new-chapter modal element (owned by CampaignManager).
    */
-  private _autoSelectCampaign(): void {
-    const allCampaigns = this.campaignEditor.getAllCampaigns();
-    if (allCampaigns.length === 0) return;
-    const campaign = allCampaigns.find((c) => c.official === true) ?? allCampaigns[0];
-    this._activeCampaign = campaign;
-    this._activeCampaignProgress = loadCampaignProgress(campaign.id);
-    this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
-    saveActiveCampaignId(campaign.id);
-  }
+  private get _newChapterModalEl(): HTMLElement { return this._campaign._newChapterModalElInternal; }
 
   /**
-   * Restore the active campaign from a persisted campaign ID.
-   * Called during construction to reload the previous session's active campaign.
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the challenge-level modal element (owned by CampaignManager).
    */
-  private _restoreActiveCampaign(campaignId: string): void {
-    // The campaign editor manages user campaigns; reload them to find the campaign.
-    const allCampaigns = this.campaignEditor.getAllCampaigns();
-    const campaign = allCampaigns.find((c) => c.id === campaignId);
-    if (campaign) {
-      this._activeCampaign = campaign;
-      this._activeCampaignProgress = loadCampaignProgress(campaign.id);
-      this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
-    } else {
-      // Campaign no longer exists – clear the persisted ID.
-      clearActiveCampaignId();
-    }
-  }
+  private get _challengeModalEl(): HTMLElement { return this._campaign._challengeModalElInternal; }
+
+  /**
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the challenge description element (owned by CampaignManager).
+   */
+  private get _challengeMsgEl(): HTMLElement { return this._campaign._challengeMsgElInternal; }
+
+  /**
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the challenge skip button (owned by CampaignManager).
+   */
+  private get _challengeSkipBtnEl(): HTMLButtonElement { return this._campaign._challengeSkipBtnElInternal; }
+
+  /**
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the pending level ID (or null).
+   */
+  private get _pendingLevelId(): number | null { return this._campaign._pendingLevelIdInternal; }
+
+  /**
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the playtest exit callback (or null when not playtesting).
+   */
+  private get _playtestExitCallback(): (() => void) | null { return this._campaign._playtestExitCallbackInternal; }
+
+  /**
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the active campaign (or null for the official campaign).
+   */
+  private get _activeCampaign(): CampaignDef | null { return this._campaign.activeCampaign; }
+
+  /**
+   * @internal Test proxy – delegates to the campaign manager.
+   * Returns the campaign progress Set (read/write by reference).
+   */
+  private get _activeCampaignProgress(): Set<number> { return this._campaign.progress; }
 }
 
 // Re-export for backward compatibility with tests that import InventoryItem via game.ts
