@@ -47,15 +47,6 @@ export class CampaignEditor {
   /** Service that owns all campaign/chapter/level data state and persistence. */
   private _service: CampaignService;
 
-  /**
-   * Backward-compat accessor so that tests (which cast the editor to a plain
-   * object type) can still read `_campaigns` directly.  All editor code should
-   * use `_service.*` instead.
-   */
-  private get _campaigns(): readonly CampaignDef[] {
-    return this._service.campaigns;
-  }
-
   // ── Navigation state ──────────────────────────────────────────────────────
   private _screen: EditorScreen = EditorScreen.List;
   private _activeCampaignId: string | null = null;
@@ -948,35 +939,6 @@ export class CampaignEditor {
     return canvas;
   }
 
-  // ─── Palette panel – backward-compat proxies ─────────────────────────────
-  // Tests cast CampaignEditor to typed interfaces and access these directly.
-  // They delegate to _paramsPanel so that palette logic stays in TileParamsPanel.
-
-  private _buildPalette(): HTMLElement { return this._paramsPanel.buildPalette(); }
-  private _buildParamPanel(): HTMLElement { return this._paramsPanel.buildParamPanel(); }
-
-  // ─── Metadata panel – backward-compat proxies ─────────────────────────────
-  // Tests access these directly; they delegate to _metadataPanel.
-
-  private _buildGridSizePanel(): HTMLElement { return this._metadataPanel!.buildGridSizePanel(); }
-  private _buildInventoryEditor(): HTMLElement { return this._metadataPanel!.buildInventoryEditor(); }
-  private _buildLevelNameSection(readOnly: boolean): HTMLElement { return this._metadataPanel!.buildNameSection(readOnly); }
-  private _buildLevelTextFieldsSection(): HTMLElement { return this._metadataPanel!.buildTextFieldsSection(); }
-  private _buildReadOnlyMetaSection(): HTMLElement { return this._metadataPanel!.buildReadOnlyMetaSection(); }
-
-  private get _goldSectionExpanded(): boolean { return this._paramsPanel.goldSectionExpanded; }
-  private set _goldSectionExpanded(v: boolean) { this._paramsPanel.goldSectionExpanded = v; }
-  private get _leakySectionExpanded(): boolean { return this._paramsPanel.leakySectionExpanded; }
-  private set _leakySectionExpanded(v: boolean) { this._paramsPanel.leakySectionExpanded = v; }
-  private get _chamberSectionExpanded(): boolean { return this._paramsPanel.chamberSectionExpanded; }
-  private set _chamberSectionExpanded(v: boolean) { this._paramsPanel.chamberSectionExpanded = v; }
-  private get _pipesSectionExpanded(): boolean { return this._paramsPanel.pipesSectionExpanded; }
-  private set _pipesSectionExpanded(v: boolean) { this._paramsPanel.pipesSectionExpanded = v; }
-  private get _floorSectionExpanded(): boolean { return this._paramsPanel.floorSectionExpanded; }
-  private set _floorSectionExpanded(v: boolean) { this._paramsPanel.floorSectionExpanded = v; }
-  private get _spinSectionExpanded(): boolean { return this._paramsPanel.spinSectionExpanded; }
-  private set _spinSectionExpanded(v: boolean) { this._paramsPanel.spinSectionExpanded = v; }
-
   private _buildInventoryReadonly(): HTMLElement {
     const panel = document.createElement('div');
     panel.style.cssText =
@@ -1033,22 +995,6 @@ export class CampaignEditor {
     el.textContent = 'Only one source tile is allowed.';
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; }, 2000);
-  }
-
-  // ─── Backward-compat proxies for test access ──────────────────────────────
-  // Tests cast CampaignEditor to typed interfaces and call these methods directly.
-  // They delegate to _editorInput so that gesture logic stays in EditorInputHandler.
-
-  private _onEditorMouseDown(e: MouseEvent): void { this._editorInput?.onMouseDown(e); }
-  private _onEditorMouseUp(e: MouseEvent): void { this._editorInput?.onMouseUp(e); }
-  private _onEditorCanvasMouseMove(e: MouseEvent): void { this._editorInput?.onMouseMove(e); }
-  private _onEditorCanvasWheel(e: WheelEvent): void { this._editorInput?.onWheel(e); }
-  private _onEditorCanvasRightClick(e: MouseEvent): void { this._editorInput?.onRightClick(e); }
-  private get _paintDragActive(): boolean { return this._editorInput?.paintDragActive ?? false; }
-  private get _rightEraseDragActive(): boolean { return this._editorInput?.rightEraseDragActive ?? false; }
-  private get _suppressNextContextMenu(): boolean { return this._editorInput?.suppressNextContextMenu ?? false; }
-  private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
-    return this._editorInput?.canvasPos(e) ?? null;
   }
 
   /** Rebuild and replace the palette and param panels in the DOM. */
