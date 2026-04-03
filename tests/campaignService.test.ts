@@ -8,7 +8,7 @@
 
 import { saveImportedCampaigns, loadImportedCampaigns } from '../src/persistence';
 import { CampaignService, ImportResult } from '../src/campaignEditor';
-import { CampaignDef, LevelDef, PipeShape } from '../src/types';
+import { CampaignDef, LevelDef, PipeShape, TileDef } from '../src/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -492,6 +492,83 @@ describe('CampaignService – reorderLevels', () => {
     const svc = makeService([campaign]);
     svc.reorderLevels(campaign, 0, 0, 2); // move A to position 2
     expect(campaign.chapters[0].levels.map((l) => l.name)).toEqual(['B', 'C', 'A']);
+  });
+
+  it('updates chapter.grid levelIdx references on adjacent swap (move down)', () => {
+    const levelTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'level',
+      levelIdx: idx,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [{
+        id: 1,
+        name: 'Ch',
+        levels: [
+          { id: 1, name: 'A', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          { id: 2, name: 'B', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+        ],
+        grid: [[levelTile(0), levelTile(1)]],
+      }],
+    };
+    const svc = makeService([campaign]);
+    svc.reorderLevels(campaign, 0, 0, 1); // swap A↔B
+    const grid = campaign.chapters[0].grid!;
+    expect((grid[0][0] as TileDef).levelIdx).toBe(1); // was 0 (A), now points to B's new position
+    expect((grid[0][1] as TileDef).levelIdx).toBe(0); // was 1 (B), now points to A's new position
+  });
+
+  it('updates chapter.grid levelIdx references on non-adjacent move', () => {
+    const levelTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'level',
+      levelIdx: idx,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [{
+        id: 1,
+        name: 'Ch',
+        levels: [
+          { id: 1, name: 'A', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          { id: 2, name: 'B', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          { id: 3, name: 'C', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+        ],
+        grid: [[levelTile(0), levelTile(1), levelTile(2)]],
+      }],
+    };
+    const svc = makeService([campaign]);
+    svc.reorderLevels(campaign, 0, 0, 2); // move A (idx 0) to position 2 → [B, C, A]
+    const grid = campaign.chapters[0].grid!;
+    expect((grid[0][0] as TileDef).levelIdx).toBe(2); // was 0 (A), now at position 2
+    expect((grid[0][1] as TileDef).levelIdx).toBe(0); // was 1 (B), shifted left to 0
+    expect((grid[0][2] as TileDef).levelIdx).toBe(1); // was 2 (C), shifted left to 1
+  });
+
+  it('does not touch levelIdx on tiles without chamberContent=level', () => {
+    const otherTile: TileDef = {
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'tank',
+    };
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [{
+        id: 1,
+        name: 'Ch',
+        levels: [
+          { id: 1, name: 'A', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          { id: 2, name: 'B', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+        ],
+        grid: [[otherTile]],
+      }],
+    };
+    const svc = makeService([campaign]);
+    svc.reorderLevels(campaign, 0, 0, 1);
+    expect((campaign.chapters[0].grid![0][0] as TileDef).levelIdx).toBeUndefined();
   });
 });
 

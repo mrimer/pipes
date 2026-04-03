@@ -6,7 +6,7 @@
  * (prompt/confirm dialogs) and tells CampaignService what to do.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef } from '../types';
+import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape } from '../types';
 import {
   loadImportedCampaigns,
   saveImportedCampaigns,
@@ -280,6 +280,22 @@ export class CampaignService {
     ) return;
     const [moved] = levels.splice(fromIdx, 1);
     levels.splice(toIdx, 0, moved);
+    if (chapter.grid) {
+      for (const row of chapter.grid) {
+        for (const tile of row) {
+          if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined) {
+            const i = tile.levelIdx;
+            if (i === fromIdx) {
+              tile.levelIdx = toIdx;
+            } else if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
+              tile.levelIdx = i - 1;
+            } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
+              tile.levelIdx = i + 1;
+            }
+          }
+        }
+      }
+    }
     this.touch(campaign);
     this.save();
   }
