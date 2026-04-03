@@ -14,6 +14,7 @@ import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignI
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
+import { LevelEditorState } from './levelEditorState';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
@@ -117,29 +118,15 @@ export class CampaignEditor {
   private _activeChapterIdx = -1;
   private _activeLevelIdx = -1;
 
-  // ── Level editor state ────────────────────────────────────────────────────
-  private _editLevelName = 'New Level';
-  private _editLevelNote = '';
-  private _editLevelHints: string[] = [''];
-  private _editLevelChallenge = false;
-  private _editRows = 6;
-  private _editCols = 6;
-  private _editGrid: (TileDef | null)[][] = [];
-  private _editInventory: InventoryItem[] = [];
-  private _editorPalette: EditorPalette = PipeShape.Source;
-  private _editorParams: TileParams = { ...DEFAULT_PARAMS };
+  // ── Level editor state (owned by LevelEditorState) ────────────────────────
+  private _state: LevelEditorState = new LevelEditorState();
+
+  // ── Level editor DOM/drag state (stays on CampaignEditor) ─────────────────
   private _editorCanvas: HTMLCanvasElement | null = null;
   private _editorCtx: CanvasRenderingContext2D | null = null;
-  private _editorHover: { row: number; col: number } | null = null;
-  private _editorHistory: EditorSnapshot[] = [];
-  private _editorHistoryIdx = -1;
-  private _goldSectionExpanded = false;
-  private _leakySectionExpanded = false;
-  private _chamberSectionExpanded = false;
-  private _pipesSectionExpanded = false;
-  private _floorSectionExpanded = false;
-  private _spinSectionExpanded = false;
   private _editorSourceErrorEl: HTMLDivElement | null = null;
+  /** The outermost flex container of the level editor layout, used to measure available canvas space. */
+  private _editorMainLayout: HTMLElement | null = null;
   /** Drag state: set when the user is dragging a tile across the grid. */
   private _dragState: {
     startPos: { row: number; col: number };
@@ -158,16 +145,13 @@ export class CampaignEditor {
    * contextmenu event (if it fires) should be suppressed.
    */
   private _suppressNextContextMenu = false;
-  /** Grid position of the tile currently linked for live param editing, or null if no link active. */
-  private _linkedTilePos: { row: number; col: number } | null = null;
-  /** True once the first param change in the current linked session has been committed. */
-  private _linkedTileDirty = false;
-  /** True when the level editor has unsaved changes (any snapshot recorded after initial open). */
-  private _editorUnsavedChanges = false;
-  /** The history index at which the level was last saved (or 0 if never saved in this session). */
-  private _editorSavedHistoryIdx = 0;
-  /** The outermost flex container of the level editor layout, used to measure available canvas space. */
-  private _editorMainLayout: HTMLElement | null = null;
+  /** Palette section expand flags (UI-only). */
+  private _goldSectionExpanded = false;
+  private _leakySectionExpanded = false;
+  private _chamberSectionExpanded = false;
+  private _pipesSectionExpanded = false;
+  private _floorSectionExpanded = false;
+  private _spinSectionExpanded = false;
 
   private readonly _onClose: () => void;
   private readonly _onPlaytest: (level: LevelDef) => void;
@@ -220,11 +204,10 @@ export class CampaignEditor {
       if (this._screen !== EditorScreen.LevelEditor) return;
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
-      if (e.key === 'Escape' && this._linkedTilePos !== null) {
+      if (e.key === 'Escape' && this._state.linkedTilePos !== null) {
         // Unlink the linked tile
         e.preventDefault();
-        this._linkedTilePos = null;
-        this._linkedTileDirty = false;
+        this._state.clearLink();
         this._renderEditorCanvas();
       }
       // Q = rotate counter-clockwise, W = rotate clockwise (mirrors in-game mouse wheel)
@@ -234,8 +217,8 @@ export class CampaignEditor {
         const key = e.key.toLowerCase();
         if (key === 'q' || key === 'w') {
           e.preventDefault();
-          this._rotateEditorPalette(key === 'w');
-          if (this._linkedTilePos) this._applyParamsToLinkedTile();
+          this._state.rotatePalette(key === 'w');
+          if (this._state.linkedTilePos) this._state.applyParamsToLinkedTile();
           this._refreshPaletteUI();
           this._renderEditorCanvas();
         }
@@ -964,24 +947,7 @@ export class CampaignEditor {
   // ─── Screen: Level editor ─────────────────────────────────────────────────
 
   private _openLevelEditor(level: LevelDef, readOnly: boolean): void {
-    this._editLevelName = level.name;
-    this._editLevelNote = level.note ?? '';
-    this._editLevelHints = level.hints?.length ? [...level.hints] : [''];
-    this._editLevelChallenge = level.challenge ?? false;
-    this._editRows = level.rows;
-    this._editCols = level.cols;
-    this._editGrid = JSON.parse(JSON.stringify(level.grid)) as (TileDef | null)[][];
-    this._editInventory = JSON.parse(JSON.stringify(level.inventory)) as InventoryItem[];
-    this._editorPalette = PipeShape.Source;
-    this._editorParams = { ...DEFAULT_PARAMS };
-    this._editorHistory = [];
-    this._editorHistoryIdx = -1;
-    this._editorHover = null;
-    this._linkedTilePos = null;
-    this._linkedTileDirty = false;
-    this._editorUnsavedChanges = false;
-    this._editorSavedHistoryIdx = 0;
-    this._recordEditorSnapshot();
+    this._state.initFromLevel(level);
     this._showLevelEditor(readOnly);
   }
 
@@ -995,9 +961,9 @@ export class CampaignEditor {
     if (!chapter) { this._showCampaignDetail(); return; }
 
     const toolbar = this._buildToolbar(
-      readOnly ? `👁 View Level: ${this._editLevelName}` : `✏️ Level Editor`,
+      readOnly ? `👁 View Level: ${this._state.levelName}` : `✏️ Level Editor`,
       () => {
-        if (!readOnly && this._editorUnsavedChanges) {
+        if (!readOnly && this._state.hasUnsavedChanges) {
           this._showUnsavedModal(
             () => {
               this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
@@ -1142,18 +1108,18 @@ export class CampaignEditor {
       nameLbl.style.cssText = 'font-size:0.85rem;color:#aaa;';
       const nameInp = document.createElement('input');
       nameInp.type = 'text';
-      nameInp.value = this._editLevelName;
+      nameInp.value = this._state.levelName;
       nameInp.style.cssText =
         'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
         'border:1px solid #4a90d9;border-radius:4px;flex:1;';
-      nameInp.addEventListener('input', () => { this._editLevelName = nameInp.value; });
+      nameInp.addEventListener('input', () => { this._state.levelName = nameInp.value; });
       nameWrap.appendChild(nameLbl);
       nameWrap.appendChild(nameInp);
       return nameWrap;
     } else {
       const lvlNameEl = document.createElement('div');
       lvlNameEl.style.cssText = 'font-size:1rem;font-weight:bold;color:#f0c040;';
-      lvlNameEl.textContent = this._editLevelName;
+      lvlNameEl.textContent = this._state.levelName;
       return lvlNameEl;
     }
   }
@@ -1165,9 +1131,9 @@ export class CampaignEditor {
    */
   private _buildEditorCanvasSection(readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
-    setTileSize(computeTileSize(this._editRows, this._editCols));
-    canvas.width  = this._editCols * TILE_SIZE;
-    canvas.height = this._editRows * TILE_SIZE;
+    setTileSize(computeTileSize(this._state.rows, this._state.cols));
+    canvas.width  = this._state.cols * TILE_SIZE;
+    canvas.height = this._state.rows * TILE_SIZE;
     canvas.style.cssText =
       `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:4px;cursor:` + (readOnly ? 'default' : 'crosshair') + ';' +
       'display:block;';
@@ -1188,18 +1154,20 @@ export class CampaignEditor {
         this._onEditorCanvasRightClick(e);
       });
       canvas.addEventListener('mouseleave',  () => {
-        this._editorHover = null;
+        this._state.hover = null;
         // Cancel any active drag when the mouse leaves the canvas.
         if (this._dragState) {
           this._dragState = null;
         }
         if (this._paintDragActive) {
           this._paintDragActive = false;
-          this._recordEditorSnapshot();
+          this._state.recordSnapshot();
+          this._updateEditorUndoRedoButtons();
         }
         if (this._rightEraseDragActive) {
           this._rightEraseDragActive = false;
-          this._recordEditorSnapshot();
+          this._state.recordSnapshot();
+          this._updateEditorUndoRedoButtons();
         }
         this._renderEditorCanvas();
       });
@@ -1245,10 +1213,10 @@ export class CampaignEditor {
     noteLbl.textContent = 'Note (shown beneath the grid while playing):';
     noteLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
     const noteInp = document.createElement('textarea');
-    noteInp.value = this._editLevelNote;
+    noteInp.value = this._state.levelNote;
     noteInp.placeholder = 'Optional – displayed in a box below the puzzle grid.';
     noteInp.style.cssText = textareaStyle;
-    noteInp.addEventListener('input', () => { this._editLevelNote = noteInp.value; });
+    noteInp.addEventListener('input', () => { this._state.levelNote = noteInp.value; });
     noteWrap.appendChild(noteLbl);
     noteWrap.appendChild(noteInp);
     container.appendChild(noteWrap);
@@ -1265,7 +1233,7 @@ export class CampaignEditor {
 
     const rebuildHintList = (): void => {
       hintListEl.innerHTML = '';
-      this._editLevelHints.forEach((hint, idx) => {
+      this._state.levelHints.forEach((hint, idx) => {
         const rowEl = document.createElement('div');
         rowEl.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
         const inp = document.createElement('textarea');
@@ -1274,7 +1242,7 @@ export class CampaignEditor {
           ? 'Hint 1 – hidden until the player clicks "Show Hint".'
           : `Hint ${idx + 1} – revealed after expanding the previous hint.`;
         inp.style.cssText = textareaStyle + 'border-color:#f0c040;flex:1;';
-        inp.addEventListener('input', () => { this._editLevelHints[idx] = inp.value; });
+        inp.addEventListener('input', () => { this._state.levelHints[idx] = inp.value; });
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.textContent = '✕';
@@ -1283,8 +1251,8 @@ export class CampaignEditor {
           'padding:4px 7px;font-size:0.8rem;background:#2c1a00;color:#f0c040;' +
           'border:1px solid #f0c040;border-radius:4px;cursor:pointer;flex-shrink:0;';
         removeBtn.addEventListener('click', () => {
-          this._editLevelHints.splice(idx, 1);
-          if (this._editLevelHints.length === 0) this._editLevelHints = [''];
+          this._state.levelHints.splice(idx, 1);
+          if (this._state.levelHints.length === 0) this._state.levelHints = [''];
           rebuildHintList();
         });
         rowEl.appendChild(inp);
@@ -1303,7 +1271,7 @@ export class CampaignEditor {
       'align-self:flex-start;padding:4px 10px;font-size:0.8rem;background:#1a1400;color:#f0c040;' +
       'border:1px solid #f0c040;border-radius:4px;cursor:pointer;';
     addHintBtn.addEventListener('click', () => {
-      this._editLevelHints.push('');
+      this._state.levelHints.push('');
       rebuildHintList();
     });
     hintWrap.appendChild(addHintBtn);
@@ -1315,8 +1283,8 @@ export class CampaignEditor {
     const challengeChk = document.createElement('input');
     challengeChk.type = 'checkbox';
     challengeChk.id = 'editor-challenge-chk';
-    challengeChk.checked = this._editLevelChallenge;
-    challengeChk.addEventListener('change', () => { this._editLevelChallenge = challengeChk.checked; });
+    challengeChk.checked = this._state.levelChallenge;
+    challengeChk.addEventListener('change', () => { this._state.levelChallenge = challengeChk.checked; });
     const challengeLbl = document.createElement('label');
     challengeLbl.htmlFor = 'editor-challenge-chk';
     challengeLbl.textContent = '💀 Challenge level (optional – not required to unlock next chapter)';
@@ -1332,14 +1300,14 @@ export class CampaignEditor {
   private _buildReadOnlyMetaSection(): HTMLElement {
     const container = document.createElement('div');
     container.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
-    if (this._editLevelNote) {
-      container.appendChild(this._createInfoBox('#4a90d9', `📝 ${this._editLevelNote}`));
+    if (this._state.levelNote) {
+      container.appendChild(this._createInfoBox('#4a90d9', `📝 ${this._state.levelNote}`));
     }
-    const activeHints = this._editLevelHints.filter(h => h.trim());
+    const activeHints = this._state.levelHints.filter(h => h.trim());
     if (activeHints.length > 0) {
       container.appendChild(this._createInfoBox('#f0c040', `💡 ${activeHints.join(' → ')}`));
     }
-    if (this._editLevelChallenge) {
+    if (this._state.levelChallenge) {
       container.appendChild(this._createInfoBox('#e74c3c', '💀 Challenge level'));
     }
     return container;
@@ -1447,9 +1415,9 @@ export class CampaignEditor {
     title.textContent = 'TILE PALETTE';
     panel.appendChild(title);
 
-    const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
-    const isLeakySelected = this._LEAKY_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
-    const isFloorSelected = this._FLOOR_PALETTE_ITEMS.some(i => i.palette === this._editorPalette);
+    const isGoldSelected = this._GOLD_PALETTE_ITEMS.some(i => i.palette === this._state.palette);
+    const isLeakySelected = this._LEAKY_PALETTE_ITEMS.some(i => i.palette === this._state.palette);
+    const isFloorSelected = this._FLOOR_PALETTE_ITEMS.some(i => i.palette === this._state.palette);
     // Auto-expand the gold section if a gold item is currently selected
     if (isGoldSelected) this._goldSectionExpanded = true;
     // Auto-expand the leaky section if a leaky item is currently selected
@@ -1457,18 +1425,18 @@ export class CampaignEditor {
     // Auto-expand the floor section if a floor item is currently selected
     if (isFloorSelected) this._floorSectionExpanded = true;
     // Auto-expand the chamber section if a chamber item is currently selected
-    if (isChamberPalette(this._editorPalette)) this._chamberSectionExpanded = true;
+    if (isChamberPalette(this._state.palette)) this._chamberSectionExpanded = true;
     // Auto-expand the pipes section if a pipe item is currently selected
-    if (this._PIPES_PALETTE_ITEMS.some(i => i.palette === this._editorPalette)) this._pipesSectionExpanded = true;
+    if (this._PIPES_PALETTE_ITEMS.some(i => i.palette === this._state.palette)) this._pipesSectionExpanded = true;
     // Auto-expand the spin section if a spin item is currently selected
-    if (this._SPIN_PALETTE_ITEMS.some(i => i.palette === this._editorPalette)) this._spinSectionExpanded = true;
+    if (this._SPIN_PALETTE_ITEMS.some(i => i.palette === this._state.palette)) this._spinSectionExpanded = true;
 
     const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = item.label;
       btn.dataset['palette'] = String(item.palette);
-      const isSelected = this._editorPalette === item.palette;
+      const isSelected = this._state.palette === item.palette;
       btn.style.cssText =
         'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
         (indent ? 'margin-left:12px;' : '') +
@@ -1477,11 +1445,10 @@ export class CampaignEditor {
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
 
       btn.addEventListener('click', () => {
-        this._editorPalette = item.palette;
-        this._linkedTilePos = null;
-        this._linkedTileDirty = false;
+        this._state.palette = item.palette;
+        this._state.clearLink();
         if (isChamberPalette(item.palette)) {
-          this._editorParams.chamberContent = chamberPaletteContent(item.palette);
+          this._state.params.chamberContent = chamberPaletteContent(item.palette);
         }
         const newPanel = this._buildPalette();
         panel.replaceWith(newPanel);
@@ -1551,7 +1518,7 @@ export class CampaignEditor {
     title.textContent = 'TILE PARAMS';
     panel.appendChild(title);
 
-    const p = this._editorPalette;
+    const p = this._state.palette;
     const isChm = isChamberPalette(p);
     // Spin-cement shapes are in PIPE_SHAPES but do have a parameter (Drying Time), so exclude them
     // from the "no parameters" early-return check.
@@ -1568,9 +1535,11 @@ export class CampaignEditor {
     // Cement: show only Drying Time input.
     // Spin-cement tiles: show Drying Time; rotation is adjusted via wheel/Q/W in the editor.
     if (p === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(p as PipeShape)) {
-      panel.appendChild(this._labeledInput('Drying Time', String(this._editorParams.dryingTime), (v) => {
-        this._editorParams.dryingTime = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
+      panel.appendChild(this._labeledInput('Drying Time', String(this._state.params.dryingTime), (v) => {
+        this._state.params.dryingTime = Math.max(0, parseInt(v) || 0);
+        this._state.applyParamsToLinkedTile();
+        this._updateEditorUndoRedoButtons();
+        this._renderEditorCanvas();
       }, 'number', '90px'));
       return panel;
     }
@@ -1578,21 +1547,27 @@ export class CampaignEditor {
     // Source/Chamber(tank): capacity
     const cc = isChm ? chamberPaletteContent(p as ChamberPalette) : null;
     if (p === PipeShape.Source || cc === 'tank') {
-      panel.appendChild(this._labeledInput('Capacity', String(this._editorParams.capacity), (v) => {
-        this._editorParams.capacity = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
+      panel.appendChild(this._labeledInput('Capacity', String(this._state.params.capacity), (v) => {
+        this._state.params.capacity = Math.max(0, parseInt(v) || 0);
+        this._state.applyParamsToLinkedTile();
+        this._updateEditorUndoRedoButtons();
+        this._renderEditorCanvas();
       }, 'number', '90px'));
     }
 
     // Source: temperature and pressure
     if (p === PipeShape.Source) {
-      panel.appendChild(this._labeledInput('Base Temp', String(this._editorParams.temperature), (v) => {
-        this._editorParams.temperature = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
+      panel.appendChild(this._labeledInput('Base Temp', String(this._state.params.temperature), (v) => {
+        this._state.params.temperature = Math.max(0, parseInt(v) || 0);
+        this._state.applyParamsToLinkedTile();
+        this._updateEditorUndoRedoButtons();
+        this._renderEditorCanvas();
       }, 'number', '90px'));
-      panel.appendChild(this._labeledInput('Base Pressure', String(this._editorParams.pressure), (v) => {
-        this._editorParams.pressure = Math.max(0, parseInt(v) || 0);
-        this._applyParamsToLinkedTile();
+      panel.appendChild(this._labeledInput('Base Pressure', String(this._state.params.pressure), (v) => {
+        this._state.params.pressure = Math.max(0, parseInt(v) || 0);
+        this._state.applyParamsToLinkedTile();
+        this._updateEditorUndoRedoButtons();
+        this._renderEditorCanvas();
       }, 'number', '90px'));
     }
 
@@ -1630,15 +1605,17 @@ export class CampaignEditor {
       const o = document.createElement('option');
       o.value = opt;
       o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
-      if (this._editorParams.chamberContent === opt) o.selected = true;
+      if (this._state.params.chamberContent === opt) o.selected = true;
       sel.appendChild(o);
     }
     sel.addEventListener('change', () => {
-      this._editorParams.chamberContent = sel.value as TileParams['chamberContent'];
+      this._state.params.chamberContent = sel.value as TileParams['chamberContent'];
       if ((TEMP_CHAMBER_CONTENTS as ReadonlySet<string>).has(sel.value)) {
-        if (this._editorParams.temperature === 0) this._editorParams.temperature = 1;
+        if (this._state.params.temperature === 0) this._state.params.temperature = 1;
       }
-      this._applyParamsToLinkedTile();
+      this._state.applyParamsToLinkedTile();
+      this._updateEditorUndoRedoButtons();
+      this._renderEditorCanvas();
       const newPanel = this._buildParamPanel();
       newPanel.id = 'editor-param-panel';
       panel.replaceWith(newPanel);
@@ -1662,19 +1639,23 @@ export class CampaignEditor {
     const descriptors = CHAMBER_PARAM_DESCRIPTORS[cc];
     if (descriptors) {
       for (const { label, field, clampMin } of descriptors) {
-        parent.appendChild(this._labeledInput(label, String(this._editorParams[field]), (v) => {
+        parent.appendChild(this._labeledInput(label, String(this._state.params[field]), (v) => {
           const parsed = parseInt(v) || 0;
-          this._editorParams[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
-          this._applyParamsToLinkedTile();
+          this._state.params[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
+          this._state.applyParamsToLinkedTile();
+          this._updateEditorUndoRedoButtons();
+          this._renderEditorCanvas();
         }, 'number', '90px'));
       }
     }
     if (cc === 'item') {
       parent.appendChild(this._buildItemShapeSelector());
-      parent.appendChild(this._labeledInput('Count', String(this._editorParams.itemCount), (v) => {
+      parent.appendChild(this._labeledInput('Count', String(this._state.params.itemCount), (v) => {
         const parsed = parseInt(v);
-        this._editorParams.itemCount = isNaN(parsed) ? 1 : parsed;
-        this._applyParamsToLinkedTile();
+        this._state.params.itemCount = isNaN(parsed) ? 1 : parsed;
+        this._state.applyParamsToLinkedTile();
+        this._updateEditorUndoRedoButtons();
+        this._renderEditorCanvas();
       }, 'number', '90px'));
     }
   }
@@ -1694,12 +1675,14 @@ export class CampaignEditor {
       const o = document.createElement('option');
       o.value = shp;
       o.textContent = shp;
-      if (this._editorParams.itemShape === shp) o.selected = true;
+      if (this._state.params.itemShape === shp) o.selected = true;
       itemSel.appendChild(o);
     }
     itemSel.addEventListener('change', () => {
-      this._editorParams.itemShape = itemSel.value as PipeShape;
-      this._applyParamsToLinkedTile();
+      this._state.params.itemShape = itemSel.value as PipeShape;
+      this._state.applyParamsToLinkedTile();
+      this._updateEditorUndoRedoButtons();
+      this._renderEditorCanvas();
     });
     const itemSelWrap = document.createElement('div');
     itemSelWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
@@ -1729,7 +1712,7 @@ export class CampaignEditor {
     connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
 
     const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
-      const active = this._editorParams.connections[dir];
+      const active = this._state.params.connections[dir];
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = dir;
@@ -1741,8 +1724,10 @@ export class CampaignEditor {
         'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
         'border-radius:4px;cursor:pointer;padding:0;';
       b.addEventListener('click', () => {
-        this._editorParams.connections[dir] = !this._editorParams.connections[dir];
-        this._applyParamsToLinkedTile();
+        this._state.params.connections[dir] = !this._state.params.connections[dir];
+        this._state.applyParamsToLinkedTile();
+        this._updateEditorUndoRedoButtons();
+        this._renderEditorCanvas();
         const newPanel = this._buildParamPanel();
         newPanel.id = 'editor-param-panel';
         replaceTarget.replaceWith(newPanel);
@@ -1762,7 +1747,7 @@ export class CampaignEditor {
     previewCanvas.style.cssText = 'width:28px;height:28px;border:1px solid #4a90d9;border-radius:4px;';
     const previewCtx = previewCanvas.getContext('2d');
     if (previewCtx) {
-      drawEditorTile(previewCtx, 0, 0, this._buildTileDef(this._editorPalette));
+      drawEditorTile(previewCtx, 0, 0, this._state.buildTileDef());
     }
     connGrid.appendChild(previewCanvas);
     connGrid.appendChild(makeConnBtn('E'));
@@ -1793,13 +1778,13 @@ export class CampaignEditor {
     rowsInp.type = 'number';
     rowsInp.min = String(GRID_MIN_DIM);
     rowsInp.max = String(GRID_MAX_DIM);
-    rowsInp.value = String(this._editRows);
+    rowsInp.value = String(this._state.rows);
     rowsInp.style.cssText = gridSizeInputStyle;
     const colsInp = document.createElement('input');
     colsInp.type = 'number';
     colsInp.min = String(GRID_MIN_DIM);
     colsInp.max = String(GRID_MAX_DIM);
-    colsInp.value = String(this._editCols);
+    colsInp.value = String(this._state.cols);
     colsInp.style.cssText = gridSizeInputStyle;
 
     const inputRow = document.createElement('div');
@@ -1824,11 +1809,11 @@ export class CampaignEditor {
       const cVal = parseInt(colsInp.value);
       let outOfRange = false;
       if (isNaN(rVal) || rVal < GRID_MIN_DIM || rVal > GRID_MAX_DIM) {
-        rowsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(rVal) ? this._editRows : rVal)));
+        rowsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(rVal) ? this._state.rows : rVal)));
         outOfRange = true;
       }
       if (isNaN(cVal) || cVal < GRID_MIN_DIM || cVal > GRID_MAX_DIM) {
-        colsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(cVal) ? this._editCols : cVal)));
+        colsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(cVal) ? this._state.cols : cVal)));
         outOfRange = true;
       }
       if (outOfRange) {
@@ -1896,8 +1881,8 @@ export class CampaignEditor {
     title.textContent = 'PLAYER INVENTORY';
     panel.appendChild(title);
 
-    for (let i = 0; i < this._editInventory.length; i++) {
-      const item = this._editInventory[i];
+    for (let i = 0; i < this._state.inventory.length; i++) {
+      const item = this._state.inventory[i];
       panel.appendChild(this._buildInventoryItemRow(i, item));
     }
 
@@ -1921,13 +1906,14 @@ export class CampaignEditor {
     addRow.appendChild(shapeSel);
     addRow.appendChild(this._btn('+ Add', '#16213e', '#7ed321', () => {
       const shp = shapeSel.value as PipeShape;
-      const existing = this._editInventory.find((it) => it.shape === shp);
+      const existing = this._state.inventory.find((it) => it.shape === shp);
       if (existing) {
         existing.count++;
       } else {
-        this._editInventory.push({ shape: shp, count: 1 });
+        this._state.inventory.push({ shape: shp, count: 1 });
       }
-      this._recordEditorSnapshot();
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
       const newPanel = this._buildInventoryEditor();
       panel.replaceWith(newPanel);
     }));
@@ -1953,8 +1939,9 @@ export class CampaignEditor {
     countInp.value = String(item.count);
     countInp.style.cssText = 'width:44px;padding:2px 4px;background:#16213e;color:#eee;border:1px solid #4a90d9;border-radius:3px;font-size:0.8rem;';
     countInp.addEventListener('change', () => {
-      this._editInventory[idx].count = Math.max(0, parseInt(countInp.value) || 0);
-      this._recordEditorSnapshot();
+      this._state.inventory[idx].count = Math.max(0, parseInt(countInp.value) || 0);
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
     });
     row.appendChild(countInp);
 
@@ -1965,8 +1952,9 @@ export class CampaignEditor {
       'padding:2px 6px;font-size:0.75rem;background:#2a2a4a;color:#e74c3c;' +
       'border:1px solid #e74c3c;border-radius:3px;cursor:pointer;';
     delBtn.addEventListener('click', () => {
-      this._editInventory.splice(idx, 1);
-      this._recordEditorSnapshot();
+      this._state.inventory.splice(idx, 1);
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
       const panel = document.getElementById('editor-inventory-panel');
       if (panel) panel.replaceWith(this._buildInventoryEditor());
     });
@@ -1984,13 +1972,13 @@ export class CampaignEditor {
     title.textContent = 'PLAYER INVENTORY';
     panel.appendChild(title);
 
-    if (this._editInventory.length === 0) {
+    if (this._state.inventory.length === 0) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
       none.textContent = 'None';
       panel.appendChild(none);
     }
-    for (const item of this._editInventory) {
+    for (const item of this._state.inventory) {
       const row = document.createElement('div');
       row.style.cssText = 'font-size:0.85rem;color:#eee;';
       row.textContent = `${item.shape} ×${item.count}`;
@@ -2015,34 +2003,20 @@ export class CampaignEditor {
         toPos: this._dragState.currentPos,
         tile: this._dragState.tile,
       };
-    } else if (this._editorHover) {
-      if (this._editorPalette === 'erase') {
-        const isEmptyCell = (this._editGrid[this._editorHover.row]?.[this._editorHover.col] ?? null) === null;
-        overlay = { pos: this._editorHover, def: null, alpha: isEmptyCell ? 0.2 : 1 };
+    } else if (this._state.hover) {
+      if (this._state.palette === 'erase') {
+        const isEmptyCell = (this._state.grid[this._state.hover.row]?.[this._state.hover.col] ?? null) === null;
+        overlay = { pos: this._state.hover, def: null, alpha: isEmptyCell ? 0.2 : 1 };
       } else {
         // Placement preview: transparent tile at hover
-        overlay = { pos: this._editorHover, def: this._buildTileDef(this._editorPalette), alpha: 0.55 };
+        overlay = { pos: this._state.hover, def: this._state.buildTileDef(), alpha: 0.55 };
       }
     }
 
-    renderEditorCanvas(ctx, this._editGrid, this._editRows, this._editCols, overlay, drag, this._linkedTilePos);
+    renderEditorCanvas(ctx, this._state.grid, this._state.rows, this._state.cols, overlay, drag, this._state.linkedTilePos);
   }
 
   // ─── Editor canvas mouse events ────────────────────────────────────────────
-
-  /**
-   * Returns true if a Source tile already exists anywhere on the grid except
-   * at `exceptPos` (if given).  Used to enforce the one-Source constraint.
-   */
-  private _hasSourceElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    for (let r = 0; r < this._editRows; r++) {
-      for (let c = 0; c < this._editCols; c++) {
-        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
-        if (this._editGrid[r]?.[c]?.shape === PipeShape.Source) return true;
-      }
-    }
-    return false;
-  }
 
   /** Flashes an error message below the canvas when the Source placement constraint is violated. */
   private _showSourceError(): void {
@@ -2057,11 +2031,10 @@ export class CampaignEditor {
    * Places the current palette tile on the given grid cell.
    */
   private _paintEditorCell(pos: { row: number; col: number }): void {
-    this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
+    this._state.grid[pos.row][pos.col] = this._state.buildTileDef();
     // Only link tiles that have parameters beyond rotation (Source, Sink, Chamber).
-    if (this._paletteHasNonRotationParams(this._editorPalette)) {
-      this._linkedTilePos = pos;
-      this._linkedTileDirty = false;
+    if (this._state.paletteHasNonRotationParams()) {
+      this._state.linkTile(pos);
     }
   }
 
@@ -2072,9 +2045,9 @@ export class CampaignEditor {
       // Start a right-button erase-drag: erase the first cell immediately.
       this._rightEraseDragActive = true;
       this._suppressNextContextMenu = false;
-      if (this._editGrid[pos.row][pos.col] !== null) {
-        this._editGrid[pos.row][pos.col] = null;
-        this._clearLinkAt(pos);
+      if (this._state.grid[pos.row][pos.col] !== null) {
+        this._state.grid[pos.row][pos.col] = null;
+        this._state.clearLinkAt(pos);
         this._renderEditorCanvas();
       }
       return;
@@ -2083,42 +2056,42 @@ export class CampaignEditor {
     const pos = this._canvasPos(e);
     if (!pos) return;
 
-    const existingTile = this._editGrid[pos.row][pos.col];
+    const existingTile = this._state.grid[pos.row][pos.col];
 
     // Repeatable tile on an empty cell: start a paint-drag session.
-    if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._editorPalette)) {
+    if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._state.palette)) {
       this._paintDragActive = true;
       this._paintEditorCell(pos);
       this._renderEditorCanvas();
       return;
     }
 
-    if (existingTile !== null && this._editorPalette !== 'erase') {
+    if (existingTile !== null && this._state.palette !== 'erase') {
       // Start a drag: track the tile but don't modify the grid yet
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._renderEditorCanvas();
     } else {
       // Guard: only one Source tile is allowed per level.
-      if (this._editorPalette === PipeShape.Source && this._hasSourceElsewhere()) {
+      if (this._state.palette === PipeShape.Source && this._state.hasSourceElsewhere()) {
         this._showSourceError();
         return;
       }
       // Paint / erase immediately; snapshot recorded after the change so that
       // the placed/erased tile is captured in the new history entry.
-      if (this._editorPalette === 'erase') {
-        this._editGrid[pos.row][pos.col] = null;
+      if (this._state.palette === 'erase') {
+        this._state.grid[pos.row][pos.col] = null;
         // Clear the link if the erased tile was linked
-        this._clearLinkAt(pos);
+        this._state.clearLinkAt(pos);
       } else {
-        this._editGrid[pos.row][pos.col] = this._buildTileDef(this._editorPalette);
+        this._state.grid[pos.row][pos.col] = this._state.buildTileDef();
         // Only link the newly placed tile for live param editing if it has
         // parameters beyond rotation (Source, Sink, Chamber).
-        if (this._paletteHasNonRotationParams(this._editorPalette)) {
-          this._linkedTilePos = pos;
-          this._linkedTileDirty = false;
+        if (this._state.paletteHasNonRotationParams()) {
+          this._state.linkTile(pos);
         }
       }
-      this._recordEditorSnapshot();
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
       this._renderEditorCanvas();
     }
   }
@@ -2129,7 +2102,8 @@ export class CampaignEditor {
       // End right-erase-drag: record the undo snapshot now (PR #101 pattern).
       this._rightEraseDragActive = false;
       this._suppressNextContextMenu = true;
-      this._recordEditorSnapshot();
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
       this._renderEditorCanvas();
       return;
     }
@@ -2138,7 +2112,8 @@ export class CampaignEditor {
     // End paint-drag session.
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._recordEditorSnapshot();
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
       this._renderEditorCanvas();
       return;
     }
@@ -2150,54 +2125,55 @@ export class CampaignEditor {
 
     if (moved) {
       // Commit the drag: move tile from startPos to currentPos; snapshot after.
-      this._editGrid[startPos.row][startPos.col] = null;
-      this._editGrid[currentPos.row][currentPos.col] = tile;
+      this._state.grid[startPos.row][startPos.col] = null;
+      this._state.grid[currentPos.row][currentPos.col] = tile;
       // Only link the moved tile if it has parameters beyond rotation.
       if (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink || tile.shape === PipeShape.Chamber) {
-        this._linkedTilePos = currentPos;
-        this._linkedTileDirty = false;
+        this._state.linkTile(currentPos);
       }
-      this._recordEditorSnapshot();
+      this._state.recordSnapshot();
+      this._updateEditorUndoRedoButtons();
     } else {
       // It was a click on a non-empty tile (no movement occurred)
       if (e.ctrlKey) {
         // Guard: only one Source tile is allowed per level.
-        if (this._editorPalette === PipeShape.Source && this._hasSourceElsewhere(startPos)) {
+        if (this._state.palette === PipeShape.Source && this._state.hasSourceElsewhere(startPos)) {
           this._showSourceError();
           return;
         }
         // Ctrl+click: force-overwrite; snapshot recorded after the change.
-        if (this._editorPalette === 'erase') {
-          this._editGrid[startPos.row][startPos.col] = null;
+        if (this._state.palette === 'erase') {
+          this._state.grid[startPos.row][startPos.col] = null;
           // Clear the link if the erased tile was linked
-          this._clearLinkAt(startPos);
+          this._state.clearLinkAt(startPos);
         } else {
-          this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
+          this._state.grid[startPos.row][startPos.col] = this._state.buildTileDef();
           // Only link the overwritten tile if it has parameters beyond rotation.
-          if (this._paletteHasNonRotationParams(this._editorPalette)) {
-            this._linkedTilePos = startPos;
-            this._linkedTileDirty = false;
+          if (this._state.paletteHasNonRotationParams()) {
+            this._state.linkTile(startPos);
           }
         }
-        this._recordEditorSnapshot();
+        this._state.recordSnapshot();
+        this._updateEditorUndoRedoButtons();
       } else if (
-        this._editorPalette !== 'erase' &&
+        this._state.palette !== 'erase' &&
         (
-          (PIPE_SHAPES.has(this._editorPalette as PipeShape) && PIPE_SHAPES.has(tile.shape)) ||
-          (this._editorPalette === PipeShape.OneWay && tile.shape === PipeShape.OneWay)
+          (PIPE_SHAPES.has(this._state.palette as PipeShape) && PIPE_SHAPES.has(tile.shape)) ||
+          (this._state.palette === PipeShape.OneWay && tile.shape === PipeShape.OneWay)
         )
       ) {
         // Both palette and tile are pipe shapes: auto-replace; snapshot after.
-        this._editGrid[startPos.row][startPos.col] = this._buildTileDef(this._editorPalette);
+        this._state.grid[startPos.row][startPos.col] = this._state.buildTileDef();
         // Only link if the new tile has parameters beyond rotation.
-        if (this._paletteHasNonRotationParams(this._editorPalette)) {
-          this._linkedTilePos = startPos;
-          this._linkedTileDirty = false;
+        if (this._state.paletteHasNonRotationParams()) {
+          this._state.linkTile(startPos);
         }
-        this._recordEditorSnapshot();
+        this._state.recordSnapshot();
+        this._updateEditorUndoRedoButtons();
       } else {
         // Select the clicked tile in the palette and populate Tile Params
-        this._selectTileFromDef(tile, startPos);
+        this._state.selectTileFromDef(tile, startPos);
+        this._refreshPaletteUI();
       }
     }
     this._renderEditorCanvas();
@@ -2206,27 +2182,28 @@ export class CampaignEditor {
   private _onEditorCanvasRightClick(e: MouseEvent): void {
     const pos = this._canvasPos(e);
     if (!pos) return;
-    this._recordEditorSnapshot();
-    this._editGrid[pos.row][pos.col] = null;
+    this._state.recordSnapshot();
+    this._updateEditorUndoRedoButtons();
+    this._state.grid[pos.row][pos.col] = null;
     // Clear the link if the erased tile was linked
-    this._clearLinkAt(pos);
+    this._state.clearLinkAt(pos);
     this._renderEditorCanvas();
   }
 
   private _onEditorCanvasMouseMove(e: MouseEvent): void {
     const pos = this._canvasPos(e);
-    this._editorHover = pos;
+    this._state.hover = pos;
 
     if (this._paintDragActive && pos) {
       // Paint each new empty cell the cursor enters during a paint-drag.
-      if (this._editGrid[pos.row][pos.col] === null) {
+      if (this._state.grid[pos.row][pos.col] === null) {
         this._paintEditorCell(pos);
       }
     } else if (this._rightEraseDragActive && pos) {
       // Erase each non-empty cell the cursor enters during a right-erase-drag.
-      if (this._editGrid[pos.row][pos.col] !== null) {
-        this._editGrid[pos.row][pos.col] = null;
-        this._clearLinkAt(pos);
+      if (this._state.grid[pos.row][pos.col] !== null) {
+        this._state.grid[pos.row][pos.col] = null;
+        this._state.clearLinkAt(pos);
       }
     } else if (this._dragState && pos) {
       const { startPos, currentPos } = this._dragState;
@@ -2236,7 +2213,7 @@ export class CampaignEditor {
           // Moved back to start: cancel the move
           this._dragState.currentPos = pos;
           this._dragState.moved = false;
-        } else if (this._editGrid[pos.row][pos.col] === null) {
+        } else if (this._state.grid[pos.row][pos.col] === null) {
           // Empty cell: move tile here
           this._dragState.currentPos = pos;
           this._dragState.moved = true;
@@ -2250,111 +2227,22 @@ export class CampaignEditor {
 
   // ─── Mouse wheel: rotate tile or connections ──────────────────────────────
 
-  /**
-   * Rotate the currently selected palette item clockwise or counter-clockwise.
-   * Updates pending-placement params and, if a tile is linked, applies the change.
-   */
-  private _rotateEditorPalette(clockwise: boolean): void {
-    const p = this._editorPalette;
-    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Empty) return;
-
-    if (
-      p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)
-    ) {
-      // Rotate the connection set for tiles with optional connections
-      const c = this._editorParams.connections;
-      if (clockwise) {
-        this._editorParams.connections = { N: c.W, E: c.N, S: c.E, W: c.S };
-      } else {
-        this._editorParams.connections = { N: c.E, E: c.S, S: c.W, W: c.N };
-      }
-    } else {
-      // Rotate the tile shape
-      const cur = this._editorParams.rotation;
-      if (clockwise) {
-        this._editorParams.rotation = ((cur + 90) % 360) as Rotation;
-      } else {
-        this._editorParams.rotation = ((cur + 270) % 360) as Rotation;
-      }
-    }
-  }
-
   private _onEditorCanvasWheel(e: WheelEvent): void {
     e.preventDefault();
     const clockwise = e.deltaY > 0;
-    this._rotateEditorPalette(clockwise);
+    this._state.rotatePalette(clockwise);
 
     // Only write the rotation/connection change back to the linked tile when the
     // cursor is hovering directly over it.  When the cursor is elsewhere the
     // wheel only updates the pending-placement params (the ghost preview).
-    const hover = this._editorHover;
-    const linked = this._linkedTilePos;
+    const hover = this._state.hover;
+    const linked = this._state.linkedTilePos;
     if (linked && hover && hover.row === linked.row && hover.col === linked.col) {
-      this._applyParamsToLinkedTile();
+      this._state.applyParamsToLinkedTile();
+      this._updateEditorUndoRedoButtons();
     }
     this._refreshPaletteUI();
     this._renderEditorCanvas();
-  }
-
-  // ─── Select a tile in the palette from a TileDef ──────────────────────────
-
-  /** Populate _editorPalette and _editorParams from a TileDef, then refresh the UI panels. */
-  private _selectTileFromDef(def: TileDef, pos?: { row: number; col: number }): void {
-    if (def.shape === PipeShape.Empty) {
-      this._editorPalette = 'erase';
-    } else if (def.shape === PipeShape.Chamber) {
-      const cc = def.chamberContent ?? 'tank';
-      this._editorPalette = `chamber:${cc}` as ChamberPalette;
-    } else {
-      this._editorPalette = def.shape;
-    }
-    // Only link the tile for live param editing if it has parameters beyond rotation.
-    if (pos !== undefined && this._paletteHasNonRotationParams(this._editorPalette)) {
-      this._linkedTilePos = pos;
-    } else {
-      // Plain/gold/spin pipe clicked (or no position): clear any existing link.
-      this._linkedTilePos = null;
-    }
-    this._linkedTileDirty = false;
-    this._populateParamsFromDef(def);
-    this._refreshPaletteUI();
-  }
-
-  /**
-   * Returns true when the given palette entry has editable parameters beyond
-   * rotation alone.  Tiles with only rotation (plain pipes, gold pipes, spin
-   * pipes) should not be auto-linked for live param editing; linking is
-   * reserved for Source, Sink, and Chamber tiles that expose richer settings.
-   */
-  private _paletteHasNonRotationParams(palette: EditorPalette): boolean {
-    return palette === PipeShape.Source || palette === PipeShape.Sink || palette === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(palette as PipeShape) || isChamberPalette(palette);
-  }
-
-  /** Set _editorParams to match all relevant fields from a TileDef. */
-  private _populateParamsFromDef(def: TileDef): void {
-    this._editorParams = { ...DEFAULT_PARAMS };
-    if (def.rotation !== undefined) this._editorParams.rotation = def.rotation;
-    if (def.capacity !== undefined) this._editorParams.capacity = def.capacity;
-    if (def.cost !== undefined) this._editorParams.cost = def.cost;
-    if (def.temperature !== undefined) this._editorParams.temperature = def.temperature;
-    if (def.pressure !== undefined) this._editorParams.pressure = def.pressure;
-    if (def.hardness !== undefined) this._editorParams.hardness = def.hardness;
-    if (def.shatter !== undefined) this._editorParams.shatter = def.shatter;
-    if (def.dryingTime !== undefined) this._editorParams.dryingTime = def.dryingTime;
-    if (def.chamberContent !== undefined) this._editorParams.chamberContent = def.chamberContent;
-    if (def.itemShape !== undefined) this._editorParams.itemShape = def.itemShape;
-    if (def.itemCount !== undefined) this._editorParams.itemCount = def.itemCount;
-    if (def.connections) {
-      this._editorParams.connections = {
-        N: def.connections.includes(Direction.North),
-        E: def.connections.includes(Direction.East),
-        S: def.connections.includes(Direction.South),
-        W: def.connections.includes(Direction.West),
-      };
-    } else {
-      // No explicit connections: default to all open (for Source/Sink/Chamber)
-      this._editorParams.connections = { N: true, E: true, S: true, W: true };
-    }
   }
 
   /** Rebuild and replace the palette and param panels in the DOM. */
@@ -2371,48 +2259,12 @@ export class CampaignEditor {
     }
   }
 
-  /** Clear the link if the currently linked tile is at the given position. */
-  private _clearLinkAt(pos: { row: number; col: number }): void {
-    if (this._linkedTilePos &&
-        this._linkedTilePos.row === pos.row &&
-        this._linkedTilePos.col === pos.col) {
-      this._linkedTilePos = null;
-      this._linkedTileDirty = false;
-    }
-  }
-
-  /**
-   * If a tile is currently linked for live param editing, update it in the grid
-   * with the current palette and params.
-   *
-   * A single undo snapshot is recorded on the first param change in a linked session;
-   * subsequent changes in the same session overwrite the tile without additional snapshots.
-   * This means all live edits to the linked tile undo as one step, which avoids flooding
-   * the undo history when the user types into a number input.
-   */
-  private _applyParamsToLinkedTile(): void {
-    if (!this._linkedTilePos) return;
-    const { row, col } = this._linkedTilePos;
-    // Guard against the linked position becoming out-of-bounds (e.g. after a grid resize).
-    if (row < 0 || row >= this._editRows || col < 0 || col >= this._editCols) {
-      this._linkedTilePos = null;
-      this._linkedTileDirty = false;
-      return;
-    }
-    if (!this._linkedTileDirty) {
-      this._recordEditorSnapshot();
-      this._linkedTileDirty = true;
-    }
-    this._editGrid[row][col] = this._buildTileDef(this._editorPalette);
-    this._renderEditorCanvas();
-  }
-
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
     if (!this._editorCanvas) return null;
     const rect = this._editorCanvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) * this._editCols / rect.width);
-    const row = Math.floor((e.clientY - rect.top)  * this._editRows / rect.height);
-    if (row < 0 || row >= this._editRows || col < 0 || col >= this._editCols) return null;
+    const col = Math.floor((e.clientX - rect.left) * this._state.cols / rect.width);
+    const row = Math.floor((e.clientY - rect.top)  * this._state.rows / rect.height);
+    if (row < 0 || row >= this._state.rows || col < 0 || col >= this._state.cols) return null;
     return { row, col };
   }
 
@@ -2426,8 +2278,8 @@ export class CampaignEditor {
    */
   private _updateCanvasDisplaySize(): void {
     if (!this._editorCanvas) return;
-    const intrinsicW = this._editCols * TILE_SIZE;
-    const intrinsicH = this._editRows * TILE_SIZE;
+    const intrinsicW = this._state.cols * TILE_SIZE;
+    const intrinsicH = this._state.rows * TILE_SIZE;
 
     // Determine the maximum pixel width the canvas may occupy.
     let maxPx = MAX_EDITOR_CANVAS_PX;
@@ -2471,129 +2323,33 @@ export class CampaignEditor {
     this._editorCanvas.style.height = Math.round(intrinsicH * scale) + 'px';
   }
 
-  /** Build a TileDef from the current palette and params. */
-  private _buildTileDef(palette: EditorPalette): TileDef {
-    if (palette === 'erase') return { shape: PipeShape.Empty };
-
-    const isChm = isChamberPalette(palette);
-    const effectiveShape = isChm ? PipeShape.Chamber : (palette as PipeShape);
-    const p = this._editorParams;
-
-    // Cement: only dryingTime param; no rotation or connections
-    if (effectiveShape === PipeShape.Cement) {
-      const def: TileDef = { shape: PipeShape.Cement };
-      if (p.dryingTime !== 0) def.dryingTime = p.dryingTime;
-      return def;
-    }
-
-    // Spin-cement tiles: rotation + dryingTime; no connections
-    if (SPIN_CEMENT_SHAPES.has(effectiveShape)) {
-      const def: TileDef = { shape: effectiveShape, rotation: p.rotation };
-      if (p.dryingTime !== 0) def.dryingTime = p.dryingTime;
-      return def;
-    }
-
-    // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
-    // GoldSpace, Granite, and Tree are connectionless background/block tiles with no rotation either.
-    // OneWay uses rotation to encode direction, so it is NOT in the noRotation set.
-    const noRotation = new Set([
-      PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
-      PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree,
-    ]).has(effectiveShape);
-    const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
-
-    // Connections
-    const connDirs: Direction[] = [];
-    if (p.connections.N) connDirs.push(Direction.North);
-    if (p.connections.E) connDirs.push(Direction.East);
-    if (p.connections.S) connDirs.push(Direction.South);
-    if (p.connections.W) connDirs.push(Direction.West);
-    // Only set explicit connections for Source/Sink/Chamber (not all-4-default)
-    const needsConn = (effectiveShape === PipeShape.Source || effectiveShape === PipeShape.Sink || effectiveShape === PipeShape.Chamber);
-    if (needsConn && connDirs.length < 4) {
-      def.connections = connDirs;
-    }
-
-    if (effectiveShape === PipeShape.Source) {
-      def.capacity = p.capacity;
-      if (p.temperature !== 0) def.temperature = p.temperature;
-      if (p.pressure !== 0) def.pressure = p.pressure;
-    } else if (isChm) {
-      const cc = chamberPaletteContent(palette as ChamberPalette);
-      def.chamberContent = cc;
-      if (cc === 'tank') def.capacity = p.capacity;
-      if (cc === 'dirt') def.cost = p.cost;
-      if (cc === 'heater') def.temperature = p.temperature;
-      if (cc === 'ice') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (cc === 'pump') def.pressure = p.pressure;
-      if (cc === 'snow') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; if (p.shatter !== 0) def.shatter = p.shatter; }
-      if (cc === 'hot_plate') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
-    }
-
-    return def;
-  }
-
   // ─── Editor undo / redo ────────────────────────────────────────────────────
 
-  private _recordEditorSnapshot(): void {
-    const snapshot: EditorSnapshot = {
-      grid: JSON.parse(JSON.stringify(this._editGrid)) as (TileDef | null)[][],
-      rows: this._editRows,
-      cols: this._editCols,
-      inventory: JSON.parse(JSON.stringify(this._editInventory)) as InventoryItem[],
-    };
-    if (this._editorHistoryIdx < this._editorHistory.length - 1) {
-      this._editorHistory = this._editorHistory.slice(0, this._editorHistoryIdx + 1);
-    }
-    this._editorHistory.push(snapshot);
-    this._editorHistoryIdx = this._editorHistory.length - 1;
-    // Mark unsaved changes on any snapshot recorded after the initial open snapshot.
-    if (this._editorHistoryIdx > 0) this._editorUnsavedChanges = true;
-    this._updateEditorUndoRedoButtons();
-  }
-
   private _editorUndo(): void {
-    // If a linked tile has unsaved edits, record the current state first so that
-    // a subsequent redo can return to those modified parameters.
-    if (this._linkedTileDirty) {
-      this._recordEditorSnapshot();
-      this._linkedTileDirty = false;
-    }
-    if (this._editorHistoryIdx <= 0) return;
-    this._editorHistoryIdx--;
-    this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
-    this._editorUnsavedChanges = this._editorHistoryIdx !== this._editorSavedHistoryIdx;
-    this._linkedTilePos = null;
-    this._linkedTileDirty = false;
+    if (!this._state.undo()) return;
+    this._onStateRestored();
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
   }
 
   private _editorRedo(): void {
-    if (this._editorHistoryIdx >= this._editorHistory.length - 1) return;
-    this._editorHistoryIdx++;
-    this._restoreEditorSnapshot(this._editorHistory[this._editorHistoryIdx]);
-    this._editorUnsavedChanges = this._editorHistoryIdx !== this._editorSavedHistoryIdx;
-    this._linkedTilePos = null;
-    this._linkedTileDirty = false;
+    if (!this._state.redo()) return;
+    this._onStateRestored();
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
   }
 
-  private _restoreEditorSnapshot(snapshot: EditorSnapshot): void {
-    this._editGrid = JSON.parse(JSON.stringify(snapshot.grid)) as (TileDef | null)[][];
-    this._editRows = snapshot.rows;
-    this._editCols = snapshot.cols;
-    this._editInventory = JSON.parse(JSON.stringify(snapshot.inventory)) as InventoryItem[];
+  /**
+   * Called after undo/redo restores state: updates the canvas dimensions and
+   * rebuilds the inventory panel to reflect the newly restored state.
+   */
+  private _onStateRestored(): void {
     if (this._editorCanvas) {
-      setTileSize(computeTileSize(this._editRows, this._editCols));
-      this._editorCanvas.width  = this._editCols * TILE_SIZE;
-      this._editorCanvas.height = this._editRows * TILE_SIZE;
+      setTileSize(computeTileSize(this._state.rows, this._state.cols));
+      this._editorCanvas.width  = this._state.cols * TILE_SIZE;
+      this._editorCanvas.height = this._state.rows * TILE_SIZE;
     }
     this._updateCanvasDisplaySize();
-    // Refresh inventory panel
     const invPanel = document.getElementById('editor-inventory-panel');
     if (invPanel) invPanel.replaceWith(this._buildInventoryEditor());
   }
@@ -2602,12 +2358,12 @@ export class CampaignEditor {
     const undoBtn = document.getElementById('editor-undo-btn') as HTMLButtonElement | null;
     const redoBtn = document.getElementById('editor-redo-btn') as HTMLButtonElement | null;
     if (undoBtn) {
-      undoBtn.disabled = this._editorHistoryIdx <= 0;
+      undoBtn.disabled = !this._state.canUndo;
       undoBtn.style.opacity = undoBtn.disabled ? '0.4' : '1';
       undoBtn.style.cursor = undoBtn.disabled ? 'not-allowed' : 'pointer';
     }
     if (redoBtn) {
-      redoBtn.disabled = this._editorHistoryIdx >= this._editorHistory.length - 1;
+      redoBtn.disabled = !this._state.canRedo;
       redoBtn.style.opacity = redoBtn.disabled ? '0.4' : '1';
       redoBtn.style.cursor = redoBtn.disabled ? 'not-allowed' : 'pointer';
     }
@@ -2616,19 +2372,8 @@ export class CampaignEditor {
   // ─── Grid resize ──────────────────────────────────────────────────────────
 
   private _resizeGrid(newRows: number, newCols: number): void {
-    const newGrid: (TileDef | null)[][] = [];
-    for (let r = 0; r < newRows; r++) {
-      newGrid[r] = [];
-      for (let c = 0; c < newCols; c++) {
-        newGrid[r][c] = (r < this._editRows && c < this._editCols)
-          ? (this._editGrid[r]?.[c] ?? null)
-          : null;
-      }
-    }
-    this._editRows = newRows;
-    this._editCols = newCols;
-    this._editGrid = newGrid;
-    this._recordEditorSnapshot();
+    this._state.resize(newRows, newCols);
+    this._updateEditorUndoRedoButtons();
     if (this._editorCanvas) {
       setTileSize(computeTileSize(newRows, newCols));
       this._editorCanvas.width  = newCols * TILE_SIZE;
@@ -2646,31 +2391,8 @@ export class CampaignEditor {
    * snapshot so it can be undone.
    */
   private _slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void {
-    const newGrid: (TileDef | null)[][] = Array.from(
-      { length: this._editRows },
-      () => Array(this._editCols).fill(null) as null[],
-    );
-    for (let r = 0; r < this._editRows; r++) {
-      for (let c = 0; c < this._editCols; c++) {
-        const tile = this._editGrid[r]?.[c] ?? null;
-        if (tile === null) continue;
-        let nr = r;
-        let nc = c;
-        if (dir === 'N') nr = r - 1;
-        else if (dir === 'S') nr = r + 1;
-        else if (dir === 'W') nc = c - 1;
-        else nc = c + 1; // E
-        if (nr >= 0 && nr < this._editRows && nc >= 0 && nc < this._editCols) {
-          newGrid[nr][nc] = tile;
-        }
-        // Tiles that go out of bounds are simply dropped.
-      }
-    }
-    this._editGrid = newGrid;
-    // Clear link since positions have shifted.
-    this._linkedTilePos = null;
-    this._linkedTileDirty = false;
-    this._recordEditorSnapshot();
+    this._state.slide(dir);
+    this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
   }
 
@@ -2683,9 +2405,9 @@ export class CampaignEditor {
     let ok = true;
 
     // Count sources and sinks
-    for (let r = 0; r < this._editRows; r++) {
-      for (let c = 0; c < this._editCols; c++) {
-        const def = this._editGrid[r]?.[c];
+    for (let r = 0; r < this._state.rows; r++) {
+      for (let c = 0; c < this._state.cols; c++) {
+        const def = this._state.grid[r]?.[c];
         if (!def) continue;
         if (def.shape === PipeShape.Source) {
           if (sourcePos) { msgs.push('Multiple Source tiles found – only one is allowed.'); ok = false; }
@@ -2700,7 +2422,7 @@ export class CampaignEditor {
     if (!ok) return { ok, messages: msgs };
 
     // Check that inventory has at least one item (otherwise level may be impossible)
-    const hasInventory = this._editInventory.some((it) => it.count > 0);
+    const hasInventory = this._state.inventory.some((it) => it.count > 0);
     if (!hasInventory) msgs.push('⚠️ Inventory is empty – the player has no tiles to place.');
 
     // Try to create a Board and check if the level has a valid layout
@@ -2759,7 +2481,7 @@ export class CampaignEditor {
 
     // Count star chambers in the grid and cache in starCount
     let starCount = 0;
-    for (const row of this._editGrid) {
+    for (const row of this._state.grid) {
       for (const cell of row) {
         if (cell?.shape === PipeShape.Chamber && cell.chamberContent === 'star') {
           starCount++;
@@ -2767,7 +2489,7 @@ export class CampaignEditor {
       }
     }
 
-    const rawGrid = JSON.parse(JSON.stringify(this._editGrid)) as (TileDef | null)[][];
+    const rawGrid = JSON.parse(JSON.stringify(this._state.grid)) as (TileDef | null)[][];
     // Strip any fields not supported by each tile's shape to keep saved data clean.
     const cleanGrid: (TileDef | null)[][] = rawGrid.map(row =>
       row.map(tile => {
@@ -2781,17 +2503,17 @@ export class CampaignEditor {
     );
     const def: LevelDef = {
       id: existingId,
-      name: this._editLevelName,
-      rows: this._editRows,
-      cols: this._editCols,
+      name: this._state.levelName,
+      rows: this._state.rows,
+      cols: this._state.cols,
       grid: cleanGrid,
-      inventory: JSON.parse(JSON.stringify(this._editInventory)) as InventoryItem[],
+      inventory: JSON.parse(JSON.stringify(this._state.inventory)) as InventoryItem[],
     };
-    if (this._editLevelNote.trim()) def.note = this._editLevelNote.trim();
-    const activeHints = this._editLevelHints.map(h => h.trim()).filter(h => h.length > 0);
+    if (this._state.levelNote.trim()) def.note = this._state.levelNote.trim();
+    const activeHints = this._state.levelHints.map(h => h.trim()).filter(h => h.length > 0);
     if (activeHints.length > 0) def.hints = activeHints;
     if (starCount > 0) def.starCount = starCount;
-    if (this._editLevelChallenge) def.challenge = true;
+    if (this._state.levelChallenge) def.challenge = true;
     return def;
   }
 
@@ -2800,8 +2522,7 @@ export class CampaignEditor {
   private _saveLevel(campaign: CampaignDef, chapterIdx: number, levelIdx: number): void {
     const newLevel = this._buildCurrentLevelDef();
     this._service.saveLevel(campaign, chapterIdx, levelIdx, newLevel);
-    this._editorUnsavedChanges = false;
-    this._editorSavedHistoryIdx = this._editorHistoryIdx;
+    this._state.markSaved();
 
     // Visual confirmation on the Save button
     const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
