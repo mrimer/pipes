@@ -1985,16 +1985,16 @@ export class CampaignEditor {
   // Tests cast CampaignEditor to typed interfaces and call these methods directly.
   // They delegate to _editorInput so that gesture logic stays in EditorInputHandler.
 
-  private _onEditorMouseDown(e: MouseEvent): void { this._editorInput?._onMouseDown(e); }
-  private _onEditorMouseUp(e: MouseEvent): void { this._editorInput?._onMouseUp(e); }
-  private _onEditorCanvasMouseMove(e: MouseEvent): void { this._editorInput?._onMouseMove(e); }
-  private _onEditorCanvasWheel(e: WheelEvent): void { this._editorInput?._onWheel(e); }
-  private _onEditorCanvasRightClick(e: MouseEvent): void { this._editorInput?._onRightClick(e); }
+  private _onEditorMouseDown(e: MouseEvent): void { this._editorInput?.onMouseDown(e); }
+  private _onEditorMouseUp(e: MouseEvent): void { this._editorInput?.onMouseUp(e); }
+  private _onEditorCanvasMouseMove(e: MouseEvent): void { this._editorInput?.onMouseMove(e); }
+  private _onEditorCanvasWheel(e: WheelEvent): void { this._editorInput?.onWheel(e); }
+  private _onEditorCanvasRightClick(e: MouseEvent): void { this._editorInput?.onRightClick(e); }
   private get _paintDragActive(): boolean { return this._editorInput?.paintDragActive ?? false; }
   private get _rightEraseDragActive(): boolean { return this._editorInput?.rightEraseDragActive ?? false; }
   private get _suppressNextContextMenu(): boolean { return this._editorInput?.suppressNextContextMenu ?? false; }
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
-    return this._editorInput?._canvasPos(e) ?? null;
+    return this._editorInput?.canvasPos(e) ?? null;
   }
 
   /** Rebuild and replace the palette and param panels in the DOM. */

@@ -76,25 +76,25 @@ export class EditorInputHandler {
 
   /** Register all canvas and window event listeners. */
   attach(): void {
-    this._canvas.addEventListener('mousedown',   (e) => this._onMouseDown(e));
-    this._canvas.addEventListener('mousemove',   (e) => this._onMouseMove(e));
+    this._canvas.addEventListener('mousedown',   (e) => this.onMouseDown(e));
+    this._canvas.addEventListener('mousemove',   (e) => this.onMouseMove(e));
     this._canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (this._suppressNextContextMenu) {
         this._suppressNextContextMenu = false;
         return;
       }
-      this._onRightClick(e);
+      this.onRightClick(e);
     });
-    this._canvas.addEventListener('mouseleave',  () => this._onMouseLeave());
-    this._canvas.addEventListener('wheel', (e) => this._onWheel(e), { passive: false });
+    this._canvas.addEventListener('mouseleave',  () => this.onMouseLeave());
+    this._canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
 
     // Listen on window so mouseup is captured even when released outside the canvas.
     // Remove any previous handler first to avoid duplicates.
     if (this._windowMouseUpHandler) {
       window.removeEventListener('mouseup', this._windowMouseUpHandler);
     }
-    this._windowMouseUpHandler = (e: MouseEvent) => this._onMouseUp(e);
+    this._windowMouseUpHandler = (e: MouseEvent) => this.onMouseUp(e);
     window.addEventListener('mouseup', this._windowMouseUpHandler);
   }
 
@@ -116,7 +116,7 @@ export class EditorInputHandler {
     }
   }
 
-  _canvasPos(e: MouseEvent): { row: number; col: number } | null {
+  canvasPos(e: MouseEvent): { row: number; col: number } | null {
     const rect = this._canvas.getBoundingClientRect();
     const state = this._cb.getState();
     const col = Math.floor((e.clientX - rect.left) * state.cols / rect.width);
@@ -127,10 +127,10 @@ export class EditorInputHandler {
 
   // ─── Event handlers ───────────────────────────────────────────────────────────
 
-  _onMouseDown(e: MouseEvent): void {
+  onMouseDown(e: MouseEvent): void {
     const state = this._cb.getState();
     if (e.button === 2) {
-      const pos = this._canvasPos(e);
+      const pos = this.canvasPos(e);
       if (!pos) return;
       // Start a right-button erase-drag: erase the first cell immediately.
       this._rightEraseDragActive = true;
@@ -143,7 +143,7 @@ export class EditorInputHandler {
       return;
     }
     if (e.button !== 0) return; // left button only
-    const pos = this._canvasPos(e);
+    const pos = this.canvasPos(e);
     if (!pos) return;
 
     const existingTile = state.grid[pos.row][pos.col];
@@ -186,7 +186,7 @@ export class EditorInputHandler {
     }
   }
 
-  _onMouseUp(e: MouseEvent): void {
+  onMouseUp(e: MouseEvent): void {
     const state = this._cb.getState();
     if (e.button === 2) {
       if (!this._rightEraseDragActive) return;
@@ -270,9 +270,9 @@ export class EditorInputHandler {
     this._cb.renderCanvas();
   }
 
-  _onRightClick(e: MouseEvent): void {
+  onRightClick(e: MouseEvent): void {
     const state = this._cb.getState();
-    const pos = this._canvasPos(e);
+    const pos = this.canvasPos(e);
     if (!pos) return;
     state.recordSnapshot();
     this._cb.updateUndoRedoButtons();
@@ -282,9 +282,9 @@ export class EditorInputHandler {
     this._cb.renderCanvas();
   }
 
-  _onMouseMove(e: MouseEvent): void {
+  onMouseMove(e: MouseEvent): void {
     const state = this._cb.getState();
-    const pos = this._canvasPos(e);
+    const pos = this.canvasPos(e);
     state.hover = pos;
 
     if (this._paintDragActive && pos) {
@@ -318,7 +318,7 @@ export class EditorInputHandler {
     this._cb.renderCanvas();
   }
 
-  _onWheel(e: WheelEvent): void {
+  onWheel(e: WheelEvent): void {
     e.preventDefault();
     const state = this._cb.getState();
     const clockwise = e.deltaY > 0;
@@ -337,7 +337,7 @@ export class EditorInputHandler {
     this._cb.renderCanvas();
   }
 
-  _onMouseLeave(): void {
+  onMouseLeave(): void {
     const state = this._cb.getState();
     state.hover = null;
     // Cancel any active drag when the mouse leaves the canvas.
