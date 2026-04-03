@@ -545,11 +545,15 @@ export class AnimationManager {
       const dir = dirs[Math.floor(Math.random() * dirs.length)];
       // Place at a random point along the arm (avoiding the very center).
       const t = 0.3 + Math.random() * 0.7;
+      // Perpendicular offset (±LINE_WIDTH/2) so the twinkle lands at the edge
+      // of the pipe stroke rather than on its center line where it would be
+      // obscured by the pipe fill color.
+      const edgeOffset = (LINE_WIDTH / 2) * (Math.random() < 0.5 ? 1 : -1);
       switch (dir) {
-        case Direction.North: tileX = cx; tileY = cy - t * half; break;
-        case Direction.South: tileX = cx; tileY = cy + t * half; break;
-        case Direction.West:  tileX = cx - t * half; tileY = cy; break;
-        case Direction.East:  tileX = cx + t * half; tileY = cy; break;
+        case Direction.North: tileX = cx + edgeOffset; tileY = cy - t * half; break;
+        case Direction.South: tileX = cx + edgeOffset; tileY = cy + t * half; break;
+        case Direction.West:  tileX = cx - t * half; tileY = cy + edgeOffset; break;
+        case Direction.East:  tileX = cx + t * half; tileY = cy + edgeOffset; break;
         default:              tileX = cx; tileY = cy;
       }
     } else {
