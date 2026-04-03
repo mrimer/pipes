@@ -43,6 +43,8 @@ export const CEMENT_COLOR            = '#8090a0';
 export const CEMENT_FILL_COLOR       = '#c0c8d4';
 export const GOLD_PIPE_COLOR         = '#ffd700';
 export const GOLD_PIPE_WATER_COLOR   = '#ffec6e';
+/** Bubble particle color for connected golden pipes (pale yellow-white). */
+export const GOLD_BUBBLE_COLOR       = '#fffde7';
 export const GOLD_SPACE_BASE_COLOR   = '#6b4d00';
 /** Prefix for gold-space shimmer fill; append alpha value + ')' at runtime. */
 export const GOLD_SPACE_SHIMMER_COLOR = 'rgba(255,215,0,';

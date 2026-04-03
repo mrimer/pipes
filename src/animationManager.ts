@@ -9,6 +9,7 @@ import { Direction, GridPos, PipeShape, GameState } from './types';
 import {
   WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR,
+  GOLD_BUBBLE_COLOR,
 } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims } from './renderer';
 import {
@@ -103,6 +104,11 @@ export class AnimationManager {
   private _bubbles: BubbleParticle[] = [];
   /** `performance.now()` of the last bubble spawn. */
   private _lastBubbleSpawn = 0;
+
+  /** Separate bubble pool for golden pipe tiles, rendered in pale yellow-white. */
+  private _goldBubbles: BubbleParticle[] = [];
+  /** `performance.now()` of the last golden bubble spawn. */
+  private _lastGoldBubbleSpawn = 0;
 
   private _leakySprayDrops: LeakySprayDrop[] = [];
   /** `performance.now()` of the last leaky spray drop spawn. */
@@ -364,6 +370,7 @@ export class AnimationManager {
   clearWinFlow(): void {
     this._flowDrops = [];
     this._bubbles = [];
+    this._goldBubbles = [];
     this._vortexParticles = [];
     this._flowGoodDirs = null;
   }
@@ -380,6 +387,7 @@ export class AnimationManager {
     this._dryPuffs = [];
     this._flowDrops = [];
     this._bubbles = [];
+    this._goldBubbles = [];
     this._leakySprayDrops = [];
     this._vortexParticles = [];
     this._flowGoodDirs = null;
@@ -436,6 +444,8 @@ export class AnimationManager {
   /**
    * Spawn and render fizzing bubble particles inside connected pipe tiles.
    * Runs every frame to give a sense of liquid flowing in the pipes.
+   * Regular/spin pipe bubbles use the standard water color; golden pipe bubbles
+   * use a pale yellow-white to match the golden pipe aesthetic.
    */
   private _tickBubbles(board: Board): void {
     const filledPositions = board.getFilledPositions();
@@ -446,7 +456,12 @@ export class AnimationManager {
       spawnBubble(this._bubbles, board, filledPositions);
       this._lastBubbleSpawn = now;
     }
+    if (now - this._lastGoldBubbleSpawn >= BUBBLE_SPAWN_INTERVAL_MS) {
+      spawnBubble(this._goldBubbles, board, filledPositions, GOLD_PIPE_SHAPES);
+      this._lastGoldBubbleSpawn = now;
+    }
     renderBubbles(this.ctx, this._bubbles, WATER_COLOR);
+    renderBubbles(this.ctx, this._goldBubbles, GOLD_BUBBLE_COLOR);
   }
 
   /**

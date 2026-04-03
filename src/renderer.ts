@@ -308,11 +308,8 @@ function _drawTree(ctx: CanvasRenderingContext2D, half: number): void {
     ctx.arc(Math.cos(angle) * dLobeOff, Math.sin(angle) * dLobeOff, dLobeR, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Small brown trunk circle in the center
-  ctx.fillStyle = TREE_TRUNK_COLOR;
-  ctx.beginPath();
-  ctx.arc(0, 0, half * 0.14, 0, Math.PI * 2);
-  ctx.fill();
+  // Small brown trunk circle in the center – omitted as the trunk would not be
+  // visible from a top-down aerial perspective; the canopy fully covers it.
   // Dark green outline around the whole canopy
   ctx.strokeStyle = TREE_COLOR;
   ctx.lineWidth = _s(2);
@@ -1130,7 +1127,8 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
   // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
-  if (chamberContent === 'ice' || chamberContent === 'snow') {
+  // Only shown when the chamber is not connected (no water flowing through it).
+  if (!isWater && (chamberContent === 'ice' || chamberContent === 'snow')) {
     _drawChamberFrostHalo(ctx, color, bw, bh, br);
   }
   if (chamberContent === 'tank') {
