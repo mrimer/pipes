@@ -112,6 +112,9 @@ export class AnimationManager {
   /** `performance.now()` of the last vortex particle spawn. */
   private _lastVortexSpawn = 0;
 
+  /** `performance.now()` after which the next golden-pipe twinkle may fire. */
+  private _nextGoldenTwinkle = 0;
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly ctx: CanvasRenderingContext2D,
@@ -338,6 +341,7 @@ export class AnimationManager {
     this._tickLeakySpray(board, gameState);
     this._tickWinFlow(board, gameState);
     this._tickVortex(board);
+    this._tickGoldenTwinkles(board);
   }
 
   // ─── Win-flow lifecycle ───────────────────────────────────────────────────
@@ -381,6 +385,7 @@ export class AnimationManager {
     this._flowGoodDirs = null;
     this._rotationAnims = [];
     this._fillAnims = [];
+    this._nextGoldenTwinkle = 0;
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */
@@ -500,6 +505,39 @@ export class AnimationManager {
   }
 
   // ─── Private label helpers ────────────────────────────────────────────────
+
+  /**
+   * Occasionally spawn a small golden star sparkle at a random position on a
+   * random golden pipe tile on the board.  Fires every few seconds (with jitter)
+   * to give golden pipes a subtle glittering appearance.
+   */
+  private _tickGoldenTwinkles(board: Board): void {
+    const now = performance.now();
+    if (now < this._nextGoldenTwinkle) return;
+    // Re-arm with a random interval of 2–5 s.
+    this._nextGoldenTwinkle = now + 2000 + Math.random() * 3000;
+
+    // Collect all golden pipe tile positions on the board.
+    const goldPositions: Array<{ r: number; c: number }> = [];
+    for (let r = 0; r < board.rows; r++) {
+      for (let c = 0; c < board.cols; c++) {
+        if (GOLD_PIPE_SHAPES.has(board.grid[r][c].shape)) goldPositions.push({ r, c });
+      }
+    }
+    if (goldPositions.length === 0) return;
+
+    // Pick a random golden tile.
+    const { r, c } = goldPositions[Math.floor(Math.random() * goldPositions.length)];
+
+    // Convert a random point within that tile from canvas pixels to viewport pixels.
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = rect.width  / this.canvas.width;
+    const scaleY = rect.height / this.canvas.height;
+    const tileX = (c + Math.random()) * TILE_SIZE;
+    const tileY = (r + Math.random()) * TILE_SIZE;
+    spawnStarSparkles(rect.left + tileX * scaleX, rect.top + tileY * scaleY, 5);
+  }
+
 
   /**
    * Compute and push the floating label(s) for a single tile that was just

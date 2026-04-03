@@ -129,6 +129,15 @@ export class Game implements InputCallbacks {
   /** Rotation that will be applied when the pending inventory item is placed. */
   private pendingRotation: Rotation = 0;
 
+  /**
+   * When true, a level-intro ring effect is waiting to be spawned.  Set whenever
+   * a new level begins; cleared after the rings are actually shown (which may be
+   * deferred until a campaign modal is dismissed).
+   */
+  private _pendingRings = false;
+  /** `setTimeout` handle for the pending ring check, or null when none is queued. */
+  private _pendingRingsTimerId: ReturnType<typeof setTimeout> | null = null;
+
   /** Tooltip manager for displaying grid coordinates and tile info under Ctrl. */
   private readonly _tooltip: TooltipManager;
 
@@ -287,7 +296,13 @@ export class Game implements InputCallbacks {
       startLevelDef: (level) => this.startLevelDef(level),
       showLevelSelect: () => this._showLevelSelect(),
       exitToMenu: () => this.exitToMenu(),
-      closeModal: (el) => this._closeModal(el),
+      closeModal: (el) => {
+        this._closeModal(el);
+        // After a campaign modal is dismissed, the campaign manager may call
+        // startLevel() synchronously in the same tick.  Use setTimeout so the
+        // ring check runs after that second startLevel() completes.
+        setTimeout(() => this._spawnPendingRingsIfReady(), 0);
+      },
       triggerModalSparkle: (el, cls) => this._triggerModalSparkle(el, cls),
       setScreen: (s) => { this.screen = s; },
       setLevelSelectVisible: (v) => { this.levelSelectEl.style.display = v ? 'flex' : 'none'; },
@@ -316,6 +331,14 @@ export class Game implements InputCallbacks {
   // ─── Screen transitions ───────────────────────────────────────────────────
 
   private _showLevelSelect(): void {
+    // Cancel any pending intro-ring spawn before leaving the play screen.
+    this._cancelPendingRings();
+    // Remember the last played level ID for the scroll below, then clear currentLevel
+    // so that re-entering the same level via the level-select screen will be treated
+    // as a new entry (showing the ring effect again).
+    const scrollToLevelId = this.currentLevel?.id ?? null;
+    this.currentLevel = null;
+
     this.screen = GameScreen.LevelSelect;
     this.levelSelectEl.style.display = 'flex';
     this.playScreenEl.style.display = 'none';
@@ -342,9 +365,8 @@ export class Game implements InputCallbacks {
     this.exitBtnEl.textContent = '← Menu';
     this._campaign.renderLevelList();
     // Scroll the active level's row into view near the center of the viewport.
-    if (this.currentLevel) {
-      const levelId = this.currentLevel.id;
-      const levelRow = this.levelListEl.querySelector<HTMLElement>(`[data-level-id="${levelId}"]`);
+    if (scrollToLevelId !== null) {
+      const levelRow = this.levelListEl.querySelector<HTMLElement>(`[data-level-id="${scrollToLevelId}"]`);
       if (levelRow) {
         levelRow.scrollIntoView?.({ behavior: 'instant', block: 'center' });
       }
@@ -423,7 +445,7 @@ export class Game implements InputCallbacks {
   }
 
   /** Start (or restart) the given level. */
-  startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[]): void {
+  startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[], isUserRestart = false): void {
     // Look up the level in the active campaign; no-op if no campaign is active.
     if (!this._campaign.activeCampaign) return;
     let level: LevelDef | undefined;
@@ -433,9 +455,22 @@ export class Game implements InputCallbacks {
     }
     if (!level) return;
 
-    // Show the intro ring effect only when navigating to a different level,
-    // not when restarting the same level.
+    // Determine whether this is the first time entering this level (not a restart
+    // or the campaign manager's second startLevel call for the same level).
     const isNewLevel = !this.currentLevel || this.currentLevel.id !== levelId;
+
+    if (isUserRestart) {
+      // Explicit restart: cancel any ring spawning scheduled by a prior new-level entry.
+      this._cancelPendingRings();
+    } else if (isNewLevel) {
+      // New level: schedule the intro ring effect.  It is deferred (setTimeout) so
+      // that if a campaign modal (challenge / new-chapter) appears synchronously
+      // after this call the ring check can detect and wait for it.
+      this._schedulePendingRings();
+    }
+    // A campaign manager "second startLevel for same level" (e.g. from playChallengeLevel)
+    // falls through without touching the pending rings state so the already-scheduled
+    // check from the first startLevel call still fires correctly.
 
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
@@ -448,10 +483,6 @@ export class Game implements InputCallbacks {
     this.canvas.focus();
 
     this._checkAndShowInitialError();
-
-    if (isNewLevel) {
-      this._animMgr.spawnLevelIntroRings(this.board);
-    }
 
     // If the level starts already in a losing state, show the unplayable modal.
     if (this.board.getCurrentWater() <= 0) {
@@ -553,6 +584,7 @@ export class Game implements InputCallbacks {
     if (this.screen === GameScreen.Play) {
       this._renderBoard();
       this._animMgr.tick(this.board, this.gameState);
+      this._metrics.tickGoldenInventoryTwinkle();
     }
     requestAnimationFrame(() => this._loop());
   }
@@ -653,6 +685,46 @@ export class Game implements InputCallbacks {
   private _closeModal(modalEl: HTMLElement): void {
     modalEl.style.display = 'none';
     this._clearModalSparkle(modalEl);
+  }
+
+  // ─── Level-intro ring helpers ─────────────────────────────────────────────
+
+  /**
+   * Schedule a deferred check that will spawn the level-intro rings if no
+   * campaign modal is blocking them.  Called when a new level starts.
+   */
+  private _schedulePendingRings(): void {
+    this._pendingRings = true;
+    if (this._pendingRingsTimerId !== null) clearTimeout(this._pendingRingsTimerId);
+    this._pendingRingsTimerId = setTimeout(() => {
+      this._pendingRingsTimerId = null;
+      this._spawnPendingRingsIfReady();
+    }, 0);
+  }
+
+  /** Cancel any scheduled or pending level-intro ring spawn (e.g. on explicit restart). */
+  private _cancelPendingRings(): void {
+    this._pendingRings = false;
+    if (this._pendingRingsTimerId !== null) {
+      clearTimeout(this._pendingRingsTimerId);
+      this._pendingRingsTimerId = null;
+    }
+  }
+
+  /**
+   * Spawn the pending level-intro rings if no campaign modal is currently visible.
+   * Called from the deferred timeout set in {@link _schedulePendingRings} and also
+   * after a campaign modal (challenge / new-chapter) is dismissed.
+   */
+  private _spawnPendingRingsIfReady(): void {
+    if (!this._pendingRings || !this.board) return;
+    // Defer until campaign modals that block the view are dismissed.
+    if (
+      this._newChapterModalEl.style.display !== 'none' ||
+      this._challengeModalEl.style.display !== 'none'
+    ) return;
+    this._pendingRings = false;
+    this._animMgr.spawnLevelIntroRings(this.board);
   }
 
   /**
@@ -1048,7 +1120,7 @@ export class Game implements InputCallbacks {
     if (!this.currentLevel) return;
     const prevBoard = this.board;
     const prevDecorations = prevBoard?.ambientDecorations;
-    this.startLevel(this.currentLevel.id, prevDecorations);
+    this.startLevel(this.currentLevel.id, prevDecorations, /* isUserRestart */ true);
     // Graft the pre-restart history onto the new board so Undo can revert to
     // the state the player was in before restarting.
     // Any losing-move snapshot will have already been removed by

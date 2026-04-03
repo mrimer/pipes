@@ -1092,8 +1092,9 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
   }
 }
 
-function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, isWater: boolean, half: number, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null, lockedGain: number | null): void {
-  // Clip to tile bounds so that connection stubs end exactly at the tile edge.
+function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, isWater: boolean, half: number, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null, lockedGain: number | null, buttEndDirs?: Set<Direction>): void {
+  // Phase 1: Draw the box, inner content, and flush (butt-end) stubs inside the tile clip.
+  ctx.save();
   ctx.beginPath();
   ctx.rect(-half, -half, half * 2, half * 2);
   ctx.clip();
@@ -1136,22 +1137,46 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
   }
-  // Connection stubs drawn with flat (butt) caps, starting exactly at the box edge
-  // so each stub connects flush with the outside edge of the inner rectangle.
+  // Connection stubs that use a flat (butt) end cap are drawn inside the clip so
+  // the end sits exactly flush with the tile edge and does not bleed into
+  // adjacent tiles.  When buttEndDirs is undefined all stubs use butt caps
+  // (legacy / default behaviour for tiles that don't compute butt-end sets).
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
   ctx.lineCap = 'butt';
-  if (tile.connections.has(Direction.North)) {
+  if (tile.connections.has(Direction.North) && (!buttEndDirs || buttEndDirs.has(Direction.North))) {
     ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
   }
-  if (tile.connections.has(Direction.South)) {
+  if (tile.connections.has(Direction.South) && (!buttEndDirs || buttEndDirs.has(Direction.South))) {
     ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
   }
-  if (tile.connections.has(Direction.West)) {
+  if (tile.connections.has(Direction.West) && (!buttEndDirs || buttEndDirs.has(Direction.West))) {
     ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
   }
-  if (tile.connections.has(Direction.East)) {
+  if (tile.connections.has(Direction.East) && (!buttEndDirs || buttEndDirs.has(Direction.East))) {
     ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+  }
+  ctx.restore(); // Remove clip so round-end stubs can extend beyond the tile boundary.
+
+  // Phase 2: Connection stubs that face empty tiles or pipes without a reciprocating
+  // arm use a round end cap, matching the nub style used by plain pipe arms.  These
+  // are drawn outside the clip so the round cap protrudes slightly beyond the tile edge.
+  if (buttEndDirs !== undefined) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.lineCap = 'round';
+    if (tile.connections.has(Direction.North) && !buttEndDirs.has(Direction.North)) {
+      ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.South) && !buttEndDirs.has(Direction.South)) {
+      ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
+    }
+    if (tile.connections.has(Direction.West) && !buttEndDirs.has(Direction.West)) {
+      ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
+    }
+    if (tile.connections.has(Direction.East) && !buttEndDirs.has(Direction.East)) {
+      ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+    }
   }
 }
 
@@ -1436,7 +1461,7 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    _drawChamber(ctx, tile, color, isWater, half, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
+    _drawChamber(ctx, tile, color, isWater, half, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, effectiveButtEndDirs);
   } else if (shape === PipeShape.Granite) {
     // Granite – solid impassable stone block; no connections
     ctx.restore();
@@ -2000,8 +2025,8 @@ function _renderPass2NonPipeTiles(
         }
       }
 
-      // For Source/Sink tiles, compute which arm directions need a butt end cap.
-      const buttEndDirs = (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink)
+      // For Source/Sink/Chamber tiles, compute which arm directions need a butt end cap.
+      const buttEndDirs = (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink || tile.shape === PipeShape.Chamber)
         ? _computeButtEndDirs(board, r, c)
         : undefined;
 
