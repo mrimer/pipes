@@ -38,6 +38,7 @@ import {
 } from './types';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { EditorInputHandler } from './editorInputHandler';
+import { DataValidationDialog } from './dataValidationDialog';
 import { renderMinimap } from '../minimap';
 import { validateLevel } from './levelValidator';
 
@@ -85,6 +86,9 @@ export class CampaignEditor {
   /** Chapter map editor sub-section (manages grid, palette, canvas, undo/redo). */
   private readonly _chapterMapEditor: ChapterMapEditorSection;
 
+  /** Data validation dialog (dev tool). */
+  private readonly _dataValidator: DataValidationDialog;
+
   constructor(
     onClose: () => void,
     onPlaytest: (level: LevelDef) => void,
@@ -111,6 +115,8 @@ export class CampaignEditor {
       },
     };
     this._chapterMapEditor = new ChapterMapEditorSection(chapterCallbacks);
+
+    this._dataValidator = new DataValidationDialog(this._service, this._btn.bind(this));
 
     this._paramsPanel = new TileParamsPanel({
       getState: () => this._state,
@@ -589,7 +595,8 @@ export class CampaignEditor {
     );
     if (!isOfficial) {
       toolbar.appendChild(this._btn('📤 Export', '#16213e', '#4a90d9', () => this._exportCampaign(campaign)));
-      toolbar.appendChild(this._btn('🔍 Dev – Validate data', '#16213e', '#f0c040', () => this._showValidateDataModal(campaign)));
+      toolbar.appendChild(this._btn('🔍 Dev – Validate data', '#16213e', '#f0c040',
+        () => this._dataValidator.show(this._el, campaign)));
     }
     this._el.appendChild(toolbar);
 
@@ -1736,10 +1743,11 @@ export class CampaignEditor {
   }
 
   // ─── Dev: Data validation ─────────────────────────────────────────────────
+  // (Moved to DataValidationDialog — see dataValidationDialog.ts)
 
   /**
    * Delegate to {@link CampaignService.scanData} for backward compatibility.
-   * All validation logic lives in the service.
+   * @deprecated Use this._service.scanData() or DataValidationDialog directly.
    */
   private _scanCampaignData(
     campaign: CampaignDef,
@@ -1747,136 +1755,6 @@ export class CampaignEditor {
   ): Map<string, Map<string, number>> {
     return this._service.scanData(campaign, dryRun);
   }
-
-  /**
-   * Build an HTML table summarising the unrecognized field issues found in campaign data.
-   * Each row contains the record type, field name, and occurrence count.
-   * Returns null when there are no issues to display.
-   */
-  private _buildValidationIssuesTable(
-    issues: Map<string, Map<string, number>>,
-  ): HTMLTableElement | null {
-    let totalIssues = 0;
-    for (const m of issues.values()) for (const c of m.values()) totalIssues += c;
-    if (totalIssues === 0) return null;
-
-    const table = document.createElement('table');
-    table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.85rem;';
-
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    for (const [label, align] of [['Record Type', 'left'], ['Field Name', 'left'], ['Count', 'right']] as const) {
-      const th = document.createElement('th');
-      th.style.cssText = `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid #2a3a5e;`;
-      th.textContent = label;
-      headerRow.appendChild(th);
-    }
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    for (const [recordType, fieldMap] of issues) {
-      for (const [fieldName, count] of fieldMap) {
-        const tr = document.createElement('tr');
-        for (const [txt, align] of [
-          [recordType, 'left'],
-          [fieldName, 'left'],
-          [String(count), 'right'],
-        ] as const) {
-          const td = document.createElement('td');
-          td.style.cssText = `text-align:${align};padding:4px 8px;border-bottom:1px solid #1a2a3e;`;
-          td.textContent = txt;
-          tr.appendChild(td);
-        }
-        tbody.appendChild(tr);
-      }
-    }
-    table.appendChild(tbody);
-    return table;
-  }
-
-  /**
-   * Render the validate-data dialog content into `overlay`.
-   * Called initially with the scan results, and again after a clean-up to show the updated state.
-   */
-  private _renderValidateDataContent(
-    overlay: HTMLElement,
-    campaign: CampaignDef,
-    issues: Map<string, Map<string, number>>,
-    cleanupDone: boolean,
-  ): void {
-    overlay.innerHTML = '';
-
-    let totalIssues = 0;
-    for (const m of issues.values()) for (const c of m.values()) totalIssues += c;
-
-    const dialog = document.createElement('div');
-    dialog.style.cssText =
-      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
-      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:520px;' +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
-
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
-    title.textContent = cleanupDone ? '🧹 Cleanup Complete' : '🔍 Dev – Validate Data';
-    dialog.appendChild(title);
-
-    const body = document.createElement('div');
-    body.style.cssText = 'font-size:0.9rem;color:#eee;line-height:1.6;';
-
-    const issuesTable = this._buildValidationIssuesTable(issues);
-    if (!issuesTable) {
-      const p = document.createElement('p');
-      p.style.margin = '0';
-      p.textContent = cleanupDone
-        ? 'Cleanup complete. No issues were found.'
-        : 'Data validation complete. No issues found.';
-      body.appendChild(p);
-    } else {
-      const intro = document.createElement('p');
-      intro.style.margin = '0 0 8px 0';
-      intro.textContent = cleanupDone
-        ? 'The following unrecognized fields were removed:'
-        : 'The following unrecognized fields were found:';
-      body.appendChild(intro);
-      body.appendChild(issuesTable);
-    }
-    dialog.appendChild(body);
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
-
-    if (totalIssues > 0 && !cleanupDone) {
-      const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {
-        const cleanIssues = this._service.scanData(campaign, false);
-        this._service.touch(campaign);
-        this._service.save();
-        this._renderValidateDataContent(overlay, campaign, cleanIssues, true);
-      });
-      btnRow.appendChild(cleanupBtn);
-    }
-
-    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
-    dialog.appendChild(btnRow);
-    overlay.appendChild(dialog);
-  }
-
-  /**
-   * Show a modal dialog that reports unrecognized field names found in the
-   * campaign data.  Offers a "Clean Up" button that removes those fields,
-   * saves the campaign, and updates its lastUpdated timestamp.
-   */
-  private _showValidateDataModal(campaign: CampaignDef): void {
-    const overlay = document.createElement('div');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
-
-    this._renderValidateDataContent(overlay, campaign, this._scanCampaignData(campaign, true), false);
-    this._el.appendChild(overlay);
-  }
-
-
 
   /** Export a campaign by triggering a JSON file download.
    *  Unrecognized fields are stripped from the output via a clean pass. */
