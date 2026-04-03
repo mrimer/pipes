@@ -466,11 +466,14 @@ const BUBBLE_MAX = 80;
  * @param bubbles         Mutable array of active bubbles.
  * @param board           The current game board.
  * @param filledPositions Pre-computed set of connected tile keys ("row,col").
+ * @param shapesFilter    Optional set of PipeShapes to restrict spawning to.
+ *                        Defaults to regular, spin, and golden pipe shapes.
  */
 export function spawnBubble(
   bubbles: BubbleParticle[],
   board: Board,
   filledPositions: Set<string>,
+  shapesFilter?: ReadonlySet<string>,
 ): void {
   if (bubbles.length >= BUBBLE_MAX) return;
 
@@ -479,7 +482,10 @@ export function spawnBubble(
   for (const key of filledPositions) {
     const [r, c] = parseKey(key);
     const shape = board.grid[r][c].shape;
-    if (PIPE_SHAPES.has(shape) || GOLD_PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape)) {
+    const eligible = shapesFilter
+      ? shapesFilter.has(shape)
+      : PIPE_SHAPES.has(shape) || SPIN_PIPE_SHAPES.has(shape);
+    if (eligible) {
       candidates.push(key);
     }
   }
