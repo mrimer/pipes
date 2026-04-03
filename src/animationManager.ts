@@ -539,10 +539,10 @@ export class AnimationManager {
     const cx = (c + 0.5) * TILE_SIZE;
     const cy = (r + 0.5) * TILE_SIZE;
 
-    const connections = [...tile.connections];
     let tileX: number, tileY: number;
-    if (connections.length > 0) {
-      const dir = connections[Math.floor(Math.random() * connections.length)];
+    if (tile.connections.size > 0) {
+      const dirs = [...tile.connections];
+      const dir = dirs[Math.floor(Math.random() * dirs.length)];
       // Place at a random point along the arm (avoiding the very center).
       const t = 0.3 + Math.random() * 0.7;
       switch (dir) {

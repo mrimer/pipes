@@ -350,7 +350,7 @@ export class MetricsDisplay {
     // Pick one arm at random and place the twinkle at a random point along its
     // length so it appears on the pipe itself rather than blending into the
     // pipe color at the center.
-    const shape = el.dataset['shape'] as PipeShape | undefined;
+    const shape = el.dataset.shape as PipeShape | undefined;
     const armTips = _goldInvArmTips(shape);
     const [ax, ay] = armTips[Math.floor(Math.random() * armTips.length)];
     // Interpolate from center (16,16) toward the arm tip by a random fraction.
