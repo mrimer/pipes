@@ -298,14 +298,16 @@ describe('CampaignEditor – note and hint in level definitions', () => {
   /** Access private editor state for testing purposes. */
   function editorState(editor: CampaignEditor) {
     return editor as unknown as {
-      _editLevelNote: string;
-      _editLevelHints: string[];
-      _editLevelChallenge: boolean;
-      _editLevelName: string;
-      _editRows: number;
-      _editCols: number;
-      _editGrid: (import('../src/types').TileDef | null)[][];
-      _editInventory: import('../src/types').InventoryItem[];
+      _state: {
+        levelNote: string;
+        levelHints: string[];
+        levelChallenge: boolean;
+        levelName: string;
+        rows: number;
+        cols: number;
+        grid: (import('../src/types').TileDef | null)[][];
+        inventory: import('../src/types').InventoryItem[];
+      };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _activeLevelIdx: number;
@@ -317,8 +319,8 @@ describe('CampaignEditor – note and hint in level definitions', () => {
   it('_editLevelNote and _editLevelHints are empty by default', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    expect(state._editLevelNote).toBe('');
-    expect(state._editLevelHints).toEqual(['']);
+    expect(state._state.levelNote).toBe('');
+    expect(state._state.levelHints).toEqual(['']);
   });
 
   it('_openLevelEditor populates _editLevelNote and _editLevelHints from a level', () => {
@@ -335,8 +337,8 @@ describe('CampaignEditor – note and hint in level definitions', () => {
       hints: ['This is a hint.'],
     };
     state._openLevelEditor(level, true);
-    expect(state._editLevelNote).toBe('This is a note.');
-    expect(state._editLevelHints).toEqual(['This is a hint.']);
+    expect(state._state.levelNote).toBe('This is a note.');
+    expect(state._state.levelHints).toEqual(['This is a hint.']);
   });
 
   it('_openLevelEditor uses empty hints when level has no hints', () => {
@@ -351,7 +353,7 @@ describe('CampaignEditor – note and hint in level definitions', () => {
       inventory: [],
     };
     state._openLevelEditor(level, true);
-    expect(state._editLevelHints).toEqual(['']);
+    expect(state._state.levelHints).toEqual(['']);
   });
 
   it('_openLevelEditor sets empty array when level has no note or hint', () => {
@@ -366,8 +368,8 @@ describe('CampaignEditor – note and hint in level definitions', () => {
       inventory: [],
     };
     state._openLevelEditor(level, true);
-    expect(state._editLevelNote).toBe('');
-    expect(state._editLevelHints).toEqual(['']);
+    expect(state._state.levelNote).toBe('');
+    expect(state._state.levelHints).toEqual(['']);
   });
 
   it('_buildCurrentLevelDef omits note/hints when they are empty', () => {
@@ -393,13 +395,13 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     state._activeCampaignId = 'cmp_test_nh';
     state._activeChapterIdx = 0;
     state._activeLevelIdx = 0;
-    state._editLevelName = 'Test Level';
-    state._editLevelNote = '';
-    state._editLevelHints = [''];
-    state._editRows = 3;
-    state._editCols = 3;
-    state._editGrid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
-    state._editInventory = [];
+    state._state.levelName = 'Test Level';
+    state._state.levelNote = '';
+    state._state.levelHints = [''];
+    state._state.rows = 3;
+    state._state.cols = 3;
+    state._state.grid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
+    state._state.inventory = [];
 
     const def = state._buildCurrentLevelDef();
     expect(def.note).toBeUndefined();
@@ -429,13 +431,13 @@ describe('CampaignEditor – note and hint in level definitions', () => {
     state._activeCampaignId = 'cmp_test_nh2';
     state._activeChapterIdx = 0;
     state._activeLevelIdx = 0;
-    state._editLevelName = 'Test Level';
-    state._editLevelNote = 'Route the water carefully.';
-    state._editLevelHints = ['Start from the left.', 'Try an elbow piece.'];
-    state._editRows = 3;
-    state._editCols = 3;
-    state._editGrid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
-    state._editInventory = [];
+    state._state.levelName = 'Test Level';
+    state._state.levelNote = 'Route the water carefully.';
+    state._state.levelHints = ['Start from the left.', 'Try an elbow piece.'];
+    state._state.rows = 3;
+    state._state.cols = 3;
+    state._state.grid = Array.from({ length: 3 }, () => Array(3).fill(null) as null[]);
+    state._state.inventory = [];
 
     const def = state._buildCurrentLevelDef();
     expect(def.note).toBe('Route the water carefully.');
@@ -753,18 +755,20 @@ describe('CampaignEditor – import version comparison', () => {
     );
 
     const state = editor as unknown as {
+      _state: {
+        levelName: string;
+        levelNote: string;
+        levelHints: string[];
+        levelChallenge: boolean;
+        rows: number;
+        cols: number;
+        grid: (import('../src/types').TileDef | null)[][];
+        inventory: import('../src/types').InventoryItem[];
+      };
       _campaigns: CampaignDef[];
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _activeLevelIdx: number;
-      _editLevelName: string;
-      _editLevelNote: string;
-      _editLevelHints: string[];
-      _editLevelChallenge: boolean;
-      _editRows: number;
-      _editCols: number;
-      _editGrid: (import('../src/types').TileDef | null)[][];
-      _editInventory: import('../src/types').InventoryItem[];
       _showLevelEditor(readOnly: boolean): void;
       _validateLevel(): { ok: boolean; messages: string[] };
     };
@@ -773,14 +777,14 @@ describe('CampaignEditor – import version comparison', () => {
     state._activeCampaignId = 'cmp_pt1';
     state._activeChapterIdx = 0;
     state._activeLevelIdx = 0;
-    state._editLevelName = 'Playtest Level';
-    state._editLevelNote = '';
-    state._editLevelHints = [''];
-    state._editLevelChallenge = false;
-    state._editRows = 2;
-    state._editCols = 2;
-    state._editGrid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
-    state._editInventory = [];
+    state._state.levelName = 'Playtest Level';
+    state._state.levelNote = '';
+    state._state.levelHints = [''];
+    state._state.levelChallenge = false;
+    state._state.rows = 2;
+    state._state.cols = 2;
+    state._state.grid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
+    state._state.inventory = [];
 
     // Bypass _validateLevel so the test does not need a fully valid board.
     jest.spyOn(state, '_validateLevel').mockReturnValue({ ok: true, messages: [] });
@@ -932,14 +936,16 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
   /** Reuse the editorState helper from the note/hint suite. */
   function editorState(editor: CampaignEditor) {
     return editor as unknown as {
-      _editLevelChallenge: boolean;
-      _editLevelName: string;
-      _editLevelNote: string;
-      _editLevelHints: string[];
-      _editRows: number;
-      _editCols: number;
-      _editGrid: (import('../src/types').TileDef | null)[][];
-      _editInventory: import('../src/types').InventoryItem[];
+      _state: {
+        levelChallenge: boolean;
+        levelName: string;
+        levelNote: string;
+        levelHints: string[];
+        rows: number;
+        cols: number;
+        grid: (import('../src/types').TileDef | null)[][];
+        inventory: import('../src/types').InventoryItem[];
+      };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _activeLevelIdx: number;
@@ -950,7 +956,7 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
 
   it('_editLevelChallenge defaults to false', () => {
     const editor = makeEditor();
-    expect(editorState(editor)._editLevelChallenge).toBe(false);
+    expect(editorState(editor)._state.levelChallenge).toBe(false);
   });
 
   it('_openLevelEditor reads challenge=true from level', () => {
@@ -966,7 +972,7 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
       challenge: true,
     };
     state._openLevelEditor(level, true);
-    expect(state._editLevelChallenge).toBe(true);
+    expect(state._state.levelChallenge).toBe(true);
   });
 
   it('_openLevelEditor sets false when level has no challenge flag', () => {
@@ -981,7 +987,7 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
       inventory: [],
     };
     state._openLevelEditor(level, true);
-    expect(state._editLevelChallenge).toBe(false);
+    expect(state._state.levelChallenge).toBe(false);
   });
 
   it('_buildCurrentLevelDef omits challenge when false', () => {
@@ -1007,14 +1013,14 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
     state._activeCampaignId = 'cmp_chal1';
     state._activeChapterIdx = 0;
     state._activeLevelIdx = 0;
-    state._editLevelName = 'Level';
-    state._editLevelNote = '';
-    state._editLevelHints = [''];
-    state._editLevelChallenge = false;
-    state._editRows = 2;
-    state._editCols = 2;
-    state._editGrid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
-    state._editInventory = [];
+    state._state.levelName = 'Level';
+    state._state.levelNote = '';
+    state._state.levelHints = [''];
+    state._state.levelChallenge = false;
+    state._state.rows = 2;
+    state._state.cols = 2;
+    state._state.grid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
+    state._state.inventory = [];
 
     const def = state._buildCurrentLevelDef();
     expect(def.challenge).toBeUndefined();
@@ -1043,14 +1049,14 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
     state._activeCampaignId = 'cmp_chal2';
     state._activeChapterIdx = 0;
     state._activeLevelIdx = 0;
-    state._editLevelName = 'Level';
-    state._editLevelNote = '';
-    state._editLevelHints = [''];
-    state._editLevelChallenge = true;
-    state._editRows = 2;
-    state._editCols = 2;
-    state._editGrid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
-    state._editInventory = [];
+    state._state.levelName = 'Level';
+    state._state.levelNote = '';
+    state._state.levelHints = [''];
+    state._state.levelChallenge = true;
+    state._state.rows = 2;
+    state._state.cols = 2;
+    state._state.grid = Array.from({ length: 2 }, () => Array(2).fill(null) as null[]);
+    state._state.inventory = [];
 
     const def = state._buildCurrentLevelDef();
     expect(def.challenge).toBe(true);
@@ -1068,8 +1074,10 @@ describe('CampaignEditor – Source tile parameter validation', () => {
   /** Access private editor state for testing purposes. */
   function editorState(editor: CampaignEditor) {
     return editor as unknown as {
-      _editorParams: TileParams;
-      _editorPalette: PipeShape | string;
+      _state: {
+        params: TileParams;
+        palette: PipeShape | string;
+      };
       _buildParamPanel(): HTMLElement;
     };
   }
@@ -1095,86 +1103,86 @@ describe('CampaignEditor – Source tile parameter validation', () => {
   it('Source pressure can be set to 0 without reverting to 1', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = PipeShape.Source;
-    state._editorParams.pressure = 1;
+    state._state.palette = PipeShape.Source;
+    state._state.params.pressure = 1;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Base Pressure');
     expect(input).not.toBeNull();
     fireInput(input!, '0');
-    expect(state._editorParams.pressure).toBe(0);
+    expect(state._state.params.pressure).toBe(0);
   });
 
   it('Source pressure negative values are clamped to 0', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = PipeShape.Source;
-    state._editorParams.pressure = 5;
+    state._state.palette = PipeShape.Source;
+    state._state.params.pressure = 5;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Base Pressure');
     expect(input).not.toBeNull();
     fireInput(input!, '-3');
-    expect(state._editorParams.pressure).toBe(0);
+    expect(state._state.params.pressure).toBe(0);
   });
 
   it('Source capacity negative values are clamped to 0', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = PipeShape.Source;
+    state._state.palette = PipeShape.Source;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Capacity');
     expect(input).not.toBeNull();
     fireInput(input!, '-3');
-    expect(state._editorParams.capacity).toBe(0);
+    expect(state._state.params.capacity).toBe(0);
   });
 
   it('Source temperature negative values are clamped to 0', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = PipeShape.Source;
+    state._state.palette = PipeShape.Source;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Base Temp');
     expect(input).not.toBeNull();
     fireInput(input!, '-10');
-    expect(state._editorParams.temperature).toBe(0);
+    expect(state._state.params.temperature).toBe(0);
   });
 
   it('Pump chamber pressure can be set to 0 without reverting to 1', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = 'chamber:pump';
-    state._editorParams.chamberContent = 'pump';
-    state._editorParams.pressure = 1;
+    state._state.palette = 'chamber:pump';
+    state._state.params.chamberContent = 'pump';
+    state._state.params.pressure = 1;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Pressure');
     expect(input).not.toBeNull();
     fireInput(input!, '0');
-    expect(state._editorParams.pressure).toBe(0);
+    expect(state._state.params.pressure).toBe(0);
   });
 
   it('Pump chamber pressure supports negative values', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = 'chamber:pump';
-    state._editorParams.chamberContent = 'pump';
-    state._editorParams.pressure = 2;
+    state._state.palette = 'chamber:pump';
+    state._state.params.chamberContent = 'pump';
+    state._state.params.pressure = 2;
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Pressure');
     expect(input).not.toBeNull();
     fireInput(input!, '-5');
-    expect(state._editorParams.pressure).toBe(-5);
+    expect(state._state.params.pressure).toBe(-5);
   });
 
   it('Hot plate chamber Mass and Boiling° inputs update params correctly', () => {
     const editor = makeEditor();
     const state = editorState(editor);
-    state._editorPalette = 'chamber:hot_plate';
-    state._editorParams.chamberContent = 'hot_plate';
+    state._state.palette = 'chamber:hot_plate';
+    state._state.params.chamberContent = 'hot_plate';
     const panel = state._buildParamPanel();
     document.body.appendChild(panel);
     const massInput = findInputByLabel(panel, 'Mass');
@@ -1183,22 +1191,24 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     expect(boilingInput).not.toBeNull();
     fireInput(massInput!, '3');
     fireInput(boilingInput!, '50');
-    expect(state._editorParams.cost).toBe(3);
-    expect(state._editorParams.temperature).toBe(50);
+    expect(state._state.params.cost).toBe(3);
+    expect(state._state.params.temperature).toBe(50);
   });
 
   it('Hot plate _buildTileDef saves cost and temperature to TileDef', () => {
     const editor = makeEditor();
     const state = editor as unknown as {
-      _editorParams: TileParams;
-      _editorPalette: PipeShape | string;
-      _buildTileDef(palette: string): import('../src/types').TileDef;
+      _state: {
+        params: TileParams;
+        palette: PipeShape | string;
+        buildTileDef(): import('../src/types').TileDef;
+      };
     };
-    state._editorPalette = 'chamber:hot_plate';
-    state._editorParams.chamberContent = 'hot_plate';
-    state._editorParams.cost = 3;
-    state._editorParams.temperature = 50;
-    const def = state._buildTileDef('chamber:hot_plate');
+    state._state.palette = 'chamber:hot_plate';
+    state._state.params.chamberContent = 'hot_plate';
+    state._state.params.cost = 3;
+    state._state.params.temperature = 50;
+    const def = state._state.buildTileDef();
     expect(def.chamberContent).toBe('hot_plate');
     expect(def.cost).toBe(3);
     expect(def.temperature).toBe(50);
@@ -1258,12 +1268,14 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     };
     const editor = makeEditor([camp]);
     const state = editor as unknown as {
+      _state: {
+        rows: number;
+        cols: number;
+      };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _activeLevelIdx: number;
       _editorCanvas: HTMLCanvasElement | null;
-      _editRows: number;
-      _editCols: number;
       _openLevelEditor(level: LevelDef, readOnly: boolean): void;
       _resizeGrid(rows: number, cols: number): void;
       _canvasPos(e: MouseEvent): { row: number; col: number } | null;
@@ -1371,8 +1383,7 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
 
   it('resize to 1×1 is rejected and shows an error', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
-      _editRows: number;
-      _editCols: number;
+      _state: { rows: number; cols: number; };
       _buildGridSizePanel(): HTMLElement;
     };
     const panel = state._buildGridSizePanel();
@@ -1383,8 +1394,8 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     resizeBtn.click();
 
     // Grid must not have changed.
-    expect(state._editRows).toBe(4);
-    expect(state._editCols).toBe(4);
+    expect(state._state.rows).toBe(4);
+    expect(state._state.cols).toBe(4);
     // Error message must be shown.
     expect(errorDiv.style.display).not.toBe('none');
     expect(errorDiv.textContent).toMatch(/dimension/i);
@@ -1392,8 +1403,7 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
 
   it('resize to 1×5 (one dim > 1) is accepted', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
-      _editRows: number;
-      _editCols: number;
+      _state: { rows: number; cols: number; };
       _buildGridSizePanel(): HTMLElement;
     };
     const panel = state._buildGridSizePanel();
@@ -1403,14 +1413,13 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     colsInp.value = '5';
     resizeBtn.click();
 
-    expect(state._editRows).toBe(1);
-    expect(state._editCols).toBe(5);
+    expect(state._state.rows).toBe(1);
+    expect(state._state.cols).toBe(5);
   });
 
   it('resize to 5×1 (one dim > 1) is accepted', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
-      _editRows: number;
-      _editCols: number;
+      _state: { rows: number; cols: number; };
       _buildGridSizePanel(): HTMLElement;
     };
     const panel = state._buildGridSizePanel();
@@ -1420,14 +1429,13 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     colsInp.value = '1';
     resizeBtn.click();
 
-    expect(state._editRows).toBe(5);
-    expect(state._editCols).toBe(1);
+    expect(state._state.rows).toBe(5);
+    expect(state._state.cols).toBe(1);
   });
 
   it('undo after resize restores the pre-resize grid dimensions', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
-      _editRows: number;
-      _editCols: number;
+      _state: { rows: number; cols: number; };
       _buildGridSizePanel(): HTMLElement;
       _editorUndo(): void;
     };
@@ -1438,13 +1446,13 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     rowsInp.value = '6';
     colsInp.value = '8';
     resizeBtn.click();
-    expect(state._editRows).toBe(6);
-    expect(state._editCols).toBe(8);
+    expect(state._state.rows).toBe(6);
+    expect(state._state.cols).toBe(8);
 
     // Undo should restore to the original 4×4.
     state._editorUndo();
-    expect(state._editRows).toBe(4);
-    expect(state._editCols).toBe(4);
+    expect(state._state.rows).toBe(4);
+    expect(state._state.cols).toBe(4);
   });
 });
 
@@ -1480,17 +1488,19 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
   });
 
   type EditorDragState = {
+    _state: {
+      rows: number;
+      cols: number;
+      grid: (import('../src/types').TileDef | null)[][];
+      palette: import('../src/campaignEditor/types').EditorPalette;
+      _history: import('../src/campaignEditor/types').EditorSnapshot[];
+      _historyIdx: number;
+    };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _editRows: number;
-    _editCols: number;
-    _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
     _paintDragActive: boolean;
-    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
-    _editorHistoryIdx: number;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
     _onEditorCanvasMouseMove(e: MouseEvent): void;
@@ -1538,22 +1548,22 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
   it('does not record a new snapshot during paint-drag mousedown', () => {
     const state = makeDragEditor(makeLevel(4, 4));
     // _openLevelEditor records the initial snapshot, so history has exactly 1 entry.
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
     // Mousedown on empty cell with a repeatable palette tile starts a paint drag.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Snapshot count must NOT have increased yet – drag is still in progress.
-    expect(state._editorHistory.length).toBe(historyLenBefore);
+    expect(state._state._history.length).toBe(historyLenBefore);
     expect(state._paintDragActive).toBe(true);
   });
 
   it('records a snapshot only on mouseup after a paint-drag', () => {
     const state = makeDragEditor(makeLevel(4, 4));
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     // Start drag
     state._onEditorMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
     // Extend drag to another cell
@@ -1562,27 +1572,27 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     state._onEditorMouseUp(mouseEvent('mouseup', 96, 32));
 
     // Exactly one new snapshot should have been added, and drag is finished.
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
     expect(state._paintDragActive).toBe(false);
   });
 
   it('painted cells are present in the new snapshot, pre-drag state is the previous one', () => {
     const state = makeDragEditor(makeLevel(4, 4));
     // Capture the initial (pre-drag) snapshot content.
-    const preDragSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
+    const preDragSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
 
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(mouseEvent('mousedown', 32, 32));   // col 0
     state._onEditorCanvasMouseMove(mouseEvent('mousemove', 96, 32)); // col 1
     state._onEditorMouseUp(mouseEvent('mouseup', 96, 32));
 
     // The new snapshot records the post-drag state (cells painted).
-    const postDragSnapshot = state._editorHistory[state._editorHistoryIdx];
+    const postDragSnapshot = state._state._history[state._state._historyIdx];
     expect(postDragSnapshot.grid[0][0]).not.toBeNull();
     expect(postDragSnapshot.grid[0][1]).not.toBeNull();
 
     // The previous history entry is still the clean pre-drag state.
-    const prevSnapshot = state._editorHistory[state._editorHistoryIdx - 1];
+    const prevSnapshot = state._state._history[state._state._historyIdx - 1];
     expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
   });
 });
@@ -1619,18 +1629,20 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
   });
 
   type EditorEraseState = {
+    _state: {
+      rows: number;
+      cols: number;
+      grid: (import('../src/types').TileDef | null)[][];
+      palette: import('../src/campaignEditor/types').EditorPalette;
+      _history: import('../src/campaignEditor/types').EditorSnapshot[];
+      _historyIdx: number;
+    };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _editRows: number;
-    _editCols: number;
-    _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
     _rightEraseDragActive: boolean;
     _suppressNextContextMenu: boolean;
-    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
-    _editorHistoryIdx: number;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
     _onEditorCanvasMouseMove(e: MouseEvent): void;
@@ -1681,35 +1693,35 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
   /** Seed the grid with straight-pipe tiles at the given cell positions. */
   function placeTiles(state: EditorEraseState, cells: { row: number; col: number }[]): void {
     for (const { row, col } of cells) {
-      state._editGrid[row][col] = { shape: PipeShape.Straight, rotation: 0 };
+      state._state.grid[row][col] = { shape: PipeShape.Straight, rotation: 0 };
     }
   }
 
   it('does not record a new snapshot during right-erase mousedown', () => {
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }]);
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
     state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Snapshot count must NOT have increased yet – drag is still in progress.
-    expect(state._editorHistory.length).toBe(historyLenBefore);
+    expect(state._state._history.length).toBe(historyLenBefore);
     expect(state._rightEraseDragActive).toBe(true);
     // But the cell should already be erased.
-    expect(state._editGrid[0][0]).toBeNull();
+    expect(state._state.grid[0][0]).toBeNull();
   });
 
   it('records a snapshot only on right mouseup after a right-drag-erase', () => {
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
     state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
     state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
     state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     // Exactly one new snapshot should have been added, and drag is finished.
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
     expect(state._rightEraseDragActive).toBe(false);
   });
 
@@ -1717,19 +1729,19 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
     // Snapshot the pre-drag state.
-    const preDragSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
+    const preDragSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
 
     state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));   // col 0
     state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // col 1
     state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     // The new snapshot records the post-erase state.
-    const postEraseSnapshot = state._editorHistory[state._editorHistoryIdx];
+    const postEraseSnapshot = state._state._history[state._state._historyIdx];
     expect(postEraseSnapshot.grid[0][0]).toBeNull();
     expect(postEraseSnapshot.grid[0][1]).toBeNull();
 
     // The previous history entry is still the pre-erase state.
-    const prevSnapshot = state._editorHistory[state._editorHistoryIdx - 1];
+    const prevSnapshot = state._state._history[state._state._historyIdx - 1];
     expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
   });
 
@@ -1753,22 +1765,22 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
     state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
 
-    expect(state._editGrid[0][0]).toBeNull(); // erased
-    expect(state._editGrid[0][1]).toBeNull(); // was already null
+    expect(state._state.grid[0][0]).toBeNull(); // erased
+    expect(state._state.grid[0][1]).toBeNull(); // was already null
   });
 
   it('left-button paint-drag still works normally alongside right-drag state', () => {
     const state = makeEraseEditor(makeLevel(4, 4));
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
     state._onEditorCanvasMouseMove(leftMouseEvent('mousemove', 96, 32)); // row 0, col 1
     state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
 
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
-    expect(state._editGrid[0][0]).not.toBeNull();
-    expect(state._editGrid[0][1]).not.toBeNull();
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    expect(state._state.grid[0][0]).not.toBeNull();
+    expect(state._state.grid[0][1]).not.toBeNull();
     expect(state._rightEraseDragActive).toBe(false);
   });
 });
@@ -1805,17 +1817,19 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
   });
 
   type EditorPlaceState = {
+    _state: {
+      rows: number;
+      cols: number;
+      grid: (import('../src/types').TileDef | null)[][];
+      palette: import('../src/campaignEditor/types').EditorPalette;
+      _history: import('../src/campaignEditor/types').EditorSnapshot[];
+      _historyIdx: number;
+      _linkedTilePos: { row: number; col: number } | null;
+    };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _editRows: number;
-    _editCols: number;
-    _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
-    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
-    _editorHistoryIdx: number;
-    _linkedTilePos: { row: number; col: number } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
     _onEditorMouseUp(e: MouseEvent): void;
@@ -1864,17 +1878,17 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
   it('placed container tile IS present in the new snapshot', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
     // Place a container tile (Chamber with chamberContent='item') by single-click on empty cell.
-    state._editorPalette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
+    state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Exactly one new snapshot should have been added.
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
 
     // The new snapshot must include the placed container tile.
-    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    const newSnapshot = state._state._history[state._state._historyIdx];
     expect(newSnapshot.grid[0][0]).not.toBeNull();
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Chamber);
     expect(newSnapshot.grid[0][0]?.chamberContent).toBe('item');
@@ -1882,40 +1896,40 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
   it('placed non-repeatable tile (Sink) IS present in the new snapshot', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
-    const historyLenBefore = state._editorHistory.length;
+    const historyLenBefore = state._state._history.length;
 
-    state._editorPalette = PipeShape.Sink;
+    state._state.palette = PipeShape.Sink;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state._history[state._state._historyIdx];
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Sink);
   });
 
   it('erased tile IS absent in the new snapshot (single-click erase on occupied cell)', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed a tile to erase.
-    state._editGrid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
-    const historyLenBefore = state._editorHistory.length;
+    state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    const historyLenBefore = state._state._history.length;
 
-    state._editorPalette = 'erase';
+    state._state.palette = 'erase';
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state._history[state._state._historyIdx];
     expect(newSnapshot.grid[0][0]).toBeNull();
   });
 
   it('previous snapshot is the pre-placement state when a container is placed', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
     // Capture the pre-placement state from history.
-    const prePlacementSnapshot = JSON.stringify(state._editorHistory[state._editorHistoryIdx].grid);
+    const prePlacementSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
 
-    state._editorPalette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
+    state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
 
     // The snapshot before the latest must still reflect the empty pre-placement grid.
-    const prevSnapshot = state._editorHistory[state._editorHistoryIdx - 1];
+    const prevSnapshot = state._state._history[state._state._historyIdx - 1];
     expect(JSON.stringify(prevSnapshot.grid)).toBe(prePlacementSnapshot);
     // And the placed tile should NOT be in that previous snapshot.
     expect(prevSnapshot.grid[0][0]).toBeNull();
@@ -1924,50 +1938,50 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
   it('ctrl+click overwrite: new tile IS present in the snapshot after overwrite', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed an Elbow tile at (0,0).
-    state._editGrid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
-    const historyLenBefore = state._editorHistory.length;
+    state._state.grid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
+    const historyLenBefore = state._state._history.length;
 
     // Mousedown registers a drag-state (tile exists), then ctrl+mouseup overwrites.
-    state._editorPalette = PipeShape.Tee;
+    state._state.palette = PipeShape.Tee;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state._history[state._state._historyIdx];
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Tee);
   });
 
   it('auto-replace pipe: replaced tile IS present in the snapshot after auto-replace', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed an Elbow tile at (0,0).
-    state._editGrid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
-    const historyLenBefore = state._editorHistory.length;
+    state._state.grid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
+    const historyLenBefore = state._state._history.length;
 
     // Click on the occupied tile with a different pipe shape palette (no drag, no ctrl).
-    state._editorPalette = PipeShape.Cross;
+    state._state.palette = PipeShape.Cross;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
 
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state._history[state._state._historyIdx];
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Cross);
   });
 
   it('drag-move: moved tile IS present at the destination in the snapshot', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed a tile at (0,0).
-    state._editGrid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
-    const historyLenBefore = state._editorHistory.length;
+    state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    const historyLenBefore = state._state._history.length;
 
     // Mousedown grabs the tile; mousemove to (0,1); mouseup commits.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));  // row 0, col 0
     (state as unknown as { _onEditorCanvasMouseMove(e: MouseEvent): void })
       ._onEditorCanvasMouseMove(leftMouseEvent('mousemove', 96, 32));  // row 0, col 1
     state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
 
-    expect(state._editorHistory.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._editorHistory[state._editorHistoryIdx];
+    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state._history[state._state._historyIdx];
     // Tile moved from (0,0) to (0,1).
     expect(newSnapshot.grid[0][0]).toBeNull();
     expect(newSnapshot.grid[0][1]?.shape).toBe(PipeShape.Straight);
@@ -2011,17 +2025,19 @@ describe('CampaignEditor – Source tile placement constraint', () => {
   });
 
   type EditorSourceState = {
+    _state: {
+      rows: number;
+      cols: number;
+      grid: (import('../src/types').TileDef | null)[][];
+      palette: import('../src/campaignEditor/types').EditorPalette;
+      _history: import('../src/campaignEditor/types').EditorSnapshot[];
+      _historyIdx: number;
+    };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
     _editorSourceErrorEl: HTMLDivElement | null;
-    _editRows: number;
-    _editCols: number;
-    _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
-    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
-    _editorHistoryIdx: number;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _onEditorMouseDown(e: MouseEvent): void;
     _onEditorMouseUp(e: MouseEvent): void;
@@ -2069,11 +2085,11 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
   it('allows placing the first Source tile on an empty board', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
-    state._editorPalette = PipeShape.Source;
+    state._state.palette = PipeShape.Source;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
-    expect(state._editGrid[0][0]).not.toBeNull();
-    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+    expect(state._state.grid[0][0]).not.toBeNull();
+    expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Source);
     expect(state._editorSourceErrorEl?.style.display).not.toBe('block');
   });
 
@@ -2081,48 +2097,48 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
 
     // Place first Source at (0,0)
-    state._editorPalette = PipeShape.Source;
+    state._state.palette = PipeShape.Source;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
-    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+    expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Source);
 
     // Attempt to place second Source at (0,1)
     state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32)); // row 0, col 1
 
     expect(state._editorSourceErrorEl?.style.display).toBe('block');
     expect(state._editorSourceErrorEl?.textContent).toBe('Only one source tile is allowed.');
-    expect(state._editGrid[0][1]).toBeNull(); // second Source not placed
+    expect(state._state.grid[0][1]).toBeNull(); // second Source not placed
   });
 
   it('shows a flash error when trying to overwrite a non-Source tile with Source via Ctrl+click', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
 
     // Place a Straight tile at (0,0) and a Source at (1,0)
-    state._editGrid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
-    state._editGrid[1][0] = { shape: PipeShape.Source, rotation: 0 };
+    state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    state._state.grid[1][0] = { shape: PipeShape.Source, rotation: 0 };
 
     // Ctrl+click on (0,0) with Source palette: should be blocked
-    state._editorPalette = PipeShape.Source;
+    state._state.palette = PipeShape.Source;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
     state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(state._editorSourceErrorEl?.style.display).toBe('block');
     expect(state._editorSourceErrorEl?.textContent).toBe('Only one source tile is allowed.');
-    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Straight); // not overwritten
+    expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Straight); // not overwritten
   });
 
   it('allows ctrl+click overwrite when the occupied tile is already the Source', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
 
     // Place a Source at (0,0)
-    state._editGrid[0][0] = { shape: PipeShape.Source, rotation: 0 };
+    state._state.grid[0][0] = { shape: PipeShape.Source, rotation: 0 };
 
     // Ctrl+click on (0,0) with Source palette: should be allowed (same position)
-    state._editorPalette = PipeShape.Source;
+    state._state.palette = PipeShape.Source;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
     state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(window.alert).not.toHaveBeenCalled();
-    expect(state._editGrid[0][0]?.shape).toBe(PipeShape.Source);
+    expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Source);
   });
 });
 
@@ -2248,10 +2264,12 @@ describe('CampaignEditor – Escape key un-links the linked tile in the level ed
   });
 
   type LinkedState = {
+    _state: {
+      _linkedTilePos: { row: number; col: number } | null;
+      _linkedTileDirty: boolean;
+    };
     _screen: string;
     _el: HTMLElement;
-    _linkedTilePos: { row: number; col: number } | null;
-    _linkedTileDirty: boolean;
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
@@ -2288,12 +2306,12 @@ describe('CampaignEditor – Escape key un-links the linked tile in the level ed
     const state = makeLinkedEditor(level);
 
     // Simulate a tile being linked
-    state._linkedTilePos = { row: 0, col: 1 };
-    state._linkedTileDirty = false;
+    state._state._linkedTilePos = { row: 0, col: 1 };
+    state._state._linkedTileDirty = false;
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-    expect(state._linkedTilePos).toBeNull();
+    expect(state._state._linkedTilePos).toBeNull();
   });
 
   it('pressing Escape does nothing when no tile is linked', () => {
@@ -2308,11 +2326,11 @@ describe('CampaignEditor – Escape key un-links the linked tile in the level ed
     const state = makeLinkedEditor(level);
 
     // Ensure no tile is linked
-    state._linkedTilePos = null;
+    state._state._linkedTilePos = null;
 
     // Should not throw; _linkedTilePos stays null
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(state._linkedTilePos).toBeNull();
+    expect(state._state._linkedTilePos).toBeNull();
   });
 
   it('pressing Escape does not clear _linkedTilePos when not in the level editor screen', () => {
@@ -2328,12 +2346,12 @@ describe('CampaignEditor – Escape key un-links the linked tile in the level ed
 
     // Manually switch the screen away from levelEditor
     state._screen = 'list';
-    state._linkedTilePos = { row: 0, col: 1 };
+    state._state._linkedTilePos = { row: 0, col: 1 };
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
     // The handler guards on _screen === 'levelEditor', so _linkedTilePos should be unchanged.
-    expect(state._linkedTilePos).toEqual({ row: 0, col: 1 });
+    expect(state._state._linkedTilePos).toEqual({ row: 0, col: 1 });
   });
 });
 
@@ -2367,11 +2385,13 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
   });
 
   type WheelState = {
-    _editorPalette: PipeShape | string;
-    _editorParams: TileParams;
-    _editorHover: { row: number; col: number } | null;
-    _linkedTilePos: { row: number; col: number } | null;
-    _editGrid: (import('../src/types').TileDef | null)[][];
+    _state: {
+      palette: PipeShape | string;
+      params: TileParams;
+      hover: { row: number; col: number } | null;
+      _linkedTilePos: { row: number; col: number } | null;
+      grid: (import('../src/types').TileDef | null)[][];
+    };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
@@ -2415,13 +2435,13 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
       inventory: [],
     };
     const state = makeWheelEditor(level);
-    state._editorPalette = PipeShape.Straight;
-    state._editorParams.rotation = 0;
-    state._linkedTilePos = null;
+    state._state.palette = PipeShape.Straight;
+    state._state.params.rotation = 0;
+    state._state._linkedTilePos = null;
 
     state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
 
-    expect(state._editorParams.rotation).toBe(90);
+    expect(state._state.params.rotation).toBe(90);
   });
 
   it('wheel rotates linked tile when cursor is hovering over it', () => {
@@ -2439,18 +2459,18 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
       inventory: [],
     };
     const state = makeWheelEditor(level);
-    state._editorPalette = PipeShape.Straight;
-    state._editorParams.rotation = 0;
+    state._state.palette = PipeShape.Straight;
+    state._state.params.rotation = 0;
     // Link the tile at (0, 0) and position the hover over it
-    state._linkedTilePos = { row: 0, col: 0 };
-    state._editorHover = { row: 0, col: 0 };
+    state._state._linkedTilePos = { row: 0, col: 0 };
+    state._state.hover = { row: 0, col: 0 };
 
     state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
 
     // Params should be updated
-    expect(state._editorParams.rotation).toBe(90);
+    expect(state._state.params.rotation).toBe(90);
     // The linked grid tile should be updated too
-    expect(state._editGrid[0][0]?.rotation).toBe(90);
+    expect(state._state.grid[0][0]?.rotation).toBe(90);
   });
 
   it('wheel does NOT rotate linked tile when cursor is NOT hovering over it', () => {
@@ -2468,18 +2488,18 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
       inventory: [],
     };
     const state = makeWheelEditor(level);
-    state._editorPalette = PipeShape.Straight;
-    state._editorParams.rotation = 0;
+    state._state.palette = PipeShape.Straight;
+    state._state.params.rotation = 0;
     // Link the tile at (0, 0) but hover over a different cell
-    state._linkedTilePos = { row: 0, col: 0 };
-    state._editorHover = { row: 1, col: 1 };
+    state._state._linkedTilePos = { row: 0, col: 0 };
+    state._state.hover = { row: 1, col: 1 };
 
     state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
 
     // Pending-placement params should be updated
-    expect(state._editorParams.rotation).toBe(90);
+    expect(state._state.params.rotation).toBe(90);
     // But the linked grid tile must remain unchanged at rotation 0
-    expect(state._editGrid[0][0]?.rotation).toBe(0);
+    expect(state._state.grid[0][0]?.rotation).toBe(0);
   });
 
   it('wheel does NOT rotate linked tile when cursor is off the canvas (no hover)', () => {
@@ -2497,15 +2517,15 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
       inventory: [],
     };
     const state = makeWheelEditor(level);
-    state._editorPalette = PipeShape.Straight;
-    state._editorParams.rotation = 0;
-    state._linkedTilePos = { row: 0, col: 0 };
-    state._editorHover = null; // no hover position
+    state._state.palette = PipeShape.Straight;
+    state._state.params.rotation = 0;
+    state._state._linkedTilePos = { row: 0, col: 0 };
+    state._state.hover = null; // no hover position
 
     state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
 
-    expect(state._editorParams.rotation).toBe(90);
-    expect(state._editGrid[0][0]?.rotation).toBe(0);
+    expect(state._state.params.rotation).toBe(90);
+    expect(state._state.grid[0][0]?.rotation).toBe(0);
   });
 });
 
@@ -2853,11 +2873,15 @@ describe('CampaignEditor – _buildTileDef omits rotation for non-rotatable shap
   function editorBuildTileDef(palette: PipeShape | string): import('../src/types').TileDef {
     const editor = makeEditor();
     const state = editor as unknown as {
-      _editorParams: TileParams;
-      _buildTileDef(palette: PipeShape | string): import('../src/types').TileDef;
+      _state: {
+        params: TileParams;
+        palette: PipeShape | string;
+        buildTileDef(): import('../src/types').TileDef;
+      };
     };
-    state._editorParams.rotation = 90; // non-zero rotation to detect if it leaks
-    return state._buildTileDef(palette);
+    state._state.params.rotation = 90; // non-zero rotation to detect if it leaks
+    state._state.palette = palette;
+    return state._state.buildTileDef();
   }
 
   it('GoldSpace _buildTileDef does not include rotation field', () => {
@@ -2898,28 +2922,30 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
     };
     const editor = makeEditor([userCampaign]);
     const state = editor as unknown as {
+      _state: {
+        levelName: string;
+        levelNote: string;
+        levelHints: string[];
+        rows: number;
+        cols: number;
+        grid: (TileDef | null)[][];
+        inventory: import('../src/types').InventoryItem[];
+      };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _activeLevelIdx: number;
-      _editLevelName: string;
-      _editLevelNote: string;
-      _editLevelHints: string[];
-      _editRows: number;
-      _editCols: number;
-      _editGrid: (TileDef | null)[][];
-      _editInventory: import('../src/types').InventoryItem[];
       _buildCurrentLevelDef(): LevelDef;
     };
     state._activeCampaignId = 'cmp_strip_test';
     state._activeChapterIdx = 0;
     state._activeLevelIdx = 0;
-    state._editLevelName = 'L1';
-    state._editLevelNote = '';
-    state._editLevelHints = [];
-    state._editRows = 1;
-    state._editCols = grid[0].length;
-    state._editGrid = grid;
-    state._editInventory = [];
+    state._state.levelName = 'L1';
+    state._state.levelNote = '';
+    state._state.levelHints = [];
+    state._state.rows = 1;
+    state._state.cols = grid[0].length;
+    state._state.grid = grid;
+    state._state.inventory = [];
     return { buildCurrentLevelDef: () => state._buildCurrentLevelDef() };
   }
 
@@ -3019,18 +3045,20 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
   });
 
   type SaveUndoState = {
+    _state: {
+      rows: number;
+      cols: number;
+      grid: (import('../src/types').TileDef | null)[][];
+      palette: import('../src/campaignEditor/types').EditorPalette;
+      _history: import('../src/campaignEditor/types').EditorSnapshot[];
+      _historyIdx: number;
+      _unsavedChanges: boolean;
+      _savedHistoryIdx: number;
+    };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _editRows: number;
-    _editCols: number;
-    _editGrid: (import('../src/types').TileDef | null)[][];
-    _editorPalette: import('../src/campaignEditor/types').EditorPalette;
-    _editorHistory: import('../src/campaignEditor/types').EditorSnapshot[];
-    _editorHistoryIdx: number;
-    _editorUnsavedChanges: boolean;
-    _editorSavedHistoryIdx: number;
     _campaigns: CampaignDef[];
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _editorUndo(): void;
@@ -3079,47 +3107,47 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
 
   it('_editorUnsavedChanges is false after opening the editor (no changes)', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
-    expect(state._editorUnsavedChanges).toBe(false);
+    expect(state._state._unsavedChanges).toBe(false);
   });
 
   it('_editorUnsavedChanges is true after making a change', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
-    expect(state._editorUnsavedChanges).toBe(true);
+    expect(state._state._unsavedChanges).toBe(true);
   });
 
   it('_editorUnsavedChanges is false after saving', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change then save.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
     const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    expect(state._editorUnsavedChanges).toBe(false);
+    expect(state._state._unsavedChanges).toBe(false);
   });
 
   it('_editorUnsavedChanges is true after save then undo', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
     // Save.
     const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    expect(state._editorUnsavedChanges).toBe(false);
+    expect(state._state._unsavedChanges).toBe(false);
     // Undo: now differs from saved state.
     state._editorUndo();
-    expect(state._editorUnsavedChanges).toBe(true);
+    expect(state._state._unsavedChanges).toBe(true);
   });
 
   it('_editorUnsavedChanges is true after save then redo', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make two changes.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
     state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32));
@@ -3129,35 +3157,35 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     // Save at this intermediate state.
     const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    expect(state._editorUnsavedChanges).toBe(false);
+    expect(state._state._unsavedChanges).toBe(false);
     // Redo: now differs from saved state.
     state._editorRedo();
-    expect(state._editorUnsavedChanges).toBe(true);
+    expect(state._state._unsavedChanges).toBe(true);
   });
 
   it('_editorUnsavedChanges returns to false after redo brings state back to saved index', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
     // Save.
     const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    const savedIdx = state._editorSavedHistoryIdx;
+    const savedIdx = state._state._savedHistoryIdx;
     // Undo (moves away from saved).
     state._editorUndo();
-    expect(state._editorUnsavedChanges).toBe(true);
+    expect(state._state._unsavedChanges).toBe(true);
     // Redo (comes back to saved state).
     state._editorRedo();
-    expect(state._editorHistoryIdx).toBe(savedIdx);
-    expect(state._editorUnsavedChanges).toBe(false);
+    expect(state._state._historyIdx).toBe(savedIdx);
+    expect(state._state._unsavedChanges).toBe(false);
   });
 
   it('back button shows unsaved-changes modal after save then undo', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change then save.
-    state._editorPalette = PipeShape.Straight;
+    state._state.palette = PipeShape.Straight;
     state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
     const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
