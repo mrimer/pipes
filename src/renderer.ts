@@ -1092,6 +1092,25 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
   }
 }
 
+/**
+ * Draw a frosted-glass halo overlay inside the chamber box for snow and ice chambers.
+ * A radial gradient fades from fully transparent at the tile center (keeping the cost
+ * number readable) to ~25% opaque at the box border (75% transparency), giving a
+ * frosted-over ring effect in the same colour as the chamber border.
+ */
+function _drawChamberFrostHalo(ctx: CanvasRenderingContext2D, color: string, bw: number, bh: number, br: number): void {
+  // Gradient radius: reach the box edge so the frost is most visible at the border.
+  const outerR = Math.min(bw, bh);
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerR);
+  gradient.addColorStop(0,    color + '00'); // fully transparent at centre
+  gradient.addColorStop(0.35, color + '00'); // stay clear in the inner area (cost number zone)
+  gradient.addColorStop(1,    color + '40'); // ~25% opaque at the box edge (75% transparent)
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
+  ctx.fill();
+}
+
 function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, isWater: boolean, half: number, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null, lockedGain: number | null, buttEndDirs?: Set<Direction>): void {
   // Phase 1: Draw the box, inner content, and flush (butt-end) stubs inside the tile clip.
   ctx.save();
@@ -1110,6 +1129,10 @@ function _drawChamber(ctx: CanvasRenderingContext2D, tile: Tile, color: string, 
   ctx.stroke();
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
+  // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
+  if (chamberContent === 'ice' || chamberContent === 'snow') {
+    _drawChamberFrostHalo(ctx, color, bw, bh, br);
+  }
   if (chamberContent === 'tank') {
     _drawChamberTankContent(ctx, tile, bw, bh, isWater);
   } else if (chamberContent === 'dirt') {
