@@ -467,7 +467,9 @@ const BUBBLE_MAX = 80;
  * @param board           The current game board.
  * @param filledPositions Pre-computed set of connected tile keys ("row,col").
  * @param shapesFilter    Optional set of PipeShapes to restrict spawning to.
- *                        Defaults to regular, spin, and golden pipe shapes.
+ *                        When omitted, spawns on regular and spin pipes only
+ *                        (golden pipes are excluded so they can be handled
+ *                        by a separate pool rendered with a distinct color).
  */
 export function spawnBubble(
   bubbles: BubbleParticle[],
