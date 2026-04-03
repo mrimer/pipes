@@ -4,7 +4,7 @@ import { Board, GOLD_PIPE_SHAPES } from './board';
 import { PipeShape } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { renderInventoryBar } from './inventoryRenderer';
-import { spawnStarSparkles } from './visuals/starSparkle';
+import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
 import { AnimSparkleCallbacks } from './animationManager';
 import { CampaignManager } from './campaignManager';
 
@@ -342,7 +342,39 @@ export class MetricsDisplay {
     if (goldItems.length === 0) return;
 
     const el = goldItems[Math.floor(Math.random() * goldItems.length)];
-    const rect = el.getBoundingClientRect();
-    spawnStarSparkles(rect.left + Math.random() * rect.width, rect.top + Math.random() * rect.height, 5);
+    const svgEl = el.querySelector<SVGElement>('.inv-shape svg');
+    if (!svgEl) return;
+    const svgRect = svgEl.getBoundingClientRect();
+
+    // Arm-tip positions (in the 0..32 SVG coordinate space used by shapeIcon).
+    // Pick one arm at random and place the twinkle at a random point along its
+    // length so it appears on the pipe itself rather than blending into the
+    // pipe color at the center.
+    const shape = el.dataset['shape'] as PipeShape | undefined;
+    const armTips = _goldInvArmTips(shape);
+    const [ax, ay] = armTips[Math.floor(Math.random() * armTips.length)];
+    // Interpolate from center (16,16) toward the arm tip by a random fraction.
+    const t = 0.3 + Math.random() * 0.7;
+    const x = svgRect.left + ((16 + (ax - 16) * t) / 32) * svgRect.width;
+    const y = svgRect.top  + ((16 + (ay - 16) * t) / 32) * svgRect.height;
+    spawnStarTwinkle(x, y);
+  }
+}
+
+/**
+ * Arm-tip positions in the 0..32 SVG coordinate space used by {@link shapeIcon}.
+ * Each entry is [x, y] of the far end of one arm (the center is always at [16,16]).
+ * Used to pick a random arm along which to place the inventory twinkle.
+ */
+function _goldInvArmTips(shape: PipeShape | undefined): Array<[number, number]> {
+  switch (shape) {
+    case PipeShape.GoldElbow:
+      return [[16, 0], [32, 16]];
+    case PipeShape.GoldTee:
+      return [[16, 0], [16, 32], [32, 16]];
+    case PipeShape.GoldCross:
+      return [[16, 0], [16, 32], [0, 16], [32, 16]];
+    default: // GoldStraight (and unknown)
+      return [[16, 0], [16, 32]];
   }
 }

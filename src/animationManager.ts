@@ -528,14 +528,36 @@ export class AnimationManager {
 
     // Pick a random golden tile.
     const { r, c } = goldPositions[Math.floor(Math.random() * goldPositions.length)];
+    const tile = board.grid[r][c];
 
-    // Convert a random point within that tile from canvas pixels to viewport pixels.
+    // Place the twinkle at a random arm tip so it appears along the pipe edge
+    // rather than in the interior (where it would blend into the pipe color).
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = rect.width  / this.canvas.width;
     const scaleY = rect.height / this.canvas.height;
-    const tileX = (c + Math.random()) * TILE_SIZE;
-    const tileY = (r + Math.random()) * TILE_SIZE;
-    spawnStarSparkles(rect.left + tileX * scaleX, rect.top + tileY * scaleY, 5);
+    const half = TILE_SIZE / 2;
+    const cx = (c + 0.5) * TILE_SIZE;
+    const cy = (r + 0.5) * TILE_SIZE;
+
+    const connections = [...tile.connections];
+    let tileX: number, tileY: number;
+    if (connections.length > 0) {
+      const dir = connections[Math.floor(Math.random() * connections.length)];
+      // Place at a random point along the arm (avoiding the very center).
+      const t = 0.3 + Math.random() * 0.7;
+      switch (dir) {
+        case Direction.North: tileX = cx; tileY = cy - t * half; break;
+        case Direction.South: tileX = cx; tileY = cy + t * half; break;
+        case Direction.West:  tileX = cx - t * half; tileY = cy; break;
+        case Direction.East:  tileX = cx + t * half; tileY = cy; break;
+        default:              tileX = cx; tileY = cy;
+      }
+    } else {
+      tileX = cx;
+      tileY = cy;
+    }
+
+    spawnStarTwinkle(rect.left + tileX * scaleX, rect.top + tileY * scaleY);
   }
 
 
