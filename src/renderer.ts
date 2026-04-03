@@ -2026,9 +2026,16 @@ function _renderPass2NonPipeTiles(
       }
 
       // For Source/Sink/Chamber tiles, compute which arm directions need a butt end cap.
-      const buttEndDirs = (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink || tile.shape === PipeShape.Chamber)
-        ? _computeButtEndDirs(board, r, c)
-        : undefined;
+      // For Chamber tiles the result is always a defined Set (possibly empty) so that
+      // arms pointing at empty tiles trigger Phase 2 in _drawChamber and get round end
+      // caps sticking into the adjacent tile.  An undefined result would fall through to
+      // the legacy "all butt caps" path and suppress the round nubs entirely.
+      let buttEndDirs: Set<Direction> | undefined;
+      if (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
+        buttEndDirs = _computeButtEndDirs(board, r, c);
+      } else if (tile.shape === PipeShape.Chamber) {
+        buttEndDirs = _computeButtEndDirs(board, r, c) ?? new Set<Direction>();
+      }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
     }
