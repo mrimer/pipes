@@ -299,19 +299,21 @@ type GameTestHooks = {
   focusPos: { row: number; col: number };
   completedLevels: Set<number>;
   resetConfirmModalEl: HTMLElement;
-  _newChapterModalEl: HTMLElement;
-  _challengeModalEl: HTMLElement;
-  _challengeMsgEl: HTMLElement;
-  _challengeSkipBtnEl: HTMLButtonElement;
   _exitConfirmModalEl: HTMLElement;
   _rulesModalEl: HTMLElement;
-  _pendingLevelId: number | null;
   board: { recordMove(): void; canUndo(): boolean; undoMove(): void } | null;
-  _animations: { x: number; y: number; text: string; color: string }[];
-  _playtestExitCallback: (() => void) | null;
-  _activeCampaign: unknown;
-  _activeCampaignProgress: Set<number>;
-  tooltipEl: HTMLElement;
+  _animMgr: { animations: { x: number; y: number; text: string; color: string }[] };
+  _tooltip: { el: HTMLElement };
+  _campaign: {
+    activeCampaign: unknown;
+    progress: Set<number>;
+    _newChapterModalElInternal: HTMLElement;
+    _challengeModalElInternal: HTMLElement;
+    _challengeMsgElInternal: HTMLElement;
+    _challengeSkipBtnElInternal: HTMLButtonElement;
+    _pendingLevelIdInternal: number | null;
+    _playtestExitCallbackInternal: (() => void) | null;
+  };
   _input: {
     handleInventoryClick(shape: PipeShape, count: number): void;
     _handleKey(e: KeyboardEvent): void;
@@ -590,7 +592,7 @@ describe('Game – reset progress', () => {
     const hooks = gameHooks(game);
 
     // Add progress so the Reset Progress button becomes enabled.
-    hooks._activeCampaignProgress.add(1);
+    hooks._campaign.progress.add(1);
     hooks._renderLevelList();
 
     const levelListEl = document.getElementById('level-list')!;
@@ -607,7 +609,7 @@ describe('Game – reset progress', () => {
     const hooks = gameHooks(game);
 
     // Add progress so the Reset Progress button becomes enabled.
-    hooks._activeCampaignProgress.add(1);
+    hooks._campaign.progress.add(1);
     hooks._renderLevelList();
 
     const levelListEl = document.getElementById('level-list')!;
@@ -628,7 +630,7 @@ describe('Game – reset progress', () => {
     const hooks = gameHooks(game);
 
     // Mark level 1 as completed internally, then re-render
-    hooks._activeCampaignProgress.add(1);
+    hooks._campaign.progress.add(1);
     hooks._renderLevelList();
 
     const levelListEl = document.getElementById('level-list')!;
@@ -642,7 +644,7 @@ describe('Game – reset progress', () => {
     confirmBtn.click();
 
     // Campaign progress should be cleared
-    expect(hooks._activeCampaignProgress.size).toBe(0);
+    expect(hooks._campaign.progress.size).toBe(0);
     // The chapter header should no longer show a completion indicator
     const chapterHeader = levelListEl.querySelector('.chapter-header span');
     expect(chapterHeader?.textContent).not.toContain('✅');
@@ -893,7 +895,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
 
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const waterAnims = hooks._animations.filter((a) => a.text === '-1💧');
+    const waterAnims = hooks._animMgr.animations.filter((a) => a.text === '-1💧');
     expect(waterAnims.length).toBeGreaterThanOrEqual(1);
     expect(waterAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
   });
@@ -914,7 +916,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations from step 1 so we can inspect only step 2 results
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
@@ -922,7 +924,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The Chamber-tank at (3,0) should now be newly connected → +5 animation
-    const tankAnims = hooks._animations.filter((a) => a.text === '+5💧');
+    const tankAnims = hooks._animMgr.animations.filter((a) => a.text === '+5💧');
     expect(tankAnims.length).toBeGreaterThanOrEqual(1);
     expect(tankAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -943,14 +945,14 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 1, col: 0 };
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     hooks.selectedShape = PipeShape.Straight;
     hooks.pendingRotation = 0;
     hooks.focusPos = { row: 2, col: 0 };
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const tankAnims = hooks._animations.filter((a) => a.text === '+0💧');
+    const tankAnims = hooks._animMgr.animations.filter((a) => a.text === '+0💧');
     expect(tankAnims.length).toBeGreaterThanOrEqual(1);
     expect(tankAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
@@ -971,7 +973,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 0, col: 1 };
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const dirtAnims = hooks._animations.filter((a) => a.text === '-0💧');
+    const dirtAnims = hooks._animMgr.animations.filter((a) => a.text === '-0💧');
     expect(dirtAnims.length).toBeGreaterThanOrEqual(1);
     expect(dirtAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
@@ -991,7 +993,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 0, col: 1 };
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Place Tee E-S-W at (0,2) to connect Ice(1,2) with currentTemp=2 (free).
     hooks.selectedShape = PipeShape.Tee;
@@ -999,7 +1001,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 0, col: 2 };
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const iceAnims = hooks._animations.filter((a) => a.text === '-0💧');
+    const iceAnims = hooks._animMgr.animations.filter((a) => a.text === '-0💧');
     expect(iceAnims.length).toBeGreaterThanOrEqual(1);
     expect(iceAnims[0].color).toBe(ANIM_ZERO_COLOR);
   });
@@ -1015,7 +1017,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks.focusPos = { row: 1, col: 0 };
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const animCountAfterFirstPlacement = hooks._animations.length;
+    const animCountAfterFirstPlacement = hooks._animMgr.animations.length;
 
     // Rotating the source tile (it's fixed so rotate is a no-op) changes no fill state.
     // No new tiles become connected, so no new animations should be created.
@@ -1024,7 +1026,7 @@ describe('Game – tile connection animations (_spawnConnectionAnimations)', () 
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // The animation list should not have grown (no new tiles entered the fill path)
-    expect(hooks._animations.length).toBeLessThanOrEqual(animCountAfterFirstPlacement);
+    expect(hooks._animMgr.animations.length).toBeLessThanOrEqual(animCountAfterFirstPlacement);
   });
 });
 
@@ -1499,13 +1501,13 @@ describe('Game – playtesting does not persist progress', () => {
 
     // Enter playtest mode (sets _playtestExitCallback)
     hooks._playtestLevel(LEVELS[0]);
-    expect(hooks._playtestExitCallback).not.toBeNull();
+    expect(hooks._campaign._playtestExitCallbackInternal).not.toBeNull();
 
     const levelId = LEVELS[0].id;
-    hooks._activeCampaignProgress.delete(levelId); // reset any data from shared localStorage
+    hooks._campaign.progress.delete(levelId); // reset any data from shared localStorage
     hooks._markLevelCompleted(levelId);
 
-    expect(hooks._activeCampaignProgress.has(levelId)).toBe(false);
+    expect(hooks._campaign.progress.has(levelId)).toBe(false);
   });
 
   it('adds the level to campaign progress when winning during normal play', () => {
@@ -1514,13 +1516,13 @@ describe('Game – playtesting does not persist progress', () => {
 
     game.startLevel(LEVELS[0].id);
     // Not in playtest mode
-    expect(hooks._playtestExitCallback).toBeNull();
+    expect(hooks._campaign._playtestExitCallbackInternal).toBeNull();
 
     const levelId = LEVELS[0].id;
-    hooks._activeCampaignProgress.delete(levelId); // reset any data from shared localStorage
+    hooks._campaign.progress.delete(levelId); // reset any data from shared localStorage
     hooks._markLevelCompleted(levelId);
 
-    expect(hooks._activeCampaignProgress.has(levelId)).toBe(true);
+    expect(hooks._campaign.progress.has(levelId)).toBe(true);
   });
 });
 
@@ -1538,7 +1540,7 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
 
     expect(hooks._input.ctrlHeld).toBe(true);
-    expect(hooks.tooltipEl.style.display).toBe('block');
+    expect(hooks._tooltip.el.style.display).toBe('block');
   });
 
   it('does not show tooltip on Ctrl keydown when gameState is Won', () => {
@@ -1552,7 +1554,7 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
 
     expect(hooks._input.ctrlHeld).toBe(true);
-    expect(hooks.tooltipEl.style.display).not.toBe('block');
+    expect(hooks._tooltip.el.style.display).not.toBe('block');
   });
 
   it('does not show tooltip on Ctrl keydown when gameState is GameOver', () => {
@@ -1566,7 +1568,7 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
     hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Control' }));
 
     expect(hooks._input.ctrlHeld).toBe(true);
-    expect(hooks.tooltipEl.style.display).not.toBe('block');
+    expect(hooks._tooltip.el.style.display).not.toBe('block');
   });
 
   it('does not show tooltip on mouse move when gameState is Won and Ctrl is held', () => {
@@ -1579,7 +1581,7 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
 
     hooks._input._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
 
-    expect(hooks.tooltipEl.style.display).not.toBe('block');
+    expect(hooks._tooltip.el.style.display).not.toBe('block');
   });
 
   it('does not show tooltip on mouse move when gameState is GameOver and Ctrl is held', () => {
@@ -1592,7 +1594,7 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
 
     hooks._input._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
 
-    expect(hooks.tooltipEl.style.display).not.toBe('block');
+    expect(hooks._tooltip.el.style.display).not.toBe('block');
   });
 
   it('shows tooltip on mouse move when gameState is Playing and Ctrl is held', () => {
@@ -1604,7 +1606,7 @@ describe('Game – Ctrl key tooltip suppressed during win/fail modals', () => {
 
     hooks._input._handleCanvasMouseMove(new MouseEvent('mousemove', { clientX: 60, clientY: 60 }));
 
-    expect(hooks.tooltipEl.style.display).toBe('block');
+    expect(hooks._tooltip.el.style.display).toBe('block');
   });
 });
 
@@ -1693,12 +1695,12 @@ describe('Game – disconnection animations after reclaimTile', () => {
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations from placement
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Reclaim it via right-click
     hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
 
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
+    const plusOneAnims = hooks._animMgr.animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -1716,13 +1718,13 @@ describe('Game – disconnection animations after reclaimTile', () => {
     boardAccess.board.inventory.push({ shape: PipeShape.Straight, count: 1 });
     boardAccess.board.initHistory();
 
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Right-click at (row=2, col=1): clientX = col*TILE_SIZE+32 = 1*64+32=96, clientY = row*TILE_SIZE+32 = 2*64+32=160
     hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 160 }));
 
     // No animation since the pipe was not in the fill path
-    expect(hooks._animations.filter((a) => a.text === '+1💧').length).toBe(0);
+    expect(hooks._animMgr.animations.filter((a) => a.text === '+1💧').length).toBe(0);
   });
 });
 
@@ -1747,7 +1749,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations from the placements above
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Replace the Straight at (0,1) with a N-S orientation (rotation=0):
     // it no longer connects East → (0,2) becomes disconnected.
@@ -1757,7 +1759,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Expect a "+1" disconnection animation for the now-disconnected pipe at (0,2)
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
+    const plusOneAnims = hooks._animMgr.animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -1774,7 +1776,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     // Clear animations
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Replace with Straight N-S (rotation=0) – it doesn't connect to Source's East,
     // so the position itself is disconnected and the old tile's cost is reversed.
@@ -1785,7 +1787,7 @@ describe('Game – disconnection animations after replaceInventoryTile', () => {
 
     // The replaced position (0,1) was in the fill path before and is not after,
     // so a "+1" disconnection animation is shown for the old tile's water cost reversal.
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
+    const plusOneAnims = hooks._animMgr.animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -1807,12 +1809,12 @@ describe('Game – performRedo spawns tile impact animations', () => {
 
     // Undo the placement
     game.performUndo();
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Redo – should respawn the connection animation ("-1" for the pipe)
     game.performRedo();
 
-    const minusOneAnims = hooks._animations.filter((a) => a.text === '-1💧');
+    const minusOneAnims = hooks._animMgr.animations.filter((a) => a.text === '-1💧');
     expect(minusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(minusOneAnims[0].color).toBe(ANIM_NEGATIVE_COLOR);
   });
@@ -1842,14 +1844,14 @@ describe('Game – performRedo spawns tile impact animations', () => {
 
     // Undo the reclaim (restores the pipe at (0,1), reconnects (0,1) and (0,2))
     game.performUndo();
-    hooks._animations.length = 0;
+    hooks._animMgr.animations.length = 0;
 
     // Redo the reclaim – (0,1) becomes empty again, (0,2) disconnects.
     // _spawnDisconnectionAnimations should fire "+1" for (0,2) (still in grid).
     game.performRedo();
 
     // (0,2) is still in the grid and was disconnected → "+1" disconnection animation
-    const plusOneAnims = hooks._animations.filter((a) => a.text === '+1💧');
+    const plusOneAnims = hooks._animMgr.animations.filter((a) => a.text === '+1💧');
     expect(plusOneAnims.length).toBeGreaterThanOrEqual(1);
     expect(plusOneAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
   });
@@ -2142,9 +2144,9 @@ describe('Game – new-chapter modal', () => {
     game.nextLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._newChapterModalEl.style.display).toBe('flex');
+    expect(hooks._campaign._newChapterModalElInternal.style.display).toBe('flex');
     // pending level should be set but the play screen is still on the previous level
-    expect(hooks._pendingLevelId).toBe(firstLevelOfChapter2.id);
+    expect(hooks._campaign._pendingLevelIdInternal).toBe(firstLevelOfChapter2.id);
     expect(playScreenEl.style.display).toBe('flex');
   });
 
@@ -2155,7 +2157,7 @@ describe('Game – new-chapter modal', () => {
     game.nextLevel();
 
     const hooks = gameHooks(game);
-    const box = hooks._newChapterModalEl.querySelector<HTMLElement>('.modal-box')!;
+    const box = hooks._campaign._newChapterModalElInternal.querySelector<HTMLElement>('.modal-box')!;
     expect(box.textContent).toContain('Chapter 2');
     expect(box.textContent).toContain(CHAPTERS[1].name);
   });
@@ -2168,7 +2170,7 @@ describe('Game – new-chapter modal', () => {
     game.startChapterLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._newChapterModalEl.style.display).toBe('none');
+    expect(hooks._campaign._newChapterModalElInternal.style.display).toBe('none');
     expect(playScreenEl.style.display).toBe('flex');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id)
       .toBe(firstLevelOfChapter2.id);
@@ -2184,7 +2186,7 @@ describe('Game – new-chapter modal', () => {
     game.nextLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._newChapterModalEl.style.display).toBe('none');
+    expect(hooks._campaign._newChapterModalElInternal.style.display).toBe('none');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id)
       .toBe(secondLevelOfChapter1.id);
   });
@@ -2197,8 +2199,8 @@ describe('Game – new-chapter modal', () => {
     game.exitToMenu();
 
     const hooks = gameHooks(game);
-    expect(hooks._newChapterModalEl.style.display).toBe('none');
-    expect(hooks._pendingLevelId).toBeNull();
+    expect(hooks._campaign._newChapterModalElInternal.style.display).toBe('none');
+    expect(hooks._campaign._pendingLevelIdInternal).toBeNull();
   });
 });
 
@@ -2233,8 +2235,8 @@ describe('Game – challenge-level modal', () => {
     game.requestLevel(9002);
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeModalEl.style.display).toBe('flex');
-    expect(hooks._pendingLevelId).toBe(9002);
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('flex');
+    expect(hooks._campaign._pendingLevelIdInternal).toBe(9002);
     // The level should be started (visible on screen) before the modal appears.
     expect(playScreenEl.style.display).toBe('flex');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
@@ -2248,7 +2250,7 @@ describe('Game – challenge-level modal', () => {
     game.requestLevel(9001);
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('none');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9001);
   });
 
@@ -2261,8 +2263,8 @@ describe('Game – challenge-level modal', () => {
     game.nextLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeModalEl.style.display).toBe('flex');
-    expect(hooks._pendingLevelId).toBe(9002);
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('flex');
+    expect(hooks._campaign._pendingLevelIdInternal).toBe(9002);
     // The challenge level should be started (visible on screen) before the modal appears.
     expect(playScreenEl.style.display).toBe('flex');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
@@ -2277,7 +2279,7 @@ describe('Game – challenge-level modal', () => {
     game.playChallengeLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('none');
     expect(playScreenEl.style.display).toBe('flex');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
   });
@@ -2292,7 +2294,7 @@ describe('Game – challenge-level modal', () => {
     game.skipChallengeLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeModalEl.style.display).toBe('none');
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('none');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9003);
   });
 
@@ -2329,8 +2331,8 @@ describe('Game – challenge-level modal', () => {
     game.exitToMenu();
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeModalEl.style.display).toBe('none');
-    expect(hooks._pendingLevelId).toBeNull();
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('none');
+    expect(hooks._campaign._pendingLevelIdInternal).toBeNull();
   });
 
   it('hides the skip button and description when opened via requestLevel() (direct selection)', () => {
@@ -2341,8 +2343,8 @@ describe('Game – challenge-level modal', () => {
     game.requestLevel(9002);
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeSkipBtnEl.style.display).toBe('none');
-    expect(hooks._challengeMsgEl.style.display).toBe('none');
+    expect(hooks._campaign._challengeSkipBtnElInternal.style.display).toBe('none');
+    expect(hooks._campaign._challengeMsgElInternal.style.display).toBe('none');
   });
 
   it('shows the skip button and description when opened via nextLevel() (sequential flow)', () => {
@@ -2354,8 +2356,8 @@ describe('Game – challenge-level modal', () => {
     game.nextLevel();
 
     const hooks = gameHooks(game);
-    expect(hooks._challengeSkipBtnEl.style.display).not.toBe('none');
-    expect(hooks._challengeMsgEl.style.display).not.toBe('none');
+    expect(hooks._campaign._challengeSkipBtnElInternal.style.display).not.toBe('none');
+    expect(hooks._campaign._challengeMsgElInternal.style.display).not.toBe('none');
   });
 });
 
@@ -2401,7 +2403,7 @@ describe('Game – campaign auto-selection on startup', () => {
 
   it('selects no campaign when no campaigns are available', () => {
     const game = makeGameWithStorage();
-    expect(gameHooks(game)._activeCampaign).toBeNull();
+    expect(gameHooks(game)._campaign.activeCampaign).toBeNull();
   });
 
   it('auto-selects the first available campaign when none is saved', () => {
@@ -2410,7 +2412,7 @@ describe('Game – campaign auto-selection on startup', () => {
 
     const game = makeGameWithStorage();
 
-    expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'c1' });
+    expect(gameHooks(game)._campaign.activeCampaign).toMatchObject({ id: 'c1' });
     expect(loadActiveCampaignId()).toBe('c1');
   });
 
@@ -2421,7 +2423,7 @@ describe('Game – campaign auto-selection on startup', () => {
 
     const game = makeGameWithStorage();
 
-    expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'o1' });
+    expect(gameHooks(game)._campaign.activeCampaign).toMatchObject({ id: 'o1' });
     expect(loadActiveCampaignId()).toBe('o1');
   });
 
@@ -2434,7 +2436,7 @@ describe('Game – campaign auto-selection on startup', () => {
     const game = makeGameWithStorage();
 
     // Should restore c1 (the saved one) rather than auto-selecting the official c2.
-    expect(gameHooks(game)._activeCampaign).toMatchObject({ id: 'c1' });
+    expect(gameHooks(game)._campaign.activeCampaign).toMatchObject({ id: 'c1' });
   });
 });
 

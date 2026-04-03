@@ -166,22 +166,6 @@ export class Game implements InputCallbacks {
   /** Manages all canvas-based visual effects (particles, fill/rotation animations, labels, rings). */
   private readonly _animMgr: AnimationManager;
 
-  /**
-   * Proxy giving tests direct access to the active floating label animations.
-   * The underscore prefix is intentional – it signals that this getter exists
-   * solely for test backward compatibility and should not be used by production
-   * code outside of Game.
-   * @internal
-   */
-  get _animations() { return this._animMgr.animations; }
-
-  /**
-   * Proxy giving tests direct access to the tooltip DOM element.
-   * Exists solely for test backward compatibility.
-   * @internal
-   */
-  get tooltipEl() { return this._tooltip.el; }
-
   /** Manages the play-screen HUD metrics, inventory bar, and best-score box. */
   private readonly _metrics: MetricsDisplay;
 
@@ -720,8 +704,8 @@ export class Game implements InputCallbacks {
     if (!this._pendingRings || !this.board) return;
     // Defer until campaign modals that block the view are dismissed.
     if (
-      this._newChapterModalEl.style.display !== 'none' ||
-      this._challengeModalEl.style.display !== 'none'
+      this._campaign._newChapterModalElInternal.style.display !== 'none' ||
+      this._campaign._challengeModalElInternal.style.display !== 'none'
     ) return;
     this._pendingRings = false;
     this._animMgr.spawnLevelIntroRings(this.board);
@@ -1328,56 +1312,6 @@ export class Game implements InputCallbacks {
   private _activateCampaign(campaign: CampaignDef): void { this._campaign.activate(campaign); }
   private _deactivateCampaign(): void { this._campaign.deactivate(); }
 
-  // ─── Backward-compat proxy getters for test hooks ─────────────────────────
-  // Tests cast Game to GameTestHooks and access these private members directly.
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the new-chapter modal element (owned by CampaignManager).
-   */
-  private get _newChapterModalEl(): HTMLElement { return this._campaign._newChapterModalElInternal; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the challenge-level modal element (owned by CampaignManager).
-   */
-  private get _challengeModalEl(): HTMLElement { return this._campaign._challengeModalElInternal; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the challenge description element (owned by CampaignManager).
-   */
-  private get _challengeMsgEl(): HTMLElement { return this._campaign._challengeMsgElInternal; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the challenge skip button (owned by CampaignManager).
-   */
-  private get _challengeSkipBtnEl(): HTMLButtonElement { return this._campaign._challengeSkipBtnElInternal; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the pending level ID (or null).
-   */
-  private get _pendingLevelId(): number | null { return this._campaign._pendingLevelIdInternal; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the playtest exit callback (or null when not playtesting).
-   */
-  private get _playtestExitCallback(): (() => void) | null { return this._campaign._playtestExitCallbackInternal; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the active campaign (or null for the official campaign).
-   */
-  private get _activeCampaign(): CampaignDef | null { return this._campaign.activeCampaign; }
-
-  /**
-   * @internal Test proxy – delegates to the campaign manager.
-   * Returns the campaign progress Set (read/write by reference).
-   */
-  private get _activeCampaignProgress(): Set<number> { return this._campaign.progress; }
 }
 
 // Re-export for backward compatibility with tests that import InventoryItem via game.ts

@@ -715,7 +715,7 @@ describe('CampaignEditor – import version comparison', () => {
     const campaign: CampaignDef = { id: 'cmp_ts1', name: 'C', author: '', chapters: [], lastUpdated: old };
     const editor = makeEditor([campaign]);
     // Get the campaign reference that the editor actually owns (loaded from storage).
-    const internalCampaign = (editor as unknown as { _campaigns: CampaignDef[] })._campaigns[0];
+    const internalCampaign = (editor as unknown as { _service: { campaigns: readonly CampaignDef[] } })._service.campaigns[0];
     jest.spyOn(window, 'prompt').mockReturnValueOnce('Chapter 1');
 
     const before = Date.now();
@@ -765,7 +765,7 @@ describe('CampaignEditor – import version comparison', () => {
         grid: (import('../src/types').TileDef | null)[][];
         inventory: import('../src/types').InventoryItem[];
       };
-      _campaigns: CampaignDef[];
+      _service: { campaigns: readonly CampaignDef[] };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _activeLevelIdx: number;
@@ -1078,7 +1078,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
         params: TileParams;
         palette: PipeShape | string;
       };
-      _buildParamPanel(): HTMLElement;
+      _paramsPanel: { buildParamPanel(): HTMLElement };
     };
   }
 
@@ -1105,7 +1105,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     const state = editorState(editor);
     state._state.palette = PipeShape.Source;
     state._state.params.pressure = 1;
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Base Pressure');
     expect(input).not.toBeNull();
@@ -1118,7 +1118,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     const state = editorState(editor);
     state._state.palette = PipeShape.Source;
     state._state.params.pressure = 5;
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Base Pressure');
     expect(input).not.toBeNull();
@@ -1130,7 +1130,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     state._state.palette = PipeShape.Source;
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Capacity');
     expect(input).not.toBeNull();
@@ -1142,7 +1142,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     const editor = makeEditor();
     const state = editorState(editor);
     state._state.palette = PipeShape.Source;
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Base Temp');
     expect(input).not.toBeNull();
@@ -1156,7 +1156,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     state._state.palette = 'chamber:pump';
     state._state.params.chamberContent = 'pump';
     state._state.params.pressure = 1;
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Pressure');
     expect(input).not.toBeNull();
@@ -1170,7 +1170,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     state._state.palette = 'chamber:pump';
     state._state.params.chamberContent = 'pump';
     state._state.params.pressure = 2;
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const input = findInputByLabel(panel, 'Pressure');
     expect(input).not.toBeNull();
@@ -1183,7 +1183,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
     const state = editorState(editor);
     state._state.palette = 'chamber:hot_plate';
     state._state.params.chamberContent = 'hot_plate';
-    const panel = state._buildParamPanel();
+    const panel = state._paramsPanel.buildParamPanel();
     document.body.appendChild(panel);
     const massInput = findInputByLabel(panel, 'Mass');
     const boilingInput = findInputByLabel(panel, 'Boiling °');
@@ -1276,9 +1276,9 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
       _activeChapterIdx: number;
       _activeLevelIdx: number;
       _editorCanvas: HTMLCanvasElement | null;
+      _editorInput: { canvasPos(e: MouseEvent): { row: number; col: number } | null } | null;
       _openLevelEditor(level: LevelDef, readOnly: boolean): void;
       _resizeGrid(rows: number, cols: number): void;
-      _canvasPos(e: MouseEvent): { row: number; col: number } | null;
     };
     state._activeCampaignId = 'cmp_canvas_test';
     state._activeChapterIdx = 0;
@@ -1344,7 +1344,7 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
 
     // Column 5 starts at 5 * 51.2 = 256 px; its center is at ~281.6 px.
     // With the fixed formula (rect.width * col / editCols) this is tile col=5.
-    const pos = state._canvasPos(mouseAt(281, 281));
+    const pos = state._editorInput!.canvasPos(mouseAt(281, 281));
     expect(pos).not.toBeNull();
     expect(pos!.col).toBe(5);
     expect(pos!.row).toBe(5);
@@ -1362,9 +1362,9 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
     });
 
     // Mouse to the left of the canvas
-    expect(state._canvasPos(mouseAt(5, 50))).toBeNull();
+    expect(state._editorInput!.canvasPos(mouseAt(5, 50))).toBeNull();
     // Mouse below the canvas
-    expect(state._canvasPos(mouseAt(50, 280))).toBeNull();
+    expect(state._editorInput!.canvasPos(mouseAt(50, 280))).toBeNull();
   });
 
   // ─── Resize panel constraint: both dims cannot be <= 1 ──────────────────────
@@ -1384,9 +1384,9 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   it('resize to 1×1 is rejected and shows an error', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
       _state: { rows: number; cols: number; };
-      _buildGridSizePanel(): HTMLElement;
+      _metadataPanel: { buildGridSizePanel(): HTMLElement } | null;
     };
-    const panel = state._buildGridSizePanel();
+    const panel = state._metadataPanel!.buildGridSizePanel();
     const { rowsInp, colsInp, resizeBtn, errorDiv } = getResizeControls(panel);
 
     rowsInp.value = '1';
@@ -1404,9 +1404,9 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   it('resize to 1×5 (one dim > 1) is accepted', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
       _state: { rows: number; cols: number; };
-      _buildGridSizePanel(): HTMLElement;
+      _metadataPanel: { buildGridSizePanel(): HTMLElement } | null;
     };
-    const panel = state._buildGridSizePanel();
+    const panel = state._metadataPanel!.buildGridSizePanel();
     const { rowsInp, colsInp, resizeBtn } = getResizeControls(panel);
 
     rowsInp.value = '1';
@@ -1420,9 +1420,9 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   it('resize to 5×1 (one dim > 1) is accepted', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
       _state: { rows: number; cols: number; };
-      _buildGridSizePanel(): HTMLElement;
+      _metadataPanel: { buildGridSizePanel(): HTMLElement } | null;
     };
-    const panel = state._buildGridSizePanel();
+    const panel = state._metadataPanel!.buildGridSizePanel();
     const { rowsInp, colsInp, resizeBtn } = getResizeControls(panel);
 
     rowsInp.value = '5';
@@ -1436,10 +1436,10 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   it('undo after resize restores the pre-resize grid dimensions', () => {
     const state = makeEditorWithCanvas(makeLevel(4, 4)) as unknown as {
       _state: { rows: number; cols: number; };
-      _buildGridSizePanel(): HTMLElement;
+      _metadataPanel: { buildGridSizePanel(): HTMLElement } | null;
       _editorUndo(): void;
     };
-    const panel = state._buildGridSizePanel();
+    const panel = state._metadataPanel!.buildGridSizePanel();
     const { rowsInp, colsInp, resizeBtn } = getResizeControls(panel);
 
     // Resize from 4×4 to 6×8.
@@ -1500,12 +1500,14 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _paintDragActive: boolean;
+    _editorInput: {
+      paintDragActive: boolean;
+      onMouseDown(e: MouseEvent): void;
+      onMouseMove(e: MouseEvent): void;
+      onMouseUp(e: MouseEvent): void;
+      canvasPos(e: MouseEvent): { row: number; col: number } | null;
+    } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
-    _onEditorMouseDown(e: MouseEvent): void;
-    _onEditorCanvasMouseMove(e: MouseEvent): void;
-    _onEditorMouseUp(e: MouseEvent): void;
-    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
   };
 
   function makeLevel(rows: number, cols: number): LevelDef {
@@ -1552,11 +1554,11 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
 
     // Mousedown on empty cell with a repeatable palette tile starts a paint drag.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Snapshot count must NOT have increased yet – drag is still in progress.
     expect(state._state._history.length).toBe(historyLenBefore);
-    expect(state._paintDragActive).toBe(true);
+    expect(state._editorInput!.paintDragActive).toBe(true);
   });
 
   it('records a snapshot only on mouseup after a paint-drag', () => {
@@ -1565,15 +1567,15 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
 
     state._state.palette = PipeShape.Straight;
     // Start drag
-    state._onEditorMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
     // Extend drag to another cell
-    state._onEditorCanvasMouseMove(mouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._editorInput!.onMouseMove(mouseEvent('mousemove', 96, 32)); // row 0, col 1
     // Release mouse
-    state._onEditorMouseUp(mouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseUp(mouseEvent('mouseup', 96, 32));
 
     // Exactly one new snapshot should have been added, and drag is finished.
     expect(state._state._history.length).toBe(historyLenBefore + 1);
-    expect(state._paintDragActive).toBe(false);
+    expect(state._editorInput!.paintDragActive).toBe(false);
   });
 
   it('painted cells are present in the new snapshot, pre-drag state is the previous one', () => {
@@ -1582,9 +1584,9 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     const preDragSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
 
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(mouseEvent('mousedown', 32, 32));   // col 0
-    state._onEditorCanvasMouseMove(mouseEvent('mousemove', 96, 32)); // col 1
-    state._onEditorMouseUp(mouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseDown(mouseEvent('mousedown', 32, 32));   // col 0
+    state._editorInput!.onMouseMove(mouseEvent('mousemove', 96, 32)); // col 1
+    state._editorInput!.onMouseUp(mouseEvent('mouseup', 96, 32));
 
     // The new snapshot records the post-drag state (cells painted).
     const postDragSnapshot = state._state._history[state._state._historyIdx];
@@ -1641,13 +1643,15 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _rightEraseDragActive: boolean;
-    _suppressNextContextMenu: boolean;
+    _editorInput: {
+      rightEraseDragActive: boolean;
+      suppressNextContextMenu: boolean;
+      onMouseDown(e: MouseEvent): void;
+      onMouseMove(e: MouseEvent): void;
+      onMouseUp(e: MouseEvent): void;
+      canvasPos(e: MouseEvent): { row: number; col: number } | null;
+    } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
-    _onEditorMouseDown(e: MouseEvent): void;
-    _onEditorCanvasMouseMove(e: MouseEvent): void;
-    _onEditorMouseUp(e: MouseEvent): void;
-    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
   };
 
   function makeLevel(rows: number, cols: number): LevelDef {
@@ -1702,11 +1706,11 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     placeTiles(state, [{ row: 0, col: 0 }]);
     const historyLenBefore = state._state._history.length;
 
-    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Snapshot count must NOT have increased yet – drag is still in progress.
     expect(state._state._history.length).toBe(historyLenBefore);
-    expect(state._rightEraseDragActive).toBe(true);
+    expect(state._editorInput!.rightEraseDragActive).toBe(true);
     // But the cell should already be erased.
     expect(state._state.grid[0][0]).toBeNull();
   });
@@ -1716,13 +1720,13 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
     const historyLenBefore = state._state._history.length;
 
-    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
-    state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
-    state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._editorInput!.onMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     // Exactly one new snapshot should have been added, and drag is finished.
     expect(state._state._history.length).toBe(historyLenBefore + 1);
-    expect(state._rightEraseDragActive).toBe(false);
+    expect(state._editorInput!.rightEraseDragActive).toBe(false);
   });
 
   it('erased cells are absent in the new snapshot, pre-drag state is the previous one', () => {
@@ -1731,9 +1735,9 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     // Snapshot the pre-drag state.
     const preDragSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
 
-    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));   // col 0
-    state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // col 1
-    state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32));   // col 0
+    state._editorInput!.onMouseMove(rightMouseEvent('mousemove', 96, 32)); // col 1
+    state._editorInput!.onMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     // The new snapshot records the post-erase state.
     const postEraseSnapshot = state._state._history[state._state._historyIdx];
@@ -1749,10 +1753,10 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }]);
 
-    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));
-    expect(state._suppressNextContextMenu).toBe(false);
-    state._onEditorMouseUp(rightMouseEvent('mouseup', 32, 32));
-    expect(state._suppressNextContextMenu).toBe(true);
+    state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32));
+    expect(state._editorInput!.suppressNextContextMenu).toBe(false);
+    state._editorInput!.onMouseUp(rightMouseEvent('mouseup', 32, 32));
+    expect(state._editorInput!.suppressNextContextMenu).toBe(true);
   });
 
   it('right-drag does not erase cells that are already empty', () => {
@@ -1760,10 +1764,10 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     // Only place a tile at col 0; col 1 stays empty.
     placeTiles(state, [{ row: 0, col: 0 }]);
 
-    state._onEditorMouseDown(rightMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32));
     // Move to an already-empty cell – should not cause errors.
-    state._onEditorCanvasMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
-    state._onEditorMouseUp(rightMouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._editorInput!.onMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     expect(state._state.grid[0][0]).toBeNull(); // erased
     expect(state._state.grid[0][1]).toBeNull(); // was already null
@@ -1774,14 +1778,14 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     const historyLenBefore = state._state._history.length;
 
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
-    state._onEditorCanvasMouseMove(leftMouseEvent('mousemove', 96, 32)); // row 0, col 1
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32)); // row 0, col 1
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 96, 32));
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     expect(state._state.grid[0][0]).not.toBeNull();
     expect(state._state.grid[0][1]).not.toBeNull();
-    expect(state._rightEraseDragActive).toBe(false);
+    expect(state._editorInput!.rightEraseDragActive).toBe(false);
   });
 });
 
@@ -1830,10 +1834,13 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
+    _editorInput: {
+      onMouseDown(e: MouseEvent): void;
+      onMouseUp(e: MouseEvent): void;
+      onMouseMove(e: MouseEvent): void;
+      canvasPos(e: MouseEvent): { row: number; col: number } | null;
+    } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
-    _onEditorMouseDown(e: MouseEvent): void;
-    _onEditorMouseUp(e: MouseEvent): void;
-    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
   };
 
   function makeLevel(rows: number, cols: number): LevelDef {
@@ -1882,7 +1889,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
     // Place a container tile (Chamber with chamberContent='item') by single-click on empty cell.
     state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Exactly one new snapshot should have been added.
     expect(state._state._history.length).toBe(historyLenBefore + 1);
@@ -1899,7 +1906,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const historyLenBefore = state._state._history.length;
 
     state._state.palette = PipeShape.Sink;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     const newSnapshot = state._state._history[state._state._historyIdx];
@@ -1913,7 +1920,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const historyLenBefore = state._state._history.length;
 
     state._state.palette = 'erase';
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     const newSnapshot = state._state._history[state._state._historyIdx];
@@ -1926,7 +1933,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const prePlacementSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
 
     state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
 
     // The snapshot before the latest must still reflect the empty pre-placement grid.
     const prevSnapshot = state._state._history[state._state._historyIdx - 1];
@@ -1943,8 +1950,8 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
     // Mousedown registers a drag-state (tile exists), then ctrl+mouseup overwrites.
     state._state.palette = PipeShape.Tee;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     const newSnapshot = state._state._history[state._state._historyIdx];
@@ -1959,8 +1966,8 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
     // Click on the occupied tile with a different pipe shape palette (no drag, no ctrl).
     state._state.palette = PipeShape.Cross;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     const newSnapshot = state._state._history[state._state._historyIdx];
@@ -1975,10 +1982,9 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
     // Mousedown grabs the tile; mousemove to (0,1); mouseup commits.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));  // row 0, col 0
-    (state as unknown as { _onEditorCanvasMouseMove(e: MouseEvent): void })
-      ._onEditorCanvasMouseMove(leftMouseEvent('mousemove', 96, 32));  // row 0, col 1
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));  // row 0, col 0
+    state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32));  // row 0, col 1
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 96, 32));
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     const newSnapshot = state._state._history[state._state._historyIdx];
@@ -2038,9 +2044,11 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
     _editorSourceErrorEl: HTMLDivElement | null;
+    _editorInput: {
+      onMouseDown(e: MouseEvent): void;
+      onMouseUp(e: MouseEvent): void;
+    } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
-    _onEditorMouseDown(e: MouseEvent): void;
-    _onEditorMouseUp(e: MouseEvent): void;
   };
 
   function makeLevel(rows: number, cols: number): LevelDef {
@@ -2086,7 +2094,7 @@ describe('CampaignEditor – Source tile placement constraint', () => {
   it('allows placing the first Source tile on an empty board', () => {
     const state = makeSourceEditor(makeLevel(4, 4));
     state._state.palette = PipeShape.Source;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     expect(state._state.grid[0][0]).not.toBeNull();
     expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Source);
@@ -2098,11 +2106,11 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
     // Place first Source at (0,0)
     state._state.palette = PipeShape.Source;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
     expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Source);
 
     // Attempt to place second Source at (0,1)
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32)); // row 0, col 1
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 96, 32)); // row 0, col 1
 
     expect(state._editorSourceErrorEl?.style.display).toBe('block');
     expect(state._editorSourceErrorEl?.textContent).toBe('Only one source tile is allowed.');
@@ -2118,8 +2126,8 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
     // Ctrl+click on (0,0) with Source palette: should be blocked
     state._state.palette = PipeShape.Source;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
-    state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
+    state._editorInput!.onMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(state._editorSourceErrorEl?.style.display).toBe('block');
     expect(state._editorSourceErrorEl?.textContent).toBe('Only one source tile is allowed.');
@@ -2134,8 +2142,8 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
     // Ctrl+click on (0,0) with Source palette: should be allowed (same position)
     state._state.palette = PipeShape.Source;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
-    state._onEditorMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
+    state._editorInput!.onMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(window.alert).not.toHaveBeenCalled();
     expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Source);
@@ -2396,8 +2404,8 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
+    _editorInput: { onWheel(e: WheelEvent): void } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
-    _onEditorCanvasWheel(e: WheelEvent): void;
   };
 
   function makeWheelEditor(level: LevelDef): WheelState {
@@ -2439,7 +2447,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
     state._state.params.rotation = 0;
     state._state._linkedTilePos = null;
 
-    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+    state._editorInput!.onWheel(wheelEvent(100)); // clockwise
 
     expect(state._state.params.rotation).toBe(90);
   });
@@ -2465,7 +2473,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
     state._state._linkedTilePos = { row: 0, col: 0 };
     state._state.hover = { row: 0, col: 0 };
 
-    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+    state._editorInput!.onWheel(wheelEvent(100)); // clockwise
 
     // Params should be updated
     expect(state._state.params.rotation).toBe(90);
@@ -2494,7 +2502,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
     state._state._linkedTilePos = { row: 0, col: 0 };
     state._state.hover = { row: 1, col: 1 };
 
-    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+    state._editorInput!.onWheel(wheelEvent(100)); // clockwise
 
     // Pending-placement params should be updated
     expect(state._state.params.rotation).toBe(90);
@@ -2522,7 +2530,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
     state._state._linkedTilePos = { row: 0, col: 0 };
     state._state.hover = null; // no hover position
 
-    state._onEditorCanvasWheel(wheelEvent(100)); // clockwise
+    state._editorInput!.onWheel(wheelEvent(100)); // clockwise
 
     expect(state._state.params.rotation).toBe(90);
     expect(state._state.grid[0][0]?.rotation).toBe(0);
@@ -3000,11 +3008,10 @@ describe('CampaignEditor palette – Blocks section label', () => {
   it('palette has a "Blocks" toggle button, not "Chamber"', () => {
     const editor = makeEditor();
     const state = editor as unknown as {
-      _chamberSectionExpanded: boolean;
-      _buildPalette(): HTMLElement;
+      _paramsPanel: { chamberSectionExpanded: boolean; buildPalette(): HTMLElement };
     };
-    state._chamberSectionExpanded = false;
-    const panel = state._buildPalette();
+    state._paramsPanel.chamberSectionExpanded = false;
+    const panel = state._paramsPanel.buildPalette();
     const buttons = Array.from(panel.querySelectorAll('button'));
     const blocksBtn = buttons.find(b => b.textContent?.includes('Blocks'));
     const chamberBtn = buttons.find(b => b.textContent?.includes('Chamber'));
@@ -3059,14 +3066,16 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     _activeChapterIdx: number;
     _activeLevelIdx: number;
     _editorCanvas: HTMLCanvasElement | null;
-    _campaigns: CampaignDef[];
+    _service: { campaigns: readonly CampaignDef[] };
+    _editorInput: {
+      onMouseDown(e: MouseEvent): void;
+      onMouseUp(e: MouseEvent): void;
+      canvasPos(e: MouseEvent): { row: number; col: number } | null;
+    } | null;
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
     _editorUndo(): void;
     _editorRedo(): void;
     _saveLevel(campaign: CampaignDef, chapterIdx: number, levelIdx: number): void;
-    _onEditorMouseDown(e: MouseEvent): void;
-    _onEditorMouseUp(e: MouseEvent): void;
-    _canvasPos(e: MouseEvent): { row: number; col: number } | null;
   };
 
   function makeLevel(rows: number, cols: number): LevelDef {
@@ -3113,8 +3122,8 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
   it('_editorUnsavedChanges is true after making a change', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
     expect(state._state._unsavedChanges).toBe(true);
   });
 
@@ -3122,9 +3131,9 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change then save.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
-    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
+    const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
     expect(state._state._unsavedChanges).toBe(false);
   });
@@ -3133,10 +3142,10 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
     // Save.
-    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
     expect(state._state._unsavedChanges).toBe(false);
     // Undo: now differs from saved state.
@@ -3148,14 +3157,14 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make two changes.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 96, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 96, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 96, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 96, 32));
     // Undo once to move away from the latest change.
     state._editorUndo();
     // Save at this intermediate state.
-    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
     expect(state._state._unsavedChanges).toBe(false);
     // Redo: now differs from saved state.
@@ -3167,10 +3176,10 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
     // Save.
-    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
     const savedIdx = state._state._savedHistoryIdx;
     // Undo (moves away from saved).
@@ -3186,9 +3195,9 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
     // Make a change then save.
     state._state.palette = PipeShape.Straight;
-    state._onEditorMouseDown(leftMouseEvent('mousedown', 32, 32));
-    state._onEditorMouseUp(leftMouseEvent('mouseup', 32, 32));
-    const campaign = state._campaigns.find(c => c.id === 'cmp_save_undo_test')!;
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
+    const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
     // Undo: differs from saved state.
     state._editorUndo();
@@ -3216,10 +3225,12 @@ describe('CampaignEditor – palette section expanded state is retained between 
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
     _activeLevelIdx: number;
-    _goldSectionExpanded: boolean;
-    _chamberSectionExpanded: boolean;
-    _pipesSectionExpanded: boolean;
-    _floorSectionExpanded: boolean;
+    _paramsPanel: {
+      goldSectionExpanded: boolean;
+      chamberSectionExpanded: boolean;
+      pipesSectionExpanded: boolean;
+      floorSectionExpanded: boolean;
+    };
     _openLevelEditor(level: LevelDef, readOnly: boolean): void;
   };
 
@@ -3249,10 +3260,10 @@ describe('CampaignEditor – palette section expanded state is retained between 
     state._activeLevelIdx = 0;
     state._openLevelEditor(level, false);
 
-    expect(state._goldSectionExpanded).toBe(false);
-    expect(state._chamberSectionExpanded).toBe(false);
-    expect(state._pipesSectionExpanded).toBe(false);
-    expect(state._floorSectionExpanded).toBe(false);
+    expect(state._paramsPanel.goldSectionExpanded).toBe(false);
+    expect(state._paramsPanel.chamberSectionExpanded).toBe(false);
+    expect(state._paramsPanel.pipesSectionExpanded).toBe(false);
+    expect(state._paramsPanel.floorSectionExpanded).toBe(false);
   });
 
   it('manually set section states are preserved when re-opening the level editor', () => {
@@ -3271,19 +3282,19 @@ describe('CampaignEditor – palette section expanded state is retained between 
 
     // First session: open editor and expand all sections.
     state._openLevelEditor(level, false);
-    state._goldSectionExpanded = true;
-    state._chamberSectionExpanded = true;
-    state._pipesSectionExpanded = true;
-    state._floorSectionExpanded = true;
+    state._paramsPanel.goldSectionExpanded = true;
+    state._paramsPanel.chamberSectionExpanded = true;
+    state._paramsPanel.pipesSectionExpanded = true;
+    state._paramsPanel.floorSectionExpanded = true;
 
     // Second session: re-open the same (or any) level.
     state._openLevelEditor(level, false);
 
     // All section states must still be expanded.
-    expect(state._goldSectionExpanded).toBe(true);
-    expect(state._chamberSectionExpanded).toBe(true);
-    expect(state._pipesSectionExpanded).toBe(true);
-    expect(state._floorSectionExpanded).toBe(true);
+    expect(state._paramsPanel.goldSectionExpanded).toBe(true);
+    expect(state._paramsPanel.chamberSectionExpanded).toBe(true);
+    expect(state._paramsPanel.pipesSectionExpanded).toBe(true);
+    expect(state._paramsPanel.floorSectionExpanded).toBe(true);
   });
 
   it('only the expanded sections remain expanded; collapsed ones stay collapsed', () => {
@@ -3302,16 +3313,16 @@ describe('CampaignEditor – palette section expanded state is retained between 
 
     // First session: expand only gold and pipes.
     state._openLevelEditor(level, false);
-    state._goldSectionExpanded = true;
-    state._pipesSectionExpanded = true;
+    state._paramsPanel.goldSectionExpanded = true;
+    state._paramsPanel.pipesSectionExpanded = true;
     // chamber and floor remain false.
 
     // Second session: re-open.
     state._openLevelEditor(level, false);
 
-    expect(state._goldSectionExpanded).toBe(true);
-    expect(state._pipesSectionExpanded).toBe(true);
-    expect(state._chamberSectionExpanded).toBe(false);
-    expect(state._floorSectionExpanded).toBe(false);
+    expect(state._paramsPanel.goldSectionExpanded).toBe(true);
+    expect(state._paramsPanel.pipesSectionExpanded).toBe(true);
+    expect(state._paramsPanel.chamberSectionExpanded).toBe(false);
+    expect(state._paramsPanel.floorSectionExpanded).toBe(false);
   });
 });
