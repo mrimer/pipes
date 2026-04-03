@@ -264,7 +264,7 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
   }
 }
 
-function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
+export function drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
   const bw = half * 0.7;
   const bh = half * 0.7;
   ctx.fillStyle = GRANITE_FILL_COLOR;
@@ -281,7 +281,7 @@ function _drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
 }
 
 /** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
-function _drawTree(ctx: CanvasRenderingContext2D, half: number): void {
+export function drawTree(ctx: CanvasRenderingContext2D, half: number): void {
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
   // Main canopy – large dark-green filled circle
   ctx.fillStyle = TREE_LEAF_COLOR;
@@ -1504,13 +1504,13 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    _drawGranite(ctx, half);
+    drawGranite(ctx, half);
   } else if (shape === PipeShape.Tree) {
     // Tree – impassable obstacle rendered as a top-down broad-leafed tree
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    _drawTree(ctx, half);
+    drawTree(ctx, half);
   }
 
   ctx.restore();
