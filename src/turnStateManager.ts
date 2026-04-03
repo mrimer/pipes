@@ -396,7 +396,7 @@ export class TurnStateManager {
           }
           // 'zero' (sandstone shatter): impact stays 0, no frozen water consumed.
         }
-        // 'heater', 'pump', 'item', 'star', 'skill': no direct water impact.
+        // 'heater', 'pump', 'item', 'star', 'level': no direct water impact.
       }
       // Source, Sink, Empty, Granite, Tree: no water impact.
 
