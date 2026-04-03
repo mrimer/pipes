@@ -5,7 +5,7 @@ import { parseKey } from './board';
 // ── Ice / snow / sandstone cost-calculation helpers ────────────────────────
 // These formulas appear in getCurrentWater(), _lockNewTiles(), and
 // _reEvaluateConnectedTiles() in board.ts, and in _pushTileAnimLabels() in
-// game.ts.  Centralising them here avoids copy-paste bugs and makes the
+// animationManager.ts.  Centralising them here avoids copy-paste bugs and makes the
 // cost model easier to understand.
 
 /**
