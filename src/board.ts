@@ -559,7 +559,7 @@ export class Board {
   /**
    * Return a player-placed pipe tile back to the inventory.
    * Only non-fixed, non-special tiles (Straight, Elbow, Tee, Cross and their gold
-   * variants) can be reclaimed.
+   * and leaky variants) can be reclaimed.
    * Returns a failing {@link MoveResult} if reclaiming would reduce an
    * inventory value below zero due to lost ItemContainer grants.
    */

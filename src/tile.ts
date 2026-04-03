@@ -82,7 +82,7 @@ export class Tile {
   readonly isFixed: boolean;
   /** Water capacity for Source and Chamber-tank tiles. */
   capacity: number;
-  /** Water cost for Chamber-damage tiles – deducted from the source when water flows through. */
+  /** Water cost for Chamber cost tiles (dirt, ice, snow, sandstone, hot_plate) – deducted from the source when water flows through. */
   cost: number;
   /** Inventory item shape granted when a Chamber-item tile is in the fill path. */
   itemShape: PipeShape | null;
@@ -143,7 +143,7 @@ export class Tile {
    * @param itemShape - Inventory item shape (Chamber-item tiles only).
    * @param itemCount - Number of items granted (Chamber-item tiles only, defaults to 1).
    * @param customConnections - Explicit connection set (Source, Sink, or Chamber tiles; overrides rotation-based default).
-   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', or 'hot plate').
+   * @param chamberContent - Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate', or 'level').
    * @param temperature - Temperature value for Source (base temp), Heater (additive bonus), Ice/Snow/Sandstone/Hot Plate (cost factor).
    * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.

@@ -154,13 +154,13 @@ export interface TileDef {
   rotation?: Rotation;
   /** Water capacity (Source and Chamber-tank tiles only). */
   capacity?: number;
-  /** Water cost for Chamber-dirt and Chamber-ice tiles – water wasted when water flows through this tile. */
+  /** Water cost for Chamber cost tiles (dirt, ice, snow, sandstone, hot_plate) – water consumed when water flows through this tile. */
   cost?: number;
   /** Shape of the inventory item stored inside a Chamber-item tile. */
   itemShape?: PipeShape;
   /** Number of inventory items granted by a Chamber-item tile (defaults to 1). */
   itemCount?: number;
-  /** Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', or 'ice'). */
+  /** Content type for Chamber tiles ('tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate', or 'level'). */
   chamberContent?: ChamberContent;
   /**
    * Temperature value: the base temperature for Source tiles, the additive bonus for
