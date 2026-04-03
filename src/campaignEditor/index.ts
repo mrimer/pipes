@@ -21,8 +21,6 @@ import { TileParamsPanel } from './tileParamsPanel';
 const EDITOR_LAYOUT_PADDING = 16;
 /** Gap (px) between flex columns in the main editor layout. */
 const EDITOR_LAYOUT_GAP = 16;
-/** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
-const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
 import {
   EditorScreen,
   generateLevelId,
@@ -39,6 +37,7 @@ import {
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { EditorInputHandler } from './editorInputHandler';
 import { DataValidationDialog } from './dataValidationDialog';
+import { EditorDialogs } from './editorDialogs';
 import { renderMinimap } from '../minimap';
 import { validateLevel } from './levelValidator';
 
@@ -89,6 +88,9 @@ export class CampaignEditor {
   /** Data validation dialog (dev tool). */
   private readonly _dataValidator: DataValidationDialog;
 
+  /** Import and unsaved-changes modal dialogs. */
+  private readonly _dialogs: EditorDialogs;
+
   constructor(
     onClose: () => void,
     onPlaytest: (level: LevelDef) => void,
@@ -129,6 +131,8 @@ export class CampaignEditor {
       'display:none;position:fixed;inset:0;background:#0d1520;overflow:auto;z-index:200;' +
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
     document.body.appendChild(this._el);
+
+    this._dialogs = new EditorDialogs(this._el, this._btn.bind(this));
 
     // Global keyboard handler for shortcuts (guarded by active screen)
     document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -305,27 +309,6 @@ export class CampaignEditor {
   }
 
   /**
-   * Create a standard full-screen modal overlay and a centered dialog box,
-   * append the overlay to `_el`, and return both elements for the caller to
-   * populate.
-   * @param maxWidth CSS max-width for the dialog (default '460px').
-   */
-  private _createDialogOverlay(maxWidth = '460px'): { overlay: HTMLDivElement; dialog: HTMLDivElement } {
-    const overlay = document.createElement('div');
-    overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
-    const dialog = document.createElement('div');
-    dialog.style.cssText =
-      `background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;` +
-      `display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:${maxWidth};` +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
-    overlay.appendChild(dialog);
-    this._el.appendChild(overlay);
-    return { overlay, dialog };
-  }
-
-  /**
    * Create a small styled info-box `<div>` used to display a level note, hint
    * summary, or challenge badge in the non-edit level card view.
    *
@@ -347,124 +330,6 @@ export class CampaignEditor {
   /** Set the campaign's lastUpdated timestamp to the current time. */
   private _touchCampaign(campaign: CampaignDef): void {
     this._service.touch(campaign);
-  }
-
-  /** Format an ISO timestamp for display, or return a fallback string if absent. */
-  private _formatTimestamp(ts: string | undefined): string {
-    if (!ts) return 'unknown';
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return ts;
-    return d.toLocaleString();
-  }
-
-  /**
-   * Show an info dialog telling the user the imported campaign is the same version
-   * as the local copy. The import is canceled.
-   */
-  private _showImportSameVersionDialog(name: string, ts: string | undefined): void {
-    const { overlay, dialog } = this._createDialogOverlay('460px');
-
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
-    title.textContent = '✅ Same Version';
-
-    const msg = document.createElement('div');
-    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
-    msg.innerHTML =
-      `<strong style="color:#fff;">"${name}"</strong> is already up to date.<br><br>` +
-      `The imported campaign has the same version as your local copy<br>` +
-      `(last updated: <em>${this._formatTimestamp(ts)}</em>).<br><br>` +
-      `The campaign will not be updated.`;
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
-    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
-
-    dialog.appendChild(title);
-    dialog.appendChild(msg);
-    dialog.appendChild(btnRow);
-  }
-
-  /**
-   * Show a confirmation dialog asking the user whether to overwrite a local campaign
-   * with an imported one of a different version.
-   * @param imported  The campaign data being imported.
-   * @param existing  The local campaign with the same ID.
-   * @param isNewer   True when the imported campaign is more recent.
-   * @param onConfirm Called when the user confirms the import.
-   */
-  private _showImportVersionConflictDialog(
-    imported: CampaignDef,
-    existing: CampaignDef,
-    isNewer: boolean,
-    onConfirm: () => void,
-  ): void {
-    const { overlay, dialog } = this._createDialogOverlay('480px');
-
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
-    title.textContent = isNewer ? '⏩ Import Newer Version?' : '⏪ Import Older Version?';
-
-    const msg = document.createElement('div');
-    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
-    const localLabel = `Local version: <em>${this._formatTimestamp(existing.lastUpdated)}</em>`;
-    const importedLabel = `Imported version: <em>${this._formatTimestamp(imported.lastUpdated)}</em> (${isNewer ? 'newer' : 'older'})`;
-    msg.innerHTML =
-      `<strong style="color:#fff;">"${imported.name}"</strong> already exists locally.<br><br>` +
-      `${localLabel}<br>` +
-      `${importedLabel}<br><br>` +
-      `Importing will replace all chapters and levels in the local campaign.<br>` +
-      `Player progress will be retained.`;
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
-
-    const confirmLabel = isNewer ? '⏩ Import newer version' : '⏪ Overwrite with older version';
-    const confirmColor = isNewer ? '#27ae60' : '#e67e22';
-    const confirmBtn = this._btn(confirmLabel, confirmColor, '#fff', () => {
-      overlay.remove();
-      onConfirm();
-    });
-    const cancelBtn = this._btn('Cancel', '#2a2a4a', '#aaa', () => overlay.remove());
-
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(confirmBtn);
-    dialog.appendChild(title);
-    dialog.appendChild(msg);
-    dialog.appendChild(btnRow);
-  }
-
-  /**
-   * Show a modal dialog asking the user to Save or Discard unsaved level changes.
-   * Appended to `_el`; removed when either button is clicked.
-   */
-  private _showUnsavedModal(onSave: () => void, onDiscard: () => void): void {
-    const { overlay, dialog } = this._createDialogOverlay('420px');
-
-    const msg = document.createElement('div');
-    msg.style.cssText = 'font-size:1rem;color:#eee;line-height:1.5;';
-    msg.textContent = 'You have unsaved changes. Would you like to save before leaving?';
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
-
-    const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
-      overlay.remove();
-      onSave();
-    });
-    const discardBtn = this._btn('🗑 Discard', '#c0392b', '#fff', () => {
-      overlay.remove();
-      onDiscard();
-    });
-    const cancelBtn = this._btn('Cancel', '#2a2a4a', '#aaa', () => {
-      overlay.remove();
-    });
-
-    btnRow.appendChild(cancelBtn);
-    btnRow.appendChild(discardBtn);
-    btnRow.appendChild(saveBtn);
-    dialog.appendChild(msg);
-    dialog.appendChild(btnRow);
   }
 
   private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
@@ -892,7 +757,7 @@ export class CampaignEditor {
       readOnly ? `👁 View Level: ${this._state.levelName}` : `✏️ Level Editor`,
       () => {
         if (!readOnly && this._state.hasUnsavedChanges) {
-          this._showUnsavedModal(
+          this._dialogs.showUnsavedChanges(
             () => {
               this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
               this._showChapterDetail();
@@ -1788,12 +1653,12 @@ export class CampaignEditor {
         }
 
         if (result.conflict === 'same_version') {
-          this._showImportSameVersionDialog(result.campaign.name, result.campaign.lastUpdated);
+          this._dialogs.showImportSameVersion(result.campaign.name, result.campaign.lastUpdated);
           return;
         }
 
         if (result.conflict === 'version_conflict') {
-          this._showImportVersionConflictDialog(result.campaign, result.existing!, result.isNewer!, () => {
+          this._dialogs.showImportVersionConflict(result.campaign, result.existing!, result.isNewer!, () => {
             // Replace the campaign record while retaining player progress (keyed by ID).
             this._service.acceptImport(result);
             alert(`Campaign "${result.campaign.name}" imported successfully.`);
