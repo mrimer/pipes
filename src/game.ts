@@ -71,6 +71,8 @@ const PLAY_PADDING_BOTTOM = 24;
 const PLAY_NOTE_PANEL_H = 42;
 /** Estimated height (px) of the collapsed hint panel: toggle-button 10 px padding × 2 + font. */
 const PLAY_HINT_PANEL_H = 37;
+/** Vertical border height (px) added by the 3 px CSS border on #game-canvas (3 px × 2 sides). */
+const PLAY_CANVAS_BORDER_H = 6;
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -386,7 +388,7 @@ export class Game implements InputCallbacks {
     const hasNote  = !!level.note;
     const hasHints = !!(level.hints?.length);
 
-    let overhead = PLAY_TOP_PADDING + PLAY_LEVEL_HEADER_H + PLAY_GAP + PLAY_HUD_H + PLAY_GAP + PLAY_PADDING_BOTTOM;
+    let overhead = PLAY_TOP_PADDING + PLAY_LEVEL_HEADER_H + PLAY_GAP + PLAY_HUD_H + PLAY_GAP + PLAY_CANVAS_BORDER_H + PLAY_PADDING_BOTTOM;
     if (hasNote)  overhead += PLAY_NOTE_PANEL_H + PLAY_GAP;
     if (hasHints) overhead += PLAY_HINT_PANEL_H + PLAY_GAP;
     return overhead;
