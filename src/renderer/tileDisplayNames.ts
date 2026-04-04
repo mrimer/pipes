@@ -110,6 +110,7 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Sink:         return 'Sink - goal';
     case PipeShape.Granite:      return 'Granite';
     case PipeShape.Tree:         return 'Tree';
+    case PipeShape.Sea:          return 'Sea';
     case PipeShape.Cement:       return 'Cement';
     case PipeShape.Chamber:
       switch (tile.chamberContent) {

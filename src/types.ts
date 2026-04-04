@@ -34,6 +34,10 @@ export enum PipeShape {
   /** Tree – an impassable obstacle; cannot be moved and water cannot flow through it.
    *  Rendered as a 2-D top-down view of a broad-leafed tree (fern / palm style). */
   Tree = 'TREE',
+  /** Sea – an impassable obstacle; cannot be moved and water cannot flow through it.
+   *  Rendered as a blue water tile with animated ripples and a thin land border
+   *  on edges where a non-sea tile is adjacent. */
+  Sea = 'SEA',
   /** Cement – open background tile; any pipe may be placed here, but pipes placed on
    *  hardened cement (Drying Time = 0) may not be removed or rotated. */
   Cement = 'CEMENT',

@@ -34,6 +34,7 @@ import {
   ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
+  SEA_FILL_COLOR,
 } from './colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
@@ -102,6 +103,8 @@ function tileColor(tile: TileDef | null): string {
       return GRANITE_FILL_COLOR;
     case PipeShape.Tree:
       return TREE_COLOR;
+    case PipeShape.Sea:
+      return SEA_FILL_COLOR;
     case PipeShape.Cement:
       return CEMENT_FILL_COLOR;
     case PipeShape.OneWay:

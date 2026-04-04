@@ -130,6 +130,7 @@ const LEAKY_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
 const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
   { palette: PipeShape.Granite,   label: '▪ Granite' },
   { palette: PipeShape.Tree,      label: '🌿 Tree' },
+  { palette: PipeShape.Sea,       label: '🌊 Sea' },
   { palette: PipeShape.Cement,    label: '🪧 Cement' },
   { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
   { palette: PipeShape.OneWay,    label: '→ One-Way' },
@@ -275,7 +276,7 @@ export class TileParamsPanel {
     // Spin-cement shapes are in PIPE_SHAPES but do have a parameter (Drying Time), so exclude them
     // from the "no parameters" early-return check.
     const isParamFreePipe = PIPE_SHAPES.has(p as PipeShape) && !SPIN_CEMENT_SHAPES.has(p as PipeShape);
-    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.GoldSpace ||
+    if (p === 'erase' || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.GoldSpace ||
         p === PipeShape.OneWay || isParamFreePipe) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';

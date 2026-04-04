@@ -199,6 +199,7 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.Cross]:         '#4a90d9',
   [PipeShape.Granite]:       '#636e72',
   [PipeShape.Tree]:          '#2d6e1a',
+  [PipeShape.Sea]:           '#2a7fbf',
   [PipeShape.Cement]:        '#8090a0',
   [PipeShape.GoldSpace]:     '#b8860b',
   [PipeShape.GoldStraight]:  '#f39c12',
@@ -273,7 +274,7 @@ export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
-  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree,
+  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
   PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
 ]);

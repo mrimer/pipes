@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, AmbientDecorationType } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
@@ -457,6 +457,36 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.restore();
 }
 
+/** Draw Sea tile like in-game with neighbor-aware borders. */
+function _drawChapterMapSea(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  r: number,
+  c: number,
+): void {
+  const CELL = TILE_SIZE;
+  const _isSea = (rr: number, cc: number): boolean =>
+    rr >= 0 && rr < rows && cc >= 0 && cc < cols && grid[rr]?.[cc]?.shape === PipeShape.Sea;
+  const neighbors: SeaNeighbors = {
+    north: _isSea(r - 1, c),
+    south: _isSea(r + 1, c),
+    west:  _isSea(r, c - 1),
+    east:  _isSea(r, c + 1),
+    nw:    _isSea(r - 1, c - 1),
+    ne:    _isSea(r - 1, c + 1),
+    sw:    _isSea(r + 1, c - 1),
+    se:    _isSea(r + 1, c + 1),
+  };
+  ctx.save();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawSea(ctx, CELL / 2, neighbors);
+  ctx.restore();
+}
+
 /**
  * Render the chapter map canvas (used on the chapter map screen).
  *
@@ -565,6 +595,8 @@ export function renderChapterMapCanvas(
         _drawChapterMapGranite(ctx, x, y);
       } else if (def.shape === PipeShape.Tree) {
         _drawChapterMapTree(ctx, x, y);
+      } else if (def.shape === PipeShape.Sea) {
+        _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c);
       }
     }
   }
