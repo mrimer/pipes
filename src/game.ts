@@ -1301,6 +1301,9 @@ export class Game implements InputCallbacks {
       if (minimapRect && boardSnapshot) {
         // Play zoom-out animation: level snapshot shrinks back to minimap position.
         chapterMapScreen.screenEl.style.opacity = '0';
+        // Suppress scrollbar on the chapter map screen during the animation to
+        // prevent a momentary layout shift if the map content exceeds the viewport.
+        chapterMapScreen.screenEl.style.overflow = 'hidden';
         playLevelExitTransition(
           minimapRect,
           chapterMapScreen.screenEl,
@@ -1309,6 +1312,7 @@ export class Game implements InputCallbacks {
           this.playScreenEl,
           () => {
             // Animation complete: hide the play screen and clean up.
+            chapterMapScreen.screenEl.style.overflow = '';
             this.playScreenEl.style.display = 'none';
             this.currentLevel = null;
           },
