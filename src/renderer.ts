@@ -349,10 +349,10 @@ function _drawSeaRipple(
   const hw = rw / 3;          // half-arch width
   const iw = (2 * rw) / 3;   // inner arch width
   ctx.moveTo(-rw, 0);
-  ctx.quadraticCurveTo(-rw + hw / 2, peakH,        -rw + hw,       0);  // left half-arch
-  ctx.quadraticCurveTo(-rw + hw + iw / 2, peakH,   -rw + hw + iw,  0);  // inner arch 1
-  ctx.quadraticCurveTo(iw / 2, peakH,               2 * rw / 3,    0);  // inner arch 2
-  ctx.quadraticCurveTo(2 * rw / 3 + hw / 2, peakH,  rw,            0);  // right half-arch
+  ctx.quadraticCurveTo(-rw + hw / 2, peakH,       -rw + hw,        0);  // left half-arch
+  ctx.quadraticCurveTo(-rw + hw + iw / 2, peakH,  -rw + hw + iw,   0);  // inner arch 1
+  ctx.quadraticCurveTo(-rw + hw + iw + iw / 2, peakH, -rw + hw + 2 * iw, 0);  // inner arch 2
+  ctx.quadraticCurveTo(-rw + hw + 2 * iw + hw / 2, peakH, rw,      0);  // right half-arch
   ctx.stroke();
   ctx.restore();
 }
