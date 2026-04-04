@@ -116,6 +116,10 @@ export class ChapterMapScreen {
   private _ctrlHeld = false;
   /** Floating tooltip element shown on Ctrl+hover. */
   private readonly _tooltipEl: HTMLElement;
+  /** Bound keydown handler stored so it can be removed when the screen is hidden. */
+  private readonly _onKeyDown: (e: KeyboardEvent) => void;
+  /** Bound keyup handler stored so it can be removed when the screen is hidden. */
+  private readonly _onKeyUp: (e: KeyboardEvent) => void;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   /** Temporary error message element shown when a sink click is rejected. */
@@ -179,20 +183,20 @@ export class ChapterMapScreen {
       'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;';
     document.body.appendChild(this._tooltipEl);
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Control' && !this._ctrlHeld && this.screenEl.style.display !== 'none') {
+    this._onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control' && !this._ctrlHeld) {
         this._ctrlHeld = true;
         if (this._mouseClientPos && this._chapter) {
           this._showTooltip(this._mouseClientPos.x, this._mouseClientPos.y);
         }
       }
-    });
-    document.addEventListener('keyup', (e) => {
+    };
+    this._onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Control') {
         this._ctrlHeld = false;
         this._hideTooltip();
       }
-    });
+    };
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -232,7 +236,23 @@ export class ChapterMapScreen {
 
     this._populate(campaign, chapterIdx, chapter);
     this.screenEl.style.display = 'flex';
+    document.removeEventListener('keydown', this._onKeyDown);
+    document.removeEventListener('keyup', this._onKeyUp);
+    document.addEventListener('keydown', this._onKeyDown);
+    document.addEventListener('keyup', this._onKeyUp);
     this._startAnimLoop();
+  }
+
+  /**
+   * Hide the screen and remove document-level event listeners.
+   * Call this instead of setting `screenEl.style.display` directly.
+   */
+  hide(): void {
+    this.screenEl.style.display = 'none';
+    document.removeEventListener('keydown', this._onKeyDown);
+    document.removeEventListener('keyup', this._onKeyUp);
+    this._ctrlHeld = false;
+    this._hideTooltip();
   }
 
   /**

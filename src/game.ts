@@ -1249,11 +1249,10 @@ export class Game implements InputCallbacks {
       cb(); // re-open the campaign editor
     } else if (this._campaign.winFromChapterMap && this._campaign.chapterMapScreen?.chapter) {
       this._campaign.winFromChapterMap = false;
-      this._campaign.repopulateChapterMap();
       this.levelSelectEl.style.display = 'none';
       this.playScreenEl.style.display = 'none';
-      this._campaign.chapterMapScreen.screenEl.style.display = 'flex';
       this.winModalEl.style.display = 'none';
+      this._campaign.reshowChapterMap();
       this.screen = GameScreen.ChapterMap;
     } else {
       this._showLevelSelect();
