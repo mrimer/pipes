@@ -82,6 +82,9 @@ export class CampaignEditor {
   /** Import and unsaved-changes modal dialogs. */
   private readonly _dialogs: EditorDialogs;
 
+  /** Bound keydown handler stored so it can be removed by destroy(). */
+  private readonly _keydownHandler: (e: KeyboardEvent) => void;
+
   constructor(
     onClose: () => void,
     onPlaytest: (level: LevelDef) => void,
@@ -126,7 +129,7 @@ export class CampaignEditor {
     this._dialogs = new EditorDialogs(this._el, this._btn.bind(this));
 
     // Global keyboard handler for shortcuts (guarded by active screen)
-    document.addEventListener('keydown', (e: KeyboardEvent) => {
+    this._keydownHandler = (e: KeyboardEvent) => {
       if (this._el.style.display === 'none') return;
       // Chapter map editor: Q/W rotation
       if (this._screen === EditorScreen.Chapter) {
@@ -155,7 +158,8 @@ export class CampaignEditor {
           this._renderEditorCanvas();
         }
       }
-    });
+    };
+    document.addEventListener('keydown', this._keydownHandler);
   }
 
   /** Show the campaign editor (campaign list screen). */
@@ -191,6 +195,11 @@ export class CampaignEditor {
   /** Hide the campaign editor. */
   hide(): void {
     this._el.style.display = 'none';
+  }
+
+  /** Remove event listeners and clean up DOM resources. */
+  destroy(): void {
+    document.removeEventListener('keydown', this._keydownHandler);
   }
 
   // ─── Toolbar ─────────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ let _canvas: HTMLCanvasElement | null = null;
 let _ctx: CanvasRenderingContext2D | null = null;
 /** Timestamp (from `requestAnimationFrame`) of the previous tick, used for frame-rate-independent motion. */
 let _lastTickTime: number | null = null;
+let _resizeListenerAdded = false;
 
 function _resizeCanvas(): void {
   if (!_canvas) return;
@@ -45,7 +46,10 @@ function _ensureCanvas(): void {
   document.body.appendChild(_canvas);
   _ctx = _canvas.getContext('2d')!;
   _resizeCanvas();
-  window.addEventListener('resize', _resizeCanvas);
+  if (!_resizeListenerAdded) {
+    window.addEventListener('resize', _resizeCanvas);
+    _resizeListenerAdded = true;
+  }
 }
 
 /**
