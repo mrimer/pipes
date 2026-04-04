@@ -22,6 +22,7 @@ import {
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal } from './gameModals';
+import type { ChapterMapSnapshot } from './levelTransition';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
 
@@ -52,13 +53,13 @@ export interface CampaignCallbacks {
 
   /**
    * Play the zoom transition from the chapter-map minimap to the full game canvas.
-   * @param minimapRect  Screen-space rect of the minimap on the chapter map.
-   * @param chapterMapEl The chapter-map overlay element.
-   * @param onComplete   Called when the animation finishes.
+   * @param minimapRect        Screen-space rect of the minimap on the chapter map.
+   * @param chapterMapSnapshot Pre-captured snapshot of the chapter map canvas.
+   * @param onComplete         Called when the animation finishes.
    */
   playLevelTransition(
     minimapRect: { x: number; y: number; width: number; height: number },
-    chapterMapEl: HTMLElement,
+    chapterMapSnapshot: ChapterMapSnapshot | null,
     onComplete: () => void,
   ): void;
 
@@ -221,8 +222,11 @@ export class CampaignManager {
           this._callbacks.winMenuBtnEl.textContent = 'Chapter Map';
           this._callbacks.exitBtnEl.textContent = '← Chapter Map';
 
-          // Capture minimap screen rect BEFORE startLevel hides the chapter map.
+          // Capture minimap screen rect AND a canvas snapshot BEFORE startLevel
+          // hides the chapter map or changes TILE_SIZE.  The snapshot is used to
+          // create a precisely-aligned fade-out overlay during the transition.
           const minimapRect = this._chapterMapScreen?.getMinimapScreenRect(levelDef) ?? null;
+          const chapterMapSnapshot = this._chapterMapScreen?.captureCanvasSnapshot() ?? null;
 
           if (levelDef.challenge) {
             this._pendingLevelId = levelDef.id;
@@ -233,7 +237,7 @@ export class CampaignManager {
           if (minimapRect) {
             this._callbacks.playLevelTransition(
               minimapRect,
-              this._chapterMapScreen!.screenEl,
+              chapterMapSnapshot,
               () => {
                 if (levelDef.challenge) {
                   this._showChallengeLevelModal(false);
@@ -416,6 +420,7 @@ export class CampaignManager {
 
   /** Update the level-header element with chapter, level number, and level name. */
   updateLevelHeader(levelId: number): void {
+    const el = this._callbacks.levelHeaderEl;
     const chapters = this._activeCampaign?.chapters ?? [];
     for (let ci = 0; ci < chapters.length; ci++) {
       const chapter = chapters[ci];
@@ -423,22 +428,33 @@ export class CampaignManager {
       if (idx !== -1) {
         this.currentChapterId = chapter.id;
         const level = chapter.levels[idx];
-        const campaignPrefix = this._activeCampaign
-          ? `${this._activeCampaign.name}  ·  `
-          : '';
         const chapterNumber = ci + 1;
         const challengeSuffix = level.challenge ? '  💀' : '';
-        this._callbacks.levelHeaderEl.textContent =
-          `${campaignPrefix}Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}${challengeSuffix}`;
+        el.innerHTML = '';
+        if (this._activeCampaign) {
+          const line1 = document.createElement('div');
+          line1.style.cssText = 'font-size:0.9rem;color:#aaa;';
+          line1.textContent = this._activeCampaign.name;
+          el.appendChild(line1);
+        }
+        const line2 = document.createElement('div');
+        line2.style.cssText = 'font-size:1rem;color:#f0c040;';
+        line2.textContent =
+          `Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}${challengeSuffix}`;
+        el.appendChild(line2);
         return;
       }
     }
-    // Fallback if level isn't in any chapter
+    // Fallback if level isn't in any chapter (non-campaign play)
     this.currentChapterId = 0;
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === levelId);
     const challengeSuffix = level?.challenge ? '  💀' : '';
-    this._callbacks.levelHeaderEl.textContent = level ? `Level ${levelId}: ${level.name}${challengeSuffix}` : '';
+    el.innerHTML = '';
+    const line2 = document.createElement('div');
+    line2.style.cssText = 'font-size:1rem;color:#f0c040;';
+    line2.textContent = level ? `Level ${levelId}: ${level.name}${challengeSuffix}` : '';
+    el.appendChild(line2);
   }
 
   // ── Public API: persistence (campaign-scoped) ────────────────────────────

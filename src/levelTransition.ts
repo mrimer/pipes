@@ -10,9 +10,12 @@
 import { Board } from './board';
 import { TILE_SIZE, renderBoard } from './renderer';
 import { GridPos } from './types';
+import { CHAPTER_MAP_BG } from './colors';
 
 /** Width (px) of the CSS border around the game canvas (#game-canvas). */
 const GAME_CANVAS_BORDER_PX = 3;
+/** Color of the CSS border around the game canvas (#game-canvas). */
+const GAME_CANVAS_BORDER_COLOR = '#4a90d9';
 /** Duration of the zoom transition in milliseconds. */
 const TRANSITION_DURATION_MS = 1000;
 
@@ -22,6 +25,20 @@ export interface ScreenRect {
   y: number;
   width: number;
   height: number;
+}
+
+/**
+ * A pre-captured snapshot of the chapter map canvas used for the fade-out
+ * overlay during the level transition.  Captured before {@link startLevel}
+ * changes the global tile size or hides the chapter map, ensuring the
+ * fade-out lines up precisely with what the player was looking at.
+ */
+export interface ChapterMapSnapshot {
+  /** Canvas element containing a pixel copy of the chapter map grid. */
+  canvas: HTMLCanvasElement;
+  /** Viewport-relative CSS bounding rect of the original chapter map canvas
+   *  (border box, as returned by {@link getBoundingClientRect}). */
+  cssRect: DOMRect;
 }
 
 /** Ease-in-out quadratic: smooth acceleration then deceleration. */
@@ -37,18 +54,19 @@ function lerp(a: number, b: number, t: number): number {
 /**
  * Play the level-enter transition animation.
  *
- * @param minimapRect   Screen-space rect of the minimap on the chapter map.
- * @param gameCanvas    The in-game canvas element (already sized for the level).
- * @param board         The Board instance for the new level.
- * @param chapterMapEl  The chapter-map screen overlay element.
- * @param playScreenEl  The play-screen element.
- * @param onComplete    Callback invoked when the animation finishes.
+ * @param minimapRect        Screen-space rect of the minimap on the chapter map.
+ * @param gameCanvas         The in-game canvas element (already sized for the level).
+ * @param board              The Board instance for the new level.
+ * @param chapterMapSnapshot Pre-captured snapshot of the chapter map canvas, or
+ *                           null if there is no chapter map to fade out.
+ * @param playScreenEl       The play-screen element.
+ * @param onComplete         Callback invoked when the animation finishes.
  */
 export function playLevelTransition(
   minimapRect: ScreenRect,
   gameCanvas: HTMLCanvasElement,
   board: Board,
-  chapterMapEl: HTMLElement,
+  chapterMapSnapshot: ChapterMapSnapshot | null,
   playScreenEl: HTMLElement,
   onComplete: () => void,
 ): void {
@@ -84,18 +102,51 @@ export function playLevelTransition(
     height: canvasRect.height - 2 * GAME_CANVAS_BORDER_PX,
   };
 
-  // ── 3. Create a fixed-position overlay to host the animating snapshot ────
+  // ── 3. Create a fixed-position chapter-map fade overlay ──────────────────
+  //
+  // Instead of re-showing the live chapter map element (which risks misalignment
+  // due to TILE_SIZE changes and animation-loop re-renders), we use a pre-captured
+  // pixel snapshot positioned at exactly the same screen coordinates.
+
+  let chapterMapFadeEl: HTMLElement | null = null;
+  if (chapterMapSnapshot) {
+    const { canvas: snapSrc, cssRect } = chapterMapSnapshot;
+
+    // Full-screen background matching the chapter map background color.
+    const fadeOverlay = document.createElement('div');
+    fadeOverlay.style.cssText =
+      `position:fixed;inset:0;z-index:12;pointer-events:none;background:${CHAPTER_MAP_BG};`;
+
+    // Canvas snapshot element, positioned to match the original canvas exactly.
+    const snapEl = document.createElement('canvas');
+    snapEl.width  = snapSrc.width;
+    snapEl.height = snapSrc.height;
+    const snapCtx = snapEl.getContext('2d');
+    if (snapCtx) snapCtx.drawImage(snapSrc, 0, 0);
+    snapEl.style.cssText =
+      `position:absolute;left:${cssRect.left}px;top:${cssRect.top}px;` +
+      `width:${cssRect.width}px;height:${cssRect.height}px;`;
+
+    fadeOverlay.appendChild(snapEl);
+    document.body.appendChild(fadeOverlay);
+    chapterMapFadeEl = fadeOverlay;
+  }
+
+  // ── 4. Create a fixed-position overlay to host the animating snapshot ────
 
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
 
   // The snapshot element – starts at minimap size, ends at full game-canvas size.
   // CSS `image-rendering: auto` ensures the browser uses bilinear interpolation.
+  // An outline matching the game canvas border grows with the snapshot so the
+  // border appears naturally as the image scales up to full size.
   const snapshotEl = document.createElement('canvas');
   snapshotEl.width = snapshotW;
   snapshotEl.height = snapshotH;
   snapshotEl.style.cssText =
     'position:absolute;image-rendering:auto;' +
+    `outline:${GAME_CANVAS_BORDER_PX}px solid ${GAME_CANVAS_BORDER_COLOR};border-radius:4px;` +
     `left:${minimapRect.x}px;top:${minimapRect.y}px;` +
     `width:${minimapRect.width}px;height:${minimapRect.height}px;`;
   const snapshotCtx = snapshotEl.getContext('2d');
@@ -105,17 +156,16 @@ export function playLevelTransition(
   overlay.appendChild(snapshotEl);
   document.body.appendChild(overlay);
 
-  // ── 4. Prepare screen element styles for the animation ──────────────────
+  // ── 5. Prepare screen element styles for the animation ──────────────────
 
-  // Re-show the chapter map element (it was hidden by _enterPlayScreenState)
-  // so we can fade it out during the transition.
-  chapterMapEl.style.display = 'flex';
-  chapterMapEl.style.opacity = '1';
+  // Hide the game canvas during the transition – it is represented by the
+  // zooming snapshot, so it should not also fade in at full size.
+  gameCanvas.style.visibility = 'hidden';
 
   // Start the play screen invisible so we can fade it in.
   playScreenEl.style.opacity = '0';
 
-  // ── 5. Animate using requestAnimationFrame ──────────────────────────────
+  // ── 6. Animate using requestAnimationFrame ──────────────────────────────
 
   const startTime = performance.now();
 
@@ -134,20 +184,22 @@ export function playLevelTransition(
     snapshotEl.style.width = `${w}px`;
     snapshotEl.style.height = `${h}px`;
 
-    // Fade chapter map out (linear)
-    chapterMapEl.style.opacity = `${1 - rawT}`;
+    // Fade chapter map snapshot out (linear)
+    if (chapterMapFadeEl) chapterMapFadeEl.style.opacity = `${1 - rawT}`;
 
-    // Fade play screen in (linear)
+    // Fade play screen in (linear), but keep the game canvas hidden
+    // until the very end so it doesn't also appear at full size during the zoom.
     playScreenEl.style.opacity = `${rawT}`;
 
     if (rawT < 1) {
       requestAnimationFrame(tick);
     } else {
-      // ── 6. Clean up and finalize ────────────────────────────────────────
+      // ── 7. Clean up and finalize ────────────────────────────────────────
       overlay.remove();
-      chapterMapEl.style.display = 'none';
-      chapterMapEl.style.opacity = '1';
+      if (chapterMapFadeEl) chapterMapFadeEl.remove();
       playScreenEl.style.opacity = '1';
+      // Reveal the game canvas now that the zoomed snapshot overlay is gone.
+      gameCanvas.style.visibility = '';
       onComplete();
     }
   }

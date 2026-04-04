@@ -17,6 +17,7 @@ import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } fr
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
+import type { ChapterMapSnapshot } from './levelTransition';
 
 // ─── Layout overhead constants ────────────────────────────────────────────────
 // Estimated heights of UI elements that appear above/below the chapter map
@@ -257,6 +258,29 @@ export class ChapterMapScreen {
       width: mw * cssScaleX,
       height: mh * cssScaleY,
     };
+  }
+
+  /**
+   * Capture a pixel snapshot of the chapter map canvas along with its current
+   * CSS bounding rect.  Call this *before* any action that changes TILE_SIZE or
+   * hides the chapter map (e.g. {@link startLevel}) so the snapshot perfectly
+   * matches what the player was looking at.
+   *
+   * Returns `null` if the canvas is not available or has zero dimensions.
+   */
+  captureCanvasSnapshot(): ChapterMapSnapshot | null {
+    const canvas = this._canvas;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+    const cssRect = canvas.getBoundingClientRect();
+
+    const snapshot = document.createElement('canvas');
+    snapshot.width  = canvas.width;
+    snapshot.height = canvas.height;
+    const ctx = snapshot.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(canvas, 0, 0);
+
+    return { canvas: snapshot, cssRect };
   }
 
   /**
