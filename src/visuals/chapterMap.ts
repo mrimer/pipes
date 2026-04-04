@@ -16,7 +16,7 @@ import {
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
 import { tileDefConnections } from '../chapterMapUtils';
-import { renderMinimap } from '../minimap';
+import { renderMinimap, minimapDimensions } from '../minimap';
 import { FlowDrop, drawFlowDrop } from './waterParticles';
 
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
@@ -99,6 +99,41 @@ export interface LevelProgressMap {
 }
 
 // ─── Level chamber tile ────────────────────────────────────────────────────────
+
+/**
+ * Compute the canvas-space bounding rectangle of the minimap image drawn
+ * inside a level-chamber tile whose top-left corner is at pixel (cellX, cellY).
+ *
+ * This is used both for rendering the minimap (in {@link drawLevelChamberTile})
+ * and for the level-transition animation (via {@link ChapterMapScreen.getMinimapScreenRect}).
+ */
+export function computeMinimapRect(
+  cellX: number,
+  cellY: number,
+  levelDef: LevelDef,
+): { x: number; y: number; width: number; height: number } {
+  const CELL = TILE_SIZE;
+  const cx = cellX + CELL / 2;
+  const cy = cellY + CELL / 2;
+  const half = CELL / 2;
+  const bw = half * 0.7 + 2;
+  const bh = half * 0.7 + 2;
+  const labelH = _s(16);
+  const boxTop = cy - bh;
+  const contentY = boxTop + labelH;
+  const contentH = bh * 2 - labelH;
+
+  const { width: mmW, height: mmH } = minimapDimensions(levelDef.rows, levelDef.cols);
+  const maxW = bw * 2 - _s(6);
+  const maxH = contentH - _s(6);
+  const scale = Math.min(maxW / mmW, maxH / mmH, 1);
+  const mw = Math.round(mmW * scale);
+  const mh = Math.round(mmH * scale);
+  const mx = Math.round(cx - mw / 2);
+  const my = contentY + Math.round((contentH - mh) / 2);
+
+  return { x: mx, y: my, width: mw, height: mh };
+}
 
 /** Draw a level-chamber tile in the editor/chapter-map canvas at pixel (x, y).
  *
@@ -284,15 +319,7 @@ export function drawLevelChamberTile(
   if (levelDef) {
     try {
       const minimap = renderMinimap(levelDef);
-      const maxW = bw * 2 - _s(6);
-      const maxH = contentH - _s(6);
-      const scaleX = maxW / minimap.width;
-      const scaleY = maxH / minimap.height;
-      const scale = Math.min(scaleX, scaleY, 1);
-      const mw = Math.round(minimap.width * scale);
-      const mh = Math.round(minimap.height * scale);
-      const mx = Math.round(cx - mw / 2);
-      const my = contentY + Math.round((contentH - mh) / 2);
+      const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(x, y, levelDef);
       ctx.drawImage(minimap, mx, my, mw, mh);
     } catch {
       // If minimap rendering fails, show a placeholder
