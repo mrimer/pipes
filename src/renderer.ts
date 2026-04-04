@@ -284,7 +284,8 @@ export function drawSea(
   const r = Math.round(30 + osc * 18);   // 30..48
   const g = Math.round(110 + osc * 28);  // 110..138
   const b = Math.round(175 + osc * 22);  // 175..197
-  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  const waterColor = `rgb(${r},${g},${b})`;
+  ctx.fillStyle = waterColor;
   ctx.fillRect(-half, -half, half * 2, half * 2);
 
   // ── Land border on non-sea edges ────────────────────────────────────────
@@ -298,12 +299,12 @@ export function drawSea(
   if (!neighbors.west)  ctx.fillRect(-half, -half, bw, half * 2);
   if (!neighbors.east)  ctx.fillRect(half - bw, -half, bw, half * 2);
 
-  // Rounded convex corners where two edge borders meet at a corner
+  // Rounded concave inner corners where two edge borders meet at a tile corner
   // (i.e., both cardinal neighbors at the corner are NOT sea).
-  _drawSeaConvexCorner(ctx, -half, -half, cornerR, 0, !neighbors.north, !neighbors.west);
-  _drawSeaConvexCorner(ctx, half, -half, cornerR, Math.PI / 2, !neighbors.north, !neighbors.east);
-  _drawSeaConvexCorner(ctx, half, half, cornerR, Math.PI, !neighbors.south, !neighbors.east);
-  _drawSeaConvexCorner(ctx, -half, half, cornerR, 3 * Math.PI / 2, !neighbors.south, !neighbors.west);
+  _drawSeaBorderInnerCorner(ctx, -half, -half, waterColor, bw, !neighbors.north, !neighbors.west);
+  _drawSeaBorderInnerCorner(ctx, half, -half, waterColor, bw, !neighbors.north, !neighbors.east);
+  _drawSeaBorderInnerCorner(ctx, half, half, waterColor, bw, !neighbors.south, !neighbors.east);
+  _drawSeaBorderInnerCorner(ctx, -half, half, waterColor, bw, !neighbors.south, !neighbors.west);
 
   // Concave (inner) corners: both cardinal edge neighbors are sea but the diagonal is NOT.
   _drawSeaConcaveCorner(ctx, -half, -half, cornerR, neighbors.north, neighbors.west, !neighbors.nw);
@@ -317,24 +318,39 @@ export function drawSea(
 }
 
 /**
- * Draw a convex rounded corner piece for the sea land border.
- * This is a filled quarter-circle arc at the tile corner where two
- * perpendicular edge borders meet.
+ * Paint a water-coloured quarter-circle at the inner corner of two
+ * perpendicular land-border edges, producing a smooth concave (rounded
+ * inward) inner corner on the border.
  */
-function _drawSeaConvexCorner(
+function _drawSeaBorderInnerCorner(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number,
-  r: number,
-  _startAngle: number,
+  waterColor: string,
+  bw: number,
   edgeA: boolean,
   edgeB: boolean,
 ): void {
   if (!edgeA || !edgeB) return;
+  const dx = cx > 0 ? -1 : 1;  // direction toward tile centre in x
+  const dy = cy > 0 ? -1 : 1;  // direction toward tile centre in y
+  // Inner corner of the border frame (where the two border rects meet inside).
+  const icx = cx + dx * bw;
+  const icy = cy + dy * bw;
+  // Quarter arc that spans the corner quadrant pointing toward the outer tile corner.
+  // NW corner (dx=1,dy=1):  π → 3π/2, anticlockwise
+  // NE corner (dx=-1,dy=1): 3π/2 → 0,  anticlockwise
+  // SE corner (dx=-1,dy=-1):0 → π/2,   clockwise
+  // SW corner (dx=1,dy=-1): π/2 → π,   clockwise
+  const startAngle = dx > 0 ? (dy > 0 ? Math.PI : Math.PI / 2)
+                             : (dy > 0 ? 3 * Math.PI / 2 : 0);
+  const endAngle   = dx > 0 ? (dy > 0 ? 3 * Math.PI / 2 : Math.PI)
+                             : (dy > 0 ? 0 : Math.PI / 2);
+  const anticlockwise = dy > 0;
   ctx.save();
-  ctx.fillStyle = SEA_BORDER_COLOR;
+  ctx.fillStyle = waterColor;
   ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.arc(cx, cy, r, _startAngle, _startAngle + Math.PI / 2);
+  ctx.moveTo(icx, icy);
+  ctx.arc(icx, icy, bw, startAngle, endAngle, anticlockwise);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
@@ -356,16 +372,24 @@ function _drawSeaConcaveCorner(
   if (!cardA || !cardB || !diagonalNotSea) return;
   ctx.save();
   ctx.fillStyle = SEA_BORDER_COLOR;
-  // Fill a small square at the corner, then carve out a quarter-circle
   const dx = cx > 0 ? -1 : 1;
   const dy = cy > 0 ? -1 : 1;
-  ctx.fillRect(cx, cy, dx * r, dy * r);
-  // Cut the arc to make the concave shape
-  ctx.globalCompositeOperation = 'destination-out';
+  // Arc centre is inset from the outer tile corner by r in each direction.
+  const arcCx = cx + dx * r;
+  const arcCy = cy + dy * r;
+  // Arc goes from one inner edge point to the other via the outer-corner
+  // direction, tracing the concave boundary of the notch shape.
+  // Start: point on top/bottom edge inner → (cx+dx*r, cy)
+  // End:   point on left/right edge inner → (cx, cy+dy*r)
+  const startAngle = dy > 0 ? 3 * Math.PI / 2 : Math.PI / 2;
+  const endAngle   = dx > 0 ? Math.PI : 0;
+  const anticlockwise = dx * dy > 0;
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + dx * r, cy);
+  ctx.arc(arcCx, arcCy, r, startAngle, endAngle, anticlockwise);
+  ctx.closePath();
   ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
 }
 
@@ -397,8 +421,8 @@ function _drawSeaRipple(
   ctx.moveTo(-rw / 2, 0);
   // Two peaks at 1/4 and 3/4 of the ripple width
   const peakH = maxH * t;
-  ctx.quadraticCurveTo(-rw / 4, -peakH, 0, 0);
-  ctx.quadraticCurveTo(rw / 4, -peakH, rw / 2, 0);
+  ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);
+  ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);
   ctx.stroke();
   ctx.restore();
 }
