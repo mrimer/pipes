@@ -67,7 +67,6 @@ export interface CampaignCallbacks {
   readonly levelHeaderEl: HTMLElement;
   readonly levelListEl: HTMLElement;
   readonly winModalEl: HTMLElement;
-  readonly winMenuBtnEl: HTMLButtonElement;
   readonly winNextBtnEl: HTMLButtonElement;
   readonly exitBtnEl: HTMLButtonElement;
   readonly gameoverMenuBtnEl: HTMLButtonElement;
@@ -219,7 +218,6 @@ export class CampaignManager {
         onShowLevelSelect: () => this._callbacks.showLevelSelect(),
         onLevelSelected: (levelDef) => {
           this._winFromChapterMap = true;
-          this._callbacks.winMenuBtnEl.textContent = 'Chapter Map';
           this._callbacks.exitBtnEl.textContent = '← Chapter Map';
 
           // Capture minimap screen rect AND a canvas snapshot BEFORE startLevel
@@ -312,7 +310,6 @@ export class CampaignManager {
       this._pendingLevelId = null;
       this._callbacks.winModalEl.style.display = 'none';
       this._winFromChapterMap = true;
-      this._callbacks.winMenuBtnEl.textContent = 'Chapter Map';
       this.showChapterMap(chapters.indexOf(currentChapter));
       return;
     }
@@ -328,7 +325,6 @@ export class CampaignManager {
         this._pendingLevelId = null;
         this._callbacks.winModalEl.style.display = 'none';
         this._winFromChapterMap = true;
-        this._callbacks.winMenuBtnEl.textContent = 'Chapter Map';
         this.showChapterMap(chapterIdx);
         this._showNewChapterModal(chapterIdx, nextChapter);
       } else {
@@ -576,9 +572,8 @@ export class CampaignManager {
       this._callbacks.setLevelSelectVisible(false);
       this._campaignEditor.showAndRestore();
     };
-    this._callbacks.winMenuBtnEl.textContent = '↩ Return to Editor';
+    this._callbacks.winNextBtnEl.textContent = '↩ Return to Editor';
     this._callbacks.gameoverMenuBtnEl.textContent = '↩ Return to Editor';
-    this._callbacks.winNextBtnEl.style.display = 'none';
     this._callbacks.exitBtnEl.textContent = '← Edit';
     this._callbacks.startLevelDef(level);
   }

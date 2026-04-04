@@ -50,6 +50,14 @@ const CHAPTER_MAP_GRID_OVERHEAD =
   CHAPTER_MAP_INSTRUCTION_H + CHAPTER_MAP_STATUS_H + CHAPTER_MAP_ERROR_H +
   6 * CHAPTER_MAP_GAP + CHAPTER_MAP_PADDING;
 
+// ─── Canvas border constants ──────────────────────────────────────────────────
+
+/** CSS border-width (px) on the chapter map canvas element. */
+const CHAPTER_MAP_CANVAS_BORDER_PX = 2;
+/** Default CSS border-color on the chapter map canvas element. */
+const CHAPTER_MAP_CANVAS_BORDER_COLOR = '#4a90d9';
+/** CSS border-radius (px) on the chapter map canvas element. */
+const CHAPTER_MAP_CANVAS_BORDER_RADIUS = 6;
 
 /** Callbacks that the chapter map screen uses to interact with the rest of the game. */
 export interface ChapterMapCallbacks {
@@ -149,6 +157,12 @@ export class ChapterMapScreen {
    * Each entry records which cell is jittering and when the animation started.
    */
   private _jitterAnims: Array<{ row: number; col: number; startedAt: number }> = [];
+  /**
+   * Current canvas border color – default blue, animated gold when the chapter
+   * is mastered. Tracked here so captureCanvasSnapshot() can include the border
+   * in the snapshot image.
+   */
+  private _borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
   private static readonly VORTEX_SPAWN_INTERVAL_MS  = 80;
   private static readonly SPRAY_SPAWN_INTERVAL_MS   = 150;
   private static readonly FLOW_SPAWN_INTERVAL_MS    = 350;
@@ -248,13 +262,19 @@ export class ChapterMapScreen {
     );
 
     // Convert canvas-space → screen-space using the canvas bounding rect.
+    // The canvas has a CSS border (CHAPTER_MAP_CANVAS_BORDER_PX wide on each side);
+    // getBoundingClientRect() returns the border-box, so we subtract the border from
+    // the dimensions and add it to the origin to get the true content area in screen space.
     const rect = canvas.getBoundingClientRect();
-    const cssScaleX = rect.width / canvas.width;
-    const cssScaleY = rect.height / canvas.height;
+    const border = CHAPTER_MAP_CANVAS_BORDER_PX;
+    const contentW = rect.width - 2 * border;
+    const contentH = rect.height - 2 * border;
+    const cssScaleX = contentW / canvas.width;
+    const cssScaleY = contentH / canvas.height;
 
     return {
-      x: rect.left + mx * cssScaleX,
-      y: rect.top + my * cssScaleY,
+      x: rect.left + border + mx * cssScaleX,
+      y: rect.top + border + my * cssScaleY,
       width: mw * cssScaleX,
       height: mh * cssScaleY,
     };
@@ -279,6 +299,19 @@ export class ChapterMapScreen {
     const ctx = snapshot.getContext('2d');
     if (!ctx) return null;
     ctx.drawImage(canvas, 0, 0);
+
+    // Draw the framing border rounded rectangle on the snapshot so that the
+    // animation overlay includes the border visual.  The CSS canvas border is
+    // outside the content box, but when the snapshot is displayed at cssRect
+    // dimensions (border-box), drawing the border at the canvas pixel edges
+    // aligns it with the CSS border area.  A lineWidth of 4 gives 2 px visible
+    // inside the canvas (the outer 2 px are clipped).
+    ctx.strokeStyle = this._borderColor;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS);
+    ctx.stroke();
 
     return { canvas: snapshot, cssRect };
   }
@@ -897,9 +930,12 @@ export class ChapterMapScreen {
         const t = (Math.sin(now / ChapterMapScreen.GOLD_BORDER_PERIOD) + 1) / 2;  // oscillates 0→1, period ~3.1 s
         const r = Math.round(180 + t * 75);         // 180–255
         const g = Math.round(130 + t * 85);         // 130–215
-        this._canvas.style.borderColor = `rgb(${r},${g},0)`;
+        const color = `rgb(${r},${g},0)`;
+        this._borderColor = color;
+        this._canvas.style.borderColor = color;
       } else {
-        this._canvas.style.borderColor = '#4a90d9';
+        this._borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
+        this._canvas.style.borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
       }
     }
   }

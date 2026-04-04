@@ -17,7 +17,7 @@ import {
 import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
-import { playLevelTransition, ChapterMapSnapshot } from './levelTransition';
+import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -101,7 +101,7 @@ export class Game implements InputCallbacks {
   /** "← Menu" / "← Edit" exit button in the play-screen HUD. */
   private readonly exitBtnEl: HTMLButtonElement;
 
-  /** "Next Level" button in the win modal — hidden while playtesting in the editor. */
+  /** "Next Level" / "Continue" / "Return to Editor" button in the win modal. */
   private readonly winNextBtnEl: HTMLButtonElement;
 
   /** Challenge level indicator element in the win modal. */
@@ -112,9 +112,6 @@ export class Game implements InputCallbacks {
 
   /** Star count display element in the win modal. */
   private readonly winStarsEl: HTMLElement | null;
-
-  /** "Level Select" / "Return to Editor" button in the win modal. */
-  private readonly winMenuBtnEl: HTMLButtonElement;
 
   /** "Level Select" / "Return to Editor" button in the gameover modal. */
   private readonly gameoverMenuBtnEl: HTMLButtonElement;
@@ -226,7 +223,6 @@ export class Game implements InputCallbacks {
     this.winChallengeEl = winModalEl.querySelector<HTMLElement>('#win-challenge');
     this.winWaterEl = winModalEl.querySelector<HTMLElement>('#win-water');
     this.winStarsEl = winModalEl.querySelector<HTMLElement>('#win-stars');
-    this.winMenuBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-menu-btn')!;
     this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
 
     // Load persisted completions
@@ -319,7 +315,6 @@ export class Game implements InputCallbacks {
       levelHeaderEl: this.levelHeaderEl,
       levelListEl: this.levelListEl,
       winModalEl: this.winModalEl,
-      winMenuBtnEl: this.winMenuBtnEl,
       winNextBtnEl: this.winNextBtnEl,
       exitBtnEl: this.exitBtnEl,
       gameoverMenuBtnEl: this.gameoverMenuBtnEl,
@@ -365,12 +360,11 @@ export class Game implements InputCallbacks {
     clearStarSparkles();
     // Clear particle arrays so stale drops don't persist on the level-select screen.
     this._animMgr.clearAll();
-    // Reset modal menu button labels in case they were changed for playtesting.
-    this.winMenuBtnEl.textContent = 'Level Select';
+    // Reset modal button labels in case they were changed for playtesting.
+    this.winNextBtnEl.textContent = 'Continue';
     this.gameoverMenuBtnEl.textContent = 'Level Select';
-    // Restore the "Next Level" button visibility in case it was hidden for playtesting.
-    this.winNextBtnEl.style.display = '';
     // Reset HUD exit button label in case it was changed for playtesting.
+    this.exitBtnEl.textContent = '← Menu';
     this.exitBtnEl.textContent = '← Menu';
     this._campaign.renderLevelList();
     // Scroll the active level's row into view near the center of the viewport.
@@ -1276,11 +1270,56 @@ export class Game implements InputCallbacks {
       cb(); // re-open the campaign editor
     } else if (this._campaign.winFromChapterMap && this._campaign.chapterMapScreen?.chapter) {
       this._campaign.winFromChapterMap = false;
-      this.levelSelectEl.style.display = 'none';
-      this.playScreenEl.style.display = 'none';
       this.winModalEl.style.display = 'none';
+      this._exitConfirmModalEl.style.display = 'none';
+      // Cancel any pending ring spawning before leaving the play screen.
+      this._cancelPendingRings();
+
+      // Pre-render the board snapshot at the current game TILE_SIZE BEFORE
+      // reshowChapterMap() changes TILE_SIZE to the chapter-map tile size.
+      let boardSnapshot: HTMLCanvasElement | null = null;
+      if (this.board) {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = this.board.cols * TILE_SIZE;
+        offscreen.height = this.board.rows * TILE_SIZE;
+        const offCtx = offscreen.getContext('2d');
+        if (offCtx) {
+          renderBoard(offCtx, offscreen, this.board, { ...this.board.source }, null, 0, null);
+          boardSnapshot = offscreen;
+        }
+      }
+
+      // Reshow the chapter map (restores chapter-map TILE_SIZE and renders the canvas).
       this._campaign.reshowChapterMap();
       this.screen = GameScreen.ChapterMap;
+
+      // Compute the minimap screen rect for the current level (uses chapter-map TILE_SIZE).
+      const chapterMapScreen = this._campaign.chapterMapScreen!;
+      const minimapRect = this.currentLevel
+        ? chapterMapScreen.getMinimapScreenRect(this.currentLevel)
+        : null;
+
+      if (minimapRect && boardSnapshot) {
+        // Play zoom-out animation: level snapshot shrinks back to minimap position.
+        chapterMapScreen.screenEl.style.opacity = '0';
+        playLevelExitTransition(
+          minimapRect,
+          chapterMapScreen.screenEl,
+          this.canvas,
+          boardSnapshot,
+          this.playScreenEl,
+          () => {
+            // Animation complete: hide the play screen and clean up.
+            this.playScreenEl.style.display = 'none';
+            this.currentLevel = null;
+          },
+        );
+      } else {
+        // No minimap or snapshot available – skip animation and switch immediately.
+        this.levelSelectEl.style.display = 'none';
+        this.playScreenEl.style.display = 'none';
+        this.currentLevel = null;
+      }
     } else {
       this._showLevelSelect();
     }

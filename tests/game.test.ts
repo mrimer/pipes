@@ -94,7 +94,7 @@ function makeGame(): {
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>
     </div>
-    <div id="win-modal"><p id="win-water" style="display:none;"></p><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
+    <div id="win-modal"><p id="win-water" style="display:none;"></p><button id="win-next-btn">Continue</button></div>
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
 
@@ -246,21 +246,21 @@ describe('Game – playtest mode button labels', () => {
     expect(exitBtnEl.textContent).toBe('← Menu');
   });
 
-  it('hides the "Next Level" button in the win modal when playtesting from the editor', () => {
+  it('sets the "Continue" button text to "↩ Return to Editor" when playtesting from the editor', () => {
     const { game, winNextBtnEl } = makeGame();
 
     gameHooks(game)._playtestLevel(LEVELS[0]);
 
-    expect(winNextBtnEl.style.display).toBe('none');
+    expect(winNextBtnEl.textContent).toBe('↩ Return to Editor');
   });
 
-  it('restores the "Next Level" button visibility when exitToMenu is called after playtesting', () => {
+  it('resets the "Continue" button text when exitToMenu is called after playtesting', () => {
     const { game, winNextBtnEl } = makeGame();
 
     gameHooks(game)._playtestLevel(LEVELS[0]);
     game.exitToMenu();
 
-    expect(winNextBtnEl.style.display).toBe('');
+    expect(winNextBtnEl.textContent).toBe('Continue');
   });
 });
 
@@ -2377,7 +2377,7 @@ function makeGameWithStorage(): Game {
       <button id="redo-btn"></button>
       <button id="exit-btn">← Menu</button>
     </div>
-    <div id="win-modal"><p id="win-water" style="display:none;"></p><button id="win-next-btn">Next Level ▶</button><button id="win-menu-btn">Level Select</button></div>
+    <div id="win-modal"><p id="win-water" style="display:none;"></p><button id="win-next-btn">Continue</button></div>
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
   const get = (id: string) => document.getElementById(id) as HTMLElement;
