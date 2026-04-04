@@ -346,13 +346,14 @@ export function drawLevelChamberTile(
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
-/** Draw a Source or Sink tile: colored circle + radiating arms to connected edges. */
+/** Draw a Source or Sink tile: tile background, radiating arms with directional chevrons, and a shape-specific centre motif. */
 function _drawChapterMapEndpoint(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   color: string,
   connections: Set<Direction>,
+  isSource: boolean,
   centerText?: string,
   centerTextColor?: string,
   buttEndDirs?: Set<Direction>,
@@ -367,28 +368,84 @@ function _drawChapterMapEndpoint(
 
   ctx.save();
   ctx.translate(cx, cy);
+
+  // Radiating arms to connected directions – drawn first so centre appears on top
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  for (const dir of connections) {
+  // Unit-vector map for each direction
+  const DIRS: [Direction, number, number][] = [
+    [Direction.North, 0, -1],
+    [Direction.South, 0,  1],
+    [Direction.East,  1,  0],
+    [Direction.West, -1,  0],
+  ];
+  for (const [dir, nx, ny] of DIRS) {
+    if (!connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    if (dir === Direction.North) ctx.lineTo(0, -half);
-    else if (dir === Direction.South) ctx.lineTo(0, half);
-    else if (dir === Direction.East) ctx.lineTo(half, 0);
-    else ctx.lineTo(-half, 0);
+    ctx.lineTo(nx * half, ny * half);
+    ctx.stroke();
+    // Directional chevron: outward (▶) for Source, inward (◀) for Sink
+    const d = half * 0.66;
+    const wing = half * 0.13;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (isSource) {
+      ctx.moveTo(nx * (d - wing) - ny * wing, ny * (d - wing) + nx * wing);
+      ctx.lineTo(nx * d, ny * d);
+      ctx.lineTo(nx * (d - wing) + ny * wing, ny * (d - wing) - nx * wing);
+    } else {
+      const tipD = d - wing * 2;
+      ctx.moveTo(nx * d - ny * wing, ny * d + nx * wing);
+      ctx.lineTo(nx * tipD, ny * tipD);
+      ctx.lineTo(nx * d + ny * wing, ny * d - nx * wing);
+    }
     ctx.stroke();
   }
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
-  ctx.fill();
+
+  if (isSource) {
+    // Radial gradient circle – bright glow at centre fading to the tile colour
+    const circleR = half * 0.35;
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(0.5, color);
+    grad.addColorStop(1, color);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
+    ctx.fill();
+    // Outer aperture ring – suggests a nozzle opening
+    ctx.strokeStyle = color;
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    // Sink: bullseye / drain pattern – concentric rings with a solid innermost dot
+    ctx.strokeStyle = color;
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   if (centerText !== undefined) {
     ctx.fillStyle = centerTextColor ?? '#fff';
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = _s(2);
     ctx.fillText(centerText, 0, 0);
+    ctx.shadowBlur = 0;
   }
   ctx.restore();
 }
@@ -407,6 +464,7 @@ function _drawChapterMapSource(
     ctx, x, y,
     isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR,
     connections,
+    true,
     String(completedLevelCount),
     undefined,
     buttEndDirs,
@@ -426,12 +484,12 @@ function _drawChapterMapSink(
   const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
   if (remaining === 0 && isFilled) {
     // Star icon indicates the chapter can be completed by clicking the sink
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, '★', '#f0c040', buttEndDirs);
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, false, '★', '#f0c040', buttEndDirs);
   } else if (remaining === 0) {
     // Not yet connected but requirement already met: show "0"
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, '0', undefined, buttEndDirs);
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, false, '0', undefined, buttEndDirs);
   } else {
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, String(remaining), undefined, buttEndDirs);
+    _drawChapterMapEndpoint(ctx, x, y, color, connections, false, String(remaining), undefined, buttEndDirs);
   }
 }
 

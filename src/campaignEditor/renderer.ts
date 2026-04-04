@@ -648,10 +648,31 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     strokeFillText(ctx, 'GOLD', cx, cy - _s(7));
     strokeFillText(ctx, 'SPACE', cx, cy + _s(7));
   } else if (shape === PipeShape.Source) {
+    // Background fill
     ctx.fillStyle = SOURCE_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
+    // Source motif: radial gradient circle + outer aperture ring
+    ctx.save();
+    ctx.translate(cx, cy);
+    const half = CELL / 2;
+    const circleR = half * 0.35;
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(0.5, SOURCE_COLOR);
+    grad.addColorStop(1, SOURCE_COLOR);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
+    ctx.fill();
+    // Outer aperture ring: semi-transparent white so it shows against the solid bg
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // Text labels overlaid on top
     ctx.fillStyle = '#fff';
-    // In chapter map editor, capacity is not used; only show SOURCE label
     const lines: string[] = ['SOURCE'];
     if (!isChapterMap) {
       lines.push(`cap:${tile.capacity}`);
@@ -671,10 +692,29 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     // Draw connection lines
     drawConnectionLines(ctx, x, y, tile);
   } else if (shape === PipeShape.Sink) {
+    // Background fill
     ctx.fillStyle = SINK_COLOR;
     ctx.fillRect(x, y, CELL, CELL);
+    // Sink motif: bullseye / drain – concentric rings with solid innermost dot
+    ctx.save();
+    ctx.translate(cx, cy);
+    const half = CELL / 2;
+    // Concentric rings: semi-transparent white so they show against the solid bg
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Text labels overlaid on top
     ctx.fillStyle = '#fff';
-    // In chapter map editor, show SINK label and completion value (if set)
     const completionVal = def?.completion;
     if (isChapterMap && completionVal !== undefined && completionVal > 0) {
       ctx.font = `bold ${_s(12)}px Arial`;
