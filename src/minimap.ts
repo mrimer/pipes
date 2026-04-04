@@ -45,6 +45,20 @@ const BORDER_PX = 2;
  */
 const TARGET_SIZE = 60;
 
+/**
+ * Compute the total pixel dimensions (width × height) of a minimap canvas
+ * for a level grid with the given row and column counts.
+ * Includes the surrounding border.
+ */
+export function minimapDimensions(rows: number, cols: number): { width: number; height: number } {
+  const maxDim = Math.max(rows, cols);
+  const px = Math.max(1, Math.floor(TARGET_SIZE / maxDim));
+  return {
+    width: cols * px + 2 * BORDER_PX,
+    height: rows * px + 2 * BORDER_PX,
+  };
+}
+
 /** Returns the fill color to use for a grid tile on the minimap. */
 function tileColor(tile: TileDef | null): string {
   if (!tile || tile.shape === PipeShape.Empty) return EMPTY_COLOR;
@@ -238,14 +252,10 @@ function drawPipeLines(
  *   The canvas is not appended to the DOM; callers should attach it themselves.
  */
 export function renderMinimap(level: LevelDef): HTMLCanvasElement {
+  const { width: totalW, height: totalH } = minimapDimensions(level.rows, level.cols);
   const maxDim = Math.max(level.rows, level.cols);
   // At least 1px per tile; larger for smaller grids, capped so the image stays compact.
   const px = Math.max(1, Math.floor(TARGET_SIZE / maxDim));
-
-  const innerW = level.cols * px;
-  const innerH = level.rows * px;
-  const totalW = innerW + 2 * BORDER_PX;
-  const totalH = innerH + 2 * BORDER_PX;
 
   const canvas = document.createElement('canvas');
   canvas.width = totalW;

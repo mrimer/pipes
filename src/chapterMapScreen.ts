@@ -9,9 +9,9 @@
  */
 
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
-import { TILE_SIZE, _s, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
-import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower } from './visuals/chapterMap';
+import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -242,36 +242,9 @@ export class ChapterMapScreen {
     }
     if (cellRow < 0) return null;
 
-    // Replicate the coordinate math from drawLevelChamberTile + renderMinimap.
-    const CELL = TILE_SIZE;
-    const x = cellCol * CELL;
-    const y = cellRow * CELL;
-    const cx = x + CELL / 2;
-    const cy = y + CELL / 2;
-    const half = CELL / 2;
-    const bw = half * 0.7 + 2;
-    const bh = half * 0.7 + 2;
-    const labelH = _s(16);
-    const boxTop = cy - bh;
-    const contentY = boxTop + labelH;
-    const contentH = bh * 2 - labelH;
-
-    // Minimap dimensions (mirroring renderMinimap constants).
-    const MINIMAP_BORDER_PX = 2;
-    const MINIMAP_TARGET_SIZE = 60;
-    const maxDim = Math.max(levelDef.rows, levelDef.cols);
-    const px = Math.max(1, Math.floor(MINIMAP_TARGET_SIZE / maxDim));
-    const minimapW = levelDef.cols * px + 2 * MINIMAP_BORDER_PX;
-    const minimapH = levelDef.rows * px + 2 * MINIMAP_BORDER_PX;
-
-    // Scale to fit in the chamber content area.
-    const maxW = bw * 2 - _s(6);
-    const maxH = contentH - _s(6);
-    const scale = Math.min(maxW / minimapW, maxH / minimapH, 1);
-    const mw = Math.round(minimapW * scale);
-    const mh = Math.round(minimapH * scale);
-    const mx = Math.round(cx - mw / 2);
-    const my = contentY + Math.round((contentH - mh) / 2);
+    const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(
+      cellCol * TILE_SIZE, cellRow * TILE_SIZE, levelDef
+    );
 
     // Convert canvas-space → screen-space using the canvas bounding rect.
     const rect = canvas.getBoundingClientRect();
