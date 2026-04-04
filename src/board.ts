@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation, COLD_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
@@ -1047,7 +1047,6 @@ export class Board {
       this._turnState.lockedWaterImpact,
       this._turnState.connectionTurn,
       this._turnState.turnNumber,
-      this.sourceCapacity,
     );
   }
 
@@ -1130,7 +1129,6 @@ export class Board {
       this._turnState.lockedWaterImpact,
       this._turnState.connectionTurn,
       this._turnState.turnNumber,
-      this.sourceCapacity,
     );
   }
 

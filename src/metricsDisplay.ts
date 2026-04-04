@@ -1,6 +1,6 @@
 /** Metrics display component for the play-screen HUD stats and best-score box. */
 
-import { Board, GOLD_PIPE_SHAPES } from './board';
+import { Board } from './board';
 import { PipeShape } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { renderInventoryBar } from './inventoryRenderer';

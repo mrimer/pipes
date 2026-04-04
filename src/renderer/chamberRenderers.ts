@@ -25,7 +25,7 @@ import {
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
 } from '../colors';
-import { TILE_SIZE, LINE_WIDTH, _s } from './rendererState';
+import { LINE_WIDTH, _s } from './rendererState';
 
 // ---------------------------------------------------------------------------
 // Internal content drawers (not exported)

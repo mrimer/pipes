@@ -8,7 +8,7 @@
  */
 
 import { TileDef, InventoryItem, PipeShape, Direction, Rotation, LevelDef } from '../types';
-import { PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
+import { SPIN_CEMENT_SHAPES } from '../board';
 import {
   EditorPalette,
   EditorSnapshot,

@@ -343,7 +343,6 @@ export function renderLevelList(
         },
         { completedInChapter: 0, nonChallengeInChapter: 0, nonChallengeCompleted: 0, challengeInChapter: 0, challengeCompleted: 0 },
       );
-    const totalInChapter = chapter.levels.length;
     const allLevelsCompleted = nonChallengeInChapter > 0 && nonChallengeCompleted >= nonChallengeInChapter;
 
     // Compute star totals for this chapter

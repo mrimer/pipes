@@ -646,12 +646,6 @@ export class ChapterMapScreen {
       const completedChapters = this._callbacks.getCompletedChapters?.();
       const campaign = this._callbacks.getActiveCampaign?.();
       const isAlreadyCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
-      const campaignId = this._callbacks.getActiveCampaignId();
-      const levelStarsData = loadLevelStars(campaignId ?? undefined);
-      const chLevels = chapter.levels;
-      const starsCollectedStatus = chLevels.reduce((sum, l) => sum + Math.min(levelStarsData[l.id] ?? 0, l.starCount ?? 0), 0);
-      const starsTotalStatus = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
-      const isMastered = starsTotalStatus === 0 || starsCollectedStatus >= starsTotalStatus;
       if (isAlreadyCompleted) {
         this._statusEl.innerHTML = ''; // "Complete"/"Mastered!" is already shown in the stats bar
       } else {
