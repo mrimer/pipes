@@ -316,7 +316,10 @@ export class ChapterMapScreen {
     ctx.lineWidth   = 2 * bCanvas;
     ctx.lineJoin    = 'round';
     ctx.beginPath();
-    ctx.roundRect(bCanvas, bCanvas, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS);
+    // Subtract bCanvas from the path radius so the OUTER edge of the stroke
+    // lands at radius CHAPTER_MAP_CANVAS_BORDER_RADIUS from the canvas corner,
+    // matching the CSS border-radius on the live canvas element exactly.
+    ctx.roundRect(bCanvas, bCanvas, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS - bCanvas);
     ctx.stroke();
 
     // Draw the original chapter-map content inset by bCanvas pixels so that
