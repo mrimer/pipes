@@ -50,6 +50,18 @@ export interface CampaignCallbacks {
   /** Show or hide the play-screen element. */
   setPlayScreenVisible(visible: boolean): void;
 
+  /**
+   * Play the zoom transition from the chapter-map minimap to the full game canvas.
+   * @param minimapRect  Screen-space rect of the minimap on the chapter map.
+   * @param chapterMapEl The chapter-map overlay element.
+   * @param onComplete   Called when the animation finishes.
+   */
+  playLevelTransition(
+    minimapRect: { x: number; y: number; width: number; height: number },
+    chapterMapEl: HTMLElement,
+    onComplete: () => void,
+  ): void;
+
   // ── DOM elements that CampaignManager reads/writes ──────────────────────
   readonly levelHeaderEl: HTMLElement;
   readonly levelListEl: HTMLElement;
@@ -208,12 +220,28 @@ export class CampaignManager {
           this._winFromChapterMap = true;
           this._callbacks.winMenuBtnEl.textContent = 'Chapter Map';
           this._callbacks.exitBtnEl.textContent = '← Chapter Map';
+
+          // Capture minimap screen rect BEFORE startLevel hides the chapter map.
+          const minimapRect = this._chapterMapScreen?.getMinimapScreenRect(levelDef) ?? null;
+
           if (levelDef.challenge) {
             this._pendingLevelId = levelDef.id;
-            this._callbacks.startLevel(levelDef.id);
+          }
+
+          this._callbacks.startLevel(levelDef.id);
+
+          if (minimapRect) {
+            this._callbacks.playLevelTransition(
+              minimapRect,
+              this._chapterMapScreen!.screenEl,
+              () => {
+                if (levelDef.challenge) {
+                  this._showChallengeLevelModal(false);
+                }
+              },
+            );
+          } else if (levelDef.challenge) {
             this._showChallengeLevelModal(false);
-          } else {
-            this._callbacks.startLevel(levelDef.id);
           }
         },
         getActiveCampaign: () => this._activeCampaign,

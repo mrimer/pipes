@@ -9,7 +9,7 @@
  */
 
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
-import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, _s, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
@@ -206,6 +206,85 @@ export class ChapterMapScreen {
 
   /** Index (within the campaign) of the chapter currently displayed. */
   get chapterIdx(): number { return this._chapterIdx; }
+
+  /**
+   * Compute the screen-space bounding rectangle of the minimap image drawn
+   * inside the level chamber tile for the given level definition.
+   *
+   * Returns `null` if the chapter or canvas is not available, or the level
+   * cannot be found on the grid.
+   */
+  getMinimapScreenRect(levelDef: LevelDef): { x: number; y: number; width: number; height: number } | null {
+    const chapter = this._chapter;
+    const canvas = this._canvas;
+    if (!chapter?.grid || !canvas) return null;
+
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+
+    // Find the grid cell containing this level.
+    let cellRow = -1, cellCol = -1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const def = chapter.grid[r]?.[c];
+        if (
+          def?.shape === PipeShape.Chamber &&
+          def.chamberContent === 'level' &&
+          def.levelIdx !== undefined &&
+          chapter.levels[def.levelIdx] === levelDef
+        ) {
+          cellRow = r;
+          cellCol = c;
+          break;
+        }
+      }
+      if (cellRow >= 0) break;
+    }
+    if (cellRow < 0) return null;
+
+    // Replicate the coordinate math from drawLevelChamberTile + renderMinimap.
+    const CELL = TILE_SIZE;
+    const x = cellCol * CELL;
+    const y = cellRow * CELL;
+    const cx = x + CELL / 2;
+    const cy = y + CELL / 2;
+    const half = CELL / 2;
+    const bw = half * 0.7 + 2;
+    const bh = half * 0.7 + 2;
+    const labelH = _s(16);
+    const boxTop = cy - bh;
+    const contentY = boxTop + labelH;
+    const contentH = bh * 2 - labelH;
+
+    // Minimap dimensions (mirroring renderMinimap constants).
+    const MINIMAP_BORDER_PX = 2;
+    const MINIMAP_TARGET_SIZE = 60;
+    const maxDim = Math.max(levelDef.rows, levelDef.cols);
+    const px = Math.max(1, Math.floor(MINIMAP_TARGET_SIZE / maxDim));
+    const minimapW = levelDef.cols * px + 2 * MINIMAP_BORDER_PX;
+    const minimapH = levelDef.rows * px + 2 * MINIMAP_BORDER_PX;
+
+    // Scale to fit in the chamber content area.
+    const maxW = bw * 2 - _s(6);
+    const maxH = contentH - _s(6);
+    const scale = Math.min(maxW / minimapW, maxH / minimapH, 1);
+    const mw = Math.round(minimapW * scale);
+    const mh = Math.round(minimapH * scale);
+    const mx = Math.round(cx - mw / 2);
+    const my = contentY + Math.round((contentH - mh) / 2);
+
+    // Convert canvas-space → screen-space using the canvas bounding rect.
+    const rect = canvas.getBoundingClientRect();
+    const cssScaleX = rect.width / canvas.width;
+    const cssScaleY = rect.height / canvas.height;
+
+    return {
+      x: rect.left + mx * cssScaleX,
+      y: rect.top + my * cssScaleY,
+      width: mw * cssScaleX,
+      height: mh * cssScaleY,
+    };
+  }
 
   /**
    * Populate the screen with the given chapter and make it visible.

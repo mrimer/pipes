@@ -17,6 +17,7 @@ import {
 import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
+import { playLevelTransition } from './levelTransition';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -291,6 +292,19 @@ export class Game implements InputCallbacks {
       setScreen: (s) => { this.screen = s; },
       setLevelSelectVisible: (v) => { this.levelSelectEl.style.display = v ? 'flex' : 'none'; },
       setPlayScreenVisible: (v) => { this.playScreenEl.style.display = v ? 'flex' : 'none'; },
+      playLevelTransition: (minimapRect, chapterMapEl, onComplete) => {
+        if (!this.board) { onComplete(); return; }
+        // Force-render the board so the game canvas has the level content.
+        this._renderBoard();
+        playLevelTransition(
+          minimapRect,
+          this.canvas,
+          this.board,
+          chapterMapEl,
+          this.playScreenEl,
+          onComplete,
+        );
+      },
       levelHeaderEl: this.levelHeaderEl,
       levelListEl: this.levelListEl,
       winModalEl: this.winModalEl,
