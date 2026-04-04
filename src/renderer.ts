@@ -298,6 +298,14 @@ export function drawSea(
   if (!neighbors.west)  ctx.fillRect(-half, -half, bw, half * 2);
   if (!neighbors.east)  ctx.fillRect(half - bw, -half, bw, half * 2);
 
+  // Outer corners: when two adjacent edges are both sea but their shared
+  // diagonal is not, fill the bw×bw corner square that would otherwise be
+  // left uncovered.
+  if (neighbors.north && neighbors.west && !neighbors.nw) ctx.fillRect(-half, -half, bw, bw);
+  if (neighbors.north && neighbors.east && !neighbors.ne) ctx.fillRect(half - bw, -half, bw, bw);
+  if (neighbors.south && neighbors.west && !neighbors.sw) ctx.fillRect(-half, half - bw, bw, bw);
+  if (neighbors.south && neighbors.east && !neighbors.se) ctx.fillRect(half - bw, half - bw, bw, bw);
+
   // ── Ripple effects ──────────────────────────────────────────────────────
   _drawSeaRipple(ctx, half, -half * 0.3, -half * 0.25, now, 0);
   _drawSeaRipple(ctx, half, half * 0.2, half * 0.3, now, 800);
@@ -328,16 +336,23 @@ function _drawSeaRipple(
   ctx.lineCap = 'round';
 
   ctx.beginPath();
-  // Two full arches in the middle, flanked by half-arches at each end.
-  // Pushing the end control points to the outer edge of each segment (same x
-  // as the start/end point) shifts the arch peak to the boundary, so only one
-  // side of the arch profile is visible – giving a genuine half-arch shape.
+  // Wave layout: two full inner arches flanked by half-arches at each end.
+  // Half-arches are half the width of each inner arch so they look like the
+  // visible portion of a wave whose other half is off-screen.
+  // Control points sit at the horizontal centre of each arch so the tangent
+  // at the outer endpoints is angled rather than vertical, keeping the ends
+  // visually pinned at the baseline through the full animation cycle.
+  //
+  // Widths: inner arch = 2*rw/3, half-arch = rw/3.  Total span = 2*rw.
+  // X boundaries (left→right): -rw, -2rw/3, 0, 2rw/3, rw.
   const peakH = maxH * t;
+  const hw = rw / 3;          // half-arch width
+  const iw = (2 * rw) / 3;   // inner arch width
   ctx.moveTo(-rw, 0);
-  ctx.quadraticCurveTo(-rw, peakH, -rw / 2, 0);       // left half-arch (peak at left edge)
-  ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);          // first main arch
-  ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);      // second main arch
-  ctx.quadraticCurveTo(rw, peakH, rw, 0);              // right half-arch (peak at right edge)
+  ctx.quadraticCurveTo(-rw + hw / 2, peakH,        -rw + hw,       0);  // left half-arch
+  ctx.quadraticCurveTo(-rw + hw + iw / 2, peakH,   -rw + hw + iw,  0);  // inner arch 1
+  ctx.quadraticCurveTo(iw / 2, peakH,               2 * rw / 3,    0);  // inner arch 2
+  ctx.quadraticCurveTo(2 * rw / 3 + hw / 2, peakH,  rw,            0);  // right half-arch
   ctx.stroke();
   ctx.restore();
 }
