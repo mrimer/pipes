@@ -592,7 +592,7 @@ export class ChapterMapEditorSection {
     // Update focused tile and rebuild params panel
     this._chapterFocusedTilePos = pos;
     const existingParams = document.getElementById('chapter-tile-params-panel');
-    if (existingParams) existingParams.replaceWith(this._ui!.buildTileParamsPanel(chapter, campaign));
+    if (existingParams && this._ui) existingParams.replaceWith(this._ui.buildTileParamsPanel(chapter, campaign));
 
     this._recordChapterSnapshot(chapter);
     this._saveChapterGridState(chapter, campaign);
