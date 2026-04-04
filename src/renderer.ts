@@ -328,14 +328,16 @@ function _drawSeaRipple(
   ctx.lineCap = 'round';
 
   ctx.beginPath();
-  // Two full arches in the middle, flanked by half-height arches at each end
-  // to give the wave a natural tapering entry and exit at the baseline.
+  // Two full arches in the middle, flanked by half-arches at each end.
+  // Pushing the end control points to the outer edge of each segment (same x
+  // as the start/end point) shifts the arch peak to the boundary, so only one
+  // side of the arch profile is visible – giving a genuine half-arch shape.
   const peakH = maxH * t;
   ctx.moveTo(-rw, 0);
-  ctx.quadraticCurveTo(-3 * rw / 4, peakH / 2, -rw / 2, 0);  // left half-arch
-  ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);                  // first main arch
-  ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);              // second main arch
-  ctx.quadraticCurveTo(3 * rw / 4, peakH / 2, rw, 0);          // right half-arch
+  ctx.quadraticCurveTo(-rw, peakH, -rw / 2, 0);       // left half-arch (peak at left edge)
+  ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);          // first main arch
+  ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);      // second main arch
+  ctx.quadraticCurveTo(rw, peakH, rw, 0);              // right half-arch (peak at right edge)
   ctx.stroke();
   ctx.restore();
 }
