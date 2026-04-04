@@ -293,36 +293,48 @@ export class ChapterMapScreen {
     if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
     const fullRect = canvas.getBoundingClientRect();
 
+    // Compute the CSS-to-canvas scale so we know how many canvas pixels
+    // correspond to the CSS border width.  Guard against a zero content size.
+    const border = CHAPTER_MAP_CANVAS_BORDER_PX;
+    const contentW = fullRect.width  - 2 * border;
+    const contentH = fullRect.height - 2 * border;
+    if (contentW <= 0 || contentH <= 0) return null;
+    const cssScale = contentW / canvas.width; // CSS px per canvas px (same for both axes)
+    const bCanvas  = border / cssScale;       // CSS border width expressed in canvas pixels
+
+    // Create a snapshot canvas expanded by bCanvas on each side so the full
+    // framing border fits inside without clipping.
+    const snapW = Math.round(canvas.width  + 2 * bCanvas);
+    const snapH = Math.round(canvas.height + 2 * bCanvas);
     const snapshot = document.createElement('canvas');
-    snapshot.width  = canvas.width;
-    snapshot.height = canvas.height;
+    snapshot.width  = snapW;
+    snapshot.height = snapH;
     const ctx = snapshot.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(canvas, 0, 0);
 
-    // Draw the framing border rounded rectangle on the snapshot so that the
-    // animation overlay includes the border visual.  The CSS canvas border is
-    // outside the content box; drawing at the canvas pixel edges places it at
-    // the content boundary, matching the visual position of the CSS border.
-    // A lineWidth of 4 gives 2 px visible inside the canvas (the outer 2 px
-    // are clipped), matching the 2 px CSS border width.
+    // Draw the original chapter-map content inset by bCanvas pixels so that
+    // the grid tiles occupy the same relative area within the expanded canvas.
+    ctx.drawImage(canvas, bCanvas, bCanvas);
+
+    // Draw the framing border centered on the content boundary.  Half the
+    // stroke (bCanvas px) falls inside the grid area, half in the expanded
+    // border zone – giving a fully-visible, unclipped stroke.
     ctx.strokeStyle = this._borderColor;
-    ctx.lineWidth = 4;
-    ctx.lineJoin = 'round';
+    ctx.lineWidth   = 2 * bCanvas;
+    ctx.lineJoin    = 'round';
     ctx.beginPath();
-    ctx.roundRect(0, 0, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS);
+    ctx.roundRect(bCanvas, bCanvas, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS);
     ctx.stroke();
 
-    // Use the content-area rect (excluding the CSS border) so the snapshot is
-    // displayed at exactly the same pixel scale as the chapter map canvas tiles.
-    // Using the full border-box rect would stretch the snapshot slightly, causing
-    // the grid tiles to appear at a subtly different size in the overlay.
-    const border = CHAPTER_MAP_CANVAS_BORDER_PX;
+    // Use the full border-box rect so the expanded snapshot is positioned to
+    // cover exactly the same screen area as the original canvas element
+    // (content + border).  The grid-tile scale is unchanged: the snapshot's
+    // canvas pixel count and its CSS display size both grow by the same amount.
     const cssRect = {
-      left:   fullRect.left   + border,
-      top:    fullRect.top    + border,
-      width:  fullRect.width  - 2 * border,
-      height: fullRect.height - 2 * border,
+      left:   fullRect.left,
+      top:    fullRect.top,
+      width:  fullRect.width,
+      height: fullRect.height,
     };
 
     return { canvas: snapshot, cssRect };

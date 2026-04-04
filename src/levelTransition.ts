@@ -35,11 +35,13 @@ export interface ScreenRect {
  * fade-out lines up precisely with what the player was looking at.
  */
 export interface ChapterMapSnapshot {
-  /** Canvas element containing a pixel copy of the chapter map grid. */
+  /** Canvas element containing a pixel copy of the chapter map grid, expanded
+   *  by the CSS border width on each side so the full framing border is
+   *  included without clipping. */
   canvas: HTMLCanvasElement;
-  /** Viewport-relative CSS content-area rect of the original chapter map
-   *  canvas (CSS border excluded – use this to position the snapshot at the
-   *  same pixel scale as the live canvas). */
+  /** Viewport-relative CSS border-box rect of the original chapter map canvas
+   *  (content + border).  Position the snapshot element at this rect so it
+   *  overlays the original canvas exactly at the same pixel scale. */
   cssRect: { left: number; top: number; width: number; height: number };
 }
 
