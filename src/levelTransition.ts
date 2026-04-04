@@ -9,8 +9,10 @@
 
 import { Board } from './board';
 import { TILE_SIZE, renderBoard } from './renderer';
-import { GridPos, PipeShape } from './types';
+import { GridPos } from './types';
 
+/** Width (px) of the CSS border around the game canvas (#game-canvas). */
+const GAME_CANVAS_BORDER_PX = 3;
 /** Duration of the zoom transition in milliseconds. */
 const TRANSITION_DURATION_MS = 1000;
 
@@ -69,18 +71,17 @@ export function playLevelTransition(
 
   // Render a clean board snapshot (no hover, no selection, no highlights).
   const defaultFocus: GridPos = { ...board.source };
-  renderBoard(offCtx, offscreen, board, defaultFocus, null as unknown as PipeShape | null, 0, null);
+  renderBoard(offCtx, offscreen, board, defaultFocus, null, 0, null);
 
   // ── 2. Compute the target rect (where the game canvas content area is) ──
 
   const canvasRect = gameCanvas.getBoundingClientRect();
-  // The game canvas has a 3px CSS border; the content area is inset by that.
-  const borderPx = 3;
+  // The game canvas has a CSS border; the content area is inset by that amount.
   const targetRect: ScreenRect = {
-    x: canvasRect.left + borderPx,
-    y: canvasRect.top + borderPx,
-    width: canvasRect.width - 2 * borderPx,
-    height: canvasRect.height - 2 * borderPx,
+    x: canvasRect.left + GAME_CANVAS_BORDER_PX,
+    y: canvasRect.top + GAME_CANVAS_BORDER_PX,
+    width: canvasRect.width - 2 * GAME_CANVAS_BORDER_PX,
+    height: canvasRect.height - 2 * GAME_CANVAS_BORDER_PX,
   };
 
   // ── 3. Create a fixed-position overlay to host the animating snapshot ────
