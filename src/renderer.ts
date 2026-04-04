@@ -336,12 +336,16 @@ function _drawSeaRipple(
   ctx.lineCap = 'round';
 
   ctx.beginPath();
-  // Wave layout: two full inner arches flanked by half-arches at each end.
-  // Half-arches are half the width of each inner arch so they look like the
-  // visible portion of a wave whose other half is off-screen.
-  // Control points sit at the horizontal centre of each arch so the tangent
-  // at the outer endpoints is angled rather than vertical, keeping the ends
-  // visually pinned at the baseline through the full animation cycle.
+  // Wave layout: two full inner arches flanked by true half-arches at each end.
+  //
+  // The outer half-arches are genuine half-waves: they rise from baseline to
+  // the peak (left) or descend from the peak to baseline (right).  Their
+  // outer endpoints stay fixed at y = 0 throughout the animation so the
+  // ripple appears to emerge smoothly from flat water.
+  //
+  // Inner arches connect peak-to-peak, dipping down to baseline at their
+  // midpoints (the quadratic control point is placed at y = −peakH so
+  // the curve touches y = 0 at t = 0.5).
   //
   // Widths: inner arch = 2*rw/3, half-arch = rw/3.  Total span = 2*rw.
   // X boundaries (left→right): -rw, -2rw/3, 0, 2rw/3, rw.
@@ -349,10 +353,17 @@ function _drawSeaRipple(
   const hw = rw / 3;          // half-arch width
   const iw = (2 * rw) / 3;   // inner arch width
   ctx.moveTo(-rw, 0);
-  ctx.quadraticCurveTo(-rw + hw / 2, peakH,       -rw + hw,        0);  // left half-arch
-  ctx.quadraticCurveTo(-rw + hw + iw / 2, peakH,  -rw + hw + iw,   0);  // inner arch 1
-  ctx.quadraticCurveTo(-rw + hw + iw + iw / 2, peakH, -rw + hw + 2 * iw, 0);  // inner arch 2
-  ctx.quadraticCurveTo(-rw + hw + 2 * iw + hw / 2, peakH, rw,      0);  // right half-arch
+  // Left half-arch: baseline → peak.  CP at (-rw, peakH) gives a vertical
+  // departure from baseline and a horizontal arrival at the peak.
+  ctx.quadraticCurveTo(-rw, peakH,                      -rw + hw, peakH);
+  // Inner arch 1: peak → baseline → peak.  CP y = -peakH makes the curve
+  // touch baseline exactly at its horizontal midpoint.
+  ctx.quadraticCurveTo(-rw + hw + iw / 2, -peakH,       -rw + hw + iw, peakH);
+  // Inner arch 2: peak → baseline → peak (same shape).
+  ctx.quadraticCurveTo(-rw + hw + iw + iw / 2, -peakH,  rw - hw, peakH);
+  // Right half-arch: peak → baseline.  CP at (rw, peakH) gives a horizontal
+  // departure from the peak and a vertical arrival at baseline.
+  ctx.quadraticCurveTo(rw, peakH,                        rw, 0);
   ctx.stroke();
   ctx.restore();
 }
