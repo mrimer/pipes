@@ -13,7 +13,7 @@ export let LINE_WIDTH = 10;
 export let TILE_SIZE = 64; // px
 
 /** Base tile size used as the reference for all pixel-value scaling. */
-const BASE_TILE_SIZE = 64;
+export const BASE_TILE_SIZE = 64;
 
 /**
  * Update the active tile size and derived constants.

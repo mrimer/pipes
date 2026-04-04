@@ -8,7 +8,7 @@ import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState } from './renderer/chamberRenderers';
 export { LINE_WIDTH, TILE_SIZE, _s, setTileSize } from './renderer/rendererState';
-import { LINE_WIDTH, TILE_SIZE, _s } from './renderer/rendererState';
+import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererState';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
   EMPTY_COLOR, EMPTY_TARGET_COLOR,
@@ -42,9 +42,6 @@ import {
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
-
-/** Base tile size used as the reference for all pixel-value scaling. */
-const BASE_TILE_SIZE = 64;
 
 /** Translucent blue-gray overlay drawn over empty cement cells that are valid placement targets. */
 const CEMENT_TARGET_OVERLAY = 'rgba(140,160,200,0.22)';
