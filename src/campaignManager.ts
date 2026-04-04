@@ -231,7 +231,18 @@ export class CampaignManager {
   /** Hide the chapter map screen element (if it exists). */
   hideChapterMap(): void {
     if (this._chapterMapScreen) {
-      this._chapterMapScreen.screenEl.style.display = 'none';
+      this._chapterMapScreen.hide();
+    }
+  }
+
+  /**
+   * Re-show the chapter map (reattaching listeners) and repopulate it with
+   * current progress. Used when returning from a level that was entered via
+   * the chapter map.
+   */
+  reshowChapterMap(): void {
+    if (this._chapterMapScreen && this._activeCampaign) {
+      this._chapterMapScreen.show(this._activeCampaign, this._chapterMapScreen.chapterIdx);
     }
   }
 
