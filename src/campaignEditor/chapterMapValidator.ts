@@ -75,6 +75,6 @@ export function validateChapterMap(
     }
   }
 
-  if (msgs.length === 0 || ok) msgs.push('✅ Chapter map structure looks valid.');
+  if (msgs.length === 0 && ok) msgs.push('✅ Chapter map structure looks valid.');
   return { ok, messages: msgs };
 }
