@@ -430,7 +430,7 @@ export class CampaignManager {
         const level = chapter.levels[idx];
         const chapterNumber = ci + 1;
         const challengeSuffix = level.challenge ? '  💀' : '';
-        el.innerHTML = '';
+        el.replaceChildren();
         if (this._activeCampaign) {
           const line1 = document.createElement('div');
           line1.style.cssText = 'font-size:0.9rem;color:#aaa;';
@@ -450,7 +450,7 @@ export class CampaignManager {
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === levelId);
     const challengeSuffix = level?.challenge ? '  💀' : '';
-    el.innerHTML = '';
+    el.replaceChildren();
     const line2 = document.createElement('div');
     line2.style.cssText = 'font-size:1rem;color:#f0c040;';
     line2.textContent = level ? `Level ${levelId}: ${level.name}${challengeSuffix}` : '';

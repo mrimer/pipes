@@ -55,7 +55,7 @@ const ERROR_FLASH_CSS =
 // how much vertical space is consumed by UI elements outside the game canvas, so
 // the canvas can be sized to fill the remaining viewport height.
 
-/** Estimated top padding (px) of the #play-screen element (replaced the removed <h1>). */
+/** Top padding (px) of the #play-screen element – mirrors the CSS `padding: 20px 0 24px`. */
 const PLAY_TOP_PADDING = 20;
 /** Estimated height (px) of the two-line #level-header: campaign-name row
  *  (0.9 rem ≈ 14 px × 1.4 + a couple px rounding ≈ 22 px) plus chapter/level row
