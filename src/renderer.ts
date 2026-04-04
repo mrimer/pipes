@@ -7,6 +7,8 @@ import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState } from './renderer/chamberRenderers';
+export { LINE_WIDTH, TILE_SIZE, _s, setTileSize } from './renderer/rendererState';
+import { LINE_WIDTH, TILE_SIZE, _s } from './renderer/rendererState';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
   EMPTY_COLOR, EMPTY_TARGET_COLOR,
@@ -41,11 +43,6 @@ import {
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
 
-export let LINE_WIDTH = 10; // pipe stroke width in px
-
-/** The current tile size in pixels.  64 (default) or 128 (large) depending on the viewport. */
-export let TILE_SIZE = 64; // px
-
 /** Base tile size used as the reference for all pixel-value scaling. */
 const BASE_TILE_SIZE = 64;
 
@@ -69,14 +66,6 @@ const PREVIEW_SHADOW_BLUR = 14;
 
 /** Rotation speed for the spin-arrow hover animation, in radians per millisecond (one full turn per 1.5 s). */
 const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
-
-/**
- * Scale a pixel value that was designed for BASE_TILE_SIZE to the current TILE_SIZE.
- * Use for font sizes, small offsets and decoration dimensions.
- */
-export function _s(n: number): number {
-  return Math.round(n * TILE_SIZE / BASE_TILE_SIZE);
-}
 
 /**
  * Exported alias for `_s`.  Allows other modules (e.g. campaignEditor/renderer)
@@ -104,15 +93,6 @@ export function computeTileSize(rows: number, cols: number, vOverhead = 0): numb
   const avH = window.innerHeight - vOverhead;
   const maxFit = Math.floor(Math.min(avW / cols, avH / rows));
   return Math.max(BASE_TILE_SIZE, Math.min(128, maxFit));
-}
-
-/**
- * Update the active tile size and derived constants.
- * Call this before setting canvas dimensions when loading a level.
- */
-export function setTileSize(size: number): void {
-  TILE_SIZE = size;
-  LINE_WIDTH = Math.round(10 * size / BASE_TILE_SIZE);
 }
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
