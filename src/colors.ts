@@ -117,6 +117,12 @@ export const LEAKY_PIPE_WATER_COLOR = '#b07840';
 export const LEAKY_RUST_COLOR       = '#7a2c10';
 /** Water droplet spray color for leaky pipe spray animation. */
 export const LEAKY_SPRAY_COLOR      = '#56c8e8';
+/** Base sea water color (medium blue). */
+export const SEA_COLOR              = '#2a7fbf';
+/** Land border color for sea tiles (sandy tan). */
+export const SEA_BORDER_COLOR       = '#c8a96e';
+/** Minimap fill color for sea tiles. */
+export const SEA_FILL_COLOR         = '#2a7fbf';
 /** Success/completion green color used for completed status indicators. */
 export const SUCCESS_COLOR          = '#7ed321';
 /** Chapter map screen root background color (darker than main BG). */

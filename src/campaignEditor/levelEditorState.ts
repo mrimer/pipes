@@ -261,11 +261,11 @@ export class LevelEditorState {
     }
 
     // Source, Sink, and Chamber are rotationally symmetric – omit rotation from their defs.
-    // GoldSpace, Granite, and Tree are connectionless background/block tiles with no rotation either.
+    // GoldSpace, Granite, Tree, and Sea are connectionless background/block tiles with no rotation either.
     // OneWay uses rotation to encode direction, so it is NOT in the noRotation set.
     const noRotation = new Set([
       PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
-      PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree,
+      PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
     ]).has(effectiveShape);
     const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
 
@@ -356,7 +356,7 @@ export class LevelEditorState {
    */
   rotatePalette(clockwise: boolean): void {
     const p = this.palette;
-    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Empty) return;
+    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.Empty) return;
 
     if (p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)) {
       const c = this.params.connections;

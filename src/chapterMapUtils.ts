@@ -76,7 +76,7 @@ export function editorTileConns(def: TileDef): Set<Direction> {
  *   default to all four directions (they connect to every neighbor).
  * - Pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants,
  *   Leaky variants) derive their connections from their shape and rotation.
- * - All other shapes (Granite, Tree, GoldSpace, Empty, …) return an empty set –
+ * - All other shapes (Granite, Tree, Sea, GoldSpace, Empty, …) return an empty set –
  *   they have no pipe connections.
  *
  * This is the single source of truth for "pure" (gameplay-unaware) tile

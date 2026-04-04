@@ -70,6 +70,7 @@ export class ChapterEditorUI {
       { palette: PipeShape.Sink,         label: '🏁 Sink' },
       { palette: LEVEL_CHAMBER_PALETTE,  label: '🚪 Level' },
       { palette: PipeShape.Tree,         label: '🌳 Tree' },
+      { palette: PipeShape.Sea,          label: '🌊 Sea' },
       { palette: PipeShape.Granite,      label: '🪨 Granite' },
       { palette: PipeShape.Straight,     label: '━ Straight' },
       { palette: PipeShape.Elbow,        label: '┗ Elbow' },

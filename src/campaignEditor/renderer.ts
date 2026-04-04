@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration, drawSea, SeaNeighbors } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
@@ -130,8 +130,27 @@ export function renderEditorCanvas(
       if (def === null || PIPE_SHAPES.has(def.shape)) continue;
       const x = c * CELL;
       const y = r * CELL;
-      const isFilled = filledKeys?.has(`${r},${c}`) ?? false;
-      _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined);
+
+      // Sea tiles: draw in-game style with neighbor-aware borders + "SEA" label
+      if (def.shape === PipeShape.Sea) {
+        const neighbors = _computeEditorSeaNeighbors(grid, rows, cols, r, c);
+        const cx = x + CELL / 2;
+        const cy = y + CELL / 2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        drawSea(ctx, CELL / 2, neighbors);
+        ctx.restore();
+        ctx.save();
+        ctx.font = `bold ${_s(11)}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        strokeFillText(ctx, 'SEA', cx, cy);
+        ctx.restore();
+      } else {
+        const isFilled = filledKeys?.has(`${r},${c}`) ?? false;
+        _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined);
+      }
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
@@ -237,6 +256,31 @@ export function renderEditorCanvas(
       ctx.restore();
     }
   }
+}
+
+/**
+ * Compute sea-tile neighbor data from a TileDef grid for a tile at (row, col).
+ * Used by the editor to render sea borders with adjacency awareness.
+ */
+function _computeEditorSeaNeighbors(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  row: number,
+  col: number,
+): SeaNeighbors {
+  const _isSea = (r: number, c: number): boolean =>
+    r >= 0 && r < rows && c >= 0 && c < cols && grid[r]?.[c]?.shape === PipeShape.Sea;
+  return {
+    north: _isSea(row - 1, col),
+    south: _isSea(row + 1, col),
+    west:  _isSea(row, col - 1),
+    east:  _isSea(row, col + 1),
+    nw:    _isSea(row - 1, col - 1),
+    ne:    _isSea(row - 1, col + 1),
+    sw:    _isSea(row + 1, col - 1),
+    se:    _isSea(row + 1, col + 1),
+  };
 }
 
 // ─── Tile drawing ──────────────────────────────────────────────────────────────
@@ -434,6 +478,8 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = '#4a5568';
   } else if (shape === PipeShape.Tree) {
     bgColor = '#1a4a0e';
+  } else if (shape === PipeShape.Sea) {
+    bgColor = '#2a7fbf';
   } else {
     bgColor = EDITOR_COLORS[shape] ?? '#4a90d9';
   }
@@ -498,6 +544,7 @@ const ITEM_SHAPE_LABEL: Readonly<Record<PipeShape, string>> = {
   [PipeShape.Chamber]:           'CHM',
   [PipeShape.Granite]:           'GRN',
   [PipeShape.Tree]:              'TRE',
+  [PipeShape.Sea]:               'SEA',
   [PipeShape.Cement]:            'CMT',
   [PipeShape.OneWay]:            'OWY',
   [PipeShape.GoldSpace]:         'GSP',
@@ -584,6 +631,16 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.stroke();
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'TREE', cx, cy);
+  } else if (shape === PipeShape.Sea) {
+    // Render sea tile using the in-game drawSea function with a "SEA" label
+    ctx.save();
+    ctx.translate(cx, cy);
+    // In editor, we don't have neighbor info in drawTileOnEditor; use default (no neighbors)
+    const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
+    drawSea(ctx, CELL / 2, defaultNeighbors);
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'SEA', cx, cy);
   } else if (shape === PipeShape.GoldSpace) {
     ctx.fillStyle = '#b8860b';
     ctx.fillRect(x, y, CELL, CELL);

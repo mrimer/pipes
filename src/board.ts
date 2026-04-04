@@ -111,11 +111,11 @@ export const ELBOW_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /**
- * Returns true for impassable obstacle tiles (Granite, Tree).
+ * Returns true for impassable obstacle tiles (Granite, Tree, Sea).
  * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
  */
 export function isObstacleTile(shape: PipeShape): boolean {
-  return shape === PipeShape.Granite || shape === PipeShape.Tree;
+  return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Sea;
 }
 
 // ── Error message constants ────────────────────────────────────────────────

@@ -452,8 +452,8 @@ export class ChapterMapEditorSection {
       if (connDirs.length < 4) def.connections = connDirs;
       return def;
     }
-    // Tree, Granite, and other shapes with no special params
-    if (shape === PipeShape.Tree || shape === PipeShape.Granite) {
+    // Tree, Granite, Sea, and other shapes with no special params
+    if (shape === PipeShape.Tree || shape === PipeShape.Granite || shape === PipeShape.Sea) {
       return { shape };
     }
     // Pipe shapes

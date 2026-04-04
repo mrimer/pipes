@@ -41,6 +41,7 @@ import {
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
+  SEA_COLOR, SEA_BORDER_COLOR,
 } from './colors';
 
 /** Translucent blue-gray overlay drawn over empty cement cells that are valid placement targets. */
@@ -240,6 +241,185 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number): void {
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+// ── Sea tile rendering helpers ────────────────────────────────────────────────
+
+/**
+ * Adjacency descriptor for sea tiles.  Each field indicates whether the neighbor
+ * in that direction is also a sea tile.
+ */
+export interface SeaNeighbors {
+  north: boolean;
+  east: boolean;
+  south: boolean;
+  west: boolean;
+  /** Diagonal neighbors for rounded corner detection. */
+  nw: boolean;
+  ne: boolean;
+  sw: boolean;
+  se: boolean;
+}
+
+/**
+ * Draw a sea tile at the origin (caller must translate ctx to tile center).
+ * The water color oscillates gently.  Land borders are drawn on edges where
+ * the adjacent tile is NOT sea.  Rounded corners connect adjacent edge borders.
+ * Two small ripple effects animate on the tile surface.
+ *
+ * @param ctx       Canvas 2D context (translated so origin = tile center).
+ * @param half      Half tile size in pixels.
+ * @param neighbors Which adjacent cells are also sea tiles.
+ */
+export function drawSea(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  neighbors: SeaNeighbors,
+): void {
+  const now = Date.now();
+
+  // ── Water fill with gentle color oscillation ────────────────────────────
+  // Oscillate hue between a medium and slightly lighter blue
+  const osc = Math.sin(now / 1200) * 0.5 + 0.5; // 0..1
+  const r = Math.round(30 + osc * 18);   // 30..48
+  const g = Math.round(110 + osc * 28);  // 110..138
+  const b = Math.round(175 + osc * 22);  // 175..197
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(-half, -half, half * 2, half * 2);
+
+  // ── Land border on non-sea edges ────────────────────────────────────────
+  const bw = _s(4);                           // border thickness
+  const cornerR = _s(6);                      // corner arc radius
+  ctx.fillStyle = SEA_BORDER_COLOR;
+
+  // Edge borders
+  if (!neighbors.north) ctx.fillRect(-half, -half, half * 2, bw);
+  if (!neighbors.south) ctx.fillRect(-half, half - bw, half * 2, bw);
+  if (!neighbors.west)  ctx.fillRect(-half, -half, bw, half * 2);
+  if (!neighbors.east)  ctx.fillRect(half - bw, -half, bw, half * 2);
+
+  // Rounded convex corners where two edge borders meet at a corner
+  // (i.e., both cardinal neighbors at the corner are NOT sea).
+  _drawSeaConvexCorner(ctx, -half, -half, cornerR, 0, !neighbors.north, !neighbors.west);
+  _drawSeaConvexCorner(ctx, half, -half, cornerR, Math.PI / 2, !neighbors.north, !neighbors.east);
+  _drawSeaConvexCorner(ctx, half, half, cornerR, Math.PI, !neighbors.south, !neighbors.east);
+  _drawSeaConvexCorner(ctx, -half, half, cornerR, 3 * Math.PI / 2, !neighbors.south, !neighbors.west);
+
+  // Concave (inner) corners: both cardinal edge neighbors are sea but the diagonal is NOT.
+  _drawSeaConcaveCorner(ctx, -half, -half, cornerR, neighbors.north, neighbors.west, !neighbors.nw);
+  _drawSeaConcaveCorner(ctx, half, -half, cornerR, neighbors.north, neighbors.east, !neighbors.ne);
+  _drawSeaConcaveCorner(ctx, half, half, cornerR, neighbors.south, neighbors.east, !neighbors.se);
+  _drawSeaConcaveCorner(ctx, -half, half, cornerR, neighbors.south, neighbors.west, !neighbors.sw);
+
+  // ── Ripple effects ──────────────────────────────────────────────────────
+  _drawSeaRipple(ctx, half, -half * 0.3, -half * 0.25, now, 0);
+  _drawSeaRipple(ctx, half, half * 0.2, half * 0.3, now, 800);
+}
+
+/**
+ * Draw a convex rounded corner piece for the sea land border.
+ * This is a filled quarter-circle arc at the tile corner where two
+ * perpendicular edge borders meet.
+ */
+function _drawSeaConvexCorner(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number,
+  r: number,
+  _startAngle: number,
+  edgeA: boolean,
+  edgeB: boolean,
+): void {
+  if (!edgeA || !edgeB) return;
+  ctx.save();
+  ctx.fillStyle = SEA_BORDER_COLOR;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.arc(cx, cy, r, _startAngle, _startAngle + Math.PI / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draw a concave (inner) rounded corner for the sea land border.
+ * Both cardinal neighbors are sea but the diagonal neighbor is not, producing
+ * a small curved notch at the tile corner.
+ */
+function _drawSeaConcaveCorner(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number,
+  r: number,
+  cardA: boolean,
+  cardB: boolean,
+  diagonalNotSea: boolean,
+): void {
+  if (!cardA || !cardB || !diagonalNotSea) return;
+  ctx.save();
+  ctx.fillStyle = SEA_BORDER_COLOR;
+  // Fill a small square at the corner, then carve out a quarter-circle
+  const dx = cx > 0 ? -1 : 1;
+  const dy = cy > 0 ? -1 : 1;
+  ctx.fillRect(cx, cy, dx * r, dy * r);
+  // Cut the arc to make the concave shape
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+}
+
+/**
+ * Draw a small animated ripple on the sea tile surface.
+ * The ripple oscillates between a flat line and rising pointy waves,
+ * creating a gentle in-place ambient water motion effect.
+ */
+function _drawSeaRipple(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  ox: number,
+  oy: number,
+  now: number,
+  phaseOffset: number,
+): void {
+  const rw = half * 0.5;                       // ripple width
+  const maxH = _s(3.5);                        // max wave peak height
+  // Oscillate between flat (0) and peaked (1)
+  const t = (Math.sin((now + phaseOffset) / 700) + 1) / 2; // 0..1
+
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = _s(1.2);
+  ctx.lineCap = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(-rw / 2, 0);
+  // Two peaks at 1/4 and 3/4 of the ripple width
+  const peakH = maxH * t;
+  ctx.quadraticCurveTo(-rw / 4, -peakH, 0, 0);
+  ctx.quadraticCurveTo(rw / 4, -peakH, rw / 2, 0);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Compute sea-tile neighbor data for the tile at (row, col) on the given board.
+ * Returns which of the 8 neighbors are also sea tiles.
+ */
+export function computeSeaNeighbors(board: Board, row: number, col: number): SeaNeighbors {
+  const _isSea = (r: number, c: number): boolean =>
+    r >= 0 && r < board.rows && c >= 0 && c < board.cols && board.grid[r][c].shape === PipeShape.Sea;
+  return {
+    north: _isSea(row - 1, col),
+    south: _isSea(row + 1, col),
+    west:  _isSea(row, col - 1),
+    east:  _isSea(row, col + 1),
+    nw:    _isSea(row - 1, col - 1),
+    ne:    _isSea(row - 1, col + 1),
+    sw:    _isSea(row + 1, col - 1),
+    se:    _isSea(row + 1, col + 1),
+  };
 }
 
 /**
@@ -588,6 +768,7 @@ function _resolveTileColor(
   }
   if (shape === PipeShape.Granite) return GRANITE_COLOR;
   if (shape === PipeShape.Tree) return TREE_COLOR;
+  if (shape === PipeShape.Sea) return SEA_COLOR;
   if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
   if (LEAKY_PIPE_SHAPES.has(shape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
   if (SPIN_PIPE_SHAPES.has(shape)) return isWater ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR;
@@ -612,6 +793,7 @@ export function drawTile(
   blockedWaterDir: Direction | null = null,
   rotationDegOverride?: number,
   buttEndDirs?: Set<Direction>,
+  seaNeighbors?: SeaNeighbors,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -757,6 +939,13 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     drawTree(ctx, half);
+  } else if (shape === PipeShape.Sea) {
+    // Sea – impassable water tile with animated ripples and land border
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
+    drawSea(ctx, half, seaNeighbors ?? defaultNeighbors);
   }
 
   ctx.restore();
@@ -1141,7 +1330,13 @@ function _renderPass2NonPipeTiles(
         buttEndDirs = _computeButtEndDirs(board, r, c) ?? new Set<Direction>();
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
+      // For Sea tiles, compute which neighbors are also sea for border rendering.
+      let seaNeighbors: SeaNeighbors | undefined;
+      if (tile.shape === PipeShape.Sea) {
+        seaNeighbors = computeSeaNeighbors(board, r, c);
+      }
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors);
     }
   }
 }

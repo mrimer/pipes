@@ -399,7 +399,7 @@ export class TurnStateManager {
         }
         // 'heater', 'pump', 'item', 'star', 'level': no direct water impact.
       }
-      // Source, Sink, Empty, Granite, Tree: no water impact.
+      // Source, Sink, Empty, Granite, Tree, Sea: no water impact.
 
       this._recordLockedTileState(key, impact, currentTemp, currentPressure);
       // Only emit a change entry for non-zero impacts (zero means no visible effect).
