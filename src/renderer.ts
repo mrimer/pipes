@@ -325,7 +325,7 @@ function _drawSeaRipple(
   phaseOffset: number,
 ): void {
   const rw = half * 0.5;                       // ripple width
-  const maxH = _s(3);                          // max wave peak height
+  const maxH = _s(2.5);                        // max wave peak height
   // Oscillate between flat (0) and peaked (1)
   const t = (Math.sin((now + phaseOffset) / 700) + 1) / 2; // 0..1
 
