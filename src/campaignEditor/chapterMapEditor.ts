@@ -14,7 +14,6 @@ import {
   TileParams,
   DEFAULT_PARAMS,
   EditorSnapshot,
-  ValidationResult,
   EDITOR_CANVAS_BORDER,
   MAX_EDITOR_CANVAS_PX,
 } from './types';

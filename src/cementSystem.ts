@@ -1,5 +1,5 @@
 import { Tile } from './tile';
-import { GridPos, PipeShape } from './types';
+import { GridPos } from './types';
 import { PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey } from './board';
 
 /**

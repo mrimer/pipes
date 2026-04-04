@@ -38,7 +38,6 @@ export class ConstraintValidator {
     lockedWaterImpact: ReadonlyMap<string, number>,
     connectionTurn: ReadonlyMap<string, number>,
     turnNumber: number,
-    sourceCapacity: number,
   ): { error: string | null; positions: GridPos[] | null } {
     const sandstone = this._checkSandstone(filled, lockedWaterImpact, connectionTurn, turnNumber);
     if (sandstone.error) return sandstone;
