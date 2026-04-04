@@ -44,6 +44,14 @@ import {
   SEA_COLOR, SEA_BORDER_COLOR,
 } from './colors';
 
+/** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
+const CARDINAL_DIRS: [Direction, number, number][] = [
+  [Direction.North, 0, -1],
+  [Direction.South, 0,  1],
+  [Direction.East,  1,  0],
+  [Direction.West, -1,  0],
+];
+
 /** Translucent blue-gray overlay drawn over empty cement cells that are valid placement targets. */
 const CEMENT_TARGET_OVERLAY = 'rgba(140,160,200,0.22)';
 
@@ -168,14 +176,7 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
   // Radiating lines – drawn first so the centre decorations render on top
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  // Unit-vector table for each direction
-  const DIRS: [Direction, number, number][] = [
-    [Direction.North, 0, -1],
-    [Direction.South, 0,  1],
-    [Direction.East,  1,  0],
-    [Direction.West, -1,  0],
-  ];
-  for (const [dir, nx, ny] of DIRS) {
+  for (const [dir, nx, ny] of CARDINAL_DIRS) {
     if (!tile.connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     ctx.beginPath();

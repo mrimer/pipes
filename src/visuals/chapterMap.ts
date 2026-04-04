@@ -346,6 +346,14 @@ export function drawLevelChamberTile(
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
+/** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
+const CARDINAL_DIRS: [Direction, number, number][] = [
+  [Direction.North, 0, -1],
+  [Direction.South, 0,  1],
+  [Direction.East,  1,  0],
+  [Direction.West, -1,  0],
+];
+
 /** Draw a Source or Sink tile: tile background, radiating arms with directional chevrons, and a shape-specific centre motif. */
 function _drawChapterMapEndpoint(
   ctx: CanvasRenderingContext2D,
@@ -372,14 +380,7 @@ function _drawChapterMapEndpoint(
   // Radiating arms to connected directions – drawn first so centre appears on top
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  // Unit-vector map for each direction
-  const DIRS: [Direction, number, number][] = [
-    [Direction.North, 0, -1],
-    [Direction.South, 0,  1],
-    [Direction.East,  1,  0],
-    [Direction.West, -1,  0],
-  ];
-  for (const [dir, nx, ny] of DIRS) {
+  for (const [dir, nx, ny] of CARDINAL_DIRS) {
     if (!connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     ctx.beginPath();
