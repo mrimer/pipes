@@ -73,6 +73,8 @@ const PLAY_NOTE_PANEL_H = 42;
 const PLAY_HINT_PANEL_H = 37;
 /** Vertical border height (px) added by the 3 px CSS border on #game-canvas (3 px × 2 sides). */
 const PLAY_CANVAS_BORDER_H = 6;
+/** Horizontal border width (px) added by the 3 px CSS border on #game-canvas (3 px × 2 sides). */
+const PLAY_CANVAS_BORDER_W = 6;
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -410,7 +412,7 @@ export class Game implements InputCallbacks {
     this.pendingRotation = 0;
     this._input.hoverRotationDelta = 0;
 
-    setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level)));
+    setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level), PLAY_CANVAS_BORDER_W));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
 
