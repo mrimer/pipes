@@ -165,32 +165,85 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
 }
 
 function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape, buttEndDirs?: Set<Direction>): void {
-  // Filled circle
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(0, 0, half * 0.35, 0, Math.PI * 2);
-  ctx.fill();
-  // Radiating lines – only for connected directions
+  // Radiating lines – drawn first so the centre decorations render on top
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
+  // Unit-vector table for each direction
   const DIRS: [Direction, number, number][] = [
-    [Direction.North, 0, -half],
-    [Direction.South, 0,  half],
-    [Direction.East,  half, 0],
-    [Direction.West, -half, 0],
+    [Direction.North, 0, -1],
+    [Direction.South, 0,  1],
+    [Direction.East,  1,  0],
+    [Direction.West, -1,  0],
   ];
-  for (const [dir, dx, dy] of DIRS) {
+  for (const [dir, nx, ny] of DIRS) {
     if (!tile.connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(dx, dy); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(nx * half, ny * half);
+    ctx.stroke();
+    // Directional chevron on the arm: outward (▶) for Source, inward (◀) for Sink
+    const d = half * 0.66;
+    const wing = half * 0.13;
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (shape === PipeShape.Source) {
+      // Tip points away from centre
+      ctx.moveTo(nx * (d - wing) - ny * wing, ny * (d - wing) + nx * wing);
+      ctx.lineTo(nx * d, ny * d);
+      ctx.lineTo(nx * (d - wing) + ny * wing, ny * (d - wing) - nx * wing);
+    } else {
+      // Tip points toward centre
+      const tipD = d - wing * 2;
+      ctx.moveTo(nx * d - ny * wing, ny * d + nx * wing);
+      ctx.lineTo(nx * tipD, ny * tipD);
+      ctx.lineTo(nx * d + ny * wing, ny * d - nx * wing);
+    }
+    ctx.stroke();
   }
-  // Show capacity number on Source (drawn last so it appears on top)
+
   if (shape === PipeShape.Source) {
+    // Central circle with radial gradient – bright glow at centre fading to the tile colour
+    const circleR = half * 0.35;
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(0.5, color);
+    grad.addColorStop(1, color);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
+    ctx.fill();
+    // Outer aperture ring – suggests a nozzle opening
+    ctx.strokeStyle = color;
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    // Capacity number – shadow keeps it readable over the bright gradient centre
+    ctx.save();
     ctx.fillStyle = LABEL_COLOR;
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = _s(2);
     ctx.fillText(String(currentWater), 0, 0);
+    ctx.restore();
+  } else {
+    // Sink: bullseye / drain pattern – concentric stroke rings with a solid innermost dot
+    ctx.strokeStyle = color;
+    ctx.lineWidth = _s(1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
