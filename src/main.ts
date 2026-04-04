@@ -38,10 +38,9 @@ const game = new Game(
 );
 
 // Win modal buttons
-getEl('win-next-btn').addEventListener('click',  () => game.nextLevel());
+getEl('win-next-btn').addEventListener('click',  () => game.exitToMenu());
 getEl('win-undo-btn').addEventListener('click',  () => game.undoWinningMove());
 getEl('win-retry-btn').addEventListener('click', () => game.retryLevel());
-getEl('win-menu-btn').addEventListener('click',  () => game.exitToMenu());
 
 // Game-over modal buttons
 getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove());
