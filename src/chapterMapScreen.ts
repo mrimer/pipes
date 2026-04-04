@@ -9,7 +9,7 @@
  */
 
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
-import { TILE_SIZE, setTileSize, computeTileSize, scalePx } from './renderer';
+import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
@@ -18,6 +18,15 @@ import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sin
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
+
+// ─── Canvas border constants ──────────────────────────────────────────────────
+
+/** CSS border-width (px) on the chapter map canvas element. */
+const CHAPTER_MAP_CANVAS_BORDER_PX = 2;
+/** Default CSS border-color on the chapter map canvas element. */
+const CHAPTER_MAP_CANVAS_BORDER_COLOR = '#4a90d9';
+/** CSS border-radius (px) on the chapter map canvas element. */
+const CHAPTER_MAP_CANVAS_BORDER_RADIUS = 6;
 
 // ─── Layout overhead constants ────────────────────────────────────────────────
 // Estimated heights of UI elements that appear above/below the chapter map
@@ -43,21 +52,14 @@ const CHAPTER_MAP_PADDING = 40;
 
 /**
  * Total estimated vertical overhead (px) consumed by all chapter-map UI
- * elements other than the canvas itself.
+ * elements other than the canvas itself.  Includes the canvas CSS border
+ * (top + bottom) so the computed TILE_SIZE keeps the full border-box
+ * within the viewport.
  */
 const CHAPTER_MAP_GRID_OVERHEAD =
   CHAPTER_MAP_HEADER_H + CHAPTER_MAP_STATS_H + CHAPTER_MAP_BACK_BTN_H +
   CHAPTER_MAP_INSTRUCTION_H + CHAPTER_MAP_STATUS_H + CHAPTER_MAP_ERROR_H +
-  6 * CHAPTER_MAP_GAP + CHAPTER_MAP_PADDING;
-
-// ─── Canvas border constants ──────────────────────────────────────────────────
-
-/** CSS border-width (px) on the chapter map canvas element. */
-const CHAPTER_MAP_CANVAS_BORDER_PX = 2;
-/** Default CSS border-color on the chapter map canvas element. */
-const CHAPTER_MAP_CANVAS_BORDER_COLOR = '#4a90d9';
-/** CSS border-radius (px) on the chapter map canvas element. */
-const CHAPTER_MAP_CANVAS_BORDER_RADIUS = 6;
+  6 * CHAPTER_MAP_GAP + CHAPTER_MAP_PADDING + 2 * CHAPTER_MAP_CANVAS_BORDER_PX;
 
 /** Callbacks that the chapter map screen uses to interact with the rest of the game. */
 export interface ChapterMapCallbacks {
@@ -293,9 +295,9 @@ export class ChapterMapScreen {
     if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
     const fullRect = canvas.getBoundingClientRect();
 
-    // Border thickness in canvas pixels, derived from the chapter map grid's
-    // TILE_SIZE so it scales correctly with the grid regardless of CSS zoom.
-    const bCanvas = scalePx(2);
+    // Border thickness must match the actual CSS border width so the snapshot
+    // grid aligns pixel-perfectly with the original canvas display.
+    const bCanvas = CHAPTER_MAP_CANVAS_BORDER_PX;
 
     // Create a snapshot canvas expanded by bCanvas on each side so the full
     // framing border fits inside without clipping.
