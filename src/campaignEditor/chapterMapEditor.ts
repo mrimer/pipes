@@ -17,12 +17,9 @@ import {
   ValidationResult,
   EDITOR_CANVAS_BORDER,
   MAX_EDITOR_CANVAS_PX,
-  REPEATABLE_EDITOR_TILES,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
-
-/** The palette entry used for level chamber tiles in the chapter map editor. */
-const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
+import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -40,6 +37,7 @@ export interface ChapterMapEditorCallbacks {
 export class ChapterMapEditorSection {
   private readonly _callbacks: ChapterMapEditorCallbacks;
   private _ui: ChapterEditorUI | null = null;
+  private _input: ChapterMapInput | null = null;
 
   // ── State fields ──────────────────────────────────────────────────────────
   private _chapterEditRows = 3;
@@ -49,20 +47,9 @@ export class ChapterMapEditorSection {
   private _chapterParams: TileParams = { ...DEFAULT_PARAMS };
   private _chapterCanvas: HTMLCanvasElement | null = null;
   private _chapterCtx: CanvasRenderingContext2D | null = null;
-  private _chapterHover: { row: number; col: number } | null = null;
-  private _chapterDragState: {
-    startPos: { row: number; col: number };
-    tile: TileDef;
-    currentPos: { row: number; col: number };
-    moved: boolean;
-  } | null = null;
-  private _chapterPaintDragActive = false;
-  private _chapterRightEraseDragActive = false;
-  private _chapterSuppressContextMenu = false;
   private _chapterHistory: EditorSnapshot[] = [];
   private _chapterHistoryIdx = -1;
   private _chapterSelectedLevelIdx: number | null = null;
-  private _chapterWindowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   private _chapterEditorMainLayout: HTMLDivElement = document.createElement('div');
   private _chapterFocusedTilePos: { row: number; col: number } | null = null;
   /** Ambient decorations for empty cells in the chapter editor canvas. */
@@ -80,6 +67,8 @@ export class ChapterMapEditorSection {
 
   /** Initialize grid state from the given chapter (or create defaults). */
   init(chapter: ChapterDef): void {
+    this._input?.detach();
+    this._input = null;
     this._initChapterGridState(chapter);
   }
 
@@ -128,10 +117,6 @@ export class ChapterMapEditorSection {
     this._chapterHistory = [];
     this._chapterHistoryIdx = -1;
     this._chapterSelectedLevelIdx = null;
-    this._chapterHover = null;
-    this._chapterDragState = null;
-    this._chapterPaintDragActive = false;
-    this._chapterRightEraseDragActive = false;
     this._chapterFocusedTilePos = null;
     this._recordChapterSnapshot(chapter, false);
   }
@@ -242,6 +227,39 @@ export class ChapterMapEditorSection {
     };
   }
 
+  /** Build the callback object that wires ChapterMapInput to this section's state. */
+  private _makeInputCallbacks(): ChapterMapInputCallbacks {
+    return {
+      getEditGrid:          () => this._chapterEditGrid,
+      getEditRows:          () => this._chapterEditRows,
+      getEditCols:          () => this._chapterEditCols,
+      getPalette:           () => this._chapterPalette,
+      setPalette:           (p) => { this._chapterPalette = p; },
+      getSelectedLevelIdx:  () => this._chapterSelectedLevelIdx,
+      setSelectedLevelIdx:  (i) => { this._chapterSelectedLevelIdx = i; },
+      getFocusedTilePos:    () => this._chapterFocusedTilePos,
+      setFocusedTilePos:    (pos) => { this._chapterFocusedTilePos = pos; },
+      buildTileDef:         () => this._buildChapterTileDef(),
+      hasSourceElsewhere:   () => this._chapterHasSourceElsewhere(),
+      rotateTileAt:         (pos, cw, ch, camp) => this._rotateChapterTileAt(pos, cw, ch, camp),
+      rotateSourceSinkAt:   (pos, cw, ch, camp) => this._rotateChapterSourceSinkAt(pos, cw, ch, camp),
+      rotatePalette:        (cw) => this._rotateChapterPalette(cw),
+      recordSnapshot:       (ch) => this._recordChapterSnapshot(ch),
+      saveGridState:        (ch, camp) => this._saveChapterGridState(ch, camp),
+      renderCanvas:         () => this._renderChapterCanvas(),
+      rebuildPalette:       (ch, camp) => this._ui!.rebuildPalette(ch, camp),
+      rebuildLevelInventory: (ch, camp) => this._ui!.rebuildLevelInventory(ch, camp),
+      rebuildTileParamsPanel: (ch, camp) => {
+        const el = document.getElementById('chapter-tile-params-panel');
+        if (el) el.replaceWith(this._ui!.buildTileParamsPanel(ch, camp));
+      },
+      clearFocusIfAt:       (pos) => this._clearFocusIfAt(pos),
+      getActiveCampaign:    () => this._callbacks.getActiveCampaign(),
+      getActiveChapterIdx:  () => this._callbacks.getActiveChapterIdx(),
+      openLevelEditor:      (idx, ro) => this._callbacks.openLevelEditor(idx, ro),
+    };
+  }
+
   /**
    * Slide all chapter map tiles one cell in the given direction.  Tiles that
    * would fall off the edge of the grid are discarded.  The operation is
@@ -291,63 +309,11 @@ export class ChapterMapEditorSection {
     if (ctx) this._chapterCtx = ctx;
 
     if (!readOnly) {
-      canvas.addEventListener('mousedown', (e) => this._onChapterCanvasMouseDown(e, campaign, chapter));
-      canvas.addEventListener('mousemove', (e) => this._onChapterCanvasMouseMove(e));
-      canvas.addEventListener('dblclick', (e) => this._onChapterCanvasDblClick(e));
-      canvas.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (this._chapterSuppressContextMenu) { this._chapterSuppressContextMenu = false; return; }
-        this._onChapterCanvasRightClick(e, campaign, chapter);
-      });
-      canvas.addEventListener('mouseleave', () => {
-        this._chapterHover = null;
-        if (this._chapterDragState) this._chapterDragState = null;
-        if (this._chapterPaintDragActive) {
-          this._chapterPaintDragActive = false;
-          this._recordChapterSnapshot(chapter);
-        }
-        if (this._chapterRightEraseDragActive) {
-          this._chapterRightEraseDragActive = false;
-          this._recordChapterSnapshot(chapter);
-        }
-        this._renderChapterCanvas();
-      });
-      // Mouse wheel: rotate the hovered rotatable tile, or the ghost preview when hovering empty/non-pipe cells
-      canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const pos = this._chapterCanvasPos(e);
-        if (!pos) return;
-        const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
-        if (tile && PIPE_SHAPES.has(tile.shape)) {
-          this._rotateChapterTileAt(pos, e.deltaY > 0, chapter, campaign);
-        } else if (tile && (
-          tile.shape === PipeShape.Source ||
-          tile.shape === PipeShape.Sink ||
-          (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level')
-        )) {
-          this._rotateChapterSourceSinkAt(pos, e.deltaY > 0, chapter, campaign);
-        } else if (PIPE_SHAPES.has(this._chapterPalette as PipeShape)) {
-          this._rotateChapterPalette(e.deltaY > 0);
-        }
-      }, { passive: false });
-      if (this._chapterWindowMouseUpHandler) {
-        window.removeEventListener('mouseup', this._chapterWindowMouseUpHandler);
-      }
-      this._chapterWindowMouseUpHandler = (e: MouseEvent) => this._onChapterMouseUp(e, campaign, chapter);
-      window.addEventListener('mouseup', this._chapterWindowMouseUpHandler);
+      this._input = new ChapterMapInput(this._makeInputCallbacks());
+      this._input.attach(canvas, campaign, chapter);
     }
 
     return canvas;
-  }
-
-  /** Convert a mouse event to a grid position on the chapter canvas. */
-  private _chapterCanvasPos(e: MouseEvent): { row: number; col: number } | null {
-    if (!this._chapterCanvas) return null;
-    const rect = this._chapterCanvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) * this._chapterEditCols / rect.width);
-    const row = Math.floor((e.clientY - rect.top)  * this._chapterEditRows / rect.height);
-    if (row < 0 || row >= this._chapterEditRows || col < 0 || col >= this._chapterEditCols) return null;
-    return { row, col };
   }
 
   /** Update the chapter canvas CSS display size to fit the available space. */
@@ -404,32 +370,29 @@ export class ChapterMapEditorSection {
     let overlay: HoverOverlay | null = null;
     let drag: DragState | null = null;
 
-    if (this._chapterDragState) {
-      drag = {
-        fromPos: this._chapterDragState.startPos,
-        toPos: this._chapterDragState.currentPos,
-        tile: this._chapterDragState.tile,
-      };
-    } else if (this._chapterHover) {
+    const hover = this._input?.hover ?? null;
+    drag = this._input?.dragState ?? null;
+
+    if (!drag && hover) {
       if (this._chapterPalette === 'erase') {
-        const isEmpty = (this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null) === null;
-        overlay = { pos: this._chapterHover, def: null, alpha: isEmpty ? 0.2 : 1 };
+        const isEmpty = (this._chapterEditGrid[hover.row]?.[hover.col] ?? null) === null;
+        overlay = { pos: hover, def: null, alpha: isEmpty ? 0.2 : 1 };
       } else if (this._chapterSelectedLevelIdx !== null) {
         // Preview: level chamber placeholder – only on empty cells
-        const isEmpty = (this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null) === null;
+        const isEmpty = (this._chapterEditGrid[hover.row]?.[hover.col] ?? null) === null;
         if (isEmpty) {
           const levelDef: TileDef = {
             shape: PipeShape.Chamber,
             chamberContent: 'level',
             levelIdx: this._chapterSelectedLevelIdx,
           };
-          overlay = { pos: this._chapterHover, def: levelDef, alpha: 0.55 };
+          overlay = { pos: hover, def: levelDef, alpha: 0.55 };
         }
       } else {
         // Only show placement ghost on empty cells; occupied cells cannot be overwritten
-        const isEmpty = (this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null) === null;
+        const isEmpty = (this._chapterEditGrid[hover.row]?.[hover.col] ?? null) === null;
         if (isEmpty) {
-          overlay = { pos: this._chapterHover, def: this._buildChapterTileDef(), alpha: 0.55 };
+          overlay = { pos: hover, def: this._buildChapterTileDef(), alpha: 0.55 };
         }
       }
     }
@@ -646,21 +609,22 @@ export class ChapterMapEditorSection {
       e.preventDefault();
       const clockwise = key === 'w';
       // If hovering over a tile with connections, rotate it; otherwise rotate the palette ghost
-      if (this._chapterHover) {
-        const tile = this._chapterEditGrid[this._chapterHover.row]?.[this._chapterHover.col] ?? null;
+      const hover = this._input?.hover ?? null;
+      if (hover) {
+        const tile = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
         if (tile) {
           const campaign = this._callbacks.getActiveCampaign();
           const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
           if (campaign && chapter) {
             if (PIPE_SHAPES.has(tile.shape)) {
-              this._rotateChapterTileAt(this._chapterHover, clockwise, chapter, campaign);
+              this._rotateChapterTileAt(hover, clockwise, chapter, campaign);
               return;
             } else if (
               tile.shape === PipeShape.Source ||
               tile.shape === PipeShape.Sink ||
               (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level')
             ) {
-              this._rotateChapterSourceSinkAt(this._chapterHover, clockwise, chapter, campaign);
+              this._rotateChapterSourceSinkAt(hover, clockwise, chapter, campaign);
               return;
             }
           }
@@ -668,208 +632,6 @@ export class ChapterMapEditorSection {
       }
       this._rotateChapterPalette(clockwise);
     }
-  }
-
-  // ─── Chapter canvas mouse events ──────────────────────────────────────────
-
-  private _onChapterCanvasMouseDown(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
-    if (e.button === 2) {
-      const pos = this._chapterCanvasPos(e);
-      if (!pos) return;
-      this._chapterRightEraseDragActive = true;
-      this._chapterSuppressContextMenu = false;
-      const existingTile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
-      if (existingTile !== null) {
-        this._chapterEditGrid[pos.row][pos.col] = null;
-        this._clearFocusIfAt(pos);
-        this._renderChapterCanvas();
-      }
-      return;
-    }
-    if (e.button !== 0) return;
-    const pos = this._chapterCanvasPos(e);
-    if (!pos) return;
-
-    this._chapterFocusedTilePos = pos;
-
-    // Auto-select the 'Level' palette item when a level chamber is focused
-    const tileAtPos = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
-    if (tileAtPos?.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'level') {
-      this._chapterPalette = LEVEL_CHAMBER_PALETTE;
-      this._ui!.rebuildPalette(chapter, campaign);
-    }
-
-    // Rebuild the tile params panel so it reflects the newly focused tile
-    const existingParams = document.getElementById('chapter-tile-params-panel');
-    if (existingParams) existingParams.replaceWith(this._ui!.buildTileParamsPanel(chapter, campaign));
-
-    const existingTile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
-
-    // If a level is selected for placement
-    if (this._chapterSelectedLevelIdx !== null) {
-      if (existingTile === null) {
-        // Place level chamber
-        this._chapterEditGrid[pos.row][pos.col] = {
-          shape: PipeShape.Chamber,
-          chamberContent: 'level',
-          levelIdx: this._chapterSelectedLevelIdx,
-          connections: [Direction.East, Direction.West],
-        };
-        this._chapterSelectedLevelIdx = null;
-        // Auto-select the 'Level' palette and sync params panel after placement
-        this._chapterPalette = LEVEL_CHAMBER_PALETTE;
-        this._ui!.rebuildPalette(chapter, campaign);
-        const placedParams = document.getElementById('chapter-tile-params-panel');
-        if (placedParams) placedParams.replaceWith(this._ui!.buildTileParamsPanel(chapter, campaign));
-        this._recordChapterSnapshot(chapter);
-        this._saveChapterGridState(chapter, campaign);
-        this._ui!.rebuildLevelInventory(chapter, campaign);
-        this._renderChapterCanvas();
-      } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'level') {
-        // Start dragging existing level chamber
-        this._chapterDragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-        this._renderChapterCanvas();
-      }
-      return;
-    }
-
-    // 'chamber:level' palette: only focus/drag existing tiles; never place new ones
-    if (this._chapterPalette === LEVEL_CHAMBER_PALETTE) {
-      if (existingTile !== null) {
-        this._chapterDragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-        this._renderChapterCanvas();
-      }
-      return;
-    }
-
-    // Regular tile placement / dragging
-    if (existingTile !== null && this._chapterPalette !== 'erase') {
-      // Start dragging the existing tile
-      this._chapterDragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-      this._renderChapterCanvas();
-    } else {
-      if (this._chapterPalette === PipeShape.Source && this._chapterHasSourceElsewhere()) {
-        return; // Only one source allowed
-      }
-      if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._chapterPalette)) {
-        this._chapterPaintDragActive = true;
-        this._chapterEditGrid[pos.row][pos.col] = this._buildChapterTileDef();
-        this._renderChapterCanvas();
-        return;
-      }
-      if (this._chapterPalette === 'erase') {
-        this._chapterEditGrid[pos.row][pos.col] = null;
-        this._clearFocusIfAt(pos);
-        this._ui!.rebuildLevelInventory(chapter, campaign);
-      } else {
-        this._chapterEditGrid[pos.row][pos.col] = this._buildChapterTileDef();
-      }
-      this._recordChapterSnapshot(chapter);
-      this._saveChapterGridState(chapter, campaign);
-      this._renderChapterCanvas();
-    }
-  }
-
-  private _onChapterMouseUp(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
-    if (e.button === 2) {
-      if (!this._chapterRightEraseDragActive) return;
-      this._chapterRightEraseDragActive = false;
-      this._chapterSuppressContextMenu = true;
-      this._ui!.rebuildLevelInventory(chapter, campaign);
-      this._recordChapterSnapshot(chapter);
-      this._saveChapterGridState(chapter, campaign);
-      this._renderChapterCanvas();
-      return;
-    }
-    if (e.button !== 0) return;
-
-    if (this._chapterPaintDragActive) {
-      this._chapterPaintDragActive = false;
-      this._recordChapterSnapshot(chapter);
-      this._saveChapterGridState(chapter, campaign);
-      this._renderChapterCanvas();
-      return;
-    }
-
-    if (!this._chapterDragState) return;
-    const { startPos, tile, currentPos, moved } = this._chapterDragState;
-    this._chapterDragState = null;
-
-    if (moved) {
-      this._chapterFocusedTilePos = null;
-      this._chapterEditGrid[startPos.row][startPos.col] = null;
-      this._chapterEditGrid[currentPos.row][currentPos.col] = tile;
-      this._recordChapterSnapshot(chapter);
-      this._saveChapterGridState(chapter, campaign);
-    } else {
-      // Click on a placed pipe tile: rotate it (shift = counter-clockwise)
-      if (PIPE_SHAPES.has(tile.shape)) {
-        this._rotateChapterTileAt(startPos, !e.shiftKey, chapter, campaign);
-        return; // _rotateChapterTileAt already calls _renderChapterCanvas
-      }
-    }
-    this._renderChapterCanvas();
-  }
-
-  private _onChapterCanvasMouseMove(e: MouseEvent): void {
-    const pos = this._chapterCanvasPos(e);
-    this._chapterHover = pos;
-
-    // Update the native browser tooltip with the level name when hovering a level chamber tile.
-    if (this._chapterCanvas) {
-      const tile = pos ? (this._chapterEditGrid[pos.row]?.[pos.col] ?? null) : null;
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined) {
-        const campaign = this._callbacks.getActiveCampaign();
-        const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
-        const level = chapter?.levels[tile.levelIdx];
-        this._chapterCanvas.title = level ? `${tile.levelIdx + 1}: ${level.name}` : `Level ${tile.levelIdx + 1}`;
-      } else {
-        this._chapterCanvas.title = '';
-      }
-    }
-
-    if (this._chapterPaintDragActive && pos) {
-      if ((this._chapterEditGrid[pos.row]?.[pos.col] ?? null) === null) {
-        this._chapterEditGrid[pos.row][pos.col] = this._buildChapterTileDef();
-      }
-    } else if (this._chapterRightEraseDragActive && pos) {
-      if ((this._chapterEditGrid[pos.row]?.[pos.col] ?? null) !== null) {
-        this._chapterEditGrid[pos.row][pos.col] = null;
-        this._clearFocusIfAt(pos);
-      }
-    } else if (this._chapterDragState && pos) {
-      const { startPos, currentPos } = this._chapterDragState;
-      if (pos.row !== currentPos.row || pos.col !== currentPos.col) {
-        if (pos.row === startPos.row && pos.col === startPos.col) {
-          this._chapterDragState.currentPos = pos;
-          this._chapterDragState.moved = false;
-        } else if ((this._chapterEditGrid[pos.row]?.[pos.col] ?? null) === null) {
-          this._chapterDragState.currentPos = pos;
-          this._chapterDragState.moved = true;
-        }
-      }
-    }
-    this._renderChapterCanvas();
-  }
-
-  private _onChapterCanvasRightClick(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
-    const pos = this._chapterCanvasPos(e);
-    if (!pos) return;
-    this._chapterEditGrid[pos.row][pos.col] = null;
-    this._clearFocusIfAt(pos);
-    this._ui!.rebuildLevelInventory(chapter, campaign);
-    this._recordChapterSnapshot(chapter);
-    this._saveChapterGridState(chapter, campaign);
-    this._renderChapterCanvas();
-  }
-
-  private _onChapterCanvasDblClick(e: MouseEvent): void {
-    const pos = this._chapterCanvasPos(e);
-    if (!pos) return;
-    const tile = this._chapterEditGrid[pos.row]?.[pos.col] ?? null;
-    if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) return;
-    const readOnly = this._callbacks.getActiveCampaign()?.official === true;
-    this._callbacks.openLevelEditor(tile.levelIdx, readOnly);
   }
 
   // ─── Chapter editor undo/redo ────────────────────────────────────────────
