@@ -9,7 +9,7 @@
  */
 
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
-import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, setTileSize, computeTileSize, scalePx } from './renderer';
 import { PIPE_SHAPES } from './board';
 import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
@@ -293,38 +293,33 @@ export class ChapterMapScreen {
     if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
     const fullRect = canvas.getBoundingClientRect();
 
-    // Compute the CSS-to-canvas scale so we know how many canvas pixels
-    // correspond to the CSS border width.  Guard against a zero content size.
-    const border = CHAPTER_MAP_CANVAS_BORDER_PX;
-    const contentW = fullRect.width  - 2 * border;
-    const contentH = fullRect.height - 2 * border;
-    if (contentW <= 0 || contentH <= 0) return null;
-    const cssScale = contentW / canvas.width; // CSS px per canvas px (same for both axes)
-    const bCanvas  = border / cssScale;       // CSS border width expressed in canvas pixels
+    // Border thickness in canvas pixels, derived from the chapter map grid's
+    // TILE_SIZE so it scales correctly with the grid regardless of CSS zoom.
+    const bCanvas = scalePx(2);
 
     // Create a snapshot canvas expanded by bCanvas on each side so the full
     // framing border fits inside without clipping.
-    const snapW = Math.round(canvas.width  + 2 * bCanvas);
-    const snapH = Math.round(canvas.height + 2 * bCanvas);
+    const snapW = canvas.width  + 2 * bCanvas;
+    const snapH = canvas.height + 2 * bCanvas;
     const snapshot = document.createElement('canvas');
     snapshot.width  = snapW;
     snapshot.height = snapH;
     const ctx = snapshot.getContext('2d');
     if (!ctx) return null;
 
-    // Draw the original chapter-map content inset by bCanvas pixels so that
-    // the grid tiles occupy the same relative area within the expanded canvas.
-    ctx.drawImage(canvas, bCanvas, bCanvas);
-
-    // Draw the framing border centered on the content boundary.  Half the
-    // stroke (bCanvas px) falls inside the grid area, half in the expanded
-    // border zone – giving a fully-visible, unclipped stroke.
+    // Draw the framing border FIRST so that the grid content drawn on top
+    // covers the inward half of the stroke, leaving only the outer bCanvas
+    // pixels visible in the border zone.
     ctx.strokeStyle = this._borderColor;
     ctx.lineWidth   = 2 * bCanvas;
     ctx.lineJoin    = 'round';
     ctx.beginPath();
     ctx.roundRect(bCanvas, bCanvas, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS);
     ctx.stroke();
+
+    // Draw the original chapter-map content inset by bCanvas pixels so that
+    // the grid tiles occupy the same relative area within the expanded canvas.
+    ctx.drawImage(canvas, bCanvas, bCanvas);
 
     // Use the full border-box rect so the expanded snapshot is positioned to
     // cover exactly the same screen area as the original canvas element
