@@ -291,7 +291,7 @@ export class ChapterMapScreen {
   captureCanvasSnapshot(): ChapterMapSnapshot | null {
     const canvas = this._canvas;
     if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
-    const cssRect = canvas.getBoundingClientRect();
+    const fullRect = canvas.getBoundingClientRect();
 
     const snapshot = document.createElement('canvas');
     snapshot.width  = canvas.width;
@@ -302,16 +302,28 @@ export class ChapterMapScreen {
 
     // Draw the framing border rounded rectangle on the snapshot so that the
     // animation overlay includes the border visual.  The CSS canvas border is
-    // outside the content box, but when the snapshot is displayed at cssRect
-    // dimensions (border-box), drawing the border at the canvas pixel edges
-    // aligns it with the CSS border area.  A lineWidth of 4 gives 2 px visible
-    // inside the canvas (the outer 2 px are clipped).
+    // outside the content box; drawing at the canvas pixel edges places it at
+    // the content boundary, matching the visual position of the CSS border.
+    // A lineWidth of 4 gives 2 px visible inside the canvas (the outer 2 px
+    // are clipped), matching the 2 px CSS border width.
     ctx.strokeStyle = this._borderColor;
     ctx.lineWidth = 4;
     ctx.lineJoin = 'round';
     ctx.beginPath();
     ctx.roundRect(0, 0, canvas.width, canvas.height, CHAPTER_MAP_CANVAS_BORDER_RADIUS);
     ctx.stroke();
+
+    // Use the content-area rect (excluding the CSS border) so the snapshot is
+    // displayed at exactly the same pixel scale as the chapter map canvas tiles.
+    // Using the full border-box rect would stretch the snapshot slightly, causing
+    // the grid tiles to appear at a subtly different size in the overlay.
+    const border = CHAPTER_MAP_CANVAS_BORDER_PX;
+    const cssRect = {
+      left:   fullRect.left   + border,
+      top:    fullRect.top    + border,
+      width:  fullRect.width  - 2 * border,
+      height: fullRect.height - 2 * border,
+    };
 
     return { canvas: snapshot, cssRect };
   }

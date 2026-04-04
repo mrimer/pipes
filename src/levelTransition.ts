@@ -37,9 +37,10 @@ export interface ScreenRect {
 export interface ChapterMapSnapshot {
   /** Canvas element containing a pixel copy of the chapter map grid. */
   canvas: HTMLCanvasElement;
-  /** Viewport-relative CSS bounding rect of the original chapter map canvas
-   *  (border box, as returned by {@link getBoundingClientRect}). */
-  cssRect: DOMRect;
+  /** Viewport-relative CSS content-area rect of the original chapter map
+   *  canvas (CSS border excluded – use this to position the snapshot at the
+   *  same pixel scale as the live canvas). */
+  cssRect: { left: number; top: number; width: number; height: number };
 }
 
 /** Ease-in-out quadratic: smooth acceleration then deceleration. */

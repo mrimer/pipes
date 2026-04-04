@@ -290,7 +290,6 @@ export function drawSea(
 
   // ── Land border on non-sea edges ────────────────────────────────────────
   const bw = _s(4);                           // border thickness
-  const cornerR = _s(6);                      // corner arc radius
   ctx.fillStyle = SEA_BORDER_COLOR;
 
   // Edge borders
@@ -307,10 +306,7 @@ export function drawSea(
   _drawSeaBorderInnerCorner(ctx, -half, half, waterColor, bw, !neighbors.south, !neighbors.west);
 
   // Concave (inner) corners: both cardinal edge neighbors are sea but the diagonal is NOT.
-  _drawSeaConcaveCorner(ctx, -half, -half, cornerR, neighbors.north, neighbors.west, !neighbors.nw);
-  _drawSeaConcaveCorner(ctx, half, -half, cornerR, neighbors.north, neighbors.east, !neighbors.ne);
-  _drawSeaConcaveCorner(ctx, half, half, cornerR, neighbors.south, neighbors.east, !neighbors.se);
-  _drawSeaConcaveCorner(ctx, -half, half, cornerR, neighbors.south, neighbors.west, !neighbors.sw);
+  // (removed: concave/convex corner curve rendering has been eliminated)
 
   // ── Ripple effects ──────────────────────────────────────────────────────
   _drawSeaRipple(ctx, half, -half * 0.3, -half * 0.25, now, 0);
@@ -418,11 +414,15 @@ function _drawSeaRipple(
   ctx.lineCap = 'round';
 
   ctx.beginPath();
-  ctx.moveTo(-rw / 2, 0);
-  // Two peaks at 1/4 and 3/4 of the ripple width
+  // Start and end with a short flat section at baseline so the wave naturally
+  // returns to zero at both ends instead of appearing as a half-peak.
+  const ext = rw / 6;
   const peakH = maxH * t;
+  ctx.moveTo(-rw / 2 - ext, 0);
+  ctx.lineTo(-rw / 2, 0);                              // flat entry
   ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);
   ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);
+  ctx.lineTo(rw / 2 + ext, 0);                         // flat exit
   ctx.stroke();
   ctx.restore();
 }
