@@ -17,7 +17,7 @@ import {
 import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
-import { playLevelTransition } from './levelTransition';
+import { playLevelTransition, ChapterMapSnapshot } from './levelTransition';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -55,11 +55,12 @@ const ERROR_FLASH_CSS =
 // how much vertical space is consumed by UI elements outside the game canvas, so
 // the canvas can be sized to fill the remaining viewport height.
 
-/** Estimated height (px) of the <h1> title: margin(20) + 2rem text(32) + margin(16) = 68,
- *  plus ~6 px empirical allowance for line-height and sub-pixel rounding = 74. */
-const PLAY_H1_H = 74;
-/** Estimated height (px) of the #level-header row: 1rem font (16 px) × ~1.4 line-height ≈ 22. */
-const PLAY_LEVEL_HEADER_H = 22;
+/** Estimated top padding (px) of the #play-screen element (replaced the removed <h1>). */
+const PLAY_TOP_PADDING = 20;
+/** Estimated height (px) of the two-line #level-header: campaign-name row
+ *  (0.9 rem ≈ 14 px × 1.4 + a couple px rounding ≈ 22 px) plus chapter/level row
+ *  (1 rem ≈ 16 px × 1.4 ≈ 23 px) plus a 4 px gap between lines ≈ 49. */
+const PLAY_LEVEL_HEADER_H = 49;
 /** Estimated height (px) of the #hud button row (buttons with 6 px vertical padding). */
 const PLAY_HUD_H = 32;
 /** Gap (px) between flex children in the #play-screen column layout. */
@@ -138,6 +139,11 @@ export class Game implements InputCallbacks {
   private _pendingRings = false;
   /** `setTimeout` handle for the pending ring check, or null when none is queued. */
   private _pendingRingsTimerId: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * True while the level-enter zoom transition animation is in progress.
+   * Ring spawning and other post-load effects are deferred until it completes.
+   */
+  private _levelTransitionInProgress = false;
 
   /** Tooltip manager for displaying grid coordinates and tile info under Ctrl. */
   private readonly _tooltip: TooltipManager;
@@ -292,17 +298,22 @@ export class Game implements InputCallbacks {
       setScreen: (s) => { this.screen = s; },
       setLevelSelectVisible: (v) => { this.levelSelectEl.style.display = v ? 'flex' : 'none'; },
       setPlayScreenVisible: (v) => { this.playScreenEl.style.display = v ? 'flex' : 'none'; },
-      playLevelTransition: (minimapRect, chapterMapEl, onComplete) => {
+      playLevelTransition: (minimapRect, chapterMapSnapshot, onComplete) => {
         if (!this.board) { onComplete(); return; }
         // Force-render the board so the game canvas has the level content.
         this._renderBoard();
+        this._levelTransitionInProgress = true;
         playLevelTransition(
           minimapRect,
           this.canvas,
           this.board,
-          chapterMapEl,
+          chapterMapSnapshot,
           this.playScreenEl,
-          onComplete,
+          () => {
+            this._levelTransitionInProgress = false;
+            this._spawnPendingRingsIfReady();
+            onComplete();
+          },
         );
       },
       levelHeaderEl: this.levelHeaderEl,
@@ -382,7 +393,7 @@ export class Game implements InputCallbacks {
     const hasNote  = !!level.note;
     const hasHints = !!(level.hints?.length);
 
-    let overhead = PLAY_H1_H + PLAY_LEVEL_HEADER_H + PLAY_GAP + PLAY_HUD_H + PLAY_GAP + PLAY_PADDING_BOTTOM;
+    let overhead = PLAY_TOP_PADDING + PLAY_LEVEL_HEADER_H + PLAY_GAP + PLAY_HUD_H + PLAY_GAP + PLAY_PADDING_BOTTOM;
     if (hasNote)  overhead += PLAY_NOTE_PANEL_H + PLAY_GAP;
     if (hasHints) overhead += PLAY_HINT_PANEL_H + PLAY_GAP;
     return overhead;
@@ -716,6 +727,8 @@ export class Game implements InputCallbacks {
    */
   private _spawnPendingRingsIfReady(): void {
     if (!this._pendingRings || !this.board) return;
+    // Defer until the zoom transition finishes so rings don't appear mid-animation.
+    if (this._levelTransitionInProgress) return;
     // Defer until campaign modals that block the view are dismissed.
     if (
       this._campaign._newChapterModalElInternal.style.display !== 'none' ||
@@ -1293,7 +1306,15 @@ export class Game implements InputCallbacks {
     this.board = new Board(level.rows, level.cols, level);
     this._enterPlayScreenState(level);
     this._campaign.currentChapterId = 0;
-    this.levelHeaderEl.textContent = `▶ Playtesting: ${level.name}`;
+    this.levelHeaderEl.innerHTML = '';
+    const ptLine1 = document.createElement('div');
+    ptLine1.style.cssText = 'font-size:0.9rem;color:#aaa;';
+    ptLine1.textContent = '▶ Playtesting';
+    this.levelHeaderEl.appendChild(ptLine1);
+    const ptLine2 = document.createElement('div');
+    ptLine2.style.cssText = 'font-size:1rem;color:#f0c040;';
+    ptLine2.textContent = level.name;
+    this.levelHeaderEl.appendChild(ptLine2);
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
     this._metrics.hideBestScore();
