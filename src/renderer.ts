@@ -1277,7 +1277,7 @@ function _renderHoverPreview(
     const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
     const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
     if (canPlace || canReplace) {
-      const previewTile = new Tile(selectedShape, (pendingRotation % 360) as 0 | 90 | 180 | 270);
+      const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
       _drawPreviewTile(ctx, px, py, previewTile, currentWater);
     }
   } else if (hoverRotationDelta > 0) {
