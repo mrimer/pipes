@@ -255,7 +255,8 @@ export class MetricsDisplay {
    * current board state. Spawns metric sparkles when values change (suppressed after
    * undo/redo until {@link resetBaselines} is called).
    */
-  updateWaterDisplay(board: Board): void {    const suppressSparkles = this._suppressNextMetricSparkles;
+  updateWaterDisplay(board: Board): void {
+    const suppressSparkles = this._suppressNextMetricSparkles;
     this._suppressNextMetricSparkles = false;
 
     const w = board.getCurrentWater();

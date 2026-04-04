@@ -1107,10 +1107,13 @@ export class Board {
   private _unspendInventory(shape: PipeShape): void {
     const idx = this.inventory.findIndex((it) => it.shape === shape);
     if (idx !== -1) {
-      this.inventory[idx].count++;
-    } else {
-      const pushIdx = this.inventory.findIndex((it) => it.shape === shape && it.count < 0);
-      if (pushIdx !== -1) this.inventory.splice(pushIdx, 1);
+      if (this.inventory[idx].count === -1) {
+        // Remove the sentinel over-draw entry pushed by _spendInventory when the
+        // shape had no base inventory entry; restoring the pre-spend no-entry state.
+        this.inventory.splice(idx, 1);
+      } else {
+        this.inventory[idx].count++;
+      }
     }
   }
 

@@ -223,7 +223,8 @@ export class TurnStateManager {
         const tile = this.grid[r]?.[c];
         if (
           tile?.shape === PipeShape.Chamber &&
-          ENV_MODIFIER_CONTENTS.has(tile.chamberContent!)
+          tile.chamberContent !== null &&
+          ENV_MODIFIER_CONTENTS.has(tile.chamberContent)
         ) {
           return true;
         }
