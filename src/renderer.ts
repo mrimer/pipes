@@ -414,15 +414,15 @@ function _drawSeaRipple(
   ctx.lineCap = 'round';
 
   ctx.beginPath();
-  // Start and end with a short flat section at baseline so the wave naturally
-  // returns to zero at both ends instead of appearing as a half-peak.
-  const ext = rw / 6;
+  // Four equal arches spanning -rw to rw: half-arches at each end complete the
+  // sinusoidal pattern so the wave enters and exits at baseline with a smooth curve
+  // rather than an abrupt half-peak.
   const peakH = maxH * t;
-  ctx.moveTo(-rw / 2 - ext, 0);
-  ctx.lineTo(-rw / 2, 0);                              // flat entry
-  ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);
-  ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);
-  ctx.lineTo(rw / 2 + ext, 0);                         // flat exit
+  ctx.moveTo(-rw, 0);
+  ctx.quadraticCurveTo(-3 * rw / 4, peakH, -rw / 2, 0);  // left half-arch
+  ctx.quadraticCurveTo(-rw / 4, peakH, 0, 0);             // first main arch
+  ctx.quadraticCurveTo(rw / 4, peakH, rw / 2, 0);         // second main arch
+  ctx.quadraticCurveTo(3 * rw / 4, peakH, rw, 0);         // right half-arch
   ctx.stroke();
   ctx.restore();
 }
