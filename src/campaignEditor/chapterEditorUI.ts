@@ -40,7 +40,7 @@ export interface ChapterEditorUICallbacks {
   recordSnapshot(chapter: ChapterDef, markChanged?: boolean): void;
   saveGridState(chapter: ChapterDef, campaign: CampaignDef): void;
   resizeGrid(newRows: number, newCols: number, chapter: ChapterDef, campaign: CampaignDef): void;
-  slideGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef, campaign: CampaignDef): void;
+  slideGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void;
   renderCanvas(): void;
 
   // Parent callbacks (forwarded from ChapterMapEditorCallbacks)
@@ -287,7 +287,7 @@ export class ChapterEditorUI {
       b.textContent = icon;
       b.title = `Slide all tiles ${dir === 'N' ? 'North (up)' : dir === 'E' ? 'East (right)' : dir === 'S' ? 'South (down)' : 'West (left)'}`;
       b.style.cssText = arrowBtnStyle;
-      b.addEventListener('click', () => this._cb.slideGrid(dir, chapter, campaign));
+      b.addEventListener('click', () => this._cb.slideGrid(dir, chapter));
       return b;
     };
 
