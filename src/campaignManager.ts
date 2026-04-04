@@ -241,7 +241,7 @@ export class CampaignManager {
    * the chapter map.
    */
   reshowChapterMap(): void {
-    if (this._chapterMapScreen && this._activeCampaign) {
+    if (this._chapterMapScreen && this._activeCampaign && this._chapterMapScreen.chapterIdx >= 0) {
       this._chapterMapScreen.show(this._activeCampaign, this._chapterMapScreen.chapterIdx);
     }
   }
