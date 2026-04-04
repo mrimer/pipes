@@ -365,7 +365,6 @@ export class Game implements InputCallbacks {
     this.gameoverMenuBtnEl.textContent = 'Level Select';
     // Reset HUD exit button label in case it was changed for playtesting.
     this.exitBtnEl.textContent = '← Menu';
-    this.exitBtnEl.textContent = '← Menu';
     this._campaign.renderLevelList();
     // Scroll the active level's row into view near the center of the viewport.
     if (scrollToLevelId !== null) {
