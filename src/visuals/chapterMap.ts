@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, AmbientDecorationType } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_LIGHT_CYCLE_MS } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
@@ -356,11 +356,6 @@ const CARDINAL_DIRS: [Direction, number, number][] = [
   [Direction.West, -1,  0],
 ];
 
-/** Triangle geometry fractions – must match the values in renderer.ts. */
-const _TRI_FRACS = [0.58, 0.72, 0.86] as const;
-const _TRI_DEPTH = 0.10;
-const _TRI_WING  = 0.09;
-
 /**
  * Draw 3 small dark filled triangles along one chapter-map connector arm
  * (landing-strip base markers).  Called with the canvas already translated
@@ -373,10 +368,10 @@ function _drawChapterMapArmTriangles(
   half: number,
   isSource: boolean,
 ): void {
-  const depth = half * _TRI_DEPTH;
-  const wing  = half * _TRI_WING;
+  const depth = half * CONNECTOR_TRI_DEPTH;
+  const wing  = half * CONNECTOR_TRI_WING;
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  for (const frac of _TRI_FRACS) {
+  for (const frac of CONNECTOR_TRI_FRACS) {
     const d = half * frac;
     ctx.beginPath();
     if (isSource) {
@@ -858,7 +853,7 @@ export function renderChapterMapConnectorLights(
   now: number,
 ): void {
   const half = TILE_SIZE / 2;
-  const litIndex = Math.floor((now % CONNECTOR_LIGHT_CYCLE_MS) / (CONNECTOR_LIGHT_CYCLE_MS / 3));
+  const litIndex = connectorLitIndex(now);
 
   if (positions.source) {
     const src = positions.source;
