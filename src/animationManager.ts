@@ -13,7 +13,7 @@ import {
   GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR,
   GOLD_BUBBLE_COLOR,
 } from './colors';
-import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, drawConnectorGlow, CONNECTOR_LIGHT_CYCLE_MS } from './renderer';
+import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, drawConnectorGlow, connectorLitIndex } from './renderer';
 import {
   TileAnimation, renderAnimations, animColor, ANIM_DURATION,
   ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR,
@@ -429,7 +429,7 @@ export class AnimationManager {
    */
   private _tickConnectorLights(board: Board): void {
     const now = performance.now();
-    const litIndex = Math.floor((now % CONNECTOR_LIGHT_CYCLE_MS) / (CONNECTOR_LIGHT_CYCLE_MS / 3));
+    const litIndex = connectorLitIndex(now);
     const half = TILE_SIZE / 2;
     const filled = board.getFilledPositions();
 

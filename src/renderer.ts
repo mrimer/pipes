@@ -77,14 +77,24 @@ const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
  * Positions of the 3 landing-strip triangles along a Source/Sink connector arm,
  * as fractions of `half` (the half tile size).
  */
-const CONNECTOR_TRI_FRACS = [0.58, 0.72, 0.86] as const;
+export const CONNECTOR_TRI_FRACS = [0.58, 0.72, 0.86] as const;
 /** Depth (along-arm extent) of each landing-strip triangle, as a fraction of `half`. */
-const CONNECTOR_TRI_DEPTH = 0.10;
+export const CONNECTOR_TRI_DEPTH = 0.10;
 /** Half-width (perpendicular extent) of each landing-strip triangle, as a fraction of `half`. */
-const CONNECTOR_TRI_WING  = 0.09;
+export const CONNECTOR_TRI_WING  = 0.09;
 
-/** Full landing-strip cycle duration in ms (3 steps × 300 ms each). */
-export const CONNECTOR_LIGHT_CYCLE_MS = 900;
+/** Number of distinct triangle positions (steps) in one landing-strip cycle. */
+export const CONNECTOR_LIGHT_STEPS = CONNECTOR_TRI_FRACS.length;
+/** Full landing-strip cycle duration in ms (CONNECTOR_LIGHT_STEPS steps × 300 ms each). */
+export const CONNECTOR_LIGHT_CYCLE_MS = CONNECTOR_LIGHT_STEPS * 300;
+
+/**
+ * Compute which triangle index (0 … CONNECTOR_LIGHT_STEPS−1) should be lit
+ * at the given timestamp.
+ */
+export function connectorLitIndex(now: number): number {
+  return Math.floor((now % CONNECTOR_LIGHT_CYCLE_MS) / (CONNECTOR_LIGHT_CYCLE_MS / CONNECTOR_LIGHT_STEPS));
+}
 
 /**
  * Exported alias for `_s`.  Allows other modules (e.g. campaignEditor/renderer)
