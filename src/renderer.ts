@@ -74,6 +74,19 @@ const PREVIEW_SHADOW_BLUR = 14;
 const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
 
 /**
+ * Positions of the 3 landing-strip triangles along a Source/Sink connector arm,
+ * as fractions of `half` (the half tile size).
+ */
+const CONNECTOR_TRI_FRACS = [0.58, 0.72, 0.86] as const;
+/** Depth (along-arm extent) of each landing-strip triangle, as a fraction of `half`. */
+const CONNECTOR_TRI_DEPTH = 0.10;
+/** Half-width (perpendicular extent) of each landing-strip triangle, as a fraction of `half`. */
+const CONNECTOR_TRI_WING  = 0.09;
+
+/** Full landing-strip cycle duration in ms (3 steps × 300 ms each). */
+export const CONNECTOR_LIGHT_CYCLE_MS = 900;
+
+/**
  * Exported alias for `_s`.  Allows other modules (e.g. campaignEditor/renderer)
  * to scale pixel constants using the same factor.
  */
@@ -172,7 +185,97 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
   ctx.restore();
 }
 
+/**
+ * Draw 3 small dark filled triangles along one connector arm.
+ * The triangles act as the unlit base of the landing-strip light markers.
+ *
+ * @param ctx       Canvas rendering context (translation already applied so origin = tile center).
+ * @param nx        X component of the arm unit vector (±1 or 0).
+ * @param ny        Y component of the arm unit vector (±1 or 0).
+ * @param half      Half the tile size in canvas pixels.
+ * @param isSource  When true triangles point outward (away from centre);
+ *                  when false they point inward (toward centre).
+ */
+function _drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number, half: number, isSource: boolean): void {
+  const depth = half * CONNECTOR_TRI_DEPTH;
+  const wing  = half * CONNECTOR_TRI_WING;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  for (const frac of CONNECTOR_TRI_FRACS) {
+    const d = half * frac;
+    ctx.beginPath();
+    if (isSource) {
+      // Tip points away from centre
+      ctx.moveTo(nx * (d + depth / 2), ny * (d + depth / 2));
+      ctx.lineTo(nx * (d - depth / 2) - ny * wing, ny * (d - depth / 2) + nx * wing);
+      ctx.lineTo(nx * (d - depth / 2) + ny * wing, ny * (d - depth / 2) - nx * wing);
+    } else {
+      // Tip points toward centre
+      ctx.moveTo(nx * (d - depth / 2), ny * (d - depth / 2));
+      ctx.lineTo(nx * (d + depth / 2) - ny * wing, ny * (d + depth / 2) + nx * wing);
+      ctx.lineTo(nx * (d + depth / 2) + ny * wing, ny * (d + depth / 2) - nx * wing);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/**
+ * Draw the animated landing-strip light glow for one frame on a Source or Sink tile.
+ * Call once per animation frame BEFORE particle effects so the glow renders below droplets.
+ *
+ * @param ctx         Canvas rendering context.
+ * @param cx          Canvas x-coordinate of the tile center.
+ * @param cy          Canvas y-coordinate of the tile center.
+ * @param connections Set of directions this tile connects to.
+ * @param isSource    true for source (outward triangles), false for sink (inward triangles).
+ * @param brightColor Lit color (brighter than the tile's main hue).
+ * @param half        Half the tile size in canvas pixels.
+ * @param litIndex    Which step of the sequence is lit (0, 1, or 2).
+ */
+export function drawConnectorGlow(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  connections: Set<Direction>,
+  isSource: boolean,
+  brightColor: string,
+  half: number,
+  litIndex: number,
+): void {
+  const depth = half * CONNECTOR_TRI_DEPTH;
+  const wing  = half * CONNECTOR_TRI_WING;
+  // Source: sequence moves outward (0→1→2 maps to nearest→farthest).
+  // Sink:   sequence moves inward  (0→1→2 maps to farthest→nearest).
+  const posIndex = isSource ? litIndex : (2 - litIndex);
+  const d = half * CONNECTOR_TRI_FRACS[posIndex];
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = brightColor;
+  ctx.shadowColor = brightColor;
+  ctx.shadowBlur = _s(6);
+
+  for (const [dir, nx, ny] of CARDINAL_DIRS) {
+    if (!connections.has(dir)) continue;
+    ctx.beginPath();
+    if (isSource) {
+      ctx.moveTo(nx * (d + depth / 2), ny * (d + depth / 2));
+      ctx.lineTo(nx * (d - depth / 2) - ny * wing, ny * (d - depth / 2) + nx * wing);
+      ctx.lineTo(nx * (d - depth / 2) + ny * wing, ny * (d - depth / 2) - nx * wing);
+    } else {
+      ctx.moveTo(nx * (d - depth / 2), ny * (d - depth / 2));
+      ctx.lineTo(nx * (d + depth / 2) - ny * wing, ny * (d + depth / 2) + nx * wing);
+      ctx.lineTo(nx * (d + depth / 2) + ny * wing, ny * (d + depth / 2) - nx * wing);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape, buttEndDirs?: Set<Direction>): void {
+  const isSource = shape === PipeShape.Source;
   // Radiating lines – drawn first so the centre decorations render on top
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
@@ -183,25 +286,8 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
     ctx.stroke();
-    // Directional chevron on the arm: outward (▶) for Source, inward (◀) for Sink
-    const d = half * 0.66;
-    const wing = half * 0.13;
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    if (shape === PipeShape.Source) {
-      // Tip points away from centre
-      ctx.moveTo(nx * (d - wing) - ny * wing, ny * (d - wing) + nx * wing);
-      ctx.lineTo(nx * d, ny * d);
-      ctx.lineTo(nx * (d - wing) + ny * wing, ny * (d - wing) - nx * wing);
-    } else {
-      // Tip points toward centre
-      const tipD = d - wing * 2;
-      ctx.moveTo(nx * d - ny * wing, ny * d + nx * wing);
-      ctx.lineTo(nx * tipD, ny * tipD);
-      ctx.lineTo(nx * d + ny * wing, ny * d - nx * wing);
-    }
-    ctx.stroke();
+    // 3 small dark triangles along the arm (landing-strip base markers)
+    _drawArmTriangles(ctx, nx, ny, half, isSource);
   }
 
   if (shape === PipeShape.Source) {

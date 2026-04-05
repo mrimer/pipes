@@ -9,6 +9,14 @@ export const SOURCE_COLOR            = '#e67e22';
 export const SOURCE_WATER_COLOR      = '#f39c12';
 export const SINK_COLOR              = '#8e44ad';
 export const SINK_WATER_COLOR        = '#9b59b6';
+/** Bright glow color for lit landing-strip triangles on Source connector arms. */
+export const SOURCE_CONNECTOR_LIT       = '#ffba70';
+/** Bright glow color for lit landing-strip triangles on Source connector arms (water state). */
+export const SOURCE_WATER_CONNECTOR_LIT = '#ffd080';
+/** Bright glow color for lit landing-strip triangles on Sink connector arms. */
+export const SINK_CONNECTOR_LIT         = '#cc88ff';
+/** Bright glow color for lit landing-strip triangles on Sink connector arms (water state). */
+export const SINK_WATER_CONNECTOR_LIT   = '#d4a0ff';
 export const TANK_COLOR              = '#2196f3';
 export const TANK_WATER_COLOR        = '#00bcd4';
 export const FIXED_PIPE_COLOR        = '#4a6878';

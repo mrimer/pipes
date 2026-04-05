@@ -7,11 +7,13 @@ import {
 import { Tile } from './tile';
 import { Direction, GridPos, PipeShape, GameState } from './types';
 import {
-  WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR,
+  WATER_COLOR, SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
+  SOURCE_CONNECTOR_LIT, SOURCE_WATER_CONNECTOR_LIT,
+  SINK_CONNECTOR_LIT, SINK_WATER_CONNECTOR_LIT,
   GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR,
   GOLD_BUBBLE_COLOR,
 } from './colors';
-import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims } from './renderer';
+import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, drawConnectorGlow, CONNECTOR_LIGHT_CYCLE_MS } from './renderer';
 import {
   TileAnimation, renderAnimations, animColor, ANIM_DURATION,
   ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR,
@@ -342,6 +344,8 @@ export class AnimationManager {
   tick(board: Board | null, gameState: GameState): void {
     renderAnimations(this.ctx, this.animations, this.canvas.width);
     if (!board) return;
+    // Connector lights run first so they render below droplets and particles.
+    this._tickConnectorLights(board);
     this._tickSourceSpray(board, gameState);
     this._tickBubbles(board);
     this._tickLeakySpray(board, gameState);
@@ -418,6 +422,36 @@ export class AnimationManager {
   }
 
   // ─── Private tick helpers ─────────────────────────────────────────────────
+
+  /**
+   * Render the animated landing-strip connector lights on the source and sink tiles.
+   * Called at the start of each frame tick so the glow renders below all particle effects.
+   */
+  private _tickConnectorLights(board: Board): void {
+    const now = performance.now();
+    const litIndex = Math.floor((now % CONNECTOR_LIGHT_CYCLE_MS) / (CONNECTOR_LIGHT_CYCLE_MS / 3));
+    const half = TILE_SIZE / 2;
+    const filled = board.getFilledPositions();
+
+    const { source, sink } = board;
+    const sourceTile = board.grid[source.row]?.[source.col];
+    if (sourceTile) {
+      const sourceIsFilled = filled.has(`${source.row},${source.col}`);
+      const color = sourceIsFilled ? SOURCE_WATER_CONNECTOR_LIT : SOURCE_CONNECTOR_LIT;
+      const cx = source.col * TILE_SIZE + TILE_SIZE / 2;
+      const cy = source.row * TILE_SIZE + TILE_SIZE / 2;
+      drawConnectorGlow(this.ctx, cx, cy, sourceTile.connections, true, color, half, litIndex);
+    }
+
+    const sinkTile = board.grid[sink.row]?.[sink.col];
+    if (sinkTile) {
+      const sinkIsFilled = filled.has(`${sink.row},${sink.col}`);
+      const color = sinkIsFilled ? SINK_WATER_CONNECTOR_LIT : SINK_CONNECTOR_LIT;
+      const cx = sink.col * TILE_SIZE + TILE_SIZE / 2;
+      const cy = sink.row * TILE_SIZE + TILE_SIZE / 2;
+      drawConnectorGlow(this.ctx, cx, cy, sinkTile.connections, false, color, half, litIndex);
+    }
+  }
 
   /** Spawn and render the source spray drops (or dry puffs). Runs every frame during play. */
   private _tickSourceSpray(board: Board, gameState: GameState): void {
