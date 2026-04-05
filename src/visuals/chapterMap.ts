@@ -5,11 +5,13 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, AmbientDecorationType } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_LIGHT_CYCLE_MS } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
+  SOURCE_CONNECTOR_LIT, SOURCE_WATER_CONNECTOR_LIT,
+  SINK_CONNECTOR_LIT, SINK_WATER_CONNECTOR_LIT,
   CHAMBER_FILL_COLOR,
   WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR,
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
@@ -354,7 +356,44 @@ const CARDINAL_DIRS: [Direction, number, number][] = [
   [Direction.West, -1,  0],
 ];
 
-/** Draw a Source or Sink tile: tile background, radiating arms with directional chevrons, and a shape-specific centre motif. */
+/** Triangle geometry fractions – must match the values in renderer.ts. */
+const _TRI_FRACS = [0.58, 0.72, 0.86] as const;
+const _TRI_DEPTH = 0.10;
+const _TRI_WING  = 0.09;
+
+/**
+ * Draw 3 small dark filled triangles along one chapter-map connector arm
+ * (landing-strip base markers).  Called with the canvas already translated
+ * to the tile center.
+ */
+function _drawChapterMapArmTriangles(
+  ctx: CanvasRenderingContext2D,
+  nx: number,
+  ny: number,
+  half: number,
+  isSource: boolean,
+): void {
+  const depth = half * _TRI_DEPTH;
+  const wing  = half * _TRI_WING;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  for (const frac of _TRI_FRACS) {
+    const d = half * frac;
+    ctx.beginPath();
+    if (isSource) {
+      ctx.moveTo(nx * (d + depth / 2), ny * (d + depth / 2));
+      ctx.lineTo(nx * (d - depth / 2) - ny * wing, ny * (d - depth / 2) + nx * wing);
+      ctx.lineTo(nx * (d - depth / 2) + ny * wing, ny * (d - depth / 2) - nx * wing);
+    } else {
+      ctx.moveTo(nx * (d - depth / 2), ny * (d - depth / 2));
+      ctx.lineTo(nx * (d + depth / 2) - ny * wing, ny * (d + depth / 2) + nx * wing);
+      ctx.lineTo(nx * (d + depth / 2) + ny * wing, ny * (d + depth / 2) - nx * wing);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/** Draw a Source or Sink tile: tile background, radiating arms with landing-strip triangle markers, and a shape-specific centre motif. */
 function _drawChapterMapEndpoint(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -387,22 +426,8 @@ function _drawChapterMapEndpoint(
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
     ctx.stroke();
-    // Directional chevron: outward (▶) for Source, inward (◀) for Sink
-    const d = half * 0.66;
-    const wing = half * 0.13;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    if (isSource) {
-      ctx.moveTo(nx * (d - wing) - ny * wing, ny * (d - wing) + nx * wing);
-      ctx.lineTo(nx * d, ny * d);
-      ctx.lineTo(nx * (d - wing) + ny * wing, ny * (d - wing) - nx * wing);
-    } else {
-      const tipD = d - wing * 2;
-      ctx.moveTo(nx * d - ny * wing, ny * d + nx * wing);
-      ctx.lineTo(nx * tipD, ny * tipD);
-      ctx.lineTo(nx * d + ny * wing, ny * d - nx * wing);
-    }
-    ctx.stroke();
+    // 3 small dark triangles along the arm (landing-strip base markers)
+    _drawChapterMapArmTriangles(ctx, nx, ny, half, isSource);
   }
 
   if (isSource) {
@@ -788,6 +813,7 @@ export function drawEdgeFlower(
 /**
  * Find the canvas pixel centres of the source and all sinks in the chapter map grid.
  * Returns null for source if not found.
+ * Also returns the connection set for each endpoint so callers can render directional markers.
  */
 export function findChapterMapAnimPositions(
   grid: (TileDef | null)[][],
@@ -795,12 +821,12 @@ export function findChapterMapAnimPositions(
   cols: number,
   filledKeys: ReadonlySet<string>,
 ): {
-  source: { x: number; y: number; row: number; col: number; isFilled: boolean } | null;
-  sinks:  Array<{ x: number; y: number; isFilled: boolean }>;
+  source: { x: number; y: number; row: number; col: number; isFilled: boolean; connections: Set<Direction> } | null;
+  sinks:  Array<{ x: number; y: number; isFilled: boolean; connections: Set<Direction> }>;
 } {
   const CELL = TILE_SIZE;
-  let source: { x: number; y: number; row: number; col: number; isFilled: boolean } | null = null;
-  const sinks: Array<{ x: number; y: number; isFilled: boolean }> = [];
+  let source: { x: number; y: number; row: number; col: number; isFilled: boolean; connections: Set<Direction> } | null = null;
+  const sinks: Array<{ x: number; y: number; isFilled: boolean; connections: Set<Direction> }> = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c];
@@ -808,12 +834,43 @@ export function findChapterMapAnimPositions(
       const isFilled = filledKeys.has(`${r},${c}`);
       const cx = c * CELL + CELL / 2;
       const cy = r * CELL + CELL / 2;
-      if (def.shape === PipeShape.Source) source = { x: cx, y: cy, row: r, col: c, isFilled };
-      else if (def.shape === PipeShape.Sink) sinks.push({ x: cx, y: cy, isFilled });
+      if (def.shape === PipeShape.Source) {
+        source = { x: cx, y: cy, row: r, col: c, isFilled, connections: tileDefConnections(def) };
+      } else if (def.shape === PipeShape.Sink) {
+        sinks.push({ x: cx, y: cy, isFilled, connections: tileDefConnections(def) });
+      }
     }
   }
   return { source, sinks };
 }
+
+/**
+ * Render the animated landing-strip connector lights for all Source and Sink tiles
+ * visible on the chapter map.  Call BEFORE particle effects so the glow renders below droplets.
+ *
+ * @param ctx       2D rendering context.
+ * @param positions Result from {@link findChapterMapAnimPositions}.
+ * @param now       Current timestamp from `performance.now()` or `requestAnimationFrame`.
+ */
+export function renderChapterMapConnectorLights(
+  ctx: CanvasRenderingContext2D,
+  positions: ReturnType<typeof findChapterMapAnimPositions>,
+  now: number,
+): void {
+  const half = TILE_SIZE / 2;
+  const litIndex = Math.floor((now % CONNECTOR_LIGHT_CYCLE_MS) / (CONNECTOR_LIGHT_CYCLE_MS / 3));
+
+  if (positions.source) {
+    const src = positions.source;
+    const color = src.isFilled ? SOURCE_WATER_CONNECTOR_LIT : SOURCE_CONNECTOR_LIT;
+    drawConnectorGlow(ctx, src.x, src.y, src.connections, true, color, half, litIndex);
+  }
+  for (const sink of positions.sinks) {
+    const color = sink.isFilled ? SINK_WATER_CONNECTOR_LIT : SINK_CONNECTOR_LIT;
+    drawConnectorGlow(ctx, sink.x, sink.y, sink.connections, false, color, half, litIndex);
+  }
+}
+
 
 // ─── Chapter map flow drops ────────────────────────────────────────────────────
 

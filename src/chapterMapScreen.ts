@@ -11,7 +11,7 @@
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES } from './board';
-import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect } from './visuals/chapterMap';
+import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -893,6 +893,9 @@ export class ChapterMapScreen {
     const { filledKeys, displayProgress } = renderResult;
 
     const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
+
+    // Connector landing-strip lights – rendered before particles so they appear below droplets
+    renderChapterMapConnectorLights(ctx, positions, now);
 
     // Sink vortex – spawn and render one vortex per sink tile
     for (const sink of positions.sinks) {
