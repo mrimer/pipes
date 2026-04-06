@@ -549,7 +549,7 @@ function _drawChapterMapSea(
 ): void {
   const CELL = TILE_SIZE;
   const _isSea = (rr: number, cc: number): boolean =>
-    rr >= 0 && rr < rows && cc >= 0 && cc < cols && grid[rr]?.[cc]?.shape === PipeShape.Sea;
+    rr < 0 || rr >= rows || cc < 0 || cc >= cols || grid[rr]?.[cc]?.shape === PipeShape.Sea;
   const neighbors: SeaNeighbors = {
     north: _isSea(r - 1, c),
     south: _isSea(r + 1, c),
