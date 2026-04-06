@@ -405,11 +405,12 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number): void {
  * in that direction is also a sea tile.
  */
 export interface SeaNeighbors {
+  /** True when the neighbor in that direction is sea OR is outside the grid. */
   north: boolean;
   east: boolean;
   south: boolean;
   west: boolean;
-  /** Diagonal neighbors for rounded corner detection. */
+  /** Diagonal neighbors for outer-corner detection. True when sea or outside grid. */
   nw: boolean;
   ne: boolean;
   sw: boolean;
@@ -419,12 +420,12 @@ export interface SeaNeighbors {
 /**
  * Draw a sea tile at the origin (caller must translate ctx to tile center).
  * The water color oscillates gently.  Land borders are drawn on edges where
- * the adjacent tile is NOT sea.  Rounded corners connect adjacent edge borders.
- * Two small ripple effects animate on the tile surface.
+ * the adjacent tile is NOT sea and NOT outside the grid.  Outer corners connect
+ * adjacent edge borders; corners at grid-boundary edges are suppressed.
  *
  * @param ctx       Canvas 2D context (translated so origin = tile center).
  * @param half      Half tile size in pixels.
- * @param neighbors Which adjacent cells are also sea tiles.
+ * @param neighbors Which adjacent cells are also sea tiles (or outside the grid).
  */
 export function drawSea(
   ctx: CanvasRenderingContext2D,
@@ -529,11 +530,12 @@ function _drawSeaRipple(
 
 /**
  * Compute sea-tile neighbor data for the tile at (row, col) on the given board.
- * Returns which of the 8 neighbors are also sea tiles.
+ * Returns which of the 8 neighbors are sea tiles.  Out-of-bounds positions are
+ * treated as sea so that no land border is drawn along the grid edges.
  */
 export function computeSeaNeighbors(board: Board, row: number, col: number): SeaNeighbors {
   const _isSea = (r: number, c: number): boolean =>
-    r >= 0 && r < board.rows && c >= 0 && c < board.cols && board.grid[r][c].shape === PipeShape.Sea;
+    r < 0 || r >= board.rows || c < 0 || c >= board.cols || board.grid[r][c].shape === PipeShape.Sea;
   return {
     north: _isSea(row - 1, col),
     south: _isSea(row + 1, col),

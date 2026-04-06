@@ -260,7 +260,8 @@ export function renderEditorCanvas(
 
 /**
  * Compute sea-tile neighbor data from a TileDef grid for a tile at (row, col).
- * Used by the editor to render sea borders with adjacency awareness.
+ * Out-of-bounds positions are treated as sea so no land border is drawn along
+ * the grid edges.  Used by the editor to render sea borders with adjacency awareness.
  */
 function _computeEditorSeaNeighbors(
   grid: (TileDef | null)[][],
@@ -270,7 +271,7 @@ function _computeEditorSeaNeighbors(
   col: number,
 ): SeaNeighbors {
   const _isSea = (r: number, c: number): boolean =>
-    r >= 0 && r < rows && c >= 0 && c < cols && grid[r]?.[c]?.shape === PipeShape.Sea;
+    r < 0 || r >= rows || c < 0 || c >= cols || grid[r]?.[c]?.shape === PipeShape.Sea;
   return {
     north: _isSea(row - 1, col),
     south: _isSea(row + 1, col),
