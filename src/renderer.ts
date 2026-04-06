@@ -420,8 +420,8 @@ export interface SeaNeighbors {
 /**
  * Draw a sea tile at the origin (caller must translate ctx to tile center).
  * The water color oscillates gently.  Land borders are drawn on edges where
- * the adjacent tile is NOT sea and NOT outside the grid.  Outer corners connect
- * adjacent edge borders; corners at grid-boundary edges are suppressed.
+ * the adjacent tile is in-bounds and not sea.  Outer corners connect adjacent
+ * edge borders; corners at grid-boundary edges are suppressed.
  *
  * @param ctx       Canvas 2D context (translated so origin = tile center).
  * @param half      Half tile size in pixels.
