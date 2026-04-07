@@ -346,6 +346,7 @@ export class ChapterMapInput {
     if (!pos) return;
     const tile = this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null;
     if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) return;
+    sfxManager.play(SfxId.LevelSelect);
     const readOnly = this._cb.getActiveCampaign()?.official === true;
     this._cb.openLevelEditor(tile.levelIdx, readOnly);
   }

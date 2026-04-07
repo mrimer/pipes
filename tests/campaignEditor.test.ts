@@ -1958,20 +1958,21 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Tee);
   });
 
-  it('auto-replace pipe: replaced tile IS present in the snapshot after auto-replace', () => {
+  it('click on placed pipe rotates it clockwise', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
-    // Seed an Elbow tile at (0,0).
+    // Seed an Elbow tile at (0,0) with rotation 0.
     state._state.grid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
     const historyLenBefore = state._state._history.length;
 
-    // Click on the occupied tile with a different pipe shape palette (no drag, no ctrl).
+    // Click on the occupied pipe tile (no ctrl, no shift) → should rotate CW.
     state._state.palette = PipeShape.Cross;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
 
     expect(state._state._history.length).toBe(historyLenBefore + 1);
     const newSnapshot = state._state._history[state._state._historyIdx];
-    expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Cross);
+    expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Elbow);
+    expect(newSnapshot.grid[0][0]?.rotation).toBe(90);
   });
 
   it('drag-move: moved tile IS present at the destination in the snapshot', () => {
