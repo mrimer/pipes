@@ -4,6 +4,7 @@
  */
 
 import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS } from '../types';
+import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR } from '../colors';
 
 // ─── Valid field sets for data validation ─────────────────────────────────────
@@ -128,6 +129,14 @@ export type EditorPalette =
 /** Returns true if the palette entry is a chamber content type. */
 export function isChamberPalette(p: EditorPalette): p is ChamberPalette {
   return typeof p === 'string' && p.startsWith('chamber:');
+}
+
+/**
+ * Returns true when the palette entry is a pipe shape, Source, or Sink —
+ * the tile types that trigger the standard pipe-placement sound effect.
+ */
+export function isPipePlacementPalette(p: EditorPalette): boolean {
+  return PIPE_SHAPES.has(p as PipeShape) || p === PipeShape.Source || p === PipeShape.Sink;
 }
 
 /** Extracts the ChamberContent from a ChamberPalette entry. */
