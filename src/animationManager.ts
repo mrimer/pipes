@@ -36,6 +36,7 @@ import {
   renderFillAnims, FILL_ANIM_DURATION,
 } from './visuals/pipeEffects';
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
+import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;
@@ -688,6 +689,7 @@ export class AnimationManager {
         const val = dir === 'connect' ? tile.pressure : -tile.pressure;
         text = val >= 0 ? `+${val}P` : `${val}P`;
         color = animColor(val);
+        if (dir === 'connect') sfxManager.play(SfxId.Pump);
       } else if (tile.chamberContent === 'snow') {
         const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
         const raw = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
@@ -705,11 +707,12 @@ export class AnimationManager {
       } else if (tile.chamberContent === 'hot_plate') {
         ({ text, color } = this._pushHotPlateAnimLabels(board, tile, r, c, dir, currentTemp, cx, cy, now));
       } else if (tile.chamberContent === 'star' && dir === 'connect') {
-        // Star tile connected – spawn golden sparkle burst from the tile center.
+        // Star tile connected – spawn golden sparkle burst from the tile center and play sfx.
         const starCx = c * TILE_SIZE + TILE_SIZE / 2;
         const starCy = r * TILE_SIZE + TILE_SIZE / 2;
         const canvasRect = this.canvas.getBoundingClientRect();
         spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
+        sfxManager.play(SfxId.Star);
       }
     }
 

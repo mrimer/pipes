@@ -26,6 +26,12 @@ import lockedUrl from '../data/sfx/locked.ogg';
 import invalidSelectionUrl from '../data/sfx/invalid-selection.ogg';
 import inventorySelectUrl from '../data/sfx/inventory-select.ogg';
 import inventoryUnselectUrl from '../data/sfx/inventory-unselect.ogg';
+import pumpMotorUrl from '../data/sfx/pump-motor.ogg';
+import dryPuffUrl from '../data/sfx/dry-puff.ogg';
+import winLevelUrl from '../data/sfx/win-level.ogg';
+import starUrl from '../data/sfx/star.ogg';
+import newChapterUrl from '../data/sfx/new-chapter.ogg';
+import undoUrl from '../data/sfx/undo.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -41,6 +47,12 @@ export const enum SfxId {
   InvalidSelection = 7,
   InventorySelect  = 8,
   InventoryUnselect = 9,
+  Pump             = 10,
+  Dry              = 11,
+  WinLevel         = 12,
+  Star             = 13,
+  NewChapter       = 14,
+  Undo             = 15,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -61,6 +73,12 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.InvalidSelection]: [invalidSelectionUrl],
   [SfxId.InventorySelect]:  [inventorySelectUrl],
   [SfxId.InventoryUnselect]: [inventoryUnselectUrl],
+  [SfxId.Pump]:             [pumpMotorUrl],
+  [SfxId.Dry]:              [dryPuffUrl],
+  [SfxId.WinLevel]:         [winLevelUrl],
+  [SfxId.Star]:             [starUrl],
+  [SfxId.NewChapter]:       [newChapterUrl],
+  [SfxId.Undo]:             [undoUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -85,6 +103,12 @@ export class SfxManager {
     [SfxId.InvalidSelection]: -1,
     [SfxId.InventorySelect]:  -1,
     [SfxId.InventoryUnselect]: -1,
+    [SfxId.Pump]:             -1,
+    [SfxId.Dry]:              -1,
+    [SfxId.WinLevel]:         -1,
+    [SfxId.Star]:             -1,
+    [SfxId.NewChapter]:       -1,
+    [SfxId.Undo]:             -1,
   };
 
   /**
