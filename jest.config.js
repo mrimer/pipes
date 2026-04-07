@@ -3,6 +3,9 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts'],
+  moduleNameMapper: {
+    '\\.(ogg|mp3|wav)$': '<rootDir>/tests/__mocks__/fileMock.js',
+  },
   collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/game.ts'],
   coverageThreshold: {
     './src/board.ts': { lines: 80 },

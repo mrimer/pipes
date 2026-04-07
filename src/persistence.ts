@@ -338,3 +338,29 @@ export function clearCompletedChapters(campaignId: string, completedChapters: Se
     localStorage.removeItem(campaignChaptersKey(campaignId));
   } catch { /* ignore */ }
 }
+
+// ─── Settings persistence ─────────────────────────────────────────────────────
+
+const SFX_VOLUME_KEY = 'pipes_sfx_volume';
+
+/**
+ * Load the persisted SFX volume setting.
+ * @returns An integer in [0, 100]; defaults to 100 when not yet set.
+ */
+export function loadSfxVolume(): number {
+  try {
+    const raw = localStorage.getItem(SFX_VOLUME_KEY);
+    if (raw !== null) {
+      const v = Number(raw);
+      if (!isNaN(v) && v >= 0 && v <= 100) return Math.round(v);
+    }
+  } catch { /* ignore */ }
+  return 100;
+}
+
+/** Persist the SFX volume setting. @param volume - Integer in [0, 100]. */
+export function saveSfxVolume(volume: number): void {
+  try {
+    localStorage.setItem(SFX_VOLUME_KEY, String(Math.round(Math.max(0, Math.min(100, volume)))));
+  } catch { /* ignore */ }
+}

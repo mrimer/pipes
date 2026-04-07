@@ -78,6 +78,8 @@ export interface CampaignCallbacks {
   showResetConfirmModal(): void;
   /** Show the game-rules modal overlay. */
   showRules(): void;
+  /** Show the settings modal overlay. */
+  showSettings(): void;
 }
 
 // ─── Module-level helper ──────────────────────────────────────────────────────
@@ -552,6 +554,7 @@ export class CampaignManager {
       levelWater,
       (ci) => this.showChapterMap(ci),
       this._activeCampaignCompletedChapters,
+      () => this._callbacks.showSettings(),
     );
   }
 
