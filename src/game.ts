@@ -1,4 +1,4 @@
-import { Board, MoveResult, ERR_GOLD_SPACE } from './board';
+import { Board, MoveResult, ERR_GOLD_SPACE, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
@@ -282,7 +282,8 @@ export class Game implements InputCallbacks {
     // Create the settings modal (SFX volume control, etc.)
     this._settingsModalEl = buildSettingsModal(
       () => sfxManager.getVolume(),
-      (v) => { sfxManager.setVolume(v); sfxManager.play(SfxId.PipePlacement); },
+      (v) => { sfxManager.setVolume(v); },
+      () => { sfxManager.play(SfxId.PipePlacement); },
       (el) => {
         saveSfxVolume(sfxManager.getVolume());
         el.style.display = 'none';
@@ -872,6 +873,8 @@ export class Game implements InputCallbacks {
       sfxManager.play(SfxId.Delete);
       this._animMgr.completeAnims();
       const changes = this.board.applyTurnDelta();
+      this._playLeakSfxIfNeeded(this.board, changes);
+      this._playGoldSfxIfNeeded(this.board, filledBefore);
       this.board.recordMove();
       const sparkle = this._metrics.sparkleCallbacks();
       this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col);
@@ -919,6 +922,8 @@ export class Game implements InputCallbacks {
     }
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
+    this._playLeakSfxIfNeeded(this.board, changes);
+    this._playGoldSfxIfNeeded(this.board, filledBefore);
     this.board.recordMove();
     let fillDelay = 0;
     if (rotationInfo) {
@@ -959,6 +964,35 @@ export class Game implements InputCallbacks {
       this.errorFlashEl.style.display = 'none';
       this._errorFlashTimer = null;
     }, ERROR_DISPLAY_MS);
+  }
+
+  /**
+   * Play the leak sound if any leaky-pipe penalty was applied in `changes`.
+   * Called once per board action so the sound plays at most once per turn.
+   */
+  private _playLeakSfxIfNeeded(board: Board, changes: Array<{ row: number; col: number; delta: number }>): void {
+    const hasLeak = changes.some(({ row, col }) =>
+      LEAKY_PIPE_SHAPES.has(board.grid[row]?.[col]?.shape as PipeShape),
+    );
+    if (hasLeak) sfxManager.play(SfxId.Leak);
+  }
+
+  /**
+   * Play the gold sound if any gold item chamber became newly connected since
+   * `filledBefore` was captured.
+   */
+  private _playGoldSfxIfNeeded(board: Board, filledBefore: Set<string>): void {
+    const filledAfter = board.getFilledPositions();
+    for (const key of filledAfter) {
+      if (filledBefore.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const tile = board.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' &&
+          tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape)) {
+        sfxManager.play(SfxId.Gold);
+        return;
+      }
+    }
   }
 
   /**
@@ -1064,6 +1098,8 @@ export class Game implements InputCallbacks {
     sfxManager.play(SfxId.PipePlacement);
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
+    this._playLeakSfxIfNeeded(this.board, changes);
+    this._playGoldSfxIfNeeded(this.board, filledBefore);
     this.board.recordMove();
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);

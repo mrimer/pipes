@@ -202,6 +202,7 @@ export function buildExitConfirmModal(
 export function buildSettingsModal(
   getVolume: () => number,
   onVolumeChange: (v: number) => void,
+  onVolumePreview: () => void,
   onConfirm: (el: HTMLElement) => void,
 ): HTMLElement {
   const el = createModalOverlay(0.5);
@@ -242,6 +243,9 @@ export function buildSettingsModal(
     const v = Number(slider.value);
     sfxValueEl.textContent = String(v);
     onVolumeChange(v);
+  });
+  slider.addEventListener('mouseup', () => {
+    onVolumePreview();
   });
 
   sfxSection.appendChild(sfxLabel);

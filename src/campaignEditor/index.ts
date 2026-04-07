@@ -213,7 +213,10 @@ export class CampaignEditor {
       'box-sizing:border-box;position:sticky;top:0;z-index:10;';
 
     if (onBack) {
-      const backBtn = this._btn('← Back', '#2a2a4a', '#aaa', onBack);
+      const backBtn = this._btn('← Back', '#2a2a4a', '#aaa', () => {
+        sfxManager.play(SfxId.Back);
+        onBack();
+      });
       toolbar.appendChild(backBtn);
     }
 
@@ -931,6 +934,7 @@ export class CampaignEditor {
         refreshPaletteUI: () => this._refreshPaletteUI(),
         updateUndoRedoButtons: () => this._updateEditorUndoRedoButtons(),
         showSourceError: () => this._showSourceError(),
+        showSinkError: () => this._showSinkError(),
       });
       this._editorInput.attach();
     }
@@ -1003,6 +1007,15 @@ export class CampaignEditor {
     const el = this._editorSourceErrorEl;
     if (!el) return;
     el.textContent = 'Only one source tile is allowed.';
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  }
+
+  /** Flashes an error message below the canvas when the Sink placement constraint is violated. */
+  private _showSinkError(): void {
+    const el = this._editorSourceErrorEl;
+    if (!el) return;
+    el.textContent = 'Only one sink tile is allowed.';
     el.style.display = 'block';
     setTimeout(() => { el.style.display = 'none'; }, 2000);
   }

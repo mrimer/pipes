@@ -8,7 +8,7 @@
  */
 
 import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
-import { PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -42,6 +42,8 @@ export interface ChapterMapInputCallbacks {
   // Tile operations
   buildTileDef(): TileDef;
   hasSourceElsewhere(): boolean;
+  hasSinkElsewhere(): boolean;
+  showSinkError(): void;
   rotateTileAt(pos: { row: number; col: number }, clockwise: boolean, chapter: ChapterDef, campaign: CampaignDef): void;
   rotateSourceSinkAt(pos: { row: number; col: number }, clockwise: boolean, chapter: ChapterDef, campaign: CampaignDef): void;
   rotatePalette(clockwise: boolean): void;
@@ -215,10 +217,14 @@ export class ChapterMapInput {
       if (this._cb.getPalette() === PipeShape.Source && this._cb.hasSourceElsewhere()) {
         return; // Only one source allowed
       }
+      if (this._cb.getPalette() === PipeShape.Sink && this._cb.hasSinkElsewhere()) {
+        this._cb.showSinkError();
+        return; // Only one sink allowed
+      }
       if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._cb.getPalette())) {
         this._paintDragActive = true;
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
-        sfxManager.play(SfxId.PipePlacement);
+        this._playChapterPlacementSfx();
         this._cb.renderCanvas();
         return;
       }
@@ -228,9 +234,7 @@ export class ChapterMapInput {
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
       } else {
-        if (isPipePlacementPalette(this._cb.getPalette())) {
-          sfxManager.play(SfxId.PipePlacement);
-        }
+        this._playChapterPlacementSfx();
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
       }
       this._cb.recordSnapshot(chapter);
@@ -374,6 +378,16 @@ export class ChapterMapInput {
       this._cb.rotateSourceSinkAt(pos, e.deltaY > 0, chapter, campaign);
     } else if (PIPE_SHAPES.has(this._cb.getPalette() as PipeShape)) {
       this._cb.rotatePalette(e.deltaY > 0);
+    }
+  }
+
+  /** Play the sfx appropriate for the current chapter map palette selection. */
+  private _playChapterPlacementSfx(): void {
+    const palette = this._cb.getPalette();
+    if (LEAKY_PIPE_SHAPES.has(palette as PipeShape)) {
+      sfxManager.play(SfxId.Leak);
+    } else if (isPipePlacementPalette(palette)) {
+      sfxManager.play(SfxId.PipePlacement);
     }
   }
 }

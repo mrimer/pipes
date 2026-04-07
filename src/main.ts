@@ -1,5 +1,5 @@
 import { Game } from './game';
-import { sfxManager } from './sfxManager';
+import { sfxManager, SfxId } from './sfxManager';
 import { loadSfxVolume } from './persistence';
 
 sfxManager.setVolume(loadSfxVolume());
@@ -58,7 +58,10 @@ redoBtnEl.addEventListener('click', () => game.performRedo());
 getEl('restart-btn').addEventListener('click', () => game.retryLevel());
 
 // Exit to menu button on play screen
-exitBtnEl.addEventListener('click', () => game.exitToMenu());
+exitBtnEl.addEventListener('click', () => {
+  sfxManager.play(SfxId.Back);
+  game.exitToMenu();
+});
 
 // Rules button on play screen
 rulesBtnEl.addEventListener('click', () => game.showRules());

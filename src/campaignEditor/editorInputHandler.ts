@@ -8,7 +8,7 @@
  */
 
 import { TileDef, PipeShape } from '../types';
-import { PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { LevelEditorState } from './levelEditorState';
@@ -27,6 +27,8 @@ export interface EditorInputCallbacks {
   updateUndoRedoButtons(): void;
   /** Flash the "only one source tile" error message. */
   showSourceError(): void;
+  /** Flash the "only one sink tile" error message. */
+  showSinkError(): void;
 }
 
 // ─── Internal gesture state ────────────────────────────────────────────────────
@@ -153,7 +155,7 @@ export class EditorInputHandler {
     // Repeatable tile on an empty cell: start a paint-drag session.
     if (existingTile === null && REPEATABLE_EDITOR_TILES.has(state.palette)) {
       this._paintDragActive = true;
-      sfxManager.play(SfxId.PipePlacement);
+      this._playPlacementSfx();
       this._paintCell(pos);
       this._cb.renderCanvas();
       return;
@@ -167,6 +169,11 @@ export class EditorInputHandler {
       // Guard: only one Source tile is allowed per level.
       if (state.palette === PipeShape.Source && state.hasSourceElsewhere()) {
         this._cb.showSourceError();
+        return;
+      }
+      // Guard: only one Sink tile is allowed per level.
+      if (state.palette === PipeShape.Sink && state.hasSinkElsewhere()) {
+        this._cb.showSinkError();
         return;
       }
       // Paint / erase immediately; snapshot recorded after the change so that
@@ -237,6 +244,11 @@ export class EditorInputHandler {
           this._cb.showSourceError();
           return;
         }
+        // Guard: only one Sink tile is allowed per level.
+        if (state.palette === PipeShape.Sink && state.hasSinkElsewhere(startPos)) {
+          this._cb.showSinkError();
+          return;
+        }
         // Ctrl+click: force-overwrite; snapshot recorded after the change.
         if (state.palette === 'erase') {
           sfxManager.play(SfxId.Delete);
@@ -261,7 +273,7 @@ export class EditorInputHandler {
         )
       ) {
         // Both palette and tile are pipe shapes: auto-replace; snapshot after.
-        sfxManager.play(SfxId.PipePlacement);
+        this._playPlacementSfx();
         state.grid[startPos.row][startPos.col] = state.buildTileDef();
         // Only link if the new tile has parameters beyond rotation.
         if (state.paletteHasNonRotationParams()) {
@@ -371,13 +383,18 @@ export class EditorInputHandler {
 
   /**
    * Play the placement sound appropriate for the currently selected palette.
+   * Leaky pipe tiles play the leak sfx (takes precedence over pipe placement).
    * Pump and star chamber tiles play their own sfx; heater and tank chamber
-   * tiles play their own sfx; pipe, source, and sink tiles play the standard
-   * pipe-placement sound; all other tiles are silent.
+   * tiles play their own sfx; gold item chamber tiles play the gold sfx;
+   * pipe, source, and sink tiles play the standard pipe-placement sound;
+   * all other tiles are silent.
    */
   private _playPlacementSfx(): void {
-    const palette = this._cb.getState().palette;
-    if (palette === 'chamber:pump') {
+    const state = this._cb.getState();
+    const palette = state.palette;
+    if (LEAKY_PIPE_SHAPES.has(palette as PipeShape)) {
+      sfxManager.play(SfxId.Leak);
+    } else if (palette === 'chamber:pump') {
       sfxManager.play(SfxId.Pump);
     } else if (palette === 'chamber:star') {
       sfxManager.play(SfxId.Star);
@@ -385,6 +402,8 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Heater);
     } else if (palette === 'chamber:tank') {
       sfxManager.play(SfxId.Tank);
+    } else if (palette === 'chamber:item' && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {
+      sfxManager.play(SfxId.Gold);
     } else if (
       isPipePlacementPalette(palette)
     ) {

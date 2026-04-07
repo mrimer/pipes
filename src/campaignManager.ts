@@ -665,6 +665,7 @@ export class CampaignManager {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
 
+    sfxManager.play(SfxId.WinChapter);
     markChapterCompleted(campaign.id, chapter.id, this._activeCampaignCompletedChapters);
     this._showChapterCompleteModal(chapterIdx, campaign);
   }

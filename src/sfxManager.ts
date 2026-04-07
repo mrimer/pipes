@@ -36,6 +36,10 @@ import heaterUrl from '../data/sfx/heater.ogg';
 import redoUrl from '../data/sfx/redo.ogg';
 import waterTankUrl from '../data/sfx/water-tank.ogg';
 import bubblesUrl from '../data/sfx/bubbles.ogg';
+import backClickUrl from '../data/sfx/back-click.ogg';
+import goldenUrl from '../data/sfx/golden.ogg';
+import dropletUrl from '../data/sfx/droplet.ogg';
+import winChapterUrl from '../data/sfx/win-chapter.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -61,6 +65,10 @@ export const enum SfxId {
   Redo             = 17,
   Tank             = 18,
   Rings            = 19,
+  Back             = 20,
+  Gold             = 21,
+  Leak             = 22,
+  WinChapter       = 23,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -91,6 +99,10 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Redo]:             [redoUrl],
   [SfxId.Tank]:             [waterTankUrl],
   [SfxId.Rings]:            [bubblesUrl],
+  [SfxId.Back]:             [backClickUrl],
+  [SfxId.Gold]:             [goldenUrl],
+  [SfxId.Leak]:             [dropletUrl],
+  [SfxId.WinChapter]:       [winChapterUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -125,6 +137,10 @@ export class SfxManager {
     [SfxId.Redo]:             -1,
     [SfxId.Tank]:             -1,
     [SfxId.Rings]:            -1,
+    [SfxId.Back]:             -1,
+    [SfxId.Gold]:             -1,
+    [SfxId.Leak]:             -1,
+    [SfxId.WinChapter]:       -1,
   };
 
   /**
