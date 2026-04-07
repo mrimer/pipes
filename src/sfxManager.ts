@@ -59,6 +59,11 @@ import snow0Url from '../data/sfx/snow0.ogg';
 import snow1Url from '../data/sfx/snow1.ogg';
 import snow2Url from '../data/sfx/snow2.ogg';
 import snow3Url from '../data/sfx/snow3.ogg';
+import disconnectUrl from '../data/sfx/disconnect.ogg';
+import cementSquishUrl from '../data/sfx/cement-squish.ogg';
+import coolerUrl from '../data/sfx/cooler.ogg';
+import vacuumUrl from '../data/sfx/vacuum.ogg';
+import sizzleIceUrl from '../data/sfx/sizzle-ice.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -107,6 +112,11 @@ export const enum SfxId {
   Snow1            = 40,
   Snow2            = 41,
   Snow3            = 42,
+  Disconnect       = 43,
+  Cement           = 44,
+  Cooler           = 45,
+  Vacuum           = 46,
+  SizzleIce        = 47,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -160,6 +170,11 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Snow1]:            [snow1Url],
   [SfxId.Snow2]:            [snow2Url],
   [SfxId.Snow3]:            [snow3Url],
+  [SfxId.Disconnect]:       [disconnectUrl],
+  [SfxId.Cement]:           [cementSquishUrl],
+  [SfxId.Cooler]:           [coolerUrl],
+  [SfxId.Vacuum]:           [vacuumUrl],
+  [SfxId.SizzleIce]:        [sizzleIceUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -217,6 +232,11 @@ export class SfxManager {
     [SfxId.Snow1]:            -1,
     [SfxId.Snow2]:            -1,
     [SfxId.Snow3]:            -1,
+    [SfxId.Disconnect]:       -1,
+    [SfxId.Cement]:           -1,
+    [SfxId.Cooler]:           -1,
+    [SfxId.Vacuum]:           -1,
+    [SfxId.SizzleIce]:        -1,
   };
 
   /**

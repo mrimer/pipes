@@ -8,7 +8,7 @@
  */
 
 import { TileDef, PipeShape } from '../types';
-import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { LevelEditorState } from './levelEditorState';
@@ -395,6 +395,8 @@ export class EditorInputHandler {
     const palette = state.palette;
     if (LEAKY_PIPE_SHAPES.has(palette as PipeShape)) {
       sfxManager.play(SfxId.Leak);
+    } else if (palette === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(palette as PipeShape)) {
+      sfxManager.play(SfxId.Cement);
     } else if (palette === 'chamber:pump') {
       sfxManager.play(SfxId.Pump);
     } else if (palette === 'chamber:star') {

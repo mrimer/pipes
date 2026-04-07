@@ -882,7 +882,10 @@ export class Game implements InputCallbacks {
     const filledBefore = this.board.getFilledPositions();
     const result = this.board.reclaimTile(pos);
     if (result.success) {
-      sfxManager.play(SfxId.Delete);
+      const reclaimedPosKey = `${pos.row},${pos.col}`;
+      const filledAfterReclaim = this.board.getFilledPositions();
+      const anyDisconnected = [...filledBefore].some(key => key !== reclaimedPosKey && !filledAfterReclaim.has(key));
+      sfxManager.play(anyDisconnected ? SfxId.Disconnect : SfxId.Delete);
       this._animMgr.completeAnims();
       const changes = this.board.applyTurnDelta();
       this._playLeakSfxIfNeeded(this.board, changes);
@@ -996,6 +999,7 @@ export class Game implements InputCallbacks {
     let maxIceRaw = -1;
     let maxSnowRaw = -1;
     let maxDirtCost = -1;
+    let hotPlateSfx: SfxId | null = null;
 
     const sfxToPlay: SfxId[] = [];
 
@@ -1010,11 +1014,13 @@ export class Game implements InputCallbacks {
       } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
         if (tile.itemCount <= 0) sfxToPlay.push(SfxId.NegativeCount);
       } else if (tile.chamberContent === 'heater') {
-        sfxToPlay.push(SfxId.Heater);
+        sfxToPlay.push(tile.temperature < 0 ? SfxId.Cooler : SfxId.Heater);
       } else if (tile.chamberContent === 'pump') {
-        sfxToPlay.push(SfxId.Pump);
+        sfxToPlay.push(tile.pressure < 0 ? SfxId.Vacuum : SfxId.Pump);
       } else if (tile.chamberContent === 'hot_plate') {
-        sfxToPlay.push(SfxId.Sizzle);
+        // Sizzle overrides SizzleIce; collect at most one hot-plate sound per turn.
+        const candidate = board.frozen > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
+        if (hotPlateSfx !== SfxId.Sizzle) hotPlateSfx = candidate;
       } else if (tile.chamberContent === 'star') {
         sfxToPlay.push(SfxId.Star);
       } else if (tile.chamberContent === 'ice') {
@@ -1030,6 +1036,9 @@ export class Game implements InputCallbacks {
         if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
       }
     }
+
+    // Collect a single hot-plate sfx per turn (Sizzle overrides SizzleIce).
+    if (hotPlateSfx !== null) sfxToPlay.push(hotPlateSfx);
 
     // Collect a single ice sfx based on the highest-cost ice tile connected this turn.
     if (maxIceRaw >= 0) {
@@ -1240,6 +1249,7 @@ export class Game implements InputCallbacks {
     this._animMgr.spawnFillAnims(this.board, filledBefore);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
+    if (result.cementDecrement) sfxManager.play(SfxId.Cement);
 
     this._playAfterTilePlacedSfx(this.board, filledBefore, changes, placedIsLeakyAndConnected);
 
