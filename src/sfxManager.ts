@@ -20,15 +20,27 @@ import pipe4Url   from '../data/sfx/pipe4.ogg';
 import swishCwUrl  from '../data/sfx/swish-cw.ogg';
 import swishCcwUrl from '../data/sfx/swish-ccw.ogg';
 import erasePuffUrl from '../data/sfx/erase-puff.ogg';
+import challengeUrl from '../data/sfx/challenge.ogg';
+import levelSelectUrl from '../data/sfx/level-select.ogg';
+import lockedUrl from '../data/sfx/locked.ogg';
+import invalidSelectionUrl from '../data/sfx/invalid-selection.ogg';
+import inventorySelectUrl from '../data/sfx/inventory-select.ogg';
+import inventoryUnselectUrl from '../data/sfx/inventory-unselect.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
 /** Logical identifiers for each sound effect. */
 export const enum SfxId {
-  PipePlacement = 0,
-  RotateCW      = 1,
-  RotateCCW     = 2,
-  Delete        = 3,
+  PipePlacement    = 0,
+  RotateCW         = 1,
+  RotateCCW        = 2,
+  Delete           = 3,
+  Challenge        = 4,
+  LevelSelect      = 5,
+  Locked           = 6,
+  InvalidSelection = 7,
+  InventorySelect  = 8,
+  InventoryUnselect = 9,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -39,10 +51,16 @@ export const enum SfxId {
  * played file) each time the sound is triggered.
  */
 const SFX_FILES: { [K in SfxId]: string[] } = {
-  [SfxId.PipePlacement]: [pipe1Url, pipe2Url, pipe3Url, pipe4Url],
-  [SfxId.RotateCW]:      [swishCwUrl],
-  [SfxId.RotateCCW]:     [swishCcwUrl],
-  [SfxId.Delete]:        [erasePuffUrl],
+  [SfxId.PipePlacement]:    [pipe1Url, pipe2Url, pipe3Url, pipe4Url],
+  [SfxId.RotateCW]:         [swishCwUrl],
+  [SfxId.RotateCCW]:        [swishCcwUrl],
+  [SfxId.Delete]:           [erasePuffUrl],
+  [SfxId.Challenge]:        [challengeUrl],
+  [SfxId.LevelSelect]:      [levelSelectUrl],
+  [SfxId.Locked]:           [lockedUrl],
+  [SfxId.InvalidSelection]: [invalidSelectionUrl],
+  [SfxId.InventorySelect]:  [inventorySelectUrl],
+  [SfxId.InventoryUnselect]: [inventoryUnselectUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -57,10 +75,16 @@ export class SfxManager {
    * file consecutively.  -1 means no file has been played yet for that effect.
    */
   private readonly _lastIndex: { [K in SfxId]: number } = {
-    [SfxId.PipePlacement]: -1,
-    [SfxId.RotateCW]:      -1,
-    [SfxId.RotateCCW]:     -1,
-    [SfxId.Delete]:        -1,
+    [SfxId.PipePlacement]:    -1,
+    [SfxId.RotateCW]:         -1,
+    [SfxId.RotateCCW]:        -1,
+    [SfxId.Delete]:           -1,
+    [SfxId.Challenge]:        -1,
+    [SfxId.LevelSelect]:      -1,
+    [SfxId.Locked]:           -1,
+    [SfxId.InvalidSelection]: -1,
+    [SfxId.InventorySelect]:  -1,
+    [SfxId.InventoryUnselect]: -1,
   };
 
   /**

@@ -1,4 +1,4 @@
-import { Board, MoveResult } from './board';
+import { Board, MoveResult, ERR_GOLD_SPACE } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
@@ -282,7 +282,7 @@ export class Game implements InputCallbacks {
     // Create the settings modal (SFX volume control, etc.)
     this._settingsModalEl = buildSettingsModal(
       () => sfxManager.getVolume(),
-      (v) => sfxManager.setVolume(v),
+      (v) => { sfxManager.setVolume(v); sfxManager.play(SfxId.PipePlacement); },
       (el) => {
         saveSfxVolume(sfxManager.getVolume());
         el.style.display = 'none';
@@ -981,6 +981,9 @@ export class Game implements InputCallbacks {
     this._showErrorFlash(result.error);
     if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       this._startErrorHighlight(result.errorTilePositions);
+    }
+    if (result.error === ERR_GOLD_SPACE) {
+      sfxManager.play(SfxId.Locked);
     }
   }
 

@@ -2,6 +2,7 @@ import { Board, MoveResult, SPIN_PIPE_SHAPES } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, PipeShape, Rotation } from './types';
 import { TILE_SIZE } from './renderer';
+import { sfxManager, SfxId } from './sfxManager';
 
 /**
  * Callback interface that {@link InputHandler} calls into Game for all board
@@ -207,12 +208,14 @@ export class InputHandler {
       // Clicking the already-selected item deselects it.
       this._cb.setSelectedShape(null);
       this._cb.renderInventoryBar();
+      sfxManager.play(SfxId.InventoryUnselect);
       this._canvas.focus();
       return;
     }
     this._cb.setSelectedShape(shape);
     this._cb.setPendingRotation(this.lastPlacedRotations.get(shape) ?? 0);
     this._cb.renderInventoryBar();
+    sfxManager.play(SfxId.InventorySelect);
     // Return focus to the canvas so Q/W rotation keys work immediately after
     // selecting an inventory piece without requiring a click on the board.
     this._canvas.focus();
@@ -224,6 +227,7 @@ export class InputHandler {
     if (this._cb.getSelectedShape() !== null) {
       this._cb.setSelectedShape(null);
       this._cb.renderInventoryBar();
+      sfxManager.play(SfxId.InventoryUnselect);
       this._canvas.focus();
     }
   }
@@ -382,6 +386,7 @@ export class InputHandler {
           if (this._cb.getSelectedShape() !== null) {
             this._cb.setSelectedShape(null);
             this._cb.renderInventoryBar();
+            sfxManager.play(SfxId.InventoryUnselect);
           }
         } else {
           this._cb.reclaimTileAt(this._rightDragLastTile);
@@ -499,6 +504,7 @@ export class InputHandler {
       if (this._cb.getSelectedShape() !== null) {
         this._cb.setSelectedShape(null);
         this._cb.renderInventoryBar();
+        sfxManager.play(SfxId.InventoryUnselect);
       }
       return;
     }
@@ -510,6 +516,7 @@ export class InputHandler {
       if (this._cb.getSelectedShape() !== null) {
         this._cb.setSelectedShape(null);
         this._cb.renderInventoryBar();
+        sfxManager.play(SfxId.InventoryUnselect);
       }
       return;
     }
