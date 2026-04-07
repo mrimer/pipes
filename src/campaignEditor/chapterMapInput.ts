@@ -8,7 +8,7 @@
  */
 
 import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
-import { PIPE_SHAPES, LEAKY_PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -384,9 +384,7 @@ export class ChapterMapInput {
   /** Play the sfx appropriate for the current chapter map palette selection. */
   private _playChapterPlacementSfx(): void {
     const palette = this._cb.getPalette();
-    if (LEAKY_PIPE_SHAPES.has(palette as PipeShape)) {
-      sfxManager.play(SfxId.Leak);
-    } else if (isPipePlacementPalette(palette)) {
+    if (isPipePlacementPalette(palette)) {
       sfxManager.play(SfxId.PipePlacement);
     }
   }
