@@ -5,6 +5,15 @@
  * strings.  The manager supports multi-file effects (random selection that
  * avoids consecutive repeats for variety) and a global volume control.
  *
+ * Playback uses the Web Audio API so that decoded {@link AudioBuffer} objects
+ * are kept in JS heap memory.  This prevents browsers from evicting the cached
+ * audio data when the tab is backgrounded, eliminating the stutter/delay that
+ * occurs when sound effects need to be re-fetched after the tab resumes.
+ * A {@link visibilitychange} listener resumes a suspended {@link AudioContext}
+ * and plays a silent 1 ms buffer to rewarm the audio graph whenever the tab
+ * becomes visible again.  A plain {@link Audio} element is used as a fallback
+ * in environments that do not support the Web Audio API.
+ *
  * Adding a new sound effect:
  *  1. Drop the .ogg file(s) into data/sfx/.
  *  2. Import the URL(s) at the top of this file.
@@ -190,6 +199,21 @@ export class SfxManager {
   /** Volume as a linear factor in [0, 1]. */
   private _volume = 1.0;
 
+  /** Lazily-created Web Audio context. */
+  private _ctx: AudioContext | null = null;
+
+  /** Master gain node; volume changes are applied here. */
+  private _gainNode: GainNode | null = null;
+
+  /**
+   * Decoded audio buffers keyed by asset URL.  Storing them in JS memory
+   * prevents the browser from evicting them when the tab is backgrounded.
+   */
+  private readonly _buffers = new Map<string, AudioBuffer>();
+
+  /** Whether the {@link visibilitychange} listener has been registered. */
+  private _visibilityListenerAdded = false;
+
   /**
    * Last-played variant index per SfxId, used to avoid repeating the same
    * file consecutively.  -1 means no file has been played yet for that effect.
@@ -247,16 +271,31 @@ export class SfxManager {
   };
 
   /**
-   * Preload all sound effect files so they are cached and ready to play
-   * without any delay on first use.
+   * Preload all sound effect files so they are decoded and cached in memory,
+   * ready to play without any delay on first use.
+   *
+   * Uses the Web Audio API when available so that the decoded
+   * {@link AudioBuffer} data lives in JS heap memory and is never evicted by
+   * the browser.  Falls back to `<audio>` preloading otherwise.
    */
   preload(): void {
-    if (typeof Audio === 'undefined') return;
-    for (const files of Object.values(SFX_FILES) as string[][]) {
-      for (const url of files) {
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        audio.load();
+    if (this._getContext()) {
+      // Collect every unique URL across all effects and decode them all.
+      const urls = new Set<string>();
+      for (const files of Object.values(SFX_FILES) as string[][]) {
+        for (const url of files) urls.add(url);
+      }
+      for (const url of urls) {
+        this._fetchBuffer(url).catch(() => { /* ignore individual failures */ });
+      }
+    } else if (typeof Audio !== 'undefined') {
+      // Web Audio unavailable – fall back to HTMLAudioElement preloading.
+      for (const files of Object.values(SFX_FILES) as string[][]) {
+        for (const url of files) {
+          const audio = new Audio(url);
+          audio.preload = 'auto';
+          audio.load();
+        }
       }
     }
   }
@@ -266,28 +305,47 @@ export class SfxManager {
    *
    * When multiple files are mapped to the effect, one is chosen at random
    * from the variants that differ from the previously played file.  If
-   * `Audio` is not available in the current environment (e.g. unit tests)
-   * or the volume is zero, the call is a silent no-op.
+   * neither Web Audio nor `Audio` is available (e.g. unit tests) or the
+   * volume is zero, the call is a silent no-op.
    */
   play(id: SfxId): void {
     if (this._volume === 0) return;
-    if (typeof Audio === 'undefined') return;
 
     const files = SFX_FILES[id];
     if (!files || files.length === 0) return;
 
     const idx = this._pickIndex(id, files.length);
     this._lastIndex[id] = idx;
+    const url = files[idx];
 
-    const audio = new Audio(files[idx]);
-    audio.volume = this._volume;
-    try {
-      const playResult = audio.play();
-      if (playResult !== undefined) {
-        playResult.catch(() => { /* ignore autoplay or decode errors */ });
+    const ctx = this._getContext();
+    if (ctx && this._gainNode) {
+      // Resume a browser-suspended context before playing (browsers may
+      // suspend AudioContext when the page loses focus).
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => { /* ignore */ });
       }
-    } catch {
-      // Ignore synchronous errors (e.g. not-implemented in test environments).
+      const buf = this._buffers.get(url);
+      if (buf) {
+        this._playBuffer(buf);
+      } else {
+        // Buffer not yet decoded; fetch, cache, then play.
+        this._fetchBuffer(url)
+          .then(b => { if (b) this._playBuffer(b); })
+          .catch(() => { /* ignore */ });
+      }
+    } else if (typeof Audio !== 'undefined') {
+      // Web Audio unavailable – fall back to HTMLAudioElement.
+      const audio = new Audio(url);
+      audio.volume = this._volume;
+      try {
+        const playResult = audio.play();
+        if (playResult !== undefined) {
+          playResult.catch(() => { /* ignore autoplay or decode errors */ });
+        }
+      } catch {
+        // Ignore synchronous errors (e.g. not-implemented in test environments).
+      }
     }
   }
 
@@ -297,6 +355,26 @@ export class SfxManager {
    */
   setVolume(volume: number): void {
     this._volume = Math.max(0, Math.min(100, volume)) / 100;
+    if (this._gainNode) {
+      this._gainNode.gain.value = this._volume;
+    }
+  }
+
+  /**
+   * Release all resources held by this manager (AudioContext, cached buffers,
+   * event listeners).  Call this if the manager instance is no longer needed.
+   */
+  destroy(): void {
+    if (this._visibilityListenerAdded && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
+      this._visibilityListenerAdded = false;
+    }
+    this._buffers.clear();
+    if (this._ctx) {
+      this._ctx.close().catch(() => { /* ignore */ });
+      this._ctx = null;
+      this._gainNode = null;
+    }
   }
 
   /**
@@ -307,6 +385,101 @@ export class SfxManager {
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Return the shared {@link AudioContext}, creating it lazily on first call.
+   * Returns `null` when the Web Audio API is not available.
+   */
+  private _getContext(): AudioContext | null {
+    if (this._ctx) return this._ctx;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const AC: typeof AudioContext | undefined =
+      typeof AudioContext !== 'undefined' ? AudioContext
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : typeof (globalThis as any).webkitAudioContext !== 'undefined' ? (globalThis as any).webkitAudioContext
+      : undefined;
+    if (!AC) return null;
+
+    this._ctx = new AC();
+    this._gainNode = this._ctx.createGain();
+    this._gainNode.gain.value = this._volume;
+    this._gainNode.connect(this._ctx.destination);
+
+    if (!this._visibilityListenerAdded && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this._onVisibilityChange);
+      this._visibilityListenerAdded = true;
+    }
+
+    return this._ctx;
+  }
+
+  /**
+   * Handle tab-visibility changes: resume a suspended context and rewarm the
+   * audio graph by playing a silent 1 ms buffer so the next real sound plays
+   * without any start-up latency.
+   */
+  private readonly _onVisibilityChange = (): void => {
+    if (typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+    const ctx = this._ctx;
+    if (!ctx) return;
+
+    const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+    resume
+      .then(() => this._playWarmup())
+      .catch(() => { /* ignore */ });
+  };
+
+  /** Play a 1 ms silent buffer to warm up the audio graph after a resume. */
+  private _playWarmup(): void {
+    const ctx = this._ctx;
+    const gainNode = this._gainNode;
+    if (!ctx || !gainNode) return;
+
+    /** Duration of the warmup buffer in seconds (1 ms). */
+    const WARMUP_DURATION_S = 0.001;
+    const silentBuffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * WARMUP_DURATION_S), ctx.sampleRate);
+    const source = ctx.createBufferSource();
+    source.buffer = silentBuffer;
+    source.connect(gainNode);
+    source.start();
+  }
+
+  /**
+   * Fetch the audio file at {@link url}, decode it, store it in
+   * {@link _buffers}, and return the resulting {@link AudioBuffer}.
+   * Returns `null` if the context is unavailable or the decode fails.
+   */
+  private async _fetchBuffer(url: string): Promise<AudioBuffer | null> {
+    const ctx = this._getContext();
+    if (!ctx) return null;
+
+    // Return already-cached buffer immediately.
+    const cached = this._buffers.get(url);
+    if (cached) return cached;
+
+    try {
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      this._buffers.set(url, audioBuffer);
+      return audioBuffer;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Schedule an {@link AudioBuffer} for immediate playback. */
+  private _playBuffer(buf: AudioBuffer): void {
+    const ctx = this._ctx;
+    const gainNode = this._gainNode;
+    if (!ctx || !gainNode) return;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buf;
+    source.connect(gainNode);
+    source.start();
+  }
 
   /**
    * Pick a random variant index for the given effect, excluding the last
