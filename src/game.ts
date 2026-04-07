@@ -1019,7 +1019,10 @@ export class Game implements InputCallbacks {
         sfxToPlay.push(tile.pressure < 0 ? SfxId.Vacuum : SfxId.Pump);
       } else if (tile.chamberContent === 'hot_plate') {
         // Sizzle overrides SizzleIce; collect at most one hot-plate sound per turn.
-        const candidate = board.frozen > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
+        // Use getLockedHotPlateGain to check if frozen water was actually consumed
+        // when this hot plate's cost was computed during applyTurnDelta this turn.
+        const frozenGain = board.getLockedHotPlateGain({ row: r, col: c }) ?? 0;
+        const candidate = frozenGain > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
         if (candidate === SfxId.Sizzle || hotPlateSfx === null) hotPlateSfx = candidate;
       } else if (tile.chamberContent === 'star') {
         sfxToPlay.push(SfxId.Star);
