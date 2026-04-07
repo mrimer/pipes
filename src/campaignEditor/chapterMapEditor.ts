@@ -667,6 +667,7 @@ export class ChapterMapEditorSection {
 
   private _chapterRedo(campaign: CampaignDef, chapter: ChapterDef): void {
     if (this._chapterHistoryIdx >= this._chapterHistory.length - 1) return;
+    sfxManager.play(SfxId.Redo);
     this._applyChapterSnapshot(this._chapterHistory[++this._chapterHistoryIdx], chapter, campaign);
   }
 

@@ -837,11 +837,11 @@ export class Game implements InputCallbacks {
         this.winStarsEl.style.display = 'none';
       }
     }
-    // Spawn confetti first; show win modal only after the confetti effect completes.
+    // Play win sound immediately on winning, then spawn confetti and show modal.
+    sfxManager.play(SfxId.WinLevel);
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
       this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
-      sfxManager.play(SfxId.WinLevel);
       // Spawn golden sparkles over the star icon in the win modal when stars were collected,
       // and play the star sfx 0.5 s after the win-level sound.
       if (starsCollected > 0 && this.winStarsEl) {
@@ -1292,6 +1292,7 @@ export class Game implements InputCallbacks {
   /** Redo the last undone player action. */
   performRedo(): void {
     if (!this.board || !this.board.canRedo()) return;
+    sfxManager.play(SfxId.Redo);
     const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
     const sparkle = this._metrics.sparkleCallbacks();

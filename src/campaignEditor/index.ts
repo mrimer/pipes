@@ -1079,6 +1079,7 @@ export class CampaignEditor {
 
   private _editorRedo(): void {
     if (!this._state.redo()) return;
+    sfxManager.play(SfxId.Redo);
     this._onStateRestored();
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();

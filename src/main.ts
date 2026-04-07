@@ -3,6 +3,7 @@ import { sfxManager } from './sfxManager';
 import { loadSfxVolume } from './persistence';
 
 sfxManager.setVolume(loadSfxVolume());
+sfxManager.preload();
 
 function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;

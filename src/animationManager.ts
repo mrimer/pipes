@@ -415,6 +415,8 @@ export class AnimationManager {
     const { source, sink, cols, rows } = board;
     const canvas = this.canvas;
 
+    sfxManager.play(SfxId.Rings);
+
     const spawnSinkRing = () => {
       spawnRingEffect(canvas, sink.col, sink.row, cols, rows, SINK_COLOR);
     };
@@ -654,6 +656,7 @@ export class AnimationManager {
         const val = dir === 'connect' ? tile.capacity : -tile.capacity;
         text = val >= 0 ? `+${val}💧` : `${val}💧`;
         color = animColor(val);
+        if (dir === 'connect') sfxManager.play(SfxId.Tank);
       } else if (tile.chamberContent === 'dirt') {
         // Dirt consumes water on connect; removal returns it.
         const val = dir === 'connect' ? -tile.cost : tile.cost;
@@ -681,6 +684,7 @@ export class AnimationManager {
         const val = dir === 'connect' ? tile.temperature : -tile.temperature;
         text = val >= 0 ? `+${val}°` : `${val}°`;
         color = animColor(val);
+        if (dir === 'connect') sfxManager.play(SfxId.Heater);
       } else if (tile.chamberContent === 'ice') {
         const raw = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
         ({ text, color } = this._formatWaterCostLabel(raw, dir));
