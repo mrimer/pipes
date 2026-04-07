@@ -1105,26 +1105,38 @@ export class Game implements InputCallbacks {
     if (!this.board) return;
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
-    // Play Leak instead of PipePlacement when a leaky pipe tile is placed and
-    // immediately connected to the source.
     const posKey = (replacedRow !== undefined && replacedCol !== undefined)
       ? `${replacedRow},${replacedCol}` : null;
     const placedIsLeakyAndConnected = LEAKY_PIPE_SHAPES.has(placedShape)
       && posKey !== null && this.board.getFilledPositions().has(posKey);
-    if (placedIsLeakyAndConnected) {
-      sfxManager.play(SfxId.Leak);
-    } else {
-      sfxManager.play(SfxId.PipePlacement);
-      this._playLeakSfxIfNeeded(this.board, changes);
-    }
-    this._playGoldSfxIfNeeded(this.board, filledBefore);
     this.board.recordMove();
     const sparkle = this._metrics.sparkleCallbacks();
-    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
+
+    // Spawn all animations and collect connection sounds so every sound
+    // decision can be made from one place below.
+    const connectionSfx = this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol);
     this._animMgr.spawnFillAnims(this.board, filledBefore);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
+
+    // Play all turn sounds now that every event has been scanned.
+    // Play Leak instead of PipePlacement when a leaky pipe tile is placed and
+    // immediately connected to the source.
+    if (placedIsLeakyAndConnected) {
+      sfxManager.play(SfxId.Leak);
+    } else {
+      // Only play PipePlacement when no chamber-connection sounds fire this turn.
+      if (connectionSfx.length === 0) {
+        sfxManager.play(SfxId.PipePlacement);
+      }
+      this._playLeakSfxIfNeeded(this.board, changes);
+    }
+    this._playGoldSfxIfNeeded(this.board, filledBefore);
+    for (const sfx of connectionSfx) {
+      sfxManager.play(sfx);
+    }
+
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
     this._refreshPlayUI();
