@@ -36,6 +36,7 @@ import {
   renderFillAnims, FILL_ANIM_DURATION,
 } from './visuals/pipeEffects';
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
+import { WinTileGlow, computeWinTileGlows, renderWinTileGlows } from './visuals/winTileEffect';
 import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
@@ -123,6 +124,9 @@ export class AnimationManager {
 
   /** `performance.now()` after which the next golden-pipe twinkle may fire. */
   private _nextGoldenTwinkle = 0;
+
+  /** Active win-tile glow effects (one per connected tile, spawned on level win). */
+  private _winTileGlows: WinTileGlow[] = [];
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -378,6 +382,30 @@ export class AnimationManager {
     this._goldBubbles = [];
     this._vortexParticles = [];
     this._flowGoodDirs = null;
+    this._winTileGlows = [];
+  }
+
+  // ─── Win tile glow lifecycle ──────────────────────────────────────────────
+
+  /**
+   * Spawn cascading tile-glow effects for every tile connected to the source.
+   * Effects fire in BFS order: the source and its immediate neighbours fire at
+   * `performance.now()`, then each subsequent BFS layer fires
+   * {@link WIN_TILE_LAYER_DELAY_MS} ms after the previous one.
+   *
+   * Call once when the level is first won.
+   */
+  initWinTileGlows(board: Board): void {
+    this._winTileGlows = computeWinTileGlows(board, performance.now());
+  }
+
+  /**
+   * Render the win tile glow effects for the current frame onto `ctx`.
+   * Intended to be called between pass-1 (backgrounds) and pass-2 (tile
+   * content) inside {@link renderBoard} so the glow appears behind tile items.
+   */
+  renderWinTileGlowsOverlay(now: number): void {
+    renderWinTileGlows(this.ctx, this._winTileGlows, now);
   }
 
   // ─── Level lifecycle ──────────────────────────────────────────────────────
@@ -399,6 +427,7 @@ export class AnimationManager {
     this._rotationAnims = [];
     this._fillAnims = [];
     this._nextGoldenTwinkle = 0;
+    this._winTileGlows = [];
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */

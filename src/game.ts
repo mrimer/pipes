@@ -657,6 +657,7 @@ export class Game implements InputCallbacks {
       this._input.hoverRotationDelta,
       rotationOverrides,
       fillExclude,
+      () => this._animMgr.renderWinTileGlowsOverlay(now),
     );
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
@@ -814,6 +815,7 @@ export class Game implements InputCallbacks {
     if (!this.board || !this.currentLevel) return;
     this.gameState = GameState.Won;
     this._animMgr.initWinFlow(this.board);
+    this._animMgr.initWinTileGlows(this.board);
     const starsCollected = this.board.getStarsCollected();
     const waterRemaining = this.board.getCurrentWater();
     const isChallenge = !!this.currentLevel.challenge;
