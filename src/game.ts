@@ -979,20 +979,28 @@ export class Game implements InputCallbacks {
 
   /**
    * Play the gold sound if any gold item chamber became newly connected since
-   * `filledBefore` was captured.
+   * `filledBefore` was captured.  If no gold item connected but a positive-count
+   * non-gold item chamber did, play the pickup sound instead.
+   * Gold takes precedence over pickup.
    */
   private _playGoldSfxIfNeeded(board: Board, filledBefore: Set<string>): void {
     const filledAfter = board.getFilledPositions();
+    let hasPickup = false;
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue;
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
       if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' &&
-          tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape)) {
-        sfxManager.play(SfxId.Gold);
-        return;
+          tile.itemShape !== null) {
+        if (GOLD_PIPE_SHAPES.has(tile.itemShape)) {
+          sfxManager.play(SfxId.Gold);
+          return;
+        } else if (tile.itemCount > 0) {
+          hasPickup = true;
+        }
       }
     }
+    if (hasPickup) sfxManager.play(SfxId.Pickup);
   }
 
   /**

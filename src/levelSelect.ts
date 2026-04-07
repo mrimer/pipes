@@ -429,7 +429,7 @@ export function renderLevelList(
       chapterHeader.style.cursor = 'pointer';
       if (chapter.grid && onChapterMap) {
         // Chapter has a map: clicking navigates to the chapter map screen
-        chapterHeader.addEventListener('click', () => { sfxManager.play(SfxId.LevelSelect); onChapterMap(ci); });
+        chapterHeader.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(ci); });
       } else {
         // Chapter has no map: show a temporary error message when clicked
         const noMapError = document.createElement('p');

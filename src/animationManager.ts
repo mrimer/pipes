@@ -54,6 +54,10 @@ const LEAKY_SPRAY_SPAWN_INTERVAL_MS = 100;
 const ICE_SFX_THRESHOLD_MID = 5;
 /** Ice-sfx threshold: raw cost at or above this uses Ice3 sfx (instead of Ice2). */
 const ICE_SFX_THRESHOLD_HIGH = 10;
+/** Snow-sfx threshold: raw cost at or above this uses Snow2 sfx (instead of Snow1). */
+const SNOW_SFX_THRESHOLD_MID = 5;
+/** Snow-sfx threshold: raw cost at or above this uses Snow3 sfx (instead of Snow2). */
+const SNOW_SFX_THRESHOLD_HIGH = 10;
 
 /**
  * Callbacks into Game for CSS-based inventory sparkle side effects triggered
@@ -149,9 +153,11 @@ export class AnimationManager {
     const currentTemp = board.getCurrentTemperature(filledAfter);
     const currentPressure = board.getCurrentPressure(filledAfter);
 
-    // Track the maximum raw ice cost and maximum dirt cost across all newly-connected
-    // tiles so only one sfx is played per turn (the one matching the highest cost).
+    // Track the maximum raw ice cost, maximum raw snow cost, and maximum dirt cost
+    // across all newly-connected tiles so only one sfx is played per turn (the one
+    // matching the highest cost).
     let maxIceRaw = -1;
+    let maxSnowRaw = -1;
     let maxDirtCost = -1;
 
     for (const key of filledAfter) {
@@ -164,6 +170,11 @@ export class AnimationManager {
         const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
         if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
       }
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'snow') {
+        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+        const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
+        if (rawSnowCost > maxSnowRaw) maxSnowRaw = rawSnowCost;
+      }
       if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'dirt') {
         if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
       }
@@ -175,6 +186,14 @@ export class AnimationManager {
       else if (maxIceRaw < ICE_SFX_THRESHOLD_MID) sfxManager.play(SfxId.Ice1);
       else if (maxIceRaw < ICE_SFX_THRESHOLD_HIGH) sfxManager.play(SfxId.Ice2);
       else sfxManager.play(SfxId.Ice3);
+    }
+
+    // Play a single snow sfx based on the highest-cost snow tile connected this turn.
+    if (maxSnowRaw >= 0) {
+      if (maxSnowRaw === 0) sfxManager.play(SfxId.Snow0);
+      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_MID) sfxManager.play(SfxId.Snow1);
+      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_HIGH) sfxManager.play(SfxId.Snow2);
+      else sfxManager.play(SfxId.Snow3);
     }
 
     // Play a single dirt sfx based on the highest-cost dirt tile connected this turn.

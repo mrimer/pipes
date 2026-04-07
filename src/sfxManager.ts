@@ -53,6 +53,12 @@ import undoRestoreUrl from '../data/sfx/undo-restore.ogg';
 import dirt1Url from '../data/sfx/dirt1.ogg';
 import dirt2Url from '../data/sfx/dirt2.ogg';
 import dirt3Url from '../data/sfx/dirt3.ogg';
+import pickupUrl from '../data/sfx/pickup.ogg';
+import chapterSelectUrl from '../data/sfx/chapter-select.ogg';
+import snow0Url from '../data/sfx/snow0.ogg';
+import snow1Url from '../data/sfx/snow1.ogg';
+import snow2Url from '../data/sfx/snow2.ogg';
+import snow3Url from '../data/sfx/snow3.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -95,6 +101,12 @@ export const enum SfxId {
   Dirt1            = 34,
   Dirt2            = 35,
   Dirt3            = 36,
+  Pickup           = 37,
+  ChapterSelect    = 38,
+  Snow0            = 39,
+  Snow1            = 40,
+  Snow2            = 41,
+  Snow3            = 42,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -142,6 +154,12 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Dirt1]:            [dirt1Url],
   [SfxId.Dirt2]:            [dirt2Url],
   [SfxId.Dirt3]:            [dirt3Url],
+  [SfxId.Pickup]:           [pickupUrl],
+  [SfxId.ChapterSelect]:    [chapterSelectUrl],
+  [SfxId.Snow0]:            [snow0Url],
+  [SfxId.Snow1]:            [snow1Url],
+  [SfxId.Snow2]:            [snow2Url],
+  [SfxId.Snow3]:            [snow3Url],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -193,6 +211,12 @@ export class SfxManager {
     [SfxId.Dirt1]:            -1,
     [SfxId.Dirt2]:            -1,
     [SfxId.Dirt3]:            -1,
+    [SfxId.Pickup]:           -1,
+    [SfxId.ChapterSelect]:    -1,
+    [SfxId.Snow0]:            -1,
+    [SfxId.Snow1]:            -1,
+    [SfxId.Snow2]:            -1,
+    [SfxId.Snow3]:            -1,
   };
 
   /**
