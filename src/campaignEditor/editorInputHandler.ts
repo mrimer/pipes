@@ -7,7 +7,7 @@
  * attach() / detach() as the editor screen is entered / exited.
  */
 
-import { TileDef, PipeShape } from '../types';
+import { TileDef, PipeShape, Rotation } from '../types';
 import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
@@ -239,7 +239,19 @@ export class EditorInputHandler {
       this._cb.updateUndoRedoButtons();
     } else {
       // It was a click on a non-empty tile (no movement occurred)
-      if (e.ctrlKey) {
+      if (!e.ctrlKey && PIPE_SHAPES.has(tile.shape)) {
+        // Click on a placed pipe tile: rotate it (shift = counter-clockwise)
+        const clockwise = !e.shiftKey;
+        sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
+        const cur = (tile.rotation ?? 0) as Rotation;
+        tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
+        // Keep palette ghost in sync when the palette matches the rotated tile's shape.
+        if (state.palette === tile.shape) {
+          state.params.rotation = tile.rotation;
+        }
+        state.recordSnapshot();
+        this._cb.updateUndoRedoButtons();
+      } else if (e.ctrlKey) {
         // Guard: only one Source tile is allowed per level.
         if (state.palette === PipeShape.Source && state.hasSourceElsewhere(startPos)) {
           this._cb.showSourceError();
