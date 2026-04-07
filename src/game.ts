@@ -33,6 +33,10 @@ const ICE_SFX_THRESHOLD_HIGH = 10;
 const SNOW_SFX_THRESHOLD_MID = 5;
 /** Snow-sfx threshold: raw cost at or above this uses Snow3 sfx (instead of Snow2). */
 const SNOW_SFX_THRESHOLD_HIGH = 10;
+/** Dirt-sfx threshold: dirt cost at or above this uses Dirt2 sfx (instead of Dirt1). */
+const DIRT_SFX_THRESHOLD_MID = 5;
+/** Dirt-sfx threshold: dirt cost at or above this uses Dirt3 sfx (instead of Dirt2). */
+const DIRT_SFX_THRESHOLD_HIGH = 10;
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -1045,8 +1049,8 @@ export class Game implements InputCallbacks {
 
     // Collect a single dirt sfx based on the highest-cost dirt tile connected this turn.
     if (maxDirtCost >= 0) {
-      if (maxDirtCost < 5) sfxToPlay.push(SfxId.Dirt1);
-      else if (maxDirtCost < 10) sfxToPlay.push(SfxId.Dirt2);
+      if (maxDirtCost < DIRT_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Dirt1);
+      else if (maxDirtCost < DIRT_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Dirt2);
       else sfxToPlay.push(SfxId.Dirt3);
     }
 
