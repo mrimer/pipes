@@ -416,7 +416,7 @@ export class EditorInputHandler {
       else sfxManager.play(SfxId.Dirt3);
     } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {
       sfxManager.play(SfxId.Gold);
-    } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined) {
+    } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && state.params.itemCount > 0) {
       sfxManager.play(SfxId.Pickup);
     } else if (
       isPipePlacementPalette(palette)
