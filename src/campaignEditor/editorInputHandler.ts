@@ -343,7 +343,7 @@ export class EditorInputHandler {
     e.preventDefault();
     const state = this._cb.getState();
     const clockwise = e.deltaY > 0;
-    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
+    sfxManager.play(clockwise ? SfxId.PendingCW : SfxId.PendingCCW);
     state.rotatePalette(clockwise);
 
     // Only write the rotation/connection change back to the linked tile when the
@@ -400,6 +400,10 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Star);
     } else if (palette === 'chamber:heater') {
       sfxManager.play(SfxId.Heater);
+    } else if (palette === 'chamber:hot_plate') {
+      sfxManager.play(SfxId.Sizzle);
+    } else if (palette === 'chamber:ice') {
+      sfxManager.play(SfxId.Ice1);
     } else if (palette === 'chamber:tank') {
       sfxManager.play(SfxId.Tank);
     } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {

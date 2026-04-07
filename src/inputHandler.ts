@@ -282,11 +282,13 @@ export class InputHandler {
   /** Rotate `pendingRotation` 90° clockwise (for wheel/keyboard placement rotation). */
   private _rotatePendingCW(): void {
     this._cb.setPendingRotation(((this._cb.getPendingRotation() + 90) % 360) as Rotation);
+    sfxManager.play(SfxId.PendingCW);
   }
 
   /** Rotate `pendingRotation` 90° counter-clockwise (for wheel/keyboard placement rotation). */
   private _rotatePendingCCW(): void {
     this._cb.setPendingRotation(((this._cb.getPendingRotation() - 90 + 360) % 360) as Rotation);
+    sfxManager.play(SfxId.PendingCCW);
   }
 
   /**

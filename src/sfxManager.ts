@@ -40,6 +40,13 @@ import backClickUrl from '../data/sfx/back-click.ogg';
 import goldenUrl from '../data/sfx/golden.ogg';
 import dropletUrl from '../data/sfx/droplet.ogg';
 import winChapterUrl from '../data/sfx/win-chapter.ogg';
+import sizzleUrl from '../data/sfx/sizzle.ogg';
+import pendingCwUrl from '../data/sfx/pending-cw.ogg';
+import pendingCcwUrl from '../data/sfx/pending-ccw.ogg';
+import iceCrack0Url from '../data/sfx/ice-crack0.ogg';
+import iceCrack1Url from '../data/sfx/ice-crack1.ogg';
+import iceCrack2Url from '../data/sfx/ice-crack2.ogg';
+import iceCrack3Url from '../data/sfx/ice-crack3.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -69,6 +76,13 @@ export const enum SfxId {
   Gold             = 21,
   Leak             = 22,
   WinChapter       = 23,
+  Sizzle           = 24,
+  PendingCW        = 25,
+  PendingCCW       = 26,
+  Ice0             = 27,
+  Ice1             = 28,
+  Ice2             = 29,
+  Ice3             = 30,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -103,6 +117,13 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Gold]:             [goldenUrl],
   [SfxId.Leak]:             [dropletUrl],
   [SfxId.WinChapter]:       [winChapterUrl],
+  [SfxId.Sizzle]:           [sizzleUrl],
+  [SfxId.PendingCW]:        [pendingCwUrl],
+  [SfxId.PendingCCW]:       [pendingCcwUrl],
+  [SfxId.Ice0]:             [iceCrack0Url],
+  [SfxId.Ice1]:             [iceCrack1Url],
+  [SfxId.Ice2]:             [iceCrack2Url],
+  [SfxId.Ice3]:             [iceCrack3Url],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -141,6 +162,13 @@ export class SfxManager {
     [SfxId.Gold]:             -1,
     [SfxId.Leak]:             -1,
     [SfxId.WinChapter]:       -1,
+    [SfxId.Sizzle]:           -1,
+    [SfxId.PendingCW]:        -1,
+    [SfxId.PendingCCW]:       -1,
+    [SfxId.Ice0]:             -1,
+    [SfxId.Ice1]:             -1,
+    [SfxId.Ice2]:             -1,
+    [SfxId.Ice3]:             -1,
   };
 
   /**

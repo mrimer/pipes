@@ -378,6 +378,7 @@ export class ChapterMapInput {
       this._cb.rotateSourceSinkAt(pos, e.deltaY > 0, chapter, campaign);
     } else if (PIPE_SHAPES.has(this._cb.getPalette() as PipeShape)) {
       this._cb.rotatePalette(e.deltaY > 0);
+      sfxManager.play(e.deltaY > 0 ? SfxId.PendingCW : SfxId.PendingCCW);
     }
   }
 

@@ -145,12 +145,28 @@ export class AnimationManager {
     const currentTemp = board.getCurrentTemperature(filledAfter);
     const currentPressure = board.getCurrentPressure(filledAfter);
 
+    // Track the maximum raw ice cost across all newly-connected ice tiles so
+    // only one ice sfx is played per turn (the one matching the highest cost).
+    let maxIceRaw = -1;
+
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue;
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
       if (!tile) continue;
       this._pushTileAnimLabels(board, tile, r, c, 'connect', currentTemp, currentPressure, now, sparkle);
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'ice') {
+        const raw = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
+        if (raw > maxIceRaw) maxIceRaw = raw;
+      }
+    }
+
+    // Play a single ice sfx based on the highest-cost ice tile connected this turn.
+    if (maxIceRaw >= 0) {
+      if (maxIceRaw === 0) sfxManager.play(SfxId.Ice0);
+      else if (maxIceRaw < 5) sfxManager.play(SfxId.Ice1);
+      else if (maxIceRaw < 10) sfxManager.play(SfxId.Ice2);
+      else sfxManager.play(SfxId.Ice3);
     }
   }
 
@@ -710,6 +726,7 @@ export class AnimationManager {
         }
       } else if (tile.chamberContent === 'hot_plate') {
         ({ text, color } = this._pushHotPlateAnimLabels(board, tile, r, c, dir, currentTemp, cx, cy, now));
+        if (dir === 'connect') sfxManager.play(SfxId.Sizzle);
       } else if (tile.chamberContent === 'star' && dir === 'connect') {
         // Star tile connected – spawn golden sparkle burst from the tile center and play sfx.
         const starCx = c * TILE_SIZE + TILE_SIZE / 2;
