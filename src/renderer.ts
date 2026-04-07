@@ -1130,6 +1130,7 @@ export function renderBoard(
   hoverRotationDelta = 0,
   rotationOverrides?: Map<string, number>,
   fillExclude?: Set<string>,
+  winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1148,6 +1149,8 @@ export function renderBoard(
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
   _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
+  // Win tile glow overlay: rendered above backgrounds but beneath all tile content.
+  winTileOverlayFn?.(ctx);
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
