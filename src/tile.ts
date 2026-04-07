@@ -1,4 +1,4 @@
-import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent } from './types';
+import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent, TileDef } from './types';
 
 /** Base connections for each pipe shape (at 0° rotation). */
 const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
@@ -196,4 +196,66 @@ export class Tile {
     if (this.customConnections !== null) return this.customConnections;
     return getConnections(this.shape, this.rotation);
   }
+}
+
+// ─── Direction deltas ─────────────────────────────────────────────────────────
+
+const DIRECTION_DELTA: Record<Direction, { row: number; col: number }> = {
+  [Direction.North]: { row: -1, col:  0 },
+  [Direction.East]:  { row:  0, col:  1 },
+  [Direction.South]: { row:  1, col:  0 },
+  [Direction.West]:  { row:  0, col: -1 },
+};
+
+/**
+ * Returns true when the tile at `pos` in `grid` is reachable from the
+ * Source tile via mutually-connected pipe paths.  Uses a simple BFS over
+ * the TileDef grid, so it can be called in editor contexts where no Board
+ * instance is available.
+ *
+ * Returns false immediately when no Source tile is found in the grid.
+ */
+export function isTileConnectedToSource(
+  grid: (TileDef | null)[][],
+  pos: { row: number; col: number },
+): boolean {
+  const rows = grid.length;
+  const cols = rows > 0 ? grid[0].length : 0;
+
+  // Find the source tile.
+  let sourcePos: { row: number; col: number } | null = null;
+  outer: for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c]?.shape === PipeShape.Source) {
+        sourcePos = { row: r, col: c };
+        break outer;
+      }
+    }
+  }
+  if (!sourcePos) return false;
+
+  const visited = new Set<string>();
+  const queue: Array<{ row: number; col: number }> = [sourcePos];
+  visited.add(`${sourcePos.row},${sourcePos.col}`);
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentTile = grid[current.row]?.[current.col];
+    if (!currentTile) continue;
+    const currentConns = getConnections(currentTile.shape, (currentTile.rotation ?? 0) as Rotation);
+    for (const dir of currentConns) {
+      const delta = DIRECTION_DELTA[dir];
+      const next = { row: current.row + delta.row, col: current.col + delta.col };
+      const key = `${next.row},${next.col}`;
+      if (visited.has(key)) continue;
+      const nextTile = grid[next.row]?.[next.col];
+      if (!nextTile) continue;
+      const nextConns = getConnections(nextTile.shape, (nextTile.rotation ?? 0) as Rotation);
+      if (!nextConns.has(oppositeDirection(dir))) continue;
+      visited.add(key);
+      queue.push(next);
+    }
+  }
+
+  return visited.has(`${pos.row},${pos.col}`);
 }

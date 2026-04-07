@@ -13,6 +13,7 @@ import { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { LevelEditorState } from './levelEditorState';
 import { sfxManager, SfxId } from '../sfxManager';
+import { isTileConnectedToSource } from '../tile';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -155,8 +156,8 @@ export class EditorInputHandler {
     // Repeatable tile on an empty cell: start a paint-drag session.
     if (existingTile === null && REPEATABLE_EDITOR_TILES.has(state.palette)) {
       this._paintDragActive = true;
-      this._playPlacementSfx();
       this._paintCell(pos);
+      this._playPlacementSfx(pos);
       this._cb.renderCanvas();
       return;
     }
@@ -184,8 +185,8 @@ export class EditorInputHandler {
         // Clear the link if the erased tile was linked
         state.clearLinkAt(pos);
       } else {
-        this._playPlacementSfx();
         state.grid[pos.row][pos.col] = state.buildTileDef();
+        this._playPlacementSfx(pos);
         // Only link the newly placed tile for live param editing if it has
         // parameters beyond rotation (Source, Sink, Chamber).
         if (state.paletteHasNonRotationParams()) {
@@ -256,8 +257,8 @@ export class EditorInputHandler {
           // Clear the link if the erased tile was linked
           state.clearLinkAt(startPos);
         } else {
-          this._playPlacementSfx();
           state.grid[startPos.row][startPos.col] = state.buildTileDef();
+          this._playPlacementSfx(startPos);
           // Only link the overwritten tile if it has parameters beyond rotation.
           if (state.paletteHasNonRotationParams()) {
             state.linkTile(startPos);
@@ -273,8 +274,8 @@ export class EditorInputHandler {
         )
       ) {
         // Both palette and tile are pipe shapes: auto-replace; snapshot after.
-        this._playPlacementSfx();
         state.grid[startPos.row][startPos.col] = state.buildTileDef();
+        this._playPlacementSfx(startPos);
         // Only link if the new tile has parameters beyond rotation.
         if (state.paletteHasNonRotationParams()) {
           state.linkTile(startPos);
@@ -387,10 +388,14 @@ export class EditorInputHandler {
    * Pump and star chamber tiles play their own sfx; heater and tank chamber
    * tiles play their own sfx; gold item chamber tiles play the gold sfx;
    * non-gold item chamber tiles with >0 count play the pickup sfx;
-   * pipe, source, and sink tiles play the standard pipe-placement sound;
+   * pipe, source, and sink tiles play PipeConnected when the placed tile is
+   * connected to the source, or PipePlacement otherwise;
    * all other tiles are silent.
+   *
+   * @param pos - The grid position where the tile was just placed.  Used to
+   *   check source connectivity for pipe/source/sink tiles.
    */
-  private _playPlacementSfx(): void {
+  private _playPlacementSfx(pos: { row: number; col: number }): void {
     const state = this._cb.getState();
     const palette = state.palette;
     if (LEAKY_PIPE_SHAPES.has(palette as PipeShape)) {
@@ -420,10 +425,9 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Gold);
     } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && state.params.itemCount > 0) {
       sfxManager.play(SfxId.Pickup);
-    } else if (
-      isPipePlacementPalette(palette)
-    ) {
-      sfxManager.play(SfxId.PipePlacement);
+    } else if (isPipePlacementPalette(palette)) {
+      const isConnected = isTileConnectedToSource(state.grid, pos);
+      sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
     }
   }
 }
