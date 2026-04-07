@@ -47,6 +47,12 @@ import iceCrack0Url from '../data/sfx/ice-crack0.ogg';
 import iceCrack1Url from '../data/sfx/ice-crack1.ogg';
 import iceCrack2Url from '../data/sfx/ice-crack2.ogg';
 import iceCrack3Url from '../data/sfx/ice-crack3.ogg';
+import clickUrl from '../data/sfx/click.ogg';
+import negativePartsUrl from '../data/sfx/negative-parts.ogg';
+import undoRestoreUrl from '../data/sfx/undo-restore.ogg';
+import dirt1Url from '../data/sfx/dirt1.ogg';
+import dirt2Url from '../data/sfx/dirt2.ogg';
+import dirt3Url from '../data/sfx/dirt3.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -83,6 +89,12 @@ export const enum SfxId {
   Ice1             = 28,
   Ice2             = 29,
   Ice3             = 30,
+  Click            = 31,
+  NegativeCount    = 32,
+  UndoBeforeRestart = 33,
+  Dirt1            = 34,
+  Dirt2            = 35,
+  Dirt3            = 36,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -124,6 +136,12 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Ice1]:             [iceCrack1Url],
   [SfxId.Ice2]:             [iceCrack2Url],
   [SfxId.Ice3]:             [iceCrack3Url],
+  [SfxId.Click]:            [clickUrl],
+  [SfxId.NegativeCount]:    [negativePartsUrl],
+  [SfxId.UndoBeforeRestart]: [undoRestoreUrl],
+  [SfxId.Dirt1]:            [dirt1Url],
+  [SfxId.Dirt2]:            [dirt2Url],
+  [SfxId.Dirt3]:            [dirt3Url],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -169,6 +187,12 @@ export class SfxManager {
     [SfxId.Ice1]:             -1,
     [SfxId.Ice2]:             -1,
     [SfxId.Ice3]:             -1,
+    [SfxId.Click]:            -1,
+    [SfxId.NegativeCount]:    -1,
+    [SfxId.UndoBeforeRestart]: -1,
+    [SfxId.Dirt1]:            -1,
+    [SfxId.Dirt2]:            -1,
+    [SfxId.Dirt3]:            -1,
   };
 
   /**

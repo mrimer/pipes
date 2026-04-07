@@ -247,6 +247,15 @@ export class Board {
     return this._turnState.leakyPermanentLoss;
   }
 
+  /**
+   * The current turn number (increments with each {@link applyTurnDelta} call).
+   * Turn 0 is the initial state before any moves have been made.
+   * Backed by {@link _turnState}.
+   */
+  get turnNumber(): number {
+    return this._turnState.turnNumber;
+  }
+
   /** @private Sub-modules for extracted concerns. */
   private readonly _thermo: ThermoSimulator;
   private readonly _cement: CementSystem;

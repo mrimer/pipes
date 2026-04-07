@@ -25,7 +25,7 @@ import { sfxManager, SfxId } from '../sfxManager';
 // ─── Callback interface ────────────────────────────────────────────────────────
 
 export interface ChapterMapEditorCallbacks {
-  buildBtn(label: string, bg: string, color: string, onClick: () => void): HTMLButtonElement;
+  buildBtn(label: string, bg: string, color: string, onClick: () => void, suppressClick?: boolean): HTMLButtonElement;
   getActiveCampaign(): CampaignDef | null;
   getActiveChapterIdx(): number;
   touchCampaign(campaign: CampaignDef): void;
@@ -182,10 +182,10 @@ export class ChapterMapEditorSection {
     const midToolbar = document.createElement('div');
     midToolbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
-    const undoBtn = this._callbacks.buildBtn('↩ Undo', '#2a2a4a', '#aaa', () => this._chapterUndo(campaign, chapter));
+    const undoBtn = this._callbacks.buildBtn('↩ Undo', '#2a2a4a', '#aaa', () => this._chapterUndo(campaign, chapter), true);
     undoBtn.id = 'chapter-undo-btn';
     midToolbar.appendChild(undoBtn);
-    const redoBtn = this._callbacks.buildBtn('↪ Redo', '#2a2a4a', '#aaa', () => this._chapterRedo(campaign, chapter));
+    const redoBtn = this._callbacks.buildBtn('↪ Redo', '#2a2a4a', '#aaa', () => this._chapterRedo(campaign, chapter), true);
     redoBtn.id = 'chapter-redo-btn';
     midToolbar.appendChild(redoBtn);
 
