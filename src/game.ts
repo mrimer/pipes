@@ -1020,7 +1020,7 @@ export class Game implements InputCallbacks {
       } else if (tile.chamberContent === 'hot_plate') {
         // Sizzle overrides SizzleIce; collect at most one hot-plate sound per turn.
         const candidate = board.frozen > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
-        if (hotPlateSfx !== SfxId.Sizzle) hotPlateSfx = candidate;
+        if (candidate === SfxId.Sizzle || hotPlateSfx === null) hotPlateSfx = candidate;
       } else if (tile.chamberContent === 'star') {
         sfxToPlay.push(SfxId.Star);
       } else if (tile.chamberContent === 'ice') {
