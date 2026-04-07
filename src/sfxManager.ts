@@ -13,10 +13,14 @@
  *  5. Call `sfxManager.play(SfxId.YourNew)` wherever the sound should trigger.
  */
 
-import pipe1Url   from '../data/sfx/pipe1.ogg';
-import pipe2Url   from '../data/sfx/pipe2.ogg';
-import pipe3Url   from '../data/sfx/pipe3.ogg';
-import pipe4Url   from '../data/sfx/pipe4.ogg';
+import pipe1Url        from '../data/sfx/pipe1.ogg';
+import pipe2Url        from '../data/sfx/pipe2.ogg';
+import pipe3Url        from '../data/sfx/pipe3.ogg';
+import pipe4Url        from '../data/sfx/pipe4.ogg';
+import pipe1FullUrl    from '../data/sfx/pipe1-full.ogg';
+import pipe2FullUrl    from '../data/sfx/pipe2-full.ogg';
+import pipe3FullUrl    from '../data/sfx/pipe3-full.ogg';
+import pipe4FullUrl    from '../data/sfx/pipe4-full.ogg';
 import swishCwUrl  from '../data/sfx/swish-cw.ogg';
 import swishCcwUrl from '../data/sfx/swish-ccw.ogg';
 import erasePuffUrl from '../data/sfx/erase-puff.ogg';
@@ -117,6 +121,7 @@ export const enum SfxId {
   Cooler           = 45,
   Vacuum           = 46,
   SizzleIce        = 47,
+  PipeConnected    = 48,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -175,6 +180,7 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Cooler]:           [coolerUrl],
   [SfxId.Vacuum]:           [vacuumUrl],
   [SfxId.SizzleIce]:        [sizzleIceUrl],
+  [SfxId.PipeConnected]:    [pipe1FullUrl, pipe2FullUrl, pipe3FullUrl, pipe4FullUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -237,6 +243,7 @@ export class SfxManager {
     [SfxId.Cooler]:           -1,
     [SfxId.Vacuum]:           -1,
     [SfxId.SizzleIce]:        -1,
+    [SfxId.PipeConnected]:    -1,
   };
 
   /**

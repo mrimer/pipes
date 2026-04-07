@@ -1076,7 +1076,9 @@ export class Game implements InputCallbacks {
    *
    * - When a leaky pipe tile is placed and immediately connected to the source,
    *   plays only the Leak sound (suppresses PipePlacement and connection sounds).
-   * - Otherwise plays PipePlacement (only when no chamber-connection sounds fire),
+   * - Otherwise plays PipeConnected when the placed tile is connected to the source
+   *   (only when no chamber-connection sounds fire), or PipePlacement when it is not
+   *   connected to the source (only when no chamber-connection sounds fire),
    *   Leak (if a leaky tile penalty was applied), Gold/Pickup (if applicable),
    *   and all chamber-connection sounds collected by {@link _collectConnectionSfx}.
    */
@@ -1085,15 +1087,18 @@ export class Game implements InputCallbacks {
     filledBefore: Set<string>,
     changes: Array<{ row: number; col: number; delta: number }>,
     placedIsLeakyAndConnected: boolean,
+    placedPosKey: string | null,
   ): void {
     if (placedIsLeakyAndConnected) {
       sfxManager.play(SfxId.Leak);
       return;
     }
     const connectionSfx = this._collectConnectionSfx(board, filledBefore);
-    // Only play PipePlacement when no chamber-connection sounds fire this turn.
+    // Only play PipePlacement/PipeConnected when no chamber-connection sounds fire this turn.
     if (connectionSfx.length === 0) {
-      sfxManager.play(SfxId.PipePlacement);
+      const filledAfter = board.getFilledPositions();
+      const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
+      sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
     }
     this._playLeakSfxIfNeeded(board, changes);
     this._playGoldSfxIfNeeded(board, filledBefore);
@@ -1256,7 +1261,7 @@ export class Game implements InputCallbacks {
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
     if (result.cementDecrement) sfxManager.play(SfxId.Cement);
 
-    this._playAfterTilePlacedSfx(this.board, filledBefore, changes, placedIsLeakyAndConnected);
+    this._playAfterTilePlacedSfx(this.board, filledBefore, changes, placedIsLeakyAndConnected, posKey);
 
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();

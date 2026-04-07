@@ -12,6 +12,7 @@ import { PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
+import { isTileConnectedToSource } from '../tile';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -224,7 +225,7 @@ export class ChapterMapInput {
       if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._cb.getPalette())) {
         this._paintDragActive = true;
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
-        this._playChapterPlacementSfx();
+        this._playChapterPlacementSfx(pos);
         this._cb.renderCanvas();
         return;
       }
@@ -234,8 +235,8 @@ export class ChapterMapInput {
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
       } else {
-        this._playChapterPlacementSfx();
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
+        this._playChapterPlacementSfx(pos);
       }
       this._cb.recordSnapshot(chapter);
       this._cb.saveGridState(chapter, campaign);
@@ -383,10 +384,11 @@ export class ChapterMapInput {
   }
 
   /** Play the sfx appropriate for the current chapter map palette selection. */
-  private _playChapterPlacementSfx(): void {
+  private _playChapterPlacementSfx(pos: { row: number; col: number }): void {
     const palette = this._cb.getPalette();
     if (isPipePlacementPalette(palette)) {
-      sfxManager.play(SfxId.PipePlacement);
+      const isConnected = isTileConnectedToSource(this._cb.getEditGrid(), pos);
+      sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
     }
   }
 }
