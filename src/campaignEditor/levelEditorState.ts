@@ -400,6 +400,20 @@ export class LevelEditorState {
     return false;
   }
 
+  /**
+   * Returns true if a Sink tile already exists anywhere on the grid except
+   * at `exceptPos` (if given).  Used to enforce the one-Sink constraint.
+   */
+  hasSinkElsewhere(exceptPos?: { row: number; col: number }): boolean {
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
+        if (this.grid[r]?.[c]?.shape === PipeShape.Sink) return true;
+      }
+    }
+    return false;
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /** Restore grid/inventory/dimensions from the current history index entry. */

@@ -443,7 +443,10 @@ export class ChapterMapScreen {
     backBtn.style.cssText =
       `padding:8px 16px;font-size:0.9rem;background:#16213e;color:${SUCCESS_COLOR};` +
       `border:1px solid ${SUCCESS_COLOR};border-radius:6px;cursor:pointer;`;
-    backBtn.addEventListener('click', () => this._callbacks.onShowLevelSelect());
+    backBtn.addEventListener('click', () => {
+      sfxManager.play(SfxId.Back);
+      this._callbacks.onShowLevelSelect();
+    });
     el.appendChild(backBtn);
 
     // Canvas container

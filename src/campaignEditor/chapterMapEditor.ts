@@ -55,6 +55,8 @@ export class ChapterMapEditorSection {
   private _chapterFocusedTilePos: { row: number; col: number } | null = null;
   /** Ambient decorations for empty cells in the chapter editor canvas. */
   private _chapterDecorations: ReadonlyMap<string, import('../types').AmbientDecoration> = new Map();
+  /** Error flash element shown below the chapter map canvas. */
+  private _chapterErrorEl: HTMLDivElement | null = null;
 
   /** Default chapter grid dimensions. */
   private static readonly CHAPTER_DEFAULT_ROWS = 3;
@@ -244,6 +246,8 @@ export class ChapterMapEditorSection {
       setFocusedTilePos:    (pos) => { this._chapterFocusedTilePos = pos; },
       buildTileDef:         () => this._buildChapterTileDef(),
       hasSourceElsewhere:   () => this._chapterHasSourceElsewhere(),
+      hasSinkElsewhere:     () => this._chapterHasSinkElsewhere(),
+      showSinkError:        () => this._showChapterSinkError(),
       rotateTileAt:         (pos, cw, ch, camp) => this._rotateChapterTileAt(pos, cw, ch, camp),
       rotateSourceSinkAt:   (pos, cw, ch, camp) => this._rotateChapterSourceSinkAt(pos, cw, ch, camp),
       rotatePalette:        (cw) => this._rotateChapterPalette(cw),
@@ -314,6 +318,17 @@ export class ChapterMapEditorSection {
     if (!readOnly) {
       this._input = new ChapterMapInput(this._makeInputCallbacks());
       this._input.attach(canvas, campaign, chapter);
+    }
+
+    if (!readOnly) {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+      wrap.appendChild(canvas);
+      const errorDiv = document.createElement('div');
+      errorDiv.style.cssText = 'font-size:0.85rem;color:#f44;display:none;font-weight:bold;';
+      this._chapterErrorEl = errorDiv;
+      wrap.appendChild(errorDiv);
+      return wrap;
     }
 
     return canvas;
@@ -470,6 +485,26 @@ export class ChapterMapEditorSection {
       }
     }
     return false;
+  }
+
+  /** Check if a sink tile already exists on the chapter grid (outside a given position). */
+  private _chapterHasSinkElsewhere(exceptPos?: { row: number; col: number }): boolean {
+    for (let r = 0; r < this._chapterEditRows; r++) {
+      for (let c = 0; c < this._chapterEditCols; c++) {
+        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
+        if (this._chapterEditGrid[r]?.[c]?.shape === PipeShape.Sink) return true;
+      }
+    }
+    return false;
+  }
+
+  /** Flash an error below the chapter map canvas when the Sink placement constraint is violated. */
+  private _showChapterSinkError(): void {
+    const el = this._chapterErrorEl;
+    if (!el) return;
+    el.textContent = 'Only one sink tile is allowed.';
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
   }
 
   /**
