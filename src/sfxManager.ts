@@ -121,6 +121,8 @@ export class SfxManager {
     for (let i = 0; i < count; i++) {
       if (i !== last) candidates.push(i);
     }
+    // Fallback: if all candidates were excluded (shouldn't happen) play index 0.
+    if (candidates.length === 0) return 0;
     return candidates[Math.floor(Math.random() * candidates.length)];
   }
 }
