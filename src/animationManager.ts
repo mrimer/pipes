@@ -171,6 +171,8 @@ export class AnimationManager {
         if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
       }
       if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'snow') {
+        // Snow cost is pressure-adjusted (unlike ice): snowCostPerDeltaTemp factors in
+        // the current pressure, which reduces the effective cost per deltaTemp unit.
         const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
         const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
         if (rawSnowCost > maxSnowRaw) maxSnowRaw = rawSnowCost;
