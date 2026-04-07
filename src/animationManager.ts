@@ -50,6 +50,10 @@ const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
 const VORTEX_SPAWN_INTERVAL_MS = 120;
 /** How often (ms) to spawn a leaky spray drop from connected leaky pipe tiles. */
 const LEAKY_SPRAY_SPAWN_INTERVAL_MS = 100;
+/** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
+const ICE_SFX_THRESHOLD_MID = 5;
+/** Ice-sfx threshold: raw cost at or above this uses Ice3 sfx (instead of Ice2). */
+const ICE_SFX_THRESHOLD_HIGH = 10;
 
 /**
  * Callbacks into Game for CSS-based inventory sparkle side effects triggered
@@ -156,16 +160,16 @@ export class AnimationManager {
       if (!tile) continue;
       this._pushTileAnimLabels(board, tile, r, c, 'connect', currentTemp, currentPressure, now, sparkle);
       if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'ice') {
-        const raw = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
-        if (raw > maxIceRaw) maxIceRaw = raw;
+        const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
+        if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
       }
     }
 
     // Play a single ice sfx based on the highest-cost ice tile connected this turn.
     if (maxIceRaw >= 0) {
       if (maxIceRaw === 0) sfxManager.play(SfxId.Ice0);
-      else if (maxIceRaw < 5) sfxManager.play(SfxId.Ice1);
-      else if (maxIceRaw < 10) sfxManager.play(SfxId.Ice2);
+      else if (maxIceRaw < ICE_SFX_THRESHOLD_MID) sfxManager.play(SfxId.Ice1);
+      else if (maxIceRaw < ICE_SFX_THRESHOLD_HIGH) sfxManager.play(SfxId.Ice2);
       else sfxManager.play(SfxId.Ice3);
     }
   }
