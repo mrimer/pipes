@@ -402,7 +402,7 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Heater);
     } else if (palette === 'chamber:tank') {
       sfxManager.play(SfxId.Tank);
-    } else if (palette === 'chamber:item' && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {
+    } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {
       sfxManager.play(SfxId.Gold);
     } else if (
       isPipePlacementPalette(palette)
