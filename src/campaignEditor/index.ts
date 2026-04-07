@@ -38,6 +38,7 @@ import { DataValidationDialog } from './dataValidationDialog';
 import { EditorDialogs } from './editorDialogs';
 import { renderMinimap } from '../minimap';
 import { validateLevel } from './levelValidator';
+import { sfxManager, SfxId } from '../sfxManager';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -1070,6 +1071,7 @@ export class CampaignEditor {
 
   private _editorUndo(): void {
     if (!this._state.undo()) return;
+    sfxManager.play(SfxId.Undo);
     this._onStateRestored();
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();

@@ -661,6 +661,7 @@ export class ChapterMapEditorSection {
 
   private _chapterUndo(campaign: CampaignDef, chapter: ChapterDef): void {
     if (this._chapterHistoryIdx <= 0) return;
+    sfxManager.play(SfxId.Undo);
     this._applyChapterSnapshot(this._chapterHistory[--this._chapterHistoryIdx], chapter, campaign);
   }
 

@@ -647,6 +647,7 @@ export class CampaignManager {
     this._newChapterNumberEl.textContent = `Chapter ${chapterIdx + 1}`;
     this._newChapterNameEl.textContent = chapter.name;
     this._newChapterModalEl.style.display = 'flex';
+    sfxManager.play(SfxId.NewChapter);
     this._callbacks.triggerModalSparkle(this._newChapterModalEl, 'sparkle-blue');
   }
 

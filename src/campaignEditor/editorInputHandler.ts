@@ -177,7 +177,7 @@ export class EditorInputHandler {
         // Clear the link if the erased tile was linked
         state.clearLinkAt(pos);
       } else {
-        sfxManager.play(SfxId.PipePlacement);
+        this._playPlacementSfx();
         state.grid[pos.row][pos.col] = state.buildTileDef();
         // Only link the newly placed tile for live param editing if it has
         // parameters beyond rotation (Source, Sink, Chamber).
@@ -244,7 +244,7 @@ export class EditorInputHandler {
           // Clear the link if the erased tile was linked
           state.clearLinkAt(startPos);
         } else {
-          sfxManager.play(SfxId.PipePlacement);
+          this._playPlacementSfx();
           state.grid[startPos.row][startPos.col] = state.buildTileDef();
           // Only link the overwritten tile if it has parameters beyond rotation.
           if (state.paletteHasNonRotationParams()) {
@@ -365,5 +365,23 @@ export class EditorInputHandler {
       this._cb.updateUndoRedoButtons();
     }
     this._cb.renderCanvas();
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Play the placement sound appropriate for the currently selected palette.
+   * Pump and star chamber tiles play their own sfx; all other tiles play the
+   * standard pipe-placement sound.
+   */
+  private _playPlacementSfx(): void {
+    const palette = this._cb.getState().palette;
+    if (palette === 'chamber:pump') {
+      sfxManager.play(SfxId.Pump);
+    } else if (palette === 'chamber:star') {
+      sfxManager.play(SfxId.Star);
+    } else {
+      sfxManager.play(SfxId.PipePlacement);
+    }
   }
 }

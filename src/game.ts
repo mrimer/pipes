@@ -23,8 +23,8 @@ import { sfxManager, SfxId } from './sfxManager';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
-/** Delay (ms) before spawning star sparkles over the win modal star icon. */
-const MODAL_SPARKLE_DELAY_MS = 150;
+/** Delay (ms) after the win-level sfx before playing the star sfx and sparkles. */
+const STAR_SFX_DELAY_MS = 500;
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -792,6 +792,7 @@ export class Game implements InputCallbacks {
   private _showGameOver(): void {
     this.gameState = GameState.GameOver;
     this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
+    sfxManager.play(SfxId.Dry);
     this._showModalWithAnimation(this.gameoverModalEl, 'sparkle-red');
   }
 
@@ -840,15 +841,17 @@ export class Game implements InputCallbacks {
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
       this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
-      // Spawn golden sparkles over the star icon in the win modal when stars were collected
+      sfxManager.play(SfxId.WinLevel);
+      // Spawn golden sparkles over the star icon in the win modal when stars were collected,
+      // and play the star sfx 0.5 s after the win-level sound.
       if (starsCollected > 0 && this.winStarsEl) {
         const winStarsEl = this.winStarsEl;
-        // Short delay so the modal finishes rendering and is positioned before
-        // getBoundingClientRect() is called.
         setTimeout(() => {
+          if (this.gameState !== GameState.Won) return;
+          sfxManager.play(SfxId.Star);
           const rect = winStarsEl.getBoundingClientRect();
           spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
-        }, MODAL_SPARKLE_DELAY_MS);
+        }, STAR_SFX_DELAY_MS);
       }
     });
   }
@@ -1270,6 +1273,7 @@ export class Game implements InputCallbacks {
       return;
     }
     this._animMgr.completeAnims();
+    sfxManager.play(SfxId.Undo);
     const filledBefore = this.board.getFilledPositions();
     if (this.gameState === GameState.GameOver) {
       // discardLastMoveFromHistory() was already called when the fail was detected,
