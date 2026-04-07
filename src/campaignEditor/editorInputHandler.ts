@@ -386,6 +386,7 @@ export class EditorInputHandler {
    * Leaky pipe tiles play the leak sfx (takes precedence over pipe placement).
    * Pump and star chamber tiles play their own sfx; heater and tank chamber
    * tiles play their own sfx; gold item chamber tiles play the gold sfx;
+   * non-gold item chamber tiles with >0 count play the pickup sfx;
    * pipe, source, and sink tiles play the standard pipe-placement sound;
    * all other tiles are silent.
    */
@@ -404,6 +405,8 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Sizzle);
     } else if (palette === 'chamber:ice') {
       sfxManager.play(SfxId.Ice1);
+    } else if (palette === 'chamber:snow') {
+      sfxManager.play(SfxId.Snow1);
     } else if (palette === 'chamber:tank') {
       sfxManager.play(SfxId.Tank);
     } else if (palette === 'chamber:dirt') {
@@ -413,6 +416,8 @@ export class EditorInputHandler {
       else sfxManager.play(SfxId.Dirt3);
     } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {
       sfxManager.play(SfxId.Gold);
+    } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined) {
+      sfxManager.play(SfxId.Pickup);
     } else if (
       isPipePlacementPalette(palette)
     ) {

@@ -415,6 +415,7 @@ export class CampaignEditor {
       btns.appendChild(activeBtn);
     } else {
       btns.appendChild(this._btn('▶ Play', '#16213e', '#7ed321', () => {
+        sfxManager.play(SfxId.ChapterSelect);
         this.hide();
         this._onPlayCampaign(campaign);
       }));
@@ -422,6 +423,7 @@ export class CampaignEditor {
 
     if (!isOfficial) {
       btns.appendChild(this._btn('✏️ Edit', '#16213e', '#f0c040', () => {
+        sfxManager.play(SfxId.ChapterSelect);
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
       }));
@@ -528,6 +530,7 @@ export class CampaignEditor {
 
     if (!isOfficial) {
       chaptersHeader.appendChild(this._btn('➕ Add Chapter', '#16213e', '#7ed321', () => {
+        sfxManager.play(SfxId.ChapterSelect);
         this._addChapter(campaign);
       }));
     }
