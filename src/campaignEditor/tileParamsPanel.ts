@@ -29,6 +29,7 @@ import {
 import { LevelEditorState } from './levelEditorState';
 import { TILE_SIZE } from '../renderer';
 import { drawEditorTile } from './renderer';
+import { sfxManager, SfxId } from '../sfxManager';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -195,11 +196,13 @@ export class TileParamsPanel {
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
 
       btn.addEventListener('click', () => {
+        const changed = state.palette !== item.palette;
         state.palette = item.palette;
         state.clearLink();
         if (isChamberPalette(item.palette)) {
           state.params.chamberContent = chamberPaletteContent(item.palette);
         }
+        if (changed) sfxManager.play(SfxId.InventorySelect);
         const newPanel = this.buildPalette();
         panel.replaceWith(newPanel);
         const paramPanel = document.getElementById('editor-param-panel');

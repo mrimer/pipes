@@ -18,6 +18,7 @@ import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sin
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
+import { sfxManager, SfxId } from './sfxManager';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -659,10 +660,12 @@ export class ChapterMapScreen {
     // Only start a level that has water reaching it
     if (!filledKeys.has(`${pos.row},${pos.col}`)) {
       // Trigger a brief jitter animation to indicate the tile cannot be accessed
+      sfxManager.play(SfxId.InvalidSelection);
       this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
       return;
     }
 
+    sfxManager.play(SfxId.LevelSelect);
     this._callbacks.onLevelSelected(levelDef);
   }
 

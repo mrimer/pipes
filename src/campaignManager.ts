@@ -23,6 +23,7 @@ import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
+import { sfxManager, SfxId } from './sfxManager';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
 
@@ -653,6 +654,7 @@ export class CampaignManager {
     this._challengeMsgEl.style.display    = canSkip ? '' : 'none';
     this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
     this._challengeModalEl.style.display = 'flex';
+    sfxManager.play(SfxId.Challenge);
     this._callbacks.triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
   }
 

@@ -18,6 +18,7 @@ import {
   GRID_MIN_DIM,
   GRID_MAX_DIM,
 } from './types';
+import { sfxManager, SfxId } from '../sfxManager';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -90,8 +91,10 @@ export class ChapterEditorUI {
         'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
       btn.addEventListener('click', () => {
+        const changed = this._cb.getChapterPalette() !== item.palette;
         this._cb.setChapterPalette(item.palette);
         this._cb.setChapterSelectedLevelIdx(null);
+        if (changed) sfxManager.play(SfxId.InventorySelect);
         panel.replaceWith(this.buildPalettePanel(chapter, campaign));
         const existingParams = document.getElementById('chapter-tile-params-panel');
         if (existingParams) existingParams.replaceWith(this.buildTileParamsPanel(chapter, campaign));
@@ -161,6 +164,7 @@ export class ChapterEditorUI {
             this._cb.setChapterSelectedLevelIdx(li);
             this._cb.setChapterPalette(PipeShape.Source); // deselect palette
             this.rebuildPalette(chapter, campaign);
+            sfxManager.play(SfxId.LevelSelect);
           }
           panel.replaceWith(this.buildLevelInventoryPanel(chapter, campaign));
           this._cb.renderCanvas();

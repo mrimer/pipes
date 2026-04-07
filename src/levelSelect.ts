@@ -2,6 +2,7 @@
 
 import { ChapterDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
+import { sfxManager, SfxId } from './sfxManager';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -428,7 +429,7 @@ export function renderLevelList(
       chapterHeader.style.cursor = 'pointer';
       if (chapter.grid && onChapterMap) {
         // Chapter has a map: clicking navigates to the chapter map screen
-        chapterHeader.addEventListener('click', () => { onChapterMap(ci); });
+        chapterHeader.addEventListener('click', () => { sfxManager.play(SfxId.LevelSelect); onChapterMap(ci); });
       } else {
         // Chapter has no map: show a temporary error message when clicked
         const noMapError = document.createElement('p');
@@ -448,6 +449,9 @@ export function renderLevelList(
         chapterBox.appendChild(noMapError);
       }
       attachChapterWaveAnimation(chapterHeader, isGold, chapterBox);
+    } else {
+      // Locked chapter: play invalid-selection sound on click.
+      chapterHeader.addEventListener('click', () => { sfxManager.play(SfxId.InvalidSelection); });
     }
 
     chapterBox.appendChild(chapterHeader);
