@@ -167,6 +167,10 @@ export function renderLevelList(
     msg.textContent = 'Click Campaign Editor to import or create levels.';
     levelListEl.appendChild(msg);
   } else {
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Select a Level';
+    h2.style.textAlign = 'center';
+
     if (onSettingsClick) {
       // Row containing the gear/settings button (left) and the "Select a Level" heading.
       const selectRow = document.createElement('div');
@@ -182,17 +186,9 @@ export function renderLevelList(
         'position:absolute;left:0;';
       gearBtn.addEventListener('click', () => onSettingsClick());
       selectRow.appendChild(gearBtn);
-
-      const h2 = document.createElement('h2');
-      h2.textContent = 'Select a Level';
-      h2.style.textAlign = 'center';
       selectRow.appendChild(h2);
-
       levelListEl.appendChild(selectRow);
     } else {
-      const h2 = document.createElement('h2');
-      h2.textContent = 'Select a Level';
-      h2.style.textAlign = 'center';
       levelListEl.appendChild(h2);
     }
   }
