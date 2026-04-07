@@ -188,7 +188,6 @@ export class ChapterMapInput {
         this._cb.recordSnapshot(chapter);
         this._cb.saveGridState(chapter, campaign);
         this._cb.rebuildLevelInventory(chapter, campaign);
-        sfxManager.play(SfxId.PipePlacement);
         this._cb.renderCanvas();
       } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'level') {
         // Start dragging existing level chamber
@@ -229,7 +228,11 @@ export class ChapterMapInput {
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
       } else {
-        sfxManager.play(SfxId.PipePlacement);
+        if (PIPE_SHAPES.has(this._cb.getPalette() as PipeShape) ||
+            this._cb.getPalette() === PipeShape.Source ||
+            this._cb.getPalette() === PipeShape.Sink) {
+          sfxManager.play(SfxId.PipePlacement);
+        }
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
       }
       this._cb.recordSnapshot(chapter);

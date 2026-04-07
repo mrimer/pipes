@@ -32,6 +32,10 @@ import winLevelUrl from '../data/sfx/win-level.ogg';
 import starUrl from '../data/sfx/star.ogg';
 import newChapterUrl from '../data/sfx/new-chapter.ogg';
 import undoUrl from '../data/sfx/undo.ogg';
+import heaterUrl from '../data/sfx/heater.ogg';
+import redoUrl from '../data/sfx/redo.ogg';
+import waterTankUrl from '../data/sfx/water-tank.ogg';
+import bubblesUrl from '../data/sfx/bubbles.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -53,6 +57,10 @@ export const enum SfxId {
   Star             = 13,
   NewChapter       = 14,
   Undo             = 15,
+  Heater           = 16,
+  Redo             = 17,
+  Tank             = 18,
+  Rings            = 19,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -79,6 +87,10 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Star]:             [starUrl],
   [SfxId.NewChapter]:       [newChapterUrl],
   [SfxId.Undo]:             [undoUrl],
+  [SfxId.Heater]:           [heaterUrl],
+  [SfxId.Redo]:             [redoUrl],
+  [SfxId.Tank]:             [waterTankUrl],
+  [SfxId.Rings]:            [bubblesUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -109,7 +121,26 @@ export class SfxManager {
     [SfxId.Star]:             -1,
     [SfxId.NewChapter]:       -1,
     [SfxId.Undo]:             -1,
+    [SfxId.Heater]:           -1,
+    [SfxId.Redo]:             -1,
+    [SfxId.Tank]:             -1,
+    [SfxId.Rings]:            -1,
   };
+
+  /**
+   * Preload all sound effect files so they are cached and ready to play
+   * without any delay on first use.
+   */
+  preload(): void {
+    if (typeof Audio === 'undefined') return;
+    for (const files of Object.values(SFX_FILES) as string[][]) {
+      for (const url of files) {
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        audio.load();
+      }
+    }
+  }
 
   /**
    * Play the given sound effect.

@@ -371,8 +371,9 @@ export class EditorInputHandler {
 
   /**
    * Play the placement sound appropriate for the currently selected palette.
-   * Pump and star chamber tiles play their own sfx; all other tiles play the
-   * standard pipe-placement sound.
+   * Pump and star chamber tiles play their own sfx; heater and tank chamber
+   * tiles play their own sfx; pipe, source, and sink tiles play the standard
+   * pipe-placement sound; all other tiles are silent.
    */
   private _playPlacementSfx(): void {
     const palette = this._cb.getState().palette;
@@ -380,7 +381,15 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Pump);
     } else if (palette === 'chamber:star') {
       sfxManager.play(SfxId.Star);
-    } else {
+    } else if (palette === 'chamber:heater') {
+      sfxManager.play(SfxId.Heater);
+    } else if (palette === 'chamber:tank') {
+      sfxManager.play(SfxId.Tank);
+    } else if (
+      PIPE_SHAPES.has(palette as PipeShape) ||
+      palette === PipeShape.Source ||
+      palette === PipeShape.Sink
+    ) {
       sfxManager.play(SfxId.PipePlacement);
     }
   }
