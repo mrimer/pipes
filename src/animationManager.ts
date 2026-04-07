@@ -50,14 +50,6 @@ const WIN_FLOW_SPAWN_INTERVAL_MS = 70;
 const VORTEX_SPAWN_INTERVAL_MS = 120;
 /** How often (ms) to spawn a leaky spray drop from connected leaky pipe tiles. */
 const LEAKY_SPRAY_SPAWN_INTERVAL_MS = 100;
-/** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
-const ICE_SFX_THRESHOLD_MID = 5;
-/** Ice-sfx threshold: raw cost at or above this uses Ice3 sfx (instead of Ice2). */
-const ICE_SFX_THRESHOLD_HIGH = 10;
-/** Snow-sfx threshold: raw cost at or above this uses Snow2 sfx (instead of Snow1). */
-const SNOW_SFX_THRESHOLD_MID = 5;
-/** Snow-sfx threshold: raw cost at or above this uses Snow3 sfx (instead of Snow2). */
-const SNOW_SFX_THRESHOLD_HIGH = 10;
 
 /**
  * Callbacks into Game for CSS-based inventory sparkle side effects triggered
@@ -142,76 +134,24 @@ export class AnimationManager {
   /**
    * Spawn floating animation labels for tiles that became newly connected to the
    * fill path since `filledBefore` was captured.
-   *
-   * Returns the list of SFX IDs triggered by chamber connections this turn so
-   * that the caller can play all turn sounds from a single location.  No sounds
-   * are played inside this method.
    */
   spawnConnectionAnimations(
     board: Board,
     filledBefore: Set<string>,
     sparkle: AnimSparkleCallbacks,
-  ): SfxId[] {
+  ): void {
     const filledAfter = board.getFilledPositions();
     const now = performance.now();
     const currentTemp = board.getCurrentTemperature(filledAfter);
     const currentPressure = board.getCurrentPressure(filledAfter);
-
-    // Track the maximum raw ice cost, maximum raw snow cost, and maximum dirt cost
-    // across all newly-connected tiles so only one sfx is played per turn (the one
-    // matching the highest cost).
-    let maxIceRaw = -1;
-    let maxSnowRaw = -1;
-    let maxDirtCost = -1;
-
-    const sfxToPlay: SfxId[] = [];
 
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue;
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
       if (!tile) continue;
-      this._pushTileAnimLabels(board, tile, r, c, 'connect', currentTemp, currentPressure, now, sparkle, sfxToPlay);
-      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'ice') {
-        const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
-        if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
-      }
-      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'snow') {
-        // Snow cost is pressure-adjusted (unlike ice): snowCostPerDeltaTemp factors in
-        // the current pressure, which reduces the effective cost per deltaTemp unit.
-        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-        const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
-        if (rawSnowCost > maxSnowRaw) maxSnowRaw = rawSnowCost;
-      }
-      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'dirt') {
-        if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
-      }
+      this._pushTileAnimLabels(board, tile, r, c, 'connect', currentTemp, currentPressure, now, sparkle);
     }
-
-    // Collect a single ice sfx based on the highest-cost ice tile connected this turn.
-    if (maxIceRaw >= 0) {
-      if (maxIceRaw === 0) sfxToPlay.push(SfxId.Ice0);
-      else if (maxIceRaw < ICE_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Ice1);
-      else if (maxIceRaw < ICE_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Ice2);
-      else sfxToPlay.push(SfxId.Ice3);
-    }
-
-    // Collect a single snow sfx based on the highest-cost snow tile connected this turn.
-    if (maxSnowRaw >= 0) {
-      if (maxSnowRaw === 0) sfxToPlay.push(SfxId.Snow0);
-      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Snow1);
-      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Snow2);
-      else sfxToPlay.push(SfxId.Snow3);
-    }
-
-    // Collect a single dirt sfx based on the highest-cost dirt tile connected this turn.
-    if (maxDirtCost >= 0) {
-      if (maxDirtCost < 5) sfxToPlay.push(SfxId.Dirt1);
-      else if (maxDirtCost < 10) sfxToPlay.push(SfxId.Dirt2);
-      else sfxToPlay.push(SfxId.Dirt3);
-    }
-
-    return sfxToPlay;
   }
 
   /**
@@ -243,7 +183,7 @@ export class AnimationManager {
         ? reclaimedTile
         : board.grid[r]?.[c];
       if (!tile) continue;
-      this._pushTileAnimLabels(board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle, []);
+      this._pushTileAnimLabels(board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle);
     }
   }
 
@@ -687,9 +627,6 @@ export class AnimationManager {
    * `animations` and leave `text` null so the outer push is skipped.
    * Side effects: may invoke `sparkle` callbacks (item connect) or trigger
    * star sparkle particles (star connect).
-   *
-   * Chamber connection sounds are collected into `sfxToPlay` rather than
-   * played immediately, so the caller can play all turn sounds from one place.
    */
   private _pushTileAnimLabels(
     board: Board,
@@ -701,7 +638,6 @@ export class AnimationManager {
     currentPressure: number,
     now: number,
     sparkle: AnimSparkleCallbacks,
-    sfxToPlay: SfxId[],
   ): void {
     // Lower-right quadrant (avoids drawing over the pipe image)
     const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
@@ -720,7 +656,6 @@ export class AnimationManager {
         const val = dir === 'connect' ? tile.capacity : -tile.capacity;
         text = val >= 0 ? `+${val}💧` : `${val}💧`;
         color = animColor(val);
-        if (dir === 'connect') sfxToPlay.push(SfxId.Tank);
       } else if (tile.chamberContent === 'dirt') {
         // Dirt consumes water on connect; removal returns it.
         const val = dir === 'connect' ? -tile.cost : tile.cost;
@@ -737,11 +672,9 @@ export class AnimationManager {
           } else if (val < 0) {
             color = ANIM_ITEM_NEG_COLOR;
             sparkle.negative(tile.itemShape);
-            sfxToPlay.push(SfxId.NegativeCount);
           } else {
             color = ANIM_ZERO_COLOR;
             sparkle.zero(tile.itemShape);
-            sfxToPlay.push(SfxId.NegativeCount);
           }
         }
         // disconnect: items already granted; no reversal animation
@@ -750,7 +683,6 @@ export class AnimationManager {
         const val = dir === 'connect' ? tile.temperature : -tile.temperature;
         text = val >= 0 ? `+${val}°` : `${val}°`;
         color = animColor(val);
-        if (dir === 'connect') sfxToPlay.push(SfxId.Heater);
       } else if (tile.chamberContent === 'ice') {
         const raw = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
         ({ text, color } = this._formatWaterCostLabel(raw, dir));
@@ -759,7 +691,6 @@ export class AnimationManager {
         const val = dir === 'connect' ? tile.pressure : -tile.pressure;
         text = val >= 0 ? `+${val}P` : `${val}P`;
         color = animColor(val);
-        if (dir === 'connect') sfxToPlay.push(SfxId.Pump);
       } else if (tile.chamberContent === 'snow') {
         const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
         const raw = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
@@ -776,14 +707,12 @@ export class AnimationManager {
         }
       } else if (tile.chamberContent === 'hot_plate') {
         ({ text, color } = this._pushHotPlateAnimLabels(board, tile, r, c, dir, currentTemp, cx, cy, now));
-        if (dir === 'connect') sfxToPlay.push(SfxId.Sizzle);
       } else if (tile.chamberContent === 'star' && dir === 'connect') {
-        // Star tile connected – spawn golden sparkle burst from the tile center and play sfx.
+        // Star tile connected – spawn golden sparkle burst from the tile center.
         const starCx = c * TILE_SIZE + TILE_SIZE / 2;
         const starCy = r * TILE_SIZE + TILE_SIZE / 2;
         const canvasRect = this.canvas.getBoundingClientRect();
         spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
-        sfxToPlay.push(SfxId.Star);
       }
     }
 

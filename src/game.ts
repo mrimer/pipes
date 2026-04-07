@@ -1,4 +1,4 @@
-import { Board, MoveResult, ERR_GOLD_SPACE, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from './board';
+import { Board, MoveResult, ERR_GOLD_SPACE, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
@@ -25,6 +25,14 @@ import { sfxManager, SfxId } from './sfxManager';
 const ERROR_DISPLAY_MS = 2000;
 /** Delay (ms) after the win-level sfx before playing the star sfx and sparkles. */
 const STAR_SFX_DELAY_MS = 500;
+/** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
+const ICE_SFX_THRESHOLD_MID = 5;
+/** Ice-sfx threshold: raw cost at or above this uses Ice3 sfx (instead of Ice2). */
+const ICE_SFX_THRESHOLD_HIGH = 10;
+/** Snow-sfx threshold: raw cost at or above this uses Snow2 sfx (instead of Snow1). */
+const SNOW_SFX_THRESHOLD_MID = 5;
+/** Snow-sfx threshold: raw cost at or above this uses Snow3 sfx (instead of Snow2). */
+const SNOW_SFX_THRESHOLD_HIGH = 10;
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -967,6 +975,116 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * Collect the SFX IDs to play for all chamber tiles that became newly
+   * connected to the fill path since `filledBefore` was captured.
+   *
+   * Iterates over newly-connected tiles and collects one sfx per chamber type:
+   * - Per-tile sounds: Tank, Heater, Pump, Sizzle, Star, NegativeCount (item).
+   * - Single-per-turn sounds: one Ice (based on the highest raw ice cost) and
+   *   one Snow (based on the highest raw snow cost), one Dirt (based on the
+   *   highest dirt cost).
+   */
+  private _collectConnectionSfx(board: Board, filledBefore: Set<string>): SfxId[] {
+    const filledAfter = board.getFilledPositions();
+    const currentTemp = board.getCurrentTemperature(filledAfter);
+    const currentPressure = board.getCurrentPressure(filledAfter);
+
+    let maxIceRaw = -1;
+    let maxSnowRaw = -1;
+    let maxDirtCost = -1;
+
+    const sfxToPlay: SfxId[] = [];
+
+    for (const key of filledAfter) {
+      if (filledBefore.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const tile = board.grid[r]?.[c];
+      if (tile?.shape !== PipeShape.Chamber) continue;
+
+      if (tile.chamberContent === 'tank') {
+        sfxToPlay.push(SfxId.Tank);
+      } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
+        if (tile.itemCount <= 0) sfxToPlay.push(SfxId.NegativeCount);
+      } else if (tile.chamberContent === 'heater') {
+        sfxToPlay.push(SfxId.Heater);
+      } else if (tile.chamberContent === 'pump') {
+        sfxToPlay.push(SfxId.Pump);
+      } else if (tile.chamberContent === 'hot_plate') {
+        sfxToPlay.push(SfxId.Sizzle);
+      } else if (tile.chamberContent === 'star') {
+        sfxToPlay.push(SfxId.Star);
+      } else if (tile.chamberContent === 'ice') {
+        const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
+        if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
+      } else if (tile.chamberContent === 'snow') {
+        // Snow cost is pressure-adjusted (unlike ice): snowCostPerDeltaTemp factors in
+        // the current pressure, which reduces the effective cost per deltaTemp unit.
+        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+        const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
+        if (rawSnowCost > maxSnowRaw) maxSnowRaw = rawSnowCost;
+      } else if (tile.chamberContent === 'dirt') {
+        if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
+      }
+    }
+
+    // Collect a single ice sfx based on the highest-cost ice tile connected this turn.
+    if (maxIceRaw >= 0) {
+      if (maxIceRaw === 0) sfxToPlay.push(SfxId.Ice0);
+      else if (maxIceRaw < ICE_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Ice1);
+      else if (maxIceRaw < ICE_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Ice2);
+      else sfxToPlay.push(SfxId.Ice3);
+    }
+
+    // Collect a single snow sfx based on the highest-cost snow tile connected this turn.
+    if (maxSnowRaw >= 0) {
+      if (maxSnowRaw === 0) sfxToPlay.push(SfxId.Snow0);
+      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Snow1);
+      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Snow2);
+      else sfxToPlay.push(SfxId.Snow3);
+    }
+
+    // Collect a single dirt sfx based on the highest-cost dirt tile connected this turn.
+    if (maxDirtCost >= 0) {
+      if (maxDirtCost < 5) sfxToPlay.push(SfxId.Dirt1);
+      else if (maxDirtCost < 10) sfxToPlay.push(SfxId.Dirt2);
+      else sfxToPlay.push(SfxId.Dirt3);
+    }
+
+    return sfxToPlay;
+  }
+
+  /**
+   * Play all SFX for a tile-placement action.
+   *
+   * - When a leaky pipe tile is placed and immediately connected to the source,
+   *   plays only the Leak sound (suppresses PipePlacement and connection sounds).
+   * - Otherwise plays PipePlacement (only when no chamber-connection sounds fire),
+   *   Leak (if a leaky tile penalty was applied), Gold/Pickup (if applicable),
+   *   and all chamber-connection sounds collected by {@link _collectConnectionSfx}.
+   */
+  private _playAfterTilePlacedSfx(
+    board: Board,
+    filledBefore: Set<string>,
+    changes: Array<{ row: number; col: number; delta: number }>,
+    placedIsLeakyAndConnected: boolean,
+  ): void {
+    if (placedIsLeakyAndConnected) {
+      sfxManager.play(SfxId.Leak);
+      return;
+    }
+    const connectionSfx = this._collectConnectionSfx(board, filledBefore);
+    // Only play PipePlacement when no chamber-connection sounds fire this turn.
+    if (connectionSfx.length === 0) {
+      sfxManager.play(SfxId.PipePlacement);
+    }
+    this._playLeakSfxIfNeeded(board, changes);
+    this._playGoldSfxIfNeeded(board, filledBefore);
+    for (const sfx of connectionSfx) {
+      sfxManager.play(sfx);
+    }
+  }
+
+  /**
    * Play the leak sound if any leaky-pipe penalty was applied in `changes`.
    * Called once per board action so the sound plays at most once per turn.
    */
@@ -1112,30 +1230,14 @@ export class Game implements InputCallbacks {
     this.board.recordMove();
     const sparkle = this._metrics.sparkleCallbacks();
 
-    // Spawn all animations and collect connection sounds so every sound
-    // decision can be made from one place below.
-    const connectionSfx = this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
+    // Spawn all animations.
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol);
     this._animMgr.spawnFillAnims(this.board, filledBefore);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
 
-    // Play all turn sounds now that every event has been scanned.
-    // Play Leak instead of PipePlacement when a leaky pipe tile is placed and
-    // immediately connected to the source.
-    if (placedIsLeakyAndConnected) {
-      sfxManager.play(SfxId.Leak);
-    } else {
-      // Only play PipePlacement when no chamber-connection sounds fire this turn.
-      if (connectionSfx.length === 0) {
-        sfxManager.play(SfxId.PipePlacement);
-      }
-      this._playLeakSfxIfNeeded(this.board, changes);
-    }
-    this._playGoldSfxIfNeeded(this.board, filledBefore);
-    for (const sfx of connectionSfx) {
-      sfxManager.play(sfx);
-    }
+    this._playAfterTilePlacedSfx(this.board, filledBefore, changes, placedIsLeakyAndConnected);
 
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
