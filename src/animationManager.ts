@@ -149,9 +149,10 @@ export class AnimationManager {
     const currentTemp = board.getCurrentTemperature(filledAfter);
     const currentPressure = board.getCurrentPressure(filledAfter);
 
-    // Track the maximum raw ice cost across all newly-connected ice tiles so
-    // only one ice sfx is played per turn (the one matching the highest cost).
+    // Track the maximum raw ice cost and maximum dirt cost across all newly-connected
+    // tiles so only one sfx is played per turn (the one matching the highest cost).
     let maxIceRaw = -1;
+    let maxDirtCost = -1;
 
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue;
@@ -163,6 +164,9 @@ export class AnimationManager {
         const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
         if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
       }
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'dirt') {
+        if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
+      }
     }
 
     // Play a single ice sfx based on the highest-cost ice tile connected this turn.
@@ -171,6 +175,13 @@ export class AnimationManager {
       else if (maxIceRaw < ICE_SFX_THRESHOLD_MID) sfxManager.play(SfxId.Ice1);
       else if (maxIceRaw < ICE_SFX_THRESHOLD_HIGH) sfxManager.play(SfxId.Ice2);
       else sfxManager.play(SfxId.Ice3);
+    }
+
+    // Play a single dirt sfx based on the highest-cost dirt tile connected this turn.
+    if (maxDirtCost >= 0) {
+      if (maxDirtCost < 5) sfxManager.play(SfxId.Dirt1);
+      else if (maxDirtCost < 10) sfxManager.play(SfxId.Dirt2);
+      else sfxManager.play(SfxId.Dirt3);
     }
   }
 
@@ -693,9 +704,11 @@ export class AnimationManager {
           } else if (val < 0) {
             color = ANIM_ITEM_NEG_COLOR;
             sparkle.negative(tile.itemShape);
+            sfxManager.play(SfxId.NegativeCount);
           } else {
             color = ANIM_ZERO_COLOR;
             sparkle.zero(tile.itemShape);
+            sfxManager.play(SfxId.NegativeCount);
           }
         }
         // disconnect: items already granted; no reversal animation

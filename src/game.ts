@@ -1095,10 +1095,20 @@ export class Game implements InputCallbacks {
     replacedCol?: number,
   ): void {
     if (!this.board) return;
-    sfxManager.play(SfxId.PipePlacement);
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
-    this._playLeakSfxIfNeeded(this.board, changes);
+    // Play Leak instead of PipePlacement when a leaky pipe tile is placed and
+    // immediately connected to the source.
+    const posKey = (replacedRow !== undefined && replacedCol !== undefined)
+      ? `${replacedRow},${replacedCol}` : null;
+    const placedIsLeakyAndConnected = LEAKY_PIPE_SHAPES.has(placedShape)
+      && posKey !== null && this.board.getFilledPositions().has(posKey);
+    if (placedIsLeakyAndConnected) {
+      sfxManager.play(SfxId.Leak);
+    } else {
+      sfxManager.play(SfxId.PipePlacement);
+      this._playLeakSfxIfNeeded(this.board, changes);
+    }
     this._playGoldSfxIfNeeded(this.board, filledBefore);
     this.board.recordMove();
     const sparkle = this._metrics.sparkleCallbacks();
@@ -1309,7 +1319,7 @@ export class Game implements InputCallbacks {
       return;
     }
     this._animMgr.completeAnims();
-    sfxManager.play(SfxId.Undo);
+    const turnBefore = this.board.turnNumber;
     const filledBefore = this.board.getFilledPositions();
     if (this.gameState === GameState.GameOver) {
       // discardLastMoveFromHistory() was already called when the fail was detected,
@@ -1318,6 +1328,13 @@ export class Game implements InputCallbacks {
       this.board.restoreFromCurrentSnapshot();
     } else {
       this.board.undoMove();
+    }
+    // Play UndoBeforeRestart when undoing from turn 0 restores a prior play sequence
+    // (turn count goes up), otherwise play the regular Undo sound.
+    if (turnBefore === 0 && this.board.turnNumber > 0) {
+      sfxManager.play(SfxId.UndoBeforeRestart);
+    } else {
+      sfxManager.play(SfxId.Undo);
     }
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);

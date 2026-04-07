@@ -97,7 +97,7 @@ export class CampaignEditor {
     this._service = new CampaignService();
 
     const chapterCallbacks: ChapterMapEditorCallbacks = {
-      buildBtn: (l, bg, c, cb) => this._btn(l, bg, c, cb),
+      buildBtn: (l, bg, c, cb, suppressClick) => this._btn(l, bg, c, cb, '', suppressClick),
       getActiveCampaign: () => this._getActiveCampaign(),
       getActiveChapterIdx: () => this._activeChapterIdx,
       touchCampaign: (campaign) => this._touchCampaign(campaign),
@@ -216,7 +216,7 @@ export class CampaignEditor {
       const backBtn = this._btn('← Back', '#2a2a4a', '#aaa', () => {
         sfxManager.play(SfxId.Back);
         onBack();
-      });
+      }, '', true);
       toolbar.appendChild(backBtn);
     }
 
@@ -230,14 +230,17 @@ export class CampaignEditor {
 
   // ─── Button helpers ────────────────────────────────────────────────────────
 
-  private _btn(label: string, bg: string, color: string, onClick: () => void, extraStyle = ''): HTMLButtonElement {
+  private _btn(label: string, bg: string, color: string, onClick: () => void, extraStyle = '', suppressClick = false): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
     b.style.cssText =
       `padding:8px 16px;font-size:0.9rem;background:${bg};color:${color};` +
       `border:1px solid ${color};border-radius:6px;cursor:pointer;${extraStyle}`;
-    b.addEventListener('click', onClick);
+    b.addEventListener('click', () => {
+      if (!suppressClick) sfxManager.play(SfxId.Click);
+      onClick();
+    });
     return b;
   }
 
@@ -851,10 +854,10 @@ export class CampaignEditor {
     if (readOnly) return;
 
     // Undo/redo
-    const undoBtn = this._btn('↩ Undo', '#2a2a4a', '#aaa', () => this._editorUndo());
+    const undoBtn = this._btn('↩ Undo', '#2a2a4a', '#aaa', () => this._editorUndo(), '', true);
     undoBtn.id = 'editor-undo-btn';
     toolbar.appendChild(undoBtn);
-    const redoBtn = this._btn('↪ Redo', '#2a2a4a', '#aaa', () => this._editorRedo());
+    const redoBtn = this._btn('↪ Redo', '#2a2a4a', '#aaa', () => this._editorRedo(), '', true);
     redoBtn.id = 'editor-redo-btn';
     toolbar.appendChild(redoBtn);
 

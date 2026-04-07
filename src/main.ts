@@ -43,19 +43,19 @@ const game = new Game(
 );
 
 // Win modal buttons
-getEl('win-next-btn').addEventListener('click',  () => game.exitToMenu());
-getEl('win-undo-btn').addEventListener('click',  () => game.undoWinningMove());
-getEl('win-retry-btn').addEventListener('click', () => game.retryLevel());
+getEl('win-next-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.exitToMenu(); });
+getEl('win-undo-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.undoWinningMove(); });
+getEl('win-retry-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
 
 // Game-over modal buttons
 getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove());
-getEl('gameover-retry-btn').addEventListener('click', () => game.retryLevel());
-getEl('gameover-menu-btn').addEventListener('click',  () => game.exitToMenu());
+getEl('gameover-retry-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
+getEl('gameover-menu-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.exitToMenu(); });
 
 // HUD undo / redo / restart buttons
 undoBtnEl.addEventListener('click', () => game.performUndo());
 redoBtnEl.addEventListener('click', () => game.performRedo());
-getEl('restart-btn').addEventListener('click', () => game.retryLevel());
+getEl('restart-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
 
 // Exit to menu button on play screen
 exitBtnEl.addEventListener('click', () => {
@@ -64,5 +64,5 @@ exitBtnEl.addEventListener('click', () => {
 });
 
 // Rules button on play screen
-rulesBtnEl.addEventListener('click', () => game.showRules());
+rulesBtnEl.addEventListener('click', () => { sfxManager.play(SfxId.Click); game.showRules(); });
 
