@@ -10,7 +10,7 @@
 import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
-import { EditorPalette, REPEATABLE_EDITOR_TILES } from './types';
+import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
@@ -228,9 +228,7 @@ export class ChapterMapInput {
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
       } else {
-        if (PIPE_SHAPES.has(this._cb.getPalette() as PipeShape) ||
-            this._cb.getPalette() === PipeShape.Source ||
-            this._cb.getPalette() === PipeShape.Sink) {
+        if (isPipePlacementPalette(this._cb.getPalette())) {
           sfxManager.play(SfxId.PipePlacement);
         }
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();

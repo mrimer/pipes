@@ -10,7 +10,7 @@
 import { TileDef, PipeShape } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
-import { REPEATABLE_EDITOR_TILES } from './types';
+import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { LevelEditorState } from './levelEditorState';
 import { sfxManager, SfxId } from '../sfxManager';
 
@@ -386,9 +386,7 @@ export class EditorInputHandler {
     } else if (palette === 'chamber:tank') {
       sfxManager.play(SfxId.Tank);
     } else if (
-      PIPE_SHAPES.has(palette as PipeShape) ||
-      palette === PipeShape.Source ||
-      palette === PipeShape.Sink
+      isPipePlacementPalette(palette)
     ) {
       sfxManager.play(SfxId.PipePlacement);
     }
