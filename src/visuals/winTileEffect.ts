@@ -6,8 +6,9 @@
  * once – alpha ramps up to a peak then fades out quickly.
  *
  * The sequence starts with the source tile and all tiles directly connected to
- * it (BFS layer 0 + 1 fire simultaneously at t=0).  Each subsequent BFS layer
- * starts {@link WIN_TILE_LAYER_DELAY_MS} milliseconds after the previous one,
+ * it (BFS depth 0 = source, BFS depth 1 = immediate neighbours, both fire
+ * simultaneously at t=0).  Each subsequent BFS depth fires
+ * {@link WIN_TILE_LAYER_DELAY_MS} milliseconds after the previous one,
  * creating a ripple that propagates outward until every connected tile has been
  * triggered.
  */

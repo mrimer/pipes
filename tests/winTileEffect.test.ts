@@ -65,7 +65,7 @@ describe('computeWinTileGlows', () => {
     expect(sourceGlow!.startTime).toBe(base);
   });
 
-  it('tile at depth 1 (immediate neighbour) starts at baseTime (same as source)', () => {
+  it('tile at depth 1 (immediate neighbour of source) starts at baseTime – same delay as source (depth 0)', () => {
     const base = 1000;
     const board = makeLinearBoard();
     const glows = computeWinTileGlows(board, base);
@@ -73,6 +73,17 @@ describe('computeWinTileGlows', () => {
     const midGlow = glows.find(g => g.row === 0 && g.col === 1);
     expect(midGlow).toBeDefined();
     expect(midGlow!.startTime).toBe(base);
+  });
+
+  it('source (depth 0) and its immediate neighbour (depth 1) fire simultaneously at baseTime', () => {
+    const base = 500;
+    const board = makeLinearBoard();
+    const glows = computeWinTileGlows(board, base);
+    const sourceGlow = glows.find(g => g.row === 0 && g.col === 0);
+    const midGlow    = glows.find(g => g.row === 0 && g.col === 1);
+    expect(sourceGlow!.startTime).toBe(base);
+    expect(midGlow!.startTime).toBe(base);
+    expect(sourceGlow!.startTime).toBe(midGlow!.startTime);
   });
 
   it('tile at depth 2 starts at baseTime + WIN_TILE_LAYER_DELAY_MS', () => {
