@@ -20,6 +20,7 @@ import {
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
 import { validateChapterMap } from './chapterMapValidator';
+import { sfxManager, SfxId } from '../sfxManager';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -509,6 +510,7 @@ export class ChapterMapEditorSection {
   ): void {
     const tile = this._chapterEditGrid[pos.row]?.[pos.col];
     if (!tile || !PIPE_SHAPES.has(tile.shape)) return;
+    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
     const cur = (tile.rotation ?? 0) as Rotation;
     tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
     // When the palette matches the rotated tile's shape, keep the ghost preview in sync
@@ -526,6 +528,7 @@ export class ChapterMapEditorSection {
    */
   private _rotateChapterPalette(clockwise: boolean): void {
     if (!PIPE_SHAPES.has(this._chapterPalette as PipeShape)) return;
+    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
     const cur = this._chapterParams.rotation ?? 0;
     this._chapterParams.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
     this._renderChapterCanvas();
@@ -549,6 +552,7 @@ export class ChapterMapEditorSection {
       tile.shape === PipeShape.Sink ||
       (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level');
     if (!isConnectable) return;
+    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
 
     const allDirs: Direction[] = [Direction.North, Direction.East, Direction.South, Direction.West];
     const currentConns = new Set(tile.connections ?? allDirs);

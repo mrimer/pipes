@@ -1,4 +1,8 @@
 import { Game } from './game';
+import { sfxManager } from './sfxManager';
+import { loadSfxVolume } from './persistence';
+
+sfxManager.setVolume(loadSfxVolume());
 
 function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;

@@ -10,6 +10,10 @@ module.exports = {
         use: 'ts-loader',
         exclude: /node_modules/,
       },
+      {
+        test: /\.ogg$/,
+        type: 'asset/resource',
+      },
     ],
   },
   resolve: {

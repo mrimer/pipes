@@ -187,6 +187,86 @@ export function buildExitConfirmModal(
 }
 
 /**
+ * Build and attach the Settings modal.
+ *
+ * The modal contains a "Sound Effects" volume slider (0–100) and a Confirm
+ * button.  The slider calls `onVolumeChange` live as the user drags it; the
+ * Confirm button calls `onConfirm` (which should persist the value and dismiss
+ * the modal).
+ *
+ * @param getVolume      - Returns the current volume (0–100) to initialise the slider.
+ * @param onVolumeChange - Called with the new value whenever the slider moves.
+ * @param onConfirm      - Called when the player clicks Confirm; receives the
+ *                         modal element so the caller can hide it.
+ */
+export function buildSettingsModal(
+  getVolume: () => number,
+  onVolumeChange: (v: number) => void,
+  onConfirm: (el: HTMLElement) => void,
+): HTMLElement {
+  const el = createModalOverlay(0.5);
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+  box.style.minWidth = '300px';
+
+  const title = document.createElement('h2');
+  title.textContent = '⚙️ Settings';
+  box.appendChild(title);
+
+  // ── Sound Effects row ────────────────────────────────────────────────────
+  const sfxSection = document.createElement('div');
+  sfxSection.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;';
+
+  const sfxLabel = document.createElement('div');
+  sfxLabel.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+
+  const sfxLabelText = document.createElement('span');
+  sfxLabelText.textContent = '🔊 Sound Effects';
+
+  const sfxValueEl = document.createElement('span');
+  sfxValueEl.style.cssText = 'font-size:0.9rem;color:#aaa;';
+  sfxValueEl.dataset.sfxValue = '1';
+  sfxValueEl.textContent = String(getVolume());
+
+  sfxLabel.appendChild(sfxLabelText);
+  sfxLabel.appendChild(sfxValueEl);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = '0';
+  slider.max = '100';
+  slider.value = String(getVolume());
+  slider.dataset.sfxSlider = '1';
+  slider.style.cssText = 'width:100%;cursor:pointer;';
+  slider.addEventListener('input', () => {
+    const v = Number(slider.value);
+    sfxValueEl.textContent = String(v);
+    onVolumeChange(v);
+  });
+
+  sfxSection.appendChild(sfxLabel);
+  sfxSection.appendChild(slider);
+  box.appendChild(sfxSection);
+
+  // ── Confirm button ───────────────────────────────────────────────────────
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = 'Confirm';
+  confirmBtn.className = 'modal-btn primary';
+  confirmBtn.type = 'button';
+  confirmBtn.addEventListener('click', () => onConfirm(el));
+
+  actions.appendChild(confirmBtn);
+  box.appendChild(actions);
+
+  el.appendChild(box);
+  document.body.appendChild(el);
+  return el;
+}
+
+/**
  * Build and attach the unplayable-level modal (shown when a level starts in an
  * already-lost state).
  *

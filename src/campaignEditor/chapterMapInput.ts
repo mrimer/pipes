@@ -11,6 +11,7 @@ import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types
 import { PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES } from './types';
+import { sfxManager, SfxId } from '../sfxManager';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -146,6 +147,7 @@ export class ChapterMapInput {
       if (existingTile !== null) {
         this._cb.getEditGrid()[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
+        sfxManager.play(SfxId.Delete);
         this._cb.renderCanvas();
       }
       return;
@@ -186,6 +188,7 @@ export class ChapterMapInput {
         this._cb.recordSnapshot(chapter);
         this._cb.saveGridState(chapter, campaign);
         this._cb.rebuildLevelInventory(chapter, campaign);
+        sfxManager.play(SfxId.PipePlacement);
         this._cb.renderCanvas();
       } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'level') {
         // Start dragging existing level chamber
@@ -216,14 +219,17 @@ export class ChapterMapInput {
       if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._cb.getPalette())) {
         this._paintDragActive = true;
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
+        sfxManager.play(SfxId.PipePlacement);
         this._cb.renderCanvas();
         return;
       }
       if (this._cb.getPalette() === 'erase') {
+        if (existingTile !== null) sfxManager.play(SfxId.Delete);
         this._cb.getEditGrid()[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
       } else {
+        sfxManager.play(SfxId.PipePlacement);
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
       }
       this._cb.recordSnapshot(chapter);
@@ -320,6 +326,7 @@ export class ChapterMapInput {
   private _onRightClick(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
     const pos = this._canvasPos(e);
     if (!pos) return;
+    if ((this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null) !== null) sfxManager.play(SfxId.Delete);
     this._cb.getEditGrid()[pos.row][pos.col] = null;
     this._cb.clearFocusIfAt(pos);
     this._cb.rebuildLevelInventory(chapter, campaign);

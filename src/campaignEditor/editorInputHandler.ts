@@ -12,6 +12,7 @@ import { PIPE_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES } from './types';
 import { LevelEditorState } from './levelEditorState';
+import { sfxManager, SfxId } from '../sfxManager';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -138,6 +139,7 @@ export class EditorInputHandler {
       if (state.grid[pos.row][pos.col] !== null) {
         state.grid[pos.row][pos.col] = null;
         state.clearLinkAt(pos);
+        sfxManager.play(SfxId.Delete);
         this._cb.renderCanvas();
       }
       return;
@@ -151,6 +153,7 @@ export class EditorInputHandler {
     // Repeatable tile on an empty cell: start a paint-drag session.
     if (existingTile === null && REPEATABLE_EDITOR_TILES.has(state.palette)) {
       this._paintDragActive = true;
+      sfxManager.play(SfxId.PipePlacement);
       this._paintCell(pos);
       this._cb.renderCanvas();
       return;
@@ -169,10 +172,12 @@ export class EditorInputHandler {
       // Paint / erase immediately; snapshot recorded after the change so that
       // the placed/erased tile is captured in the new history entry.
       if (state.palette === 'erase') {
+        if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
         state.grid[pos.row][pos.col] = null;
         // Clear the link if the erased tile was linked
         state.clearLinkAt(pos);
       } else {
+        sfxManager.play(SfxId.PipePlacement);
         state.grid[pos.row][pos.col] = state.buildTileDef();
         // Only link the newly placed tile for live param editing if it has
         // parameters beyond rotation (Source, Sink, Chamber).
@@ -234,10 +239,12 @@ export class EditorInputHandler {
         }
         // Ctrl+click: force-overwrite; snapshot recorded after the change.
         if (state.palette === 'erase') {
+          sfxManager.play(SfxId.Delete);
           state.grid[startPos.row][startPos.col] = null;
           // Clear the link if the erased tile was linked
           state.clearLinkAt(startPos);
         } else {
+          sfxManager.play(SfxId.PipePlacement);
           state.grid[startPos.row][startPos.col] = state.buildTileDef();
           // Only link the overwritten tile if it has parameters beyond rotation.
           if (state.paletteHasNonRotationParams()) {
@@ -254,6 +261,7 @@ export class EditorInputHandler {
         )
       ) {
         // Both palette and tile are pipe shapes: auto-replace; snapshot after.
+        sfxManager.play(SfxId.PipePlacement);
         state.grid[startPos.row][startPos.col] = state.buildTileDef();
         // Only link if the new tile has parameters beyond rotation.
         if (state.paletteHasNonRotationParams()) {
@@ -276,6 +284,7 @@ export class EditorInputHandler {
     if (!pos) return;
     state.recordSnapshot();
     this._cb.updateUndoRedoButtons();
+    if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
     state.grid[pos.row][pos.col] = null;
     // Clear the link if the erased tile was linked
     state.clearLinkAt(pos);
@@ -322,6 +331,7 @@ export class EditorInputHandler {
     e.preventDefault();
     const state = this._cb.getState();
     const clockwise = e.deltaY > 0;
+    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
     state.rotatePalette(clockwise);
 
     // Only write the rotation/connection change back to the linked tile when the

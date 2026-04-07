@@ -3,7 +3,7 @@ import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
-import { loadCompletedLevels } from './persistence';
+import { loadCompletedLevels, saveSfxVolume } from './persistence';
 import { createGameRulesModal } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
 import { CampaignManager, CampaignCallbacks } from './campaignManager';
@@ -13,11 +13,13 @@ import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
 import {
   buildResetModal,
   buildExitConfirmModal, buildUnplayableModal,
+  buildSettingsModal,
 } from './gameModals';
 import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
+import { sfxManager, SfxId } from './sfxManager';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -192,6 +194,9 @@ export class Game implements InputCallbacks {
   /** Modal overlay shown when a level starts in an already-lost state (unplayable). */
   private readonly _unplayableModalEl: HTMLElement;
 
+  /** Modal overlay for the game settings (SFX volume, etc.). */
+  private readonly _settingsModalEl: HTMLElement;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -274,6 +279,16 @@ export class Game implements InputCallbacks {
       () => { this._closeModal(this._unplayableModalEl); this.exitToMenu(); },
     );
 
+    // Create the settings modal (SFX volume control, etc.)
+    this._settingsModalEl = buildSettingsModal(
+      () => sfxManager.getVolume(),
+      (v) => sfxManager.setVolume(v),
+      (el) => {
+        saveSfxVolume(sfxManager.getVolume());
+        el.style.display = 'none';
+      },
+    );
+
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
       () => this._showLevelSelect(),              // onClose: return to level select
@@ -325,6 +340,15 @@ export class Game implements InputCallbacks {
       completedLevels: this.completedLevels,
       showResetConfirmModal: () => { this.resetConfirmModalEl.style.display = 'flex'; },
       showRules: () => { this._rulesModalEl.style.display = 'flex'; },
+      showSettings: () => {
+        // Sync slider and value display to current volume before showing.
+        const v = sfxManager.getVolume();
+        const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
+        const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
+        if (slider) slider.value = String(v);
+        if (valueEl) valueEl.textContent = String(v);
+        this._settingsModalEl.style.display = 'flex';
+      },
     };
     this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
     this._campaign.restoreFromPersistence();
@@ -842,6 +866,7 @@ export class Game implements InputCallbacks {
     const filledBefore = this.board.getFilledPositions();
     const result = this.board.reclaimTile(pos);
     if (result.success) {
+      sfxManager.play(SfxId.Delete);
       this._animMgr.completeAnims();
       const changes = this.board.applyTurnDelta();
       this.board.recordMove();
@@ -877,6 +902,18 @@ export class Game implements InputCallbacks {
     rotationInfo?: { row: number; col: number; oldRotation: number },
   ): void {
     if (!this.board) return;
+    // Play rotation sound based on the direction of rotation.
+    if (rotationInfo) {
+      const tile = this.board.getTile(rotationInfo);
+      if (tile) {
+        const delta = (tile.rotation - rotationInfo.oldRotation + 360) % 360;
+        sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
+      } else {
+        sfxManager.play(SfxId.RotateCW);
+      }
+    } else {
+      sfxManager.play(SfxId.RotateCW);
+    }
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
     this.board.recordMove();
@@ -1018,6 +1055,7 @@ export class Game implements InputCallbacks {
     replacedCol?: number,
   ): void {
     if (!this.board) return;
+    sfxManager.play(SfxId.PipePlacement);
     this._animMgr.completeAnims();
     const changes = this.board.applyTurnDelta();
     this.board.recordMove();
