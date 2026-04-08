@@ -85,6 +85,40 @@ export function findContinueLevelId(
   return firstNonCompleteChallenge ?? firstUncollectedStar;
 }
 
+/**
+ * Find the index of the latest unlocked chapter that has a chapter map (grid).
+ * Returns the 0-based chapter index, or `null` if no such chapter is accessible.
+ */
+export function findContinueChapterIdx(
+  chapters: import('./types').ChapterDef[],
+  completedLevels: Set<number>,
+  completedChapters?: ReadonlySet<number>,
+): number | null {
+  let lastUnlockedIdx: number | null = null;
+
+  for (let ci = 0; ci < chapters.length; ci++) {
+    const chapter = chapters[ci];
+    if (!chapter.grid) continue;
+
+    const prevChapter = ci > 0 ? chapters[ci - 1] : null;
+    const prevNonChallengeCount = prevChapter
+      ? prevChapter.levels.filter((l) => !l.challenge).length : 0;
+    const prevCompletedCount = prevChapter
+      ? prevChapter.levels.filter((l) => completedLevels.has(l.id)).length : 0;
+    let chapterLocked: boolean;
+    if (prevChapter !== null && prevChapter.grid && completedChapters !== undefined) {
+      chapterLocked = !completedChapters.has(prevChapter.id);
+    } else {
+      chapterLocked = prevChapter !== null && prevCompletedCount < prevNonChallengeCount;
+    }
+
+    if (chapterLocked) break;
+    lastUnlockedIdx = ci;
+  }
+
+  return lastUnlockedIdx;
+}
+
 /** Compute the total stars available and collected across a set of levels. */
 function chapterStarTotals(
   levels: import('./types').LevelDef[],
@@ -284,35 +318,48 @@ export function renderLevelList(
     }
 
     // ── Continue button ────────────────────────────────────────────────────
-    const continueId = findContinueLevelId(chapters, completedLevels, levelStars);
+    // When chapter maps are available, navigate to the latest unlocked chapter map.
+    // Otherwise fall back to the level-based continue behaviour.
+    const continueChapterIdx = onChapterMap
+      ? findContinueChapterIdx(chapters, completedLevels, completedChapters)
+      : null;
+    const continueId = continueChapterIdx === null
+      ? findContinueLevelId(chapters, completedLevels, levelStars, completedChapters)
+      : null;
 
-    // Find the chapter and level number (1-based) for the continue target.
-    let continueChapterNum: number | null = null;
-    let continueLevelNum: number | null = null;
-    if (continueId !== null) {
-      for (let ci = 0; ci < chapters.length; ci++) {
-        const idx = chapters[ci].levels.findIndex((l) => l.id === continueId);
-        if (idx !== -1) {
-          continueChapterNum = ci + 1;
-          continueLevelNum = idx + 1;
-          break;
+    const continueActive = continueChapterIdx !== null || continueId !== null;
+    const continueBtn = document.createElement('button');
+    if (continueChapterIdx !== null) {
+      continueBtn.textContent = `▶ Chapter ${continueChapterIdx + 1}`;
+    } else {
+      // Find the chapter and level number (1-based) for the level-based continue target.
+      let continueChapterNum: number | null = null;
+      let continueLevelNum: number | null = null;
+      if (continueId !== null) {
+        for (let ci = 0; ci < chapters.length; ci++) {
+          const idx = chapters[ci].levels.findIndex((l) => l.id === continueId);
+          if (idx !== -1) {
+            continueChapterNum = ci + 1;
+            continueLevelNum = idx + 1;
+            break;
+          }
         }
       }
+      const continueLoc = (continueChapterNum !== null && continueLevelNum !== null)
+        ? ` (${continueChapterNum}-${continueLevelNum})` : '';
+      continueBtn.textContent = `▶ Continue${continueLoc}`;
     }
-
-    const continueBtn = document.createElement('button');
-    const continueLoc = (continueChapterNum !== null && continueLevelNum !== null)
-      ? ` (${continueChapterNum}-${continueLevelNum})` : '';
-    continueBtn.textContent = `▶ Continue${continueLoc}`;
-    continueBtn.disabled = continueId === null;
+    continueBtn.disabled = !continueActive;
     continueBtn.style.cssText =
       'padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:6px;' +
-      'border:1px solid ' + (continueId !== null ? '#f0c040' : '#555') + ';' +
-      'background:' + (continueId !== null ? '#f0c040' : '#333') + ';' +
-      'color:' + (continueId !== null ? '#16213e' : '#888') + ';' +
-      'cursor:' + (continueId !== null ? 'pointer' : 'default') + ';' +
+      'border:1px solid ' + (continueActive ? '#f0c040' : '#555') + ';' +
+      'background:' + (continueActive ? '#f0c040' : '#333') + ';' +
+      'color:' + (continueActive ? '#16213e' : '#888') + ';' +
+      'cursor:' + (continueActive ? 'pointer' : 'default') + ';' +
       'width:100%;';
-    if (continueId !== null) {
+    if (continueChapterIdx !== null && onChapterMap) {
+      continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx); });
+    } else if (continueId !== null) {
       continueBtn.addEventListener('click', () => startLevel(continueId));
     }
     header.appendChild(continueBtn);

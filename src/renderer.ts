@@ -1552,8 +1552,8 @@ function _renderPass4CementLabels(ctx: CanvasRenderingContext2D, board: Board): 
 
 /**
  * Draw a semi-transparent placement/rotation preview overlay at (px, py).
- * Applies 50% alpha and a yellow glow so the preview is visually distinct from
- * a live tile without obscuring what is beneath it.
+ * Applies a slowly-pulsing alpha and a yellow glow so the preview is visually
+ * distinct from a live tile without obscuring what is beneath it.
  */
 function _drawPreviewTile(
   ctx: CanvasRenderingContext2D,
@@ -1562,8 +1562,11 @@ function _drawPreviewTile(
   previewTile: Tile,
   currentWater: number,
 ): void {
+  const PULSE_PERIOD_MS = 1200;
+  const t = (Date.now() % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
+  const alpha = 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
   ctx.save();
-  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = alpha;
   ctx.shadowColor = PREVIEW_SHADOW_COLOR;
   ctx.shadowBlur = PREVIEW_SHADOW_BLUR;
   drawTile(ctx, px, py, previewTile, false, currentWater);

@@ -339,8 +339,8 @@ export class Game implements InputCallbacks {
           this.playScreenEl,
           () => {
             this._levelTransitionInProgress = false;
-            this._spawnPendingRingsIfReady();
             onComplete();
+            this._spawnPendingRingsIfReady();
           },
         );
       },
@@ -1094,12 +1094,9 @@ export class Game implements InputCallbacks {
       return;
     }
     const connectionSfx = this._collectConnectionSfx(board, filledBefore);
-    // Only play PipePlacement/PipeConnected when no chamber-connection sounds fire this turn.
-    if (connectionSfx.length === 0) {
-      const filledAfter = board.getFilledPositions();
-      const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
-      sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
-    }
+    const filledAfter = board.getFilledPositions();
+    const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
+    sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
     this._playLeakSfxIfNeeded(board, changes);
     this._playGoldSfxIfNeeded(board, filledBefore);
     for (const sfx of connectionSfx) {

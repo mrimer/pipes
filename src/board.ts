@@ -598,7 +598,8 @@ export class Board {
         // count would be `baseCount + newBonus`; block if that would go below zero.
         const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
         if (baseCount + newBonus < 0) {
-          return { success: false, error: ERR_CONTAINER_REMOVE };
+          const itemPositions = this._getConnectedItemChamberPositions(shape);
+          return { success: false, error: ERR_CONTAINER_REMOVE, errorTilePositions: itemPositions.length ? itemPositions : undefined };
         }
       }
     }
@@ -727,9 +728,12 @@ export class Board {
       const originalBonuses = this.getContainerBonuses();
       const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
       const errorMsg = originalEffective > 0 ? ERR_CONTAINER_DISCONNECT : undefined;
+      const errorPositions = originalEffective > 0
+        ? this._getConnectedItemChamberPositions(newShape)
+        : undefined;
       this.inventory = savedInventory;
       // grid[pos.row][pos.col] is already restored to the old tile above
-      return { success: false, error: errorMsg };
+      return { success: false, error: errorMsg, errorTilePositions: errorPositions?.length ? errorPositions : undefined };
     }
 
     this._spendInventory(newShape);
@@ -789,7 +793,17 @@ export class Board {
         }
         this.inventory = savedInventory;
         this.grid[pos.row][pos.col] = tile;
-        return { success: false, error: ERR_CONTAINER_REPLACE };
+        // Highlight the disconnected item chambers that are causing the constraint.
+        const disconnectedPositions = [...originalFilled!].flatMap((key) => {
+          if (finalFilled.has(key)) return [];
+          const [r, c] = parseKey(key);
+          const t = this.grid[r]?.[c];
+          if (t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === item.shape && t.itemCount > 0) {
+            return [{ row: r, col: c } as GridPos];
+          }
+          return [];
+        });
+        return { success: false, error: ERR_CONTAINER_REPLACE, errorTilePositions: disconnectedPositions.length ? disconnectedPositions : undefined };
       }
     }
 
@@ -828,6 +842,24 @@ export class Board {
       }
     }
     return bonuses;
+  }
+
+  /**
+   * Return the grid positions of connected item-chamber tiles that grant the given shape.
+   * @param shape  - The inventory shape to look for.
+   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
+   */
+  private _getConnectedItemChamberPositions(shape: PipeShape, filled?: Set<string>): GridPos[] {
+    const filledSet = filled ?? this.getFilledPositions();
+    const positions: GridPos[] = [];
+    for (const key of filledSet) {
+      const [r, c] = parseKey(key);
+      const t = this.grid[r]?.[c];
+      if (t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === shape) {
+        positions.push({ row: r, col: c });
+      }
+    }
+    return positions;
   }
 
   /**
@@ -1308,7 +1340,11 @@ export class Board {
           for (let i = 0; i < 4 - normalizedSteps; i++) {
             tile.rotate();
           }
-          return { success: false, error: ERR_CONTAINER_ROTATE };
+          // After reverting the rotation the tile is back to its original state.
+          // Find item chambers granting this shape in the original (pre-rotation) fill.
+          const origFilled = this.getFilledPositions();
+          const itemPositions = this._getConnectedItemChamberPositions(item.shape, origFilled);
+          return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: itemPositions.length ? itemPositions : undefined };
         }
       }
     }
