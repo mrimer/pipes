@@ -794,7 +794,7 @@ export class Board {
         this.inventory = savedInventory;
         this.grid[pos.row][pos.col] = tile;
         // Highlight the disconnected item chambers that are causing the constraint.
-        const disconnectedPositions = [...originalFilled!].flatMap((key) => {
+        const disconnectedPositions = [...(originalFilled ?? new Set<string>())].flatMap((key) => {
           if (finalFilled.has(key)) return [];
           const [r, c] = parseKey(key);
           const t = this.grid[r]?.[c];
