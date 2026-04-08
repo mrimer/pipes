@@ -211,8 +211,14 @@ export class SfxManager {
    */
   private readonly _buffers = new Map<string, AudioBuffer>();
 
+  /** Currently playing Web Audio source nodes; used by {@link stopAll}. */
+  private readonly _activeSources = new Set<AudioBufferSourceNode>();
+
   /** Whether the {@link visibilitychange} listener has been registered. */
   private _visibilityListenerAdded = false;
+
+  /** When true, fetch/decode/play errors are logged via {@link console.warn}. */
+  private _debug = false;
 
   /**
    * Last-played variant index per SfxId, used to avoid repeating the same
@@ -286,7 +292,7 @@ export class SfxManager {
         for (const url of files) urls.add(url);
       }
       for (const url of urls) {
-        this._fetchBuffer(url).catch(() => { /* ignore individual failures */ });
+        this._fetchBuffer(url).catch((err) => { this._warn(`Preload failed: ${url}`, err); });
       }
     } else if (typeof Audio !== 'undefined') {
       // Web Audio unavailable – fall back to HTMLAudioElement preloading.
@@ -323,7 +329,7 @@ export class SfxManager {
       // Resume a browser-suspended context before playing (browsers may
       // suspend AudioContext when the page loses focus).
       if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => { /* ignore */ });
+        ctx.resume().catch((err) => { this._warn('AudioContext resume failed', err); });
       }
       const buf = this._buffers.get(url);
       if (buf) {
@@ -332,7 +338,7 @@ export class SfxManager {
         // Buffer not yet decoded; fetch, cache, then play.
         this._fetchBuffer(url)
           .then(b => { if (b) this._playBuffer(b); })
-          .catch(() => { /* ignore */ });
+          .catch((err) => { this._warn(`Playback fetch failed: ${url}`, err); });
       }
     } else if (typeof Audio !== 'undefined') {
       // Web Audio unavailable – fall back to HTMLAudioElement.
@@ -341,10 +347,11 @@ export class SfxManager {
       try {
         const playResult = audio.play();
         if (playResult !== undefined) {
-          playResult.catch(() => { /* ignore autoplay or decode errors */ });
+          playResult.catch((err) => { this._warn('HTMLAudio play failed', err); });
         }
-      } catch {
+      } catch (err) {
         // Ignore synchronous errors (e.g. not-implemented in test environments).
+        this._warn('HTMLAudio play threw synchronously', err);
       }
     }
   }
@@ -371,7 +378,7 @@ export class SfxManager {
     }
     this._buffers.clear();
     if (this._ctx) {
-      this._ctx.close().catch(() => { /* ignore */ });
+      this._ctx.close().catch((err) => { this._warn('AudioContext close failed', err); });
       this._ctx = null;
       this._gainNode = null;
     }
@@ -384,7 +391,37 @@ export class SfxManager {
     return Math.round(this._volume * 100);
   }
 
+  /**
+   * Stop all currently playing sounds immediately.
+   * Call this on screen transitions or level restarts to silence any sounds
+   * that are still playing from the previous state.
+   */
+  stopAll(): void {
+    for (const source of this._activeSources) {
+      try { source.stop(); } catch { /* already stopped */ }
+    }
+    this._activeSources.clear();
+  }
+
+  /**
+   * Enable or disable debug mode.
+   * When enabled, fetch, decode, and playback errors that are normally
+   * swallowed silently will be logged via {@link console.warn}, making it
+   * easier to diagnose audio issues without affecting production behavior.
+   */
+  setDebugMode(enabled: boolean): void {
+    this._debug = enabled;
+  }
+
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  /** Emit a warning when debug mode is enabled; silent no-op otherwise. */
+  private _warn(message: string, err?: unknown): void {
+    if (this._debug) {
+      // eslint-disable-next-line no-console
+      console.warn(`[SfxManager] ${message}`, err ?? '');
+    }
+  }
 
   /**
    * Return the shared {@link AudioContext}, creating it lazily on first call.
@@ -427,7 +464,7 @@ export class SfxManager {
     const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
     resume
       .then(() => this._playWarmup())
-      .catch(() => { /* ignore */ });
+      .catch((err) => { this._warn('AudioContext resume (visibility) failed', err); });
   };
 
   /** Play a 1 ms silent buffer to warm up the audio graph after a resume. */
@@ -464,7 +501,8 @@ export class SfxManager {
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
       this._buffers.set(url, audioBuffer);
       return audioBuffer;
-    } catch {
+    } catch (err) {
+      this._warn(`Failed to fetch/decode audio: ${url}`, err);
       return null;
     }
   }
@@ -478,6 +516,8 @@ export class SfxManager {
     const source = ctx.createBufferSource();
     source.buffer = buf;
     source.connect(gainNode);
+    this._activeSources.add(source);
+    source.onended = () => { this._activeSources.delete(source); };
     source.start();
   }
 
