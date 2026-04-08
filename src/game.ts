@@ -1094,9 +1094,12 @@ export class Game implements InputCallbacks {
       return;
     }
     const connectionSfx = this._collectConnectionSfx(board, filledBefore);
-    const filledAfter = board.getFilledPositions();
-    const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
-    sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
+    // Only play PipePlacement/PipeConnected when no chamber-connection sounds fire this turn.
+    if (connectionSfx.length === 0) {
+      const filledAfter = board.getFilledPositions();
+      const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
+      sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
+    }
     this._playLeakSfxIfNeeded(board, changes);
     this._playGoldSfxIfNeeded(board, filledBefore);
     for (const sfx of connectionSfx) {
