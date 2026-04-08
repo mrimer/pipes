@@ -1119,10 +1119,16 @@ export class Game implements InputCallbacks {
     const filledAfter = board.getFilledPositions();
     const connectionSfx = this._collectConnectionSfx(board, filledBefore);
     if (connectionSfx.length === 0) {
-      const anyNewlyConnected = [...filledAfter].some(key => !filledBefore.has(key));
+      let anyNewlyConnected = false;
+      for (const key of filledAfter) {
+        if (!filledBefore.has(key)) { anyNewlyConnected = true; break; }
+      }
       if (anyNewlyConnected) sfxManager.play(SfxId.PipeConnected);
     }
-    const anyDisconnected = [...filledBefore].some(key => !filledAfter.has(key));
+    let anyDisconnected = false;
+    for (const key of filledBefore) {
+      if (!filledAfter.has(key)) { anyDisconnected = true; break; }
+    }
     if (anyDisconnected) sfxManager.play(SfxId.Disconnect);
     for (const sfx of connectionSfx) {
       sfxManager.play(sfx);
