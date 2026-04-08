@@ -941,6 +941,7 @@ export class Game implements InputCallbacks {
     const changes = this.board.applyTurnDelta();
     this._playLeakSfxIfNeeded(this.board, changes);
     this._playGoldSfxIfNeeded(this.board, filledBefore);
+    this._playAfterTileRotatedSfx(this.board, filledBefore);
     this.board.recordMove();
     let fillDelay = 0;
     if (rotationInfo) {
@@ -1102,6 +1103,27 @@ export class Game implements InputCallbacks {
     }
     this._playLeakSfxIfNeeded(board, changes);
     this._playGoldSfxIfNeeded(board, filledBefore);
+    for (const sfx of connectionSfx) {
+      sfxManager.play(sfx);
+    }
+  }
+
+  /**
+   * Play connection and disconnection SFX after a tile rotation.
+   *
+   * - Plays the chamber-specific connection sound for each newly connected chamber.
+   * - Plays PipeConnected if any tile is newly connected and no chamber-specific sfx fired.
+   * - Plays Disconnect if any previously filled position is no longer filled.
+   */
+  private _playAfterTileRotatedSfx(board: Board, filledBefore: Set<string>): void {
+    const filledAfter = board.getFilledPositions();
+    const connectionSfx = this._collectConnectionSfx(board, filledBefore);
+    if (connectionSfx.length === 0) {
+      const anyNewlyConnected = [...filledAfter].some(key => !filledBefore.has(key));
+      if (anyNewlyConnected) sfxManager.play(SfxId.PipeConnected);
+    }
+    const anyDisconnected = [...filledBefore].some(key => !filledAfter.has(key));
+    if (anyDisconnected) sfxManager.play(SfxId.Disconnect);
     for (const sfx of connectionSfx) {
       sfxManager.play(sfx);
     }
