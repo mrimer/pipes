@@ -378,6 +378,8 @@ export class Game implements InputCallbacks {
   private _showLevelSelect(): void {
     // Cancel any pending intro-ring spawn before leaving the play screen.
     this._cancelPendingRings();
+    // Stop any sounds still playing from the previous screen.
+    sfxManager.stopAll();
     // Remember the last played level ID for the scroll below, then clear currentLevel
     // so that re-entering the same level via the level-select screen will be treated
     // as a new entry (showing the ring effect again).
@@ -1390,6 +1392,7 @@ export class Game implements InputCallbacks {
    */
   retryLevel(): void {
     if (!this.currentLevel) return;
+    sfxManager.stopAll();
     const prevBoard = this.board;
     const prevDecorations = prevBoard?.ambientDecorations;
     this.startLevel(this.currentLevel.id, prevDecorations, /* isUserRestart */ true);
@@ -1550,6 +1553,8 @@ export class Game implements InputCallbacks {
       this._exitConfirmModalEl.style.display = 'none';
       // Cancel any pending ring spawning before leaving the play screen.
       this._cancelPendingRings();
+      // Stop any sounds still playing from the play screen.
+      sfxManager.stopAll();
 
       // Pre-render the board snapshot at the current game TILE_SIZE BEFORE
       // reshowChapterMap() changes TILE_SIZE to the chapter-map tile size.
