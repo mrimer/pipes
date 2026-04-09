@@ -266,3 +266,125 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   });
 }
 
+/**
+ * Attach a persistent water-wave background animation to the in-game inventory
+ * box.
+ *
+ * A `<canvas>` is appended as the last child of `el` and positioned absolutely
+ * to fill it (inset:0, z-index:-1, opacity:0.2).  The element is given
+ * `position:relative; z-index:0` to form a local stacking context, ensuring the
+ * canvas paints behind the box's text content while staying above the element's
+ * own CSS background.  The existing CSS background is preserved so the faint
+ * wave overlay blends with it.
+ *
+ * The animation runs continuously (no hover trigger).
+ *
+ * @param el  The element that receives the animated canvas as a child.
+ */
+export function attachInventoryWaveAnimation(el: HTMLElement): void {
+  // ── Canvas setup ────────────────────────────────────────────────────────────
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText =
+    'position:absolute;inset:0;width:100%;height:100%;' +
+    'pointer-events:none;border-radius:inherit;z-index:-1;opacity:0.2;';
+
+  el.style.position = 'relative';
+  el.style.zIndex = '0';
+
+  el.appendChild(canvas);
+
+  const waves = _buildWaves();
+  let animId: number | null = null;
+
+  // Low-resolution offscreen canvas reused across frames when the size is stable.
+  let offEl: HTMLCanvasElement | null = null;
+  let offCtx: CanvasRenderingContext2D | null = null;
+
+  // ── Animation frame ─────────────────────────────────────────────────────────
+  function _frame(ts: number): void {
+    // Stop the loop if the canvas has been detached from the document.
+    if (!document.contains(canvas)) {
+      animId = null;
+      return;
+    }
+
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    if (w === 0 || h === 0) {
+      animId = requestAnimationFrame(_frame);
+      return;
+    }
+
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width  = w;
+      canvas.height = h;
+    }
+
+    const sw = Math.max(1, Math.ceil(w / WAVE_SCALE));
+    const sh = Math.max(1, Math.ceil(h / WAVE_SCALE));
+
+    if (!offEl || offEl.width !== sw || offEl.height !== sh) {
+      offEl  = document.createElement('canvas');
+      offEl.width  = sw;
+      offEl.height = sh;
+      offCtx = offEl.getContext('2d');
+    }
+    if (!offCtx) {
+      animId = requestAnimationFrame(_frame);
+      return;
+    }
+
+    const imgData = offCtx.createImageData(sw, sh);
+    const pixels  = imgData.data;
+    const n       = waves.length;
+
+    const cosA = new Float32Array(n);
+    const sinA = new Float32Array(n);
+    const phi  = new Float32Array(n);
+    for (let wi = 0; wi < n; wi++) {
+      cosA[wi] = Math.cos(waves[wi].angle);
+      sinA[wi] = Math.sin(waves[wi].angle);
+      phi[wi]  = waves[wi].offset + waves[wi].speed * ts;
+    }
+
+    for (let py = 0; py < sh; py++) {
+      const y = (py + 0.5) * WAVE_SCALE;
+      for (let px = 0; px < sw; px++) {
+        const x = (px + 0.5) * WAVE_SCALE;
+
+        let hVal = 0;
+        for (let wi = 0; wi < n; wi++) {
+          hVal += Math.sin(
+            (x * cosA[wi] + y * sinA[wi]) * waves[wi].freq + phi[wi],
+          );
+        }
+        hVal /= n;
+
+        const [r, g, b] = _heightToRgb(hVal, false);
+        const i = (py * sw + px) << 2;
+        pixels[i]     = r;
+        pixels[i + 1] = g;
+        pixels[i + 2] = b;
+        pixels[i + 3] = 255;
+      }
+    }
+
+    offCtx.putImageData(imgData, 0, 0);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      animId = requestAnimationFrame(_frame);
+      return;
+    }
+    ctx.clearRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(offEl, 0, 0, w, h);
+
+    animId = requestAnimationFrame(_frame);
+  }
+
+  // Start the animation immediately.
+  animId = requestAnimationFrame(_frame);
+}
+

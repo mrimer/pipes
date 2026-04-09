@@ -4,7 +4,7 @@
 
 /** Tests for the chapter-box water-wave animation module. */
 
-import { _heightToRgb, attachChapterWaveAnimation } from '../src/visuals/chapterWaves';
+import { _heightToRgb, attachChapterWaveAnimation, attachInventoryWaveAnimation } from '../src/visuals/chapterWaves';
 
 // ─── _heightToRgb ─────────────────────────────────────────────────────────────
 
@@ -194,5 +194,77 @@ describe('attachChapterWaveAnimation', () => {
   it('works with isGold = true without throwing', () => {
     const header = document.createElement('button');
     expect(() => attachChapterWaveAnimation(header, true)).not.toThrow();
+  });
+});
+
+// ─── attachInventoryWaveAnimation ─────────────────────────────────────────────
+
+describe('attachInventoryWaveAnimation', () => {
+  it('inserts a canvas element as the last child of the element', () => {
+    const el   = document.createElement('div');
+    const span = document.createElement('span');
+    span.textContent = 'Inventory';
+    el.appendChild(span);
+
+    attachInventoryWaveAnimation(el);
+
+    const lastChild = el.lastChild as HTMLCanvasElement;
+    expect(lastChild).toBeInstanceOf(HTMLCanvasElement);
+    expect(el.firstChild).toBe(span);
+  });
+
+  it('sets position:relative and z-index:0 on the element to form a stacking context', () => {
+    const el = document.createElement('div');
+    attachInventoryWaveAnimation(el);
+    expect(el.style.position).toBe('relative');
+    expect(el.style.zIndex).toBe('0');
+  });
+
+  it('sets the canvas to pointer-events:none so it does not block clicks', () => {
+    const el = document.createElement('div');
+    attachInventoryWaveAnimation(el);
+
+    const canvas = el.lastChild as HTMLCanvasElement;
+    expect(canvas.style.pointerEvents).toBe('none');
+  });
+
+  it('sets z-index:-1 on the canvas so it renders behind the box content', () => {
+    const el = document.createElement('div');
+    attachInventoryWaveAnimation(el);
+
+    const canvas = el.lastChild as HTMLCanvasElement;
+    expect(canvas.style.zIndex).toBe('-1');
+  });
+
+  it('sets opacity:0.2 on the canvas for the faint wave effect', () => {
+    const el = document.createElement('div');
+    attachInventoryWaveAnimation(el);
+
+    const canvas = el.lastChild as HTMLCanvasElement;
+    expect(canvas.style.opacity).toBe('0.2');
+  });
+
+  it('does not modify the element background style', () => {
+    const el = document.createElement('div');
+    el.style.background = '#16213e';
+    const bgBefore = el.style.background;
+    attachInventoryWaveAnimation(el);
+    expect(el.style.background).toBe(bgBefore);
+  });
+
+  it('does not attach mouseenter or mouseleave listeners to the element', () => {
+    const el     = document.createElement('div');
+    const addSpy = jest.spyOn(el, 'addEventListener');
+
+    attachInventoryWaveAnimation(el);
+
+    const events = addSpy.mock.calls.map((call) => call[0]);
+    expect(events).not.toContain('mouseenter');
+    expect(events).not.toContain('mouseleave');
+  });
+
+  it('does not throw', () => {
+    const el = document.createElement('div');
+    expect(() => attachInventoryWaveAnimation(el)).not.toThrow();
   });
 });

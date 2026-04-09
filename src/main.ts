@@ -1,6 +1,7 @@
 import { Game } from './game';
 import { sfxManager, SfxId } from './sfxManager';
 import { loadSfxVolume } from './persistence';
+import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
 
 sfxManager.setVolume(loadSfxVolume());
 sfxManager.preload();
@@ -41,6 +42,9 @@ const game = new Game(
   redoBtnEl,
   exitBtnEl,
 );
+
+// Attach a persistent water-wave background animation (alpha 0.2) to the inventory box.
+attachInventoryWaveAnimation(inventoryBarEl);
 
 // Win modal buttons
 getEl('win-next-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.exitToMenu(); });
