@@ -235,6 +235,58 @@ export class LevelEditorState {
     this.recordSnapshot();
   }
 
+  /**
+   * Rotate the entire board 90° clockwise or counter-clockwise.
+   * Swaps rows/cols dimensions, repositions all tiles, and rotates each
+   * tile's connections/rotation to match the new orientation.
+   * Updates the linked-tile position so params remain in sync.
+   * Records an undo snapshot.
+   */
+  rotate(clockwise: boolean): void {
+    const oldRows = this.rows;
+    const oldCols = this.cols;
+    // After rotation the dimensions swap.
+    const newRows = oldCols;
+    const newCols = oldRows;
+
+    const newGrid: (TileDef | null)[][] = Array.from(
+      { length: newRows },
+      () => Array(newCols).fill(null) as null[],
+    );
+
+    for (let r = 0; r < oldRows; r++) {
+      for (let c = 0; c < oldCols; c++) {
+        const tile = this.grid[r]?.[c];
+        if (!tile) continue;
+        // CW:  (r, c) → (c, oldRows-1-r)
+        // CCW: (r, c) → (oldCols-1-c, r)
+        const nr = clockwise ? c : oldCols - 1 - c;
+        const nc = clockwise ? oldRows - 1 - r : r;
+        newGrid[nr][nc] = rotateTileDef(tile, clockwise);
+      }
+    }
+
+    // Update linked tile position to follow the rotation.
+    if (this._linkedTilePos) {
+      const { row: lr, col: lc } = this._linkedTilePos;
+      this._linkedTilePos = clockwise
+        ? { row: lc, col: oldRows - 1 - lr }
+        : { row: oldCols - 1 - lc, col: lr };
+    }
+
+    this.rows = newRows;
+    this.cols = newCols;
+    this.grid = newGrid;
+
+    // Sync params to the rotated linked tile if one is set.
+    if (this._linkedTilePos) {
+      const t = this.grid[this._linkedTilePos.row]?.[this._linkedTilePos.col];
+      if (t) this.populateParamsFromDef(t);
+    }
+
+    this.recordSnapshot();
+  }
+
   // ── Tile building ──────────────────────────────────────────────────────────
 
   /** Build a TileDef from the current palette and params. */
@@ -427,4 +479,50 @@ export class LevelEditorState {
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
   }
+}
+
+// ── Module-level helpers ──────────────────────────────────────────────────────
+
+/**
+ * Return a direction rotated 90° clockwise (CW) or counter-clockwise (CCW).
+ * CW:  N→E→S→W→N
+ * CCW: N→W→S→E→N
+ */
+function rotateDir(dir: Direction, clockwise: boolean): Direction {
+  if (clockwise) {
+    switch (dir) {
+      case Direction.North: return Direction.East;
+      case Direction.East:  return Direction.South;
+      case Direction.South: return Direction.West;
+      case Direction.West:  return Direction.North;
+    }
+  } else {
+    switch (dir) {
+      case Direction.North: return Direction.West;
+      case Direction.West:  return Direction.South;
+      case Direction.South: return Direction.East;
+      case Direction.East:  return Direction.North;
+    }
+  }
+}
+
+/**
+ * Return a shallow-copy of `tile` with its orientation (rotation/connections)
+ * rotated 90° CW or CCW to match the board rotation.
+ */
+function rotateTileDef(tile: TileDef, clockwise: boolean): TileDef {
+  const rotated: TileDef = { ...tile };
+
+  // Tiles with explicit connection sets (Source, Sink, Chamber).
+  if (rotated.connections) {
+    rotated.connections = rotated.connections.map(d => rotateDir(d, clockwise));
+  }
+
+  // Tiles whose visual orientation is encoded in `rotation`.
+  if (rotated.rotation !== undefined) {
+    const delta = clockwise ? 90 : 270;
+    rotated.rotation = ((rotated.rotation + delta) % 360) as Rotation;
+  }
+
+  return rotated;
 }
