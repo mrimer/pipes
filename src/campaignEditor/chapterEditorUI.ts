@@ -18,6 +18,7 @@ import {
   GRID_MIN_DIM,
   GRID_MAX_DIM,
 } from './types';
+import { buildSlideAndRotateControls } from './levelMetadataPanel';
 import { sfxManager, SfxId } from '../sfxManager';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
@@ -274,66 +275,10 @@ export class ChapterEditorUI {
       this._cb.resizeGrid(rVal, cVal, chapter, campaign);
     }));
 
-    // ── Slide buttons (N/E/S/W compass layout) ──
-    const slideTitle = document.createElement('div');
-    slideTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
-    slideTitle.textContent = 'Slide tiles:';
-    panel.appendChild(slideTitle);
-
-    const compass = document.createElement('div');
-    compass.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;justify-self:start;';
-
-    const arrowBtnStyle =
-      'width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center;' +
-      'background:#0d1a30;color:#7ed321;border:1px solid #4a90d9;border-radius:4px;cursor:pointer;padding:0;';
-
-    const makeArrow = (icon: string, dir: 'N' | 'E' | 'S' | 'W'): HTMLButtonElement => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = icon;
-      b.title = `Slide all tiles ${dir === 'N' ? 'North (up)' : dir === 'E' ? 'East (right)' : dir === 'S' ? 'South (down)' : 'West (left)'}`;
-      b.style.cssText = arrowBtnStyle;
-      b.addEventListener('click', () => this._cb.slideGrid(dir, chapter));
-      return b;
-    };
-
-    // Row 1: [empty] [↑] [empty]
-    compass.appendChild(document.createElement('span')); // placeholder
-    compass.appendChild(makeArrow('↑', 'N'));
-    compass.appendChild(document.createElement('span')); // placeholder
-    // Row 2: [←] [empty] [→]
-    compass.appendChild(makeArrow('←', 'W'));
-    compass.appendChild(document.createElement('span')); // center placeholder
-    compass.appendChild(makeArrow('→', 'E'));
-    // Row 3: [empty] [↓] [empty]
-    compass.appendChild(document.createElement('span')); // placeholder
-    compass.appendChild(makeArrow('↓', 'S'));
-    compass.appendChild(document.createElement('span')); // placeholder
-
-    panel.appendChild(compass);
-
-    // ── Rotate buttons (CW / CCW) ──
-    const rotateTitle = document.createElement('div');
-    rotateTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
-    rotateTitle.textContent = 'Rotate board:';
-    panel.appendChild(rotateTitle);
-
-    const rotateRow = document.createElement('div');
-    rotateRow.style.cssText = 'display:flex;gap:4px;';
-
-    const makeRotateBtn = (icon: string, clockwise: boolean): HTMLButtonElement => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = icon;
-      b.title = clockwise ? 'Rotate board 90° clockwise' : 'Rotate board 90° counter-clockwise';
-      b.style.cssText = arrowBtnStyle;
-      b.addEventListener('click', () => this._cb.rotateGrid(clockwise, chapter));
-      return b;
-    };
-
-    rotateRow.appendChild(makeRotateBtn('↻', true));
-    rotateRow.appendChild(makeRotateBtn('↺', false));
-    panel.appendChild(rotateRow);
+    panel.appendChild(buildSlideAndRotateControls(
+      (dir) => this._cb.slideGrid(dir, chapter),
+      (cw)  => this._cb.rotateGrid(cw, chapter),
+    ));
 
     return panel;
   }

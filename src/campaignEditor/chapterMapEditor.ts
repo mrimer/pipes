@@ -16,7 +16,8 @@ import {
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
   MAX_EDITOR_CANVAS_PX,
-  rotateTileDefBy90,
+  rotateGridBy90,
+  rotatePositionBy90,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
@@ -308,25 +309,8 @@ export class ChapterMapEditorSection {
   private _rotateChapterGrid(clockwise: boolean, chapter: ChapterDef): void {
     const oldRows = this._chapterEditRows;
     const oldCols = this._chapterEditCols;
-    const newRows = oldCols;
-    const newCols = oldRows;
 
-    const newGrid: (TileDef | null)[][] = Array.from(
-      { length: newRows },
-      () => Array(newCols).fill(null) as null[],
-    );
-
-    for (let r = 0; r < oldRows; r++) {
-      for (let c = 0; c < oldCols; c++) {
-        const tile = this._chapterEditGrid[r]?.[c];
-        if (!tile) continue;
-        // CW:  (r, c) → (c, oldRows-1-r)
-        // CCW: (r, c) → (oldCols-1-c, r)
-        const nr = clockwise ? c : oldCols - 1 - c;
-        const nc = clockwise ? oldRows - 1 - r : r;
-        newGrid[nr][nc] = rotateTileDefBy90(tile, clockwise);
-      }
-    }
+    const { newGrid, newRows, newCols } = rotateGridBy90(this._chapterEditGrid, oldRows, oldCols, clockwise);
 
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
@@ -335,10 +319,7 @@ export class ChapterMapEditorSection {
 
     // Update focused tile position to follow the rotation.
     if (this._chapterFocusedTilePos) {
-      const { row: lr, col: lc } = this._chapterFocusedTilePos;
-      this._chapterFocusedTilePos = clockwise
-        ? { row: lc, col: oldRows - 1 - lr }
-        : { row: oldCols - 1 - lc, col: lr };
+      this._chapterFocusedTilePos = rotatePositionBy90(this._chapterFocusedTilePos, oldRows, oldCols, clockwise);
     }
 
     this._recordChapterSnapshot(chapter);
