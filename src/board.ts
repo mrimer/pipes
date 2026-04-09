@@ -7,6 +7,7 @@ import { TurnStateManager, TurnStateSnapshot } from './turnStateManager';
 
 // Re-export cost helpers so existing consumers (game.ts, renderer.ts) need no import changes.
 export { computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
+export { ERR_SANDSTONE_TOO_HARD_PREFIX } from './constraintValidator';
 
 /**
  * Encode a grid row/col pair into the canonical string key used by all internal
@@ -608,12 +609,24 @@ export class Board {
     // Simulate tile removal and verify no connected sandstone tile would have deltaDamage ≤ 0.
     // (This can happen when removing a pipe that carried the only path to a pump chamber.)
     {
+      const filledBefore = this.getFilledPositions();
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       const filledAfter = this.getFilledPositions();
       const { error, positions } = this._validateConstraints(filledAfter);
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
       if (error) {
-        return { success: false, error, errorTilePositions: positions ?? undefined };
+        // Highlight tiles that would have been disconnected by the removal,
+        // so the player can see what would be lost.  Fall back to the
+        // constraint-violating positions if nothing was disconnected.
+        const reclaimedKey = posKey(pos.row, pos.col);
+        const disconnected: GridPos[] = [];
+        for (const k of filledBefore) {
+          if (k !== reclaimedKey && !filledAfter.has(k)) {
+            const [r, c] = parseKey(k);
+            disconnected.push({ row: r, col: c });
+          }
+        }
+        return { success: false, error, errorTilePositions: disconnected.length ? disconnected : positions ?? undefined };
       }
     }
 
@@ -813,8 +826,19 @@ export class Board {
       this._validateConstraints(finalFilled);
     if (constraintError) {
       this.inventory = savedInventory;
-      this.grid[pos.row][pos.col] = tile;
-      return { success: false, error: constraintError, errorTilePositions: constraintPositions ?? undefined };
+      this.grid[pos.row][pos.col] = tile; // revert to old tile
+      // Compute disconnected positions now that the old tile is restored.
+      // These are tiles that were connected before replacement but would not
+      // be connected after — shown to the player to clarify what the error means.
+      const filledBeforeReplace = this.getFilledPositions();
+      const disconnected: GridPos[] = [];
+      for (const k of filledBeforeReplace) {
+        if (!finalFilled.has(k)) {
+          const [r, c] = parseKey(k);
+          disconnected.push({ row: r, col: c });
+        }
+      }
+      return { success: false, error: constraintError, errorTilePositions: disconnected.length ? disconnected : constraintPositions ?? undefined };
     }
 
     // Decrement cement setting time after successful replace.
@@ -1316,6 +1340,8 @@ export class Board {
     // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return { success: true };
+    // Capture the pre-rotation fill for disconnection-highlight computation.
+    const filledBefore = this.getFilledPositions();
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
     }
@@ -1327,7 +1353,16 @@ export class Board {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
-      return { success: false, error: constraintError, errorTilePositions: constraintPositions ?? undefined };
+      // Highlight tiles that would have been disconnected by the rotation.
+      // Fall back to the constraint-violating positions if nothing was disconnected.
+      const disconnected: GridPos[] = [];
+      for (const k of filledBefore) {
+        if (!filled.has(k)) {
+          const [r, c] = parseKey(k);
+          disconnected.push({ row: r, col: c });
+        }
+      }
+      return { success: false, error: constraintError, errorTilePositions: disconnected.length ? disconnected : constraintPositions ?? undefined };
     }
 
     // Validate container-grant constraints: rotation may disconnect a container from

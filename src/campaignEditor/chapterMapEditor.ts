@@ -301,6 +301,7 @@ export class ChapterMapEditorSection {
     }
     this._chapterEditGrid = newGrid;
     this._recordChapterSnapshot(chapter);
+    sfxManager.play(SfxId.BoardSlide);
     this._renderChapterCanvas();
   }
 
@@ -326,6 +327,7 @@ export class ChapterMapEditorSection {
     }
 
     this._recordChapterSnapshot(chapter);
+    sfxManager.play(SfxId.BoardSlide);
     if (this._chapterCanvas) {
       setTileSize(computeTileSize(newRows, newCols));
       this._chapterCanvas.width  = newCols * TILE_SIZE;
@@ -356,6 +358,7 @@ export class ChapterMapEditorSection {
     }
 
     this._recordChapterSnapshot(chapter);
+    sfxManager.play(SfxId.BoardSlide);
     if (this._chapterCanvas) {
       setTileSize(computeTileSize(newRows, newCols));
       this._chapterCanvas.width  = newCols * TILE_SIZE;

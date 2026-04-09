@@ -433,6 +433,11 @@ export class EditorInputHandler {
       if (cost < 5) sfxManager.play(SfxId.Dirt1);
       else if (cost < 10) sfxManager.play(SfxId.Dirt2);
       else sfxManager.play(SfxId.Dirt3);
+    } else if (palette === 'chamber:sandstone') {
+      const cost = state.params.cost;
+      if (cost < 5) sfxManager.play(SfxId.Sandstone1);
+      else if (cost < 10) sfxManager.play(SfxId.Sandstone2);
+      else sfxManager.play(SfxId.Sandstone3);
     } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && GOLD_PIPE_SHAPES.has(state.params.itemShape)) {
       sfxManager.play(SfxId.Gold);
     } else if (palette === 'chamber:item' && state.params.itemShape !== null && state.params.itemShape !== undefined && state.params.itemCount > 0) {

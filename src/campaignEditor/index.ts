@@ -1159,6 +1159,7 @@ export class CampaignEditor {
    */
   private _slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void {
     this._state.slide(dir);
+    sfxManager.play(SfxId.BoardSlide);
     this._updateEditorUndoRedoButtons();
     this._renderEditorCanvas();
   }
@@ -1171,6 +1172,7 @@ export class CampaignEditor {
    */
   private _rotateGrid(clockwise: boolean): void {
     this._state.rotate(clockwise);
+    sfxManager.play(SfxId.BoardSlide);
     this._updateEditorUndoRedoButtons();
     const newRows = this._state.rows;
     const newCols = this._state.cols;
@@ -1191,6 +1193,7 @@ export class CampaignEditor {
    */
   private _reflectGrid(): void {
     this._state.reflect();
+    sfxManager.play(SfxId.BoardSlide);
     this._updateEditorUndoRedoButtons();
     const newRows = this._state.rows;
     const newCols = this._state.cols;
