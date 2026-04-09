@@ -3,7 +3,7 @@
  * Campaign Editor. Kept separate to reduce the size of campaignEditor.ts.
  */
 
-import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS } from '../types';
+import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR } from '../colors';
 
@@ -338,4 +338,47 @@ export async function ungzipBlob(blob: Blob): Promise<string> {
     offset += chunk.length;
   }
   return new TextDecoder().decode(merged);
+}
+
+// ── Grid rotation helpers ─────────────────────────────────────────────────────
+
+/**
+ * Return a direction rotated 90° clockwise (CW) or counter-clockwise (CCW).
+ * CW:  N→E→S→W→N   CCW: N→W→S→E→N
+ */
+export function rotateDirectionBy90(dir: Direction, clockwise: boolean): Direction {
+  if (clockwise) {
+    switch (dir) {
+      case Direction.North: return Direction.East;
+      case Direction.East:  return Direction.South;
+      case Direction.South: return Direction.West;
+      case Direction.West:  return Direction.North;
+    }
+  } else {
+    switch (dir) {
+      case Direction.North: return Direction.West;
+      case Direction.West:  return Direction.South;
+      case Direction.South: return Direction.East;
+      case Direction.East:  return Direction.North;
+    }
+  }
+}
+
+/**
+ * Return a shallow-copy of `tile` with its orientation (rotation/connections)
+ * rotated 90° CW or CCW to match a board rotation.
+ */
+export function rotateTileDefBy90(tile: TileDef, clockwise: boolean): TileDef {
+  const rotated: TileDef = { ...tile };
+
+  if (rotated.connections) {
+    rotated.connections = rotated.connections.map(d => rotateDirectionBy90(d, clockwise));
+  }
+
+  if (rotated.rotation !== undefined) {
+    const delta = clockwise ? 90 : 270;
+    rotated.rotation = ((rotated.rotation + delta) % 360) as Rotation;
+  }
+
+  return rotated;
 }

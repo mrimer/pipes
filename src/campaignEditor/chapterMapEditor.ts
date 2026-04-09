@@ -16,6 +16,7 @@ import {
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
   MAX_EDITOR_CANVAS_PX,
+  rotateTileDefBy90,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
@@ -323,7 +324,7 @@ export class ChapterMapEditorSection {
         // CCW: (r, c) → (oldCols-1-c, r)
         const nr = clockwise ? c : oldCols - 1 - c;
         const nc = clockwise ? oldRows - 1 - r : r;
-        newGrid[nr][nc] = chapterRotateTileDef(tile, clockwise);
+        newGrid[nr][nc] = rotateTileDefBy90(tile, clockwise);
       }
     }
 
@@ -816,45 +817,4 @@ export class ChapterMapEditorSection {
 
 }
 
-// ── Module-level helpers ──────────────────────────────────────────────────────
-
-/**
- * Return a direction rotated 90° CW or CCW.
- * CW:  N→E→S→W→N   CCW: N→W→S→E→N
- */
-function chapterRotateDir(dir: Direction, clockwise: boolean): Direction {
-  if (clockwise) {
-    switch (dir) {
-      case Direction.North: return Direction.East;
-      case Direction.East:  return Direction.South;
-      case Direction.South: return Direction.West;
-      case Direction.West:  return Direction.North;
-    }
-  } else {
-    switch (dir) {
-      case Direction.North: return Direction.West;
-      case Direction.West:  return Direction.South;
-      case Direction.South: return Direction.East;
-      case Direction.East:  return Direction.North;
-    }
-  }
-}
-
-/**
- * Return a shallow-copy of `tile` with its orientation rotated 90° CW or CCW.
- */
-function chapterRotateTileDef(tile: TileDef, clockwise: boolean): TileDef {
-  const rotated: TileDef = { ...tile };
-
-  if (rotated.connections) {
-    rotated.connections = rotated.connections.map(d => chapterRotateDir(d, clockwise));
-  }
-
-  if (rotated.rotation !== undefined) {
-    const delta = clockwise ? 90 : 270;
-    rotated.rotation = ((rotated.rotation + delta) % 360) as Rotation;
-  }
-
-  return rotated;
-}
 
