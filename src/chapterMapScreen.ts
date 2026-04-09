@@ -925,9 +925,10 @@ export class ChapterMapScreen {
       renderSourceSpray(ctx, this._sourceSprayDrops, src.x, src.y, sprayColor);
 
       // Flow drops – water drops traveling from source to sink along filled pipe path.
+      // Only shown once the chapter has been completed (sink clicked to unlock next chapter).
       // Use WATER_COLOR to match the flow drop color on the level screen.
       const sinkFilled = positions.sinks.some(s => s.isFilled);
-      if (src.isFilled && sinkFilled) {
+      if (src.isFilled && sinkFilled && this._isChapterCompleted(chapter)) {
         const maxDrops = Math.max(10, filledKeys.size * 5);
         if (now - this._lastFlowSpawn >= ChapterMapScreen.FLOW_SPAWN_INTERVAL_MS) {
           spawnChapterMapFlowDrop(this._chapterMapFlowDrops, grid, rows, cols, filledKeys, src.row, src.col, maxDrops);
