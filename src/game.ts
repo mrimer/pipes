@@ -1,4 +1,4 @@
-import { Board, MoveResult, ERR_GOLD_SPACE, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp } from './board';
+import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
@@ -37,6 +37,10 @@ const SNOW_SFX_THRESHOLD_HIGH = 10;
 const DIRT_SFX_THRESHOLD_MID = 5;
 /** Dirt-sfx threshold: dirt cost at or above this uses Dirt3 sfx (instead of Dirt2). */
 const DIRT_SFX_THRESHOLD_HIGH = 10;
+/** Sandstone-sfx threshold: sandstone cost above this uses Sandstone2 sfx (instead of Sandstone1). */
+const SANDSTONE_SFX_THRESHOLD_MID = 5;
+/** Sandstone-sfx threshold: sandstone cost above this uses Sandstone3 sfx (instead of Sandstone2). */
+const SANDSTONE_SFX_THRESHOLD_HIGH = 10;
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -994,7 +998,8 @@ export class Game implements InputCallbacks {
    * - Per-tile sounds: Tank, Heater, Pump, Sizzle, Star, NegativeCount (item).
    * - Single-per-turn sounds: one Ice (based on the highest raw ice cost) and
    *   one Snow (based on the highest raw snow cost), one Dirt (based on the
-   *   highest dirt cost).
+   *   highest dirt cost), and one Sandstone (based on the highest cost sandstone
+   *   or SandstoneShatter if the most costly tile was shattered this turn).
    */
   private _collectConnectionSfx(board: Board, filledBefore: Set<string>): SfxId[] {
     const filledAfter = board.getFilledPositions();
@@ -1005,6 +1010,8 @@ export class Game implements InputCallbacks {
     let maxSnowRaw = -1;
     let maxDirtCost = -1;
     let hotPlateSfx: SfxId | null = null;
+    // Track highest-cost sandstone tile connected this turn, and whether it shattered.
+    let maxSandstoneInfo: { cost: number; shattered: boolean } | null = null;
 
     const sfxToPlay: SfxId[] = [];
 
@@ -1042,6 +1049,13 @@ export class Game implements InputCallbacks {
         if (rawSnowCost > maxSnowRaw) maxSnowRaw = rawSnowCost;
       } else if (tile.chamberContent === 'dirt') {
         if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
+      } else if (tile.chamberContent === 'sandstone') {
+        // Track the sandstone tile with the highest base cost connected this turn.
+        // When the highest-cost tile shatters, play SandstoneShatter; otherwise Sandstone1/2/3.
+        const { shatterOverride } = sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
+        if (maxSandstoneInfo === null || tile.cost > maxSandstoneInfo.cost) {
+          maxSandstoneInfo = { cost: tile.cost, shattered: shatterOverride };
+        }
       }
     }
 
@@ -1069,6 +1083,20 @@ export class Game implements InputCallbacks {
       if (maxDirtCost < DIRT_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Dirt1);
       else if (maxDirtCost < DIRT_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Dirt2);
       else sfxToPlay.push(SfxId.Dirt3);
+    }
+
+    // Collect a single sandstone sfx based on the highest-cost sandstone tile connected.
+    // SandstoneShatter plays when the highest-cost tile was shattered (pressure ≥ shatter).
+    if (maxSandstoneInfo !== null) {
+      if (maxSandstoneInfo.shattered) {
+        sfxToPlay.push(SfxId.SandstoneShatter);
+      } else if (maxSandstoneInfo.cost < SANDSTONE_SFX_THRESHOLD_MID) {
+        sfxToPlay.push(SfxId.Sandstone1);
+      } else if (maxSandstoneInfo.cost < SANDSTONE_SFX_THRESHOLD_HIGH) {
+        sfxToPlay.push(SfxId.Sandstone2);
+      } else {
+        sfxToPlay.push(SfxId.Sandstone3);
+      }
     }
 
     return sfxToPlay;
@@ -1200,6 +1228,10 @@ export class Game implements InputCallbacks {
     }
     if (result.error === ERR_GOLD_SPACE) {
       sfxManager.play(SfxId.Locked);
+    } else if (result.error.startsWith(ERR_SANDSTONE_TOO_HARD_PREFIX)) {
+      sfxManager.play(SfxId.SandstoneHard);
+    } else if (result.errorTilePositions && result.errorTilePositions.length > 0) {
+      sfxManager.play(SfxId.BadConnection);
     }
   }
 

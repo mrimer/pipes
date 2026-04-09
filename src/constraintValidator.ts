@@ -4,6 +4,13 @@ import { parseKey } from './board';
 import { ThermoSimulator } from './thermoSimulator';
 
 /**
+ * Prefix of the error message emitted when a sandstone tile's pressure is too
+ * low to connect.  Exported so callers can identify this specific error type
+ * without fragile string equality checks on the full dynamic message.
+ */
+export const ERR_SANDSTONE_TOO_HARD_PREFIX = 'Pressure must exceed Sandstone hardness to connect.';
+
+/**
  * Validates board constraints that prevent illegal game states.
  *
  * Responsibilities:

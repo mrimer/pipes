@@ -77,6 +77,13 @@ import cementSquishUrl from '../data/sfx/cement-squish.ogg';
 import coolerUrl from '../data/sfx/cooler.ogg';
 import vacuumUrl from '../data/sfx/vacuum.ogg';
 import sizzleIceUrl from '../data/sfx/sizzle-ice.ogg';
+import errorThumpUrl from '../data/sfx/error-thump.ogg';
+import boxSlideUrl from '../data/sfx/box-slide.ogg';
+import sandstoneHardUrl from '../data/sfx/sandstone-hard.ogg';
+import sandstoneShatterUrl from '../data/sfx/sandstone-shatter.ogg';
+import sandstone1Url from '../data/sfx/sandstone-1.ogg';
+import sandstone2Url from '../data/sfx/sandstone-2.ogg';
+import sandstone3Url from '../data/sfx/sandstone-3.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -131,6 +138,13 @@ export const enum SfxId {
   Vacuum           = 46,
   SizzleIce        = 47,
   PipeConnected    = 48,
+  BadConnection    = 49,
+  BoardSlide       = 50,
+  SandstoneHard    = 51,
+  SandstoneShatter = 52,
+  Sandstone1       = 53,
+  Sandstone2       = 54,
+  Sandstone3       = 55,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -190,6 +204,13 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Vacuum]:           [vacuumUrl],
   [SfxId.SizzleIce]:        [sizzleIceUrl],
   [SfxId.PipeConnected]:    [pipe1FullUrl, pipe2FullUrl, pipe3FullUrl, pipe4FullUrl],
+  [SfxId.BadConnection]:    [errorThumpUrl],
+  [SfxId.BoardSlide]:       [boxSlideUrl],
+  [SfxId.SandstoneHard]:    [sandstoneHardUrl],
+  [SfxId.SandstoneShatter]: [sandstoneShatterUrl],
+  [SfxId.Sandstone1]:       [sandstone1Url],
+  [SfxId.Sandstone2]:       [sandstone2Url],
+  [SfxId.Sandstone3]:       [sandstone3Url],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -274,6 +295,13 @@ export class SfxManager {
     [SfxId.Vacuum]:           -1,
     [SfxId.SizzleIce]:        -1,
     [SfxId.PipeConnected]:    -1,
+    [SfxId.BadConnection]:    -1,
+    [SfxId.BoardSlide]:       -1,
+    [SfxId.SandstoneHard]:    -1,
+    [SfxId.SandstoneShatter]: -1,
+    [SfxId.Sandstone1]:       -1,
+    [SfxId.Sandstone2]:       -1,
+    [SfxId.Sandstone3]:       -1,
   };
 
   /**
