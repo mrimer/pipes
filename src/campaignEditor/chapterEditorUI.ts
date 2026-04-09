@@ -42,6 +42,7 @@ export interface ChapterEditorUICallbacks {
   saveGridState(chapter: ChapterDef, campaign: CampaignDef): void;
   resizeGrid(newRows: number, newCols: number, chapter: ChapterDef, campaign: CampaignDef): void;
   slideGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void;
+  rotateGrid(clockwise: boolean, chapter: ChapterDef): void;
   renderCanvas(): void;
 
   // Parent callbacks (forwarded from ChapterMapEditorCallbacks)
@@ -310,6 +311,29 @@ export class ChapterEditorUI {
     compass.appendChild(document.createElement('span')); // placeholder
 
     panel.appendChild(compass);
+
+    // ── Rotate buttons (CW / CCW) ──
+    const rotateTitle = document.createElement('div');
+    rotateTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
+    rotateTitle.textContent = 'Rotate board:';
+    panel.appendChild(rotateTitle);
+
+    const rotateRow = document.createElement('div');
+    rotateRow.style.cssText = 'display:flex;gap:4px;';
+
+    const makeRotateBtn = (icon: string, clockwise: boolean): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = icon;
+      b.title = clockwise ? 'Rotate board 90° clockwise' : 'Rotate board 90° counter-clockwise';
+      b.style.cssText = arrowBtnStyle;
+      b.addEventListener('click', () => this._cb.rotateGrid(clockwise, chapter));
+      return b;
+    };
+
+    rotateRow.appendChild(makeRotateBtn('↻', true));
+    rotateRow.appendChild(makeRotateBtn('↺', false));
+    panel.appendChild(rotateRow);
 
     return panel;
   }

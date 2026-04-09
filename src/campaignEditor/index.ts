@@ -770,6 +770,7 @@ export class CampaignEditor {
         updateUndoRedoButtons: () => this._updateEditorUndoRedoButtons(),
         resizeGrid: (r, c) => this._resizeGrid(r, c),
         slideGrid: (d) => this._slideGrid(d),
+        rotateGrid: (cw) => this._rotateGrid(cw),
       },
       this._btn.bind(this),
     );
@@ -1158,6 +1159,27 @@ export class CampaignEditor {
   private _slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void {
     this._state.slide(dir);
     this._updateEditorUndoRedoButtons();
+    this._renderEditorCanvas();
+  }
+
+  /**
+   * Rotate the entire board 90° CW or CCW, updating tile positions,
+   * connections, and orientations.  Swaps canvas dimensions, refreshes
+   * the palette/param panel to reflect the rotated selected tile, and
+   * records an undo snapshot.
+   */
+  private _rotateGrid(clockwise: boolean): void {
+    this._state.rotate(clockwise);
+    this._updateEditorUndoRedoButtons();
+    const newRows = this._state.rows;
+    const newCols = this._state.cols;
+    if (this._editorCanvas) {
+      setTileSize(computeTileSize(newRows, newCols));
+      this._editorCanvas.width  = newCols * TILE_SIZE;
+      this._editorCanvas.height = newRows * TILE_SIZE;
+    }
+    this._updateCanvasDisplaySize();
+    this._refreshPaletteUI();
     this._renderEditorCanvas();
   }
 

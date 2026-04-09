@@ -227,6 +227,7 @@ export class ChapterMapEditorSection {
       saveGridState:  (ch, camp)  => this._saveChapterGridState(ch, camp),
       resizeGrid: (r, c, ch, camp) => this._resizeChapterGrid(r, c, camp, ch),
       slideGrid:  (d, ch)         => this._slideChapterGrid(d, ch),
+      rotateGrid: (cw, ch)        => this._rotateChapterGrid(cw, ch),
       renderCanvas: () => this._renderChapterCanvas(),
       buildBtn: (...args) => this._callbacks.buildBtn(...args),
     };
@@ -295,6 +296,57 @@ export class ChapterMapEditorSection {
     }
     this._chapterEditGrid = newGrid;
     this._recordChapterSnapshot(chapter);
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Rotate the entire chapter map board 90° CW or CCW.  Swaps rows/cols,
+   * repositions all tiles, and rotates each tile's connections/rotation
+   * to match the new orientation.  Records an undo snapshot.
+   */
+  private _rotateChapterGrid(clockwise: boolean, chapter: ChapterDef): void {
+    const oldRows = this._chapterEditRows;
+    const oldCols = this._chapterEditCols;
+    const newRows = oldCols;
+    const newCols = oldRows;
+
+    const newGrid: (TileDef | null)[][] = Array.from(
+      { length: newRows },
+      () => Array(newCols).fill(null) as null[],
+    );
+
+    for (let r = 0; r < oldRows; r++) {
+      for (let c = 0; c < oldCols; c++) {
+        const tile = this._chapterEditGrid[r]?.[c];
+        if (!tile) continue;
+        // CW:  (r, c) → (c, oldRows-1-r)
+        // CCW: (r, c) → (oldCols-1-c, r)
+        const nr = clockwise ? c : oldCols - 1 - c;
+        const nc = clockwise ? oldRows - 1 - r : r;
+        newGrid[nr][nc] = chapterRotateTileDef(tile, clockwise);
+      }
+    }
+
+    this._chapterEditRows = newRows;
+    this._chapterEditCols = newCols;
+    this._chapterEditGrid = newGrid;
+    this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
+
+    // Update focused tile position to follow the rotation.
+    if (this._chapterFocusedTilePos) {
+      const { row: lr, col: lc } = this._chapterFocusedTilePos;
+      this._chapterFocusedTilePos = clockwise
+        ? { row: lc, col: oldRows - 1 - lr }
+        : { row: oldCols - 1 - lc, col: lr };
+    }
+
+    this._recordChapterSnapshot(chapter);
+    if (this._chapterCanvas) {
+      setTileSize(computeTileSize(newRows, newCols));
+      this._chapterCanvas.width  = newCols * TILE_SIZE;
+      this._chapterCanvas.height = newRows * TILE_SIZE;
+    }
+    this._updateChapterCanvasDisplaySize();
     this._renderChapterCanvas();
   }
 
@@ -762,5 +814,47 @@ export class ChapterMapEditorSection {
     this._renderChapterCanvas();
   }
 
+}
+
+// ── Module-level helpers ──────────────────────────────────────────────────────
+
+/**
+ * Return a direction rotated 90° CW or CCW.
+ * CW:  N→E→S→W→N   CCW: N→W→S→E→N
+ */
+function chapterRotateDir(dir: Direction, clockwise: boolean): Direction {
+  if (clockwise) {
+    switch (dir) {
+      case Direction.North: return Direction.East;
+      case Direction.East:  return Direction.South;
+      case Direction.South: return Direction.West;
+      case Direction.West:  return Direction.North;
+    }
+  } else {
+    switch (dir) {
+      case Direction.North: return Direction.West;
+      case Direction.West:  return Direction.South;
+      case Direction.South: return Direction.East;
+      case Direction.East:  return Direction.North;
+    }
+  }
+}
+
+/**
+ * Return a shallow-copy of `tile` with its orientation rotated 90° CW or CCW.
+ */
+function chapterRotateTileDef(tile: TileDef, clockwise: boolean): TileDef {
+  const rotated: TileDef = { ...tile };
+
+  if (rotated.connections) {
+    rotated.connections = rotated.connections.map(d => chapterRotateDir(d, clockwise));
+  }
+
+  if (rotated.rotation !== undefined) {
+    const delta = clockwise ? 90 : 270;
+    rotated.rotation = ((rotated.rotation + delta) % 360) as Rotation;
+  }
+
+  return rotated;
 }
 
