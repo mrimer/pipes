@@ -3290,7 +3290,7 @@ describe('Chamber tile (sandstone content)', () => {
     const result = b.reclaimTile({ row: 1, col: 0 });
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
-    expect(result.errorTilePositions).toEqual([{ row: 2, col: 0 }]);
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
     expect(b.grid[1][0].shape).toBe(PipeShape.Straight);
   });
 
@@ -3392,7 +3392,7 @@ describe('Chamber tile (sandstone content)', () => {
     const result = b.reclaimTile({ row: 1, col: 2 });
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
-    expect(result.errorTilePositions).toEqual([{ row: 2, col: 2 }]);
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 4 }]);
     // Tile should be restored
     expect(b.grid[1][2].shape).toBe(PipeShape.Straight);
     // Sandstone impact should be unchanged

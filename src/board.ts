@@ -615,13 +615,15 @@ export class Board {
       const { error, positions } = this._validateConstraints(filledAfter);
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
       if (error) {
-        // Highlight tiles that would have been disconnected by the removal,
-        // so the player can see what would be lost.  Fall back to the
-        // constraint-violating positions if nothing was disconnected.
+        // Highlight only tiles that are both disconnected by the removal AND
+        // in the constraint-violating positions set.  This ensures only the
+        // relevant constraint tiles are shown.  Falls back to positions when
+        // the intersection is empty (common case: constraint tile stays connected).
         const reclaimedKey = posKey(pos.row, pos.col);
+        const positionKeys = positions ? new Set(positions.map(p => posKey(p.row, p.col))) : null;
         const disconnected: GridPos[] = [];
         for (const k of filledBefore) {
-          if (k !== reclaimedKey && !filledAfter.has(k)) {
+          if (k !== reclaimedKey && !filledAfter.has(k) && positionKeys?.has(k)) {
             const [r, c] = parseKey(k);
             disconnected.push({ row: r, col: c });
           }
@@ -827,13 +829,13 @@ export class Board {
     if (constraintError) {
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile; // revert to old tile
-      // Compute disconnected positions now that the old tile is restored.
-      // These are tiles that were connected before replacement but would not
-      // be connected after — shown to the player to clarify what the error means.
+      // Compute only tiles that are both disconnected by the replacement AND in the
+      // constraint positions set.  Falls back to positions when the intersection is empty.
       const filledBeforeReplace = this.getFilledPositions();
+      const positionKeys = constraintPositions ? new Set(constraintPositions.map(p => posKey(p.row, p.col))) : null;
       const disconnected: GridPos[] = [];
       for (const k of filledBeforeReplace) {
-        if (!finalFilled.has(k)) {
+        if (!finalFilled.has(k) && positionKeys?.has(k)) {
           const [r, c] = parseKey(k);
           disconnected.push({ row: r, col: c });
         }
@@ -1353,11 +1355,13 @@ export class Board {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
-      // Highlight tiles that would have been disconnected by the rotation.
-      // Fall back to the constraint-violating positions if nothing was disconnected.
+      // Highlight only tiles that are both disconnected by the rotation AND
+      // in the constraint-violating positions set.  Falls back to positions
+      // when the intersection is empty.
+      const positionKeys = constraintPositions ? new Set(constraintPositions.map(p => posKey(p.row, p.col))) : null;
       const disconnected: GridPos[] = [];
       for (const k of filledBefore) {
-        if (!filled.has(k)) {
+        if (!filled.has(k) && positionKeys?.has(k)) {
           const [r, c] = parseKey(k);
           disconnected.push({ row: r, col: c });
         }
