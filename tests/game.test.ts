@@ -1262,6 +1262,31 @@ describe('renderInventoryBar – bonus shapes not in inventory', () => {
   });
 });
 
+// ─── Tests: renderInventoryBar – canvas preservation ─────────────────────────
+
+describe('renderInventoryBar – canvas preservation', () => {
+  it('preserves canvas child elements across re-renders so wave animations are not interrupted', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Sink,   0, true);
+    board.sourceCapacity = 5;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+
+    const container = document.createElement('div');
+    // Simulate a wave animation canvas appended by attachInventoryWaveAnimation.
+    const waveCanvas = document.createElement('canvas');
+    waveCanvas.style.cssText = 'position:absolute;inset:0;z-index:-1;opacity:0.2;';
+    container.appendChild(waveCanvas);
+
+    renderInventoryBar(container, board, null, () => {});
+
+    // The canvas should still be present in the container after re-render.
+    expect(container.querySelector('canvas')).toBe(waveCanvas);
+  });
+});
+
 // ─── Tests: _positionModalBelowCanvas ────────────────────────────────────────
 
 describe('Game – _positionModalBelowCanvas', () => {
