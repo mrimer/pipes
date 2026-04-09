@@ -21,7 +21,11 @@ export function renderInventoryBar(
   onItemClick: (shape: PipeShape, effectiveCount: number) => void,
   onItemRightClick?: () => void,
 ): void {
+  // Preserve any canvas children (e.g. the wave animation overlay) so that
+  // the wave animation loop is not interrupted by the innerHTML replacement.
+  const savedCanvases = Array.from(inventoryBarEl.querySelectorAll<HTMLCanvasElement>(':scope > canvas'));
   inventoryBarEl.innerHTML = '<h3 class="inv-title">Inventory</h3>';
+  for (const cv of savedCanvases) inventoryBarEl.appendChild(cv);
 
   const bonuses = board.getContainerBonuses();
 
