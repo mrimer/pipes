@@ -299,8 +299,6 @@ export class LevelEditorState {
     this.recordSnapshot();
   }
 
-
-
   /** Build a TileDef from the current palette and params. */
   buildTileDef(): TileDef {
     const palette = this.palette;
