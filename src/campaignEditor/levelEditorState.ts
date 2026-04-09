@@ -17,6 +17,7 @@ import {
   ChamberPalette,
   isChamberPalette,
   chamberPaletteContent,
+  rotateTileDefBy90,
 } from './types';
 
 export class LevelEditorState {
@@ -262,7 +263,7 @@ export class LevelEditorState {
         // CCW: (r, c) → (oldCols-1-c, r)
         const nr = clockwise ? c : oldCols - 1 - c;
         const nc = clockwise ? oldRows - 1 - r : r;
-        newGrid[nr][nc] = rotateTileDef(tile, clockwise);
+        newGrid[nr][nc] = rotateTileDefBy90(tile, clockwise);
       }
     }
 
@@ -481,48 +482,3 @@ export class LevelEditorState {
   }
 }
 
-// ── Module-level helpers ──────────────────────────────────────────────────────
-
-/**
- * Return a direction rotated 90° clockwise (CW) or counter-clockwise (CCW).
- * CW:  N→E→S→W→N
- * CCW: N→W→S→E→N
- */
-function rotateDir(dir: Direction, clockwise: boolean): Direction {
-  if (clockwise) {
-    switch (dir) {
-      case Direction.North: return Direction.East;
-      case Direction.East:  return Direction.South;
-      case Direction.South: return Direction.West;
-      case Direction.West:  return Direction.North;
-    }
-  } else {
-    switch (dir) {
-      case Direction.North: return Direction.West;
-      case Direction.West:  return Direction.South;
-      case Direction.South: return Direction.East;
-      case Direction.East:  return Direction.North;
-    }
-  }
-}
-
-/**
- * Return a shallow-copy of `tile` with its orientation (rotation/connections)
- * rotated 90° CW or CCW to match the board rotation.
- */
-function rotateTileDef(tile: TileDef, clockwise: boolean): TileDef {
-  const rotated: TileDef = { ...tile };
-
-  // Tiles with explicit connection sets (Source, Sink, Chamber).
-  if (rotated.connections) {
-    rotated.connections = rotated.connections.map(d => rotateDir(d, clockwise));
-  }
-
-  // Tiles whose visual orientation is encoded in `rotation`.
-  if (rotated.rotation !== undefined) {
-    const delta = clockwise ? 90 : 270;
-    rotated.rotation = ((rotated.rotation + delta) % 360) as Rotation;
-  }
-
-  return rotated;
-}
