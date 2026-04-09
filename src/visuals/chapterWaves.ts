@@ -88,6 +88,116 @@ export function _heightToRgb(h: number, isGold: boolean): [number, number, numbe
 }
 
 /**
+ * Mutable holder for the low-resolution offscreen canvas reused across frames.
+ * Passed by reference so {@link _renderWaveFrame} can (re-)create it when the
+ * element size changes.
+ */
+interface OffscreenState {
+  el:  HTMLCanvasElement | null;
+  ctx: CanvasRenderingContext2D | null;
+}
+
+/**
+ * Render one wave animation frame onto `canvas`.
+ *
+ * This is the shared pixel-computation kernel used by both
+ * {@link attachChapterWaveAnimation} and {@link attachInventoryWaveAnimation}.
+ *
+ * @param ts     `requestAnimationFrame` timestamp in milliseconds.
+ * @param canvas The display canvas to draw into.
+ * @param el     The element whose offsetWidth/offsetHeight give the target size.
+ * @param waves  The array of plane waves to superimpose.
+ * @param isGold `true` → gold color palette; `false` → blue palette.
+ * @param off    Mutable offscreen-canvas state (updated in-place when resized).
+ * @returns `'stop'` – canvas detached, caller should cancel the loop.
+ *          `'skip'` – element is zero-sized or no 2-D context; reschedule only.
+ *          `'ok'`   – frame painted successfully; reschedule.
+ */
+function _renderWaveFrame(
+  ts: number,
+  canvas: HTMLCanvasElement,
+  el: HTMLElement,
+  waves: Wave[],
+  isGold: boolean,
+  off: OffscreenState,
+): 'stop' | 'skip' | 'ok' {
+  if (!document.contains(canvas)) return 'stop';
+
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  if (w === 0 || h === 0) return 'skip';
+
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width  = w;
+    canvas.height = h;
+  }
+
+  // Dimensions of the low-resolution sampling grid.
+  const sw = Math.max(1, Math.ceil(w / WAVE_SCALE));
+  const sh = Math.max(1, Math.ceil(h / WAVE_SCALE));
+
+  // (Re-)create the offscreen canvas only when the grid size changes.
+  if (!off.el || off.el.width !== sw || off.el.height !== sh) {
+    off.el = document.createElement('canvas');
+    off.el.width  = sw;
+    off.el.height = sh;
+    off.ctx = off.el.getContext('2d');
+  }
+  if (!off.ctx) return 'skip';
+
+  // ── Pixel computation ─────────────────────────────────────────────────────
+  const imgData = off.ctx.createImageData(sw, sh);
+  const pixels  = imgData.data;
+  const n       = waves.length;
+
+  // Pre-compute per-wave direction cosines and current phase.
+  const cosA = new Float32Array(n);
+  const sinA = new Float32Array(n);
+  const phi  = new Float32Array(n);
+  for (let wi = 0; wi < n; wi++) {
+    cosA[wi] = Math.cos(waves[wi].angle);
+    sinA[wi] = Math.sin(waves[wi].angle);
+    phi[wi]  = waves[wi].offset + waves[wi].speed * ts;
+  }
+
+  for (let py = 0; py < sh; py++) {
+    // Sample at the center of each low-res cell.
+    const y = (py + 0.5) * WAVE_SCALE;
+    for (let px = 0; px < sw; px++) {
+      const x = (px + 0.5) * WAVE_SCALE;
+
+      // Accumulate contributions from all plane waves.
+      let hVal = 0;
+      for (let wi = 0; wi < n; wi++) {
+        hVal += Math.sin(
+          (x * cosA[wi] + y * sinA[wi]) * waves[wi].freq + phi[wi],
+        );
+      }
+      hVal /= n; // normalize to [−1, +1]
+
+      const [r, g, b] = _heightToRgb(hVal, isGold);
+      const i = (py * sw + px) << 2; // × 4
+      pixels[i]     = r;
+      pixels[i + 1] = g;
+      pixels[i + 2] = b;
+      pixels[i + 3] = 255; // fully opaque
+    }
+  }
+
+  off.ctx.putImageData(imgData, 0, 0);
+
+  // Scale the low-res image up to fill the display canvas with bilinear smoothing.
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 'skip';
+  ctx.clearRect(0, 0, w, h);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(off.el, 0, 0, w, h);
+
+  return 'ok';
+}
+
+/**
  * Attach a water-wave background animation to a chapter header element.
  *
  * A `<canvas>` is appended as the last child of `headerEl` and positioned
@@ -134,8 +244,7 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   let animId: number | null = null;
 
   // Low-resolution offscreen canvas reused across frames when the size is stable.
-  let offEl: HTMLCanvasElement | null = null;
-  let offCtx: CanvasRenderingContext2D | null = null;
+  const off: OffscreenState = { el: null, ctx: null };
 
   // ── Static background helper ────────────────────────────────────────────────
   /** Paint the idle background color onto the canvas (used before and after animation). */
@@ -158,94 +267,8 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
 
   // ── Animation frame ─────────────────────────────────────────────────────────
   function _frame(ts: number): void {
-    // Stop the loop if the canvas has been detached from the document
-    // (e.g., after levelListEl.innerHTML = '' rebuilds the list).
-    if (!document.contains(canvas)) {
-      animId = null;
-      return;
-    }
-
-    const w = headerEl.offsetWidth;
-    const h = headerEl.offsetHeight;
-    if (w === 0 || h === 0) {
-      animId = requestAnimationFrame(_frame);
-      return;
-    }
-
-    // Resize the display canvas when the element dimensions change.
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width  = w;
-      canvas.height = h;
-    }
-
-    // Dimensions of the low-resolution sampling grid.
-    const sw = Math.max(1, Math.ceil(w / WAVE_SCALE));
-    const sh = Math.max(1, Math.ceil(h / WAVE_SCALE));
-
-    // (Re-)create the offscreen canvas only when the grid size changes.
-    if (!offEl || offEl.width !== sw || offEl.height !== sh) {
-      offEl  = document.createElement('canvas');
-      offEl.width  = sw;
-      offEl.height = sh;
-      offCtx = offEl.getContext('2d');
-    }
-    if (!offCtx) {
-      animId = requestAnimationFrame(_frame);
-      return;
-    }
-
-    // ── Pixel computation ───────────────────────────────────────────────────
-    const imgData = offCtx.createImageData(sw, sh);
-    const pixels  = imgData.data;
-    const n       = waves.length;
-
-    // Pre-compute per-wave direction cosines and current phase.
-    const cosA = new Float32Array(n);
-    const sinA = new Float32Array(n);
-    const phi  = new Float32Array(n);
-    for (let wi = 0; wi < n; wi++) {
-      cosA[wi] = Math.cos(waves[wi].angle);
-      sinA[wi] = Math.sin(waves[wi].angle);
-      phi[wi]  = waves[wi].offset + waves[wi].speed * ts;
-    }
-
-    for (let py = 0; py < sh; py++) {
-      // Sample at the center of each low-res cell.
-      const y = (py + 0.5) * WAVE_SCALE;
-      for (let px = 0; px < sw; px++) {
-        const x = (px + 0.5) * WAVE_SCALE;
-
-        // Accumulate contributions from all plane waves.
-        let hVal = 0;
-        for (let wi = 0; wi < n; wi++) {
-          hVal += Math.sin(
-            (x * cosA[wi] + y * sinA[wi]) * waves[wi].freq + phi[wi],
-          );
-        }
-        hVal /= n; // normalize to [−1, +1]
-
-        const [r, g, b] = _heightToRgb(hVal, isGold);
-        const i = (py * sw + px) << 2; // × 4
-        pixels[i]     = r;
-        pixels[i + 1] = g;
-        pixels[i + 2] = b;
-        pixels[i + 3] = 255; // fully opaque
-      }
-    }
-
-    offCtx.putImageData(imgData, 0, 0);
-
-    // Scale the low-res image up to fill the display canvas with bilinear smoothing.
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      animId = requestAnimationFrame(_frame);
-      return;
-    }
-    ctx.clearRect(0, 0, w, h);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(offEl, 0, 0, w, h);
-
+    const result = _renderWaveFrame(ts, canvas, headerEl, waves, isGold, off);
+    if (result === 'stop') { animId = null; return; }
     animId = requestAnimationFrame(_frame);
   }
 
@@ -295,92 +318,12 @@ export function attachInventoryWaveAnimation(el: HTMLElement): void {
 
   const waves = _buildWaves();
   let animId: number | null = null;
-
-  // Low-resolution offscreen canvas reused across frames when the size is stable.
-  let offEl: HTMLCanvasElement | null = null;
-  let offCtx: CanvasRenderingContext2D | null = null;
+  const off: OffscreenState = { el: null, ctx: null };
 
   // ── Animation frame ─────────────────────────────────────────────────────────
   function _frame(ts: number): void {
-    // Stop the loop if the canvas has been detached from the document.
-    if (!document.contains(canvas)) {
-      animId = null;
-      return;
-    }
-
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    if (w === 0 || h === 0) {
-      animId = requestAnimationFrame(_frame);
-      return;
-    }
-
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width  = w;
-      canvas.height = h;
-    }
-
-    const sw = Math.max(1, Math.ceil(w / WAVE_SCALE));
-    const sh = Math.max(1, Math.ceil(h / WAVE_SCALE));
-
-    if (!offEl || offEl.width !== sw || offEl.height !== sh) {
-      offEl  = document.createElement('canvas');
-      offEl.width  = sw;
-      offEl.height = sh;
-      offCtx = offEl.getContext('2d');
-    }
-    if (!offCtx) {
-      animId = requestAnimationFrame(_frame);
-      return;
-    }
-
-    const imgData = offCtx.createImageData(sw, sh);
-    const pixels  = imgData.data;
-    const n       = waves.length;
-
-    const cosA = new Float32Array(n);
-    const sinA = new Float32Array(n);
-    const phi  = new Float32Array(n);
-    for (let wi = 0; wi < n; wi++) {
-      cosA[wi] = Math.cos(waves[wi].angle);
-      sinA[wi] = Math.sin(waves[wi].angle);
-      phi[wi]  = waves[wi].offset + waves[wi].speed * ts;
-    }
-
-    for (let py = 0; py < sh; py++) {
-      const y = (py + 0.5) * WAVE_SCALE;
-      for (let px = 0; px < sw; px++) {
-        const x = (px + 0.5) * WAVE_SCALE;
-
-        let hVal = 0;
-        for (let wi = 0; wi < n; wi++) {
-          hVal += Math.sin(
-            (x * cosA[wi] + y * sinA[wi]) * waves[wi].freq + phi[wi],
-          );
-        }
-        hVal /= n;
-
-        const [r, g, b] = _heightToRgb(hVal, false);
-        const i = (py * sw + px) << 2;
-        pixels[i]     = r;
-        pixels[i + 1] = g;
-        pixels[i + 2] = b;
-        pixels[i + 3] = 255;
-      }
-    }
-
-    offCtx.putImageData(imgData, 0, 0);
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      animId = requestAnimationFrame(_frame);
-      return;
-    }
-    ctx.clearRect(0, 0, w, h);
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(offEl, 0, 0, w, h);
-
+    const result = _renderWaveFrame(ts, canvas, el, waves, false, off);
+    if (result === 'stop') { animId = null; return; }
     animId = requestAnimationFrame(_frame);
   }
 
