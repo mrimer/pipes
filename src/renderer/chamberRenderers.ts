@@ -21,7 +21,7 @@ import {
   SANDSTONE_COLOR, SANDSTONE_WATER_COLOR,
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
   SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
-  STAR_COLOR, STAR_WATER_COLOR,
+  STAR_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
 } from '../colors';
@@ -507,9 +507,31 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
 
 /** Draw a 5-pointed star inside the chamber inner box. */
 function _drawChamberStarContent(ctx: CanvasRenderingContext2D, isWater: boolean, half: number): void {
-  ctx.fillStyle = isWater ? STAR_WATER_COLOR : STAR_COLOR;
   const outerR = half * 0.45;
   const innerR = outerR * 0.42;
+
+  if (isWater) {
+    // Rainbow animation: cycle the hue over 3 seconds and emit a soft glow.
+    const RAINBOW_PERIOD_MS = 3000;
+    const hue = (Date.now() % RAINBOW_PERIOD_MS) / RAINBOW_PERIOD_MS * 360;
+    const starColor = `hsl(${hue},100%,65%)`;
+
+    // Soft radial glow behind the star
+    const glowRadius = outerR * 1.6;
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
+    glow.addColorStop(0,   `hsla(${hue},100%,75%,0.55)`);
+    glow.addColorStop(0.5, `hsla(${hue},100%,65%,0.20)`);
+    glow.addColorStop(1,   `hsla(${hue},100%,55%,0.00)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = starColor;
+  } else {
+    ctx.fillStyle = STAR_COLOR;
+  }
+
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
     const angle = (Math.PI / 5) * i - Math.PI / 2;
