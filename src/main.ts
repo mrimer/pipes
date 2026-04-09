@@ -18,6 +18,7 @@ const levelListEl    = getEl('level-list');
 const playScreenEl   = getEl('play-screen');
 const levelHeaderEl  = getEl('level-header');
 const inventoryBarEl = getEl('inventory-bar');
+const statsBoxEl     = getEl('stats-box');
 const waterDisplayEl = getEl('water-display');
 const winModalEl     = getEl('win-modal');
 const gameoverModalEl = getEl('gameover-modal');
@@ -43,7 +44,8 @@ const game = new Game(
   exitBtnEl,
 );
 
-// Attach a persistent water-wave background animation (alpha 0.2) to the inventory box.
+// Attach a persistent water-wave background animation (alpha 0.2) to the inventory box and stats box.
+attachInventoryWaveAnimation(statsBoxEl);
 attachInventoryWaveAnimation(inventoryBarEl);
 
 // Win modal buttons
