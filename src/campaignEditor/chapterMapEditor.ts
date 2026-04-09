@@ -18,6 +18,8 @@ import {
   MAX_EDITOR_CANVAS_PX,
   rotateGridBy90,
   rotatePositionBy90,
+  reflectGridAboutDiagonal,
+  reflectPositionAboutDiagonal,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
@@ -230,6 +232,7 @@ export class ChapterMapEditorSection {
       resizeGrid: (r, c, ch, camp) => this._resizeChapterGrid(r, c, camp, ch),
       slideGrid:  (d, ch)         => this._slideChapterGrid(d, ch),
       rotateGrid: (cw, ch)        => this._rotateChapterGrid(cw, ch),
+      reflectGrid: (ch)           => this._reflectChapterGrid(ch),
       renderCanvas: () => this._renderChapterCanvas(),
       buildBtn: (...args) => this._callbacks.buildBtn(...args),
     };
@@ -320,6 +323,36 @@ export class ChapterMapEditorSection {
     // Update focused tile position to follow the rotation.
     if (this._chapterFocusedTilePos) {
       this._chapterFocusedTilePos = rotatePositionBy90(this._chapterFocusedTilePos, oldRows, oldCols, clockwise);
+    }
+
+    this._recordChapterSnapshot(chapter);
+    if (this._chapterCanvas) {
+      setTileSize(computeTileSize(newRows, newCols));
+      this._chapterCanvas.width  = newCols * TILE_SIZE;
+      this._chapterCanvas.height = newRows * TILE_SIZE;
+    }
+    this._updateChapterCanvasDisplaySize();
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Reflect the entire chapter map board about the main diagonal (x=y /
+   * transpose).  Swaps rows/cols, repositions all tiles, and reflects each
+   * tile's connections/rotation.  Records an undo snapshot.
+   */
+  private _reflectChapterGrid(chapter: ChapterDef): void {
+    const oldRows = this._chapterEditRows;
+    const oldCols = this._chapterEditCols;
+
+    const { newGrid, newRows, newCols } = reflectGridAboutDiagonal(this._chapterEditGrid, oldRows, oldCols);
+
+    this._chapterEditRows = newRows;
+    this._chapterEditCols = newCols;
+    this._chapterEditGrid = newGrid;
+    this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
+
+    if (this._chapterFocusedTilePos) {
+      this._chapterFocusedTilePos = reflectPositionAboutDiagonal(this._chapterFocusedTilePos);
     }
 
     this._recordChapterSnapshot(chapter);

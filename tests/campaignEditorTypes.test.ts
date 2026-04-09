@@ -13,6 +13,10 @@ import {
   generateLevelId,
   REPEATABLE_EDITOR_TILES,
   EditorScreen,
+  reflectDirectionAboutDiagonal,
+  reflectTileDefAboutDiagonal,
+  reflectGridAboutDiagonal,
+  reflectPositionAboutDiagonal,
 } from '../src/campaignEditor/types';
 
 // ─── isChamberPalette ─────────────────────────────────────────────────────────
@@ -331,5 +335,159 @@ describe('EditorScreen enum', () => {
     expect(EditorScreen.Campaign).toBe('campaign');
     expect(EditorScreen.Chapter).toBe('chapter');
     expect(EditorScreen.LevelEditor).toBe('levelEditor');
+  });
+});
+
+// ─── reflectDirectionAboutDiagonal ───────────────────────────────────────────
+
+describe('reflectDirectionAboutDiagonal', () => {
+  it('maps North ↔ West', () => {
+    expect(reflectDirectionAboutDiagonal(Direction.North)).toBe(Direction.West);
+    expect(reflectDirectionAboutDiagonal(Direction.West)).toBe(Direction.North);
+  });
+
+  it('maps East ↔ South', () => {
+    expect(reflectDirectionAboutDiagonal(Direction.East)).toBe(Direction.South);
+    expect(reflectDirectionAboutDiagonal(Direction.South)).toBe(Direction.East);
+  });
+
+  it('is its own inverse (applying twice returns original)', () => {
+    for (const dir of [Direction.North, Direction.East, Direction.South, Direction.West]) {
+      expect(reflectDirectionAboutDiagonal(reflectDirectionAboutDiagonal(dir))).toBe(dir);
+    }
+  });
+});
+
+// ─── reflectTileDefAboutDiagonal ─────────────────────────────────────────────
+
+describe('reflectTileDefAboutDiagonal', () => {
+  it('transforms Source connections correctly', () => {
+    const tile = { shape: PipeShape.Source, connections: [Direction.North, Direction.East] };
+    const reflected = reflectTileDefAboutDiagonal(tile);
+    expect(reflected.connections).toEqual([Direction.West, Direction.South]);
+  });
+
+  it('Straight 0° → 90°', () => {
+    const tile = { shape: PipeShape.Straight, rotation: 0 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(90);
+  });
+
+  it('Straight 90° → 0°', () => {
+    const tile = { shape: PipeShape.Straight, rotation: 90 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(0);
+  });
+
+  it('Elbow 0° → 180°', () => {
+    const tile = { shape: PipeShape.Elbow, rotation: 0 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(180);
+  });
+
+  it('Elbow 90° → 90°', () => {
+    const tile = { shape: PipeShape.Elbow, rotation: 90 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(90);
+  });
+
+  it('Elbow 180° → 0°', () => {
+    const tile = { shape: PipeShape.Elbow, rotation: 180 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(0);
+  });
+
+  it('Elbow 270° → 270°', () => {
+    const tile = { shape: PipeShape.Elbow, rotation: 270 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(270);
+  });
+
+  it('Tee 0° → 90°', () => {
+    const tile = { shape: PipeShape.Tee, rotation: 0 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(90);
+  });
+
+  it('Tee 180° → 270°', () => {
+    const tile = { shape: PipeShape.Tee, rotation: 180 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(270);
+  });
+
+  it('OneWay 0° → 270°', () => {
+    const tile = { shape: PipeShape.OneWay, rotation: 0 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(270);
+  });
+
+  it('OneWay 90° → 180°', () => {
+    const tile = { shape: PipeShape.OneWay, rotation: 90 as const };
+    expect(reflectTileDefAboutDiagonal(tile).rotation).toBe(180);
+  });
+
+  it('is its own inverse for rotation shapes', () => {
+    for (const shape of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.OneWay]) {
+      for (const rotation of [0, 90, 180, 270] as const) {
+        const tile = { shape, rotation };
+        const once = reflectTileDefAboutDiagonal(tile);
+        const twice = reflectTileDefAboutDiagonal(once);
+        expect(twice.rotation).toBe(rotation);
+      }
+    }
+  });
+
+  it('leaves shape unchanged', () => {
+    const tile = { shape: PipeShape.Elbow, rotation: 0 as const };
+    expect(reflectTileDefAboutDiagonal(tile).shape).toBe(PipeShape.Elbow);
+  });
+
+  it('does not mutate the original tile', () => {
+    const tile = { shape: PipeShape.Straight, rotation: 0 as const };
+    reflectTileDefAboutDiagonal(tile);
+    expect(tile.rotation).toBe(0);
+  });
+});
+
+// ─── reflectGridAboutDiagonal ─────────────────────────────────────────────────
+
+describe('reflectGridAboutDiagonal', () => {
+  it('swaps rows and cols (transposes)', () => {
+    const grid: (import('../src/types').TileDef | null)[][] = [
+      [{ shape: PipeShape.Straight, rotation: 0 }, null, null],
+      [null, null, { shape: PipeShape.Elbow, rotation: 90 }],
+    ];
+    const { newGrid, newRows, newCols } = reflectGridAboutDiagonal(grid, 2, 3);
+    expect(newRows).toBe(3);
+    expect(newCols).toBe(2);
+    // (0,0) → (0,0)
+    expect(newGrid[0][0]).not.toBeNull();
+    // (1,2) → (2,1)
+    expect(newGrid[2][1]).not.toBeNull();
+    // (0,2) → (2,0) should be null
+    expect(newGrid[2][0]).toBeNull();
+  });
+
+  it('applying reflect twice returns original grid layout', () => {
+    const tile = { shape: PipeShape.Tee, rotation: 0 as const };
+    const grid: (import('../src/types').TileDef | null)[][] = [
+      [tile, null],
+      [null, null],
+      [null, { shape: PipeShape.Elbow, rotation: 90 as const }],
+    ];
+    const { newGrid: once, newRows: r1, newCols: c1 } = reflectGridAboutDiagonal(grid, 3, 2);
+    const { newGrid: twice, newRows: r2, newCols: c2 } = reflectGridAboutDiagonal(once, r1, c1);
+    expect(r2).toBe(3);
+    expect(c2).toBe(2);
+    // (0,0) present in both original and twice
+    expect(twice[0][0]).not.toBeNull();
+    // (2,1) present in both
+    expect(twice[2][1]).not.toBeNull();
+    // (0,1) null in both
+    expect(twice[0][1]).toBeNull();
+  });
+});
+
+// ─── reflectPositionAboutDiagonal ────────────────────────────────────────────
+
+describe('reflectPositionAboutDiagonal', () => {
+  it('swaps row and col', () => {
+    expect(reflectPositionAboutDiagonal({ row: 2, col: 5 })).toEqual({ row: 5, col: 2 });
+  });
+
+  it('is its own inverse', () => {
+    const pos = { row: 3, col: 7 };
+    expect(reflectPositionAboutDiagonal(reflectPositionAboutDiagonal(pos))).toEqual(pos);
   });
 });

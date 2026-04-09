@@ -340,7 +340,7 @@ export async function ungzipBlob(blob: Blob): Promise<string> {
   return new TextDecoder().decode(merged);
 }
 
-// ── Grid rotation helpers ─────────────────────────────────────────────────────
+// ── Grid rotation and reflection helpers ─────────────────────────────────────
 
 /**
  * Rotate a 2-D grid of TileDefs 90° clockwise or counter-clockwise.
@@ -428,4 +428,101 @@ export function rotateTileDefBy90(tile: TileDef, clockwise: boolean): TileDef {
   }
 
   return rotated;
+}
+
+// ── Grid reflection helpers (reflect about the x=y diagonal / transpose) ──────
+
+/**
+ * Map a direction through a reflection about the main diagonal (x=y / transpose).
+ *
+ * The transpose swaps (row, col) → (col, row), which transforms neighbors as:
+ *   North ↔ West,  East ↔ South
+ */
+export function reflectDirectionAboutDiagonal(dir: Direction): Direction {
+  switch (dir) {
+    case Direction.North: return Direction.West;
+    case Direction.West:  return Direction.North;
+    case Direction.East:  return Direction.South;
+    case Direction.South: return Direction.East;
+  }
+}
+
+/**
+ * The rotation value transformation under reflection about the main diagonal
+ * depends on the pipe shape's geometry.
+ *
+ * Straight / Tee  – shapes whose 0° axis points N/S: new = (90  − R + 360) % 360
+ * Elbow           – shape whose 0° corner is NE:     new = (180 − R + 360) % 360
+ * OneWay          – encodes a single direction:       new = (270 − R + 360) % 360
+ */
+function _reflectRotationAboutDiagonal(shape: PipeShape, rotation: Rotation): Rotation {
+  const isElbowLike = new Set<PipeShape>([
+    PipeShape.Elbow, PipeShape.GoldElbow,
+    PipeShape.SpinElbow, PipeShape.SpinElbowCement, PipeShape.LeakyElbow,
+  ]).has(shape);
+  const isOneWay = shape === PipeShape.OneWay;
+
+  if (isElbowLike) return ((180 - rotation + 360) % 360) as Rotation;
+  if (isOneWay)    return ((270 - rotation + 360) % 360) as Rotation;
+  // Straight-like and Tee-like shapes
+  return ((90 - rotation + 360) % 360) as Rotation;
+}
+
+/**
+ * Return a shallow-copy of `tile` with its orientation reflected about the
+ * main diagonal (transpose: row ↔ col).
+ */
+export function reflectTileDefAboutDiagonal(tile: TileDef): TileDef {
+  const reflected: TileDef = { ...tile };
+
+  if (reflected.connections) {
+    reflected.connections = reflected.connections.map(reflectDirectionAboutDiagonal);
+  }
+
+  if (reflected.rotation !== undefined) {
+    reflected.rotation = _reflectRotationAboutDiagonal(reflected.shape, reflected.rotation);
+  }
+
+  return reflected;
+}
+
+/**
+ * Reflect a 2-D grid of TileDefs about the main diagonal (x=y / transpose).
+ * Returns the reflected grid and its new dimensions (rows and cols are swapped).
+ *
+ * Transform: (r, c) → (c, r)
+ */
+export function reflectGridAboutDiagonal(
+  grid: (TileDef | null)[][],
+  oldRows: number,
+  oldCols: number,
+): { newGrid: (TileDef | null)[][]; newRows: number; newCols: number } {
+  const newRows = oldCols;
+  const newCols = oldRows;
+
+  const newGrid: (TileDef | null)[][] = Array.from(
+    { length: newRows },
+    () => Array(newCols).fill(null) as null[],
+  );
+
+  for (let r = 0; r < oldRows; r++) {
+    for (let c = 0; c < oldCols; c++) {
+      const tile = grid[r]?.[c];
+      if (!tile) continue;
+      newGrid[c][r] = reflectTileDefAboutDiagonal(tile);
+    }
+  }
+
+  return { newGrid, newRows, newCols };
+}
+
+/**
+ * Return a grid position transformed by a reflection about the main diagonal.
+ *
+ * (r, c) → (c, r)
+ */
+export function reflectPositionAboutDiagonal(
+  pos: { row: number; col: number },
+): { row: number; col: number } {
+  return { row: pos.col, col: pos.row };
 }

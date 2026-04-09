@@ -26,6 +26,7 @@ export interface LevelMetadataPanelCallbacks {
   resizeGrid(newRows: number, newCols: number): void;
   slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void;
   rotateGrid(clockwise: boolean): void;
+  reflectGrid(): void;
 }
 
 // ─── LevelMetadataPanel class ─────────────────────────────────────────────────
@@ -256,6 +257,7 @@ export class LevelMetadataPanel {
     const slideRotateSection = buildSlideAndRotateControls(
       (dir) => this._cb.slideGrid(dir),
       (cw)  => this._cb.rotateGrid(cw),
+      ()    => this._cb.reflectGrid(),
     );
     panel.appendChild(slideRotateSection);
 
@@ -375,14 +377,16 @@ export class LevelMetadataPanel {
  * section that appears in both the level editor and chapter map editor grid
  * size panels.
  *
- * @param onSlide  - Called with a direction when a slide arrow is clicked.
- * @param onRotate - Called with `true` for CW, `false` for CCW when a rotate
- *                   button is clicked.
- * @returns A DocumentFragment containing the two sub-sections (slide + rotate).
+ * @param onSlide   - Called with a direction when a slide arrow is clicked.
+ * @param onRotate  - Called with `true` for CW, `false` for CCW when a rotate
+ *                    button is clicked.
+ * @param onReflect - Called when the Reflect button is clicked.
+ * @returns A DocumentFragment containing the sub-sections (slide, rotate, reflect).
  */
 export function buildSlideAndRotateControls(
-  onSlide:  (dir: 'N' | 'E' | 'S' | 'W') => void,
-  onRotate: (clockwise: boolean) => void,
+  onSlide:   (dir: 'N' | 'E' | 'S' | 'W') => void,
+  onRotate:  (clockwise: boolean) => void,
+  onReflect: () => void,
 ): DocumentFragment {
   const frag = document.createDocumentFragment();
 
@@ -448,6 +452,25 @@ export function buildSlideAndRotateControls(
   rotateRow.appendChild(makeRotateBtn('↻', true));
   rotateRow.appendChild(makeRotateBtn('↺', false));
   frag.appendChild(rotateRow);
+
+  // ── Reflect section ────────────────────────────────────────────────────────
+
+  const reflectTitle = document.createElement('div');
+  reflectTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
+  reflectTitle.textContent = 'Reflect board:';
+  frag.appendChild(reflectTitle);
+
+  const reflectRow = document.createElement('div');
+  reflectRow.style.cssText = 'display:flex;gap:4px;';
+
+  const reflectBtn = document.createElement('button');
+  reflectBtn.type = 'button';
+  reflectBtn.textContent = '⤢';
+  reflectBtn.title = 'Reflect board about the diagonal (transpose)';
+  reflectBtn.style.cssText = arrowBtnStyle;
+  reflectBtn.addEventListener('click', () => onReflect());
+  reflectRow.appendChild(reflectBtn);
+  frag.appendChild(reflectRow);
 
   return frag;
 }

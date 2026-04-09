@@ -44,6 +44,7 @@ export interface ChapterEditorUICallbacks {
   resizeGrid(newRows: number, newCols: number, chapter: ChapterDef, campaign: CampaignDef): void;
   slideGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void;
   rotateGrid(clockwise: boolean, chapter: ChapterDef): void;
+  reflectGrid(chapter: ChapterDef): void;
   renderCanvas(): void;
 
   // Parent callbacks (forwarded from ChapterMapEditorCallbacks)
@@ -278,6 +279,7 @@ export class ChapterEditorUI {
     panel.appendChild(buildSlideAndRotateControls(
       (dir) => this._cb.slideGrid(dir, chapter),
       (cw)  => this._cb.rotateGrid(cw, chapter),
+      ()    => this._cb.reflectGrid(chapter),
     ));
 
     return panel;

@@ -771,6 +771,7 @@ export class CampaignEditor {
         resizeGrid: (r, c) => this._resizeGrid(r, c),
         slideGrid: (d) => this._slideGrid(d),
         rotateGrid: (cw) => this._rotateGrid(cw),
+        reflectGrid: () => this._reflectGrid(),
       },
       this._btn.bind(this),
     );
@@ -1170,6 +1171,26 @@ export class CampaignEditor {
    */
   private _rotateGrid(clockwise: boolean): void {
     this._state.rotate(clockwise);
+    this._updateEditorUndoRedoButtons();
+    const newRows = this._state.rows;
+    const newCols = this._state.cols;
+    if (this._editorCanvas) {
+      setTileSize(computeTileSize(newRows, newCols));
+      this._editorCanvas.width  = newCols * TILE_SIZE;
+      this._editorCanvas.height = newRows * TILE_SIZE;
+    }
+    this._updateCanvasDisplaySize();
+    this._refreshPaletteUI();
+    this._renderEditorCanvas();
+  }
+
+  /**
+   * Reflect the entire board about the main diagonal (x=y / transpose),
+   * updating tile positions, connections, and orientations.  Swaps canvas
+   * dimensions, refreshes the palette/param panel, and records an undo snapshot.
+   */
+  private _reflectGrid(): void {
+    this._state.reflect();
     this._updateEditorUndoRedoButtons();
     const newRows = this._state.rows;
     const newCols = this._state.cols;

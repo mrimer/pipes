@@ -19,6 +19,8 @@ import {
   chamberPaletteContent,
   rotateGridBy90,
   rotatePositionBy90,
+  reflectGridAboutDiagonal,
+  reflectPositionAboutDiagonal,
 } from './types';
 
 export class LevelEditorState {
@@ -268,7 +270,36 @@ export class LevelEditorState {
     this.recordSnapshot();
   }
 
-  // ── Tile building ──────────────────────────────────────────────────────────
+  /**
+   * Reflect the entire board about the main diagonal (x=y / transpose).
+   * Swaps rows/cols dimensions, repositions all tiles, and reflects each
+   * tile's connections/rotation to match the new orientation.
+   * Updates the linked-tile position so params remain in sync.
+   * Records an undo snapshot.
+   */
+  reflect(): void {
+    const oldRows = this.rows;
+    const oldCols = this.cols;
+
+    const { newGrid, newRows, newCols } = reflectGridAboutDiagonal(this.grid, oldRows, oldCols);
+
+    if (this._linkedTilePos) {
+      this._linkedTilePos = reflectPositionAboutDiagonal(this._linkedTilePos);
+    }
+
+    this.rows = newRows;
+    this.cols = newCols;
+    this.grid = newGrid;
+
+    if (this._linkedTilePos) {
+      const t = this.grid[this._linkedTilePos.row]?.[this._linkedTilePos.col];
+      if (t) this.populateParamsFromDef(t);
+    }
+
+    this.recordSnapshot();
+  }
+
+
 
   /** Build a TileDef from the current palette and params. */
   buildTileDef(): TileDef {
