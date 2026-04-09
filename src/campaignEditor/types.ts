@@ -343,9 +343,56 @@ export async function ungzipBlob(blob: Blob): Promise<string> {
 // ── Grid rotation helpers ─────────────────────────────────────────────────────
 
 /**
- * Return a direction rotated 90° clockwise (CW) or counter-clockwise (CCW).
- * CW:  N→E→S→W→N   CCW: N→W→S→E→N
+ * Rotate a 2-D grid of TileDefs 90° clockwise or counter-clockwise.
+ * Returns the rotated grid and its new dimensions (rows/cols are swapped).
+ *
+ * Transform formulas:
+ *   CW:  (r, c) → (c, oldRows-1-r)
+ *   CCW: (r, c) → (oldCols-1-c, r)
  */
+export function rotateGridBy90(
+  grid: (TileDef | null)[][],
+  oldRows: number,
+  oldCols: number,
+  clockwise: boolean,
+): { newGrid: (TileDef | null)[][]; newRows: number; newCols: number } {
+  const newRows = oldCols;
+  const newCols = oldRows;
+
+  const newGrid: (TileDef | null)[][] = Array.from(
+    { length: newRows },
+    () => Array(newCols).fill(null) as null[],
+  );
+
+  for (let r = 0; r < oldRows; r++) {
+    for (let c = 0; c < oldCols; c++) {
+      const tile = grid[r]?.[c];
+      if (!tile) continue;
+      const nr = clockwise ? c : oldCols - 1 - c;
+      const nc = clockwise ? oldRows - 1 - r : r;
+      newGrid[nr][nc] = rotateTileDefBy90(tile, clockwise);
+    }
+  }
+
+  return { newGrid, newRows, newCols };
+}
+
+/**
+ * Return a grid position transformed by a 90° CW or CCW board rotation.
+ *
+ * CW:  (r, c) → (c, oldRows-1-r)
+ * CCW: (r, c) → (oldCols-1-c, r)
+ */
+export function rotatePositionBy90(
+  pos: { row: number; col: number },
+  oldRows: number,
+  oldCols: number,
+  clockwise: boolean,
+): { row: number; col: number } {
+  return clockwise
+    ? { row: pos.col, col: oldRows - 1 - pos.row }
+    : { row: oldCols - 1 - pos.col, col: pos.row };
+}
 export function rotateDirectionBy90(dir: Direction, clockwise: boolean): Direction {
   if (clockwise) {
     switch (dir) {
