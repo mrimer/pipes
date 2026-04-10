@@ -317,17 +317,16 @@ export function attachInventoryWaveAnimation(el: HTMLElement): void {
   el.appendChild(canvas);
 
   const waves = _buildWaves();
-  let animId: number | null = null;
   const off: OffscreenState = { el: null, ctx: null };
 
   // ── Animation frame ─────────────────────────────────────────────────────────
   function _frame(ts: number): void {
     const result = _renderWaveFrame(ts, canvas, el, waves, false, off);
-    if (result === 'stop') { animId = null; return; }
-    animId = requestAnimationFrame(_frame);
+    if (result === 'stop') { return; }
+    requestAnimationFrame(_frame);
   }
 
   // Start the animation immediately.
-  animId = requestAnimationFrame(_frame);
+  requestAnimationFrame(_frame);
 }
 

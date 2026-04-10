@@ -236,12 +236,12 @@ describe('attachInventoryWaveAnimation', () => {
     expect(canvas.style.zIndex).toBe('-1');
   });
 
-  it('sets opacity:0.2 on the canvas for the faint wave effect', () => {
+  it('sets opacity:0.4 on the canvas for the wave effect', () => {
     const el = document.createElement('div');
     attachInventoryWaveAnimation(el);
 
     const canvas = el.lastChild as HTMLCanvasElement;
-    expect(canvas.style.opacity).toBe('0.2');
+    expect(canvas.style.opacity).toBe('0.4');
   });
 
   it('does not modify the element background style', () => {
