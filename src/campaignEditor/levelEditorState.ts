@@ -60,16 +60,14 @@ export class LevelEditorState {
   get linkedTilePos(): { row: number; col: number } | null { return this._linkedTilePos; }
   get linkedTileDirty(): boolean { return this._linkedTileDirty; }
 
-  // ── Backward-compat test accessors ─────────────────────────────────────────
+  // ── History inspection (used by tests and UI) ───────────────────────────────
 
-  /** Exposes the raw history stack for use by campaignEditor.test.ts. */
-  get _history(): readonly EditorSnapshot[] { return this._hist.snapshots; }
-  /** Exposes the current history index for use by campaignEditor.test.ts. */
-  get _historyIdx(): number { return this._hist.currentIndex; }
-  /** Exposes the unsaved-changes flag for use by campaignEditor.test.ts. */
-  get _unsavedChanges(): boolean { return this._hist.hasUnsavedChanges; }
-  /** Exposes the saved history index for use by campaignEditor.test.ts. */
-  get _savedHistoryIdx(): number { return this._hist.savedIndex; }
+  /** Total number of recorded history entries. */
+  get historyLength(): number { return this._hist.snapshots.length; }
+  /** Current position within the history stack. */
+  get historyIndex(): number { return this._hist.currentIndex; }
+  /** Return the history entry at the given absolute index. */
+  historyEntryAt(index: number): EditorSnapshot { return this._hist.snapshots[index]; }
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 

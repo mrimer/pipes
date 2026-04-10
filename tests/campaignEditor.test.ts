@@ -1493,8 +1493,9 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
       cols: number;
       grid: (import('../src/types').TileDef | null)[][];
       palette: import('../src/campaignEditor/types').EditorPalette;
-      _history: import('../src/campaignEditor/types').EditorSnapshot[];
-      _historyIdx: number;
+      historyLength: number;
+      historyIndex: number;
+      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -1550,20 +1551,20 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
   it('does not record a new snapshot during paint-drag mousedown', () => {
     const state = makeDragEditor(makeLevel(4, 4));
     // _openLevelEditor records the initial snapshot, so history has exactly 1 entry.
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     // Mousedown on empty cell with a repeatable palette tile starts a paint drag.
     state._state.palette = PipeShape.Straight;
     state._editorInput!.onMouseDown(mouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Snapshot count must NOT have increased yet – drag is still in progress.
-    expect(state._state._history.length).toBe(historyLenBefore);
+    expect(state._state.historyLength).toBe(historyLenBefore);
     expect(state._editorInput!.paintDragActive).toBe(true);
   });
 
   it('records a snapshot only on mouseup after a paint-drag', () => {
     const state = makeDragEditor(makeLevel(4, 4));
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     state._state.palette = PipeShape.Straight;
     // Start drag
@@ -1574,14 +1575,14 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     state._editorInput!.onMouseUp(mouseEvent('mouseup', 96, 32));
 
     // Exactly one new snapshot should have been added, and drag is finished.
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
     expect(state._editorInput!.paintDragActive).toBe(false);
   });
 
   it('painted cells are present in the new snapshot, pre-drag state is the previous one', () => {
     const state = makeDragEditor(makeLevel(4, 4));
     // Capture the initial (pre-drag) snapshot content.
-    const preDragSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
+    const preDragSnapshot = JSON.stringify(state._state.historyEntryAt(state._state.historyIndex).grid);
 
     state._state.palette = PipeShape.Straight;
     state._editorInput!.onMouseDown(mouseEvent('mousedown', 32, 32));   // col 0
@@ -1589,12 +1590,12 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     state._editorInput!.onMouseUp(mouseEvent('mouseup', 96, 32));
 
     // The new snapshot records the post-drag state (cells painted).
-    const postDragSnapshot = state._state._history[state._state._historyIdx];
+    const postDragSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(postDragSnapshot.grid[0][0]).not.toBeNull();
     expect(postDragSnapshot.grid[0][1]).not.toBeNull();
 
     // The previous history entry is still the clean pre-drag state.
-    const prevSnapshot = state._state._history[state._state._historyIdx - 1];
+    const prevSnapshot = state._state.historyEntryAt(state._state.historyIndex - 1);
     expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
   });
 });
@@ -1636,8 +1637,9 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
       cols: number;
       grid: (import('../src/types').TileDef | null)[][];
       palette: import('../src/campaignEditor/types').EditorPalette;
-      _history: import('../src/campaignEditor/types').EditorSnapshot[];
-      _historyIdx: number;
+      historyLength: number;
+      historyIndex: number;
+      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -1704,12 +1706,12 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
   it('does not record a new snapshot during right-erase mousedown', () => {
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }]);
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Snapshot count must NOT have increased yet – drag is still in progress.
-    expect(state._state._history.length).toBe(historyLenBefore);
+    expect(state._state.historyLength).toBe(historyLenBefore);
     expect(state._editorInput!.rightEraseDragActive).toBe(true);
     // But the cell should already be erased.
     expect(state._state.grid[0][0]).toBeNull();
@@ -1718,14 +1720,14 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
   it('records a snapshot only on right mouseup after a right-drag-erase', () => {
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32)); // row 0, col 0
     state._editorInput!.onMouseMove(rightMouseEvent('mousemove', 96, 32)); // row 0, col 1
     state._editorInput!.onMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     // Exactly one new snapshot should have been added, and drag is finished.
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
     expect(state._editorInput!.rightEraseDragActive).toBe(false);
   });
 
@@ -1733,19 +1735,19 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     const state = makeEraseEditor(makeLevel(4, 4));
     placeTiles(state, [{ row: 0, col: 0 }, { row: 0, col: 1 }]);
     // Snapshot the pre-drag state.
-    const preDragSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
+    const preDragSnapshot = JSON.stringify(state._state.historyEntryAt(state._state.historyIndex).grid);
 
     state._editorInput!.onMouseDown(rightMouseEvent('mousedown', 32, 32));   // col 0
     state._editorInput!.onMouseMove(rightMouseEvent('mousemove', 96, 32)); // col 1
     state._editorInput!.onMouseUp(rightMouseEvent('mouseup', 96, 32));
 
     // The new snapshot records the post-erase state.
-    const postEraseSnapshot = state._state._history[state._state._historyIdx];
+    const postEraseSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(postEraseSnapshot.grid[0][0]).toBeNull();
     expect(postEraseSnapshot.grid[0][1]).toBeNull();
 
     // The previous history entry is still the pre-erase state.
-    const prevSnapshot = state._state._history[state._state._historyIdx - 1];
+    const prevSnapshot = state._state.historyEntryAt(state._state.historyIndex - 1);
     expect(JSON.stringify(prevSnapshot.grid)).toBe(preDragSnapshot);
   });
 
@@ -1775,14 +1777,14 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
 
   it('left-button paint-drag still works normally alongside right-drag state', () => {
     const state = makeEraseEditor(makeLevel(4, 4));
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     state._state.palette = PipeShape.Straight;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
     state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32)); // row 0, col 1
     state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 96, 32));
 
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
     expect(state._state.grid[0][0]).not.toBeNull();
     expect(state._state.grid[0][1]).not.toBeNull();
     expect(state._editorInput!.rightEraseDragActive).toBe(false);
@@ -1826,8 +1828,9 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
       cols: number;
       grid: (import('../src/types').TileDef | null)[][];
       palette: import('../src/campaignEditor/types').EditorPalette;
-      _history: import('../src/campaignEditor/types').EditorSnapshot[];
-      _historyIdx: number;
+      historyLength: number;
+      historyIndex: number;
+      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
       _linkedTilePos: { row: number; col: number } | null;
     };
     _activeCampaignId: string | null;
@@ -1885,17 +1888,17 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
   it('placed container tile IS present in the new snapshot', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     // Place a container tile (Chamber with chamberContent='item') by single-click on empty cell.
     state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Exactly one new snapshot should have been added.
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
 
     // The new snapshot must include the placed container tile.
-    const newSnapshot = state._state._history[state._state._historyIdx];
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(newSnapshot.grid[0][0]).not.toBeNull();
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Chamber);
     expect(newSnapshot.grid[0][0]?.chamberContent).toBe('item');
@@ -1903,13 +1906,13 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
   it('placed non-repeatable tile (Sink) IS present in the new snapshot', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     state._state.palette = PipeShape.Sink;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._state._history[state._state._historyIdx];
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Sink);
   });
 
@@ -1917,26 +1920,26 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed a tile to erase.
     state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     state._state.palette = 'erase';
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._state._history[state._state._historyIdx];
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(newSnapshot.grid[0][0]).toBeNull();
   });
 
   it('previous snapshot is the pre-placement state when a container is placed', () => {
     const state = makePlaceEditor(makeLevel(4, 4));
     // Capture the pre-placement state from history.
-    const prePlacementSnapshot = JSON.stringify(state._state._history[state._state._historyIdx].grid);
+    const prePlacementSnapshot = JSON.stringify(state._state.historyEntryAt(state._state.historyIndex).grid);
 
     state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
 
     // The snapshot before the latest must still reflect the empty pre-placement grid.
-    const prevSnapshot = state._state._history[state._state._historyIdx - 1];
+    const prevSnapshot = state._state.historyEntryAt(state._state.historyIndex - 1);
     expect(JSON.stringify(prevSnapshot.grid)).toBe(prePlacementSnapshot);
     // And the placed tile should NOT be in that previous snapshot.
     expect(prevSnapshot.grid[0][0]).toBeNull();
@@ -1946,15 +1949,15 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed an Elbow tile at (0,0).
     state._state.grid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     // Mousedown registers a drag-state (tile exists), then ctrl+mouseup overwrites.
     state._state.palette = PipeShape.Tee;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._editorInput!.onMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._state._history[state._state._historyIdx];
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Tee);
   });
 
@@ -1962,15 +1965,15 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed an Elbow tile at (0,0) with rotation 0.
     state._state.grid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     // Click on the occupied pipe tile (no ctrl, no shift) → should rotate CW.
     state._state.palette = PipeShape.Cross;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
 
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._state._history[state._state._historyIdx];
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Elbow);
     expect(newSnapshot.grid[0][0]?.rotation).toBe(90);
   });
@@ -1979,7 +1982,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const state = makePlaceEditor(makeLevel(4, 4));
     // Seed a tile at (0,0).
     state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
-    const historyLenBefore = state._state._history.length;
+    const historyLenBefore = state._state.historyLength;
 
     // Mousedown grabs the tile; mousemove to (0,1); mouseup commits.
     state._state.palette = PipeShape.Straight;
@@ -1987,8 +1990,8 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32));  // row 0, col 1
     state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 96, 32));
 
-    expect(state._state._history.length).toBe(historyLenBefore + 1);
-    const newSnapshot = state._state._history[state._state._historyIdx];
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     // Tile moved from (0,0) to (0,1).
     expect(newSnapshot.grid[0][0]).toBeNull();
     expect(newSnapshot.grid[0][1]?.shape).toBe(PipeShape.Straight);
@@ -2037,8 +2040,9 @@ describe('CampaignEditor – Source tile placement constraint', () => {
       cols: number;
       grid: (import('../src/types').TileDef | null)[][];
       palette: import('../src/campaignEditor/types').EditorPalette;
-      _history: import('../src/campaignEditor/types').EditorSnapshot[];
-      _historyIdx: number;
+      historyLength: number;
+      historyIndex: number;
+      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -3058,10 +3062,7 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
       cols: number;
       grid: (import('../src/types').TileDef | null)[][];
       palette: import('../src/campaignEditor/types').EditorPalette;
-      _history: import('../src/campaignEditor/types').EditorSnapshot[];
-      _historyIdx: number;
-      _unsavedChanges: boolean;
-      _savedHistoryIdx: number;
+      hasUnsavedChanges: boolean;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -3117,7 +3118,7 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
 
   it('_editorUnsavedChanges is false after opening the editor (no changes)', () => {
     const state = makeSaveUndoEditor(makeLevel(4, 4));
-    expect(state._state._unsavedChanges).toBe(false);
+    expect(state._state.hasUnsavedChanges).toBe(false);
   });
 
   it('_editorUnsavedChanges is true after making a change', () => {
@@ -3125,7 +3126,7 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     state._state.palette = PipeShape.Straight;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
-    expect(state._state._unsavedChanges).toBe(true);
+    expect(state._state.hasUnsavedChanges).toBe(true);
   });
 
   it('_editorUnsavedChanges is false after saving', () => {
@@ -3136,7 +3137,7 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 32, 32));
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    expect(state._state._unsavedChanges).toBe(false);
+    expect(state._state.hasUnsavedChanges).toBe(false);
   });
 
   it('_editorUnsavedChanges is true after save then undo', () => {
@@ -3148,10 +3149,10 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     // Save.
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    expect(state._state._unsavedChanges).toBe(false);
+    expect(state._state.hasUnsavedChanges).toBe(false);
     // Undo: now differs from saved state.
     state._editorUndo();
-    expect(state._state._unsavedChanges).toBe(true);
+    expect(state._state.hasUnsavedChanges).toBe(true);
   });
 
   it('_editorUnsavedChanges is true after save then redo', () => {
@@ -3167,10 +3168,10 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     // Save at this intermediate state.
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    expect(state._state._unsavedChanges).toBe(false);
+    expect(state._state.hasUnsavedChanges).toBe(false);
     // Redo: now differs from saved state.
     state._editorRedo();
-    expect(state._state._unsavedChanges).toBe(true);
+    expect(state._state.hasUnsavedChanges).toBe(true);
   });
 
   it('_editorUnsavedChanges returns to false after redo brings state back to saved index', () => {
@@ -3182,14 +3183,12 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     // Save.
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_save_undo_test')!;
     state._saveLevel(campaign, 0, 0);
-    const savedIdx = state._state._savedHistoryIdx;
     // Undo (moves away from saved).
     state._editorUndo();
-    expect(state._state._unsavedChanges).toBe(true);
+    expect(state._state.hasUnsavedChanges).toBe(true);
     // Redo (comes back to saved state).
     state._editorRedo();
-    expect(state._state._historyIdx).toBe(savedIdx);
-    expect(state._state._unsavedChanges).toBe(false);
+    expect(state._state.hasUnsavedChanges).toBe(false);
   });
 
   it('back button shows unsaved-changes modal after save then undo', () => {
