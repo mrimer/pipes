@@ -94,7 +94,11 @@ export class LevelEditorState {
 
   // ── History ────────────────────────────────────────────────────────────────
 
-  /** Capture the current grid/inventory into the undo history. */
+  /**
+   * Capture the current grid/inventory into the undo history.
+   * Passing live references is intentional: HistoryManager.record() deep-clones
+   * via JSON.parse(JSON.stringify()) so the stored copy is independent.
+   */
   recordSnapshot(): void {
     const snapshot: EditorSnapshot = {
       grid: this.grid,
@@ -438,7 +442,11 @@ export class LevelEditorState {
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  /** Restore grid/inventory/dimensions from a history snapshot returned by undo/redo. */
+  /**
+   * Restore grid/inventory/dimensions from a history snapshot returned by undo/redo.
+   * Direct assignment is intentional: HistoryManager.undo()/redo() return deep clones
+   * so the snapshot is independent of the stored history entries.
+   */
   private _restoreFromSnapshot(snapshot: EditorSnapshot): void {
     this.grid = snapshot.grid as (TileDef | null)[][];
     this.rows = snapshot.rows;

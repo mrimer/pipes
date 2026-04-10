@@ -682,6 +682,8 @@ export class ChapterMapEditorSection {
   // ─── Chapter editor undo/redo ────────────────────────────────────────────
 
   private _recordChapterSnapshot(_chapter: ChapterDef, markChanged = true): void {
+    // Passing live reference is intentional: HistoryManager.record() deep-clones
+    // via JSON.parse(JSON.stringify()) so the stored copy is independent.
     const snapshot: EditorSnapshot = {
       grid: this._chapterEditGrid,
       rows: this._chapterEditRows,
@@ -708,7 +710,11 @@ export class ChapterMapEditorSection {
     this._applyChapterSnapshot(snap, chapter, campaign);
   }
 
-  /** Apply a saved snapshot: restore grid dimensions, resize canvas, save, and re-render. */
+  /**
+   * Apply a saved snapshot: restore grid dimensions, resize canvas, save, and re-render.
+   * Direct assignment is intentional: HistoryManager.undo()/redo() return deep clones
+   * so the snapshot is independent of stored history entries.
+   */
   private _applyChapterSnapshot(snap: EditorSnapshot, chapter: ChapterDef, campaign: CampaignDef): void {
     this._chapterEditGrid = snap.grid as (TileDef | null)[][];
     this._chapterEditRows = snap.rows;
