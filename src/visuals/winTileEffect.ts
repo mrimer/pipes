@@ -50,6 +50,61 @@ export interface WinTileGlow {
 // ── BFS layer computation ─────────────────────────────────────────────────────
 
 /**
+ * BFS from `sourceKey`, recording the minimum graph distance (depth) from the
+ * source to every reachable node.
+ *
+ * @param sourceKey         The `"row,col"` key of the BFS start node.
+ * @param sourceRow         Row index of the start node.
+ * @param sourceCol         Column index of the start node.
+ * @param getNeighborKeys   Given a `(row, col)`, returns the `{ row, col, key }`
+ *                          entries for all nodes directly reachable from that cell.
+ * @returns A map from `"row,col"` key → BFS depth.
+ */
+function _bfsDepths(
+  sourceKey: string,
+  sourceRow: number,
+  sourceCol: number,
+  getNeighborKeys: (row: number, col: number) => Array<{ row: number; col: number; key: string }>,
+): Map<string, number> {
+  const depths = new Map<string, number>();
+  depths.set(sourceKey, 0);
+  const queue: Array<{ row: number; col: number; depth: number }> = [
+    { row: sourceRow, col: sourceCol, depth: 0 },
+  ];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const { row, col, key } of getNeighborKeys(cur.row, cur.col)) {
+      if (depths.has(key)) continue;
+      depths.set(key, cur.depth + 1);
+      queue.push({ row, col, depth: cur.depth + 1 });
+    }
+  }
+  return depths;
+}
+
+/**
+ * Convert a BFS depth-map to `WinTileGlow` entries for every key in
+ * `filledKeys`.
+ *
+ * Depth 0 and 1 both fire at `baseTime` (no delay); depth d ≥ 2 fires at
+ * `baseTime + (d − 1) * WIN_TILE_LAYER_DELAY_MS`.
+ */
+function _buildGlowsFromDepths(
+  filledKeys: Iterable<string>,
+  depths: Map<string, number>,
+  baseTime: number,
+): WinTileGlow[] {
+  const glows: WinTileGlow[] = [];
+  for (const key of filledKeys) {
+    const depth = depths.get(key) ?? 0;
+    const delayMs = Math.max(0, depth - 1) * WIN_TILE_LAYER_DELAY_MS;
+    const [row, col] = key.split(',').map(Number);
+    glows.push({ row, col, startTime: baseTime + delayMs });
+  }
+  return glows;
+}
+
+/**
  * Build `WinTileGlow` entries for every tile connected to the source on
  * `board`, with start times spaced {@link WIN_TILE_LAYER_DELAY_MS} apart by
  * BFS layer.
@@ -63,42 +118,27 @@ export interface WinTileGlow {
  */
 export function computeWinTileGlows(board: Board, baseTime: number): WinTileGlow[] {
   const filled = board.getFilledPositions();
-  const glows: WinTileGlow[] = [];
-
-  // BFS from source recording depth.
-  const depths = new Map<string, number>();
   const sourceKey = posKey(board.source.row, board.source.col);
-  depths.set(sourceKey, 0);
-  const queue: Array<{ row: number; col: number; depth: number }> = [
-    { row: board.source.row, col: board.source.col, depth: 0 },
-  ];
 
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    for (const dir of Object.values(Direction)) {
-      if (!board.areMutuallyConnected(cur, dir)) continue;
-      const delta = NEIGHBOUR_DELTA[dir];
-      const next = { row: cur.row + delta.row, col: cur.col + delta.col };
-      const key = posKey(next.row, next.col);
-      if (depths.has(key)) continue;
-      const nextDepth = cur.depth + 1;
-      depths.set(key, nextDepth);
-      queue.push({ row: next.row, col: next.col, depth: nextDepth });
-    }
-  }
+  const depths = _bfsDepths(
+    sourceKey,
+    board.source.row,
+    board.source.col,
+    (row, col) => {
+      const neighbors: Array<{ row: number; col: number; key: string }> = [];
+      for (const dir of Object.values(Direction)) {
+        if (!board.areMutuallyConnected({ row, col }, dir)) continue;
+        const delta = NEIGHBOUR_DELTA[dir];
+        const nr = row + delta.row;
+        const nc = col + delta.col;
+        neighbors.push({ row: nr, col: nc, key: posKey(nr, nc) });
+      }
+      return neighbors;
+    },
+  );
 
-  for (const key of filled) {
-    const depth = depths.get(key) ?? 0;
-    // depth 0 and 1 both fire at t=0; depth d >= 2 fires at (d-1)*delay.
-    const delayMs = Math.max(0, depth - 1) * WIN_TILE_LAYER_DELAY_MS;
-    const [row, col] = key.split(',').map(Number);
-    glows.push({ row, col, startTime: baseTime + delayMs });
-  }
-
-  return glows;
+  return _buildGlowsFromDepths(filled, depths, baseTime);
 }
-
-// ── Chapter-map win glow computation ──────────────────────────────────────────
 
 /**
  * Build `WinTileGlow` entries for all water-filled cells on the chapter map,
@@ -119,43 +159,31 @@ export function computeChapterMapWinGlows(
   sourceCol: number,
   baseTime: number,
 ): WinTileGlow[] {
-  const glows: WinTileGlow[] = [];
-  if (!filledKeys.has(`${sourceRow},${sourceCol}`)) return glows;
-
-  const depths = new Map<string, number>();
   const srcKey = `${sourceRow},${sourceCol}`;
-  depths.set(srcKey, 0);
-
-  const queue: Array<{ row: number; col: number; depth: number }> = [
-    { row: sourceRow, col: sourceCol, depth: 0 },
-  ];
+  if (!filledKeys.has(srcKey)) return [];
 
   const DIRS: Array<{ dr: number; dc: number }> = [
     { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
     { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
   ];
 
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    for (const { dr, dc } of DIRS) {
-      const nr = cur.row + dr;
-      const nc = cur.col + dc;
-      const key = `${nr},${nc}`;
-      if (!filledKeys.has(key) || depths.has(key)) continue;
-      const nextDepth = cur.depth + 1;
-      depths.set(key, nextDepth);
-      queue.push({ row: nr, col: nc, depth: nextDepth });
-    }
-  }
+  const depths = _bfsDepths(
+    srcKey,
+    sourceRow,
+    sourceCol,
+    (row, col) => {
+      const neighbors: Array<{ row: number; col: number; key: string }> = [];
+      for (const { dr, dc } of DIRS) {
+        const nr = row + dr;
+        const nc = col + dc;
+        const key = `${nr},${nc}`;
+        if (filledKeys.has(key)) neighbors.push({ row: nr, col: nc, key });
+      }
+      return neighbors;
+    },
+  );
 
-  for (const key of filledKeys) {
-    const depth = depths.get(key) ?? 0;
-    const delayMs = Math.max(0, depth - 1) * WIN_TILE_LAYER_DELAY_MS;
-    const [row, col] = key.split(',').map(Number);
-    glows.push({ row, col, startTime: baseTime + delayMs });
-  }
-
-  return glows;
+  return _buildGlowsFromDepths(filledKeys, depths, baseTime);
 }
 
 /**
