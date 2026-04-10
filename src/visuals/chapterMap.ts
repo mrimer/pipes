@@ -68,7 +68,7 @@ export function generateChapterMapDecorations(
   cols: number,
 ): ReadonlyMap<string, AmbientDecoration> {
   const DECORATION_DENSITY = 0.30;
-  const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass'];
+  const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
   const map = new Map<string, AmbientDecoration>();
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -504,7 +504,7 @@ function _drawChapterMapSink(
 ): void {
   const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
   if (remaining === 0 && isFilled) {
-    // Star icon indicates the chapter can be completed by clicking the sink
+    // Star icon indicates the chapter is complete
     _drawChapterMapEndpoint(ctx, x, y, color, connections, false, '★', '#f0c040', buttEndDirs);
   } else if (remaining === 0) {
     // Not yet connected but requirement already met: show "0"

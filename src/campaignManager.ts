@@ -255,7 +255,6 @@ export class CampaignManager {
         },
         getActiveCampaign: () => this._activeCampaign,
         getCompletedChapters: () => this._activeCampaignCompletedChapters,
-        onChapterSinkClicked: (idx) => this._onChapterSinkClicked(idx),
       });
     }
 
@@ -263,6 +262,9 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
+
+    // Auto-trigger chapter completion if the level is complete and not yet recorded
+    this._checkAutoCompleteChapter(chapterIdx);
 
     // Show the mastery sequence once per chapter mastery, on entering the map
     if (chapter.id !== undefined && this._isCampaignChapterMastered(chapter)) {
@@ -286,7 +288,10 @@ export class CampaignManager {
    */
   reshowChapterMap(): void {
     if (this._chapterMapScreen && this._activeCampaign && this._chapterMapScreen.chapterIdx >= 0) {
-      this._chapterMapScreen.show(this._activeCampaign, this._chapterMapScreen.chapterIdx);
+      const chapterIdx = this._chapterMapScreen.chapterIdx;
+      this._chapterMapScreen.show(this._activeCampaign, chapterIdx);
+      // Auto-trigger chapter completion if the last level just completed it
+      this._checkAutoCompleteChapter(chapterIdx);
     }
   }
 
@@ -669,6 +674,24 @@ export class CampaignManager {
     this._challengeModalEl.style.display = 'flex';
     sfxManager.play(SfxId.Challenge);
     this._callbacks.triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
+  }
+
+  /**
+   * Check if the current chapter is complete (sink filled, requirements met) and
+   * has not yet been recorded as completed.  If so, auto-trigger the chapter
+   * completion sequence (win animation → mastery check → complete modal).
+   * Called on every chapter map entry so the sequence fires once after the player
+   * finishes the last required level and returns to the map.
+   */
+  private _checkAutoCompleteChapter(chapterIdx: number): void {
+    const campaign = this._activeCampaign;
+    if (!campaign) return;
+    const chapter = campaign.chapters[chapterIdx];
+    if (!chapter || chapter.id === undefined) return;
+    if (this._activeCampaignCompletedChapters.has(chapter.id)) return;
+    if (this._chapterMapScreen?.isChapterComplete()) {
+      this._onChapterSinkClicked(chapterIdx);
+    }
   }
 
   private _onChapterSinkClicked(chapterIdx: number): void {

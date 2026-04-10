@@ -248,7 +248,7 @@ export interface LevelDef {
 }
 
 /** Possible types of ambient decorative element drawn under grid tiles. */
-export type AmbientDecorationType = 'pebbles' | 'flower' | 'grass';
+export type AmbientDecorationType = 'pebbles' | 'flower' | 'grass' | 'mushroom' | 'crystal';
 
 /**
  * One ambient background decoration, placed on a grid cell and rendered under

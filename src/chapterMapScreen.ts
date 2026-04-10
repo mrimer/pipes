@@ -43,10 +43,8 @@ const CHAPTER_MAP_STATS_H = 22;
 const CHAPTER_MAP_BACK_BTN_H = 32;
 /** Estimated height (px) of the instruction text line. */
 const CHAPTER_MAP_INSTRUCTION_H = 20;
-/** Estimated height (px) of the status element (has min-height: 2.5em). */
-const CHAPTER_MAP_STATUS_H = 40;
-/** Estimated height (px) of the error element (has min-height: 1.5em). */
-const CHAPTER_MAP_ERROR_H = 24;
+/** Estimated height (px) of the status element (has min-height: 1.5em). */
+const CHAPTER_MAP_STATUS_H = 24;
 /** Gap (px) between flex children of the chapter-map screen. */
 const CHAPTER_MAP_GAP = 16;
 /** Top + bottom padding (px) of the chapter-map screen container. */
@@ -60,8 +58,8 @@ const CHAPTER_MAP_PADDING = 40;
  */
 const CHAPTER_MAP_GRID_OVERHEAD =
   CHAPTER_MAP_HEADER_H + CHAPTER_MAP_STATS_H + CHAPTER_MAP_BACK_BTN_H +
-  CHAPTER_MAP_INSTRUCTION_H + CHAPTER_MAP_STATUS_H + CHAPTER_MAP_ERROR_H +
-  6 * CHAPTER_MAP_GAP + CHAPTER_MAP_PADDING + 2 * CHAPTER_MAP_CANVAS_BORDER_PX;
+  CHAPTER_MAP_INSTRUCTION_H + CHAPTER_MAP_STATUS_H +
+  5 * CHAPTER_MAP_GAP + CHAPTER_MAP_PADDING + 2 * CHAPTER_MAP_CANVAS_BORDER_PX;
 
 /** Callbacks that the chapter map screen uses to interact with the rest of the game. */
 export interface ChapterMapCallbacks {
@@ -75,8 +73,6 @@ export interface ChapterMapCallbacks {
   onLevelSelected(levelDef: LevelDef): void;
   /** Returns the active campaign def, or null. */
   getActiveCampaign?(): CampaignDef | null;
-  /** Called when the player clicks the water-filled Sink to complete the chapter. */
-  onChapterSinkClicked?(chapterIdx: number): void;
   /** Returns the set of completed chapter IDs. */
   getCompletedChapters?(): Set<number>;
 }
@@ -135,9 +131,6 @@ export class ChapterMapScreen {
   private readonly _onKeyUp: (e: KeyboardEvent) => void;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
-  /** Temporary error message element shown when a sink click is rejected. */
-  private _errorEl: HTMLElement | null = null;
-  private _errorTimeout: ReturnType<typeof setTimeout> | null = null;
   /** Ambient decorations for empty cells, keyed by "row,col". */
   private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
 
@@ -162,8 +155,8 @@ export class ChapterMapScreen {
    */
   private _jitterAnims: Array<{ row: number; col: number; startedAt: number }> = [];
   /**
-   * Active win-tile glow animations triggered when the sink is clicked.
-   * The same WinTileGlow type used on the level-complete screen.
+   * Active win-tile glow animations triggered when the chapter completion
+   * sequence plays. The same WinTileGlow type used on the level-complete screen.
    */
   private _winGlows: WinTileGlow[] = [];
   /**
@@ -230,6 +223,30 @@ export class ChapterMapScreen {
 
   /** Index (within the campaign) of the chapter currently displayed. */
   get chapterIdx(): number { return this._chapterIdx; }
+
+  /**
+   * Returns true when the chapter's sink is water-filled and all level-completion
+   * requirements have been met (i.e., the chapter is ready to be marked complete).
+   * Used by the campaign manager to auto-trigger the completion sequence on screen entry.
+   */
+  isChapterComplete(): boolean {
+    const chapter = this._chapter;
+    if (!chapter?.grid) return false;
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const grid = chapter.grid;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const tileDef = grid[r]?.[c];
+        if (tileDef?.shape === PipeShape.Sink && filledKeys.has(`${r},${c}`)) {
+          return this._sinkRemaining(tileDef, chapter, displayProgress) <= 0;
+        }
+      }
+    }
+    return false;
+  }
 
   /**
    * Compute the screen-space bounding rectangle of the minimap image drawn
@@ -487,8 +504,8 @@ export class ChapterMapScreen {
       `padding:8px 16px;font-size:0.9rem;background:#16213e;color:${SUCCESS_COLOR};` +
       `border:1px solid ${SUCCESS_COLOR};border-radius:6px;cursor:pointer;`;
     backBtn.addEventListener('click', () => {
+      this._callbacks.onShowLevelSelect(); // stopAll() is called inside; play Back after
       sfxManager.play(SfxId.Back);
-      this._callbacks.onShowLevelSelect();
     });
     el.appendChild(backBtn);
 
@@ -529,13 +546,12 @@ export class ChapterMapScreen {
         } else if (def?.shape === PipeShape.Sink) {
           const filledKeys = this._computeFilledCells(chapter, displayProgress);
           const remaining = this._sinkRemaining(def, chapter, displayProgress);
-          const isFilled = filledKeys.has(`${pos.row},${pos.col}`);
           if (remaining > 0) {
             canvas.title = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
-          } else if (isFilled) {
-            canvas.title = 'Next Chapter Unlocked!';
+          } else if (filledKeys.has(`${pos.row},${pos.col}`)) {
+            canvas.title = 'Chapter Complete!';
           } else {
-            canvas.title = 'Connect to unlock next chapter';
+            canvas.title = '';
           }
         } else {
           canvas.title = '';
@@ -564,17 +580,11 @@ export class ChapterMapScreen {
     instruction.textContent = 'Click on an accessible level';
     el.appendChild(instruction);
 
-    // Status text (Level Complete / Click Sink to advance)
+    // Status text (shown when the sink is filled / chapter complete)
     const statusEl = document.createElement('div');
-    statusEl.style.cssText = 'text-align:center;margin:4px 0;min-height:2.5em;';
+    statusEl.style.cssText = 'text-align:center;margin:4px 0;min-height:1.5em;';
     this._statusEl = statusEl;
     el.appendChild(statusEl);
-
-    // Error text (shown temporarily when sink is clicked but conditions not met)
-    const errorEl = document.createElement('div');
-    errorEl.style.cssText = 'text-align:center;margin:2px 0;min-height:1.5em;font-size:0.9rem;color:#f44;';
-    this._errorEl = errorEl;
-    el.appendChild(errorEl);
 
     // Render the chapter map
     this._render(chapter);
@@ -589,17 +599,6 @@ export class ChapterMapScreen {
   private _sinkRemaining(def: TileDef, chapter: ChapterDef, displayProgress: Set<number>): number {
     const completedLevelCount = chapter.levels.filter(l => displayProgress.has(l.id)).length;
     return Math.max(0, (def.completion ?? 0) - completedLevelCount);
-  }
-
-  /** Show a temporary error message below the chapter map canvas. */
-  private _showError(msg: string): void {
-    if (!this._errorEl) return;
-    this._errorEl.textContent = msg;
-    if (this._errorTimeout !== null) clearTimeout(this._errorTimeout);
-    this._errorTimeout = setTimeout(() => {
-      if (this._errorEl) this._errorEl.textContent = '';
-      this._errorTimeout = null;
-    }, 3000);
   }
 
   private _showTooltip(clientX: number, clientY: number): void {
@@ -636,20 +635,14 @@ export class ChapterMapScreen {
       return;
     } else if (def?.shape === PipeShape.Sink) {
       const remaining = this._sinkRemaining(def, chapter, displayProgress);
-      const isFilled = filledKeys.has(`${row},${col}`);
-      let text: string;
       if (remaining > 0) {
-        text = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
-      } else if (isFilled) {
-        text = 'Next Chapter Unlocked!';
-      } else {
-        text = 'Connect to unlock next chapter';
+        const text = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
+        this._tooltipEl.textContent = text;
+        this._tooltipEl.style.display = 'block';
+        this._tooltipEl.style.left = `${clientX + 12}px`;
+        this._tooltipEl.style.top  = `${clientY + 12}px`;
+        return;
       }
-      this._tooltipEl.textContent = text;
-      this._tooltipEl.style.display = 'block';
-      this._tooltipEl.style.left = `${clientX + 12}px`;
-      this._tooltipEl.style.top  = `${clientY + 12}px`;
-      return;
     }
     this._hideTooltip();
   }
@@ -675,7 +668,7 @@ export class ChapterMapScreen {
     this._render(chapter);
   }
 
-  private _onClick(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
+  private _onClick(e: MouseEvent, _campaign: CampaignDef, chapter: ChapterDef): void {
     const pos = this._canvasPos(e, chapter);
     if (!pos || !chapter.grid) return;
 
@@ -684,17 +677,6 @@ export class ChapterMapScreen {
 
     const displayProgress = this._callbacks.getDisplayProgress();
     const filledKeys = this._computeFilledCells(chapter, displayProgress);
-
-    // Handle sink click (chapter completion)
-    if (def.shape === PipeShape.Sink && filledKeys.has(`${pos.row},${pos.col}`)) {
-      const remaining = this._sinkRemaining(def, chapter, displayProgress);
-      if (remaining <= 0) {
-        this._callbacks.onChapterSinkClicked?.(this._chapterIdx);
-        return;
-      }
-      this._showError(`Finish ${remaining} more level${remaining === 1 ? '' : 's'} to complete the chapter.`);
-      return;
-    }
 
     // Handle level chamber click
     if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
@@ -817,8 +799,9 @@ export class ChapterMapScreen {
   }
 
   /**
-   * Update the status line below the canvas ("Level Complete!" / "Click the Sink…").
-   * The status is cleared when the sink is not yet filled or its completion requirement is not yet met.
+   * Update the status line below the canvas.
+   * Shows "✅ Level Complete!" when the sink is filled and all requirements are met,
+   * unless the chapter is already marked as completed (status is shown in the stats bar).
    */
   private _updateStatus(chapter: ChapterDef, displayProgress: Set<number>, filledKeys: Set<string>): void {
     if (!this._statusEl) return;
@@ -846,20 +829,12 @@ export class ChapterMapScreen {
 
     if (sinkFilled && sinkRemaining <= 0) {
       const completedChapters = this._callbacks.getCompletedChapters?.();
-      const campaign = this._callbacks.getActiveCampaign?.();
       const isAlreadyCompleted = chapter.id !== undefined && completedChapters?.has(chapter.id);
       if (isAlreadyCompleted) {
         this._statusEl.innerHTML = ''; // "Complete"/"Mastered!" is already shown in the stats bar
       } else {
-        let html = `<span style="color:${SUCCESS_COLOR};font-size:1rem;font-weight:bold;">✅ Level Complete!</span>`;
-        if (campaign) {
-          const chapterIdx = campaign.chapters.indexOf(chapter);
-          const nextChapter = campaign.chapters[chapterIdx + 1] ?? null;
-          if (nextChapter && !(completedChapters?.has(chapter.id))) {
-            html += `<br><span style="color:${FOCUS_COLOR};font-size:1.05rem;font-weight:bold;">Click the Sink to advance to the next chapter.</span>`;
-          }
-        }
-        this._statusEl.innerHTML = html;
+        this._statusEl.innerHTML =
+          `<span style="color:${SUCCESS_COLOR};font-size:1rem;font-weight:bold;">✅ Level Complete!</span>`;
       }
     } else {
       this._statusEl.innerHTML = '';
@@ -968,7 +943,7 @@ export class ChapterMapScreen {
       renderSourceSpray(ctx, this._sourceSprayDrops, src.x, src.y, sprayColor);
 
       // Flow drops – water drops traveling from source to sink along filled pipe path.
-      // Only shown once the chapter has been completed (sink clicked to unlock next chapter).
+      // Only shown once the chapter has been completed (auto-triggered on screen entry).
       // Use WATER_COLOR to match the flow drop color on the level screen.
       const sinkFilled = positions.sinks.some(s => s.isFilled);
       if (src.isFilled && sinkFilled && this._isChapterCompleted(chapter)) {
@@ -988,7 +963,7 @@ export class ChapterMapScreen {
     }
     renderBubbles(ctx, this._bubbles, WATER_COLOR);
 
-    // Win tile glows – blue tile flash animation triggered when the sink is clicked
+    // Win tile glows – blue tile flash animation triggered by the chapter completion sequence
     if (this._winGlows.length > 0) {
       renderWinTileGlows(ctx, this._winGlows, now);
     }
