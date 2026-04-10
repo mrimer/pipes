@@ -370,7 +370,7 @@ export class Board {
    */
   private _generateAmbientDecorations(): AmbientDecoration[] {
     const DECORATION_DENSITY = 0.30;
-    const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass'];
+    const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
     const decorations: AmbientDecoration[] = [];
 
     for (let r = 0; r < this.rows; r++) {

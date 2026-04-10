@@ -1,6 +1,7 @@
 /**
- * Ambient decoration rendering – scattered pebbles, flowers, and grass tufts
- * drawn on top of empty tiles in the game board and chapter map.
+ * Ambient decoration rendering – scattered pebbles, flowers, grass tufts,
+ * mushrooms, and crystals drawn on top of empty tiles in the game board and
+ * chapter map.
  *
  * Zero coupling to game state: decorations are purely positional.
  */
@@ -29,6 +30,26 @@ const FLOWER_CENTER_COLOR = 'rgba(120,104,56,0.82)';
 
 /** Grass blade color. */
 const GRASS_COLOR = 'rgba(72,115,58,0.90)';
+
+/** Mushroom cap colors: earthy tones for each variant. */
+const MUSHROOM_CAP_COLORS = [
+  'rgba(160,72,52,0.85)',   // earthy red-brown
+  'rgba(180,138,58,0.85)',  // warm tan
+  'rgba(120,70,140,0.82)',  // purple
+] as const;
+
+/** Mushroom spot color: light, translucent dots on the cap. */
+const MUSHROOM_SPOT_COLOR = 'rgba(235,222,195,0.90)';
+
+/** Crystal shard colors: gem-like tones for each variant. */
+const CRYSTAL_COLORS = [
+  'rgba(72,152,212,0.80)',  // sky blue
+  'rgba(140,82,198,0.80)',  // amethyst purple
+  'rgba(65,192,162,0.80)',  // teal
+] as const;
+
+/** Highlight facet color applied to crystal shards. */
+const CRYSTAL_HIGHLIGHT = 'rgba(225,242,255,0.55)';
 
 // ─── Ambient decoration drawing helpers ──────────────────────────────────────
 
@@ -85,6 +106,63 @@ function _drawGrass(ctx: CanvasRenderingContext2D, variant: number): void {
 }
 
 /**
+ * Draw a small top-down mushroom cap centered at the current canvas origin.
+ * Rendered as a filled circle with a few lighter spots.
+ */
+function _drawMushroom(ctx: CanvasRenderingContext2D, variant: number): void {
+  const capColor = MUSHROOM_CAP_COLORS[variant % MUSHROOM_CAP_COLORS.length];
+  // Cap circle
+  ctx.fillStyle = capColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, _s(5), 0, Math.PI * 2);
+  ctx.fill();
+  // Spots
+  ctx.fillStyle = MUSHROOM_SPOT_COLOR;
+  const spots: Array<[number, number, number]> = [
+    [-_s(2), -_s(1.5), _s(1.2)],
+    [_s(1.8), _s(0.8), _s(1.0)],
+    [_s(0.2), -_s(3.2), _s(0.8)],
+  ];
+  for (const [dx, dy, r] of spots) {
+    ctx.beginPath();
+    ctx.arc(dx, dy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Draw a small cluster of crystal shards centered at the current canvas origin.
+ * Each shard is an elongated diamond with a lighter highlight facet.
+ */
+function _drawCrystal(ctx: CanvasRenderingContext2D, variant: number): void {
+  const color = CRYSTAL_COLORS[variant % CRYSTAL_COLORS.length];
+  // Two shards side-by-side with slight height variation
+  const shards: Array<[number, number, number, number]> = [
+    [-_s(3.0),  _s(0.5), _s(2.2), _s(6.5)],  // [cx, cy, halfW, halfH]
+    [ _s(2.0), -_s(1.0), _s(1.8), _s(5.0)],
+  ];
+  for (const [cx, cy, hw, hh] of shards) {
+    // Diamond shard (slightly flat bottom for a natural crystal look)
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx,      cy - hh);
+    ctx.lineTo(cx + hw, cy);
+    ctx.lineTo(cx,      cy + hh * 0.55);
+    ctx.lineTo(cx - hw, cy);
+    ctx.closePath();
+    ctx.fill();
+    // Highlight facet on the upper-left face
+    ctx.fillStyle = CRYSTAL_HIGHLIGHT;
+    ctx.beginPath();
+    ctx.moveTo(cx,             cy - hh);
+    ctx.lineTo(cx + hw * 0.4,  cy - hh * 0.35);
+    ctx.lineTo(cx,             cy - hh * 0.1);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/**
  * Draw a single ambient decoration onto the canvas.
  * The canvas context should NOT have any prior transforms applied;
  * this function handles its own save/restore cycle.
@@ -101,9 +179,11 @@ export function drawAmbientDecoration(
     ctx.rotate((dec.rotation * Math.PI) / 180);
   }
   switch (dec.type) {
-    case 'pebbles': _drawPebbles(ctx, dec.variant); break;
-    case 'flower':  _drawFlower(ctx, dec.variant);  break;
-    case 'grass':   _drawGrass(ctx, dec.variant);   break;
+    case 'pebbles':  _drawPebbles(ctx, dec.variant);  break;
+    case 'flower':   _drawFlower(ctx, dec.variant);   break;
+    case 'grass':    _drawGrass(ctx, dec.variant);    break;
+    case 'mushroom': _drawMushroom(ctx, dec.variant); break;
+    case 'crystal':  _drawCrystal(ctx, dec.variant);  break;
   }
   ctx.restore();
 }

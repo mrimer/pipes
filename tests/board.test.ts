@@ -3698,7 +3698,7 @@ describe('Board ambientDecorations', () => {
     for (const dec of decorations) {
       expect(dec.row).toBeGreaterThanOrEqual(0);
       expect(dec.col).toBeGreaterThanOrEqual(0);
-      expect(['pebbles', 'flower', 'grass']).toContain(dec.type);
+      expect(['pebbles', 'flower', 'grass', 'mushroom', 'crystal']).toContain(dec.type);
       expect(dec.offsetX).toBeGreaterThanOrEqual(0);
       expect(dec.offsetX).toBeLessThanOrEqual(1);
       expect(dec.offsetY).toBeGreaterThanOrEqual(0);
