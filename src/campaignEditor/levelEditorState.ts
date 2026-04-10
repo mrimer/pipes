@@ -22,6 +22,8 @@ import {
   reflectGridAboutDiagonal,
   reflectPositionAboutDiagonal,
 } from './types';
+import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
+import { HistoryManager } from './historyManager';
 
 export class LevelEditorState {
   // ── Grid & inventory ───────────────────────────────────────────────────────
@@ -44,10 +46,7 @@ export class LevelEditorState {
   hover: { row: number; col: number } | null = null;
 
   // ── History ────────────────────────────────────────────────────────────────
-  private _history: EditorSnapshot[] = [];
-  private _historyIdx: number = -1;
-  private _unsavedChanges: boolean = false;
-  private _savedHistoryIdx: number = 0;
+  private readonly _hist = new HistoryManager<EditorSnapshot>();
 
   // ── Linked tile ────────────────────────────────────────────────────────────
   private _linkedTilePos: { row: number; col: number } | null = null;
@@ -55,11 +54,22 @@ export class LevelEditorState {
 
   // ── Computed accessors ─────────────────────────────────────────────────────
 
-  get canUndo(): boolean { return this._historyIdx > 0; }
-  get canRedo(): boolean { return this._historyIdx < this._history.length - 1; }
-  get hasUnsavedChanges(): boolean { return this._unsavedChanges; }
+  get canUndo(): boolean { return this._hist.canUndo; }
+  get canRedo(): boolean { return this._hist.canRedo; }
+  get hasUnsavedChanges(): boolean { return this._hist.hasUnsavedChanges; }
   get linkedTilePos(): { row: number; col: number } | null { return this._linkedTilePos; }
   get linkedTileDirty(): boolean { return this._linkedTileDirty; }
+
+  // ── Backward-compat test accessors ─────────────────────────────────────────
+
+  /** Exposes the raw history stack for use by campaignEditor.test.ts. */
+  get _history(): readonly EditorSnapshot[] { return this._hist.snapshots; }
+  /** Exposes the current history index for use by campaignEditor.test.ts. */
+  get _historyIdx(): number { return this._hist.currentIndex; }
+  /** Exposes the unsaved-changes flag for use by campaignEditor.test.ts. */
+  get _unsavedChanges(): boolean { return this._hist.hasUnsavedChanges; }
+  /** Exposes the saved history index for use by campaignEditor.test.ts. */
+  get _savedHistoryIdx(): number { return this._hist.savedIndex; }
 
   // ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -75,13 +85,10 @@ export class LevelEditorState {
     this.inventory = JSON.parse(JSON.stringify(level.inventory)) as InventoryItem[];
     this.palette = PipeShape.Source;
     this.params = { ...DEFAULT_PARAMS };
-    this._history = [];
-    this._historyIdx = -1;
+    this._hist.clear();
     this.hover = null;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
-    this._unsavedChanges = false;
-    this._savedHistoryIdx = 0;
     this.recordSnapshot();
   }
 
@@ -90,18 +97,12 @@ export class LevelEditorState {
   /** Capture the current grid/inventory into the undo history. */
   recordSnapshot(): void {
     const snapshot: EditorSnapshot = {
-      grid: JSON.parse(JSON.stringify(this.grid)) as (TileDef | null)[][],
+      grid: this.grid,
       rows: this.rows,
       cols: this.cols,
-      inventory: JSON.parse(JSON.stringify(this.inventory)) as InventoryItem[],
+      inventory: this.inventory,
     };
-    if (this._historyIdx < this._history.length - 1) {
-      this._history = this._history.slice(0, this._historyIdx + 1);
-    }
-    this._history.push(snapshot);
-    this._historyIdx = this._history.length - 1;
-    // Mark unsaved changes on any snapshot recorded after the initial open snapshot.
-    if (this._historyIdx > 0) this._unsavedChanges = true;
+    this._hist.record(snapshot);
   }
 
   /**
@@ -114,9 +115,9 @@ export class LevelEditorState {
       this.recordSnapshot();
       this._linkedTileDirty = false;
     }
-    if (this._historyIdx <= 0) return false;
-    this._historyIdx--;
-    this._restoreFromHistory();
+    const snapshot = this._hist.undo();
+    if (!snapshot) return false;
+    this._restoreFromSnapshot(snapshot);
     return true;
   }
 
@@ -125,16 +126,15 @@ export class LevelEditorState {
    * restored, false when already at the end of history.
    */
   redo(): boolean {
-    if (this._historyIdx >= this._history.length - 1) return false;
-    this._historyIdx++;
-    this._restoreFromHistory();
+    const snapshot = this._hist.redo();
+    if (!snapshot) return false;
+    this._restoreFromSnapshot(snapshot);
     return true;
   }
 
   /** Mark the current history position as the last-saved point. */
   markSaved(): void {
-    this._unsavedChanges = false;
-    this._savedHistoryIdx = this._historyIdx;
+    this._hist.markSaved();
   }
 
   // ── Linked tile ────────────────────────────────────────────────────────────
@@ -194,18 +194,9 @@ export class LevelEditorState {
    * Records an undo snapshot.
    */
   resize(newRows: number, newCols: number): void {
-    const newGrid: (TileDef | null)[][] = [];
-    for (let r = 0; r < newRows; r++) {
-      newGrid[r] = [];
-      for (let c = 0; c < newCols; c++) {
-        newGrid[r][c] = (r < this.rows && c < this.cols)
-          ? (this.grid[r]?.[c] ?? null)
-          : null;
-      }
-    }
+    this.grid = resizeGrid(this.grid, this.rows, this.cols, newRows, newCols);
     this.rows = newRows;
     this.cols = newCols;
-    this.grid = newGrid;
     this.recordSnapshot();
   }
 
@@ -215,26 +206,7 @@ export class LevelEditorState {
    * (since positions have shifted).
    */
   slide(dir: 'N' | 'E' | 'S' | 'W'): void {
-    const newGrid: (TileDef | null)[][] = Array.from(
-      { length: this.rows },
-      () => Array(this.cols).fill(null) as null[],
-    );
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        const tile = this.grid[r]?.[c] ?? null;
-        if (tile === null) continue;
-        let nr = r;
-        let nc = c;
-        if (dir === 'N') nr = r - 1;
-        else if (dir === 'S') nr = r + 1;
-        else if (dir === 'W') nc = c - 1;
-        else nc = c + 1; // E
-        if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
-          newGrid[nr][nc] = tile;
-        }
-      }
-    }
-    this.grid = newGrid;
+    this.grid = slideGrid(this.grid, this.rows, this.cols, dir);
     this.clearLink();
     this.recordSnapshot();
   }
@@ -453,13 +425,7 @@ export class LevelEditorState {
    * at `exceptPos` (if given).  Used to enforce the one-Source constraint.
    */
   hasSourceElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
-        if (this.grid[r]?.[c]?.shape === PipeShape.Source) return true;
-      }
-    }
-    return false;
+    return hasShapeElsewhere(this.grid, this.rows, this.cols, PipeShape.Source, exceptPos);
   }
 
   /**
@@ -467,25 +433,17 @@ export class LevelEditorState {
    * at `exceptPos` (if given).  Used to enforce the one-Sink constraint.
    */
   hasSinkElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
-        if (this.grid[r]?.[c]?.shape === PipeShape.Sink) return true;
-      }
-    }
-    return false;
+    return hasShapeElsewhere(this.grid, this.rows, this.cols, PipeShape.Sink, exceptPos);
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
-  /** Restore grid/inventory/dimensions from the current history index entry. */
-  private _restoreFromHistory(): void {
-    const snapshot = this._history[this._historyIdx];
-    this.grid = JSON.parse(JSON.stringify(snapshot.grid)) as (TileDef | null)[][];
+  /** Restore grid/inventory/dimensions from a history snapshot returned by undo/redo. */
+  private _restoreFromSnapshot(snapshot: EditorSnapshot): void {
+    this.grid = snapshot.grid as (TileDef | null)[][];
     this.rows = snapshot.rows;
     this.cols = snapshot.cols;
-    this.inventory = JSON.parse(JSON.stringify(snapshot.inventory)) as InventoryItem[];
-    this._unsavedChanges = this._historyIdx !== this._savedHistoryIdx;
+    this.inventory = snapshot.inventory as InventoryItem[];
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
   }

@@ -13,6 +13,7 @@ import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
 import { isTileConnectedToSource } from '../tile';
+import { canvasPos as computeCanvasPos } from './canvasUtils';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -131,11 +132,7 @@ export class ChapterMapInput {
   /** Convert a mouse event to a grid position on the chapter canvas. */
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
     if (!this._canvas) return null;
-    const rect = this._canvas.getBoundingClientRect();
-    const col = Math.floor((e.clientX - rect.left) * this._cb.getEditCols() / rect.width);
-    const row = Math.floor((e.clientY - rect.top)  * this._cb.getEditRows() / rect.height);
-    if (row < 0 || row >= this._cb.getEditRows() || col < 0 || col >= this._cb.getEditCols()) return null;
-    return { row, col };
+    return computeCanvasPos(e, this._canvas, this._cb.getEditRows(), this._cb.getEditCols());
   }
 
   // ─── Event handlers ───────────────────────────────────────────────────────────

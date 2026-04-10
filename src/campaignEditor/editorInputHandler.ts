@@ -14,6 +14,7 @@ import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { LevelEditorState } from './levelEditorState';
 import { sfxManager, SfxId } from '../sfxManager';
 import { isTileConnectedToSource } from '../tile';
+import { canvasPos as computeCanvasPos } from './canvasUtils';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -121,12 +122,8 @@ export class EditorInputHandler {
   }
 
   canvasPos(e: MouseEvent): { row: number; col: number } | null {
-    const rect = this._canvas.getBoundingClientRect();
     const state = this._cb.getState();
-    const col = Math.floor((e.clientX - rect.left) * state.cols / rect.width);
-    const row = Math.floor((e.clientY - rect.top)  * state.rows / rect.height);
-    if (row < 0 || row >= state.rows || col < 0 || col >= state.cols) return null;
-    return { row, col };
+    return computeCanvasPos(e, this._canvas, state.rows, state.cols);
   }
 
   // ─── Event handlers ───────────────────────────────────────────────────────────
