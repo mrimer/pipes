@@ -371,3 +371,40 @@ describe('migrateCampaign', () => {
     expect(campaign.chapters[0].levels[0].grid[0][0]?.chamberContent).toBeUndefined();
   });
 });
+
+// ─── Campaign mastered shown flag ─────────────────────────────────────────────
+
+import {
+  loadCampaignMasteredShown,
+  markCampaignMasteredShown,
+  clearCampaignMasteredShown,
+} from '../src/persistence';
+
+describe('loadCampaignMasteredShown / markCampaignMasteredShown / clearCampaignMasteredShown', () => {
+  it('returns false when nothing is stored', () => {
+    expect(loadCampaignMasteredShown('cmp_1')).toBe(false);
+  });
+
+  it('returns true after markCampaignMasteredShown', () => {
+    markCampaignMasteredShown('cmp_1');
+    expect(loadCampaignMasteredShown('cmp_1')).toBe(true);
+  });
+
+  it('clearCampaignMasteredShown resets the flag to false', () => {
+    markCampaignMasteredShown('cmp_1');
+    clearCampaignMasteredShown('cmp_1');
+    expect(loadCampaignMasteredShown('cmp_1')).toBe(false);
+  });
+
+  it('uses separate storage keys per campaign ID', () => {
+    markCampaignMasteredShown('cmp_A');
+    expect(loadCampaignMasteredShown('cmp_A')).toBe(true);
+    expect(loadCampaignMasteredShown('cmp_B')).toBe(false);
+  });
+
+  it('marking the same campaign twice is idempotent', () => {
+    markCampaignMasteredShown('cmp_1');
+    markCampaignMasteredShown('cmp_1');
+    expect(loadCampaignMasteredShown('cmp_1')).toBe(true);
+  });
+});

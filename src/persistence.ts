@@ -391,6 +391,36 @@ export function removeMasteredChapterShown(campaignId: string, chapterId: number
   } catch { /* ignore */ }
 }
 
+// ─── Campaign mastery shown flag ──────────────────────────────────────────────
+
+function campaignMasteredCampaignKey(campaignId: string): string {
+  return `pipes_campaign_mastered_campaign_${campaignId}`;
+}
+
+/**
+ * Returns true if the full-campaign mastery sequence (confetti + modal) has
+ * already been shown for this campaign.
+ */
+export function loadCampaignMasteredShown(campaignId: string): boolean {
+  try {
+    return localStorage.getItem(campaignMasteredCampaignKey(campaignId)) === '1';
+  } catch { return false; }
+}
+
+/** Record that the campaign mastery sequence has been shown. */
+export function markCampaignMasteredShown(campaignId: string): void {
+  try {
+    localStorage.setItem(campaignMasteredCampaignKey(campaignId), '1');
+  } catch { /* ignore storage errors */ }
+}
+
+/** Clear the campaign mastery shown flag (e.g. on progress reset). */
+export function clearCampaignMasteredShown(campaignId: string): void {
+  try {
+    localStorage.removeItem(campaignMasteredCampaignKey(campaignId));
+  } catch { /* ignore storage errors */ }
+}
+
 // ─── Settings persistence ─────────────────────────────────────────────────────
 
 const SFX_VOLUME_KEY = 'pipes_sfx_volume';

@@ -19,10 +19,11 @@ import {
   loadCompletedChapters, markChapterCompleted, clearCompletedChapters, removeChapterCompleted,
   markLevelCompleted, clearCompletedLevels,
   loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown, removeMasteredChapterShown,
+  loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
 } from './persistence';
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
-import { buildNewChapterModal, buildChallengeModal } from './gameModals';
+import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 
@@ -110,6 +111,8 @@ export class CampaignManager {
   private _activeCampaignCompletedChapters: Set<number> = new Set();
   /** Set of chapter IDs for which the mastery sequence has already been shown. */
   private _activeCampaignMasteredChaptersShown: Set<number> = new Set();
+  /** True when the full-campaign mastery sequence has already been shown. */
+  private _campaignMasteredShown = false;
 
   // ── Chapter map ───────────────────────────────────────────────────────────
 
@@ -175,6 +178,7 @@ export class CampaignManager {
     this._activeCampaignProgress = loadCampaignProgress(campaign.id);
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
     this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
+    this._campaignMasteredShown = loadCampaignMasteredShown(campaign.id);
     saveActiveCampaignId(campaign.id);
     this._callbacks.showLevelSelect();
   }
@@ -532,6 +536,8 @@ export class CampaignManager {
       clearLevelWater(this._activeCampaign.id);
       clearCompletedChapters(this._activeCampaign.id, this._activeCampaignCompletedChapters);
       clearMasteredChaptersShown(this._activeCampaign.id, this._activeCampaignMasteredChaptersShown);
+      clearCampaignMasteredShown(this._activeCampaign.id);
+      this._campaignMasteredShown = false;
     } else {
       clearCompletedLevels(this._callbacks.completedLevels);
       clearLevelStars();
@@ -586,6 +592,7 @@ export class CampaignManager {
       (ci) => this.showChapterMap(ci),
       this._activeCampaignCompletedChapters,
       () => this._callbacks.showSettings(),
+      this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
     );
   }
 
@@ -841,6 +848,26 @@ export class CampaignManager {
   }
 
   /**
+   * Show the full-campaign mastery sequence: play the master-chapter sfx, spawn
+   * confetti, and display a golden "Campaign Mastered!" modal with a "Kudos!"
+   * button.  Records the sequence as shown so it is never repeated.
+   */
+  private _showCampaignMasterySequence(): void {
+    const campaign = this._activeCampaign;
+    if (!campaign) return;
+
+    this._campaignMasteredShown = true;
+    markCampaignMasteredShown(campaign.id);
+
+    sfxManager.play(SfxId.MasterChapter);
+    spawnConfetti();
+
+    const modal = buildCampaignMasteredModal(campaign.name, () => {
+      modal.remove();
+    });
+  }
+
+  /**
    * Returns true when all levels in the chapter are completed and all available
    * stars have been collected (using the active campaign's progress).
    */
@@ -956,6 +983,7 @@ export class CampaignManager {
     this._activeCampaignProgress = loadCampaignProgress(campaign.id);
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
     this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
+    this._campaignMasteredShown = loadCampaignMasteredShown(campaign.id);
     saveActiveCampaignId(campaign.id);
   }
 
@@ -967,6 +995,7 @@ export class CampaignManager {
       this._activeCampaignProgress = loadCampaignProgress(campaign.id);
       this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
       this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
+      this._campaignMasteredShown = loadCampaignMasteredShown(campaign.id);
     } else {
       clearActiveCampaignId();
     }

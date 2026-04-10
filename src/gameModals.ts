@@ -327,6 +327,62 @@ export function buildSettingsModal(
 }
 
 /**
+ * Build and attach the campaign-mastered congratulatory modal.
+ *
+ * Shown once when the player first masters an entire campaign (all levels,
+ * stars, and challenges complete). Displayed on top of a confetti animation.
+ *
+ * @param campaignName - Name of the mastered campaign.
+ * @param onKudos      - Called when the player clicks "Kudos!" (should dismiss the modal).
+ */
+export function buildCampaignMasteredModal(
+  campaignName: string,
+  onKudos: () => void,
+): HTMLElement {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+    'justify-content:center;z-index:200;';
+
+  const box = document.createElement('div');
+  box.style.cssText =
+    'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:28px 24px;' +
+    'max-width:380px;width:90%;text-align:center;';
+
+  const iconEl = document.createElement('div');
+  iconEl.style.cssText = 'font-size:3rem;line-height:1;margin-bottom:12px;';
+  iconEl.textContent = '🏆';
+  box.appendChild(iconEl);
+
+  const titleEl = document.createElement('h2');
+  titleEl.textContent = 'Campaign Mastered!';
+  titleEl.style.cssText = 'color:#f0c040;margin:0 0 10px;font-size:1.5rem;';
+  box.appendChild(titleEl);
+
+  const nameEl = document.createElement('p');
+  nameEl.textContent = campaignName;
+  nameEl.style.cssText = 'color:#f0c040;font-size:1rem;font-weight:bold;margin:0 0 8px;';
+  box.appendChild(nameEl);
+
+  const msgEl = document.createElement('p');
+  msgEl.textContent = 'All areas complete!';
+  msgEl.style.cssText = 'color:#eee;font-size:1rem;margin:0 0 20px;';
+  box.appendChild(msgEl);
+
+  const kudosBtn = document.createElement('button');
+  kudosBtn.textContent = 'Kudos!';
+  kudosBtn.style.cssText =
+    'padding:10px 28px;font-size:1rem;border-radius:6px;cursor:pointer;' +
+    'background:#1a3a10;border:1px solid #f0c040;color:#f0c040;';
+  kudosBtn.addEventListener('click', () => onKudos());
+  box.appendChild(kudosBtn);
+
+  el.appendChild(box);
+  document.body.appendChild(el);
+  return el;
+}
+
+/**
  * Build and attach the unplayable-level modal (shown when a level starts in an
  * already-lost state).
  *
