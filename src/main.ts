@@ -19,6 +19,7 @@ const playScreenEl   = getEl('play-screen');
 const levelHeaderEl  = getEl('level-header');
 const inventoryBarEl = getEl('inventory-bar');
 const statsBoxEl     = getEl('stats-box');
+const bestScoreBoxEl = getEl('best-score-box');
 const waterDisplayEl = getEl('water-display');
 const winModalEl     = getEl('win-modal');
 const gameoverModalEl = getEl('gameover-modal');
@@ -44,9 +45,10 @@ const game = new Game(
   exitBtnEl,
 );
 
-// Attach a persistent water-wave background animation (alpha 0.2) to the inventory box and stats box.
+// Attach a persistent water-wave background animation (alpha 0.2) to the inventory box, stats box, and best-score box.
 attachInventoryWaveAnimation(statsBoxEl);
 attachInventoryWaveAnimation(inventoryBarEl);
+attachInventoryWaveAnimation(bestScoreBoxEl);
 
 // Win modal buttons
 getEl('win-next-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.exitToMenu(); });
