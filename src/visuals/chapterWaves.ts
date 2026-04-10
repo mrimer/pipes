@@ -294,7 +294,7 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
  * box.
  *
  * A `<canvas>` is appended as the last child of `el` and positioned absolutely
- * to fill it (inset:0, z-index:-1, opacity:0.2).  The element is given
+ * to fill it (inset:0, z-index:-1, opacity:0.4).  The element is given
  * `position:relative; z-index:0` to form a local stacking context, ensuring the
  * canvas paints behind the box's text content while staying above the element's
  * own CSS background.  The existing CSS background is preserved so the faint
@@ -309,7 +309,7 @@ export function attachInventoryWaveAnimation(el: HTMLElement): void {
   const canvas = document.createElement('canvas');
   canvas.style.cssText =
     'position:absolute;inset:0;width:100%;height:100%;' +
-    'pointer-events:none;border-radius:inherit;z-index:-1;opacity:0.2;';
+    'pointer-events:none;border-radius:inherit;z-index:-1;opacity:0.4;';
 
   el.style.position = 'relative';
   el.style.zIndex = '0';
