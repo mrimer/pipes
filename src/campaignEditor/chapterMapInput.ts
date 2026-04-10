@@ -158,10 +158,14 @@ export class ChapterMapInput {
 
     this._cb.setFocusedTilePos(pos);
 
-    // Auto-select the 'Level' palette item when a level chamber is focused
+    // Auto-select the palette item that matches the focused tile's type
     const tileAtPos = this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null;
-    if (tileAtPos?.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'level') {
-      this._cb.setPalette(LEVEL_CHAMBER_PALETTE);
+    if (tileAtPos !== null) {
+      const paletteForTile: EditorPalette =
+        tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'level'
+          ? LEVEL_CHAMBER_PALETTE
+          : tileAtPos.shape;
+      this._cb.setPalette(paletteForTile);
       this._cb.rebuildPalette(chapter, campaign);
     }
 
