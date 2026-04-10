@@ -265,6 +265,36 @@ describe('Game – playtest mode button labels', () => {
   });
 });
 
+// ─── Tests: playtest header preserved on restart ──────────────────────────────
+
+describe('Game – playtest header preserved on restart', () => {
+  it('keeps the "▶ Playtesting" text in the header after retryLevel', () => {
+    const { game } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+
+    const levelHeaderEl = document.getElementById('level-header')!;
+    expect(levelHeaderEl.textContent).toContain('▶ Playtesting');
+
+    game.retryLevel();
+
+    expect(levelHeaderEl.textContent).toContain('▶ Playtesting');
+  });
+
+  it('keeps the level name text in the header after retryLevel during playtesting', () => {
+    const { game } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+
+    const levelHeaderEl = document.getElementById('level-header')!;
+    expect(levelHeaderEl.textContent).toContain(LEVELS[0].name);
+
+    game.retryLevel();
+
+    expect(levelHeaderEl.textContent).toContain(LEVELS[0].name);
+  });
+});
+
 // ─── Tests: undo winning move ─────────────────────────────────────────────────
 
 describe('Game – undoWinningMove', () => {
