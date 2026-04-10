@@ -15,7 +15,6 @@ import {
   DEFAULT_PARAMS,
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
-  MAX_EDITOR_CANVAS_PX,
   rotateGridBy90,
   rotatePositionBy90,
   reflectGridAboutDiagonal,
@@ -25,6 +24,9 @@ import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
 import { validateChapterMap } from './chapterMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
+import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
+import { HistoryManager } from './historyManager';
+import { updateCanvasDisplaySize } from './canvasUtils';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -52,8 +54,7 @@ export class ChapterMapEditorSection {
   private _chapterParams: TileParams = { ...DEFAULT_PARAMS };
   private _chapterCanvas: HTMLCanvasElement | null = null;
   private _chapterCtx: CanvasRenderingContext2D | null = null;
-  private _chapterHistory: EditorSnapshot[] = [];
-  private _chapterHistoryIdx = -1;
+  private readonly _chapterHist = new HistoryManager<EditorSnapshot>();
   private _chapterSelectedLevelIdx: number | null = null;
   private _chapterEditorMainLayout: HTMLDivElement = document.createElement('div');
   private _chapterFocusedTilePos: { row: number; col: number } | null = null;
@@ -121,8 +122,7 @@ export class ChapterMapEditorSection {
     // Generate ambient decorations for the grid
     this._chapterDecorations = generateChapterMapDecorations(this._chapterEditRows, this._chapterEditCols);
     // Reset chapter editor state
-    this._chapterHistory = [];
-    this._chapterHistoryIdx = -1;
+    this._chapterHist.clear();
     this._chapterSelectedLevelIdx = null;
     this._chapterFocusedTilePos = null;
     this._recordChapterSnapshot(chapter, false);
@@ -279,27 +279,7 @@ export class ChapterMapEditorSection {
    * recorded as an undo snapshot.
    */
   private _slideChapterGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void {
-    const newGrid: (TileDef | null)[][] = Array.from(
-      { length: this._chapterEditRows },
-      () => Array(this._chapterEditCols).fill(null) as null[],
-    );
-    for (let r = 0; r < this._chapterEditRows; r++) {
-      for (let c = 0; c < this._chapterEditCols; c++) {
-        const tile = this._chapterEditGrid[r]?.[c] ?? null;
-        if (tile === null) continue;
-        let nr = r;
-        let nc = c;
-        if (dir === 'N') nr = r - 1;
-        else if (dir === 'S') nr = r + 1;
-        else if (dir === 'W') nc = c - 1;
-        else nc = c + 1; // E
-        if (nr >= 0 && nr < this._chapterEditRows && nc >= 0 && nc < this._chapterEditCols) {
-          newGrid[nr][nc] = tile;
-        }
-        // Tiles that go out of bounds are simply dropped.
-      }
-    }
-    this._chapterEditGrid = newGrid;
+    this._chapterEditGrid = slideGrid(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, dir);
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._renderChapterCanvas();
@@ -407,47 +387,15 @@ export class ChapterMapEditorSection {
   /** Update the chapter canvas CSS display size to fit the available space. */
   private _updateChapterCanvasDisplaySize(): void {
     if (!this._chapterCanvas) return;
-    const intrinsicW = this._chapterEditCols * TILE_SIZE;
-    const intrinsicH = this._chapterEditRows * TILE_SIZE;
-    let maxW = MAX_EDITOR_CANVAS_PX;
-    let maxH = MAX_EDITOR_CANVAS_PX;
-    if (this._chapterEditorMainLayout) {
-      // ── Width constraint: available horizontal space after side panels ──
-      const layoutW = this._chapterEditorMainLayout.clientWidth;
-      let otherW = 0;
-      let colCount = 0;
-      for (const child of this._chapterEditorMainLayout.children) {
-        if (!child.contains(this._chapterCanvas)) {
-          otherW += (child as HTMLElement).offsetWidth;
-          colCount++;
-        }
-      }
-      const availW = layoutW - otherW - colCount * 12 - 2 * EDITOR_CANVAS_BORDER;
-      if (availW > 0) maxW = availW;
-
-      // ── Height constraint: available vertical space in the viewport ──
-      // Walk up the offsetParent chain to find the canvas's absolute top in the
-      // document.  When the canvas is not yet in the DOM its offsetParent is null
-      // and absTop stays 0, which skips the height constraint gracefully (the
-      // requestAnimationFrame call in _showChapterEditor will re-run with the
-      // canvas properly positioned).
-      let absTop = 0;
-      let el: HTMLElement | null = this._chapterCanvas;
-      while (el) {
-        absTop += el.offsetTop;
-        el = el.offsetParent as HTMLElement | null;
-      }
-      if (absTop > 0) {
-        // Remaining viewport height below the canvas top, accounting for scroll.
-        // Subtract a small bottom margin so the canvas doesn't touch the viewport edge.
-        const BOTTOM_MARGIN = 16;
-        const availH = window.innerHeight + window.scrollY - absTop - 2 * EDITOR_CANVAS_BORDER - BOTTOM_MARGIN;
-        if (availH > 0) maxH = availH;
-      }
-    }
-    const scale = Math.min(1, maxW / intrinsicW, maxH / intrinsicH);
-    this._chapterCanvas.style.width  = Math.round(intrinsicW * scale) + 'px';
-    this._chapterCanvas.style.height = Math.round(intrinsicH * scale) + 'px';
+    updateCanvasDisplaySize(
+      this._chapterCanvas,
+      this._chapterEditRows,
+      this._chapterEditCols,
+      this._chapterEditorMainLayout,
+      12,
+      0,
+      true,
+    );
   }
 
   /** Render the chapter map editor canvas. */
@@ -546,26 +494,12 @@ export class ChapterMapEditorSection {
     return { shape, rotation: p.rotation };
   }
 
-  /** Check if a source tile already exists on the chapter grid (outside a given position). */
   private _chapterHasSourceElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    for (let r = 0; r < this._chapterEditRows; r++) {
-      for (let c = 0; c < this._chapterEditCols; c++) {
-        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
-        if (this._chapterEditGrid[r]?.[c]?.shape === PipeShape.Source) return true;
-      }
-    }
-    return false;
+    return hasShapeElsewhere(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Source, exceptPos);
   }
 
-  /** Check if a sink tile already exists on the chapter grid (outside a given position). */
   private _chapterHasSinkElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    for (let r = 0; r < this._chapterEditRows; r++) {
-      for (let c = 0; c < this._chapterEditCols; c++) {
-        if (exceptPos && r === exceptPos.row && c === exceptPos.col) continue;
-        if (this._chapterEditGrid[r]?.[c]?.shape === PipeShape.Sink) return true;
-      }
-    }
-    return false;
+    return hasShapeElsewhere(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Sink, exceptPos);
   }
 
   /** Flash an error below the chapter map canvas when the Sink placement constraint is violated. */
@@ -749,36 +683,34 @@ export class ChapterMapEditorSection {
 
   private _recordChapterSnapshot(_chapter: ChapterDef, markChanged = true): void {
     const snapshot: EditorSnapshot = {
-      grid: JSON.parse(JSON.stringify(this._chapterEditGrid)) as (TileDef | null)[][],
+      grid: this._chapterEditGrid,
       rows: this._chapterEditRows,
       cols: this._chapterEditCols,
       inventory: [],
     };
-    if (this._chapterHistoryIdx < this._chapterHistory.length - 1) {
-      this._chapterHistory = this._chapterHistory.slice(0, this._chapterHistoryIdx + 1);
-    }
-    this._chapterHistory.push(snapshot);
-    this._chapterHistoryIdx = this._chapterHistory.length - 1;
+    this._chapterHist.record(snapshot);
     if (markChanged) {
       this._updateChapterUndoRedoButtons();
     }
   }
 
   private _chapterUndo(campaign: CampaignDef, chapter: ChapterDef): void {
-    if (this._chapterHistoryIdx <= 0) return;
+    const snap = this._chapterHist.undo();
+    if (!snap) return;
     sfxManager.play(SfxId.Undo);
-    this._applyChapterSnapshot(this._chapterHistory[--this._chapterHistoryIdx], chapter, campaign);
+    this._applyChapterSnapshot(snap, chapter, campaign);
   }
 
   private _chapterRedo(campaign: CampaignDef, chapter: ChapterDef): void {
-    if (this._chapterHistoryIdx >= this._chapterHistory.length - 1) return;
+    const snap = this._chapterHist.redo();
+    if (!snap) return;
     sfxManager.play(SfxId.Redo);
-    this._applyChapterSnapshot(this._chapterHistory[++this._chapterHistoryIdx], chapter, campaign);
+    this._applyChapterSnapshot(snap, chapter, campaign);
   }
 
   /** Apply a saved snapshot: restore grid dimensions, resize canvas, save, and re-render. */
   private _applyChapterSnapshot(snap: EditorSnapshot, chapter: ChapterDef, campaign: CampaignDef): void {
-    this._chapterEditGrid = JSON.parse(JSON.stringify(snap.grid)) as (TileDef | null)[][];
+    this._chapterEditGrid = snap.grid as (TileDef | null)[][];
     this._chapterEditRows = snap.rows;
     this._chapterEditCols = snap.cols;
     if (this._chapterCanvas) {
@@ -798,28 +730,20 @@ export class ChapterMapEditorSection {
     const undoBtn = document.getElementById('chapter-undo-btn') as HTMLButtonElement | null;
     const redoBtn = document.getElementById('chapter-redo-btn') as HTMLButtonElement | null;
     if (undoBtn) {
-      undoBtn.disabled = this._chapterHistoryIdx <= 0;
+      undoBtn.disabled = !this._chapterHist.canUndo;
       undoBtn.style.opacity = undoBtn.disabled ? '0.4' : '1';
     }
     if (redoBtn) {
-      redoBtn.disabled = this._chapterHistoryIdx >= this._chapterHistory.length - 1;
+      redoBtn.disabled = !this._chapterHist.canRedo;
       redoBtn.style.opacity = redoBtn.disabled ? '0.4' : '1';
     }
   }
 
   /** Resize the chapter grid. */
   private _resizeChapterGrid(newRows: number, newCols: number, campaign: CampaignDef, chapter: ChapterDef): void {
-    const newGrid: (TileDef | null)[][] = [];
-    for (let r = 0; r < newRows; r++) {
-      newGrid[r] = [];
-      for (let c = 0; c < newCols; c++) {
-        newGrid[r][c] = (r < this._chapterEditRows && c < this._chapterEditCols)
-          ? (this._chapterEditGrid[r]?.[c] ?? null) : null;
-      }
-    }
+    this._chapterEditGrid = resizeGrid(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, newRows, newCols);
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
-    this._chapterEditGrid = newGrid;
     // Regenerate decorations for the new grid dimensions
     this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
     this._recordChapterSnapshot(chapter);

@@ -12,10 +12,9 @@ import {
   EDITOR_FLEX_ROW_CSS,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
-  GRID_MIN_DIM,
-  GRID_MAX_DIM,
 } from './types';
 import { LevelEditorState } from './levelEditorState';
+import { buildGridSizePanel } from './gridSizePanel';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -190,79 +189,26 @@ export class LevelMetadataPanel {
 
   buildGridSizePanel(): HTMLElement {
     const state = this._cb.getState();
-    const panel = document.createElement('div');
-    panel.id = 'editor-grid-size-panel';
-    panel.style.cssText =
-      EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;min-width:180px;';
-
-    const title = document.createElement('div');
-    title.style.cssText = EDITOR_PANEL_TITLE_CSS;
-    title.textContent = 'GRID SIZE';
-    panel.appendChild(title);
-
-    const gridSizeInputStyle = 'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
-
-    const rowsInp = document.createElement('input');
-    rowsInp.type = 'number';
-    rowsInp.min = String(GRID_MIN_DIM);
-    rowsInp.max = String(GRID_MAX_DIM);
-    rowsInp.value = String(state.rows);
-    rowsInp.style.cssText = gridSizeInputStyle;
-    const colsInp = document.createElement('input');
-    colsInp.type = 'number';
-    colsInp.min = String(GRID_MIN_DIM);
-    colsInp.max = String(GRID_MAX_DIM);
-    colsInp.value = String(state.cols);
-    colsInp.style.cssText = gridSizeInputStyle;
-
-    const inputRow = document.createElement('div');
-    inputRow.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:0.85rem;';
-    inputRow.appendChild(document.createTextNode('Rows:'));
-    inputRow.appendChild(rowsInp);
-    inputRow.appendChild(document.createTextNode('Cols:'));
-    inputRow.appendChild(colsInp);
-    panel.appendChild(inputRow);
-
-    const resizeError = document.createElement('div');
-    resizeError.style.cssText = 'font-size:0.8rem;color:#f44;display:none;';
-    panel.appendChild(resizeError);
-
-    panel.appendChild(this._btn('↔ Resize', '#16213e', '#f0c040', () => {
-      const showErr = (msg: string) => {
-        resizeError.textContent = msg;
-        resizeError.style.display = 'block';
-        setTimeout(() => { resizeError.style.display = 'none'; }, 2000);
-      };
-      const rVal = parseInt(rowsInp.value);
-      const cVal = parseInt(colsInp.value);
-      let outOfRange = false;
-      if (isNaN(rVal) || rVal < GRID_MIN_DIM || rVal > GRID_MAX_DIM) {
-        rowsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(rVal) ? state.rows : rVal)));
-        outOfRange = true;
-      }
-      if (isNaN(cVal) || cVal < GRID_MIN_DIM || cVal > GRID_MAX_DIM) {
-        colsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(cVal) ? state.cols : cVal)));
-        outOfRange = true;
-      }
-      if (outOfRange) {
-        showErr(`Value out of range (${GRID_MIN_DIM} to ${GRID_MAX_DIM})`);
-        return;
-      }
-      if (rVal <= 1 && cVal <= 1) {
-        showErr('At least one dimension (rows or cols) must be > 1');
-        return;
-      }
-      this._cb.resizeGrid(rVal, cVal);
-    }));
-
-    const slideRotateSection = buildSlideAndRotateControls(
-      (dir) => this._cb.slideGrid(dir),
-      (cw)  => this._cb.rotateGrid(cw),
-      ()    => this._cb.reflectGrid(),
+    return buildGridSizePanel(
+      {
+        getRows: () => state.rows,
+        getCols: () => state.cols,
+        resize: (r, c) => this._cb.resizeGrid(r, c),
+        slide:  (dir)  => this._cb.slideGrid(dir),
+        rotate: (cw)   => this._cb.rotateGrid(cw),
+        reflect: ()    => this._cb.reflectGrid(),
+        rebuildPanel: () => this.rebuildGridSizePanel(),
+      },
+      this._btn.bind(this),
+      {
+        panelId: 'editor-grid-size-panel',
+        title: 'GRID SIZE',
+        inputWidth: '60px',
+        inputRowStyle: 'gap:6px;font-size:0.85rem;',
+        requireOneAxisAbove1: true,
+        minWidth: '180px',
+      },
     );
-    panel.appendChild(slideRotateSection);
-
-    return panel;
   }
 
   rebuildGridSizePanel(): void {

@@ -15,11 +15,10 @@ import {
   PALETTE_ITEM_UNSELECTED_BG,
   PALETTE_ITEM_SELECTED_COLOR,
   PALETTE_ITEM_UNSELECTED_COLOR,
-  GRID_MIN_DIM,
-  GRID_MAX_DIM,
 } from './types';
-import { buildSlideAndRotateControls } from './levelMetadataPanel';
 import { sfxManager, SfxId } from '../sfxManager';
+import { buildCompassConnectionsWidget } from './connectionsWidget';
+import { buildGridSizePanel } from './gridSizePanel';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -221,69 +220,24 @@ export class ChapterEditorUI {
   }
 
   buildGridSizePanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
-    const panel = document.createElement('div');
-    panel.id = 'chapter-grid-size-panel';
-    panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;';
-
-    const title = document.createElement('div');
-    title.style.cssText = EDITOR_PANEL_TITLE_CSS;
-    title.textContent = 'MAP SIZE';
-    panel.appendChild(title);
-
-    const inpStyle = 'padding:4px;width:52px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
-    const rowsInp = document.createElement('input');
-    rowsInp.type = 'number';
-    rowsInp.min = String(GRID_MIN_DIM);
-    rowsInp.max = String(GRID_MAX_DIM);
-    rowsInp.value = String(this._cb.getChapterEditRows());
-    rowsInp.style.cssText = inpStyle;
-    const colsInp = document.createElement('input');
-    colsInp.type = 'number';
-    colsInp.min = String(GRID_MIN_DIM);
-    colsInp.max = String(GRID_MAX_DIM);
-    colsInp.value = String(this._cb.getChapterEditCols());
-    colsInp.style.cssText = inpStyle;
-
-    const inputRow = document.createElement('div');
-    inputRow.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:0.8rem;';
-    inputRow.appendChild(document.createTextNode('Rows:'));
-    inputRow.appendChild(rowsInp);
-    inputRow.appendChild(document.createTextNode('Cols:'));
-    inputRow.appendChild(colsInp);
-    panel.appendChild(inputRow);
-
-    const errDiv = document.createElement('div');
-    errDiv.style.cssText = 'font-size:0.78rem;color:#f44;display:none;';
-    panel.appendChild(errDiv);
-
-    panel.appendChild(this._cb.buildBtn('↔ Resize', '#16213e', '#f0c040', () => {
-      const rVal = parseInt(rowsInp.value);
-      const cVal = parseInt(colsInp.value);
-      const showErr = (msg: string) => {
-        errDiv.textContent = msg;
-        errDiv.style.display = 'block';
-        setTimeout(() => { errDiv.style.display = 'none'; }, 2000);
-      };
-      let outOfRange = false;
-      if (isNaN(rVal) || rVal < GRID_MIN_DIM || rVal > GRID_MAX_DIM) {
-        rowsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(rVal) ? this._cb.getChapterEditRows() : rVal)));
-        outOfRange = true;
-      }
-      if (isNaN(cVal) || cVal < GRID_MIN_DIM || cVal > GRID_MAX_DIM) {
-        colsInp.value = String(Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(cVal) ? this._cb.getChapterEditCols() : cVal)));
-        outOfRange = true;
-      }
-      if (outOfRange) { showErr(`Value out of range (${GRID_MIN_DIM}–${GRID_MAX_DIM})`); return; }
-      this._cb.resizeGrid(rVal, cVal, chapter, campaign);
-    }));
-
-    panel.appendChild(buildSlideAndRotateControls(
-      (dir) => this._cb.slideGrid(dir, chapter),
-      (cw)  => { this._cb.rotateGrid(cw, chapter); this.rebuildGridSizePanel(chapter, campaign); },
-      ()    => { this._cb.reflectGrid(chapter); this.rebuildGridSizePanel(chapter, campaign); },
-    ));
-
-    return panel;
+    return buildGridSizePanel(
+      {
+        getRows: () => this._cb.getChapterEditRows(),
+        getCols: () => this._cb.getChapterEditCols(),
+        resize: (r, c) => this._cb.resizeGrid(r, c, chapter, campaign),
+        slide:  (dir)  => this._cb.slideGrid(dir, chapter),
+        rotate: (cw)   => this._cb.rotateGrid(cw, chapter),
+        reflect: ()    => this._cb.reflectGrid(chapter),
+        rebuildPanel: () => this.rebuildGridSizePanel(chapter, campaign),
+      },
+      (l, bg, fg, cb) => this._cb.buildBtn(l, bg, fg, cb),
+      {
+        panelId: 'chapter-grid-size-panel',
+        title: 'MAP SIZE',
+        inputWidth: '52px',
+        inputRowStyle: 'gap:4px;font-size:0.8rem;',
+      },
+    );
   }
 
   // ── Rebuild helpers (called after state changes) ───────────────────────────
@@ -380,55 +334,12 @@ export class ChapterEditorUI {
     return wrap;
   }
 
-  /**
-   * Build a compass-layout (3×3 grid) connections toggle widget.
-   *
-   * @param getActive  Returns true when the given direction is currently active.
-   * @param onToggle   Called with the toggled direction when a button is clicked.
-   */
+  /** @see buildCompassConnectionsWidget */
   private _buildCompassConnectionsWidget(
     getActive: (dir: Direction) => boolean,
     onToggle: (dir: Direction) => void,
   ): HTMLElement {
-    const connWrap = document.createElement('div');
-    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-    const connLbl = document.createElement('div');
-    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-    connLbl.textContent = 'Connections';
-    connWrap.appendChild(connLbl);
-
-    const connGrid = document.createElement('div');
-    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
-
-    const makeConnBtn = (dir: Direction): HTMLButtonElement => {
-      const label = dir === Direction.North ? 'N' : dir === Direction.East ? 'E' : dir === Direction.South ? 'S' : 'W';
-      const active = getActive(dir);
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = label;
-      b.title = `Toggle ${label} connection`;
-      b.style.cssText =
-        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
-        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
-        'color:' + (active ? '#7ed321' : '#555') + ';' +
-        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
-        'border-radius:4px;cursor:pointer;padding:0;';
-      b.addEventListener('click', () => onToggle(dir));
-      return b;
-    };
-
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn(Direction.North));
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn(Direction.West));
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn(Direction.East));
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn(Direction.South));
-    connGrid.appendChild(document.createElement('span'));
-
-    connWrap.appendChild(connGrid);
-    return connWrap;
+    return buildCompassConnectionsWidget(getActive, onToggle);
   }
 
   /**

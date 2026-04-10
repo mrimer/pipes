@@ -27,7 +27,6 @@ import {
   generateLevelId,
   ungzipBlob,
   getValidTileDefKeys,
-  MAX_EDITOR_CANVAS_PX,
   EDITOR_CANVAS_BORDER,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
@@ -39,6 +38,7 @@ import { EditorDialogs } from './editorDialogs';
 import { renderMinimap } from '../minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
+import { updateCanvasDisplaySize } from './canvasUtils';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -1033,59 +1033,17 @@ export class CampaignEditor {
     this._paramsPanel.refresh();
   }
 
-  /** Set the canvas CSS display size so the grid fills available space up to its intrinsic size.
-   *
-   * When the editor main layout is in the DOM we measure the actual horizontal space
-   * remaining after the side columns, allowing the board to grow beyond
-   * MAX_EDITOR_CANVAS_PX whenever the viewport has room.  Falls back to
-   * MAX_EDITOR_CANVAS_PX when the layout has not yet been attached (e.g. on the
-   * first call made during _showLevelEditor before mainLayout is inserted).
-   */
   private _updateCanvasDisplaySize(): void {
     if (!this._editorCanvas) return;
-    const intrinsicW = this._state.cols * TILE_SIZE;
-    const intrinsicH = this._state.rows * TILE_SIZE;
-
-    // Determine the maximum pixel width the canvas may occupy.
-    let maxPx = MAX_EDITOR_CANVAS_PX;
-    if (this._editorMainLayout) {
-      const layoutW = this._editorMainLayout.clientWidth;
-      // Sum the widths of all flex children that do NOT contain the canvas.
-      // The canvas may be nested inside a wrapper element (midRightWrapper),
-      // so also inspect children of the direct wrapper to catch the right
-      // column that shares the row with the canvas.
-      let otherW = 0;
-      let colCount = 0;
-      for (const child of this._editorMainLayout.children) {
-        if (!child.contains(this._editorCanvas)) {
-          otherW += (child as HTMLElement).offsetWidth;
-          colCount++;
-        } else {
-          // The canvas is inside this child (midRightWrapper).  Also deduct
-          // siblings of the canvas's column that sit in the same row.
-          for (const innerChild of child.children) {
-            if (!innerChild.contains(this._editorCanvas)) {
-              otherW += (innerChild as HTMLElement).offsetWidth;
-              colCount++;
-            }
-          }
-        }
-      }
-      // Available width = layout width
-      //   − side-column widths
-      //   − inter-column gaps  (EDITOR_LAYOUT_GAP × number of non-canvas columns)
-      //   − layout's own horizontal padding (EDITOR_LAYOUT_PADDING × 2)
-      //   − canvas border     (EDITOR_CANVAS_BORDER × 2 sides)
-      const availableW =
-        layoutW - otherW - colCount * EDITOR_LAYOUT_GAP - 2 * EDITOR_LAYOUT_PADDING - 2 * EDITOR_CANVAS_BORDER;
-      if (availableW > maxPx) {
-        maxPx = availableW;
-      }
-    }
-
-    const scale = Math.min(1.0, maxPx / Math.max(intrinsicW, intrinsicH));
-    this._editorCanvas.style.width  = Math.round(intrinsicW * scale) + 'px';
-    this._editorCanvas.style.height = Math.round(intrinsicH * scale) + 'px';
+    updateCanvasDisplaySize(
+      this._editorCanvas,
+      this._state.rows,
+      this._state.cols,
+      this._editorMainLayout,
+      EDITOR_LAYOUT_GAP,
+      EDITOR_LAYOUT_PADDING,
+      false,
+    );
   }
 
   // ─── Editor undo / redo ────────────────────────────────────────────────────

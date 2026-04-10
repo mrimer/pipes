@@ -30,6 +30,8 @@ import { LevelEditorState } from './levelEditorState';
 import { TILE_SIZE } from '../renderer';
 import { drawEditorTile } from './renderer';
 import { sfxManager, SfxId } from '../sfxManager';
+import { Direction } from '../types';
+import { buildCompassConnectionsWidget } from './connectionsWidget';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -529,47 +531,7 @@ export class TileParamsPanel {
    */
   private _buildConnectionsWidget(replaceTarget: HTMLElement): HTMLElement {
     const state = this._cb.getState();
-    const connWrap = document.createElement('div');
-    connWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-    const connLbl = document.createElement('div');
-    connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-    connLbl.textContent = 'Connections';
-    connWrap.appendChild(connLbl);
 
-    // Compass grid: [empty][N][empty] / [W][tile][E] / [empty][S][empty]
-    const connGrid = document.createElement('div');
-    connGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
-
-    const makeConnBtn = (dir: keyof TileParams['connections']): HTMLButtonElement => {
-      const active = state.params.connections[dir];
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = dir;
-      b.title = `Toggle ${dir} connection`;
-      b.style.cssText =
-        'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
-        'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
-        'color:' + (active ? '#7ed321' : '#555') + ';' +
-        'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
-        'border-radius:4px;cursor:pointer;padding:0;';
-      b.addEventListener('click', () => {
-        state.params.connections[dir] = !state.params.connections[dir];
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-        const newPanel = this.buildParamPanel();
-        newPanel.id = 'editor-param-panel';
-        replaceTarget.replaceWith(newPanel);
-      });
-      return b;
-    };
-
-    // Row 1: [empty] [N] [empty]
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('N'));
-    connGrid.appendChild(document.createElement('span'));
-    // Row 2: [W] [tile preview] [E]
-    connGrid.appendChild(makeConnBtn('W'));
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = TILE_SIZE;
     previewCanvas.height = TILE_SIZE;
@@ -578,14 +540,20 @@ export class TileParamsPanel {
     if (previewCtx) {
       drawEditorTile(previewCtx, 0, 0, state.buildTileDef());
     }
-    connGrid.appendChild(previewCanvas);
-    connGrid.appendChild(makeConnBtn('E'));
-    // Row 3: [empty] [S] [empty]
-    connGrid.appendChild(document.createElement('span'));
-    connGrid.appendChild(makeConnBtn('S'));
-    connGrid.appendChild(document.createElement('span'));
 
-    connWrap.appendChild(connGrid);
-    return connWrap;
+    return buildCompassConnectionsWidget(
+      (dir) => state.params.connections[dir as keyof TileParams['connections']],
+      (dir) => {
+        const key = dir as keyof TileParams['connections'];
+        state.params.connections[key] = !state.params.connections[key];
+        state.applyParamsToLinkedTile();
+        this._cb.updateUndoRedoButtons();
+        this._cb.renderCanvas();
+        const newPanel = this.buildParamPanel();
+        newPanel.id = 'editor-param-panel';
+        replaceTarget.replaceWith(newPanel);
+      },
+      previewCanvas,
+    );
   }
 }
