@@ -724,7 +724,7 @@ export class CampaignManager {
     }
 
     sfxManager.play(SfxId.MasterChapter);
-    spawnConfetti(() => {});
+    spawnConfetti();
 
     const modal = document.createElement('div');
     modal.style.cssText =
