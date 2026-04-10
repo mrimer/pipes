@@ -191,15 +191,21 @@ export function generateAmbientDecorations(rows: number, cols: number): Readonly
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (Math.random() >= DECORATION_DENSITY) continue;
+      const type = DECORATION_TYPES[Math.floor(Math.random() * DECORATION_TYPES.length)];
+      // Mushrooms scale 0.7–1.5 (up to 50 % larger); crystals scale 0.75–1.25 (±25 %).
+      const scale = type === 'mushroom' ? 0.7 + Math.random() * 0.8
+                  : type === 'crystal'  ? 0.75 + Math.random() * 0.5
+                  : undefined;
       map.set(`${r},${c}`, {
         row: r,
         col: c,
-        type: DECORATION_TYPES[Math.floor(Math.random() * DECORATION_TYPES.length)],
+        type,
         // Keep decorations away from cell edges for a natural look
         offsetX: 0.15 + Math.random() * 0.70,
         offsetY: 0.15 + Math.random() * 0.70,
         rotation: Math.random() * 360,
         variant: Math.floor(Math.random() * 3),
+        scale,
       });
     }
   }

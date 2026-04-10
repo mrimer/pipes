@@ -270,6 +270,8 @@ export interface AmbientDecoration {
   rotation: number;
   /** Integer variant index driving color / shape choices (0–2). */
   variant: number;
+  /** Scale multiplier (1 = default size; >1 larger, <1 smaller). Only set for types that support scaling. */
+  scale?: number;
 }
 
 /** A chapter groups a set of levels under a shared name. */

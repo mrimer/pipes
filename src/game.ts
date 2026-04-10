@@ -312,7 +312,7 @@ export class Game implements InputCallbacks {
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
-      () => this._showLevelSelect(),              // onClose: return to level select
+      () => this._showLevelSelect(false),             // onClose: return to level select (no stopAll – no game audio playing in editor)
       (level) => this._campaign.playtestLevel(level), // onPlaytest: start the level in play mode
       (campaign) => this._campaign.activate(campaign), // onPlayCampaign: activate campaign for play
     );
@@ -386,11 +386,11 @@ export class Game implements InputCallbacks {
 
   // ─── Screen transitions ───────────────────────────────────────────────────
 
-  private _showLevelSelect(): void {
+  private _showLevelSelect(stopAudio = true): void {
     // Cancel any pending intro-ring spawn before leaving the play screen.
     this._cancelPendingRings();
-    // Stop any sounds still playing from the previous screen.
-    sfxManager.stopAll();
+    // Stop any sounds still playing from the previous screen (skip when exiting editor screens).
+    if (stopAudio) sfxManager.stopAll();
     // Remember the last played level ID for the scroll below, then clear currentLevel
     // so that re-entering the same level via the level-select screen will be treated
     // as a new entry (showing the ring effect again).

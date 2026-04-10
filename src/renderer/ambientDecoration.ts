@@ -107,7 +107,8 @@ function _drawGrass(ctx: CanvasRenderingContext2D, variant: number): void {
 
 /**
  * Draw a small top-down mushroom cap centered at the current canvas origin.
- * Rendered as a filled circle with a few lighter spots.
+ * Rendered as a filled circle with a large central spot and four smaller spots
+ * evenly spaced near the edge (at 90-degree intervals).
  */
 function _drawMushroom(ctx: CanvasRenderingContext2D, variant: number): void {
   const capColor = MUSHROOM_CAP_COLORS[variant % MUSHROOM_CAP_COLORS.length];
@@ -116,16 +117,19 @@ function _drawMushroom(ctx: CanvasRenderingContext2D, variant: number): void {
   ctx.beginPath();
   ctx.arc(0, 0, _s(5), 0, Math.PI * 2);
   ctx.fill();
-  // Spots
+  // Spots: one large center dot and four smaller dots near the edge
   ctx.fillStyle = MUSHROOM_SPOT_COLOR;
-  const spots: Array<[number, number, number]> = [
-    [-_s(2), -_s(1.5), _s(1.2)],
-    [_s(1.8), _s(0.8), _s(1.0)],
-    [_s(0.2), -_s(3.2), _s(0.8)],
-  ];
-  for (const [dx, dy, r] of spots) {
+  // Large center dot
+  ctx.beginPath();
+  ctx.arc(0, 0, _s(1.5), 0, Math.PI * 2);
+  ctx.fill();
+  // Four smaller edge dots at 90-degree intervals
+  const edgeDist = _s(3.4);
+  const edgeDotR = _s(0.85);
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
     ctx.beginPath();
-    ctx.arc(dx, dy, r, 0, Math.PI * 2);
+    ctx.arc(Math.cos(angle) * edgeDist, Math.sin(angle) * edgeDist, edgeDotR, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -177,6 +181,9 @@ export function drawAmbientDecoration(
   ctx.translate(cx, cy);
   if (dec.type !== 'grass') {
     ctx.rotate((dec.rotation * Math.PI) / 180);
+  }
+  if (dec.scale !== undefined && dec.scale !== 1) {
+    ctx.scale(dec.scale, dec.scale);
   }
   switch (dec.type) {
     case 'pebbles':  _drawPebbles(ctx, dec.variant);  break;
