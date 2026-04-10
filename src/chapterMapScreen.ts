@@ -367,7 +367,9 @@ export class ChapterMapScreen {
   /**
    * Start the blue tile win-glow animation over all water-filled cells on the
    * chapter map canvas, and play the Win Chapter sound effect.
-   * Calls {@link onComplete} once every glow has finished.
+   * Calls {@link onComplete} once every glow has finished AND the Win Chapter
+   * sound effect has ended, so that downstream effects (e.g. mastery sequence)
+   * do not overlap with the chapter-win audio.
    */
   playWinAnimation(onComplete: () => void): void {
     const chapter = this._chapter;
@@ -379,10 +381,25 @@ export class ChapterMapScreen {
     const cols = chapter.cols ?? 6;
     const sourcePos = findChapterMapTile(chapter.grid, rows, cols, PipeShape.Source);
 
-    sfxManager.play(SfxId.WinChapter);
+    // Wait for both the WinChapter sfx AND the glow animation to finish before
+    // calling onComplete, so mastery effects don't overlap the chapter-win sfx.
+    let sfxDone = false;
+    let animDone = false;
+    const tryComplete = () => {
+      if (sfxDone && animDone) {
+        this._winGlows = [];
+        onComplete();
+      }
+    };
+
+    sfxManager.playWithDoneCallback(SfxId.WinChapter, () => {
+      sfxDone = true;
+      tryComplete();
+    });
 
     if (!sourcePos || filledKeys.size === 0) {
-      onComplete();
+      animDone = true;
+      tryComplete();
       return;
     }
 
@@ -393,11 +410,11 @@ export class ChapterMapScreen {
     const maxStart = this._winGlows.reduce((m, g) => Math.max(m, g.startTime), baseTime);
     const endTime = maxStart + WIN_TILE_GLOW_DURATION;
 
-    // Schedule the callback once the animation is complete
+    // Schedule the animation-done signal once the last glow expires
     const delay = endTime - baseTime;
     setTimeout(() => {
-      this._winGlows = [];
-      onComplete();
+      animDone = true;
+      tryComplete();
     }, delay);
   }
 
