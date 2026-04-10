@@ -2,10 +2,17 @@
  * Idle water-pulse animation.
  *
  * After a period of player inactivity the connected pipe network pulses with a
- * bright overlay that sweeps from the source outward in BFS order.  The pulse
- * uses the same two-phase geometry as the fill animations in pipeEffects.ts
- * but draws a white (or gold) overlay whose alpha ramps up then back down as
- * the wavefront passes through each tile.
+ * bright localized glow that sweeps from the source outward in BFS order.
+ *
+ * On each tile, rather than the whole tile shape pulsing at once, a localized
+ * glow head moves along the pipe geometry:
+ *   - Phase 1 (first half of tile duration): glow travels inward from the
+ *     entry arm edge toward the tile center.
+ *   - Phase 2 (second half): glow travels outward from the center along each
+ *     exit (non-entry) arm simultaneously.
+ *
+ * For the source tile there is no entry arm; the glow starts at the center and
+ * spreads outward along all connected arms over the full tile duration.
  */
 
 import { Direction } from '../types';
@@ -18,11 +25,11 @@ import { TILE_SIZE, LINE_WIDTH } from '../renderer';
 /** ms delay between consecutive BFS-depth layers in the pulse sweep. */
 const PULSE_SPEED_PER_DEPTH = 150;
 
-/** ms for the pulse overlay to traverse a single tile (fade-in + fade-out). */
-const PULSE_TILE_DURATION = 200;
+/** ms for the pulse glow to traverse a single tile (entry arm → center → exit arms). */
+const PULSE_TILE_DURATION = 300;
 
-/** Alpha peak for the white overlay on regular (non-gold) pipe tiles. */
-const PULSE_ALPHA = 0.3;
+/** Peak alpha for the glow core (inner radial gradient center). */
+const PULSE_ALPHA = 0.8;
 
 /**
  * One tile entry in the idle-pulse sweep, analogous to {@link PipeFillAnim}
@@ -34,12 +41,17 @@ export interface IdlePulseLayer {
   col: number;
   /** The direction from which the pulse enters this tile. */
   entryDir: Direction;
-  /** BFS depth of this tile (0 = directly adjacent to source). */
+  /** BFS depth of this tile (0 = directly adjacent to source; -1 = source itself). */
   depth: number;
   /** Open connection directions for this tile at the time of pulse creation. */
   connections: Set<Direction>;
   /** Whether this tile is a gold pipe (uses gold overlay color). */
   isGold: boolean;
+  /**
+   * True for the source tile.  The source has no entry arm; the glow starts at
+   * the tile center and spreads outward along all connected arms.
+   */
+  isSource?: boolean;
 }
 
 /**
@@ -58,13 +70,33 @@ export interface IdlePulse {
  * Run a BFS from the source tile across the currently-connected network and
  * return the ordered list of pulse layers.
  *
- * Only tiles that are connected to the source (i.e. reachable via
- * {@link Board.areMutuallyConnected}) are included.  The source tile itself is
- * the BFS root (depth -1 internally) and is not included in the output;
- * directly adjacent connected tiles get depth 0.
+ * The source tile itself is included at depth -1 with {@link IdlePulseLayer.isSource}
+ * set to `true`.  Directly adjacent connected tiles get depth 0, their neighbours
+ * depth 1, and so on.
  */
 export function computePulseLayers(board: Board): IdlePulseLayer[] {
   const result: IdlePulseLayer[] = [];
+
+  // Collect the source tile's mutually-connected directions.
+  const sourceConnections = new Set<Direction>();
+  for (const dir of Object.values(Direction)) {
+    if (board.areMutuallyConnected(board.source, dir)) sourceConnections.add(dir);
+  }
+
+  if (sourceConnections.size > 0) {
+    const sourceTile = board.getTile(board.source);
+    const sourceIsGold = sourceTile !== null && GOLD_PIPE_SHAPES.has(sourceTile.shape);
+    // entryDir is unused for isSource layers; Direction.North is a placeholder.
+    result.push({
+      row: board.source.row,
+      col: board.source.col,
+      entryDir: Direction.North,
+      depth: -1,
+      connections: sourceConnections,
+      isGold: sourceIsGold,
+      isSource: true,
+    });
+  }
 
   const sourceKey = posKey(board.source.row, board.source.col);
   const bfsVisited = new Set<string>();
@@ -107,8 +139,12 @@ export function computePulseLayers(board: Board): IdlePulseLayer[] {
  * Render a single frame of the idle-pulse sweep onto `ctx`.
  *
  * Returns `true` while the pulse is still active (some tiles haven't been
- * reached yet or are still fading), `false` once the last tile has fully
+ * reached yet or are still animating), `false` once the last tile has fully
  * faded out.
+ *
+ * Timing: the source tile (depth -1) starts at elapsed = 0.  Each subsequent
+ * BFS depth starts PULSE_SPEED_PER_DEPTH ms later:
+ *   tileStart = (depth + 1) * PULSE_SPEED_PER_DEPTH
  */
 export function renderIdlePulse(
   ctx: CanvasRenderingContext2D,
@@ -117,24 +153,29 @@ export function renderIdlePulse(
 ): boolean {
   const elapsed = now - pulse.startTime;
   // The pulse finishes when its leading edge has cleared the deepest tile.
-  const totalDuration = pulse.maxDepth * PULSE_SPEED_PER_DEPTH + PULSE_TILE_DURATION;
+  // Deepest tile (maxDepth) starts at (maxDepth + 1) * PULSE_SPEED_PER_DEPTH.
+  const totalDuration = (pulse.maxDepth + 1) * PULSE_SPEED_PER_DEPTH + PULSE_TILE_DURATION;
   if (elapsed > totalDuration) return false;
 
   for (const layer of pulse.layers) {
-    // Time within this tile's own fade window.
-    const tileElapsed = elapsed - layer.depth * PULSE_SPEED_PER_DEPTH;
+    // Time within this tile's own animation window.
+    // Source (depth -1): tileStart = 0.  Depth n: tileStart = (n+1) * PULSE_SPEED_PER_DEPTH.
+    const tileStart = (layer.depth + 1) * PULSE_SPEED_PER_DEPTH;
+    const tileElapsed = elapsed - tileStart;
     const tileProgress = tileElapsed / PULSE_TILE_DURATION;
-    if (tileProgress <= 0 || tileProgress >= 1) continue; // not yet reached or already faded
+    if (tileProgress <= 0 || tileProgress >= 1) continue; // not yet reached or already done
 
-    // Alpha follows a half-sine curve: 0 → peak → 0 over the tile duration.
+    // Alpha envelope: rises and falls across the tile duration so the glow
+    // appears smoothly rather than popping on/off.
     const alpha = Math.sin(tileProgress * Math.PI) * PULSE_ALPHA;
     if (alpha <= 0) continue;
 
-    // Derive the overlay color from the base water color for this tile type.
-    const baseColor = layer.isGold ? GOLD_PIPE_WATER_COLOR : WATER_COLOR;
-    const overlayColor = _pulseColor(baseColor, alpha);
+    // Phase 1 (entry arm, inward): covers tileProgress 0 → 0.5.
+    const phase1P = Math.min(1, tileProgress * 2);
+    // Phase 2 (exit arms, outward): covers tileProgress 0.5 → 1.
+    const phase2P = Math.max(0, (tileProgress - 0.5) * 2);
 
-    _drawPulseOverlay(ctx, layer, overlayColor);
+    _drawLocalizedPulse(ctx, layer, alpha, phase1P, phase2P);
   }
 
   return true;
@@ -143,54 +184,121 @@ export function renderIdlePulse(
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 /**
- * Convert a hex or `#rrggbb` color string into an rgba string with the given
- * alpha, making the pulse brighter than the base water color by blending
- * toward white.
+ * Parse a `#rrggbb` hex string and return the blended-toward-white RGB
+ * components as an `[r, g, b]` tuple (integers 0–255).
  */
-function _pulseColor(baseHex: string, alpha: number): string {
-  // Parse the hex color.
+function _brightRGB(baseHex: string): [number, number, number] {
   const hex = baseHex.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
-  // Blend each channel toward 255 (white) proportionally to the alpha so the
-  // overlay appears brighter/lighter than the underlying pipe color.
-  const br = Math.round(r + (255 - r) * 0.6);
-  const bg = Math.round(g + (255 - g) * 0.6);
-  const bb = Math.round(b + (255 - b) * 0.6);
-  return `rgba(${br},${bg},${bb},${alpha.toFixed(3)})`;
+  return [
+    Math.round(r + (255 - r) * 0.6),
+    Math.round(g + (255 - g) * 0.6),
+    Math.round(b + (255 - b) * 0.6),
+  ];
 }
 
 /**
- * Draw the full pipe-arm geometry of a single tile at the given overlay color.
- * All connected arms are drawn fully extended (not animated to grow/shrink);
- * the alpha on the color itself drives the fade effect.
+ * Draw a radial glow centered at `(hx, hy)`.
+ *
+ * Two concentric gradients are drawn: a bright, more opaque inner core and a
+ * softer, larger outer halo.  Both fade to transparent at the edge, so the
+ * glow blends naturally over any underlying pipe artwork.
  */
-function _drawPulseOverlay(
+function _drawGlowAt(
+  ctx: CanvasRenderingContext2D,
+  hx: number,
+  hy: number,
+  r: number,
+  g: number,
+  b: number,
+  alpha: number,
+): void {
+  const glowRadius = LINE_WIDTH * 2.5;
+
+  // Outer soft halo.
+  const outer = ctx.createRadialGradient(hx, hy, 0, hx, hy, glowRadius * 2);
+  outer.addColorStop(0, `rgba(${r},${g},${b},${(alpha * 0.5).toFixed(3)})`);
+  outer.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(hx, hy, glowRadius * 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner bright core.
+  const inner = ctx.createRadialGradient(hx, hy, 0, hx, hy, glowRadius);
+  inner.addColorStop(0, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
+  inner.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.fillStyle = inner;
+  ctx.beginPath();
+  ctx.arc(hx, hy, glowRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Draw the localized moving glow for a single tile.
+ *
+ * For a normal tile, `phase1P` drives the glow head from the entry-arm edge
+ * toward the center, and `phase2P` drives it from the center outward along
+ * each exit arm.  For the source tile (`isSource === true`) only the phase-2
+ * outward spread is used, covering the full tile duration.
+ *
+ * @param phase1P - Phase-1 progress (0 → 1, entry arm inward).
+ * @param phase2P - Phase-2 progress (0 → 1, exit arms outward).
+ */
+function _drawLocalizedPulse(
   ctx: CanvasRenderingContext2D,
   layer: IdlePulseLayer,
-  color: string,
+  alpha: number,
+  phase1P: number,
+  phase2P: number,
 ): void {
   const cx = layer.col * TILE_SIZE + TILE_SIZE / 2;
   const cy = layer.row * TILE_SIZE + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
 
+  const baseColor = layer.isGold ? GOLD_PIPE_WATER_COLOR : WATER_COLOR;
+  const [r, g, b] = _brightRGB(baseColor);
+
   ctx.save();
+  // Clip to this tile so the glow doesn't bleed into neighbouring tiles.
   ctx.beginPath();
   ctx.rect(layer.col * TILE_SIZE, layer.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
   ctx.clip();
 
-  ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'round';
+  if (layer.isSource) {
+    // Source tile: glow spreads from center outward along all connected arms.
+    // phase2P covers the full tile duration for the source (passed in as the
+    // phase-2 value, but the caller also provides phase1P; we use phase2P for
+    // all arms since there is no entry arm on the source).
+    for (const dir of layer.connections) {
+      const dx = NEIGHBOUR_DELTA[dir].col;
+      const dy = NEIGHBOUR_DELTA[dir].row;
+      // For source use the union of both phases so the glow travels the full arm.
+      const p = phase1P < 1 ? phase1P * 0.5 : 0.5 + phase2P * 0.5;
+      _drawGlowAt(ctx, cx + dx * half * p, cy + dy * half * p, r, g, b, alpha);
+    }
+  } else {
+    // Phase 1: glow head moves from entry-arm edge inward toward center.
+    if (phase1P > 0 && layer.connections.has(layer.entryDir)) {
+      const dx = NEIGHBOUR_DELTA[layer.entryDir].col;
+      const dy = NEIGHBOUR_DELTA[layer.entryDir].row;
+      // At phase1P=0 head is at the arm edge; at phase1P=1 it is at the center.
+      const hx = cx + dx * half * (1 - phase1P);
+      const hy = cy + dy * half * (1 - phase1P);
+      _drawGlowAt(ctx, hx, hy, r, g, b, alpha);
+    }
 
-  for (const dir of layer.connections) {
-    const dx = NEIGHBOUR_DELTA[dir].col;
-    const dy = NEIGHBOUR_DELTA[dir].row;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + dx * half, cy + dy * half);
-    ctx.stroke();
+    // Phase 2: glow heads move from center outward along each exit arm.
+    if (phase2P > 0) {
+      for (const dir of layer.connections) {
+        if (dir === layer.entryDir) continue;
+        const dx = NEIGHBOUR_DELTA[dir].col;
+        const dy = NEIGHBOUR_DELTA[dir].row;
+        _drawGlowAt(ctx, cx + dx * half * phase2P, cy + dy * half * phase2P, r, g, b, alpha);
+      }
+    }
   }
 
   ctx.restore();
