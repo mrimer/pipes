@@ -537,6 +537,7 @@ export class Game implements InputCallbacks {
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
+    this._animMgr.resetIdleTimer();
 
     if (!this._campaign.isPlaytesting) {
       this._campaign.updateLevelHeader(levelId);
@@ -910,6 +911,7 @@ export class Game implements InputCallbacks {
       const anyDisconnected = [...filledBefore].some(key => key !== reclaimedPosKey && !filledAfterReclaim.has(key));
       sfxManager.play(anyDisconnected ? SfxId.Disconnect : SfxId.Delete);
       this._animMgr.completeAnims();
+      this._animMgr.resetIdleTimer();
       const changes = this.board.applyTurnDelta();
       this._playLeakSfxIfNeeded(this.board, changes);
       this._playGoldSfxIfNeeded(this.board, filledBefore);
@@ -959,6 +961,7 @@ export class Game implements InputCallbacks {
       sfxManager.play(SfxId.RotateCW);
     }
     this._animMgr.completeAnims();
+    this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
     this._playLeakSfxIfNeeded(this.board, changes);
     this._playGoldSfxIfNeeded(this.board, filledBefore);
@@ -1322,6 +1325,7 @@ export class Game implements InputCallbacks {
   ): void {
     if (!this.board) return;
     this._animMgr.completeAnims();
+    this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
     const posKey = (replacedRow !== undefined && replacedCol !== undefined)
       ? `${replacedRow},${replacedCol}` : null;
@@ -1543,6 +1547,7 @@ export class Game implements InputCallbacks {
       return;
     }
     this._animMgr.completeAnims();
+    this._animMgr.resetIdleTimer();
     const turnBefore = this.board.turnNumber;
     const filledBefore = this.board.getFilledPositions();
     if (this.gameState === GameState.GameOver) {
@@ -1570,6 +1575,7 @@ export class Game implements InputCallbacks {
   performRedo(): void {
     if (!this.board || !this.board.canRedo()) return;
     sfxManager.play(SfxId.Redo);
+    this._animMgr.resetIdleTimer();
     const filledBefore = this.board.getFilledPositions();
     this.board.redoMove();
     const sparkle = this._metrics.sparkleCallbacks();
