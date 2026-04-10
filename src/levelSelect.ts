@@ -327,9 +327,16 @@ export function renderLevelList(
       ? findContinueLevelId(chapters, completedLevels, levelStars, completedChapters)
       : null;
 
+    // When all chapters are mastered (every level, star, and challenge done)
+    // and chapter maps are in use, replace the continue button with a
+    // "Mastered!" trophy indicator that does nothing on click.
+    const showMastered = onChapterMap !== undefined && campaignAllComplete;
+
     const continueActive = continueChapterIdx !== null || continueId !== null;
     const continueBtn = document.createElement('button');
-    if (continueChapterIdx !== null) {
+    if (showMastered) {
+      continueBtn.textContent = '🏆 Mastered!';
+    } else if (continueChapterIdx !== null) {
       const noProgress = completedLevels.size === 0 && (!completedChapters || completedChapters.size === 0);
       continueBtn.textContent = noProgress ? '▶ Start' : `▶ Chapter ${continueChapterIdx + 1}`;
     } else {
@@ -350,18 +357,20 @@ export function renderLevelList(
         ? ` (${continueChapterNum}-${continueLevelNum})` : '';
       continueBtn.textContent = `▶ Continue${continueLoc}`;
     }
-    continueBtn.disabled = !continueActive;
+    continueBtn.disabled = !showMastered && !continueActive;
     continueBtn.style.cssText =
       'padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:6px;' +
-      'border:1px solid ' + (continueActive ? '#f0c040' : '#555') + ';' +
-      'background:' + (continueActive ? '#f0c040' : '#333') + ';' +
-      'color:' + (continueActive ? '#16213e' : '#888') + ';' +
-      'cursor:' + (continueActive ? 'pointer' : 'default') + ';' +
+      'border:1px solid ' + (showMastered || continueActive ? '#f0c040' : '#555') + ';' +
+      'background:' + (showMastered || continueActive ? '#f0c040' : '#333') + ';' +
+      'color:' + (showMastered || continueActive ? '#16213e' : '#888') + ';' +
+      'cursor:' + (showMastered ? 'default' : continueActive ? 'pointer' : 'default') + ';' +
       'width:100%;';
-    if (continueChapterIdx !== null && onChapterMap) {
-      continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx); });
-    } else if (continueId !== null) {
-      continueBtn.addEventListener('click', () => startLevel(continueId));
+    if (!showMastered) {
+      if (continueChapterIdx !== null && onChapterMap) {
+        continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx); });
+      } else if (continueId !== null) {
+        continueBtn.addEventListener('click', () => startLevel(continueId));
+      }
     }
     header.appendChild(continueBtn);
 

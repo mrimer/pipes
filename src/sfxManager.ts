@@ -389,6 +389,58 @@ export class SfxManager {
   }
 
   /**
+   * Play the given sound effect and invoke {@link onDone} once playback ends.
+   *
+   * Behaves like {@link play} but additionally calls {@link onDone} after the
+   * audio finishes.  When audio is unavailable or the volume is zero,
+   * {@link onDone} is called synchronously so the caller is never left waiting.
+   */
+  playWithDoneCallback(id: SfxId, onDone: () => void): void {
+    if (this._volume === 0) { onDone(); return; }
+
+    const files = SFX_FILES[id];
+    if (!files || files.length === 0) { onDone(); return; }
+
+    const idx = this._pickIndex(id, files.length);
+    this._lastIndex[id] = idx;
+    const url = files[idx];
+
+    const ctx = this._getContext();
+    if (ctx && this._gainNode) {
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch((err) => { this._warn('AudioContext resume failed', err); });
+      }
+      const buf = this._buffers.get(url);
+      if (buf) {
+        this._playBufferWithCallback(buf, onDone);
+      } else {
+        this._fetchBuffer(url)
+          .then(b => {
+            if (b) { this._playBufferWithCallback(b, onDone); }
+            else { onDone(); }
+          })
+          .catch((err) => { this._warn(`Playback fetch failed: ${url}`, err); onDone(); });
+      }
+    } else if (typeof Audio !== 'undefined') {
+      const audio = new Audio(url);
+      audio.volume = this._volume;
+      audio.addEventListener('ended', () => onDone(), { once: true });
+      audio.addEventListener('error', () => onDone(), { once: true });
+      try {
+        const playResult = audio.play();
+        if (playResult !== undefined) {
+          playResult.catch((err) => { this._warn('HTMLAudio play failed', err); onDone(); });
+        }
+      } catch (err) {
+        this._warn('HTMLAudio play threw synchronously', err);
+        onDone();
+      }
+    } else {
+      onDone();
+    }
+  }
+
+  /**
    * Set the playback volume.
    * @param volume - An integer in [0, 100]; 0 is silent, 100 is full volume.
    */
@@ -550,6 +602,26 @@ export class SfxManager {
     source.connect(gainNode);
     this._activeSources.add(source);
     source.onended = () => { this._activeSources.delete(source); };
+    source.start();
+  }
+
+  /**
+   * Schedule an {@link AudioBuffer} for immediate playback, invoking
+   * {@link onDone} once the source node fires its `ended` event.
+   */
+  private _playBufferWithCallback(buf: AudioBuffer, onDone: () => void): void {
+    const ctx = this._ctx;
+    const gainNode = this._gainNode;
+    if (!ctx || !gainNode) { onDone(); return; }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buf;
+    source.connect(gainNode);
+    this._activeSources.add(source);
+    source.onended = () => {
+      this._activeSources.delete(source);
+      onDone();
+    };
     source.start();
   }
 
