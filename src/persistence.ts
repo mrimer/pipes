@@ -339,6 +339,40 @@ export function clearCompletedChapters(campaignId: string, completedChapters: Se
   } catch { /* ignore */ }
 }
 
+// ─── Chapter mastery sequence tracking ───────────────────────────────────────
+
+function campaignMasteredShownKey(campaignId: string): string {
+  return `pipes_campaign_mastered_shown_${campaignId}`;
+}
+
+/**
+ * Load the set of chapter IDs for which the mastery sequence (sfx + confetti
+ * + modal) has already been shown.
+ */
+export function loadMasteredChaptersShown(campaignId: string): Set<number> {
+  try {
+    const raw = localStorage.getItem(campaignMasteredShownKey(campaignId));
+    if (raw) return new Set(JSON.parse(raw) as number[]);
+  } catch { /* ignore */ }
+  return new Set<number>();
+}
+
+/** Record that the mastery sequence has been shown for a given chapter. */
+export function markMasteredChapterShown(campaignId: string, chapterId: number, shownSet: Set<number>): void {
+  shownSet.add(chapterId);
+  try {
+    localStorage.setItem(campaignMasteredShownKey(campaignId), JSON.stringify([...shownSet]));
+  } catch { /* ignore */ }
+}
+
+/** Clear all mastery-sequence-shown records for a campaign. */
+export function clearMasteredChaptersShown(campaignId: string, shownSet: Set<number>): void {
+  shownSet.clear();
+  try {
+    localStorage.removeItem(campaignMasteredShownKey(campaignId));
+  } catch { /* ignore */ }
+}
+
 // ─── Settings persistence ─────────────────────────────────────────────────────
 
 const SFX_VOLUME_KEY = 'pipes_sfx_volume';

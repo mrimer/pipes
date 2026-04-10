@@ -98,7 +98,65 @@ export function computeWinTileGlows(board: Board, baseTime: number): WinTileGlow
   return glows;
 }
 
-// ── Rendering ─────────────────────────────────────────────────────────────────
+// ── Chapter-map win glow computation ──────────────────────────────────────────
+
+/**
+ * Build `WinTileGlow` entries for all water-filled cells on the chapter map,
+ * with start times spaced {@link WIN_TILE_LAYER_DELAY_MS} apart by BFS layer.
+ *
+ * Uses the same depth-stagger rules as {@link computeWinTileGlows}: BFS depth 0
+ * (source) and depth 1 fire at `baseTime`; depth d ≥ 2 fires at
+ * `baseTime + (d − 1) * WIN_TILE_LAYER_DELAY_MS`.
+ *
+ * @param filledKeys  Set of `"row,col"` strings for water-reachable cells.
+ * @param sourceRow   Row index of the source tile.
+ * @param sourceCol   Column index of the source tile.
+ * @param baseTime    `performance.now()` timestamp of the animation start.
+ */
+export function computeChapterMapWinGlows(
+  filledKeys: Set<string>,
+  sourceRow: number,
+  sourceCol: number,
+  baseTime: number,
+): WinTileGlow[] {
+  const glows: WinTileGlow[] = [];
+  if (!filledKeys.has(`${sourceRow},${sourceCol}`)) return glows;
+
+  const depths = new Map<string, number>();
+  const srcKey = `${sourceRow},${sourceCol}`;
+  depths.set(srcKey, 0);
+
+  const queue: Array<{ row: number; col: number; depth: number }> = [
+    { row: sourceRow, col: sourceCol, depth: 0 },
+  ];
+
+  const DIRS: Array<{ dr: number; dc: number }> = [
+    { dr: -1, dc: 0 }, { dr: 1, dc: 0 },
+    { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
+  ];
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const { dr, dc } of DIRS) {
+      const nr = cur.row + dr;
+      const nc = cur.col + dc;
+      const key = `${nr},${nc}`;
+      if (!filledKeys.has(key) || depths.has(key)) continue;
+      const nextDepth = cur.depth + 1;
+      depths.set(key, nextDepth);
+      queue.push({ row: nr, col: nc, depth: nextDepth });
+    }
+  }
+
+  for (const key of filledKeys) {
+    const depth = depths.get(key) ?? 0;
+    const delayMs = Math.max(0, depth - 1) * WIN_TILE_LAYER_DELAY_MS;
+    const [row, col] = key.split(',').map(Number);
+    glows.push({ row, col, startTime: baseTime + delayMs });
+  }
+
+  return glows;
+}
 
 /**
  * Draw the current state of all active win tile glow effects onto `ctx`.
