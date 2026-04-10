@@ -789,6 +789,7 @@ export class ChapterMapEditorSection {
     this._updateChapterCanvasDisplaySize();
     this._saveChapterGridState(chapter, campaign);
     this._ui!.rebuildLevelInventory(chapter, campaign);
+    this._ui!.rebuildGridSizePanel(chapter, campaign);
     this._updateChapterUndoRedoButtons();
     this._renderChapterCanvas();
   }
