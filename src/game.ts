@@ -525,7 +525,9 @@ export class Game implements InputCallbacks {
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
 
-    this._campaign.updateLevelHeader(levelId);
+    if (!this._campaign.isPlaytesting) {
+      this._campaign.updateLevelHeader(levelId);
+    }
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
     this._metrics.updateBestScore(levelId, this._campaign);
