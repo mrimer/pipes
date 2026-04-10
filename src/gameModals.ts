@@ -51,7 +51,29 @@ export function buildModalShell(
 // ─── Game-specific modal builders ────────────────────────────────────────────
 
 /**
+ * Progress summary shown in the reset-progress confirmation modal.
+ * All fields are optional so the modal can degrade gracefully when
+ * data is unavailable.
+ */
+export interface ResetProgressInfo {
+  campaignName: string;
+  chaptersCompleted: number;
+  chaptersTotal: number;
+  levelsCompleted: number;
+  levelsTotal: number;
+  challengesCompleted: number;
+  challengesTotal: number;
+  starsCollected: number;
+  starsTotal: number;
+  waterScore: number;
+}
+
+/**
  * Build and attach the reset-progress confirmation modal.
+ *
+ * Returns the overlay element and an `updateInfo` function that should be
+ * called (with the current campaign progress data) immediately before the
+ * modal is shown, so the modal always reflects up-to-date information.
  *
  * @param onConfirm - Called when the player confirms the reset.
  *                    Should reset progress **and** dismiss the modal.
@@ -60,15 +82,22 @@ export function buildModalShell(
 export function buildResetModal(
   onConfirm: () => void,
   onCancel: () => void,
-): HTMLElement {
+): { el: HTMLElement; updateInfo: (info: ResetProgressInfo | null) => void } {
   const el = createModalOverlay(0.7);
   const box = document.createElement('div');
   box.style.cssText =
     'background:#16213e;border:3px solid #e74c3c;border-radius:10px;' +
     'padding:32px 40px;text-align:center;display:flex;flex-direction:column;' +
-    'gap:16px;min-width:280px;';
+    'gap:16px;min-width:280px;max-width:420px;';
   const title = document.createElement('h2');
   title.textContent = '⚠️ Reset Progress?';
+
+  const campaignNameEl = document.createElement('p');
+  campaignNameEl.style.cssText = 'font-size:1rem;font-weight:bold;color:#74b9ff;margin:0;';
+
+  const progressEl = document.createElement('p');
+  progressEl.style.cssText = 'font-size:0.85rem;color:#aaa;margin:0;';
+
   const msg = document.createElement('p');
   msg.style.cssText = 'font-size:0.95rem;color:#aaa;';
   msg.textContent = 'This will remove all level completion data. Are you sure?';
@@ -89,11 +118,38 @@ export function buildResetModal(
   actions.appendChild(cancelBtn);
   actions.appendChild(confirmBtn);
   box.appendChild(title);
+  box.appendChild(campaignNameEl);
+  box.appendChild(progressEl);
   box.appendChild(msg);
   box.appendChild(actions);
   el.appendChild(box);
   document.body.appendChild(el);
-  return el;
+
+  function updateInfo(info: ResetProgressInfo | null): void {
+    if (!info) {
+      campaignNameEl.textContent = '';
+      progressEl.textContent = '';
+      return;
+    }
+    campaignNameEl.textContent = info.campaignName;
+    const parts: string[] = [];
+    if (info.chaptersTotal > 0) {
+      parts.push(`${info.chaptersCompleted}/${info.chaptersTotal} chapters`);
+    }
+    parts.push(`${info.levelsCompleted}/${info.levelsTotal} levels`);
+    if (info.challengesTotal > 0) {
+      parts.push(`${info.challengesCompleted}/${info.challengesTotal} challenges`);
+    }
+    if (info.starsTotal > 0) {
+      parts.push(`⭐ ${info.starsCollected}/${info.starsTotal}`);
+    }
+    if (info.waterScore > 0) {
+      parts.push(`💧 ${info.waterScore}`);
+    }
+    progressEl.textContent = parts.join('  ·  ');
+  }
+
+  return { el, updateInfo };
 }
 
 /**

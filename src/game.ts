@@ -11,7 +11,7 @@ import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
 import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
 import {
-  buildResetModal,
+  buildResetModal, ResetProgressInfo,
   buildExitConfirmModal, buildUnplayableModal,
   buildSettingsModal,
 } from './gameModals';
@@ -203,6 +203,8 @@ export class Game implements InputCallbacks {
 
   /** Modal overlay for confirming a progress reset. */
   private readonly resetConfirmModalEl: HTMLElement;
+  /** Updater function for the reset-progress confirmation modal content. */
+  private readonly _updateResetModalInfo: (info: ResetProgressInfo | null) => void;
 
   /** Modal overlay shown when the player presses Esc to confirm abandoning the level. */
   private readonly _exitConfirmModalEl: HTMLElement;
@@ -276,10 +278,12 @@ export class Game implements InputCallbacks {
     document.body.appendChild(this.errorFlashEl);
 
     // Create the reset-progress confirmation modal
-    this.resetConfirmModalEl = buildResetModal(
+    const resetModal = buildResetModal(
       () => { this._campaign.resetProgress(); this._closeModal(this.resetConfirmModalEl); },
       () => { this._closeModal(this.resetConfirmModalEl); },
     );
+    this.resetConfirmModalEl = resetModal.el;
+    this._updateResetModalInfo = resetModal.updateInfo;
 
     // Create the game-rules modal (appends itself to document.body)
     this._rulesModalEl = createGameRulesModal();
@@ -355,7 +359,10 @@ export class Game implements InputCallbacks {
       exitBtnEl: this.exitBtnEl,
       gameoverMenuBtnEl: this.gameoverMenuBtnEl,
       completedLevels: this.completedLevels,
-      showResetConfirmModal: () => { this.resetConfirmModalEl.style.display = 'flex'; },
+      showResetConfirmModal: (info) => {
+        this._updateResetModalInfo(info);
+        this.resetConfirmModalEl.style.display = 'flex';
+      },
       showRules: () => { this._rulesModalEl.style.display = 'flex'; },
       showSettings: () => {
         // Sync slider and value display to current volume before showing.
@@ -494,7 +501,7 @@ export class Game implements InputCallbacks {
   }
 
   /** Start (or restart) the given level. */
-  startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[], isUserRestart = false): void {
+  startLevel(levelId: number, existingDecorations?: ReadonlyMap<string, AmbientDecoration>, isUserRestart = false): void {
     let level: LevelDef | undefined;
     if (this._campaign.isPlaytesting) {
       // During playtesting the level lives in the editor, not in the active campaign.

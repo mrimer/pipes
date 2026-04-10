@@ -4,11 +4,10 @@
  */
 
 import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation } from '../types';
-import { PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, generateAmbientDecorations } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { computeChapterMapReachable, findChapterMapTile, editorTileConns } from '../chapterMapUtils';
-import { generateChapterMapDecorations } from '../visuals/chapterMap';
 import {
   EditorPalette,
   TileParams,
@@ -120,7 +119,7 @@ export class ChapterMapEditorSection {
       this._chapterEditGrid = grid;
     }
     // Generate ambient decorations for the grid
-    this._chapterDecorations = generateChapterMapDecorations(this._chapterEditRows, this._chapterEditCols);
+    this._chapterDecorations = generateAmbientDecorations(this._chapterEditRows, this._chapterEditCols);
     // Reset chapter editor state
     this._chapterHist.clear();
     this._chapterSelectedLevelIdx = null;
@@ -299,7 +298,7 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     this._chapterEditGrid = newGrid;
-    this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
+    this._chapterDecorations = generateAmbientDecorations(newRows, newCols);
 
     // Update focused tile position to follow the rotation.
     if (this._chapterFocusedTilePos) {
@@ -331,7 +330,7 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     this._chapterEditGrid = newGrid;
-    this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
+    this._chapterDecorations = generateAmbientDecorations(newRows, newCols);
 
     if (this._chapterFocusedTilePos) {
       this._chapterFocusedTilePos = reflectPositionAboutDiagonal(this._chapterFocusedTilePos);
@@ -751,7 +750,7 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     // Regenerate decorations for the new grid dimensions
-    this._chapterDecorations = generateChapterMapDecorations(newRows, newCols);
+    this._chapterDecorations = generateAmbientDecorations(newRows, newCols);
     this._recordChapterSnapshot(chapter);
     if (this._chapterCanvas) {
       setTileSize(computeTileSize(newRows, newCols));

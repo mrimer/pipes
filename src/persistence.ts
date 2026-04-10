@@ -339,6 +339,15 @@ export function clearCompletedChapters(campaignId: string, completedChapters: Se
   } catch { /* ignore */ }
 }
 
+/** Remove a single chapter from the completed-chapters set and persist. */
+export function removeChapterCompleted(campaignId: string, chapterId: number, completedChapters: Set<number>): void {
+  if (!completedChapters.has(chapterId)) return;
+  completedChapters.delete(chapterId);
+  try {
+    localStorage.setItem(campaignChaptersKey(campaignId), JSON.stringify([...completedChapters]));
+  } catch { /* ignore */ }
+}
+
 // ─── Chapter mastery sequence tracking ───────────────────────────────────────
 
 function campaignMasteredShownKey(campaignId: string): string {
@@ -370,6 +379,15 @@ export function clearMasteredChaptersShown(campaignId: string, shownSet: Set<num
   shownSet.clear();
   try {
     localStorage.removeItem(campaignMasteredShownKey(campaignId));
+  } catch { /* ignore */ }
+}
+
+/** Remove a single chapter from the mastery-sequence-shown set and persist. */
+export function removeMasteredChapterShown(campaignId: string, chapterId: number, shownSet: Set<number>): void {
+  if (!shownSet.has(chapterId)) return;
+  shownSet.delete(chapterId);
+  try {
+    localStorage.setItem(campaignMasteredShownKey(campaignId), JSON.stringify([...shownSet]));
   } catch { /* ignore */ }
 }
 

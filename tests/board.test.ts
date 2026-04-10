@@ -3663,9 +3663,9 @@ describe('Chamber tile (sandstone shatter)', () => {
 // ─── Ambient decorations ──────────────────────────────────────────────────────
 
 describe('Board ambientDecorations', () => {
-  it('is an empty array for boards constructed without a level', () => {
+  it('is an empty map for boards constructed without a level', () => {
     const board = new Board(3, 3);
-    expect(board.ambientDecorations).toEqual([]);
+    expect(board.ambientDecorations.size).toBe(0);
   });
 
   it('is populated when a level is provided', () => {
@@ -3674,7 +3674,7 @@ describe('Board ambientDecorations', () => {
     for (let i = 0; i < 20; i++) {
       const level = LEVELS[0];
       const board = new Board(level.rows, level.cols, level);
-      if (board.ambientDecorations.length > 0) {
+      if (board.ambientDecorations.size > 0) {
         found = true;
         break;
       }
@@ -3684,18 +3684,18 @@ describe('Board ambientDecorations', () => {
 
   it('each decoration has valid fields', () => {
     // Build boards until we get at least one decoration
-    let decorations: readonly import('../src/types').AmbientDecoration[] = [];
+    let decorations: ReadonlyMap<string, import('../src/types').AmbientDecoration> = new Map();
     for (let i = 0; i < 30; i++) {
       const level = LEVELS[0];
       const board = new Board(level.rows, level.cols, level);
-      if (board.ambientDecorations.length > 0) {
+      if (board.ambientDecorations.size > 0) {
         decorations = board.ambientDecorations;
         break;
       }
     }
-    if (decorations.length === 0) return; // extremely unlikely; skip rather than fail
+    if (decorations.size === 0) return; // extremely unlikely; skip rather than fail
 
-    for (const dec of decorations) {
+    for (const dec of decorations.values()) {
       expect(dec.row).toBeGreaterThanOrEqual(0);
       expect(dec.col).toBeGreaterThanOrEqual(0);
       expect(['pebbles', 'flower', 'grass', 'mushroom', 'crystal']).toContain(dec.type);
@@ -3715,11 +3715,11 @@ describe('Board ambientDecorations', () => {
     for (let i = 0; i < 30; i++) {
       const level = LEVELS[0];
       const b = new Board(level.rows, level.cols, level);
-      if (b.ambientDecorations.length > 0) { board = b; break; }
+      if (b.ambientDecorations.size > 0) { board = b; break; }
     }
     if (!board) return;
 
-    for (const dec of board.ambientDecorations) {
+    for (const dec of board.ambientDecorations.values()) {
       expect(dec.row).toBeGreaterThanOrEqual(0);
       expect(dec.row).toBeLessThan(board.rows);
       expect(dec.col).toBeGreaterThanOrEqual(0);
