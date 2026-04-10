@@ -175,6 +175,36 @@ export type MoveResult = {
   cementDecrement?: GridPos;
 };
 
+// ─── Ambient decoration generation ───────────────────────────────────────────
+
+const DECORATION_DENSITY = 0.30;
+const DECORATION_TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
+
+/**
+ * Generate a list of ambient background decorations spread across a `rows × cols`
+ * grid.  Each cell has an independent ~30 % chance of receiving one decoration.
+ * This is a shared helper used by both the game board and the chapter-map renderer.
+ */
+export function generateAmbientDecorations(rows: number, cols: number): AmbientDecoration[] {
+  const decorations: AmbientDecoration[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (Math.random() >= DECORATION_DENSITY) continue;
+      decorations.push({
+        row: r,
+        col: c,
+        type: DECORATION_TYPES[Math.floor(Math.random() * DECORATION_TYPES.length)],
+        // Keep decorations away from cell edges for a natural look
+        offsetX: 0.15 + Math.random() * 0.70,
+        offsetY: 0.15 + Math.random() * 0.70,
+        rotation: Math.random() * 360,
+        variant: Math.floor(Math.random() * 3),
+      });
+    }
+  }
+  return decorations;
+}
+
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
  * Contains all game logic for path-finding, water tracking and win detection.
@@ -369,26 +399,7 @@ export class Board {
    * independent ~30 % chance of receiving one decoration.
    */
   private _generateAmbientDecorations(): AmbientDecoration[] {
-    const DECORATION_DENSITY = 0.30;
-    const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
-    const decorations: AmbientDecoration[] = [];
-
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        if (Math.random() >= DECORATION_DENSITY) continue;
-        decorations.push({
-          row: r,
-          col: c,
-          type: TYPES[Math.floor(Math.random() * TYPES.length)],
-          // Keep decorations away from cell edges for a natural look
-          offsetX: 0.15 + Math.random() * 0.70,
-          offsetY: 0.15 + Math.random() * 0.70,
-          rotation: Math.random() * 360,
-          variant: Math.floor(Math.random() * 3),
-        });
-      }
-    }
-    return decorations;
+    return generateAmbientDecorations(this.rows, this.cols);
   }
 
   // ─── Undo / redo support ───────────────────────────────────────────────────
