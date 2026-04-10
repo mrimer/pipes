@@ -4,9 +4,9 @@
  * explicit data parameters and write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, AmbientDecorationType } from '../types';
+import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
 import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex } from '../renderer';
-import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA, generateAmbientDecorations } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
@@ -67,22 +67,9 @@ export function generateChapterMapDecorations(
   rows: number,
   cols: number,
 ): ReadonlyMap<string, AmbientDecoration> {
-  const DECORATION_DENSITY = 0.30;
-  const TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
   const map = new Map<string, AmbientDecoration>();
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (Math.random() >= DECORATION_DENSITY) continue;
-      map.set(`${r},${c}`, {
-        row: r,
-        col: c,
-        type: TYPES[Math.floor(Math.random() * TYPES.length)],
-        offsetX: 0.15 + Math.random() * 0.70,
-        offsetY: 0.15 + Math.random() * 0.70,
-        rotation: Math.random() * 360,
-        variant: Math.floor(Math.random() * 3),
-      });
-    }
+  for (const d of generateAmbientDecorations(rows, cols)) {
+    map.set(`${d.row},${d.col}`, d);
   }
   return map;
 }

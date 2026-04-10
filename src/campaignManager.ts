@@ -690,11 +690,11 @@ export class CampaignManager {
     if (!chapter || chapter.id === undefined) return;
     if (this._activeCampaignCompletedChapters.has(chapter.id)) return;
     if (this._chapterMapScreen?.isChapterComplete()) {
-      this._onChapterSinkClicked(chapterIdx);
+      this._completeChapter(chapterIdx);
     }
   }
 
-  private _onChapterSinkClicked(chapterIdx: number): void {
+  private _completeChapter(chapterIdx: number): void {
     const campaign = this._activeCampaign;
     if (!campaign) return;
     const chapter = campaign.chapters[chapterIdx];
