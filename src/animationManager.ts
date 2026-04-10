@@ -37,6 +37,7 @@ import {
 } from './visuals/pipeEffects';
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
 import { WinTileGlow, computeWinTileGlows, renderWinTileGlows } from './visuals/winTileEffect';
+import { IdlePulse, computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
 import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
@@ -127,6 +128,19 @@ export class AnimationManager {
 
   /** Active win-tile glow effects (one per connected tile, spawned on level win). */
   private _winTileGlows: WinTileGlow[] = [];
+
+  // ─── Idle-pulse state ─────────────────────────────────────────────────────
+
+  /** `performance.now()` of the last player action. */
+  private _lastActionTime = 0;
+  /** Currently-active idle pulse sweep, or null when no pulse is running. */
+  private _activePulse: IdlePulse | null = null;
+  /**
+   * `performance.now()` after which the next idle pulse may be triggered.
+   * Set to `now + 15 000` each time a pulse starts so the repeat cadence is
+   * maintained even if the first pulse finishes before 15 s elapses.
+   */
+  private _nextPulseTime = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -357,6 +371,7 @@ export class AnimationManager {
     this._tickWinFlow(board, gameState);
     this._tickVortex(board);
     this._tickGoldenTwinkles(board);
+    this._tickIdlePulse(board, gameState);
   }
 
   // ─── Win-flow lifecycle ───────────────────────────────────────────────────
@@ -428,6 +443,7 @@ export class AnimationManager {
     this._fillAnims = [];
     this._nextGoldenTwinkle = 0;
     this._winTileGlows = [];
+    this._activePulse = null;
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */
@@ -451,6 +467,19 @@ export class AnimationManager {
     };
 
     spawnRingEffect(canvas, source.col, source.row, cols, rows, SOURCE_COLOR, spawnSinkRing);
+  }
+
+  // ─── Idle-pulse lifecycle ─────────────────────────────────────────────────
+
+  /**
+   * Reset the idle timer and cancel any in-progress pulse.
+   * Call this after every player action (placement, rotation, reclaim, undo,
+   * redo) and also when a level starts so that the pulse does not fire
+   * immediately after entering a level.
+   */
+  resetIdleTimer(): void {
+    this._lastActionTime = performance.now();
+    this._activePulse = null;
   }
 
   // ─── Private tick helpers ─────────────────────────────────────────────────
@@ -643,6 +672,40 @@ export class AnimationManager {
     }
 
     spawnStarTwinkle(rect.left + tileX * scaleX, rect.top + tileY * scaleY);
+  }
+
+  /**
+   * Manage and render the idle-pulse sweep.
+   *
+   * Called once per animation frame from {@link tick}.  When the player has
+   * been idle for ≥ 10 s and the board has connected tiles, starts a new pulse
+   * sweep.  While a pulse is active it is rendered on the canvas; when the
+   * pulse finishes it is cleared so the next one can be triggered 15 s after
+   * the first one started.
+   *
+   * Only fires in {@link GameState.Playing}; the pulse is suppressed (and any
+   * active pulse cancelled) in Won or GameOver states.
+   */
+  private _tickIdlePulse(board: Board, gameState: GameState): void {
+    if (gameState !== GameState.Playing) {
+      this._activePulse = null;
+      return;
+    }
+    const now = performance.now();
+
+    if (!this._activePulse && now - this._lastActionTime >= 10000 && now >= this._nextPulseTime) {
+      const layers = computePulseLayers(board);
+      if (layers.length > 0) {
+        const maxDepth = layers.reduce((max, l) => Math.max(max, l.depth), 0);
+        this._activePulse = { layers, maxDepth, startTime: now };
+        this._nextPulseTime = now + 15000;
+      }
+    }
+
+    if (this._activePulse) {
+      const stillActive = renderIdlePulse(this.ctx, this._activePulse, now);
+      if (!stillActive) this._activePulse = null;
+    }
   }
 
 
