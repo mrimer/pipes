@@ -678,9 +678,9 @@ export class AnimationManager {
    * Manage and render the idle-pulse sweep.
    *
    * Called once per animation frame from {@link tick}.  When the player has
-   * been idle for ≥ 10 s and the board has connected tiles, starts a new pulse
+   * been idle for ≥ 5 s and the board has connected tiles, starts a new pulse
    * sweep.  While a pulse is active it is rendered on the canvas; when the
-   * pulse finishes it is cleared so the next one can be triggered 15 s after
+   * pulse finishes it is cleared so the next one can be triggered 5 s after
    * the first one started.
    *
    * Only fires in {@link GameState.Playing}; the pulse is suppressed (and any
@@ -693,12 +693,12 @@ export class AnimationManager {
     }
     const now = performance.now();
 
-    if (!this._activePulse && now - this._lastActionTime >= 10000 && now >= this._nextPulseTime) {
+    if (!this._activePulse && now - this._lastActionTime >= 5000 && now >= this._nextPulseTime) {
       const layers = computePulseLayers(board);
       if (layers.length > 0) {
         const maxDepth = layers.reduce((max, l) => Math.max(max, l.depth), 0);
         this._activePulse = { layers, maxDepth, startTime: now };
-        this._nextPulseTime = now + 15000;
+        this._nextPulseTime = now + 5000;
       }
     }
 
