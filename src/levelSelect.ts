@@ -330,7 +330,8 @@ export function renderLevelList(
     const continueActive = continueChapterIdx !== null || continueId !== null;
     const continueBtn = document.createElement('button');
     if (continueChapterIdx !== null) {
-      continueBtn.textContent = `▶ Chapter ${continueChapterIdx + 1}`;
+      const noProgress = completedLevels.size === 0 && (!completedChapters || completedChapters.size === 0);
+      continueBtn.textContent = noProgress ? '▶ Start' : `▶ Chapter ${continueChapterIdx + 1}`;
     } else {
       // Find the chapter and level number (1-based) for the level-based continue target.
       let continueChapterNum: number | null = null;
