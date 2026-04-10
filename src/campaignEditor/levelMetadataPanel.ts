@@ -191,6 +191,7 @@ export class LevelMetadataPanel {
   buildGridSizePanel(): HTMLElement {
     const state = this._cb.getState();
     const panel = document.createElement('div');
+    panel.id = 'editor-grid-size-panel';
     panel.style.cssText =
       EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;min-width:180px;';
 
@@ -262,6 +263,11 @@ export class LevelMetadataPanel {
     panel.appendChild(slideRotateSection);
 
     return panel;
+  }
+
+  rebuildGridSizePanel(): void {
+    const existing = document.getElementById('editor-grid-size-panel');
+    if (existing) existing.replaceWith(this.buildGridSizePanel());
   }
 
   buildInventoryEditor(): HTMLElement {

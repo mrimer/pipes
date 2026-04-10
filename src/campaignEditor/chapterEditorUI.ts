@@ -222,6 +222,7 @@ export class ChapterEditorUI {
 
   buildGridSizePanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
     const panel = document.createElement('div');
+    panel.id = 'chapter-grid-size-panel';
     panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:8px;';
 
     const title = document.createElement('div');
@@ -278,14 +279,20 @@ export class ChapterEditorUI {
 
     panel.appendChild(buildSlideAndRotateControls(
       (dir) => this._cb.slideGrid(dir, chapter),
-      (cw)  => this._cb.rotateGrid(cw, chapter),
-      ()    => this._cb.reflectGrid(chapter),
+      (cw)  => { this._cb.rotateGrid(cw, chapter); this.rebuildGridSizePanel(chapter, campaign); },
+      ()    => { this._cb.reflectGrid(chapter); this.rebuildGridSizePanel(chapter, campaign); },
     ));
 
     return panel;
   }
 
   // ── Rebuild helpers (called after state changes) ───────────────────────────
+
+  /** Re-render the grid size panel. */
+  rebuildGridSizePanel(chapter: ChapterDef, campaign: CampaignDef): void {
+    const existing = document.getElementById('chapter-grid-size-panel');
+    if (existing) existing.replaceWith(this.buildGridSizePanel(chapter, campaign));
+  }
 
   /** Re-render the chapter palette panel. */
   rebuildPalette(chapter: ChapterDef, campaign: CampaignDef): void {

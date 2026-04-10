@@ -1119,6 +1119,7 @@ export class CampaignEditor {
     this._updateCanvasDisplaySize();
     const invPanel = document.getElementById('editor-inventory-panel');
     if (invPanel) invPanel.replaceWith(this._metadataPanel!.buildInventoryEditor());
+    this._metadataPanel?.rebuildGridSizePanel();
   }
 
   private _updateEditorUndoRedoButtons(): void {
@@ -1183,6 +1184,7 @@ export class CampaignEditor {
     }
     this._updateCanvasDisplaySize();
     this._refreshPaletteUI();
+    this._metadataPanel?.rebuildGridSizePanel();
     this._renderEditorCanvas();
   }
 
@@ -1204,6 +1206,7 @@ export class CampaignEditor {
     }
     this._updateCanvasDisplaySize();
     this._refreshPaletteUI();
+    this._metadataPanel?.rebuildGridSizePanel();
     this._renderEditorCanvas();
   }
 
