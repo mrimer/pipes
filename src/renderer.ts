@@ -70,6 +70,15 @@ const PREVIEW_SHADOW_COLOR = '#ffff00';
 /** Blur radius (px) for the hover-preview tile glow shadow. */
 const PREVIEW_SHADOW_BLUR = 14;
 
+/** Edge highlight color for neighbors that would form a new connection (dry). */
+const CONNECTION_PREVIEW_COLOR = '#4caf50';
+
+/** Edge highlight color for neighbors that would form a new connection (water-filled). */
+const CONNECTION_PREVIEW_WATER_COLOR = '#56c8e8';
+
+/** Edge highlight color for neighbors that would lose an existing connection. */
+const DISCONNECTION_PREVIEW_COLOR = '#e57373';
+
 /** Rotation speed for the spin-arrow hover animation, in radians per millisecond (one full turn per 1.5 s). */
 const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
 
@@ -1154,7 +1163,7 @@ export function renderBoard(
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
-  _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater);
+  _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater, effectiveFilled);
 }
 
 /**
@@ -1574,6 +1583,110 @@ function _drawPreviewTile(
 }
 
 /**
+ * Draw edge highlights on neighboring tiles that would form a new mutual
+ * connection with the hovered preview tile, or lose an existing one.
+ *
+ * Green highlight  → neighbor would connect to the preview tile (dry neighbor: bright green;
+ *                    water-filled neighbor: water-blue).
+ * Red highlight    → neighbor is currently connected to the hovered cell's tile, but the
+ *                    preview tile would break that connection (replacement / rotation case).
+ *
+ * @param ctx          - Canvas 2D context.
+ * @param board        - The current game board.
+ * @param hoverRow     - Row index of the hovered cell.
+ * @param hoverCol     - Column index of the hovered cell.
+ * @param previewTile  - The tile that would be placed / result from rotation.
+ * @param filledPositions - Set of posKey strings for water-filled cells.
+ */
+function _renderConnectionPreview(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  hoverRow: number,
+  hoverCol: number,
+  previewTile: Tile,
+  filledPositions: Set<string>,
+): void {
+  const PULSE_PERIOD_MS = 1200;
+  const t = (Date.now() % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
+  const alpha = 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
+
+  const px = hoverCol * TILE_SIZE;
+  const py = hoverRow * TILE_SIZE;
+  const currentTile = board.grid[hoverRow][hoverCol];
+  const hoverKey = posKey(hoverRow, hoverCol);
+  const hoverOwDir = board.oneWayData.get(hoverKey);
+
+  for (const [dir] of CARDINAL_DIRS) {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nr = hoverRow + delta.row;
+    const nc = hoverCol + delta.col;
+    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
+
+    const neighbor = board.grid[nr][nc];
+    if (neighbor.shape === PipeShape.Empty) continue;
+
+    const oppDir = oppositeDirection(dir);
+    const neighborKey = posKey(nr, nc);
+    const neighborOwDir = board.oneWayData.get(neighborKey);
+
+    // One-way check for the preview→neighbor direction:
+    // The preview tile carries no one-way property, but the neighbor may block entry.
+    // In areMutuallyConnected the "to" (neighbor) one-way blocks when dir === opposite(toOwDir).
+    const previewBlockedByNeighbor = neighborOwDir !== undefined && dir === oppositeDirection(neighborOwDir);
+    const wouldConnect =
+      previewTile.connections.has(dir) &&
+      neighbor.connections.has(oppDir) &&
+      !previewBlockedByNeighbor;
+
+    // One-way checks for the current tile in the hovered cell (for disconnection detection).
+    const currentBlockedByHover = hoverOwDir !== undefined && dir === oppositeDirection(hoverOwDir);
+    const currentBlockedByNeighbor = neighborOwDir !== undefined && dir === oppositeDirection(neighborOwDir);
+    const currentlyConnected =
+      currentTile.connections.has(dir) &&
+      neighbor.connections.has(oppDir) &&
+      !currentBlockedByHover &&
+      !currentBlockedByNeighbor;
+
+    const wouldDisconnect = currentlyConnected && !wouldConnect;
+    if (!wouldConnect && !wouldDisconnect) continue;
+
+    const isNeighborFilled = filledPositions.has(neighborKey);
+    const color = wouldDisconnect
+      ? DISCONNECTION_PREVIEW_COLOR
+      : isNeighborFilled
+        ? CONNECTION_PREVIEW_WATER_COLOR
+        : CONNECTION_PREVIEW_COLOR;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    switch (dir) {
+      case Direction.North:
+        ctx.moveTo(px,             py);
+        ctx.lineTo(px + TILE_SIZE, py);
+        break;
+      case Direction.South:
+        ctx.moveTo(px,             py + TILE_SIZE);
+        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
+        break;
+      case Direction.East:
+        ctx.moveTo(px + TILE_SIZE, py);
+        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
+        break;
+      case Direction.West:
+        ctx.moveTo(px,             py);
+        ctx.lineTo(px,             py + TILE_SIZE);
+        break;
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
  * Draw semi-transparent hover previews: the pending inventory item placement
  * preview and the rotation preview for an existing tile.
  */
@@ -1586,6 +1699,7 @@ function _renderHoverPreview(
   mouseCanvasPos: { x: number; y: number } | null,
   hoverRotationDelta: number,
   currentWater: number,
+  filledPositions: Set<string>,
 ): void {
   if (!mouseCanvasPos) return;
   const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
@@ -1604,6 +1718,7 @@ function _renderHoverPreview(
     if (canPlace || canReplace) {
       const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
       _drawPreviewTile(ctx, px, py, previewTile, currentWater);
+      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions);
     }
   } else if (hoverRotationDelta > 0) {
     // Rotation preview on an existing tile (no inventory item selected, Q/W or scroll)
@@ -1615,6 +1730,7 @@ function _renderHoverPreview(
         hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
       );
       _drawPreviewTile(ctx, px, py, previewTile, currentWater);
+      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions);
     }
   }
 }
