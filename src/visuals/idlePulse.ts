@@ -29,7 +29,7 @@ const PULSE_SPEED_PER_DEPTH = 150;
 const PULSE_TILE_DURATION = 300;
 
 /** Peak alpha for the glow core (inner radial gradient center). */
-const PULSE_ALPHA = 0.8;
+const PULSE_ALPHA = 0.6;
 
 /**
  * One tile entry in the idle-pulse sweep, analogous to {@link PipeFillAnim}
@@ -193,9 +193,9 @@ function _brightRGB(baseHex: string): [number, number, number] {
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
   return [
-    Math.round(r + (255 - r) * 0.6),
-    Math.round(g + (255 - g) * 0.6),
-    Math.round(b + (255 - b) * 0.6),
+    Math.round(r + (255 - r) * 0.3),
+    Math.round(g + (255 - g) * 0.3),
+    Math.round(b + (255 - b) * 0.3),
   ];
 }
 
@@ -215,24 +215,25 @@ function _drawGlowAt(
   b: number,
   alpha: number,
 ): void {
-  const glowRadius = LINE_WIDTH * 2.5;
+  const innerRadius = LINE_WIDTH / 2;
+  const outerRadius = LINE_WIDTH * 0.8;
 
   // Outer soft halo.
-  const outer = ctx.createRadialGradient(hx, hy, 0, hx, hy, glowRadius * 2);
+  const outer = ctx.createRadialGradient(hx, hy, 0, hx, hy, outerRadius);
   outer.addColorStop(0, `rgba(${r},${g},${b},${(alpha * 0.5).toFixed(3)})`);
   outer.addColorStop(1, `rgba(${r},${g},${b},0)`);
   ctx.fillStyle = outer;
   ctx.beginPath();
-  ctx.arc(hx, hy, glowRadius * 2, 0, Math.PI * 2);
+  ctx.arc(hx, hy, outerRadius, 0, Math.PI * 2);
   ctx.fill();
 
   // Inner bright core.
-  const inner = ctx.createRadialGradient(hx, hy, 0, hx, hy, glowRadius);
+  const inner = ctx.createRadialGradient(hx, hy, 0, hx, hy, innerRadius);
   inner.addColorStop(0, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
   inner.addColorStop(1, `rgba(${r},${g},${b},0)`);
   ctx.fillStyle = inner;
   ctx.beginPath();
-  ctx.arc(hx, hy, glowRadius, 0, Math.PI * 2);
+  ctx.arc(hx, hy, innerRadius, 0, Math.PI * 2);
   ctx.fill();
 }
 
