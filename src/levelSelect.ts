@@ -171,6 +171,10 @@ function chapterWaterTotal(
  *   from completion status.  Only chapters absent from the map use the default rule.
  * @param onChapterToggle - Callback invoked when the player expands or collapses a chapter,
  *   so the caller can persist the new state across re-renders.
+ * @param onCampaignMastered - Optional callback invoked the first time the
+ *   campaign box is rendered in the fully-mastered state.  The caller is
+ *   responsible for tracking whether the sequence has already fired and only
+ *   passing a non-null callback when the sequence should run.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -187,6 +191,7 @@ export function renderLevelList(
   onChapterMap?: (chapterIdx: number) => void,
   completedChapters?: ReadonlySet<number>,
   onSettingsClick?: () => void,
+  onCampaignMastered?: () => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -373,6 +378,12 @@ export function renderLevelList(
       }
     }
     header.appendChild(continueBtn);
+
+    // Notify the caller the first time the mastered state is rendered so it
+    // can fire the congratulatory sequence (confetti + modal) exactly once.
+    if (showMastered) {
+      onCampaignMastered?.();
+    }
 
     // Attach the hover water-wave background animation (gold when fully complete).
     attachChapterWaveAnimation(header, campaignAllComplete);
