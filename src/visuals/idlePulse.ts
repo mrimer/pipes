@@ -29,7 +29,7 @@ const PULSE_SPEED_PER_DEPTH = 150;
 const PULSE_TILE_DURATION = 300;
 
 /** Peak alpha for the glow core (inner radial gradient center). */
-const PULSE_ALPHA = 0.75;
+const PULSE_ALPHA = 0.8;
 
 /**
  * One tile entry in the idle-pulse sweep, analogous to {@link PipeFillAnim}
