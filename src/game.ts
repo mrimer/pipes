@@ -495,12 +495,18 @@ export class Game implements InputCallbacks {
 
   /** Start (or restart) the given level. */
   startLevel(levelId: number, existingDecorations?: readonly AmbientDecoration[], isUserRestart = false): void {
-    // Look up the level in the active campaign; no-op if no campaign is active.
-    if (!this._campaign.activeCampaign) return;
     let level: LevelDef | undefined;
-    for (const ch of this._campaign.activeCampaign.chapters) {
-      level = ch.levels.find((l) => l.id === levelId);
-      if (level) break;
+    if (this._campaign.isPlaytesting) {
+      // During playtesting the level lives in the editor, not in the active campaign.
+      // Use currentLevel directly when the ID matches.
+      if (this.currentLevel?.id === levelId) level = this.currentLevel;
+    } else {
+      // Look up the level in the active campaign; no-op if no campaign is active.
+      if (!this._campaign.activeCampaign) return;
+      for (const ch of this._campaign.activeCampaign.chapters) {
+        level = ch.levels.find((l) => l.id === levelId);
+        if (level) break;
+      }
     }
     if (!level) return;
 
