@@ -36,6 +36,18 @@ export function validateChapterMap(
   if (!sourcePos) { msgs.push('❌ No Source tile found.'); ok = false; }
   if (!sinkPos) { msgs.push('❌ No Sink tile found.'); ok = false; }
 
+  // Check sink completion threshold is not greater than the number of levels
+  if (sinkPos) {
+    const sinkDef = grid[sinkPos.row]?.[sinkPos.col];
+    const completion = sinkDef?.completion ?? 0;
+    if (completion > chapter.levels.length) {
+      msgs.push(
+        `⚠️ Sink completion threshold (${completion}) exceeds the number of levels in this chapter (${chapter.levels.length}).`,
+      );
+      ok = false;
+    }
+  }
+
   // Check all levels are placed
   for (let li = 0; li < chapter.levels.length; li++) {
     if (!levelChamberIdxs.has(li)) {

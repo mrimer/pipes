@@ -10,8 +10,8 @@
 
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
-import { PIPE_SHAPES } from './board';
-import { renderChapterMapCanvas, generateChapterMapDecorations, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights } from './visuals/chapterMap';
+import { PIPE_SHAPES, generateAmbientDecorations } from './board';
+import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -413,7 +413,7 @@ export class ChapterMapScreen {
     const cols = chapter.cols ?? 6;
     // Regenerate decorations when showing a new chapter
     if (this._chapter !== chapter) {
-      this._decorations = generateChapterMapDecorations(rows, cols);
+      this._decorations = generateAmbientDecorations(rows, cols);
       // Reset animation state when switching chapters
       this._vortexParticles = [];
       this._sourceSprayDrops = [];

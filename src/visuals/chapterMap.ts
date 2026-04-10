@@ -6,7 +6,7 @@
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
 import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex } from '../renderer';
-import { PIPE_SHAPES, NEIGHBOUR_DELTA, generateAmbientDecorations } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
@@ -52,26 +52,6 @@ export function computeChapterButtEndDirs(
     (buttEndDirs ??= new Set<Direction>()).add(dir);
   }
   return buttEndDirs;
-}
-
-
-
-// ─── Ambient decorations ───────────────────────────────────────────────────────
-
-/**
- * Generate a set of ambient background decorations for a chapter map grid.
- * These are rendered on empty (null) cells to give the map a natural look.
- * Returned as a Map keyed by "row,col" for O(1) lookup.
- */
-export function generateChapterMapDecorations(
-  rows: number,
-  cols: number,
-): ReadonlyMap<string, AmbientDecoration> {
-  const map = new Map<string, AmbientDecoration>();
-  for (const d of generateAmbientDecorations(rows, cols)) {
-    map.set(`${d.row},${d.col}`, d);
-  }
-  return map;
 }
 
 // ─── Shared types ──────────────────────────────────────────────────────────────

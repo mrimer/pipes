@@ -1355,7 +1355,7 @@ function _renderPass1Backgrounds(
           ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : EMPTY_COLOR;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           // Draw any ambient decoration on this empty non-gold cell
-          const dec = board.ambientDecorationMap.get(posKey(r, c));
+          const dec = board.ambientDecorations.get(posKey(r, c));
           if (dec) drawAmbientDecoration(ctx, dec);
         }
       } else {

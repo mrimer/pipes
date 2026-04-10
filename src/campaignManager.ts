@@ -16,9 +16,9 @@ import {
   computeCampaignCompletionPct,
   loadLevelStars, saveLevelStar, clearLevelStars,
   loadLevelWater, saveLevelWater, clearLevelWater,
-  loadCompletedChapters, markChapterCompleted, clearCompletedChapters,
+  loadCompletedChapters, markChapterCompleted, clearCompletedChapters, removeChapterCompleted,
   markLevelCompleted, clearCompletedLevels,
-  loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown,
+  loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown, removeMasteredChapterShown,
 } from './persistence';
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
@@ -76,8 +76,8 @@ export interface CampaignCallbacks {
   /** Official-campaign completion progress (used when no campaign is active). */
   readonly completedLevels: Set<number>;
 
-  /** Show the reset-progress confirmation modal. */
-  showResetConfirmModal(): void;
+  /** Show the reset-progress confirmation modal with the given progress info. */
+  showResetConfirmModal(info: import('./gameModals').ResetProgressInfo | null): void;
   /** Show the game-rules modal overlay. */
   showRules(): void;
   /** Show the settings modal overlay. */
@@ -262,6 +262,16 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
+
+    // If the chapter is no longer complete (e.g. levels were added/edited), remove any
+    // stale completion and mastery records so that progress stays in sync.
+    if (chapter.id !== undefined && this._activeCampaign) {
+      const campaignId = this._activeCampaign.id;
+      if (!this._chapterMapScreen.isChapterComplete()) {
+        removeChapterCompleted(campaignId, chapter.id, this._activeCampaignCompletedChapters);
+        removeMasteredChapterShown(campaignId, chapter.id, this._activeCampaignMasteredChaptersShown);
+      }
+    }
 
     // Auto-trigger chapter completion if the level is complete and not yet recorded
     this._checkAutoCompleteChapter(chapterIdx);
@@ -558,11 +568,14 @@ export class CampaignManager {
         completionPct: pct,
       };
     }
+    const resetInfo = this._activeCampaign
+      ? this._buildResetProgressInfo(this._activeCampaign, displayProgress, levelStars, levelWater)
+      : null;
     renderLevelList(
       this._callbacks.levelListEl,
       displayProgress,
       (id) => this.requestLevel(id),
-      () => this._callbacks.showResetConfirmModal(),
+      () => this._callbacks.showResetConfirmModal(resetInfo),
       () => this._callbacks.showRules(),
       () => this._openCampaignEditor(),
       () => this.unlockAll(),
@@ -653,6 +666,44 @@ export class CampaignManager {
   get _playtestExitCallbackInternal(): (() => void) | null { return this._playtestExitCallback; }
 
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  /**
+   * Compute the progress summary used to populate the reset-progress confirmation modal.
+   */
+  private _buildResetProgressInfo(
+    campaign: CampaignDef,
+    progress: Set<number>,
+    levelStars: Record<number, number>,
+    levelWater: Record<number, number>,
+  ): import('./gameModals').ResetProgressInfo {
+    const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
+    const levelsCompleted = allLevels.filter(l => progress.has(l.id)).length;
+    const levelsTotal = allLevels.length;
+    const challengesCompleted = allLevels.filter(l => l.challenge && progress.has(l.id)).length;
+    const challengesTotal = allLevels.filter(l => l.challenge).length;
+    const starsCollected = allLevels.reduce((sum, l) =>
+      sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+    const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+    const waterScore = allLevels.reduce((sum, l) =>
+      sum + (progress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);
+    const chaptersWithMaps = campaign.chapters.filter(ch => ch.grid);
+    const chaptersTotal = chaptersWithMaps.length;
+    const chaptersCompleted = chaptersWithMaps.filter(
+      ch => ch.id !== undefined && this._activeCampaignCompletedChapters.has(ch.id)
+    ).length;
+    return {
+      campaignName: campaign.name,
+      chaptersCompleted,
+      chaptersTotal,
+      levelsCompleted,
+      levelsTotal,
+      challengesCompleted,
+      challengesTotal,
+      starsCollected,
+      starsTotal,
+      waterScore,
+    };
+  }
 
   private _openCampaignEditor(): void {
     this._callbacks.setScreen(GameScreen.CampaignEditor);

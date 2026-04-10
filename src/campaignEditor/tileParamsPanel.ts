@@ -30,7 +30,6 @@ import { LevelEditorState } from './levelEditorState';
 import { TILE_SIZE } from '../renderer';
 import { drawEditorTile } from './renderer';
 import { sfxManager, SfxId } from '../sfxManager';
-import { Direction } from '../types';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 
 // ─── Callback interface ───────────────────────────────────────────────────────

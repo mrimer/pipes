@@ -181,16 +181,17 @@ const DECORATION_DENSITY = 0.30;
 const DECORATION_TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
 
 /**
- * Generate a list of ambient background decorations spread across a `rows × cols`
+ * Generate a map of ambient background decorations spread across a `rows × cols`
  * grid.  Each cell has an independent ~30 % chance of receiving one decoration.
+ * Returned as a Map keyed by "row,col" for O(1) lookup.
  * This is a shared helper used by both the game board and the chapter-map renderer.
  */
-export function generateAmbientDecorations(rows: number, cols: number): AmbientDecoration[] {
-  const decorations: AmbientDecoration[] = [];
+export function generateAmbientDecorations(rows: number, cols: number): ReadonlyMap<string, AmbientDecoration> {
+  const map = new Map<string, AmbientDecoration>();
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (Math.random() >= DECORATION_DENSITY) continue;
-      decorations.push({
+      map.set(`${r},${c}`, {
         row: r,
         col: c,
         type: DECORATION_TYPES[Math.floor(Math.random() * DECORATION_TYPES.length)],
@@ -202,7 +203,7 @@ export function generateAmbientDecorations(rows: number, cols: number): AmbientD
       });
     }
   }
-  return decorations;
+  return map;
 }
 
 /**
@@ -249,14 +250,9 @@ export class Board {
    * Ambient background decorations (pebbles, flowers, grass tufts) generated
    * once each time a level is activated.  Rendered under all tile elements so
    * they are visible only on empty (unoccupied) cells.
+   * Keyed by "row,col" for O(1) lookup.
    */
-  readonly ambientDecorations: readonly AmbientDecoration[];
-
-  /**
-   * Pre-built O(1) lookup map for {@link ambientDecorations}, keyed by "row,col".
-   * Cached here so the renderer does not reconstruct it on every frame.
-   */
-  readonly ambientDecorationMap: ReadonlyMap<string, AmbientDecoration>;
+  readonly ambientDecorations: ReadonlyMap<string, AmbientDecoration>;
 
   /**
    * Total water units that have been frozen by ice blocks during play.
@@ -313,7 +309,7 @@ export class Board {
    *   generating new ones.  Pass the previous board's {@link ambientDecorations} when
    *   restarting a level to keep the same decor visible.
    */
-  constructor(rows: number, cols: number, level?: LevelDef, existingDecorations?: readonly AmbientDecoration[]) {
+  constructor(rows: number, cols: number, level?: LevelDef, existingDecorations?: ReadonlyMap<string, AmbientDecoration>) {
     this.rows = rows;
     this.cols = cols;
     this.source = { row: 0, col: 0 };
@@ -328,14 +324,11 @@ export class Board {
     if (level) {
       this.grid = this._emptyGrid();
       this._initFromLevel(level);
-      this.ambientDecorations = existingDecorations ?? this._generateAmbientDecorations();
+      this.ambientDecorations = existingDecorations ?? generateAmbientDecorations(this.rows, this.cols);
     } else {
       this.grid = this._buildGrid();
-      this.ambientDecorations = [];
+      this.ambientDecorations = new Map();
     }
-    this.ambientDecorationMap = new Map(
-      this.ambientDecorations.map((dec) => [posKey(dec.row, dec.col), dec]),
-    );
     // Create remaining sub-modules after the grid and source are fully set up.
     this._thermo = new ThermoSimulator(this.grid, () => this.source);
     this._validator = new ConstraintValidator(this.grid, this._thermo);
@@ -391,15 +384,6 @@ export class Board {
     }
 
     this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
-  }
-
-  /**
-   * Generate a set of ambient background decorations spread across the grid.
-   * Called once after the grid is fully initialized.  Each cell has an
-   * independent ~30 % chance of receiving one decoration.
-   */
-  private _generateAmbientDecorations(): AmbientDecoration[] {
-    return generateAmbientDecorations(this.rows, this.cols);
   }
 
   // ─── Undo / redo support ───────────────────────────────────────────────────
