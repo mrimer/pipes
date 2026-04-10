@@ -18,6 +18,7 @@ import {
   loadLevelWater, saveLevelWater, clearLevelWater,
   loadCompletedChapters, markChapterCompleted, clearCompletedChapters,
   markLevelCompleted, clearCompletedLevels,
+  loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown,
 } from './persistence';
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
@@ -107,6 +108,8 @@ export class CampaignManager {
   private _activeCampaign: CampaignDef | null = null;
   private _activeCampaignProgress: Set<number> = new Set();
   private _activeCampaignCompletedChapters: Set<number> = new Set();
+  /** Set of chapter IDs for which the mastery sequence has already been shown. */
+  private _activeCampaignMasteredChaptersShown: Set<number> = new Set();
 
   // ── Chapter map ───────────────────────────────────────────────────────────
 
@@ -171,6 +174,7 @@ export class CampaignManager {
     this._activeCampaign = campaign;
     this._activeCampaignProgress = loadCampaignProgress(campaign.id);
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
+    this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
     saveActiveCampaignId(campaign.id);
     this._callbacks.showLevelSelect();
   }
@@ -259,6 +263,13 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
+
+    // Show the mastery sequence once per chapter mastery, on entering the map
+    if (chapter.id !== undefined && this._isCampaignChapterMastered(chapter)) {
+      if (!this._activeCampaignMasteredChaptersShown.has(chapter.id)) {
+        this._showMasterySequence(chapterIdx, campaign, () => {});
+      }
+    }
   }
 
   /** Hide the chapter map screen element (if it exists). */
@@ -505,6 +516,7 @@ export class CampaignManager {
       clearLevelStars(this._activeCampaign.id);
       clearLevelWater(this._activeCampaign.id);
       clearCompletedChapters(this._activeCampaign.id, this._activeCampaignCompletedChapters);
+      clearMasteredChaptersShown(this._activeCampaign.id, this._activeCampaignMasteredChaptersShown);
     } else {
       clearCompletedLevels(this._callbacks.completedLevels);
       clearLevelStars();
@@ -665,9 +677,107 @@ export class CampaignManager {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
 
-    sfxManager.play(SfxId.WinChapter);
+    // Check mastery BEFORE marking the chapter completed
+    const wasMastered = this._isCampaignChapterMastered(chapter);
+    const masterySequenceNeeded =
+      wasMastered &&
+      chapter.id !== undefined &&
+      !this._activeCampaignMasteredChaptersShown.has(chapter.id);
+
     markChapterCompleted(campaign.id, chapter.id, this._activeCampaignCompletedChapters);
-    this._showChapterCompleteModal(chapterIdx, campaign);
+
+    // Start the win animation (plays WinChapter sfx internally)
+    const chapterMapScreen = this._chapterMapScreen;
+    if (chapterMapScreen) {
+      chapterMapScreen.playWinAnimation(() => {
+        if (masterySequenceNeeded) {
+          this._showMasterySequence(chapterIdx, campaign, () => {
+            this._showChapterCompleteModal(chapterIdx, campaign);
+          });
+        } else {
+          this._showChapterCompleteModal(chapterIdx, campaign);
+        }
+      });
+    } else {
+      if (masterySequenceNeeded) {
+        this._showMasterySequence(chapterIdx, campaign, () => {
+          this._showChapterCompleteModal(chapterIdx, campaign);
+        });
+      } else {
+        this._showChapterCompleteModal(chapterIdx, campaign);
+      }
+    }
+  }
+
+  /**
+   * Show the chapter mastery sequence: play the master-chapter sfx, spawn
+   * confetti, and display a "Level mastered!" modal with a "Congrats!" button.
+   * Records the sequence as shown so it is not repeated for this chapter.
+   * Calls {@link onComplete} after the modal is dismissed.
+   */
+  private _showMasterySequence(chapterIdx: number, campaign: CampaignDef, onComplete: () => void): void {
+    const chapter = campaign.chapters[chapterIdx];
+    if (!chapter) { onComplete(); return; }
+
+    if (chapter.id !== undefined) {
+      markMasteredChapterShown(campaign.id, chapter.id, this._activeCampaignMasteredChaptersShown);
+    }
+
+    sfxManager.play(SfxId.MasterChapter);
+    spawnConfetti(() => {});
+
+    const modal = document.createElement('div');
+    modal.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
+      'justify-content:center;z-index:200;';
+
+    const box = document.createElement('div');
+    box.style.cssText =
+      'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:28px 24px;' +
+      'max-width:380px;width:90%;text-align:center;';
+
+    const iconEl = document.createElement('div');
+    iconEl.style.cssText = 'font-size:3rem;line-height:1;margin-bottom:12px;';
+    iconEl.textContent = '🎉';
+    box.appendChild(iconEl);
+
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = 'Level mastered!';
+    titleEl.style.cssText = 'color:#f0c040;margin:0 0 10px;font-size:1.5rem;';
+    box.appendChild(titleEl);
+
+    const msgEl = document.createElement('p');
+    msgEl.textContent = 'This chapter is 100% complete!';
+    msgEl.style.cssText = 'color:#eee;font-size:1rem;margin:0 0 20px;';
+    box.appendChild(msgEl);
+
+    const congratsBtn = document.createElement('button');
+    congratsBtn.textContent = 'Congrats!';
+    congratsBtn.style.cssText =
+      'padding:10px 28px;font-size:1rem;border-radius:6px;cursor:pointer;' +
+      'background:#1a3a10;border:1px solid #f0c040;color:#f0c040;';
+    congratsBtn.addEventListener('click', () => {
+      modal.remove();
+      onComplete();
+    });
+    box.appendChild(congratsBtn);
+
+    modal.appendChild(box);
+    document.body.appendChild(modal);
+  }
+
+  /**
+   * Returns true when all levels in the chapter are completed and all available
+   * stars have been collected (using the active campaign's progress).
+   */
+  private _isCampaignChapterMastered(chapter: ChapterDef): boolean {
+    const progress = this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels;
+    const levelStars = loadLevelStars(this._activeCampaign?.id);
+    const chLevels = chapter.levels;
+    const allLevelsCompleted = chLevels.every(l => progress.has(l.id));
+    const starsCollected = chLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+    const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+    return allLevelsCompleted && (starsTotal === 0 || starsCollected >= starsTotal);
   }
 
   private _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void {
@@ -687,7 +797,7 @@ export class CampaignManager {
     const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
     const challengesDone = chLevels.filter(l => l.challenge && progress.has(l.id)).length;
     const challengesTotal = chLevels.filter(l => l.challenge).length;
-    const isMastered = (starsTotal === 0 || starsCollected >= starsTotal) && (challengesTotal === 0 || challengesDone >= challengesTotal);
+    const isMastered = this._isCampaignChapterMastered(chapter);
 
     const modal = document.createElement('div');
     modal.id = 'chapter-complete-modal';
@@ -771,6 +881,7 @@ export class CampaignManager {
     this._activeCampaign = campaign;
     this._activeCampaignProgress = loadCampaignProgress(campaign.id);
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
+    this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
     saveActiveCampaignId(campaign.id);
   }
 
@@ -781,6 +892,7 @@ export class CampaignManager {
       this._activeCampaign = campaign;
       this._activeCampaignProgress = loadCampaignProgress(campaign.id);
       this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
+      this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
     } else {
       clearActiveCampaignId();
     }

@@ -52,7 +52,8 @@ import bubblesUrl from '../data/sfx/bubbles.ogg';
 import backClickUrl from '../data/sfx/back-click.ogg';
 import goldenUrl from '../data/sfx/golden.ogg';
 import dropletUrl from '../data/sfx/droplet.ogg';
-import winChapterUrl from '../data/sfx/win-chapter.ogg';
+import winChapterUrl from '../data/sfx/win-chapter-scale.ogg';
+import masterChapterUrl from '../data/sfx/master-chapter.ogg';
 import sizzleUrl from '../data/sfx/sizzle.ogg';
 import pendingCwUrl from '../data/sfx/pending-cw.ogg';
 import pendingCcwUrl from '../data/sfx/pending-ccw.ogg';
@@ -145,6 +146,7 @@ export const enum SfxId {
   Sandstone1       = 53,
   Sandstone2       = 54,
   Sandstone3       = 55,
+  MasterChapter    = 56,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -211,6 +213,7 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Sandstone1]:       [sandstone1Url],
   [SfxId.Sandstone2]:       [sandstone2Url],
   [SfxId.Sandstone3]:       [sandstone3Url],
+  [SfxId.MasterChapter]:    [masterChapterUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -302,6 +305,7 @@ export class SfxManager {
     [SfxId.Sandstone1]:       -1,
     [SfxId.Sandstone2]:       -1,
     [SfxId.Sandstone3]:       -1,
+    [SfxId.MasterChapter]:    -1,
   };
 
   /**

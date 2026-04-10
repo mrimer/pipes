@@ -19,6 +19,7 @@ import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticl
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
+import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -160,6 +161,11 @@ export class ChapterMapScreen {
    * Each entry records which cell is jittering and when the animation started.
    */
   private _jitterAnims: Array<{ row: number; col: number; startedAt: number }> = [];
+  /**
+   * Active win-tile glow animations triggered when the sink is clicked.
+   * The same WinTileGlow type used on the level-complete screen.
+   */
+  private _winGlows: WinTileGlow[] = [];
   /**
    * Current canvas border color – default blue, animated gold when the chapter
    * is mastered. Tracked here so captureCanvasSnapshot() can include the border
@@ -339,6 +345,43 @@ export class ChapterMapScreen {
     };
 
     return { canvas: snapshot, cssRect };
+  }
+
+  /**
+   * Start the blue tile win-glow animation over all water-filled cells on the
+   * chapter map canvas, and play the Win Chapter sound effect.
+   * Calls {@link onComplete} once every glow has finished.
+   */
+  playWinAnimation(onComplete: () => void): void {
+    const chapter = this._chapter;
+    if (!chapter?.grid) { onComplete(); return; }
+
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const sourcePos = findChapterMapTile(chapter.grid, rows, cols, PipeShape.Source);
+
+    sfxManager.play(SfxId.WinChapter);
+
+    if (!sourcePos || filledKeys.size === 0) {
+      onComplete();
+      return;
+    }
+
+    const baseTime = performance.now();
+    this._winGlows = computeChapterMapWinGlows(filledKeys, sourcePos.row, sourcePos.col, baseTime);
+
+    // Compute when the last glow finishes
+    const maxStart = this._winGlows.reduce((m, g) => Math.max(m, g.startTime), baseTime);
+    const endTime = maxStart + WIN_TILE_GLOW_DURATION;
+
+    // Schedule the callback once the animation is complete
+    const delay = endTime - baseTime;
+    setTimeout(() => {
+      this._winGlows = [];
+      onComplete();
+    }, delay);
   }
 
   /**
@@ -945,10 +988,14 @@ export class ChapterMapScreen {
     }
     renderBubbles(ctx, this._bubbles, WATER_COLOR);
 
-    // Edge flowers – shown when the chapter is completed
-    const isCompleted = this._isChapterCompleted(chapter);
-    const isMastered  = isCompleted && this._isChapterMastered(chapter, displayProgress);
-    if (isCompleted) {
+    // Win tile glows – blue tile flash animation triggered when the sink is clicked
+    if (this._winGlows.length > 0) {
+      renderWinTileGlows(ctx, this._winGlows, now);
+    }
+
+    // Edge flowers – shown only when the chapter is mastered
+    const isMastered = this._isChapterMastered(chapter, displayProgress);
+    if (isMastered) {
       if (now - this._lastFlowerSpawn >= ChapterMapScreen.FLOWER_SPAWN_INTERVAL_MS) {
         this._spawnEdgeFlower(now, rows, cols);
         this._lastFlowerSpawn = now;
