@@ -1609,6 +1609,7 @@ export class Game implements InputCallbacks {
       this._campaign.winFromChapterMap = false;
       this.winModalEl.style.display = 'none';
       this._exitConfirmModalEl.style.display = 'none';
+      this._closeModal(this.gameoverModalEl);
       // Cancel any pending ring spawning before leaving the play screen.
       this._cancelPendingRings();
       // Stop any sounds still playing from the play screen.
