@@ -13,6 +13,7 @@ import { oppositeDirection } from '../tile';
 import { Direction, GridPos, TileDef } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
 import { tileDefConnections } from '../chapterMapUtils';
+import { drawIdlePulseGlow } from './idlePulse';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Source Spray
@@ -299,7 +300,7 @@ function _forwardDirs(
   return dirs;
 }
 
-/** A water drop flowing along connected pipes from the source towards the sink. */
+/** A pulse moving along connected pipes from the source towards the sink. */
 export interface FlowDrop {
   /** Grid row of the tile the drop is currently leaving. */
   row: number;
@@ -316,9 +317,10 @@ export interface FlowDrop {
   direction: Direction;
   /** Direction the drop arrived from (prevents back-tracking). */
   fromDir: Direction | null;
-  /** Half-length of the travel-axis ellipse, in pixels. */
-  size: number;
 }
+
+/** Uniform movement speed (tile-lengths per frame at ~60 fps) for all flow pulses. */
+export const FLOW_DROP_SPEED = 0.05;
 
 /**
  * Spawn a new win-flow drop at the source tile.
@@ -338,21 +340,21 @@ export function spawnFlowDrop(drops: FlowDrop[], board: Board, goodDirs: Map<str
     row: board.source.row,
     col: board.source.col,
     progress: 0,
-    speed: 0.035 + Math.random() * 0.025,
+    speed: FLOW_DROP_SPEED,
     direction: dir,
     fromDir: null,
-    size: _s(6) + Math.random() * _s(4),
   });
 }
 
 /**
- * Draw a single flow drop at its current interpolated canvas position.
+ * Draw a single flow pulse at its current interpolated canvas position using
+ * the idle-pulse radial glow visual.
  * Shared by both {@link renderFlowDrops} (level win animation) and the
  * chapter-map flow animation so the visual appearance is identical.
  *
  * @param ctx   2D rendering context.
- * @param drop  The drop to draw (position, direction, progress, size).
- * @param color CSS color string for the drop ellipse fill.
+ * @param drop  The drop to draw (position, direction, progress).
+ * @param color `#rrggbb` hex color string for the glow.
  */
 export function drawFlowDrop(
   ctx: CanvasRenderingContext2D,
@@ -367,22 +369,7 @@ export function drawFlowDrop(
   const px     = curCx + (nxtCx - curCx) * drop.progress;
   const py     = curCy + (nxtCy - curCy) * drop.progress;
 
-  // Angle of travel (used to orient the teardrop ellipse).
-  const angle = Math.atan2(nxtCy - curCy, nxtCx - curCx);
-
-  ctx.save();
-  ctx.globalAlpha = 0.85;
-  ctx.translate(px, py);
-  // Rotate so the long axis of the ellipse points in the direction of travel.
-  ctx.rotate(angle + Math.PI / 2);
-  ctx.beginPath();
-  ctx.ellipse(0, 0, drop.size * 0.55, drop.size, 0, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = _s(2);
-  ctx.stroke();
-  ctx.restore();
+  drawIdlePulseGlow(ctx, px, py, color, 0.85);
 }
 
 /**

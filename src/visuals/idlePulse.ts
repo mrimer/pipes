@@ -206,6 +206,17 @@ function _brightRGB(baseHex: string): [number, number, number] {
  * softer, larger outer halo.  Both fade to transparent at the edge, so the
  * glow blends naturally over any underlying pipe artwork.
  */
+export function drawIdlePulseGlow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  baseColorHex: string,
+  alpha: number,
+): void {
+  const [r, g, b] = _brightRGB(baseColorHex);
+  _drawGlowAt(ctx, x, y, r, g, b, alpha);
+}
+
 function _drawGlowAt(
   ctx: CanvasRenderingContext2D,
   hx: number,
