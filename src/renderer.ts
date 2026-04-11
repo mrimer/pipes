@@ -220,7 +220,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
  * @param isSource  When true triangles point outward (away from centre);
  *                  when false they point inward (toward centre).
  */
-function _drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number, half: number, isSource: boolean): void {
+export function drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number, half: number, isSource: boolean): void {
   const depth = half * CONNECTOR_TRI_DEPTH;
   const wing  = half * CONNECTOR_TRI_WING;
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -298,15 +298,38 @@ export function drawConnectorGlow(
   ctx.restore();
 }
 
-function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape, buttEndDirs?: Set<Direction>): void {
-  const isSource = shape === PipeShape.Source;
+/**
+ * Draw a Source or Sink tile: outer circle, radiating arms with landing-strip
+ * triangle markers, and a shape-specific centre motif.
+ *
+ * Call with the canvas already translated to the tile centre.
+ *
+ * @param ctx         Canvas rendering context (origin = tile centre).
+ * @param connections Set of outgoing arm directions for this tile.
+ * @param color       Arm and decoration colour (dry or water).
+ * @param half        Half the tile size in canvas pixels.
+ * @param isSource    true for Source (outward triangles, gradient), false for Sink (bullseye).
+ * @param buttEndDirs Optional set of arm directions that should use flat (butt) end caps.
+ * @param centerLabel Optional label to draw at the centre. When omitted no label is drawn.
+ * @param bgColor     Fill colour for the outer-circle background (defaults to TILE_BG).
+ */
+export function drawSourceOrSink(
+  ctx: CanvasRenderingContext2D,
+  connections: ReadonlySet<Direction>,
+  color: string,
+  half: number,
+  isSource: boolean,
+  buttEndDirs?: Set<Direction>,
+  centerLabel?: { text: string; color: string },
+  bgColor?: string,
+): void {
   // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
   const outerR = isSource ? half * 0.5 : half * 0.45;
 
   // Fill the outer circle with the tile background color so it sits as a solid
   // area above any background pattern (gingham etc.) but below the arms and
   // centre decorations.
-  ctx.fillStyle = TILE_BG;
+  ctx.fillStyle = bgColor ?? TILE_BG;
   ctx.beginPath();
   ctx.arc(0, 0, outerR, 0, Math.PI * 2);
   ctx.fill();
@@ -321,7 +344,7 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
   // Radiating lines – drawn after the circle fill so they sit on top of it;
   // centre decorations render on top of everything.
   for (const [dir, nx, ny] of CARDINAL_DIRS) {
-    if (!tile.connections.has(dir)) continue;
+    if (!connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     // Black outline for the arm
     ctx.lineWidth = LINE_WIDTH + _s(3);
@@ -338,10 +361,10 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
     ctx.lineTo(nx * half, ny * half);
     ctx.stroke();
     // 3 small dark triangles along the arm (landing-strip base markers)
-    _drawArmTriangles(ctx, nx, ny, half, isSource);
+    drawArmTriangles(ctx, nx, ny, half, isSource);
   }
 
-  if (shape === PipeShape.Source) {
+  if (isSource) {
     // Central circle with radial gradient – bright glow at centre fading to the tile colour
     const circleR = half * 0.35;
     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
@@ -358,16 +381,6 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
     ctx.beginPath();
     ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
     ctx.stroke();
-    // Capacity number – shadow keeps it readable over the bright gradient centre
-    ctx.save();
-    ctx.fillStyle = LABEL_COLOR;
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = _s(2);
-    ctx.fillText(String(currentWater), 0, 0);
-    ctx.restore();
   } else {
     // Sink: bullseye / drain pattern – concentric stroke rings with a solid innermost dot
     ctx.strokeStyle = color;
@@ -382,6 +395,19 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
     ctx.beginPath();
     ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  // Optional centre label – drawn last so it appears on top of all decorations.
+  if (centerLabel !== undefined) {
+    ctx.save();
+    ctx.fillStyle = centerLabel.color;
+    ctx.font = `bold ${_s(14)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = _s(2);
+    ctx.fillText(centerLabel.text, 0, 0);
+    ctx.restore();
   }
 }
 
@@ -693,22 +719,22 @@ function _drawSeaRipple(
 }
 
 /**
- * Compute sea-tile neighbor data for the tile at (row, col) on the given board.
- * Returns which of the 8 neighbors are sea tiles.  Out-of-bounds positions are
- * treated as sea so that no land border is drawn along the grid edges.
+ * Compute sea-tile neighbor data given an `isSea` predicate.
+ * Returns which of the 8 neighbors are sea tiles.
+ *
+ * @param isSea  Returns true when the cell at (row + dr, col + dc) is sea
+ *               (or out-of-bounds, so no land border is drawn at the grid edge).
  */
-export function computeSeaNeighbors(board: Board, row: number, col: number): SeaNeighbors {
-  const _isSea = (r: number, c: number): boolean =>
-    r < 0 || r >= board.rows || c < 0 || c >= board.cols || board.grid[r][c].shape === PipeShape.Sea;
+export function computeSeaNeighbors(isSea: (dr: number, dc: number) => boolean): SeaNeighbors {
   return {
-    north: _isSea(row - 1, col),
-    south: _isSea(row + 1, col),
-    west:  _isSea(row, col - 1),
-    east:  _isSea(row, col + 1),
-    nw:    _isSea(row - 1, col - 1),
-    ne:    _isSea(row - 1, col + 1),
-    sw:    _isSea(row + 1, col - 1),
-    se:    _isSea(row + 1, col + 1),
+    north: isSea(-1,  0),
+    south: isSea( 1,  0),
+    west:  isSea( 0, -1),
+    east:  isSea( 0,  1),
+    nw:    isSea(-1, -1),
+    ne:    isSea(-1,  1),
+    sw:    isSea( 1, -1),
+    se:    isSea( 1,  1),
   };
 }
 
@@ -766,7 +792,7 @@ function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
  * directional arrow/chevron pointing in `dir`.
  * The tile edge at pixel (x, y) is used as the top-left origin.
  */
-function _drawOneWayBackground(ctx: CanvasRenderingContext2D, x: number, y: number, dir: Direction): void {
+export function drawOneWayArrow(ctx: CanvasRenderingContext2D, x: number, y: number, dir: Direction): void {
   const half = TILE_SIZE / 2;
   const cx = x + half;
   const cy = y + half;
@@ -830,6 +856,34 @@ function _isOpenFloorCell(board: Board, nr: number, nc: number): boolean {
 }
 
 /**
+ * Shared helper: compute which arm directions of a tile need a flat (butt) end
+ * cap given a neighbor-lookup callback.
+ *
+ * An arm gets a butt end when the neighbor returned by `getNeighbor` is non-null
+ * AND either is not a pipe shape or has a reciprocal arm pointing back.  Arms
+ * pointing at null neighbors (open floor / empty cells / out-of-bounds) keep
+ * their round nubs.
+ *
+ * @param connections  The set of outgoing arm directions for this tile.
+ * @param getNeighbor  Returns the neighbor in the given direction, or null when
+ *                     the cell is empty/out-of-bounds (→ round nub).
+ */
+export function computeButtEndDirs(
+  connections: ReadonlySet<Direction>,
+  getNeighbor: (dir: Direction) => { shape: PipeShape; connections: ReadonlySet<Direction> } | null,
+): Set<Direction> | undefined {
+  let buttEndDirs: Set<Direction> | undefined;
+  for (const dir of connections) {
+    const neighbor = getNeighbor(dir);
+    if (!neighbor) continue; // empty/out-of-bounds → round end
+    // Pipe neighbor with no reciprocal arm → arms don't overlap, keep round nub
+    if (PIPE_SHAPES.has(neighbor.shape) && !neighbor.connections.has(oppositeDirection(dir))) continue;
+    (buttEndDirs ??= new Set<Direction>()).add(dir);
+  }
+  return buttEndDirs;
+}
+
+/**
  * Compute which arm directions of the tile at (r, c) need a flat (butt) end
  * cap.  Arms pointing at open floor cells (empty) keep round ends; all other
  * neighbor types use butt ends.  Exception: when an arm points at a pipe tile
@@ -838,19 +892,14 @@ function _isOpenFloorCell(board: Board, nr: number, nc: number): boolean {
  */
 function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction> | undefined {
   const tile = board.grid[r][c];
-  let buttEndDirs: Set<Direction> | undefined;
-  for (const dir of tile.connections) {
+  return computeButtEndDirs(tile.connections, (dir) => {
     const delta = NEIGHBOUR_DELTA[dir];
     const nr = r + delta.row, nc = c + delta.col;
-    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
-    if (_isOpenFloorCell(board, nr, nc)) continue;
-    const neighborTile = board.grid[nr][nc];
-    // If the neighbor is a pipe tile without a reciprocal arm, the arms
-    // don't overlap – keep a round nub here.
-    if (PIPE_SHAPES.has(neighborTile.shape) && !neighborTile.connections.has(oppositeDirection(dir))) continue;
-    (buttEndDirs ??= new Set<Direction>()).add(dir);
-  }
-  return buttEndDirs;
+    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) return null;
+    if (_isOpenFloorCell(board, nr, nc)) return null;
+    const t = board.grid[nr][nc];
+    return { shape: t.shape, connections: t.connections };
+  });
 }
 
 /**
@@ -913,7 +962,7 @@ function _drawPipeArmInRotatedFrame(
  *   the tile.  Only hardened tiles display the "X"; otherwise the numeric value
  *   (including "0") is shown.
  */
-function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number, isHardened: boolean): void {
+export function drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number, isHardened: boolean): void {
   const label = isHardened ? 'X' : String(dryingTime);
   const fontSize = _s(18);
   ctx.save();
@@ -1440,7 +1489,7 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    _drawSourceOrSink(ctx, tile, color, half, currentWater, shape, effectiveButtEndDirs);
+    drawSourceOrSink(ctx, tile.connections, color, half, shape === PipeShape.Source, effectiveButtEndDirs, { text: String(currentWater), color: LABEL_COLOR });
   } else if (shape === PipeShape.Chamber) {
     // Chamber – a steel-blue enclosure whose interior display varies by content
     ctx.restore();
@@ -1756,7 +1805,7 @@ function _renderPass1Backgrounds(
       // Tile background
       if (isOneWayCell) {
         // One-way cell: always show arrow background regardless of tile on top
-        _drawOneWayBackground(ctx, x, y, oneWayDir!);
+        drawOneWayArrow(ctx, x, y, oneWayDir!);
         if (isTarget) {
           ctx.fillStyle = ONE_WAY_TARGET_OVERLAY;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
@@ -1922,7 +1971,10 @@ function _renderPass2NonPipeTiles(
       // For Sea tiles, compute which neighbors are also sea for border rendering.
       let seaNeighbors: SeaNeighbors | undefined;
       if (tile.shape === PipeShape.Sea) {
-        seaNeighbors = computeSeaNeighbors(board, r, c);
+        seaNeighbors = computeSeaNeighbors((dr, dc) => {
+          const nr = r + dr, nc = c + dc;
+          return nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols || board.grid[nr][nc].shape === PipeShape.Sea;
+        });
       }
 
       // For Granite tiles, compute which neighbors are also granite for seaming.
@@ -2107,7 +2159,7 @@ function _renderPass4CementLabels(ctx: CanvasRenderingContext2D, board: Board): 
       const y = r * TILE_SIZE;
       // A tile is "hardened" (shows 'X') whenever dryingTime is 0.
       const isHardened = dryingTime === 0;
-      _drawCementLabel(ctx, x, y, dryingTime, isHardened);
+      drawCementLabel(ctx, x, y, dryingTime, isHardened);
     }
   }
 }
