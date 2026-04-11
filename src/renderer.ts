@@ -1531,8 +1531,9 @@ function _renderPass1Backgrounds(
             ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           }
         } else {
-          const ginghamColor = ((r % 2) + (c % 2)) === 0 ? EMPTY_COLOR_LIGHT
-            : ((r % 2) + (c % 2)) === 2 ? EMPTY_COLOR_DARK
+          const paritySum = (r % 2) + (c % 2);
+          const ginghamColor = paritySum === 0 ? EMPTY_COLOR_LIGHT
+            : paritySum === 2 ? EMPTY_COLOR_DARK
             : EMPTY_COLOR;
           ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : ginghamColor;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
