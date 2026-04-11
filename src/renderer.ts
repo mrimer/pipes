@@ -298,14 +298,43 @@ export function drawConnectorGlow(
   ctx.restore();
 }
 
+/** Half-width (per side) of the thin black outline added to pipes, chambers, and source/sink. */
+
 function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape, buttEndDirs?: Set<Direction>): void {
   const isSource = shape === PipeShape.Source;
-  // Radiating lines – drawn first so the centre decorations render on top
-  ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH;
+  // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
+  const outerR = isSource ? half * 0.5 : half * 0.45;
+
+  // Fill the outer circle with the tile background color so it sits as a solid
+  // area above any background pattern (gingham etc.) but below the arms and
+  // centre decorations.
+  ctx.fillStyle = TILE_BG;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Thin black outline on the outer circle edge (drawn before arms so arms sit on top).
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(4.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Radiating lines – drawn after the circle fill so they sit on top of it;
+  // centre decorations render on top of everything.
   for (const [dir, nx, ny] of CARDINAL_DIRS) {
     if (!tile.connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+    // Black outline for the arm
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(nx * half, ny * half);
+    ctx.stroke();
+    // Colored arm
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
@@ -1099,6 +1128,11 @@ export function drawTile(
     for (const armDir of sortedArms) {
       const armColor = (isBlockedPipe && armDir === effectiveBlockedWaterDir) ? dryColor : color;
       ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
+      // Black outline for the arm (same lineCap – butt ends have no black cap extension)
+      ctx.lineWidth = LINE_WIDTH + _s(3);
+      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black');
+      // Colored arm on top
+      ctx.lineWidth = LINE_WIDTH;
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
     // When one or more arms use a butt end cap, the flat cap at the tile centre
@@ -1121,14 +1155,36 @@ export function drawTile(
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.stroke();
   } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.SpinElbowCement) {
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, 0);
     ctx.lineTo(half, 0);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.stroke();
   } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.SpinTeeCement) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
@@ -1141,6 +1197,18 @@ export function drawTile(
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(-half, 0);
@@ -1150,6 +1218,11 @@ export function drawTile(
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.stroke();
     _drawLeakyRustSpots(ctx, tile, half, null);
   } else if (shape === PipeShape.LeakyElbow) {
@@ -1157,9 +1230,26 @@ export function drawTile(
     ctx.moveTo(0, -half);
     ctx.lineTo(0, 0);
     ctx.lineTo(half, 0);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.stroke();
     _drawLeakyRustSpots(ctx, tile, half, null);
   } else if (shape === PipeShape.LeakyTee) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
@@ -1170,6 +1260,18 @@ export function drawTile(
     ctx.stroke();
     _drawLeakyRustSpots(ctx, tile, half, null);
   } else if (shape === PipeShape.LeakyCross) {
+    ctx.beginPath();
+    ctx.moveTo(0, -half);
+    ctx.lineTo(0, half);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-half, 0);
+    ctx.lineTo(half, 0);
+    ctx.stroke();
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, -half);
     ctx.lineTo(0, half);
@@ -1674,9 +1776,9 @@ function _renderPass2NonPipeTiles(
         graniteNeighbors = computeGraniteNeighbors(board, r, c);
       }
 
-      // Gingham overlay for Granite and Tree tiles: 50% transparent green
+      // Gingham overlay for Granite, Tree, and Chamber tiles: 50% transparent green
       // gingham pattern drawn on top of the tile background color.
-      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree) {
+      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber) {
         drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c);
       }
 
