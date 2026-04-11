@@ -14,6 +14,7 @@ import {
   SINK_CONNECTOR_LIT, SINK_WATER_CONNECTOR_LIT,
   CHAMBER_FILL_COLOR,
   WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR,
+  EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK,
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
@@ -611,7 +612,11 @@ export function renderChapterMapCanvas(
       if (def !== null) continue;
       const x = c * CELL;
       const y = r * CELL;
-      ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
+      const paritySum = (r % 2) + (c % 2);
+      const ginghamColor = paritySum === 0 ? EMPTY_COLOR_LIGHT
+        : paritySum === 2 ? EMPTY_COLOR_DARK
+        : EMPTY_COLOR;
+      ctx.fillStyle = ginghamColor;
       ctx.fillRect(x, y, CELL, CELL);
       ctx.setLineDash([4, 4]);
       ctx.strokeStyle = CHAPTER_MAP_TILE_BG;
