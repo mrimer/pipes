@@ -4685,7 +4685,7 @@ describe('Chamber tile (hot_plate content)', () => {
     //   effectiveCost=1*(3+4)=7. waterGain=min(55,7)=7. frozen=48. impact=+7.
     // Turn 3: reclaim Tee → Heater AND Ice disconnect.
     //   Step 4a (heater left): re-eval HotPlate with historicalTemp=0, effectiveCost=3.
-    //     restoredFrozen=48-55=-7 → +7(oldGain)=−7+7=0. waterGain=0. impact=-3. frozen=0.
+    //     restoredFrozen=48-55=-7 → +7(oldGain)=-7+7=0. waterGain=0. impact=-3. frozen=0.
     //   Step 4b (ice left, minTurnX=2): candidates = HotPlate(turn=3>=2).
     //     Pass1: frozen += 0(updated oldGain) = 0. Pass2: effectiveCost=3, waterGain=0, impact=-3 (same).
     //     No double-animation.
