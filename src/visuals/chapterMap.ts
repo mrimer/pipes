@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex, drawGinghamOverlay, buildPipeBodyPath, toLocalDir, drawConnectionBridgePatch } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, buildPipeBodyPath, toLocalDir, drawConnectionBridgePatch, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA, isConnectorShape } from '../board';
 import { oppositeDirection } from '../tile';
@@ -40,20 +40,14 @@ export function computeChapterButtEndDirs(
   c: number,
   tileConns: Set<Direction>,
 ): Set<Direction> | undefined {
-  let buttEndDirs: Set<Direction> | undefined;
-  for (const dir of tileConns) {
+  return computeButtEndDirs(tileConns, (dir) => {
     const delta = NEIGHBOUR_DELTA[dir];
     const nr = r + delta.row, nc = c + delta.col;
-    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return null;
     const neighbor = grid[nr]?.[nc];
-    if (!neighbor) continue; // null = empty cell → round end
-    const neighborConns = tileDefConnections(neighbor);
-    const oppDir = oppositeDirection(dir);
-    // Pipe neighbor with no reciprocal arm → arms don't overlap, keep round nub
-    if (PIPE_SHAPES.has(neighbor.shape) && !neighborConns.has(oppDir)) continue;
-    (buttEndDirs ??= new Set<Direction>()).add(dir);
-  }
-  return buttEndDirs;
+    if (!neighbor) return null; // null = empty cell → round end
+    return { shape: neighbor.shape, connections: tileDefConnections(neighbor) };
+  });
 }
 
 // ─── Shared types ──────────────────────────────────────────────────────────────
@@ -302,203 +296,6 @@ export function drawLevelChamberTile(
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
-/** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
-const CARDINAL_DIRS: [Direction, number, number][] = [
-  [Direction.North, 0, -1],
-  [Direction.South, 0,  1],
-  [Direction.East,  1,  0],
-  [Direction.West, -1,  0],
-];
-
-/**
- * Draw 3 small dark filled triangles along one chapter-map connector arm
- * (landing-strip base markers).  Called with the canvas already translated
- * to the tile center.
- */
-function _drawChapterMapArmTriangles(
-  ctx: CanvasRenderingContext2D,
-  nx: number,
-  ny: number,
-  half: number,
-  isSource: boolean,
-): void {
-  const depth = half * CONNECTOR_TRI_DEPTH;
-  const wing  = half * CONNECTOR_TRI_WING;
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  for (const frac of CONNECTOR_TRI_FRACS) {
-    const d = half * frac;
-    ctx.beginPath();
-    if (isSource) {
-      ctx.moveTo(nx * (d + depth / 2), ny * (d + depth / 2));
-      ctx.lineTo(nx * (d - depth / 2) - ny * wing, ny * (d - depth / 2) + nx * wing);
-      ctx.lineTo(nx * (d - depth / 2) + ny * wing, ny * (d - depth / 2) - nx * wing);
-    } else {
-      ctx.moveTo(nx * (d - depth / 2), ny * (d - depth / 2));
-      ctx.lineTo(nx * (d + depth / 2) - ny * wing, ny * (d + depth / 2) + nx * wing);
-      ctx.lineTo(nx * (d + depth / 2) + ny * wing, ny * (d + depth / 2) - nx * wing);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-}
-
-/** Draw a Source or Sink tile: tile background, radiating arms with landing-strip triangle markers, and a shape-specific centre motif. */
-function _drawChapterMapEndpoint(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  color: string,
-  connections: Set<Direction>,
-  isSource: boolean,
-  centerText?: string,
-  centerTextColor?: string,
-  buttEndDirs?: Set<Direction>,
-): void {
-  const CELL = TILE_SIZE;
-  const cx = x + CELL / 2;
-  const cy = y + CELL / 2;
-  const half = CELL / 2;
-
-  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
-  ctx.fillRect(x, y, CELL, CELL);
-
-  // Gingham overlay: derive row/col from pixel position
-  const tileR = Math.round(y / CELL);
-  const tileC = Math.round(x / CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC);
-
-  ctx.save();
-  ctx.translate(cx, cy);
-
-  // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
-  const outerR = isSource ? half * 0.5 : half * 0.45;
-
-  // Fill the outer circle with the tile background color so it sits as a solid
-  // area above the gingham pattern but below the arms and centre decorations.
-  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
-  ctx.beginPath();
-  ctx.arc(0, 0, outerR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Thin black outline on the outer circle edge (drawn before arms so arms sit on top).
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = _s(4.5);
-  ctx.beginPath();
-  ctx.arc(0, 0, outerR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Radiating arms to connected directions – drawn after the circle fill so they
-  // sit on top of it; centre appears on top of everything.
-  for (const [dir, nx, ny] of CARDINAL_DIRS) {
-    if (!connections.has(dir)) continue;
-    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    // Black outline for the arm
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(nx * half, ny * half);
-    ctx.stroke();
-    // Colored arm
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(nx * half, ny * half);
-    ctx.stroke();
-    // 3 small dark triangles along the arm (landing-strip base markers)
-    _drawChapterMapArmTriangles(ctx, nx, ny, half, isSource);
-  }
-
-  if (isSource) {
-    // Radial gradient circle – bright glow at centre fading to the tile colour
-    const circleR = half * 0.35;
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
-    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-    grad.addColorStop(0.5, color);
-    grad.addColorStop(1, color);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
-    ctx.fill();
-    // Outer aperture ring – suggests a nozzle opening
-    ctx.strokeStyle = color;
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
-    ctx.stroke();
-  } else {
-    // Sink: bullseye / drain pattern – concentric rings with a solid innermost dot
-    ctx.strokeStyle = color;
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  if (centerText !== undefined) {
-    ctx.fillStyle = centerTextColor ?? '#fff';
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = _s(2);
-    ctx.fillText(centerText, 0, 0);
-    ctx.shadowBlur = 0;
-  }
-  ctx.restore();
-}
-
-/** Draw Source tile: shows the number of completed chapter levels in the center. */
-function _drawChapterMapSource(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  isFilled: boolean,
-  connections: Set<Direction>,
-  completedLevelCount: number,
-  buttEndDirs?: Set<Direction>,
-): void {
-  _drawChapterMapEndpoint(
-    ctx, x, y,
-    isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR,
-    connections,
-    true,
-    String(completedLevelCount),
-    undefined,
-    buttEndDirs,
-  );
-}
-
-/** Draw Sink tile: shows remaining completion value, or a star when complete and connected. */
-function _drawChapterMapSink(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  isFilled: boolean,
-  connections: Set<Direction>,
-  remaining: number,
-  buttEndDirs?: Set<Direction>,
-): void {
-  const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
-  if (remaining === 0 && isFilled) {
-    // Star icon indicates the chapter is complete
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, false, '★', '#f0c040', buttEndDirs);
-  } else if (remaining === 0) {
-    // Not yet connected but requirement already met: show "0"
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, false, '0', undefined, buttEndDirs);
-  } else {
-    _drawChapterMapEndpoint(ctx, x, y, color, connections, false, String(remaining), undefined, buttEndDirs);
-  }
-}
-
 /** Draw Granite tile like in-game, seamlessly connecting to adjacent granite tiles. */
 function _drawChapterMapGranite(
   ctx: CanvasRenderingContext2D,
@@ -671,12 +468,29 @@ export function renderChapterMapCanvas(
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
-        _drawChapterMapSource(ctx, x, y, isFilled, connections, completedLevelCount, buttEndDirs);
+        const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
+        ctx.fillStyle = CHAPTER_MAP_TILE_BG;
+        ctx.fillRect(x, y, CELL, CELL);
+        drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+        ctx.save();
+        ctx.translate(x + CELL / 2, y + CELL / 2);
+        drawSourceOrSink(ctx, connections, color, CELL / 2, true, buttEndDirs, { text: String(completedLevelCount), color: '#fff' }, CHAPTER_MAP_TILE_BG);
+        ctx.restore();
       } else if (def.shape === PipeShape.Sink) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         const remaining = Math.max(0, (def.completion ?? 0) - completedLevelCount);
-        _drawChapterMapSink(ctx, x, y, isFilled, connections, remaining, buttEndDirs);
+        const color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
+        const centerLabel = remaining === 0 && isFilled
+          ? { text: '★', color: '#f0c040' }
+          : { text: String(remaining), color: '#fff' };
+        ctx.fillStyle = CHAPTER_MAP_TILE_BG;
+        ctx.fillRect(x, y, CELL, CELL);
+        drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+        ctx.save();
+        ctx.translate(x + CELL / 2, y + CELL / 2);
+        drawSourceOrSink(ctx, connections, color, CELL / 2, false, buttEndDirs, centerLabel, CHAPTER_MAP_TILE_BG);
+        ctx.restore();
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c);
       } else if (def.shape === PipeShape.Tree) {

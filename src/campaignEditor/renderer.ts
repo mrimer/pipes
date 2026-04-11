@@ -5,11 +5,11 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration, drawSea, SeaNeighbors } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
-import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
+import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
   WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
 import { tileDefConnections } from '../chapterMapUtils';
@@ -133,7 +133,10 @@ export function renderEditorCanvas(
 
       // Sea tiles: draw in-game style with neighbor-aware borders + "SEA" label
       if (def.shape === PipeShape.Sea) {
-        const neighbors = _computeEditorSeaNeighbors(grid, rows, cols, r, c);
+        const neighbors = computeSeaNeighbors((dr, dc) => {
+          const nr = r + dr, nc = c + dc;
+          return nr < 0 || nr >= rows || nc < 0 || nc >= cols || grid[nr]?.[nc]?.shape === PipeShape.Sea;
+        });
         const cx = x + CELL / 2;
         const cy = y + CELL / 2;
         ctx.save();
@@ -258,32 +261,6 @@ export function renderEditorCanvas(
   }
 }
 
-/**
- * Compute sea-tile neighbor data from a TileDef grid for a tile at (row, col).
- * Out-of-bounds positions are treated as sea so no land border is drawn along
- * the grid edges.  Used by the editor to render sea borders with adjacency awareness.
- */
-function _computeEditorSeaNeighbors(
-  grid: (TileDef | null)[][],
-  rows: number,
-  cols: number,
-  row: number,
-  col: number,
-): SeaNeighbors {
-  const _isSea = (r: number, c: number): boolean =>
-    r < 0 || r >= rows || c < 0 || c >= cols || grid[r]?.[c]?.shape === PipeShape.Sea;
-  return {
-    north: _isSea(row - 1, col),
-    south: _isSea(row + 1, col),
-    west:  _isSea(row, col - 1),
-    east:  _isSea(row, col + 1),
-    nw:    _isSea(row - 1, col - 1),
-    ne:    _isSea(row - 1, col + 1),
-    sw:    _isSea(row + 1, col - 1),
-    se:    _isSea(row + 1, col + 1),
-  };
-}
-
 // ─── Tile drawing ──────────────────────────────────────────────────────────────
 
 /** Render a single tile at (x,y), using levelDefs for level-chamber tiles. */
@@ -320,43 +297,15 @@ function _drawOneWayEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   const dirs = [Direction.North, Direction.East, Direction.South, Direction.West];
   const dir = dirs[rot / 90] ?? Direction.North;
   const cx = x + CELL / 2;
-  const cy = y + CELL / 2;
   const half = CELL / 2;
-  const angle = dir === Direction.East  ?  Math.PI / 2
-    : dir === Direction.South ?  Math.PI
-    : dir === Direction.West  ? -Math.PI / 2
-    : 0;
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle);
-  const tipY      = -half * 0.72;
-  const headBaseY = -half * 0.28;
-  const botY      =  half * 0.30;
-  const headHalf  =  half * 0.62;
-  const shaftHalf =  half * 0.22;
-  ctx.beginPath();
-  ctx.moveTo(0, tipY);
-  ctx.lineTo( headHalf,  headBaseY);
-  ctx.lineTo( shaftHalf, headBaseY);
-  ctx.lineTo( shaftHalf, botY);
-  ctx.lineTo(-shaftHalf, botY);
-  ctx.lineTo(-shaftHalf, headBaseY);
-  ctx.lineTo(-headHalf,  headBaseY);
-  ctx.closePath();
-  ctx.fillStyle = ONE_WAY_ARROW_COLOR;
-  ctx.fill();
-  ctx.strokeStyle = ONE_WAY_ARROW_BORDER;
-  ctx.lineWidth = _s(1.5);
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-  ctx.restore();
+  drawOneWayArrow(ctx, x, y, dir);
   // Label
   ctx.save();
   ctx.font = `bold ${_s(9)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
-  strokeFillText(ctx, 'ONE-WAY', cx, cy + half * 0.65);
+  strokeFillText(ctx, 'ONE-WAY', cx, y + CELL / 2 + half * 0.65);
   ctx.restore();
   ctx.strokeStyle = '#2a3a5e';
   ctx.lineWidth = 1;
@@ -434,18 +383,7 @@ function _drawSpinCementOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-  ctx.save();
-  ctx.font = `bold ${_s(8)}px Arial`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = '#505050';
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = _s(1.5);
-  ctx.lineJoin = 'round';
-  const label = dryingTime === 0 ? 'X' : `T=${dryingTime}`;
-  ctx.strokeText(label, x + _s(2), y + _s(2));
-  ctx.fillText(label, x + _s(2), y + _s(2));
-  ctx.restore();
+  drawCementLabel(ctx, x, y, dryingTime, dryingTime === 0);
 }
 
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */
