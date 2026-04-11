@@ -1053,7 +1053,7 @@ function _buildStraightPath(
   ctx: CanvasRenderingContext2D,
   half: number,
   lw2: number,
-  localButt?: Set<Direction>,
+  localButt?: ReadonlySet<Direction>,
 ): void {
   const buttN = localButt?.has(Direction.North) ?? false;
   const buttS = localButt?.has(Direction.South) ?? false;
@@ -1085,7 +1085,7 @@ function _buildElbowPath(
   ctx: CanvasRenderingContext2D,
   half: number,
   lw2: number,
-  localButt?: Set<Direction>,
+  localButt?: ReadonlySet<Direction>,
 ): void {
   const buttN = localButt?.has(Direction.North) ?? false;
   const buttE = localButt?.has(Direction.East)  ?? false;
@@ -1132,7 +1132,7 @@ function _buildTeePath(
   ctx: CanvasRenderingContext2D,
   half: number,
   lw2: number,
-  localButt?: Set<Direction>,
+  localButt?: ReadonlySet<Direction>,
 ): void {
   const buttN = localButt?.has(Direction.North) ?? false;
   const buttS = localButt?.has(Direction.South) ?? false;
@@ -1168,7 +1168,7 @@ function _buildCrossPath(
   ctx: CanvasRenderingContext2D,
   half: number,
   lw2: number,
-  localButt?: Set<Direction>,
+  localButt?: ReadonlySet<Direction>,
 ): void {
   const buttN = localButt?.has(Direction.North) ?? false;
   const buttS = localButt?.has(Direction.South) ?? false;
@@ -1220,7 +1220,8 @@ function _buildCrossPath(
  *   2. Fill with the desired pipe colour (covers the interior, including the
  *      inner half of the stroke, so only the outer border remains visible).
  *
- * This is exported for reuse by the chapter-map renderer.
+ * This is exported for low-level use; see also {@link drawPipeBody} which wraps
+ * the full clip + stroke + fill sequence.
  *
  * @param ctx              Canvas 2D context (translated + rotated to tile centre).
  * @param shape            Any PipeShape value in PIPE_SHAPES.
@@ -1234,7 +1235,7 @@ export function buildPipeBodyPath(
   shape: PipeShape,
   half: number,
   lw2: number,
-  localButtEndDirs?: Set<Direction>,
+  localButtEndDirs?: ReadonlySet<Direction>,
 ): void {
   ctx.beginPath();
   switch (_pipeStructuralType(shape)) {
@@ -1247,6 +1248,58 @@ export function buildPipeBodyPath(
 }
 
 // ─── End of unified pipe-shape path helpers ───────────────────────────────────
+
+/**
+ * Draw a pipe body shape with butt-end boundary clipping.
+ *
+ * The context must already be translated to the tile centre (0, 0) and rotated
+ * into the tile's local frame.  This function manages its own inner save/restore
+ * so the caller's clip or transform state is unaffected.
+ *
+ * Used by both the level board renderer ({@link drawTile}) and the chapter map
+ * renderer so that the clip + path + stroke + fill logic is not duplicated.
+ *
+ * @param ctx              2D rendering context (origin at tile centre, rotated).
+ * @param shape            Pipe shape to draw.
+ * @param half             Half the tile size — distance from centre to each tile edge.
+ * @param localButtEndDirs Arm directions (in the tile's local frame) that need flat
+ *                         butt ends.  Undefined means all arms get round nub caps.
+ * @param fillColor        CSS color string used to fill the pipe body.
+ */
+export function drawPipeBody(
+  ctx: CanvasRenderingContext2D,
+  shape: PipeShape,
+  half: number,
+  localButtEndDirs: ReadonlySet<Direction> | undefined,
+  fillColor: string,
+): void {
+  const lw2 = LINE_WIDTH / 2;
+  // Clip to the tile boundary on each butt-end direction so the black stroke
+  // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
+  // left unconstrained so rounded caps can extend freely into empty space.
+  const LARGE = half + LINE_WIDTH;
+  const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
+  const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
+  const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
+  const clipB = localButtEndDirs?.has(Direction.South) ?  half :  LARGE;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
+  ctx.clip();
+  // Build the pipe body path AFTER clipping so ctx.beginPath() for the clip
+  // rect does not erase the pipe path before stroke/fill.
+  buildPipeBodyPath(ctx, shape, half, lw2, localButtEndDirs);
+  // Stroke outline first; fill covers the inner half of the stroke so only
+  // the outer border remains visible.
+  ctx.lineWidth = _s(3);
+  ctx.strokeStyle = 'black';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'butt';
+  ctx.stroke();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.restore();
+}
 
 /**
  * Draw rust-colored blotches along each non-blocked arm of a leaky pipe.
@@ -1467,38 +1520,14 @@ export function drawTile(
     // Unified shape path: draw the entire pipe body as a single filled shape
     // with a contiguous outer outline.  This eliminates the junction seam
     // artifacts that appear when arms are stroked individually.
-    const lw2 = LINE_WIDTH / 2;
+    //
     // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the path
     // endpoints land precisely on the tile edge at every tile size.
     const pathHalf = TILE_SIZE / 2;
     const localButtEndDirs = effectiveButtEndDirs?.size
       ? new Set([...effectiveButtEndDirs].map(d => toLocalDir(d, effectiveRotation)))
       : undefined;
-    // Clip to the tile boundary on each butt-end direction so the black stroke
-    // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
-    // left unconstrained so rounded caps can extend freely into empty space.
-    const LARGE = pathHalf + LINE_WIDTH;
-    const clipL = localButtEndDirs?.has(Direction.West)  ? -pathHalf : -LARGE;
-    const clipR = localButtEndDirs?.has(Direction.East)  ?  pathHalf :  LARGE;
-    const clipT = localButtEndDirs?.has(Direction.North) ? -pathHalf : -LARGE;
-    const clipB = localButtEndDirs?.has(Direction.South) ?  pathHalf :  LARGE;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
-    ctx.clip();
-    // Build the pipe body path AFTER clipping so ctx.beginPath() for the clip
-    // rect does not erase the pipe path before stroke/fill.
-    buildPipeBodyPath(ctx, shape, pathHalf, lw2, localButtEndDirs);
-    // Stroke outline first; the subsequent fill covers the inner half of the
-    // stroke so only the outer border remains visible.
-    ctx.lineWidth = _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'butt'; // end caps are defined by arcs in the path itself
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.restore(); // Release clip before drawing leaky rust spots.
+    drawPipeBody(ctx, shape, pathHalf, localButtEndDirs, color);
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, null);
     }

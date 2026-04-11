@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, buildPipeBodyPath, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
+import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
@@ -541,44 +541,17 @@ function _renderChapterMapPass3PipeTiles(
       // Gingham overlay for pipe tiles on the chapter map
       drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
 
-      // Unified pipe shape path (same as level screen – no junction seam artifacts)
       const tileConns = tileDefConnections(def);
       const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
       const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
       const tileRotation = def.rotation ?? 0;
-      const lw2 = LINE_WIDTH / 2;
       const localButtEndDirs = buttEndDirs
         ? new Set([...buttEndDirs].map(d => toLocalDir(d, tileRotation)))
         : undefined;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(tileRotation * Math.PI / 180);
-      // Clip to the tile boundary on each butt-end direction so the black stroke
-      // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
-      // left unconstrained so rounded caps can extend freely into empty space.
-      const half = CELL / 2;
-      const LARGE = half + LINE_WIDTH;
-      const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
-      const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
-      const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
-      const clipB = localButtEndDirs?.has(Direction.South) ?  half :  LARGE;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
-      ctx.clip();
-      // Build the pipe body path AFTER clipping so ctx.beginPath() for the clip
-      // rect does not erase the pipe path before stroke/fill.
-      buildPipeBodyPath(ctx, def.shape, CELL / 2, lw2, localButtEndDirs);
-      // Stroke outline first; fill covers the inner half of the stroke so only
-      // the outer border remains visible.
-      ctx.lineWidth = _s(3);
-      ctx.strokeStyle = 'black';
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'butt';
-      ctx.stroke();
-      ctx.fillStyle = pipeColor;
-      ctx.fill();
-      ctx.restore(); // Release clip.
+      drawPipeBody(ctx, def.shape, CELL / 2, localButtEndDirs, pipeColor);
       ctx.restore();
     }
   }
