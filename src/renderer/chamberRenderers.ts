@@ -612,6 +612,89 @@ function _drawChamberFrostHalo(ctx: CanvasRenderingContext2D, color: string, bw:
 }
 
 // ---------------------------------------------------------------------------
+// Shared chamber box + stub helpers (also used by chapterMap.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Draw the chamber box: rounded rectangle fill and double-stroke border.
+ *
+ * The canvas origin must already be translated to the tile center before
+ * calling this function.
+ */
+export function drawChamberBox(
+  ctx: CanvasRenderingContext2D,
+  bw: number,
+  bh: number,
+  br: number,
+  fill: string,
+  color: string,
+): void {
+  ctx.beginPath();
+  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  // Thin black outline around the chamber box, then the colored border on top.
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(6);
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = _s(3);
+  ctx.stroke();
+}
+
+/**
+ * Draw butt-end connection stubs from the chamber box edge to the tile edge.
+ *
+ * The stub start is offset outward by half the pipe line-width so the thick
+ * stroke does not visibly overlap the chamber box rectangle.
+ *
+ * The canvas origin must already be translated to the tile center before
+ * calling this function.
+ *
+ * @param connections   Full set of connection directions for this tile.
+ * @param dirFilter     When provided, only directions present in this set are
+ *                      drawn.  Pass `undefined` to draw all connections.
+ */
+export function drawChamberButtStubs(
+  ctx: CanvasRenderingContext2D,
+  connections: ReadonlySet<Direction>,
+  bw: number,
+  bh: number,
+  half: number,
+  color: string,
+  dirFilter?: ReadonlySet<Direction>,
+): void {
+  // Offset the stub start outward by half the line-width so the stroke's inner
+  // edge lands at the box border rather than inside the chamber rectangle.
+  const gap = Math.round(LINE_WIDTH / 2);
+  ctx.lineCap = 'butt';
+  const stubDirs = [
+    [Direction.North, 0,        -(bh + gap), 0,     -half],
+    [Direction.South, 0,         (bh + gap), 0,      half],
+    [Direction.West,  -(bw + gap), 0,        -half,  0   ],
+    [Direction.East,   (bw + gap), 0,         half,  0   ],
+  ] as const;
+  const shouldDraw = (dir: Direction): boolean =>
+    connections.has(dir) && (!dirFilter || dirFilter.has(dir));
+  // Black outline pass
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = LINE_WIDTH + _s(3);
+  for (const [dir, x1, y1, x2, y2] of stubDirs) {
+    if (shouldDraw(dir)) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+  // Colored stroke pass
+  ctx.strokeStyle = color;
+  ctx.lineWidth = LINE_WIDTH;
+  for (const [dir, x1, y1, x2, y2] of stubDirs) {
+    if (shouldDraw(dir)) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -642,17 +725,7 @@ export function drawChamber(
   const bw = half * 0.7 + 2;
   const bh = half * 0.7 + 2;
   const br = _s(3); // slight corner radius for the inner box
-  ctx.beginPath();
-  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
-  ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
-  ctx.fill();
-  // Thin black outline around the chamber box, then the colored border on top.
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = _s(6);
-  ctx.stroke();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = _s(3);
-  ctx.stroke();
+  drawChamberBox(ctx, bw, bh, br, isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR, color);
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
   // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
@@ -691,31 +764,7 @@ export function drawChamber(
   // the end sits exactly flush with the tile edge and does not bleed into
   // adjacent tiles.  When buttEndDirs is undefined all stubs use butt caps
   // (legacy / default behaviour for tiles that don't compute butt-end sets).
-  // Draw black outline for each stub first, then the colored stroke on top.
-  // lineCap='butt' means no black cap at the tile-boundary (connection) end.
-  ctx.lineCap = 'butt';
-  const stubDirs = [
-    [Direction.North, 0, -bh, 0, -half],
-    [Direction.South, 0, bh,  0, half],
-    [Direction.West, -bw, 0, -half, 0],
-    [Direction.East, bw, 0,  half, 0],
-  ] as const;
-  // Black outline pass
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = LINE_WIDTH + _s(3);
-  for (const [dir, x1, y1, x2, y2] of stubDirs) {
-    if (tile.connections.has(dir) && (!buttEndDirs || buttEndDirs.has(dir))) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-  }
-  // Colored stroke pass
-  ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH;
-  for (const [dir, x1, y1, x2, y2] of stubDirs) {
-    if (tile.connections.has(dir) && (!buttEndDirs || buttEndDirs.has(dir))) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-  }
+  drawChamberButtStubs(ctx, tile.connections, bw, bh, half, color, buttEndDirs);
   ctx.restore(); // Remove clip so round-end stubs can extend beyond the tile boundary.
 
   // Phase 2: Connection stubs that face empty tiles or pipes without a reciprocating
