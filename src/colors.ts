@@ -21,7 +21,11 @@ export const TANK_COLOR              = '#2196f3';
 export const TANK_WATER_COLOR        = '#00bcd4';
 export const FIXED_PIPE_COLOR        = '#4a6878';
 export const FIXED_PIPE_WATER_COLOR  = '#3a9cb8';
+/** Light shade for gingham empty-tile pattern (top-left of 2x2 cell). */
+export const EMPTY_COLOR_LIGHT       = '#386038';
 export const EMPTY_COLOR             = '#2a4a2a';
+/** Dark shade for gingham empty-tile pattern (bottom-right of 2x2 cell). */
+export const EMPTY_COLOR_DARK        = '#203820';
 export const EMPTY_TARGET_COLOR      = '#1e3a1e';
 export const LOW_WATER_COLOR         = '#e74c3c';
 export const MEDIUM_WATER_COLOR      = '#f0c040';
