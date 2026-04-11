@@ -142,29 +142,39 @@ export class TurnStateManager {
    * change the fill path.
    *
    * Ordering invariant (must not be reordered):
-   *  1. Detect beneficial disconnect — must happen before cleanup removes locks.
-   *  2. Clean up disconnected tiles — adjusts `frozen` for removed cost tiles.
-   *  3. Increment turn counter — newly-connected tiles get this turn's stamp.
-   *  4. Re-evaluate still-connected tiles — only if a beneficial tile left;
-   *     uses historically-limited temp/pressure so no tile benefits retroactively.
-   *  5. Lock newly-connected tiles — uses current temp/pressure at this moment;
-   *     ice/snow/sandstone are processed before hot_plate so frozen counts are current.
-   *  6. Apply leaky penalties — only for tiles locked *before* this turn.
+   *  1a. Detect beneficial disconnect — must happen before cleanup removes locks.
+   *  1b. Detect cold-tile disconnect — find minimum connection turn of cold chambers
+   *      that froze water and are no longer connected; triggers hot_plate re-evaluation.
+   *  2.  Clean up disconnected tiles — adjusts `frozen` for removed cost tiles.
+   *  3.  Increment turn counter — newly-connected tiles get this turn's stamp.
+   *  4a. Re-evaluate still-connected tiles — only if a beneficial tile left;
+   *      uses historically-limited temp/pressure so no tile benefits retroactively.
+   *  4b. Re-evaluate hot_plate tiles — only if a cold tile that froze water left;
+   *      sorted by connection turn so frozen is allocated correctly across multiple plates.
+   *  5.  Lock newly-connected tiles — uses current temp/pressure at this moment;
+   *      ice/snow/sandstone are processed before hot_plate so frozen counts are current.
+   *  6.  Apply leaky penalties — only for tiles locked *before* this turn.
    *
    * @returns The list of locked-cost changes for UI animation.
    */
   applyTurnDelta(filled: Set<string>): Array<{ row: number; col: number; delta: number }> {
     const changes: Array<{ row: number; col: number; delta: number }> = [];
 
-    // Step 1: detect
+    // Step 1a: detect beneficial disconnect
     const beneficialDisconnected = this._detectBeneficialDisconnect(filled);
+    // Step 1b: detect cold-tile disconnect that froze water
+    const coldDisconnectTurnX = this._detectColdDisconnect(filled);
     // Step 2: cleanup
     this._cleanupDisconnectedTiles(filled);
     // Step 3: turn counter
     this._turnNumber++;
-    // Step 4: re-evaluate (only when needed)
+    // Step 4a: re-evaluate all cost tiles when a heater/pump left
     if (beneficialDisconnected) {
       this._reEvaluateConnectedTiles(filled, changes);
+    }
+    // Step 4b: re-evaluate hot_plate tiles in turn order when frozen supply shrank
+    if (coldDisconnectTurnX !== null) {
+      this._reEvaluateHotPlatesForFrozenLoss(filled, coldDisconnectTurnX, changes);
     }
     // Step 5: lock new tiles
     this._lockNewTiles(filled, changes);
@@ -231,6 +241,109 @@ export class TurnStateManager {
       }
     }
     return false;
+  }
+
+  /**
+   * Returns the minimum connection turn of any cold-chamber tile that was
+   * previously locked with a negative impact (i.e. froze water) and is no
+   * longer in the current fill set.  Returns `null` when no such tile left.
+   *
+   * Hot-plate tiles that connected on or after this turn may have relied on the
+   * now-gone frozen water, so they must be re-evaluated.
+   */
+  private _detectColdDisconnect(filled: Set<string>): number | null {
+    let minTurn: number | null = null;
+    for (const key of this._lockedWaterImpact.keys()) {
+      if (filled.has(key)) continue;
+      const impact = this._lockedWaterImpact.get(key)!;
+      if (impact >= 0) continue; // Only care about tiles that froze water (negative impact).
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (
+        tile?.shape === PipeShape.Chamber &&
+        tile.chamberContent !== null &&
+        COLD_CHAMBER_CONTENTS.has(tile.chamberContent)
+      ) {
+        const turn = this._connectionTurn.get(key) ?? this._turnNumber;
+        if (minTurn === null || turn < minTurn) {
+          minTurn = turn;
+        }
+      }
+    }
+    return minTurn;
+  }
+
+  /**
+   * Re-evaluate the locked water impact of hot_plate tiles that connected on or
+   * after `minTurnX` when a cold-chamber tile that froze water was disconnected.
+   *
+   * After the disconnected cold tile is removed (in `_cleanupDisconnectedTiles`),
+   * `this.frozen` is already reduced and may be temporarily negative if hot_plate
+   * tiles had consumed more frozen water than what remains after the cold tile left.
+   * This method uses a **two-pass** approach to avoid invalid intermediate states:
+   *
+   * Pass 1 — budget restoration: sum all qualifying hot_plate oldWaterGains back into
+   * `this.frozen` so it reflects only the unfrozen frozen supply (non-negative).
+   *
+   * Pass 2 — redistribution (ascending turn order): re-allocate frozen to each plate
+   * using the historically-locked connect temperature (temperature did not change;
+   * only the frozen supply did).
+   */
+  private _reEvaluateHotPlatesForFrozenLoss(
+    filled: Set<string>,
+    minTurnX: number,
+    changes: Array<{ row: number; col: number; delta: number }>,
+  ): void {
+    // Collect qualifying hot_plate keys: connected, already locked, turn >= minTurnX.
+    const candidates: Array<{ key: string; turn: number }> = [];
+    for (const key of filled) {
+      if (!this._lockedWaterImpact.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'hot_plate') continue;
+      const turn = this._connectionTurn.get(key) ?? this._turnNumber;
+      if (turn >= minTurnX) {
+        candidates.push({ key, turn });
+      }
+    }
+
+    if (candidates.length === 0) return;
+
+    // Pass 1: restore all qualifying hot_plate waterGains into frozen so the budget
+    // is non-negative before redistribution.
+    for (const { key } of candidates) {
+      this.frozen += this._hotPlateWaterGain.get(key) ?? 0;
+    }
+    // Clamp to zero in case floating-point or accounting drift produced a tiny negative.
+    if (this.frozen < 0) this.frozen = 0;
+
+    // Pass 2: redistribute frozen in ascending connection-turn order.
+    candidates.sort((a, b) => a.turn - b.turn);
+
+    for (const { key } of candidates) {
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (!tile) continue;
+
+      const oldImpact = this._lockedWaterImpact.get(key)!;
+
+      // Reuse the historically-locked connect temperature; only the frozen supply changed.
+      const lockedTemp = this._lockedConnectTemp.get(key) ?? 0;
+      const effectiveCost = tile.cost * (tile.temperature + lockedTemp);
+
+      const { waterGain: newWaterGain, impact: newImpact } =
+        this.thermo.computeHotPlateWaterEffect(effectiveCost, this.frozen);
+
+      // Always update state (even when impact unchanged) so subsequent hot_plates in the
+      // sorted list see the correct frozen value.
+      this.frozen -= newWaterGain;
+      this._hotPlateWaterGain.set(key, newWaterGain);
+      this._lockedWaterImpact.set(key, newImpact);
+
+      if (newImpact !== oldImpact) {
+        changes.push({ row: r, col: c, delta: newImpact - oldImpact });
+      }
+    }
   }
 
   /**
