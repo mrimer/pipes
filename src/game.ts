@@ -679,7 +679,12 @@ export class Game implements InputCallbacks {
       this._input.hoverRotationDelta,
       rotationOverrides,
       fillExclude,
-      () => this._animMgr.renderWinTileGlowsOverlay(now),
+      () => {
+        this._animMgr.renderWinTileGlowsOverlay(now);
+        if (this.gameState === GameState.GameOver) {
+          this._animMgr.renderDrySourcePulseOverlay(this.board!, now);
+        }
+      },
     );
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
