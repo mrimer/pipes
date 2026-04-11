@@ -532,7 +532,7 @@ export function renderLevelList(
   campaignEditorBtn.style.cssText =
     'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#16213e;color:#f0c040;' +
     'border:1px solid #f0c040;border-radius:6px;cursor:pointer;width:100%;';
-  campaignEditorBtn.addEventListener('click', onCampaignEditorClick);
+  campaignEditorBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignEditorClick(); });
   levelListEl.appendChild(campaignEditorBtn);
 
   // Game Rules button above the reset button
@@ -541,7 +541,7 @@ export function renderLevelList(
   rulesBtn.style.cssText =
     'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#16213e;color:#7ed321;' +
     'border:1px solid #7ed321;border-radius:6px;cursor:pointer;width:100%;';
-  rulesBtn.addEventListener('click', onRulesClick);
+  rulesBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onRulesClick(); });
   levelListEl.appendChild(rulesBtn);
 
   // Reset-progress button: hidden when no campaign is active; disabled when there is no
@@ -559,7 +559,7 @@ export function renderLevelList(
       'color:' + (hasProgress ? '#e74c3c' : '#888') + ';' +
       'cursor:' + (hasProgress ? 'pointer' : 'default') + ';';
     if (hasProgress) {
-      resetBtn.addEventListener('click', onResetClick);
+      resetBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onResetClick(); });
     }
     levelListEl.appendChild(resetBtn);
   }
@@ -570,6 +570,6 @@ export function renderLevelList(
   unlockAllBtn.style.cssText =
     'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#f39c12;' +
     'border:1px solid #f39c12;border-radius:6px;cursor:pointer;width:100%;';
-  unlockAllBtn.addEventListener('click', onUnlockAllClick);
+  unlockAllBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); });
   levelListEl.appendChild(unlockAllBtn);
 }

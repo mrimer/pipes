@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
@@ -481,14 +481,35 @@ function _drawChapterMapSink(
   }
 }
 
-/** Draw Granite tile like in-game. */
-function _drawChapterMapGranite(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+/** Draw Granite tile like in-game, seamlessly connecting to adjacent granite tiles. */
+function _drawChapterMapGranite(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  r: number,
+  c: number,
+): void {
   const CELL = TILE_SIZE;
+  const _isGranite = (rr: number, cc: number): boolean =>
+    rr >= 0 && rr < rows && cc >= 0 && cc < cols && grid[rr]?.[cc]?.shape === PipeShape.Granite;
+  const neighbors: GraniteNeighbors = {
+    north: _isGranite(r - 1, c),
+    south: _isGranite(r + 1, c),
+    west:  _isGranite(r, c - 1),
+    east:  _isGranite(r, c + 1),
+    nw:    _isGranite(r - 1, c - 1),
+    ne:    _isGranite(r - 1, c + 1),
+    sw:    _isGranite(r + 1, c - 1),
+    se:    _isGranite(r + 1, c + 1),
+  };
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
-  drawGranite(ctx, CELL / 2);
+  drawGranite(ctx, CELL / 2, neighbors);
   ctx.restore();
 }
 
@@ -638,7 +659,7 @@ export function renderChapterMapCanvas(
         const remaining = Math.max(0, (def.completion ?? 0) - completedLevelCount);
         _drawChapterMapSink(ctx, x, y, isFilled, connections, remaining, buttEndDirs);
       } else if (def.shape === PipeShape.Granite) {
-        _drawChapterMapGranite(ctx, x, y);
+        _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c);
       } else if (def.shape === PipeShape.Tree) {
         _drawChapterMapTree(ctx, x, y);
       } else if (def.shape === PipeShape.Sea) {

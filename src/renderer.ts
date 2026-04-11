@@ -358,15 +358,118 @@ function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: str
   }
 }
 
-export function drawGranite(ctx: CanvasRenderingContext2D, half: number): void {
+/**
+ * Adjacency descriptor for granite tiles.  Each field indicates whether the
+ * neighbor in that direction is also a granite tile.
+ */
+export interface GraniteNeighbors {
+  north: boolean;
+  south: boolean;
+  east: boolean;
+  west: boolean;
+  nw: boolean;
+  ne: boolean;
+  sw: boolean;
+  se: boolean;
+}
+
+/**
+ * Compute granite-tile neighbor data for the tile at (row, col) on the given board.
+ * Returns which of the 8 neighbors are granite tiles.  Out-of-bounds positions are
+ * treated as non-granite.
+ */
+export function computeGraniteNeighbors(board: Board, row: number, col: number): GraniteNeighbors {
+  const _isGranite = (r: number, c: number): boolean =>
+    r >= 0 && r < board.rows && c >= 0 && c < board.cols &&
+    board.grid[r][c].shape === PipeShape.Granite;
+  return {
+    north: _isGranite(row - 1, col),
+    south: _isGranite(row + 1, col),
+    west:  _isGranite(row, col - 1),
+    east:  _isGranite(row, col + 1),
+    nw:    _isGranite(row - 1, col - 1),
+    ne:    _isGranite(row - 1, col + 1),
+    sw:    _isGranite(row + 1, col - 1),
+    se:    _isGranite(row + 1, col + 1),
+  };
+}
+
+/**
+ * Draw a granite tile centered at the origin.
+ *
+ * When `neighbors` is provided the shape seams cleanly with adjacent granite
+ * tiles: each edge that touches another granite tile is extended to the tile
+ * boundary without a border, corner fills are added when all three surrounding
+ * granite tiles are present, and an L-shaped inset border marks corners where
+ * two edges are adjacent to granite but the diagonal is not.
+ */
+export function drawGranite(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  neighbors?: GraniteNeighbors,
+): void {
+  const n = neighbors ?? { north: false, south: false, east: false, west: false, nw: false, ne: false, sw: false, se: false };
   const bw = half * 0.7;
   const bh = half * 0.7;
+
   ctx.fillStyle = GRANITE_FILL_COLOR;
+
+  // ── Fill ─────────────────────────────────────────────────────────────────
+  // Core inset rectangle (always drawn)
   ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
+  // Edge extension strips toward adjacent granite tiles
+  if (n.north) ctx.fillRect(-bw, -half, bw * 2, half - bh);
+  if (n.south) ctx.fillRect(-bw, bh,   bw * 2, half - bh);
+  if (n.west)  ctx.fillRect(-half, -bh, half - bw, bh * 2);
+  if (n.east)  ctx.fillRect(bw,   -bh, half - bw, bh * 2);
+  // Corner fills: only when both edge neighbors AND the diagonal are granite
+  if (n.north && n.west && n.nw) ctx.fillRect(-half, -half, half - bw, half - bh);
+  if (n.north && n.east && n.ne) ctx.fillRect(bw,   -half, half - bw, half - bh);
+  if (n.south && n.west && n.sw) ctx.fillRect(-half, bh,   half - bw, half - bh);
+  if (n.south && n.east && n.se) ctx.fillRect(bw,   bh,   half - bw, half - bh);
+
+  // ── Border ───────────────────────────────────────────────────────────────
+  // Draw border only on edges that are NOT adjacent to granite.
+  // Each exposed edge is drawn as a line at the inset level (±bw / ±bh),
+  // extended to the tile boundary when the perpendicular edges are adjacent to
+  // granite so that the border visually closes the filled shape.
   ctx.strokeStyle = GRANITE_COLOR;
   ctx.lineWidth = _s(3);
-  ctx.strokeRect(-bw, -bh, bw * 2, bh * 2);
-  // Stone texture – a few crack-like lines
+  ctx.beginPath();
+
+  // Top border (y = -bh): skip when north is granite
+  if (!n.north) {
+    ctx.moveTo(n.west ? -half : -bw, -bh);
+    ctx.lineTo(n.east ? half  :  bw, -bh);
+  }
+  // Bottom border (y = +bh): skip when south is granite
+  if (!n.south) {
+    ctx.moveTo(n.west ? -half : -bw, bh);
+    ctx.lineTo(n.east ? half  :  bw, bh);
+  }
+  // Left border (x = -bw): skip when west is granite
+  if (!n.west) {
+    ctx.moveTo(-bw, n.north ? -half : -bh);
+    ctx.lineTo(-bw, n.south ? half  :  bh);
+  }
+  // Right border (x = +bw): skip when east is granite
+  if (!n.east) {
+    ctx.moveTo(bw, n.north ? -half : -bh);
+    ctx.lineTo(bw, n.south ? half  :  bh);
+  }
+
+  // L-shaped inset borders at corners where two edges are granite but the
+  // diagonal is not.  These trace the inner boundary of the unfilled corner
+  // gap and connect cleanly to the adjacent tiles' inset border lines.
+  if (n.north && n.west && !n.nw) { ctx.moveTo(-half, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -half); }
+  if (n.north && n.east && !n.ne) { ctx.moveTo(half,  -bh); ctx.lineTo(bw,  -bh); ctx.lineTo(bw,  -half); }
+  if (n.south && n.west && !n.sw) { ctx.moveTo(-half,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  half); }
+  if (n.south && n.east && !n.se) { ctx.moveTo(half,   bh); ctx.lineTo(bw,   bh); ctx.lineTo(bw,   half); }
+
+  ctx.stroke();
+
+  // ── Stone texture ─────────────────────────────────────────────────────────
+  // A few crack-like lines confined to the core inset rectangle.
   ctx.strokeStyle = GRANITE_COLOR;
   ctx.lineWidth = _s(1.5);
   ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
@@ -934,6 +1037,7 @@ export function drawTile(
   rotationDegOverride?: number,
   buttEndDirs?: Set<Direction>,
   seaNeighbors?: SeaNeighbors,
+  graniteNeighbors?: GraniteNeighbors,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -1072,7 +1176,7 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    drawGranite(ctx, half);
+    drawGranite(ctx, half, graniteNeighbors);
   } else if (shape === PipeShape.Tree) {
     // Tree – impassable obstacle rendered as a top-down broad-leafed tree
     ctx.restore();
@@ -1540,7 +1644,13 @@ function _renderPass2NonPipeTiles(
         seaNeighbors = computeSeaNeighbors(board, r, c);
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors);
+      // For Granite tiles, compute which neighbors are also granite for seaming.
+      let graniteNeighbors: GraniteNeighbors | undefined;
+      if (tile.shape === PipeShape.Granite) {
+        graniteNeighbors = computeGraniteNeighbors(board, r, c);
+      }
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors);
     }
   }
 }
