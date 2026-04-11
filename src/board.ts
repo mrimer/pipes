@@ -119,6 +119,16 @@ export function isObstacleTile(shape: PipeShape): boolean {
   return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Sea;
 }
 
+/**
+ * Returns true for tile shapes that have connector arms: ordinary pipe shapes
+ * as well as Source and Sink tiles.  These are the shapes that use a black
+ * stroke outline on their arms and therefore need connection-bridge patches at
+ * shared tile boundaries to hide the stroke overflow.
+ */
+export function isConnectorShape(shape: PipeShape): boolean {
+  return PIPE_SHAPES.has(shape) || shape === PipeShape.Source || shape === PipeShape.Sink;
+}
+
 // ── Error message constants ────────────────────────────────────────────────
 // Centralised here so changes propagate automatically and tests can reference
 // the same strings without hard-coding them again.
