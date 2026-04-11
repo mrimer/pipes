@@ -24,6 +24,7 @@ import {
   STAR_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
+  lighten, darken,
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
 
@@ -631,7 +632,10 @@ export function drawChamberBox(
 ): void {
   ctx.beginPath();
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
-  ctx.fillStyle = fill;
+  const grad = ctx.createLinearGradient(-bw, -bh, bw, bh);
+  grad.addColorStop(0, lighten(fill, 0.15));
+  grad.addColorStop(1, darken(fill, 0.10));
+  ctx.fillStyle = grad;
   ctx.fill();
   // Thin black outline around the chamber box, then the colored border on top.
   ctx.strokeStyle = 'black';

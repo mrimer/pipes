@@ -47,6 +47,7 @@ const MOCK_CTX = {
   scale:      jest.fn(),
   closePath:  jest.fn(),
   createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
 };
 
 // Stub out requestAnimationFrame so _loop() never fires.
