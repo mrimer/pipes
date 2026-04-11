@@ -6,6 +6,7 @@
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
 import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex, drawGinghamOverlay } from '../renderer';
+import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
@@ -159,41 +160,10 @@ export function drawLevelChamberTile(
   // from a fully completed chamber tile.
   const chamberFill  = isFilled ? CHAPTER_MAP_FILLED_CHAMBER_BG    : CHAMBER_FILL_COLOR;
   const chamberColor = isFilled ? (isCompleted ? WATER_COLOR : '#ffffff') : PIPE_COLOR;
-  ctx.beginPath();
-  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
-  ctx.fillStyle = chamberFill;
-  ctx.fill();
-  // Thin black outline around the chamber box, then colored border on top.
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = _s(6);
-  ctx.stroke();
-  ctx.strokeStyle = chamberColor;
-  ctx.lineWidth = _s(3);
-  ctx.stroke();
+  drawChamberBox(ctx, bw, bh, br, chamberFill, chamberColor);
 
   // Connection stubs from box edge to tile edge (butt cap, like in-game chamber).
-  // Draw black outline first, then colored stroke on top.
-  ctx.lineCap = 'butt';
-  const chStubDirs = [
-    [Direction.North, 0, -bh, 0, -half],
-    [Direction.South, 0, bh,  0, half],
-    [Direction.West, -bw, 0, -half, 0],
-    [Direction.East, bw, 0,  half, 0],
-  ] as const;
-  ctx.strokeStyle = 'black';
-  ctx.lineWidth = LINE_WIDTH + _s(3);
-  for (const [dir, x1, y1, x2, y2] of chStubDirs) {
-    if (connections.has(dir)) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-  }
-  ctx.strokeStyle = chamberColor;
-  ctx.lineWidth = LINE_WIDTH;
-  for (const [dir, x1, y1, x2, y2] of chStubDirs) {
-    if (connections.has(dir)) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-  }
+  drawChamberButtStubs(ctx, connections, bw, bh, half, chamberColor);
 
   ctx.restore();
 
