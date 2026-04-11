@@ -423,6 +423,35 @@ export class AnimationManager {
     renderWinTileGlows(this.ctx, this._winTileGlows, now);
   }
 
+  /**
+   * Render a pulsing red radial gradient circle on the source tile.
+   *
+   * Intended to be called between pass-1 (backgrounds) and pass-2 (tile
+   * content) inside {@link renderBoard} so the glow appears under the source
+   * shape.  Should only be called when the game is in the GameOver state.
+   * Persists (continues pulsing) until the caller stops invoking this method
+   * (i.e. until the fail modal is dismissed).
+   */
+  renderDrySourcePulseOverlay(board: Board, now: number): void {
+    const { source } = board;
+    const cx = source.col * TILE_SIZE + TILE_SIZE / 2;
+    const cy = source.row * TILE_SIZE + TILE_SIZE / 2;
+
+    // Pulse alpha: oscillates between 0.15 and 0.55 over ~1 second.
+    const alpha = 0.15 + 0.4 * ((Math.sin(now / 500) + 1) / 2);
+
+    const radius = TILE_SIZE * 0.6;
+    const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    grad.addColorStop(0,   `rgba(220,30,30,${alpha.toFixed(3)})`);
+    grad.addColorStop(0.5, `rgba(200,20,20,${(alpha * 0.6).toFixed(3)})`);
+    grad.addColorStop(1,   'rgba(180,0,0,0)');
+
+    this.ctx.fillStyle = grad;
+    this.ctx.beginPath();
+    this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
   // ─── Level lifecycle ──────────────────────────────────────────────────────
 
   /**
