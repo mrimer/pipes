@@ -39,6 +39,10 @@ export interface HeatWave {
  * Spawn new heat-wave events for hot_plate tiles that are due for one.
  * Modifies `waves` and `lastSpawnTimes` in-place.
  *
+ * Only unconnected (dry) hot_plate tiles receive the effect.  When a tile
+ * becomes connected its timer is reset so it fires fresh once the pipe is
+ * disconnected again.
+ *
  * Initial timing is staggered by tile position so multiple tiles on the same
  * board do not all fire simultaneously.
  */
@@ -46,6 +50,7 @@ export function tickHeatWaves(
   waves: HeatWave[],
   lastSpawnTimes: Map<string, number>,
   board: Board,
+  filled: ReadonlySet<string>,
   now: number,
 ): void {
   for (let r = 0; r < board.rows; r++) {
@@ -54,9 +59,17 @@ export function tickHeatWaves(
       if (tile.shape !== PipeShape.Chamber || tile.chamberContent !== 'hot_plate') continue;
 
       const key = posKey(r, c);
+
+      // Skip connected (water-filled) tiles and reset their timer so the
+      // effect fires fresh once they become dry again.
+      if (filled.has(key)) {
+        lastSpawnTimes.delete(key);
+        continue;
+      }
+
       if (!lastSpawnTimes.has(key)) {
-        // First frame this tile is seen – stagger the initial delay by position
-        // so tiles don't all wave in unison.
+        // First frame this tile is seen as dry – stagger the initial delay by
+        // position so tiles don't all wave in unison.
         const stagger = ((r * 3 + c * 7) * 1137) % HEAT_WAVE_INTERVAL_MS;
         lastSpawnTimes.set(key, now - stagger);
       }

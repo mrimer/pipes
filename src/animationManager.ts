@@ -38,6 +38,7 @@ import {
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
 import { WinTileGlow, computeWinTileGlows, renderWinTileGlows } from './visuals/winTileEffect';
 import { IdlePulse, computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
+import { HeatWave, tickHeatWaves, renderHeatWaves } from './visuals/heatWave';
 import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
@@ -141,6 +142,13 @@ export class AnimationManager {
    * maintained even if the first pulse finishes before 15 s elapses.
    */
   private _nextPulseTime = 0;
+
+  // ─── Heat-wave state ──────────────────────────────────────────────────────
+
+  /** Currently active heat-wave ripple events (one per hot_plate tile at a time). */
+  private _heatWaves: HeatWave[] = [];
+  /** Maps "row,col" → `performance.now()` of the last heat-wave spawn for that tile. */
+  private _heatWaveLastSpawn: Map<string, number> = new Map();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -372,6 +380,7 @@ export class AnimationManager {
     this._tickVortex(board);
     this._tickGoldenTwinkles(board);
     this._tickIdlePulse(board, gameState);
+    this._tickHeatWaves(board);
   }
 
   // ─── Win-flow lifecycle ───────────────────────────────────────────────────
@@ -473,6 +482,8 @@ export class AnimationManager {
     this._nextGoldenTwinkle = 0;
     this._winTileGlows = [];
     this._activePulse = null;
+    this._heatWaves = [];
+    this._heatWaveLastSpawn = new Map();
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */
@@ -735,6 +746,17 @@ export class AnimationManager {
       const stillActive = renderIdlePulse(this.ctx, this._activePulse, now);
       if (!stillActive) this._activePulse = null;
     }
+  }
+
+  /**
+   * Spawn and render heat-wave shimmer effects for unconnected hot_plate
+   * chamber tiles.  Runs every frame; skips connected (water-filled) tiles.
+   */
+  private _tickHeatWaves(board: Board): void {
+    const now = performance.now();
+    const filled = board.getFilledPositions();
+    tickHeatWaves(this._heatWaves, this._heatWaveLastSpawn, board, filled, now);
+    renderHeatWaves(this.ctx, this._heatWaves, now);
   }
 
 
