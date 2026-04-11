@@ -346,15 +346,23 @@ export function buildSlideAndRotateControls(
     'width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center;' +
     'background:#0d1a30;color:#7ed321;border:1px solid #4a90d9;border-radius:4px;cursor:pointer;padding:0;';
 
-  // ── Slide section ──────────────────────────────────────────────────────────
+  // ── Two-column layout: left = slide, right = rotate + reflect ─────────────
+
+  const twoCol = document.createElement('div');
+  twoCol.style.cssText = 'display:flex;gap:10px;align-items:flex-start;margin-top:4px;';
+
+  // ── Left column: Slide section ─────────────────────────────────────────────
+
+  const leftCol = document.createElement('div');
+  leftCol.style.cssText = 'display:flex;flex-direction:column;gap:2px;';
 
   const slideTitle = document.createElement('div');
-  slideTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
+  slideTitle.style.cssText = 'font-size:0.75rem;color:#aaa;';
   slideTitle.textContent = 'Slide tiles:';
-  frag.appendChild(slideTitle);
+  leftCol.appendChild(slideTitle);
 
   const compass = document.createElement('div');
-  compass.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;justify-self:start;';
+  compass.style.cssText = 'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
 
   const makeArrow = (icon: string, dir: 'N' | 'E' | 'S' | 'W'): HTMLButtonElement => {
     const b = document.createElement('button');
@@ -379,17 +387,13 @@ export function buildSlideAndRotateControls(
   compass.appendChild(makeArrow('↓', 'S'));
   compass.appendChild(document.createElement('span'));
 
-  frag.appendChild(compass);
+  leftCol.appendChild(compass);
+  twoCol.appendChild(leftCol);
 
-  // ── Rotate section ─────────────────────────────────────────────────────────
+  // ── Right column: Rotate + Reflect sections ────────────────────────────────
 
-  const rotateTitle = document.createElement('div');
-  rotateTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
-  rotateTitle.textContent = 'Rotate board:';
-  frag.appendChild(rotateTitle);
-
-  const rotateRow = document.createElement('div');
-  rotateRow.style.cssText = 'display:flex;gap:4px;';
+  const rightCol = document.createElement('div');
+  rightCol.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
 
   const makeRotateBtn = (icon: string, clockwise: boolean): HTMLButtonElement => {
     const b = document.createElement('button');
@@ -401,16 +405,25 @@ export function buildSlideAndRotateControls(
     return b;
   };
 
+  // ── Rotate section ─────────────────────────────────────────────────────────
+
+  const rotateTitle = document.createElement('div');
+  rotateTitle.style.cssText = 'font-size:0.75rem;color:#aaa;';
+  rotateTitle.textContent = 'Rotate board:';
+  rightCol.appendChild(rotateTitle);
+
+  const rotateRow = document.createElement('div');
+  rotateRow.style.cssText = 'display:flex;gap:4px;';
   rotateRow.appendChild(makeRotateBtn('↻', true));
   rotateRow.appendChild(makeRotateBtn('↺', false));
-  frag.appendChild(rotateRow);
+  rightCol.appendChild(rotateRow);
 
   // ── Reflect section ────────────────────────────────────────────────────────
 
   const reflectTitle = document.createElement('div');
-  reflectTitle.style.cssText = 'font-size:0.75rem;color:#aaa;margin-top:4px;';
+  reflectTitle.style.cssText = 'font-size:0.75rem;color:#aaa;';
   reflectTitle.textContent = 'Reflect board:';
-  frag.appendChild(reflectTitle);
+  rightCol.appendChild(reflectTitle);
 
   const reflectRow = document.createElement('div');
   reflectRow.style.cssText = 'display:flex;gap:4px;';
@@ -422,7 +435,10 @@ export function buildSlideAndRotateControls(
   reflectBtn.style.cssText = arrowBtnStyle;
   reflectBtn.addEventListener('click', () => onReflect());
   reflectRow.appendChild(reflectBtn);
-  frag.appendChild(reflectRow);
+  rightCol.appendChild(reflectRow);
+
+  twoCol.appendChild(rightCol);
+  frag.appendChild(twoCol);
 
   return frag;
 }
