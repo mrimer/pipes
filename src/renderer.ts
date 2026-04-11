@@ -13,7 +13,7 @@ export { LINE_WIDTH, TILE_SIZE, _s, setTileSize } from './renderer/rendererState
 import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererState';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
-  EMPTY_COLOR, EMPTY_TARGET_COLOR,
+  EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK, EMPTY_TARGET_COLOR,
   GOLD_SPACE_BASE_COLOR, GOLD_SPACE_SHIMMER_COLOR, GOLD_SPACE_BORDER_COLOR,
   PIPE_COLOR, WATER_COLOR,
   SOURCE_COLOR, SOURCE_WATER_COLOR,
@@ -1531,7 +1531,10 @@ function _renderPass1Backgrounds(
             ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           }
         } else {
-          ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : EMPTY_COLOR;
+          const ginghamColor = ((r % 2) + (c % 2)) === 0 ? EMPTY_COLOR_LIGHT
+            : ((r % 2) + (c % 2)) === 2 ? EMPTY_COLOR_DARK
+            : EMPTY_COLOR;
+          ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : ginghamColor;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
           // Draw any ambient decoration on this empty non-gold cell
           const dec = board.ambientDecorations.get(posKey(r, c));
