@@ -699,6 +699,49 @@ export function drawChamberButtStubs(
 // ---------------------------------------------------------------------------
 
 /**
+ * Draw round-capped connection stubs for directions that are NOT in buttEndDirs
+ * (i.e. disconnected arms facing empty tiles or non-reciprocating pipes).
+ *
+ * These stubs must be drawn **before** the chamber box so the box border
+ * naturally covers the inner junction, giving the same visual appearance as
+ * connected (butt-capped) stubs.
+ *
+ * The canvas origin must already be translated to the tile center before
+ * calling this function.
+ */
+function _drawChamberDisconnectedStubs(
+  ctx: CanvasRenderingContext2D,
+  connections: ReadonlySet<Direction>,
+  buttEndDirs: Set<Direction>,
+  bw: number,
+  bh: number,
+  half: number,
+  color: string,
+): void {
+  ctx.lineCap = 'round';
+  const capR = LINE_WIDTH / 2 + _s(1.5);
+  const stubDirs = [
+    [Direction.North, 0,    -bh,  0,     -half,  -half, -(half + capR), half * 2, half + capR - bh] as const,
+    [Direction.South, 0,     bh,  0,      half,   -half,  bh,           half * 2, half + capR - bh] as const,
+    [Direction.West,  -bw,   0,   -half,  0,      -(half + capR), -half, half + capR - bw, half * 2] as const,
+    [Direction.East,   bw,   0,    half,  0,       bw,   -half,          half + capR - bw, half * 2] as const,
+  ];
+  for (const [dir, x1, y1, x2, y2, rx, ry, rw, rh] of stubDirs) {
+    if (connections.has(dir) && !buttEndDirs.has(dir)) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(rx, ry, rw, rh); ctx.clip();
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = LINE_WIDTH + _s(3);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+/**
  * Draw a chamber tile (box, inner content, and connection stubs).
  *
  * The canvas origin must already be translated to the tile center before
@@ -725,54 +768,7 @@ export function drawChamber(
   // The box is rendered on top afterwards, so its border cleanly covers the inner
   // junction and the chamber edge looks the same as for connected directions.
   if (buttEndDirs !== undefined) {
-    ctx.lineCap = 'round';
-    const capR = LINE_WIDTH / 2 + _s(1.5);
-    if (tile.connections.has(Direction.North) && !buttEndDirs.has(Direction.North)) {
-      ctx.save();
-      ctx.beginPath(); ctx.rect(-half, -(half + capR), half * 2, half + capR - bh); ctx.clip();
-      // Black outline
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = LINE_WIDTH + _s(3);
-      ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
-      // Colored stroke
-      ctx.strokeStyle = color;
-      ctx.lineWidth = LINE_WIDTH;
-      ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
-      ctx.restore();
-    }
-    if (tile.connections.has(Direction.South) && !buttEndDirs.has(Direction.South)) {
-      ctx.save();
-      ctx.beginPath(); ctx.rect(-half, bh, half * 2, half + capR - bh); ctx.clip();
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = LINE_WIDTH + _s(3);
-      ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = LINE_WIDTH;
-      ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
-      ctx.restore();
-    }
-    if (tile.connections.has(Direction.West) && !buttEndDirs.has(Direction.West)) {
-      ctx.save();
-      ctx.beginPath(); ctx.rect(-(half + capR), -half, half + capR - bw, half * 2); ctx.clip();
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = LINE_WIDTH + _s(3);
-      ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = LINE_WIDTH;
-      ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
-      ctx.restore();
-    }
-    if (tile.connections.has(Direction.East) && !buttEndDirs.has(Direction.East)) {
-      ctx.save();
-      ctx.beginPath(); ctx.rect(bw, -half, half + capR - bw, half * 2); ctx.clip();
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = LINE_WIDTH + _s(3);
-      ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = LINE_WIDTH;
-      ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
-      ctx.restore();
-    }
+    _drawChamberDisconnectedStubs(ctx, tile.connections, buttEndDirs, bw, bh, half, color);
   }
 
   // Phase 2: Draw the box, inner content, and connected (butt-end) stubs inside the tile clip.
