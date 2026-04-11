@@ -20,6 +20,7 @@ import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
+import { isPortrait } from './deviceUtils';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -93,6 +94,12 @@ const PLAY_HINT_PANEL_H = 42;
 const PLAY_CANVAS_BORDER_H = 6;
 /** Horizontal border width (px) added by the 3 px CSS border on #game-canvas (3 px × 2 sides). */
 const PLAY_CANVAS_BORDER_W = 6;
+/**
+ * Estimated height (px) of the right panel (stats + inventory) when it is
+ * stacked below the canvas in portrait/narrow layout.
+ * Covers: inventory bar (~72 px) + stats box (~60 px) + gap between them.
+ */
+const PLAY_RIGHT_PANEL_STACKED_H = 150;
 
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
@@ -380,6 +387,16 @@ export class Game implements InputCallbacks {
     // Create the input handler – registers all event listeners on canvas/window/document.
     this._input = new InputHandler(canvas, this);
 
+    // Re-layout on orientation change / window resize (debounced at 100 ms).
+    let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    window.addEventListener('resize', () => {
+      if (_resizeTimer !== null) clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => {
+        _resizeTimer = null;
+        this._handleResize();
+      }, 100);
+    });
+
     this._showLevelSelect();
     this._loop();
   }
@@ -430,6 +447,23 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * Called when the window is resized or the device orientation changes.
+   * Re-computes the tile size and resizes the canvas to match the new viewport,
+   * then triggers a fresh render so the board fills the updated area.
+   */
+  private _handleResize(): void {
+    if (this.screen !== GameScreen.Play || !this.currentLevel || !this.board) return;
+    setTileSize(computeTileSize(
+      this.currentLevel.rows,
+      this.currentLevel.cols,
+      this._computePlayOverhead(this.currentLevel),
+      PLAY_CANVAS_BORDER_W,
+    ));
+    this.canvas.width  = this.currentLevel.cols * TILE_SIZE;
+    this.canvas.height = this.currentLevel.rows * TILE_SIZE;
+  }
+
+  /**
    * Estimate the total vertical pixels consumed by UI elements that appear
    * alongside the grid while playing (page title, level header, HUD buttons,
    * play-screen gaps / padding, and any visible collapsed panels below the
@@ -443,6 +477,9 @@ export class Game implements InputCallbacks {
     let overhead = PLAY_TOP_PADDING + PLAY_LEVEL_HEADER_H + PLAY_GAP + PLAY_HUD_H + PLAY_GAP + PLAY_CANVAS_BORDER_H + PLAY_PADDING_BOTTOM;
     if (hasNote)  overhead += PLAY_NOTE_PANEL_H + PLAY_GAP;
     if (hasHints) overhead += PLAY_HINT_PANEL_H + PLAY_GAP;
+    // On portrait (stacked) layout the right panel appears below the canvas and
+    // consumes vertical space that would otherwise be available to the grid.
+    if (isPortrait()) overhead += PLAY_RIGHT_PANEL_STACKED_H + PLAY_GAP;
     return overhead;
   }
 
@@ -620,6 +657,7 @@ export class Game implements InputCallbacks {
       this.selectedShape,
       (shape, count) => this._input.handleInventoryClick(shape, count),
       () => this._input.handleInventoryRightClick(),
+      (el, shape, count) => this._input.attachInventoryItemTouchHandlers(el, shape, count),
     );
   }
 

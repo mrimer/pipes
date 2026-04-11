@@ -39,6 +39,7 @@ import { renderMinimap } from '../minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { updateCanvasDisplaySize } from './canvasUtils';
+import { isTouchDevice } from '../deviceUtils';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -166,6 +167,7 @@ export class CampaignEditor {
   /** Show the campaign editor (campaign list screen). */
   show(): void {
     this._el.style.display = 'flex';
+    document.body.classList.add('editor-open');
     this._showCampaignList();
   }
 
@@ -175,6 +177,7 @@ export class CampaignEditor {
    */
   showAndRestore(): void {
     this._el.style.display = 'flex';
+    document.body.classList.add('editor-open');
     switch (this._screen) {
       case EditorScreen.LevelEditor: {
         const campaign = this._getActiveCampaign();
@@ -196,6 +199,7 @@ export class CampaignEditor {
   /** Hide the campaign editor. */
   hide(): void {
     this._el.style.display = 'none';
+    document.body.classList.remove('editor-open');
   }
 
   /** Remove event listeners and clean up DOM resources. */
@@ -360,6 +364,18 @@ export class CampaignEditor {
     content.style.cssText =
       'width:100%;max-width:900px;padding:20px;box-sizing:border-box;display:flex;' +
       'flex-direction:column;gap:16px;';
+
+    // Touch device notice
+    if (isTouchDevice()) {
+      const notice = document.createElement('div');
+      notice.style.cssText =
+        'background:#2a1a00;border:1px solid #ffa500;border-radius:6px;padding:12px 16px;' +
+        'color:#ffa500;font-size:0.9rem;line-height:1.5;';
+      notice.textContent =
+        '⚠️ The Campaign Editor is designed for desktop use and may be difficult to operate on touch devices. ' +
+        'For the best experience, use a mouse and keyboard.';
+      content.appendChild(notice);
+    }
 
     // Action bar
     const actionBar = document.createElement('div');

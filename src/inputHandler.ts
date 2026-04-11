@@ -153,6 +153,30 @@ export class InputHandler {
   private readonly _onDocKeyDown       = (e: KeyboardEvent)=> this._handleDocKeyDown(e);
   private readonly _onDocKeyUp         = (e: KeyboardEvent)=> this._handleDocKeyUp(e);
 
+  // ── Touch event handlers ─────────────────────────────────────────────────
+  private readonly _onCanvasTouchStart = (e: TouchEvent) => this._handleCanvasTouchStart(e);
+  private readonly _onCanvasTouchMove  = (e: TouchEvent) => this._handleCanvasTouchMove(e);
+  private readonly _onCanvasTouchEnd   = (e: TouchEvent) => this._handleCanvasTouchEnd(e);
+
+  // ── Touch state ──────────────────────────────────────────────────────────
+
+  /** Client-x position where the current touch started (for tap/swipe detection). */
+  private _touchStartX = 0;
+  /** Client-y position where the current touch started (for tap/swipe detection). */
+  private _touchStartY = 0;
+  /** Timestamp (ms) when the current touch started (for tap/long-press detection). */
+  private _touchStartTime = 0;
+  /** Whether the touch has moved beyond the tap threshold. */
+  private _touchMoved = false;
+  /** Timer ID for the long-press reclaim gesture. */
+  private _longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Whether the long-press action was already triggered for the current touch. */
+  private _longPressTriggered = false;
+  /** Whether a horizontal swipe rotation was already fired for the current touch. */
+  private _swipeRotated = false;
+  /** Grid position recorded at the start of a touch drag-paint gesture. */
+  private _touchDragLastTile: GridPos | null = null;
+
   constructor(canvas: HTMLCanvasElement, cb: InputCallbacks) {
     this._canvas = canvas;
     this._cb = cb;
@@ -171,6 +195,11 @@ export class InputHandler {
     canvas.addEventListener('wheel',       this._onCanvasWheel, { passive: false });
     document.addEventListener('keydown',   this._onDocKeyDown);
     document.addEventListener('keyup',     this._onDocKeyUp);
+
+    // Touch event listeners (passive:false so preventDefault() works on touchmove).
+    canvas.addEventListener('touchstart', this._onCanvasTouchStart, { passive: false });
+    canvas.addEventListener('touchmove',  this._onCanvasTouchMove,  { passive: false });
+    canvas.addEventListener('touchend',   this._onCanvasTouchEnd,   { passive: false });
   }
 
   /** Remove all event listeners registered by this handler. */
@@ -185,6 +214,10 @@ export class InputHandler {
     this._canvas.removeEventListener('wheel',       this._onCanvasWheel);
     document.removeEventListener('keydown',         this._onDocKeyDown);
     document.removeEventListener('keyup',           this._onDocKeyUp);
+    this._canvas.removeEventListener('touchstart',  this._onCanvasTouchStart);
+    this._canvas.removeEventListener('touchmove',   this._onCanvasTouchMove);
+    this._canvas.removeEventListener('touchend',    this._onCanvasTouchEnd);
+    this._clearLongPressTimer();
   }
 
   // ── Inventory handlers (called by renderInventoryBar wiring in Game) ────────
@@ -723,5 +756,356 @@ export class InputHandler {
         if (this._cb.getGameState() === GameState.Playing) this._cb.retryLevel();
         break;
     }
+  }
+
+  /**
+   * Attach touch event handlers to an inventory item element.
+   * Called by Game's renderInventoryBar wiring for each `.inv-item`.
+   *
+   * Gestures:
+   *   - Tap: select/deselect the shape (mirrors handleInventoryClick).
+   *   - Drag to canvas: show a ghost element and place on touchend.
+   */
+  attachInventoryItemTouchHandlers(
+    el: HTMLElement,
+    shape: PipeShape,
+    effectiveCount: number,
+  ): void {
+    let ghostEl: HTMLElement | null = null;
+    let dragActive = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (this._cb.getGameState() !== GameState.Playing) return;
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+
+      // Create a floating ghost that follows the finger.
+      ghostEl = document.createElement('div');
+      ghostEl.style.cssText =
+        'position:fixed;pointer-events:none;z-index:200;' +
+        'background:#16213e;border:2px solid #4a90d9;border-radius:6px;' +
+        'padding:6px 8px;opacity:0.85;font-size:1rem;color:#eee;white-space:nowrap;' +
+        `left:${touch.clientX + 12}px;top:${touch.clientY + 12}px;`;
+      ghostEl.innerHTML = el.innerHTML;
+      document.body.appendChild(ghostEl);
+      dragActive = true;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragActive || !ghostEl || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      ghostEl.style.left = `${touch.clientX + 12}px`;
+      ghostEl.style.top  = `${touch.clientY + 12}px`;
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!dragActive) return;
+      e.preventDefault();
+      dragActive = false;
+
+      // Remove the ghost element.
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+
+      // Determine if the finger was released over the game canvas.
+      const changedTouch = e.changedTouches[0];
+      if (!changedTouch) {
+        // No valid endpoint — treat as a tap to select.
+        this.handleInventoryClick(shape, effectiveCount);
+        return;
+      }
+
+      const canvasRect = this._canvas.getBoundingClientRect();
+      const cx = changedTouch.clientX;
+      const cy = changedTouch.clientY;
+
+      if (
+        cx >= canvasRect.left && cx <= canvasRect.right &&
+        cy >= canvasRect.top  && cy <= canvasRect.bottom
+      ) {
+        // Dropped onto the canvas — select this shape and place it at the cell.
+        const board = this._cb.getBoard();
+        if (board && this._cb.getGameState() === GameState.Playing) {
+          // Select the shape with its last-used rotation.
+          this._cb.setSelectedShape(shape);
+          this._cb.setPendingRotation(this.lastPlacedRotations.get(shape) ?? 0);
+          this._cb.renderInventoryBar();
+          // Compute grid position from the drop coordinates.
+          const col = Math.floor((cx - canvasRect.left) * board.cols / canvasRect.width);
+          const row = Math.floor((cy - canvasRect.top)  * board.rows / canvasRect.height);
+          const pos = { row, col };
+          const tile = board.getTile(pos);
+          if (tile) {
+            const filledBefore = board.getFilledPositions();
+            if (this._cb.tryPlaceOrReplace(pos, tile, filledBefore)) {
+              // Placement was handled; afterTilePlaced called by tryPlaceOrReplace chain.
+              sfxManager.play(SfxId.PipePlacement);
+            }
+          }
+        }
+      } else {
+        // Released outside the canvas — treat as a tap to select/deselect.
+        this.handleInventoryClick(shape, effectiveCount);
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    el.addEventListener('touchend',   onTouchEnd,   { passive: false });
+  }
+
+  // ── Touch helpers ─────────────────────────────────────────────────────────
+
+  /** Cancel any pending long-press timer. */
+  private _clearLongPressTimer(): void {
+    if (this._longPressTimer !== null) {
+      clearTimeout(this._longPressTimer);
+      this._longPressTimer = null;
+    }
+  }
+
+  /**
+   * Compute a grid position from client coordinates, using the canvas bounding
+   * rect scaled to board dimensions (works even when CSS scales the canvas).
+   */
+  private _getGridPosFromClientXY(clientX: number, clientY: number): GridPos {
+    const rect = this._canvas.getBoundingClientRect();
+    const board = this._cb.getBoard();
+    if (!board) {
+      return {
+        row: Math.floor((clientY - rect.top)  / TILE_SIZE),
+        col: Math.floor((clientX - rect.left) / TILE_SIZE),
+      };
+    }
+    return {
+      row: Math.floor((clientY - rect.top)  * board.rows / rect.height),
+      col: Math.floor((clientX - rect.left) * board.cols / rect.width),
+    };
+  }
+
+  // ── Touch event handlers ─────────────────────────────────────────────────
+
+  private _handleCanvasTouchStart(e: TouchEvent): void {
+    if (this._cb.getScreen() !== GameScreen.Play) return;
+    if (this._cb.getGameState() !== GameState.Playing) return;
+
+    // Two-finger tap → deselect the current shape.
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      if (this._cb.getSelectedShape() !== null) {
+        this._cb.setSelectedShape(null);
+        this._cb.renderInventoryBar();
+        sfxManager.play(SfxId.InventoryUnselect);
+      }
+      return;
+    }
+
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    this._touchStartX = touch.clientX;
+    this._touchStartY = touch.clientY;
+    this._touchStartTime = Date.now();
+    this._touchMoved = false;
+    this._longPressTriggered = false;
+    this._swipeRotated = false;
+
+    const pos = this._getGridPosFromClientXY(touch.clientX, touch.clientY);
+    this._touchDragLastTile = pos;
+
+    // Update mouseCanvasPos so hover-dependent render logic works during touch.
+    const rect = this._canvas.getBoundingClientRect();
+    this.mouseCanvasPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+
+    // Start long-press timer for reclaim gesture (500 ms).
+    this._clearLongPressTimer();
+    this._longPressTimer = setTimeout(() => {
+      this._longPressTimer = null;
+      if (!this._touchMoved && this._cb.getScreen() === GameScreen.Play &&
+          this._cb.getGameState() === GameState.Playing) {
+        const board = this._cb.getBoard();
+        if (!board) return;
+        const lp = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
+        const tile = board.getTile(lp);
+        if (tile && tile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+          this._longPressTriggered = true;
+          // Optional haptic feedback.
+          if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
+          this._cb.reclaimTileAt(lp);
+        } else if (this._cb.getSelectedShape() !== null) {
+          // Long-press on empty/spinner with a shape selected → deselect.
+          this._longPressTriggered = true;
+          this._cb.setSelectedShape(null);
+          this._cb.renderInventoryBar();
+          sfxManager.play(SfxId.InventoryUnselect);
+        }
+      }
+    }, 500);
+  }
+
+  private _handleCanvasTouchMove(e: TouchEvent): void {
+    if (this._cb.getScreen() !== GameScreen.Play) return;
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - this._touchStartX;
+    const dy = touch.clientY - this._touchStartY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist > 8) {
+      this._touchMoved = true;
+      this._clearLongPressTimer();
+    }
+
+    // Update the canvas-space mouse position for hover rendering.
+    const rect = this._canvas.getBoundingClientRect();
+    this.mouseCanvasPos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+
+    const board = this._cb.getBoard();
+    if (!board || this._cb.getGameState() !== GameState.Playing) return;
+
+    // ── Horizontal-swipe rotation (only before placing / drag-painting starts) ──
+    // Swipe: horizontal movement > 40 px AND vertical movement < 30 px.
+    if (!this._swipeRotated && !this._longPressTriggered &&
+        Math.abs(dx) > 40 && Math.abs(dy) < 30) {
+      this._swipeRotated = true;
+      this._clearLongPressTimer();
+      if (this._cb.getSelectedShape() !== null) {
+        // Rotate the pending placement piece.
+        if (dx > 0) {
+          this._rotatePendingCW();
+        } else {
+          this._rotatePendingCCW();
+        }
+      } else {
+        // Rotate a placed non-fixed tile at the touch-start position.
+        const startPos = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
+        const startTile = board.getTile(startPos);
+        if (startTile && startTile.shape !== PipeShape.Empty &&
+            !startTile.isFixed && !SPIN_PIPE_SHAPES.has(startTile.shape)) {
+          const filledBefore = board.getFilledPositions();
+          const oldRotation = startTile.rotation;
+          const rotResult = dx > 0
+            ? board.rotateTileBy(startPos, 1)
+            : board.rotateTileBy(startPos, 3);
+          if (rotResult.success) {
+            this._cb.afterTileRotated(filledBefore, rotResult, {
+              row: startPos.row, col: startPos.col, oldRotation,
+            });
+            this._cb.refreshUI();
+            this._cb.checkWinLose();
+          } else if (rotResult.error) {
+            this._cb.handleBoardError(rotResult);
+          }
+        }
+      }
+      return;
+    }
+
+    // ── Drag-paint (only when a shape is selected and finger has clearly moved) ──
+    if (this._touchMoved && this._cb.getSelectedShape() !== null && !this._swipeRotated) {
+      const newPos = this._getGridPosFromClientXY(touch.clientX, touch.clientY);
+      const last = this._touchDragLastTile;
+      if (last && (newPos.row !== last.row || newPos.col !== last.col)) {
+        // Paint the cell we just left.
+        const oldTile = board.getTile(last);
+        if (oldTile) {
+          const filledBefore = board.getFilledPositions();
+          this._cb.tryPlaceOrReplace(last, oldTile, filledBefore);
+        }
+        this._touchDragLastTile = newPos;
+      }
+    }
+  }
+
+  private _handleCanvasTouchEnd(e: TouchEvent): void {
+    if (this._cb.getScreen() !== GameScreen.Play) return;
+    e.preventDefault();
+    this._clearLongPressTimer();
+    this.mouseCanvasPos = null;
+
+    if (this._longPressTriggered) {
+      this._touchDragLastTile = null;
+      return;
+    }
+
+    if (this._swipeRotated) {
+      this._touchDragLastTile = null;
+      return;
+    }
+
+    const board = this._cb.getBoard();
+    if (!board || this._cb.getGameState() !== GameState.Playing) {
+      this._touchDragLastTile = null;
+      return;
+    }
+
+    const changedTouch = e.changedTouches[0];
+    if (!changedTouch) {
+      this._touchDragLastTile = null;
+      return;
+    }
+
+    if (this._touchMoved) {
+      // End of a drag-paint: place on the final tile.
+      const last = this._touchDragLastTile;
+      if (last && this._cb.getSelectedShape() !== null) {
+        const tile = board.getTile(last);
+        if (tile && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+          const filledBefore = board.getFilledPositions();
+          this._cb.tryPlaceOrReplace(last, tile, filledBefore);
+        }
+      }
+    } else {
+      // Short tap: handle as a click.
+      const pos = this._getGridPosFromClientXY(changedTouch.clientX, changedTouch.clientY);
+      const tile = board.getTile(pos);
+      if (!tile) {
+        this._touchDragLastTile = null;
+        return;
+      }
+      const filledBefore = board.getFilledPositions();
+
+      if (SPIN_PIPE_SHAPES.has(tile.shape)) {
+        // Tap on a spin pipe: rotate CW by one step.
+        const oldRotation = tile.rotation;
+        const spinResult = board.rotateTileBy(pos, 1);
+        if (spinResult.success) {
+          if (this._cb.getSelectedShape() === tile.shape) {
+            this._cb.setPendingRotation(tile.rotation as Rotation);
+          }
+          this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
+          this._cb.refreshUI();
+          this._cb.checkWinLose();
+        } else if (spinResult.error) {
+          this._cb.handleBoardError(spinResult);
+        }
+      } else if (this._cb.getSelectedShape() !== null &&
+                 (tile.shape === PipeShape.Empty ||
+                  tile.shape !== this._cb.getSelectedShape() ||
+                  tile.rotation !== this._cb.getPendingRotation())) {
+        // Place or replace.
+        this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
+      } else if (tile.shape !== PipeShape.Empty) {
+        // Tap on a placed non-selected tile: rotate CW.
+        const oldRotation = tile.rotation;
+        const rotResult = board.rotateTile(pos);
+        if (rotResult.success) {
+          if (this._cb.getSelectedShape() === tile.shape) {
+            this._cb.setPendingRotation(tile.rotation as Rotation);
+          }
+          this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
+          this._cb.refreshUI();
+          this._cb.checkWinLose();
+        } else if (rotResult.error) {
+          this._cb.handleBoardError(rotResult);
+        }
+      }
+    }
+
+    this._touchDragLastTile = null;
   }
 }

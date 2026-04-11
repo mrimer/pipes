@@ -201,12 +201,14 @@ export class MetricsDisplay {
    * @param selectedShape - The pipe shape currently selected by the player, or null.
    * @param onItemClick - Callback invoked when the player left-clicks an inventory item.
    * @param onItemRightClick - Callback invoked when the player right-clicks an inventory item.
+   * @param onItemTouch - Optional callback to attach touch handlers to each item element.
    */
   renderInventoryBar(
     board: Board,
     selectedShape: PipeShape | null,
     onItemClick: (shape: PipeShape, count: number) => void,
     onItemRightClick: () => void,
+    onItemTouch?: (el: HTMLElement, shape: PipeShape, effectiveCount: number) => void,
   ): void {
     renderInventoryBar(
       this.inventoryBarEl,
@@ -214,6 +216,7 @@ export class MetricsDisplay {
       selectedShape,
       onItemClick,
       onItemRightClick,
+      onItemTouch,
     );
     if (this.pendingSparkleShapes.size > 0) {
       for (const shape of this.pendingSparkleShapes) {
