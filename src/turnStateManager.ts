@@ -314,7 +314,9 @@ export class TurnStateManager {
     for (const { key } of candidates) {
       this.frozen += this._hotPlateWaterGain.get(key) ?? 0;
     }
-    // Clamp to zero in case floating-point or accounting drift produced a tiny negative.
+    // Clamp to zero as a defensive guard: all values are integers so this should
+    // never be negative after restoring all gains, but guard against any future
+    // bookkeeping bugs that could otherwise corrupt the frozen counter.
     if (this.frozen < 0) this.frozen = 0;
 
     // Pass 2: redistribute frozen in ascending connection-turn order.
