@@ -82,6 +82,11 @@ const DISCONNECTION_PREVIEW_COLOR = '#e57373';
 /** Rotation speed for the spin-arrow hover animation, in radians per millisecond (one full turn per 1.5 s). */
 const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
 
+/** Fill color for the hex bolt head drawn at the corners of pre-placed fixed pipe tiles. */
+const BOLT_FILL_COLOR = 'rgba(128,128,134,0.82)';
+/** Border color for the hex bolt head. */
+const BOLT_BORDER_COLOR = 'rgba(72,72,78,0.90)';
+
 /**
  * Positions of the 3 landing-strip triangles along a Source/Sink connector arm,
  * as fractions of `half` (the half tile size).
@@ -1123,6 +1128,54 @@ function isReplaceableByShape(
   );
 }
 
+/**
+ * Draw a small top-down hex bolt head centered at canvas position (bx, by).
+ * Used to mark the four corners of pre-placed fixed pipe tiles.
+ */
+function _drawHexBoltHead(ctx: CanvasRenderingContext2D, bx: number, by: number): void {
+  const r = _s(3.5);
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    // Flat-top orientation: first vertex at 30° (π/6)
+    const angle = (i * Math.PI) / 3 + Math.PI / 6;
+    const vx = bx + r * Math.cos(angle);
+    const vy = by + r * Math.sin(angle);
+    if (i === 0) ctx.moveTo(vx, vy);
+    else ctx.lineTo(vx, vy);
+  }
+  ctx.closePath();
+  ctx.fillStyle = BOLT_FILL_COLOR;
+  ctx.fill();
+  ctx.strokeStyle = BOLT_BORDER_COLOR;
+  ctx.lineWidth = Math.max(1, _s(0.75));
+  ctx.stroke();
+}
+
+/**
+ * Pass 5: Draw small hex bolt head decorations at the four corners of every
+ * pre-placed fixed pipe tile (non-spinnable, cannot be modified by the player).
+ * Not drawn on spin pipes (which show a rotation arrow instead) or on
+ * special tiles like Source, Sink, Chamber, or obstacle tiles.
+ */
+function _renderPass5FixedPipeBolts(ctx: CanvasRenderingContext2D, board: Board): void {
+  const inset = _s(7.5);
+  ctx.save();
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      const tile = board.grid[r][c];
+      // Only draw bolts on fixed, non-spin pipe tiles (pre-placed and unmodifiable)
+      if (!tile.isFixed || !PIPE_SHAPES.has(tile.shape)) continue;
+      const x = c * TILE_SIZE;
+      const y = r * TILE_SIZE;
+      _drawHexBoltHead(ctx, x + inset,               y + inset);
+      _drawHexBoltHead(ctx, x + TILE_SIZE - inset,   y + inset);
+      _drawHexBoltHead(ctx, x + inset,               y + TILE_SIZE - inset);
+      _drawHexBoltHead(ctx, x + TILE_SIZE - inset,   y + TILE_SIZE - inset);
+    }
+  }
+  ctx.restore();
+}
+
 /** Render the full game board onto the canvas. */
 export function renderBoard(
   ctx: CanvasRenderingContext2D,
@@ -1163,6 +1216,7 @@ export function renderBoard(
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
+  _renderPass5FixedPipeBolts(ctx, board);
   _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater, effectiveFilled);
 }
 
