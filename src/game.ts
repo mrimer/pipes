@@ -832,7 +832,7 @@ export class Game implements InputCallbacks {
   /** Transition the game to the GameOver state and show the gameover modal. */
   private _showGameOver(): void {
     this.gameState = GameState.GameOver;
-    this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the menu.';
+    this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the map.';
     sfxManager.play(SfxId.Dry);
     this._showModalWithAnimation(this.gameoverModalEl, 'sparkle-red');
   }
