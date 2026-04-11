@@ -618,11 +618,6 @@ export function renderChapterMapCanvas(
         : EMPTY_COLOR;
       ctx.fillStyle = ginghamColor;
       ctx.fillRect(x, y, CELL, CELL);
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = CHAPTER_MAP_TILE_BG;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
-      ctx.setLineDash([]);
       // Ambient decoration on empty cells
       const dec = decorations?.get(`${r},${c}`);
       if (dec) drawAmbientDecoration(ctx, dec);
