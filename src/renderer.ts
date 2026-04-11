@@ -298,8 +298,6 @@ export function drawConnectorGlow(
   ctx.restore();
 }
 
-/** Half-width (per side) of the thin black outline added to pipes, chambers, and source/sink. */
-
 function _drawSourceOrSink(ctx: CanvasRenderingContext2D, tile: Tile, color: string, half: number, currentWater: number, shape: PipeShape, buttEndDirs?: Set<Direction>): void {
   const isSource = shape === PipeShape.Source;
   // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
