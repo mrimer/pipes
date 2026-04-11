@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex, drawGinghamOverlay } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex, drawGinghamOverlay, buildPipeBodyPath, toLocalDir } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
@@ -687,7 +687,7 @@ export function renderChapterMapCanvas(
     }
   }
 
-  // Pass 3: pipe tiles with connection lines drawn like the normal level screen
+  // Pass 3: pipe tiles – unified shape rendering (same approach as the level screen)
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
@@ -705,38 +705,27 @@ export function renderChapterMapCanvas(
       // Gingham overlay for pipe tiles on the chapter map
       drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
 
-      // Connection lines from center to open edges – same colors as the level screen
+      // Unified pipe shape path (same as level screen – no junction seam artifacts)
       const tileConns = tileDefConnections(def);
       const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
       const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
+      const tileRotation = def.rotation ?? 0;
+      const lw2 = LINE_WIDTH / 2;
+      const localButtEndDirs = buttEndDirs
+        ? new Set([...buttEndDirs].map(d => toLocalDir(d, tileRotation)))
+        : undefined;
       ctx.save();
-      ctx.lineWidth = LINE_WIDTH;
-      for (const dir of tileConns) {
-        ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-        let ex = cx, ey = cy;
-        if (dir === Direction.North) ey = y;
-        else if (dir === Direction.South) ey = y + CELL;
-        else if (dir === Direction.East) ex = x + CELL;
-        else if (dir === Direction.West) ex = x;
-        // Black outline for the arm
-        ctx.lineWidth = LINE_WIDTH + _s(3);
-        ctx.strokeStyle = 'black';
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-        // Colored arm
-        ctx.lineWidth = LINE_WIDTH;
-        ctx.strokeStyle = pipeColor;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-      }
-      // Center junction dot fills the seam when butt-end arms meet at center
+      ctx.translate(cx, cy);
+      ctx.rotate(tileRotation * Math.PI / 180);
+      buildPipeBodyPath(ctx, def.shape, CELL / 2, lw2, localButtEndDirs);
+      // Stroke outline first; fill covers the inner half of the stroke so only
+      // the outer border remains visible.
+      ctx.lineWidth = _s(3);
+      ctx.strokeStyle = 'black';
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'butt';
+      ctx.stroke();
       ctx.fillStyle = pipeColor;
-      ctx.beginPath();
-      ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }

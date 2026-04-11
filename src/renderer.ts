@@ -933,6 +933,269 @@ function _drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, d
   ctx.restore();
 }
 
+// ─── Unified pipe-shape path helpers ─────────────────────────────────────────
+
+/**
+ * Convert an absolute (world-space) direction to the local (pre-rotation)
+ * canvas coordinate direction.  When the canvas is already rotated CW by
+ * `tileRotation` degrees, this inverts that rotation (CCW by the same amount)
+ * so that directions can be used in the local coordinate frame.
+ *
+ * Each CCW 90° step maps: N→W, W→S, S→E, E→N.
+ *
+ * This is exported so the chapter-map renderer can reuse it when adding a
+ * canvas rotation to match the level-screen rendering.
+ */
+export function toLocalDir(absDir: Direction, tileRotation: number): Direction {
+  let localDir = absDir;
+  const steps = ((tileRotation / 90) % 4 + 4) % 4;
+  for (let i = 0; i < steps; i++) {
+    switch (localDir) {
+      case Direction.North: localDir = Direction.West;  break;
+      case Direction.West:  localDir = Direction.South; break;
+      case Direction.South: localDir = Direction.East;  break;
+      case Direction.East:  localDir = Direction.North; break;
+    }
+  }
+  return localDir;
+}
+
+/**
+ * Return the structural pipe type (straight / elbow / tee / cross), ignoring
+ * Gold, Spin, and Leaky variants which share the same geometry.
+ * Returns null for non-pipe shapes.
+ */
+function _pipeStructuralType(shape: PipeShape): 'straight' | 'elbow' | 'tee' | 'cross' | null {
+  switch (shape) {
+    case PipeShape.Straight:
+    case PipeShape.GoldStraight:
+    case PipeShape.SpinStraight:
+    case PipeShape.SpinStraightCement:
+    case PipeShape.LeakyStraight:
+      return 'straight';
+    case PipeShape.Elbow:
+    case PipeShape.GoldElbow:
+    case PipeShape.SpinElbow:
+    case PipeShape.SpinElbowCement:
+    case PipeShape.LeakyElbow:
+      return 'elbow';
+    case PipeShape.Tee:
+    case PipeShape.GoldTee:
+    case PipeShape.SpinTee:
+    case PipeShape.SpinTeeCement:
+    case PipeShape.LeakyTee:
+      return 'tee';
+    case PipeShape.Cross:
+    case PipeShape.GoldCross:
+    case PipeShape.LeakyCross:
+      return 'cross';
+    default:
+      return null;
+  }
+}
+
+// ── Individual path builders (local canvas frame, CW winding) ────────────────
+
+/**
+ * Straight pipe (N→S).
+ * Boundary goes clockwise: N-end cap → right side → S-end cap → left side → close.
+ */
+function _buildStraightPath(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  lw2: number,
+  localButt?: Set<Direction>,
+): void {
+  const buttN = localButt?.has(Direction.North) ?? false;
+  const buttS = localButt?.has(Direction.South) ?? false;
+  if (buttN) {
+    ctx.moveTo(-lw2, -half);
+    ctx.lineTo( lw2, -half);
+  } else {
+    // CW arc: left (-lw2,-half) → top (0,-half-lw2) → right (lw2,-half)
+    ctx.arc(0, -half, lw2, Math.PI, 0, false);
+  }
+  ctx.lineTo(lw2, half);
+  if (buttS) {
+    ctx.lineTo(-lw2, half);
+  } else {
+    // CW arc: right (lw2,half) → bottom (0,half+lw2) → left (-lw2,half)
+    ctx.arc(0, half, lw2, 0, Math.PI, false);
+  }
+  ctx.closePath();
+}
+
+/**
+ * Elbow pipe (N→E, canonical local frame).
+ * Boundary goes clockwise:
+ *   N-end cap → right of N arm → outer convex quarter-circle at bend →
+ *   top of E arm → E-end cap → bottom of E arm →
+ *   inner concave quarter-circle at bend → left of N arm → close.
+ */
+function _buildElbowPath(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  lw2: number,
+  localButt?: Set<Direction>,
+): void {
+  const buttN = localButt?.has(Direction.North) ?? false;
+  const buttE = localButt?.has(Direction.East)  ?? false;
+  if (buttN) {
+    ctx.moveTo(-lw2, -half);
+    ctx.lineTo( lw2, -half);
+  } else {
+    ctx.arc(0, -half, lw2, Math.PI, 0, false);
+  }
+  // Right edge of N arm → bend
+  ctx.lineTo(lw2, 0);
+  // Outer convex corner: CCW quarter-circle at origin from (lw2,0) to (0,-lw2)
+  // (passes through the upper-right quadrant, i.e. the outer side of the bend)
+  ctx.arc(0, 0, lw2, 0, -Math.PI / 2, true);
+  // Top edge of E arm
+  ctx.lineTo(half, -lw2);
+  if (buttE) {
+    ctx.lineTo(half, lw2);
+  } else {
+    // CW arc: top (half,-lw2) → right (half+lw2,0) → bottom (half,lw2)
+    ctx.arc(half, 0, lw2, -Math.PI / 2, Math.PI / 2, false);
+  }
+  // Bottom edge of E arm back toward bend
+  ctx.lineTo(0, lw2);
+  // Inner concave corner: CW quarter-circle at origin from (0,lw2) to (-lw2,0)
+  // (passes through the lower-left quadrant, i.e. the concave inner side of the bend)
+  ctx.arc(0, 0, lw2, Math.PI / 2, Math.PI, false);
+  // Left edge of N arm going up
+  ctx.lineTo(-lw2, -half);
+  ctx.closePath();
+}
+
+/**
+ * Tee pipe (N-S-E, canonical local frame).
+ * Boundary goes clockwise:
+ *   N-end → right of N arm → top of E arm → E-end → bottom of E arm →
+ *   right of S arm → S-end → left side → close.
+ * Sharp 90° inner corners at the E-arm junctions are correct for a T-junction.
+ */
+function _buildTeePath(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  lw2: number,
+  localButt?: Set<Direction>,
+): void {
+  const buttN = localButt?.has(Direction.North) ?? false;
+  const buttS = localButt?.has(Direction.South) ?? false;
+  const buttE = localButt?.has(Direction.East)  ?? false;
+  if (buttN) {
+    ctx.moveTo(-lw2, -half);
+    ctx.lineTo( lw2, -half);
+  } else {
+    ctx.arc(0, -half, lw2, Math.PI, 0, false);
+  }
+  ctx.lineTo(lw2, -lw2);    // upper inner corner
+  ctx.lineTo(half, -lw2);   // top edge of E arm
+  if (buttE) {
+    ctx.lineTo(half, lw2);
+  } else {
+    ctx.arc(half, 0, lw2, -Math.PI / 2, Math.PI / 2, false);
+  }
+  ctx.lineTo(lw2,  lw2);    // lower inner corner
+  ctx.lineTo(lw2,  half);   // right side of S arm
+  if (buttS) {
+    ctx.lineTo(-lw2, half);
+  } else {
+    ctx.arc(0, half, lw2, 0, Math.PI, false);
+  }
+  ctx.closePath();
+}
+
+/**
+ * Cross pipe (N-S-E-W, canonical local frame).
+ * Boundary goes clockwise, tracing the perimeter of the +-shape.
+ */
+function _buildCrossPath(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  lw2: number,
+  localButt?: Set<Direction>,
+): void {
+  const buttN = localButt?.has(Direction.North) ?? false;
+  const buttS = localButt?.has(Direction.South) ?? false;
+  const buttE = localButt?.has(Direction.East)  ?? false;
+  const buttW = localButt?.has(Direction.West)  ?? false;
+  if (buttN) {
+    ctx.moveTo(-lw2, -half);
+    ctx.lineTo( lw2, -half);
+  } else {
+    ctx.arc(0, -half, lw2, Math.PI, 0, false);
+  }
+  ctx.lineTo( lw2, -lw2);   // NE inner corner
+  ctx.lineTo(half, -lw2);   // top of E arm
+  if (buttE) {
+    ctx.lineTo(half,  lw2);
+  } else {
+    ctx.arc(half, 0, lw2, -Math.PI / 2, Math.PI / 2, false);
+  }
+  ctx.lineTo( lw2,  lw2);   // SE inner corner
+  ctx.lineTo( lw2,  half);  // right of S arm
+  if (buttS) {
+    ctx.lineTo(-lw2,  half);
+  } else {
+    ctx.arc(0, half, lw2, 0, Math.PI, false);
+  }
+  ctx.lineTo(-lw2,  lw2);   // SW inner corner
+  ctx.lineTo(-half,  lw2);  // bottom of W arm
+  if (buttW) {
+    ctx.lineTo(-half, -lw2);
+  } else {
+    // CW arc: bottom (-half,lw2) → left (-half-lw2,0) → top (-half,-lw2)
+    ctx.arc(-half, 0, lw2, Math.PI / 2, -Math.PI / 2, false);
+  }
+  ctx.lineTo(-lw2, -lw2);  // NW inner corner
+  ctx.lineTo(-lw2, -half); // left of N arm
+  ctx.closePath();
+}
+
+/**
+ * Build the outer boundary path of a pipe tile's body in the LOCAL canvas
+ * frame (canvas already translated to tile centre and rotated by tile rotation).
+ *
+ * The resulting path describes the filled interior of the pipe shape (the union
+ * of all arm rectangles plus end caps / bends).  After calling this the caller
+ * should:
+ *   1. Stroke with `lineWidth = _s(3)` and `strokeStyle = 'black'` to draw the
+ *      1.5 px outer border (the stroke straddles the path, half inside, half
+ *      outside; step 2 covers the inner half).
+ *   2. Fill with the desired pipe colour (covers the interior, including the
+ *      inner half of the stroke, so only the outer border remains visible).
+ *
+ * This is exported for reuse by the chapter-map renderer.
+ *
+ * @param ctx              Canvas 2D context (translated + rotated to tile centre).
+ * @param shape            Any PipeShape value in PIPE_SHAPES.
+ * @param half             Distance from tile centre to tile edge in pixels.
+ * @param lw2              Half the pipe tube width (= LINE_WIDTH / 2).
+ * @param localButtEndDirs Directions in the LOCAL frame whose tile-edge end
+ *                         should be flat (butt) rather than rounded.
+ */
+export function buildPipeBodyPath(
+  ctx: CanvasRenderingContext2D,
+  shape: PipeShape,
+  half: number,
+  lw2: number,
+  localButtEndDirs?: Set<Direction>,
+): void {
+  ctx.beginPath();
+  switch (_pipeStructuralType(shape)) {
+    case 'straight': _buildStraightPath(ctx, half, lw2, localButtEndDirs); break;
+    case 'elbow':    _buildElbowPath   (ctx, half, lw2, localButtEndDirs); break;
+    case 'tee':      _buildTeePath     (ctx, half, lw2, localButtEndDirs); break;
+    case 'cross':    _buildCrossPath   (ctx, half, lw2, localButtEndDirs); break;
+    // null / unknown: empty path (no-op)
+  }
+}
+
+// ─── End of unified pipe-shape path helpers ───────────────────────────────────
+
 /**
  * Draw rust-colored blotches along each non-blocked arm of a leaky pipe.
  * The blotches are drawn in the rotated tile context (origin = tile center).
@@ -1111,174 +1374,64 @@ export function drawTile(
   // draw each pipe arm individually so the blocked arm can be shown without water.
   const isPipeShape = PIPE_SHAPES.has(shape);
   const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater && isPipeShape;
-  // When any arm points at a non-empty adjacent tile, draw arms individually so
-  // each arm end can use lineCap='butt' (flat) instead of round, preventing nubs
-  // from sticking out onto adjacent non-empty tiles.
-  const hasButtEnd = (effectiveButtEndDirs?.size ?? 0) > 0 && isPipeShape;
 
-  if (isBlockedPipe || hasButtEnd) {
-    // Arm-by-arm drawing: blocked arm uses non-water color; arms pointing at
-    // non-empty adjacent tiles use lineCap='butt' so the end sits flush with
-    // the tile boundary.  Draw blocked arms first so the unblocked (water) arms
-    // are painted on top at the tile center.
+  if (isBlockedPipe) {
+    // Arm-by-arm drawing for one-way blocked pipes: draw ALL black outlines
+    // first, then ALL color fills.  This ordering prevents a later arm's black
+    // outline from overwriting an already-painted arm's color at the junction.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
-    const sortedArms = [...tile.connections].sort((a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0));
-    for (const armDir of sortedArms) {
-      const armColor = (isBlockedPipe && armDir === effectiveBlockedWaterDir) ? dryColor : color;
+    // Sort blocked arm first so the dominant (water) color is painted last.
+    const sortedArms = [...tile.connections].sort(
+      (a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0),
+    );
+    // Step 1: all arm black outlines
+    ctx.lineWidth = LINE_WIDTH + _s(3);
+    ctx.strokeStyle = 'black';
+    for (const armDir of tile.connections) {
       ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
-      // Black outline for the arm (same lineCap – butt ends have no black cap extension)
-      ctx.lineWidth = LINE_WIDTH + _s(3);
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black');
-      // Colored arm on top
-      ctx.lineWidth = LINE_WIDTH;
+    }
+    // Step 2: black center cap covers the junction seam between arm outlines
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(0, 0, (LINE_WIDTH + _s(3)) / 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Step 3: all arm color fills (blocked arm first; dominant water color last)
+    ctx.lineWidth = LINE_WIDTH;
+    for (const armDir of sortedArms) {
+      const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
+      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
     }
-    // When one or more arms use a butt end cap, the flat cap at the tile centre
-    // can leave a visible seam where opposing arms meet.  This happens because
-    // each arm is drawn as a separate stroke from (0,0) outward, and when the
-    // tile centre lands on a sub-pixel boundary (odd TILE_SIZE), anti-aliasing
-    // on the two butt-capped ends does not sum to full opacity.  Draw an
-    // explicit round nub at (0,0) to fill any such gap for all pipe shapes.
-    // (For elbow pipes the nub also fills the visible corner gap at the curve.)
-    if (hasButtEnd) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Step 4: pipe-color center cap fills the junction interior
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
+    ctx.fill();
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
     }
-  } else if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.SpinStraightCement) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
+  } else if (isPipeShape) {
+    // Unified shape path: draw the entire pipe body as a single filled shape
+    // with a contiguous outer outline.  This eliminates the junction seam
+    // artifacts that appear when arms are stroked individually.
+    const lw2 = LINE_WIDTH / 2;
+    const localButtEndDirs = effectiveButtEndDirs?.size
+      ? new Set([...effectiveButtEndDirs].map(d => toLocalDir(d, effectiveRotation)))
+      : undefined;
+    buildPipeBodyPath(ctx, shape, half, lw2, localButtEndDirs);
+    // Stroke outline first; the subsequent fill covers the inner half of the
+    // stroke so only the outer border remains visible.
+    ctx.lineWidth = _s(3);
     ctx.strokeStyle = 'black';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'butt'; // end caps are defined by arcs in the path itself
     ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.stroke();
-  } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.SpinElbowCement) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, 0);
-    ctx.lineTo(half, 0);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.stroke();
-  } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.SpinTeeCement) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-  } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-half, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-half, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-  } else if (shape === PipeShape.LeakyStraight) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.stroke();
-    _drawLeakyRustSpots(ctx, tile, half, null);
-  } else if (shape === PipeShape.LeakyElbow) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, 0);
-    ctx.lineTo(half, 0);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.stroke();
-    _drawLeakyRustSpots(ctx, tile, half, null);
-  } else if (shape === PipeShape.LeakyTee) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-    _drawLeakyRustSpots(ctx, tile, half, null);
-  } else if (shape === PipeShape.LeakyCross) {
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-half, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -half);
-    ctx.lineTo(0, half);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(-half, 0);
-    ctx.lineTo(half, 0);
-    ctx.stroke();
-    _drawLeakyRustSpots(ctx, tile, half, null);
+    ctx.fillStyle = color;
+    ctx.fill();
+    if (LEAKY_PIPE_SHAPES.has(shape)) {
+      _drawLeakyRustSpots(ctx, tile, half, null);
+    }
   } else if (shape === PipeShape.Source || shape === PipeShape.Sink) {
     // Restore to un-rotated state so we can draw based on actual connections
     ctx.restore();
