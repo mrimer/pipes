@@ -1159,6 +1159,12 @@ function _drawHexBoltHead(ctx: CanvasRenderingContext2D, bx: number, by: number)
  */
 function _renderPass5FixedPipeBolts(ctx: CanvasRenderingContext2D, board: Board): void {
   const inset = _s(7.5);
+  /** Returns true when the cell at (nr, nc) is a fixed pipe tile. */
+  const _isFixedPipe = (nr: number, nc: number): boolean => {
+    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) return false;
+    const t = board.grid[nr][nc];
+    return t.isFixed && PIPE_SHAPES.has(t.shape);
+  };
   ctx.save();
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
@@ -1167,10 +1173,16 @@ function _renderPass5FixedPipeBolts(ctx: CanvasRenderingContext2D, board: Board)
       if (!tile.isFixed || !PIPE_SHAPES.has(tile.shape)) continue;
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      _drawHexBoltHead(ctx, x + inset,               y + inset);
-      _drawHexBoltHead(ctx, x + TILE_SIZE - inset,   y + inset);
-      _drawHexBoltHead(ctx, x + inset,               y + TILE_SIZE - inset);
-      _drawHexBoltHead(ctx, x + TILE_SIZE - inset,   y + TILE_SIZE - inset);
+      // Skip a corner's bolt when either adjacent tile sharing that corner's two
+      // edges is itself a fixed pipe tile.
+      if (!_isFixedPipe(r - 1, c) && !_isFixedPipe(r, c - 1))
+        _drawHexBoltHead(ctx, x + inset,             y + inset);
+      if (!_isFixedPipe(r - 1, c) && !_isFixedPipe(r, c + 1))
+        _drawHexBoltHead(ctx, x + TILE_SIZE - inset, y + inset);
+      if (!_isFixedPipe(r + 1, c) && !_isFixedPipe(r, c - 1))
+        _drawHexBoltHead(ctx, x + inset,             y + TILE_SIZE - inset);
+      if (!_isFixedPipe(r + 1, c) && !_isFixedPipe(r, c + 1))
+        _drawHexBoltHead(ctx, x + TILE_SIZE - inset, y + TILE_SIZE - inset);
     }
   }
   ctx.restore();
