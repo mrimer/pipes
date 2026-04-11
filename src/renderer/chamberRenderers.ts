@@ -717,62 +717,13 @@ export function drawChamber(
   lockedGain: number | null,
   buttEndDirs?: Set<Direction>,
 ): void {
-  // Phase 1: Draw the box, inner content, and flush (butt-end) stubs inside the tile clip.
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-half, -half, half * 2, half * 2);
-  ctx.clip();
   const bw = half * 0.7 + 2;
   const bh = half * 0.7 + 2;
   const br = _s(3); // slight corner radius for the inner box
-  drawChamberBox(ctx, bw, bh, br, isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR, color);
-  // Draw inner content based on chamberContent
-  const { chamberContent } = tile;
-  // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
-  // Only shown when the chamber is not connected (no water flowing through it).
-  if (!isWater && (chamberContent === 'ice' || chamberContent === 'snow')) {
-    _drawChamberFrostHalo(ctx, color, bw, bh, br);
-  }
-  if (chamberContent === 'tank') {
-    _drawChamberTankContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'dirt') {
-    _drawChamberDirtContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'item') {
-    _drawChamberItemContent(ctx, tile.itemShape, tile.itemCount, bw, bh, isWater, half);
-  } else if (chamberContent === 'heater') {
-    _drawChamberHeaterContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'ice') {
-    _drawChamberIceContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost);
-  } else if (chamberContent === 'pump') {
-    _drawChamberPumpContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'snow') {
-    _drawChamberSnowContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, currentPressure, lockedCost);
-  } else if (chamberContent === 'sandstone') {
-    const { isShatterTriggered, isHard } = sandstoneColorState(tile, currentPressure);
-    const sandstoneColor = isShatterTriggered
-      ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
-      : isHard
-        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
-    _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
-  } else if (chamberContent === 'star') {
-    _drawChamberStarContent(ctx, isWater, half);
-  } else if (chamberContent === 'hot_plate') {
-    _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
-  }
-  // Connection stubs that use a flat (butt) end cap are drawn inside the clip so
-  // the end sits exactly flush with the tile edge and does not bleed into
-  // adjacent tiles.  When buttEndDirs is undefined all stubs use butt caps
-  // (legacy / default behaviour for tiles that don't compute butt-end sets).
-  drawChamberButtStubs(ctx, tile.connections, bw, bh, half, color, buttEndDirs);
-  ctx.restore(); // Remove clip so round-end stubs can extend beyond the tile boundary.
 
-  // Phase 2: Connection stubs that face empty tiles or pipes without a reciprocating
-  // arm use a round end cap at the outer tip only, matching the nub style used by plain
-  // pipe arms.  These are drawn outside the clip so the round cap protrudes slightly
-  // beyond the tile edge.  A per-stub clip masks the inner end of each stroke (where it
-  // meets the chamber box) so only the outer tip gets a round cap; the inner junction
-  // retains a flat (butt) appearance.
+  // Phase 1: Draw disconnected stubs (round end cap) first, below the chamber box.
+  // The box is rendered on top afterwards, so its border cleanly covers the inner
+  // junction and the chamber edge looks the same as for connected directions.
   if (buttEndDirs !== undefined) {
     ctx.lineCap = 'round';
     const capR = LINE_WIDTH / 2 + _s(1.5);
@@ -823,4 +774,51 @@ export function drawChamber(
       ctx.restore();
     }
   }
+
+  // Phase 2: Draw the box, inner content, and connected (butt-end) stubs inside the tile clip.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-half, -half, half * 2, half * 2);
+  ctx.clip();
+  drawChamberBox(ctx, bw, bh, br, isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR, color);
+  // Draw inner content based on chamberContent
+  const { chamberContent } = tile;
+  // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
+  // Only shown when the chamber is not connected (no water flowing through it).
+  if (!isWater && (chamberContent === 'ice' || chamberContent === 'snow')) {
+    _drawChamberFrostHalo(ctx, color, bw, bh, br);
+  }
+  if (chamberContent === 'tank') {
+    _drawChamberTankContent(ctx, tile, bw, bh, isWater);
+  } else if (chamberContent === 'dirt') {
+    _drawChamberDirtContent(ctx, tile, bw, bh, isWater);
+  } else if (chamberContent === 'item') {
+    _drawChamberItemContent(ctx, tile.itemShape, tile.itemCount, bw, bh, isWater, half);
+  } else if (chamberContent === 'heater') {
+    _drawChamberHeaterContent(ctx, tile, bw, bh, isWater);
+  } else if (chamberContent === 'ice') {
+    _drawChamberIceContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost);
+  } else if (chamberContent === 'pump') {
+    _drawChamberPumpContent(ctx, tile, bw, bh, isWater);
+  } else if (chamberContent === 'snow') {
+    _drawChamberSnowContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, currentPressure, lockedCost);
+  } else if (chamberContent === 'sandstone') {
+    const { isShatterTriggered, isHard } = sandstoneColorState(tile, currentPressure);
+    const sandstoneColor = isShatterTriggered
+      ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
+      : isHard
+        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
+        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
+    _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
+  } else if (chamberContent === 'star') {
+    _drawChamberStarContent(ctx, isWater, half);
+  } else if (chamberContent === 'hot_plate') {
+    _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
+  }
+  // Connection stubs that use a flat (butt) end cap are drawn inside the clip so
+  // the end sits exactly flush with the tile edge and does not bleed into
+  // adjacent tiles.  When buttEndDirs is undefined all stubs use butt caps
+  // (legacy / default behaviour for tiles that don't compute butt-end sets).
+  drawChamberButtStubs(ctx, tile.connections, bw, bh, half, color, buttEndDirs);
+  ctx.restore();
 }
