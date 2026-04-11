@@ -319,7 +319,11 @@ export interface FlowDrop {
   fromDir: Direction | null;
 }
 
-/** Uniform movement speed (tile-lengths per frame at ~60 fps) for all flow pulses. */
+/** Uniform movement speed (tile-lengths per frame at ~60 fps) for all flow pulses.
+ *
+ * Note: the animation is frame-rate dependent — at 60 fps each pulse advances
+ * one tile in ~20 frames (~333 ms); at higher or lower frame rates the travel
+ * time will scale accordingly. */
 export const FLOW_DROP_SPEED = 0.05;
 
 /**

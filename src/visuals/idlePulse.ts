@@ -200,11 +200,17 @@ function _brightRGB(baseHex: string): [number, number, number] {
 }
 
 /**
- * Draw a radial glow centered at `(hx, hy)`.
+ * Draw the idle-pulse radial glow at canvas position `(x, y)`.
  *
- * Two concentric gradients are drawn: a bright, more opaque inner core and a
- * softer, larger outer halo.  Both fade to transparent at the edge, so the
- * glow blends naturally over any underlying pipe artwork.
+ * Used to render win-level and chapter-complete flow pulses with the same
+ * radial-glow visual as the in-game idle pulse.
+ *
+ * @param ctx          2D rendering context.
+ * @param x            Canvas X coordinate of the glow centre.
+ * @param y            Canvas Y coordinate of the glow centre.
+ * @param baseColorHex Base pipe color as a `#rrggbb` hex string.
+ *                     The color is brightened toward white before rendering.
+ * @param alpha        Overall opacity in the range [0, 1].
  */
 export function drawIdlePulseGlow(
   ctx: CanvasRenderingContext2D,
@@ -217,6 +223,13 @@ export function drawIdlePulseGlow(
   _drawGlowAt(ctx, x, y, r, g, b, alpha);
 }
 
+/**
+ * Draw a radial glow centered at `(hx, hy)`.
+ *
+ * Two concentric gradients are drawn: a bright, more opaque inner core and a
+ * softer, larger outer halo.  Both fade to transparent at the edge, so the
+ * glow blends naturally over any underlying pipe artwork.
+ */
 function _drawGlowAt(
   ctx: CanvasRenderingContext2D,
   hx: number,
