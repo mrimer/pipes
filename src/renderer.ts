@@ -1048,8 +1048,9 @@ function _buildElbowPath(
   }
   // Right edge of N arm → bend
   ctx.lineTo(lw2, 0);
-  // Outer convex corner: CCW quarter-circle at origin from (lw2,0) to (0,-lw2)
-  // (passes through the upper-right quadrant, i.e. the outer side of the bend)
+  // Outer convex corner: CCW quarter-circle at origin from (lw2,0) to (0,-lw2).
+  // In canvas coordinates y increases downward, so (0,-lw2) is visually above
+  // the origin – the outer (top-right) side of the N→E bend.
   ctx.arc(0, 0, lw2, 0, -Math.PI / 2, true);
   // Top edge of E arm
   ctx.lineTo(half, -lw2);
@@ -1061,8 +1062,10 @@ function _buildElbowPath(
   }
   // Bottom edge of E arm back toward bend
   ctx.lineTo(0, lw2);
-  // Inner concave corner: CW quarter-circle at origin from (0,lw2) to (-lw2,0)
-  // (passes through the lower-left quadrant, i.e. the concave inner side of the bend)
+  // Inner concave corner: CW quarter-circle at origin from (0,lw2) to (-lw2,0).
+  // In canvas coordinates (0,lw2) is visually below the origin and (-lw2,0) is
+  // to the left, so this arc curves through the bottom-left – the concave inner
+  // side of the N→E bend.
   ctx.arc(0, 0, lw2, Math.PI / 2, Math.PI, false);
   // Left edge of N arm going up
   ctx.lineTo(-lw2, -half);
