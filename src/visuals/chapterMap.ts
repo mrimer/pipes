@@ -165,7 +165,7 @@ export function drawLevelChamberTile(
   ctx.fill();
   // Thin black outline around the chamber box, then colored border on top.
   ctx.strokeStyle = 'black';
-  ctx.lineWidth = _s(3) + 2 * _s(1.5);
+  ctx.lineWidth = _s(6);
   ctx.stroke();
   ctx.strokeStyle = chamberColor;
   ctx.lineWidth = _s(3);
@@ -181,7 +181,7 @@ export function drawLevelChamberTile(
     [Direction.East, bw, 0,  half, 0],
   ] as const;
   ctx.strokeStyle = 'black';
-  ctx.lineWidth = LINE_WIDTH + 2 * _s(1.5);
+  ctx.lineWidth = LINE_WIDTH + _s(3);
   for (const [dir, x1, y1, x2, y2] of chStubDirs) {
     if (connections.has(dir)) {
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
@@ -423,7 +423,7 @@ function _drawChapterMapEndpoint(
     if (!connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     // Black outline for the arm
-    ctx.lineWidth = LINE_WIDTH + 2 * _s(1.5);
+    ctx.lineWidth = LINE_WIDTH + _s(3);
     ctx.strokeStyle = 'black';
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -749,7 +749,7 @@ export function renderChapterMapCanvas(
         else if (dir === Direction.East) ex = x + CELL;
         else if (dir === Direction.West) ex = x;
         // Black outline for the arm
-        ctx.lineWidth = LINE_WIDTH + 2 * _s(1.5);
+        ctx.lineWidth = LINE_WIDTH + _s(3);
         ctx.strokeStyle = 'black';
         ctx.beginPath();
         ctx.moveTo(cx, cy);
