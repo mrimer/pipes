@@ -664,9 +664,9 @@ export function drawChamberButtStubs(
   color: string,
   dirFilter?: ReadonlySet<Direction>,
 ): void {
-  // Offset the stub start outward by half the line-width so the stroke's inner
-  // edge lands at the box border rather than inside the chamber rectangle.
-  const gap = Math.round(LINE_WIDTH / 2);
+  // Offset the stub start outward by a quarter of the line-width so the stroke
+  // overlaps the box border edge without entering the chamber fill area.
+  const gap = Math.round(LINE_WIDTH / 4);
   ctx.lineCap = 'butt';
   const stubDirs = [
     [Direction.North, 0,        -(bh + gap), 0,     -half],
