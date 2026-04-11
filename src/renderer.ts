@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA } from './board';
+import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA, isConnectorShape } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
@@ -2005,15 +2005,46 @@ function _renderPass3PipeTiles(
 }
 
 /**
- * Pass 3b: Draw small color patches at every pipe-to-pipe connection seam.
+ * Draw a single connection-bridge patch for one arm direction.
  *
- * When two adjacent pipe tiles are mutually connected and rendered with
+ * Must be called with `ctx` already translated to the tile centre.  The patch
+ * is a thin filled rectangle placed at the tile boundary in `dir`, covering the
+ * `_s(1.5)` black-stroke overflow that the adjacent tile's arm stroke leaves
+ * inside this tile's pixel area.
+ *
+ * @param ctx  2D context (translated to tile centre).
+ * @param dir  World-space direction of the arm whose boundary edge needs patching.
+ * @param half Half the tile size in pixels (= TILE_SIZE / 2).
+ */
+export function drawConnectionBridgePatch(
+  ctx: CanvasRenderingContext2D,
+  dir: Direction,
+  half: number,
+): void {
+  const strokeHalf = _s(1.5); // half of the _s(3) pipe outline stroke width
+  const lw2 = LINE_WIDTH / 2;
+  switch (dir) {
+    case Direction.North: ctx.fillRect(-lw2, -half,              lw2 * 2, strokeHalf); break;
+    case Direction.South: ctx.fillRect(-lw2, half - strokeHalf,  lw2 * 2, strokeHalf); break;
+    case Direction.East:  ctx.fillRect(half - strokeHalf, -lw2,  strokeHalf, lw2 * 2); break;
+    case Direction.West:  ctx.fillRect(-half,             -lw2,  strokeHalf, lw2 * 2); break;
+  }
+}
+
+/**
+ * Pass 3b: Draw small color patches at every connection seam between adjacent
+ * connector tiles (pipe shapes, Source, and Sink).
+ *
+ * When two adjacent connector tiles are mutually connected and rendered with
  * `buildPipeBodyPath`, the `_s(3)` black stroke centred on the flat (butt) path
  * edge extends `_s(1.5)` beyond the tile boundary into the neighbour's area.
  * The neighbour's fill does not cover that overflow, so a visible black strip
  * appears at the connection seam.  This pass draws a thin filled rectangle
  * at each such edge, in the tile's own pipe colour, to cover the strip left
  * behind by the adjacent tile's stroke overflow.
+ *
+ * Covers pipe-shape tiles as well as Source and Sink tiles, all of which share
+ * the same black arm-stroke rendering and can therefore exhibit the seam.
  *
  * Tiles undergoing a rotation animation are skipped because their visual
  * orientation is mid-transition and the patch position would not match.
@@ -2025,14 +2056,12 @@ function _renderPass3bPipeConnectionBridges(
   currentPressure: number,
   rotationOverrides?: Map<string, number>,
 ): void {
-  const strokeHalf = _s(1.5); // half of the _s(3) pipe outline stroke width
-  const lw2 = LINE_WIDTH / 2;
   const half = TILE_SIZE / 2; // TILE_SIZE is always even (64 or 128)
 
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
-      if (!PIPE_SHAPES.has(tile.shape)) continue;
+      if (!isConnectorShape(tile.shape)) continue;
 
       // Skip tiles under rotation animation — their visual is mid-transition.
       if (rotationOverrides?.has(posKey(r, c))) continue;
@@ -2053,18 +2082,11 @@ function _renderPass3bPipeConnectionBridges(
         if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
 
         const neighborTile = board.grid[nr][nc];
-        // Only bridge to other pipe tiles with a reciprocal arm (mutual connection).
-        if (!PIPE_SHAPES.has(neighborTile.shape)) continue;
+        // Only bridge to connector tiles with a reciprocal arm (mutual connection).
+        if (!isConnectorShape(neighborTile.shape)) continue;
         if (!neighborTile.connections.has(oppositeDirection(dir))) continue;
 
-        // Draw a thin filled rectangle covering the _s(1.5) strip inside this
-        // tile at the shared edge, where the neighbour's black stroke overflow lands.
-        switch (dir) {
-          case Direction.North: ctx.fillRect(-lw2, -half, lw2 * 2, strokeHalf); break;
-          case Direction.South: ctx.fillRect(-lw2, half - strokeHalf, lw2 * 2, strokeHalf); break;
-          case Direction.East:  ctx.fillRect(half - strokeHalf, -lw2, strokeHalf, lw2 * 2); break;
-          case Direction.West:  ctx.fillRect(-half, -lw2, strokeHalf, lw2 * 2); break;
-        }
+        drawConnectionBridgePatch(ctx, dir, half);
       }
 
       ctx.restore();
