@@ -1651,10 +1651,17 @@ export class Game implements InputCallbacks {
           boardSnapshot,
           this.playScreenEl,
           () => {
-            // Animation complete: hide the play screen and clean up.
             chapterMapScreen.screenEl.style.overflow = '';
-            this.playScreenEl.style.display = 'none';
-            this.currentLevel = null;
+            // Only hide the play screen if the user hasn't already selected a new
+            // level while this exit animation was running.  If a new level was
+            // chosen mid-animation the screen is already GameScreen.Play, and
+            // unconditionally hiding the play screen here would leave a permanent
+            // black screen (the enter transition's onComplete sets opacity:1 on a
+            // display:none element, so nothing becomes visible).
+            if (this.screen === GameScreen.ChapterMap) {
+              this.playScreenEl.style.display = 'none';
+              this.currentLevel = null;
+            }
           },
         );
       } else {
