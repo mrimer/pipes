@@ -1536,7 +1536,7 @@ function _renderPass1Backgrounds(
             : paritySum === 2 ? EMPTY_COLOR_DARK
             : EMPTY_COLOR;
           ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : ginghamColor;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+          ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
           // Draw any ambient decoration on this empty non-gold cell
           const dec = board.ambientDecorations.get(posKey(r, c));
           if (dec) drawAmbientDecoration(ctx, dec);
