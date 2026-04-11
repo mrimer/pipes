@@ -148,18 +148,31 @@ export const CHAPTER_MAP_BORDER_COLOR = '#2a3a5e';
 /** Interior fill color for a level chamber tile when water has reached it. */
 export const CHAPTER_MAP_FILLED_CHAMBER_BG    = '#1a3d60';
 
+/** Parse a 7-character '#rrggbb' hex color string into [r, g, b] components. */
+function _parseHex(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+/** Format [r, g, b] components (0–255) back into a '#rrggbb' hex color string. */
+function _toHex(r: number, g: number, b: number): string {
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 /**
  * Return a lighter version of a hex color by blending each RGB channel toward
  * 255. `amount` is 0–1 where 0 leaves the color unchanged and 1 returns white.
  */
 export function lighten(hex: string, amount: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const nr = Math.round(r + (255 - r) * amount);
-  const ng = Math.round(g + (255 - g) * amount);
-  const nb = Math.round(b + (255 - b) * amount);
-  return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+  const [r, g, b] = _parseHex(hex);
+  return _toHex(
+    Math.round(r + (255 - r) * amount),
+    Math.round(g + (255 - g) * amount),
+    Math.round(b + (255 - b) * amount),
+  );
 }
 
 /**
@@ -167,11 +180,10 @@ export function lighten(hex: string, amount: number): string {
  * 0. `amount` is 0–1 where 0 leaves the color unchanged and 1 returns black.
  */
 export function darken(hex: string, amount: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const nr = Math.round(r * (1 - amount));
-  const ng = Math.round(g * (1 - amount));
-  const nb = Math.round(b * (1 - amount));
-  return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+  const [r, g, b] = _parseHex(hex);
+  return _toHex(
+    Math.round(r * (1 - amount)),
+    Math.round(g * (1 - amount)),
+    Math.round(b * (1 - amount)),
+  );
 }
