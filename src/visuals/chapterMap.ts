@@ -146,6 +146,11 @@ export function drawLevelChamberTile(
   ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
+  // Gingham overlay: derive row/col from pixel position
+  const tileR = Math.round(y / CELL);
+  const tileC = Math.round(x / CELL);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC);
+
   ctx.save();
   ctx.translate(cx, cy);
 
@@ -158,25 +163,36 @@ export function drawLevelChamberTile(
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = chamberFill;
   ctx.fill();
+  // Thin black outline around the chamber box, then colored border on top.
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(3) + 2 * _s(1.5);
+  ctx.stroke();
   ctx.strokeStyle = chamberColor;
   ctx.lineWidth = _s(3);
   ctx.stroke();
 
-  // Connection stubs from box edge to tile edge (butt cap, like in-game chamber)
+  // Connection stubs from box edge to tile edge (butt cap, like in-game chamber).
+  // Draw black outline first, then colored stroke on top.
+  ctx.lineCap = 'butt';
+  const chStubDirs = [
+    [Direction.North, 0, -bh, 0, -half],
+    [Direction.South, 0, bh,  0, half],
+    [Direction.West, -bw, 0, -half, 0],
+    [Direction.East, bw, 0,  half, 0],
+  ] as const;
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = LINE_WIDTH + 2 * _s(1.5);
+  for (const [dir, x1, y1, x2, y2] of chStubDirs) {
+    if (connections.has(dir)) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
   ctx.strokeStyle = chamberColor;
   ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'butt';
-  if (connections.has(Direction.North)) {
-    ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
-  }
-  if (connections.has(Direction.South)) {
-    ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
-  }
-  if (connections.has(Direction.West)) {
-    ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
-  }
-  if (connections.has(Direction.East)) {
-    ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+  for (const [dir, x1, y1, x2, y2] of chStubDirs) {
+    if (connections.has(dir)) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
   }
 
   ctx.restore();
@@ -376,15 +392,46 @@ function _drawChapterMapEndpoint(
   ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
 
+  // Gingham overlay: derive row/col from pixel position
+  const tileR = Math.round(y / CELL);
+  const tileC = Math.round(x / CELL);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC);
+
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Radiating arms to connected directions – drawn first so centre appears on top
-  ctx.strokeStyle = color;
-  ctx.lineWidth = LINE_WIDTH;
+  // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
+  const outerR = isSource ? half * 0.5 : half * 0.45;
+
+  // Fill the outer circle with the tile background color so it sits as a solid
+  // area above the gingham pattern but below the arms and centre decorations.
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Thin black outline on the outer circle edge (drawn before arms so arms sit on top).
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(1.5) + 2 * _s(1.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, outerR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Radiating arms to connected directions – drawn after the circle fill so they
+  // sit on top of it; centre appears on top of everything.
   for (const [dir, nx, ny] of CARDINAL_DIRS) {
     if (!connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+    // Black outline for the arm
+    ctx.lineWidth = LINE_WIDTH + 2 * _s(1.5);
+    ctx.strokeStyle = 'black';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(nx * half, ny * half);
+    ctx.stroke();
+    // Colored arm
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
@@ -685,21 +732,35 @@ export function renderChapterMapCanvas(
       ctx.fillStyle = CHAPTER_MAP_TILE_BG;
       ctx.fillRect(x, y, CELL, CELL);
 
+      // Gingham overlay for pipe tiles on the chapter map
+      drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+
       // Connection lines from center to open edges – same colors as the level screen
       const tileConns = tileDefConnections(def);
       const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
       const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
       ctx.save();
-      ctx.strokeStyle = pipeColor;
       ctx.lineWidth = LINE_WIDTH;
       for (const dir of tileConns) {
         ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+        let ex = cx, ey = cy;
+        if (dir === Direction.North) ey = y;
+        else if (dir === Direction.South) ey = y + CELL;
+        else if (dir === Direction.East) ex = x + CELL;
+        else if (dir === Direction.West) ex = x;
+        // Black outline for the arm
+        ctx.lineWidth = LINE_WIDTH + 2 * _s(1.5);
+        ctx.strokeStyle = 'black';
         ctx.beginPath();
         ctx.moveTo(cx, cy);
-        if (dir === Direction.North) ctx.lineTo(cx, y);
-        else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
-        else if (dir === Direction.East) ctx.lineTo(x + CELL, cy);
-        else if (dir === Direction.West) ctx.lineTo(x, cy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        // Colored arm
+        ctx.lineWidth = LINE_WIDTH;
+        ctx.strokeStyle = pipeColor;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(ex, ey);
         ctx.stroke();
       }
       // Center junction dot fills the seam when butt-end arms meet at center

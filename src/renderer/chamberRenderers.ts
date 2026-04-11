@@ -27,6 +27,8 @@ import {
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
 
+/** Half-width (per side) of the thin black outline added to pipes, chambers, and source/sink. */
+
 // ---------------------------------------------------------------------------
 // Internal content drawers (not exported)
 // ---------------------------------------------------------------------------
@@ -646,6 +648,10 @@ export function drawChamber(
   ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
   ctx.fillStyle = isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR;
   ctx.fill();
+  // Thin black outline around the chamber box, then the colored border on top.
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(6);
+  ctx.stroke();
   ctx.strokeStyle = color;
   ctx.lineWidth = _s(3);
   ctx.stroke();
@@ -687,20 +693,30 @@ export function drawChamber(
   // the end sits exactly flush with the tile edge and does not bleed into
   // adjacent tiles.  When buttEndDirs is undefined all stubs use butt caps
   // (legacy / default behaviour for tiles that don't compute butt-end sets).
+  // Draw black outline for each stub first, then the colored stroke on top.
+  // lineCap='butt' means no black cap at the tile-boundary (connection) end.
+  ctx.lineCap = 'butt';
+  const stubDirs = [
+    [Direction.North, 0, -bh, 0, -half],
+    [Direction.South, 0, bh,  0, half],
+    [Direction.West, -bw, 0, -half, 0],
+    [Direction.East, bw, 0,  half, 0],
+  ] as const;
+  // Black outline pass
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = LINE_WIDTH + _s(3);
+  for (const [dir, x1, y1, x2, y2] of stubDirs) {
+    if (tile.connections.has(dir) && (!buttEndDirs || buttEndDirs.has(dir))) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+  // Colored stroke pass
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
-  ctx.lineCap = 'butt';
-  if (tile.connections.has(Direction.North) && (!buttEndDirs || buttEndDirs.has(Direction.North))) {
-    ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
-  }
-  if (tile.connections.has(Direction.South) && (!buttEndDirs || buttEndDirs.has(Direction.South))) {
-    ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
-  }
-  if (tile.connections.has(Direction.West) && (!buttEndDirs || buttEndDirs.has(Direction.West))) {
-    ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
-  }
-  if (tile.connections.has(Direction.East) && (!buttEndDirs || buttEndDirs.has(Direction.East))) {
-    ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+  for (const [dir, x1, y1, x2, y2] of stubDirs) {
+    if (tile.connections.has(dir) && (!buttEndDirs || buttEndDirs.has(dir))) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
   }
   ctx.restore(); // Remove clip so round-end stubs can extend beyond the tile boundary.
 
@@ -711,31 +727,51 @@ export function drawChamber(
   // meets the chamber box) so only the outer tip gets a round cap; the inner junction
   // retains a flat (butt) appearance.
   if (buttEndDirs !== undefined) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = LINE_WIDTH;
     ctx.lineCap = 'round';
-    const capR = LINE_WIDTH / 2;
+    const capR = LINE_WIDTH / 2 + _s(1.5);
     if (tile.connections.has(Direction.North) && !buttEndDirs.has(Direction.North)) {
       ctx.save();
       ctx.beginPath(); ctx.rect(-half, -(half + capR), half * 2, half + capR - bh); ctx.clip();
+      // Black outline
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = LINE_WIDTH + _s(3);
+      ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
+      // Colored stroke
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
       ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -half); ctx.stroke();
       ctx.restore();
     }
     if (tile.connections.has(Direction.South) && !buttEndDirs.has(Direction.South)) {
       ctx.save();
       ctx.beginPath(); ctx.rect(-half, bh, half * 2, half + capR - bh); ctx.clip();
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = LINE_WIDTH + _s(3);
+      ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
       ctx.beginPath(); ctx.moveTo(0, bh);  ctx.lineTo(0, half);  ctx.stroke();
       ctx.restore();
     }
     if (tile.connections.has(Direction.West) && !buttEndDirs.has(Direction.West)) {
       ctx.save();
       ctx.beginPath(); ctx.rect(-(half + capR), -half, half + capR - bw, half * 2); ctx.clip();
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = LINE_WIDTH + _s(3);
+      ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
       ctx.beginPath(); ctx.moveTo(-bw, 0); ctx.lineTo(-half, 0); ctx.stroke();
       ctx.restore();
     }
     if (tile.connections.has(Direction.East) && !buttEndDirs.has(Direction.East)) {
       ctx.save();
       ctx.beginPath(); ctx.rect(bw, -half, half + capR - bw, half * 2); ctx.clip();
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = LINE_WIDTH + _s(3);
+      ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = LINE_WIDTH;
       ctx.beginPath(); ctx.moveTo(bw, 0);  ctx.lineTo(half, 0);  ctx.stroke();
       ctx.restore();
     }
