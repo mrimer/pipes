@@ -297,7 +297,7 @@ function _drawOneWayEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   const dirs = [Direction.North, Direction.East, Direction.South, Direction.West];
   const dir = dirs[rot / 90] ?? Direction.North;
   const cx = x + CELL / 2;
-  const half = CELL / 2;
+  const cy = y + CELL / 2;
   drawOneWayArrow(ctx, x, y, dir);
   // Label
   ctx.save();
@@ -305,7 +305,7 @@ function _drawOneWayEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
-  strokeFillText(ctx, 'ONE-WAY', cx, y + CELL / 2 + half * 0.65);
+  strokeFillText(ctx, 'ONE-WAY', cx, cy + CELL * 0.325);
   ctx.restore();
   ctx.strokeStyle = '#2a3a5e';
   ctx.lineWidth = 1;
