@@ -296,6 +296,33 @@ export function drawLevelChamberTile(
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
+/**
+ * Draw a Source or Sink endpoint tile on the chapter map at tile position (r, c).
+ * Fills the tile background, draws the gingham overlay, then delegates to the shared
+ * drawSourceOrSink renderer (translated to the tile centre).
+ */
+function _drawChapterMapEndpointTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  c: number,
+  connections: Set<Direction>,
+  color: string,
+  isSource: boolean,
+  buttEndDirs: Set<Direction> | undefined,
+  centerLabel: { text: string; color: string },
+): void {
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = CHAPTER_MAP_TILE_BG;
+  ctx.fillRect(x, y, CELL, CELL);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+  ctx.save();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawSourceOrSink(ctx, connections, color, CELL / 2, isSource, buttEndDirs, centerLabel, CHAPTER_MAP_TILE_BG);
+  ctx.restore();
+}
+
 /** Draw Granite tile like in-game, seamlessly connecting to adjacent granite tiles. */
 function _drawChapterMapGranite(
   ctx: CanvasRenderingContext2D,
@@ -469,13 +496,7 @@ export function renderChapterMapCanvas(
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
-        ctx.fillStyle = CHAPTER_MAP_TILE_BG;
-        ctx.fillRect(x, y, CELL, CELL);
-        drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
-        ctx.save();
-        ctx.translate(x + CELL / 2, y + CELL / 2);
-        drawSourceOrSink(ctx, connections, color, CELL / 2, true, buttEndDirs, { text: String(completedLevelCount), color: '#fff' }, CHAPTER_MAP_TILE_BG);
-        ctx.restore();
+        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, true, buttEndDirs, { text: String(completedLevelCount), color: '#fff' });
       } else if (def.shape === PipeShape.Sink) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
@@ -484,13 +505,7 @@ export function renderChapterMapCanvas(
         const centerLabel = remaining === 0 && isFilled
           ? { text: '★', color: '#f0c040' }
           : { text: String(remaining), color: '#fff' };
-        ctx.fillStyle = CHAPTER_MAP_TILE_BG;
-        ctx.fillRect(x, y, CELL, CELL);
-        drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
-        ctx.save();
-        ctx.translate(x + CELL / 2, y + CELL / 2);
-        drawSourceOrSink(ctx, connections, color, CELL / 2, false, buttEndDirs, centerLabel, CHAPTER_MAP_TILE_BG);
-        ctx.restore();
+        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, false, buttEndDirs, centerLabel);
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c);
       } else if (def.shape === PipeShape.Tree) {
