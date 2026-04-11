@@ -1654,6 +1654,20 @@ function _renderPass2NonPipeTiles(
         graniteNeighbors = computeGraniteNeighbors(board, r, c);
       }
 
+      // Gingham overlay for Granite and Tree tiles: 50% transparent green
+      // gingham pattern drawn on top of the tile background color.
+      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree) {
+        const paritySum = (r % 2) + (c % 2);
+        const ginghamBase = paritySum === 0 ? EMPTY_COLOR_LIGHT
+          : paritySum === 2 ? EMPTY_COLOR_DARK
+          : EMPTY_COLOR;
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = ginghamBase;
+        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+        ctx.restore();
+      }
+
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors);
     }
   }
