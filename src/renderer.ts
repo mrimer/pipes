@@ -395,6 +395,26 @@ export function computeGraniteNeighbors(board: Board, row: number, col: number):
 }
 
 /**
+ * Draw a 50% transparent green gingham overlay in the given rectangle.
+ * Tile parity (r, c) determines which gingham shade to use.
+ */
+export function drawGinghamOverlay(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  r: number, c: number,
+): void {
+  const paritySum = (r % 2) + (c % 2);
+  const ginghamBase = paritySum === 0 ? EMPTY_COLOR_LIGHT
+    : paritySum === 2 ? EMPTY_COLOR_DARK
+    : EMPTY_COLOR;
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = ginghamBase;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+/**
  * Draw a granite tile centered at the origin.
  *
  * When `neighbors` is provided the shape seams cleanly with adjacent granite
@@ -1657,15 +1677,7 @@ function _renderPass2NonPipeTiles(
       // Gingham overlay for Granite and Tree tiles: 50% transparent green
       // gingham pattern drawn on top of the tile background color.
       if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree) {
-        const paritySum = (r % 2) + (c % 2);
-        const ginghamBase = paritySum === 0 ? EMPTY_COLOR_LIGHT
-          : paritySum === 2 ? EMPTY_COLOR_DARK
-          : EMPTY_COLOR;
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-        ctx.fillStyle = ginghamBase;
-        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        ctx.restore();
+        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c);
       }
 
       drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors);

@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, CONNECTOR_TRI_FRACS, CONNECTOR_TRI_DEPTH, CONNECTOR_TRI_WING, connectorLitIndex, drawGinghamOverlay } from '../renderer';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
@@ -508,15 +508,7 @@ function _drawChapterMapGranite(
   };
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  const paritySum = (r % 2) + (c % 2);
-  const ginghamBase = paritySum === 0 ? EMPTY_COLOR_LIGHT
-    : paritySum === 2 ? EMPTY_COLOR_DARK
-    : EMPTY_COLOR;
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = ginghamBase;
-  ctx.fillRect(x, y, CELL, CELL);
-  ctx.restore();
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawGranite(ctx, CELL / 2, neighbors);
@@ -528,15 +520,7 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  const paritySum = (r % 2) + (c % 2);
-  const ginghamBase = paritySum === 0 ? EMPTY_COLOR_LIGHT
-    : paritySum === 2 ? EMPTY_COLOR_DARK
-    : EMPTY_COLOR;
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = ginghamBase;
-  ctx.fillRect(x, y, CELL, CELL);
-  ctx.restore();
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawTree(ctx, CELL / 2);
