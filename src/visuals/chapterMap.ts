@@ -546,7 +546,6 @@ export function renderChapterMapCanvas(
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(tileRotation * Math.PI / 180);
-      buildPipeBodyPath(ctx, def.shape, CELL / 2, lw2, localButtEndDirs);
       // Clip to the tile boundary on each butt-end direction so the black stroke
       // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
       // left unconstrained so rounded caps can extend freely into empty space.
@@ -560,6 +559,9 @@ export function renderChapterMapCanvas(
       ctx.beginPath();
       ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
       ctx.clip();
+      // Build the pipe body path AFTER clipping so ctx.beginPath() for the clip
+      // rect does not erase the pipe path before stroke/fill.
+      buildPipeBodyPath(ctx, def.shape, CELL / 2, lw2, localButtEndDirs);
       // Stroke outline first; fill covers the inner half of the stroke so only
       // the outer border remains visible.
       ctx.lineWidth = _s(3);
