@@ -21,7 +21,7 @@ import {
 } from '../colors';
 import { tileDefConnections } from '../chapterMapUtils';
 import { renderMinimap, minimapDimensions } from '../minimap';
-import { FlowDrop, drawFlowDrop } from './waterParticles';
+import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
 
@@ -952,10 +952,9 @@ export function spawnChapterMapFlowDrop(
     row: sourceRow,
     col: sourceCol,
     progress: 0,
-    speed: 0.035 + Math.random() * 0.025,
+    speed: FLOW_DROP_SPEED,
     direction: dir,
     fromDir: null,
-    size: _s(6) + Math.random() * _s(4),
   });
 }
 
