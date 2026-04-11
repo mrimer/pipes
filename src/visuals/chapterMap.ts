@@ -398,40 +398,13 @@ function _drawChapterMapSea(
   ctx.restore();
 }
 
-/**
- * Render the chapter map canvas (used on the chapter map screen).
- *
- * @param ctx                  2D context to draw on.
- * @param grid                 Chapter map grid.
- * @param rows                 Grid row count.
- * @param cols                 Grid column count.
- * @param levelDefs            Level definitions for the chapter.
- * @param filledKeys           Set of "row,col" keys reachable from the source (water-filled).
- * @param progress             Completed levels and star data.
- * @param hoverPos             Currently hovered grid cell (for highlighting).
- * @param accessibleLevelIdxs  Set of level indices that are accessible (water reaches them).
- * @param decorations          Optional ambient decorations for empty cells.
- */
-export function renderChapterMapCanvas(
+/** Draw the chapter map grid lines beneath all tile objects. */
+function _renderChapterMapGridLines(
   ctx: CanvasRenderingContext2D,
-  grid: (TileDef | null)[][],
   rows: number,
   cols: number,
-  levelDefs: readonly LevelDef[],
-  filledKeys: ReadonlySet<string>,
-  progress: LevelProgressMap,
-  hoverPos?: { row: number; col: number } | null,
-  accessibleLevelIdxs?: ReadonlySet<number>,
-  decorations?: ReadonlyMap<string, AmbientDecoration>,
-  jitterCell?: { row: number; col: number; dx: number; dy: number },
 ): void {
   const CELL = TILE_SIZE;
-  ctx.clearRect(0, 0, cols * CELL, rows * CELL);
-
-  // Count how many of this chapter's levels the player has completed
-  const completedLevelCount = levelDefs.filter(l => progress.completedLevels.has(l.id)).length;
-
-  // Grid lines – drawn first so they are beneath all tile objects
   ctx.strokeStyle = 'rgba(74,144,217,0.12)';
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
@@ -447,8 +420,17 @@ export function renderChapterMapCanvas(
     ctx.lineTo(c * CELL, rows * CELL);
     ctx.stroke();
   }
+}
 
-  // Pass 1: background cells
+/** Pass 1: Draw gingham backgrounds for empty (non-tile) cells, with ambient decorations. */
+function _renderChapterMapPass1Backgrounds(
+  ctx: CanvasRenderingContext2D,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  decorations?: ReadonlyMap<string, AmbientDecoration>,
+): void {
+  const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
@@ -466,8 +448,21 @@ export function renderChapterMapCanvas(
       if (dec) drawAmbientDecoration(ctx, dec);
     }
   }
+}
 
-  // Pass 2: non-pipe tiles (level chambers, source, sink)
+/** Pass 2: Draw non-pipe tiles (level chambers, source, sink, granite, tree, sea). */
+function _renderChapterMapPass2NonPipeTiles(
+  ctx: CanvasRenderingContext2D,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  levelDefs: readonly LevelDef[],
+  filledKeys: ReadonlySet<string>,
+  progress: LevelProgressMap,
+  completedLevelCount: number,
+  jitterCell?: { row: number; col: number; dx: number; dy: number },
+): void {
+  const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
@@ -515,8 +510,20 @@ export function renderChapterMapCanvas(
       }
     }
   }
+}
 
-  // Pass 3: pipe tiles – unified shape rendering (same approach as the level screen)
+/**
+ * Pass 3: Draw pipe tiles using a unified shape path (same approach as the level screen),
+ * with per-direction clipping so butt-end outlines never bleed into adjacent tiles.
+ */
+function _renderChapterMapPass3PipeTiles(
+  ctx: CanvasRenderingContext2D,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: ReadonlySet<string>,
+): void {
+  const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
@@ -575,6 +582,47 @@ export function renderChapterMapCanvas(
       ctx.restore();
     }
   }
+}
+
+/**
+ * Render the chapter map canvas (used on the chapter map screen).
+ *
+ * @param ctx                  2D context to draw on.
+ * @param grid                 Chapter map grid.
+ * @param rows                 Grid row count.
+ * @param cols                 Grid column count.
+ * @param levelDefs            Level definitions for the chapter.
+ * @param filledKeys           Set of "row,col" keys reachable from the source (water-filled).
+ * @param progress             Completed levels and star data.
+ * @param hoverPos             Currently hovered grid cell (for highlighting).
+ * @param accessibleLevelIdxs  Set of level indices that are accessible (water reaches them).
+ * @param decorations          Optional ambient decorations for empty cells.
+ */
+export function renderChapterMapCanvas(
+  ctx: CanvasRenderingContext2D,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  levelDefs: readonly LevelDef[],
+  filledKeys: ReadonlySet<string>,
+  progress: LevelProgressMap,
+  hoverPos?: { row: number; col: number } | null,
+  accessibleLevelIdxs?: ReadonlySet<number>,
+  decorations?: ReadonlyMap<string, AmbientDecoration>,
+  jitterCell?: { row: number; col: number; dx: number; dy: number },
+): void {
+  const CELL = TILE_SIZE;
+  ctx.clearRect(0, 0, cols * CELL, rows * CELL);
+
+  // Count how many of this chapter's levels the player has completed
+  const completedLevelCount = levelDefs.filter(l => progress.completedLevels.has(l.id)).length;
+
+  _renderChapterMapGridLines(ctx, rows, cols);
+  _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations);
+  _renderChapterMapPass2NonPipeTiles(
+    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell,
+  );
+  _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys);
 
   // Hover highlight – only on level chamber tiles
   if (hoverPos) {
