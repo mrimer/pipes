@@ -27,8 +27,6 @@ import {
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
 
-/** Half-width (per side) of the thin black outline added to pipes, chambers, and source/sink. */
-
 // ---------------------------------------------------------------------------
 // Internal content drawers (not exported)
 // ---------------------------------------------------------------------------

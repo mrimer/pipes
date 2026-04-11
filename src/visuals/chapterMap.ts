@@ -412,7 +412,7 @@ function _drawChapterMapEndpoint(
 
   // Thin black outline on the outer circle edge (drawn before arms so arms sit on top).
   ctx.strokeStyle = 'black';
-  ctx.lineWidth = _s(1.5) + 2 * _s(1.5);
+  ctx.lineWidth = _s(4.5);
   ctx.beginPath();
   ctx.arc(0, 0, outerR, 0, Math.PI * 2);
   ctx.stroke();
