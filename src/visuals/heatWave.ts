@@ -139,8 +139,6 @@ function _renderOneHeatWave(
   const WAVE_COUNT = 5;
   // Vertical spacing between successive shimmer lines.
   const LINE_SPACING = bh / WAVE_COUNT;
-  // Half-height of the centre safe zone around the numbers/icon area.
-  const SAFE_HALF = _s(9);
 
   ctx.lineCap = 'round';
   ctx.lineWidth = _s(1.5);
@@ -153,9 +151,6 @@ function _renderOneHeatWave(
     if (lineY < cy - bh) continue;
     // Don't draw below the leading edge.
     if (lineY > leadY + 2) continue;
-
-    // Skip the centre safe zone where the numbers and icon are rendered.
-    if (lineY > cy - SAFE_HALF && lineY < cy + SAFE_HALF) continue;
 
     // Alpha fades as the line trails further behind the leading edge.
     const distFromLead = leadY - lineY;
