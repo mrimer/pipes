@@ -5,9 +5,9 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, buildPipeBodyPath, toLocalDir, drawConnectionBridgePatch, computeButtEndDirs, drawSourceOrSink } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, buildPipeBodyPath, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
-import { PIPE_SHAPES, NEIGHBOUR_DELTA, isConnectorShape } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
@@ -547,6 +547,19 @@ export function renderChapterMapCanvas(
       ctx.translate(cx, cy);
       ctx.rotate(tileRotation * Math.PI / 180);
       buildPipeBodyPath(ctx, def.shape, CELL / 2, lw2, localButtEndDirs);
+      // Clip to the tile boundary on each butt-end direction so the black stroke
+      // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
+      // left unconstrained so rounded caps can extend freely into empty space.
+      const half = CELL / 2;
+      const LARGE = half + LINE_WIDTH;
+      const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
+      const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
+      const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
+      const clipB = localButtEndDirs?.has(Direction.South) ?  half :  LARGE;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
+      ctx.clip();
       // Stroke outline first; fill covers the inner half of the stroke so only
       // the outer border remains visible.
       ctx.lineWidth = _s(3);
@@ -556,53 +569,8 @@ export function renderChapterMapCanvas(
       ctx.stroke();
       ctx.fillStyle = pipeColor;
       ctx.fill();
+      ctx.restore(); // Release clip.
       ctx.restore();
-    }
-  }
-
-  // Pass 3b: Draw connection-bridge patches at every mutual connection seam between
-  // connector tiles (pipe shapes, Source, Sink).  The _s(3) black stroke used by
-  // buildPipeBodyPath extends _s(1.5) beyond the tile boundary into the neighbour's
-  // area; this pass fills that strip with the tile's own colour so no black seam
-  // is visible at the connection point.
-  {
-    const half = CELL / 2;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const def = grid[r]?.[c] ?? null;
-        if (def === null || !isConnectorShape(def.shape)) continue;
-
-        const isFilled = filledKeys.has(`${r},${c}`);
-        let color: string;
-        if (def.shape === PipeShape.Source) {
-          color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
-        } else if (def.shape === PipeShape.Sink) {
-          color = isFilled ? SINK_WATER_COLOR : SINK_COLOR;
-        } else {
-          color = isFilled ? WATER_COLOR : PIPE_COLOR;
-        }
-
-        const tileConns = tileDefConnections(def);
-        const cx = c * CELL + half;
-        const cy = r * CELL + half;
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.fillStyle = color;
-
-        for (const dir of tileConns) {
-          const delta = NEIGHBOUR_DELTA[dir];
-          const nr = r + delta.row, nc = c + delta.col;
-          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-          const neighbor = grid[nr]?.[nc];
-          if (!neighbor || !isConnectorShape(neighbor.shape)) continue;
-          if (!tileDefConnections(neighbor).has(oppositeDirection(dir))) continue;
-
-          drawConnectionBridgePatch(ctx, dir, half);
-        }
-
-        ctx.restore();
-      }
     }
   }
 
