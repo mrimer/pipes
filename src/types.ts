@@ -272,6 +272,8 @@ export interface AmbientDecoration {
   variant: number;
   /** Scale multiplier (1 = default size; >1 larger, <1 smaller). Only set for types that support scaling. */
   scale?: number;
+  /** Number of items to draw. Currently used by crystals (1 or 2 shards); other types always draw their default quantity. */
+  count?: number;
 }
 
 /** A chapter groups a set of levels under a shared name. */

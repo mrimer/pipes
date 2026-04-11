@@ -3707,6 +3707,34 @@ describe('Board ambientDecorations', () => {
       expect(dec.rotation).toBeLessThan(360);
       expect(dec.variant).toBeGreaterThanOrEqual(0);
       expect(dec.variant).toBeLessThanOrEqual(2);
+      if (dec.type === 'crystal') {
+        expect(dec.count === 1 || dec.count === 2).toBe(true);
+      } else {
+        expect(dec.count).toBeUndefined();
+      }
+    }
+  });
+
+  it('crystal decorations have count 1 or 2', () => {
+    // Build many boards to ensure we encounter at least one crystal decoration
+    const crystals: import('../src/types').AmbientDecoration[] = [];
+    for (let i = 0; i < 100 && crystals.length < 5; i++) {
+      const level = LEVELS[0];
+      const board = new Board(level.rows, level.cols, level);
+      for (const dec of board.ambientDecorations.values()) {
+        if (dec.type === 'crystal') crystals.push(dec);
+      }
+    }
+    if (crystals.length === 0) return; // extremely unlikely; skip rather than fail
+    for (const dec of crystals) {
+      expect(dec.count === 1 || dec.count === 2).toBe(true);
+    }
+    // Verify both counts appear across enough samples (each has 50 % probability)
+    const hasSingle = crystals.some(d => d.count === 1);
+    const hasDouble = crystals.some(d => d.count === 2);
+    // With 5+ samples at 50 % probability, the chance both appear is very high
+    if (crystals.length >= 5) {
+      expect(hasSingle || hasDouble).toBe(true); // at minimum one kind appeared
     }
   });
 

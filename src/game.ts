@@ -85,10 +85,10 @@ const PLAY_HUD_H = 32;
 const PLAY_GAP = 10;
 /** Bottom padding (px) of the #play-screen element. */
 const PLAY_PADDING_BOTTOM = 24;
-/** Estimated height (px) of the note panel: 12 px padding × 2 + one text line. */
-const PLAY_NOTE_PANEL_H = 42;
-/** Estimated height (px) of the collapsed hint panel: toggle-button 10 px padding × 2 + font. */
-const PLAY_HINT_PANEL_H = 37;
+/** Estimated height (px) of the note panel: 12 px padding × 2 + two text lines (worst-case wrapping). */
+const PLAY_NOTE_PANEL_H = 64;
+/** Estimated height (px) of the collapsed hint panel: toggle-button 10 px padding × 2 + font + border. */
+const PLAY_HINT_PANEL_H = 42;
 /** Vertical border height (px) added by the 3 px CSS border on #game-canvas (3 px × 2 sides). */
 const PLAY_CANVAS_BORDER_H = 6;
 /** Horizontal border width (px) added by the 3 px CSS border on #game-canvas (3 px × 2 sides). */
