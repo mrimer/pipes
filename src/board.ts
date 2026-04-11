@@ -196,6 +196,8 @@ export function generateAmbientDecorations(rows: number, cols: number): Readonly
       const scale = type === 'mushroom' ? 0.7 + Math.random() * 0.8
                   : type === 'crystal'  ? 0.75 + Math.random() * 0.5
                   : undefined;
+      // Crystals randomly show either one or two shards.
+      const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
       map.set(`${r},${c}`, {
         row: r,
         col: c,
@@ -206,6 +208,7 @@ export function generateAmbientDecorations(rows: number, cols: number): Readonly
         rotation: Math.random() * 360,
         variant: Math.floor(Math.random() * 3),
         scale,
+        count,
       });
     }
   }

@@ -137,15 +137,17 @@ function _drawMushroom(ctx: CanvasRenderingContext2D, variant: number): void {
 /**
  * Draw a small cluster of crystal shards centered at the current canvas origin.
  * Each shard is an elongated diamond with a lighter highlight facet.
+ * When `count` is 1, only the larger (first) shard is drawn.
  */
-function _drawCrystal(ctx: CanvasRenderingContext2D, variant: number): void {
+function _drawCrystal(ctx: CanvasRenderingContext2D, variant: number, count = 2): void {
   const color = CRYSTAL_COLORS[variant % CRYSTAL_COLORS.length];
   // Two shards side-by-side with slight height variation
   const shards: Array<[number, number, number, number]> = [
     [-_s(3.0),  _s(0.5), _s(2.2), _s(6.5)],  // [cx, cy, halfW, halfH]
     [ _s(2.0), -_s(1.0), _s(1.8), _s(5.0)],
   ];
-  for (const [cx, cy, hw, hh] of shards) {
+  const shardsToRender = count === 1 ? shards.slice(0, 1) : shards;
+  for (const [cx, cy, hw, hh] of shardsToRender) {
     // Diamond shard (slightly flat bottom for a natural crystal look)
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -190,7 +192,7 @@ export function drawAmbientDecoration(
     case 'flower':   _drawFlower(ctx, dec.variant);   break;
     case 'grass':    _drawGrass(ctx, dec.variant);    break;
     case 'mushroom': _drawMushroom(ctx, dec.variant); break;
-    case 'crystal':  _drawCrystal(ctx, dec.variant);  break;
+    case 'crystal':  _drawCrystal(ctx, dec.variant, dec.count);  break;
   }
   ctx.restore();
 }
