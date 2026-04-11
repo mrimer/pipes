@@ -4544,6 +4544,322 @@ describe('Chamber tile (hot_plate content)', () => {
     expect(board.getCurrentWater()).toBe(43);
     expect(board.frozen).toBe(0);
   });
+
+  // ── Re-evaluation on cold-chamber disconnect ──────────────────────────────
+
+  it('hot_plate cost re-evaluated when ice disconnects (scenario 1: basic)', () => {
+    // Board (3×4):
+    //   Row0: Source(0,0)[E,S] – slot A(0,1)[player E-W] – HotPlate(0,2)[W,E] – Sink(0,3)[W]
+    //   Row1: slot B(1,0)[player N-S] – Granite×3
+    //   Row2: Ice(2,0)[N, cost=3, thresh=5] – Granite×3
+    //
+    // Turn 1: connect Ice via slot B (frozen=15).
+    // Turn 2: connect HotPlate via slot A
+    //         effectiveCost=1*(2+0)=2, waterGain=min(15,2)=2, frozen=13, impact=+2.
+    // Turn 3: reclaim slot B → Ice disconnects; hot_plate re-evaluated.
+    //         Budget restored = 13 + 2 = 15, then ice removed = 15-15=0.
+    //         HotPlate: waterGain=min(0,2)=0, impact=-2. delta=-4.
+
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 50;
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 2);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][3] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1,
+      new Set([Direction.North]), 'ice', 5);
+    board.grid[2][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][3] = new Tile(PipeShape.Granite, 0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: connect Ice (frozen=15)
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.frozen).toBe(15);
+
+    // Turn 2: connect HotPlate (effectiveCost=2, waterGain=2, impact=+2, frozen=13)
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.frozen).toBe(13);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(2);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(2);
+
+    // Turn 3: disconnect Ice by reclaiming slot B
+    board.reclaimTile({ row: 1, col: 0 });
+    const animChanges = board.applyTurnDelta(); board.recordMove();
+
+    expect(board.frozen).toBe(0);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(0);
+    const hotPlateAnim = animChanges.find(ch => ch.row === 0 && ch.col === 2);
+    expect(hotPlateAnim).toBeDefined();
+    expect(hotPlateAnim!.delta).toBe(-4); // -2 - (+2) = -4
+    expect(board.getCurrentWater()).toBe(47); // 50 - 1(Straight) - 2(HotPlate) = 47
+  });
+
+  it('both hot_plates re-evaluated in turn order when ice disconnects (scenario 2)', () => {
+    // Board (3×5):
+    //   Row0: Source(0,0)[E,S] – slot A(0,1) – HotPlateA(0,2)[W,E] – HotPlateB(0,3)[W,E] – Sink(0,4)[W]
+    //   Row1: slot B(1,0) – Granite×4
+    //   Row2: Ice(2,0)[N, cost=3, thresh=5] – Granite×4
+    //
+    // Turn 1: connect Ice (frozen=15).
+    // Turn 2: connect HotPlateA + HotPlateB via slot A (same turn):
+    //   HotPlateA(0,2): cost=2, waterGain=min(15,2)=2, frozen=13, impact=+2.
+    //   HotPlateB(0,3): cost=3, waterGain=min(13,3)=3, frozen=10, impact=+3.
+    // Turn 3: reclaim slot B → Ice disconnects. Budget=(10-15)+(2+3)=0.
+    //   Both hot_plates: waterGain=0, impact=-2 and -3.
+
+    const board = new Board(3, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.sourceCapacity = 50;
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 2); // effectiveCost=2
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 0, 1, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 3); // effectiveCost=3
+    board.grid[0][4] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][3] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][4] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1,
+      new Set([Direction.North]), 'ice', 5); // cost=3, deltaTemp=5 → frozen=15
+    board.grid[2][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][3] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][4] = new Tile(PipeShape.Granite, 0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: connect Ice (frozen=15)
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.frozen).toBe(15);
+
+    // Turn 2: connect both HotPlates via slot A
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.frozen).toBe(10);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(2);
+    expect(board.getLockedWaterImpact({ row: 0, col: 3 })).toBe(3);
+
+    // Turn 3: disconnect Ice
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta(); board.recordMove();
+
+    // Budget = (10-15) + (2+3) = 0 → both hot_plates get waterGain=0
+    expect(board.frozen).toBe(0);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2);
+    expect(board.getLockedWaterImpact({ row: 0, col: 3 })).toBe(-3);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(0);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 3 })).toBe(0);
+    expect(board.getCurrentWater()).toBe(44); // 50 - 1(Straight) - 2(HPA) - 3(HPB) = 44
+  });
+
+  it('hot_plate re-evaluation is correct when heater and ice disconnect in same turn (scenario 3)', () => {
+    // Board (3×5):
+    //   Row0: Source(0,0)[E,S] – slot A(0,1) – HotPlate(0,2)[W,E] – Sink(0,3)
+    //   Row1: slot B(1,0)[Tee N,S,E] – Heater(1,1)[W, temp=4] – Granite×3
+    //   Row2: Ice(2,0)[N, cost=5, thresh=15] – Granite×4
+    //
+    // Turn 1: place Tee at (1,0) → Heater and Ice connect (turn=2).
+    //   currentTemp=4. Ice: deltaTemp=max(0,15-4)=11. frozen += 5*11=55.
+    // Turn 2: place E-W Straight at (0,1) → HotPlate connects (turn=3).
+    //   effectiveCost=1*(3+4)=7. waterGain=min(55,7)=7. frozen=48. impact=+7.
+    // Turn 3: reclaim Tee → Heater AND Ice disconnect.
+    //   Step 4a (heater left): re-eval HotPlate with historicalTemp=0, effectiveCost=3.
+    //     restoredFrozen=48-55=-7 → +7(oldGain)=−7+7=0. waterGain=0. impact=-3. frozen=0.
+    //   Step 4b (ice left, minTurnX=2): candidates = HotPlate(turn=3>=2).
+    //     Pass1: frozen += 0(updated oldGain) = 0. Pass2: effectiveCost=3, waterGain=0, impact=-3 (same).
+    //     No double-animation.
+    //   final: impact=-3, frozen=0, delta emitted once from step 4a.
+
+    const board = new Board(3, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 50;
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);   // player E-W Straight slot
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 3); // mass=1, hpTemp=3
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    board.grid[0][4] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);   // player Tee slot [N,S,E]
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]), 'heater', 4);          // temp bonus=4
+    board.grid[1][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][3] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][4] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1,
+      new Set([Direction.North]), 'ice', 15);           // cost=5, thresh=15
+    board.grid[2][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][3] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][4] = new Tile(PipeShape.Granite, 0, true);
+    board.inventory = [
+      { shape: PipeShape.Tee, count: 1 },
+      { shape: PipeShape.Straight, count: 1 },
+    ];
+    board.initHistory();
+
+    // Turn 1: place Tee at (1,0) with rotation=0 (base connections [N,E,S]):
+    //   [N]→Source(0,0)[S], [E]→Heater(1,1)[W], [S]→Ice(2,0)[N].
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Tee, 0);
+    board.applyTurnDelta(); board.recordMove();
+    // Tee rotation=0: verify Heater and Ice are in fill by checking temp and frozen.
+    expect(board.getCurrentTemperature()).toBe(4); // heater connected
+    // Ice: deltaTemp=max(0,15-4)=11. frozen += 5*11=55.
+    expect(board.frozen).toBe(55);
+
+    // Turn 2: place E-W Straight at (0,1) → HotPlate connects
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    // effectiveCost=1*(3+4)=7. waterGain=min(55,7)=7. frozen=48. impact=+7.
+    expect(board.frozen).toBe(48);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(7);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(7);
+
+    // Turn 3: reclaim Tee → Heater AND Ice disconnect simultaneously
+    board.reclaimTile({ row: 1, col: 0 });
+    const animChanges = board.applyTurnDelta(); board.recordMove();
+
+    // Step 4a re-evals HotPlate (heater loss): effectiveCost=3, restoredFrozen=-7+7=0, impact=-3.
+    // Step 4b: candidates = HotPlate(turn=3>=2); budget=0+0=0; same result, no second delta.
+    expect(board.frozen).toBe(0);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-3);
+    expect(board.getLockedHotPlateGain({ row: 0, col: 2 })).toBe(0);
+    // Only one animation change for HotPlate (from step 4a; step 4b emits nothing extra).
+    const hotPlateChanges = animChanges.filter(ch => ch.row === 0 && ch.col === 2);
+    expect(hotPlateChanges).toHaveLength(1);
+    expect(hotPlateChanges[0].delta).toBe(-10); // -3 - (+7) = -10
+    expect(board.getCurrentWater()).toBe(46); // 50 - 1(Straight) - 3(HotPlate) = 46
+  });
+
+  it('sandstone shatter (zero impact) disconnecting does not trigger hot_plate re-eval (scenario 4)', () => {
+    // Board (3×4):
+    //   Row0: Source(0,0)[E,S], slot A(0,1), HotPlate(0,2)[W,E], Sink(0,3)[W]
+    //   Row1: slot B(1,0), Granite×3
+    //   Row2: Sandstone(2,0)[N, cost=2, hardness=1, shatter=2] – Granite×3
+    //         Source pressure=3 >= shatter=2, shatter>hardness → shatterOverride → impact=0.
+    //
+    // Turn 1: connect Sandstone (shatter override → impact=0). frozen=0.
+    // Turn 2: connect HotPlate (effectiveCost=2, frozen=0 → waterGain=0, impact=-2).
+    // Turn 3: disconnect Sandstone.
+    //   _detectColdDisconnect: sandstone impact=0 (not negative) → returns null → step 4b NOT triggered.
+
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 50;
+    // Source with pressure=3 for shatter override.
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0, 3);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 2);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][3] = new Tile(PipeShape.Granite, 0, true);
+    // Sandstone: hardness=1, shatter=2; board pressure=3 >= 2 → shatterOverride → impact=0.
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 2, null, 1,
+      new Set([Direction.North]), 'sandstone', 0, 0, 1, 2);
+    board.grid[2][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][3] = new Tile(PipeShape.Granite, 0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: connect Sandstone (impact=0 due to shatter)
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 2, col: 0 })).toBe(0);
+    expect(board.frozen).toBe(0);
+
+    // Turn 2: connect HotPlate
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2);
+
+    // Turn 3: disconnect Sandstone — should NOT trigger hot_plate re-evaluation
+    board.reclaimTile({ row: 1, col: 0 });
+    const animChanges = board.applyTurnDelta(); board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2); // unchanged
+    expect(board.frozen).toBe(0);
+    expect(animChanges.find(ch => ch.row === 0 && ch.col === 2)).toBeUndefined();
+  });
+
+  it('hot_plate connected BEFORE ice is not re-evaluated when ice disconnects (scenario 5)', () => {
+    // Board (3×4): same topology as scenario 1 but connection order is reversed.
+    //
+    // Turn 1: connect HotPlate via slot A (turn=2). effectiveCost=2, frozen=0, impact=-2.
+    // Turn 2: connect Ice via slot B (turn=3). frozen=15. HotPlate already locked.
+    // Turn 3: disconnect Ice.
+    //   minTurnX = Ice.connectionTurn = 3. HotPlate.connectionTurn = 2 < 3 → NOT re-evaluated.
+
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 50;
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 50, 0, null, 1,
+      new Set([Direction.East, Direction.South]), null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 1, null, 1,
+      new Set([Direction.West, Direction.East]), 'hot_plate', 2);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1,
+      new Set([Direction.West]));
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[1][3] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 3, null, 1,
+      new Set([Direction.North]), 'ice', 5);
+    board.grid[2][1] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][2] = new Tile(PipeShape.Granite, 0, true);
+    board.grid[2][3] = new Tile(PipeShape.Granite, 0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: connect HotPlate first (before Ice)
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2);
+    expect(board.frozen).toBe(0);
+
+    // Turn 2: connect Ice
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta(); board.recordMove();
+    expect(board.frozen).toBe(15);
+
+    // Turn 3: disconnect Ice — HotPlate connected before ice, so NOT re-evaluated
+    board.reclaimTile({ row: 1, col: 0 });
+    const animChanges = board.applyTurnDelta(); board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-2); // unchanged
+    expect(board.frozen).toBe(0);
+    expect(animChanges.find(ch => ch.row === 0 && ch.col === 2)).toBeUndefined();
+    expect(board.getCurrentWater()).toBe(47); // 50 - 1(Straight) - 2(HotPlate) = 47
+  });
 });
 
 // ─── Cement tile constraints ──────────────────────────────────────────────────
