@@ -117,6 +117,8 @@ export class ChapterMapScreen {
   private _chapter: ChapterDef | null = null;
   /** Index of the chapter within the active campaign. */
   private _chapterIdx = -1;
+  /** The campaign currently displayed. */
+  private _campaign: CampaignDef | null = null;
   /** Currently hovered grid cell. */
   private _hover: { row: number; col: number } | null = null;
   /** Last known mouse position in client coordinates. */
@@ -129,10 +131,22 @@ export class ChapterMapScreen {
   private readonly _onKeyDown: (e: KeyboardEvent) => void;
   /** Bound keyup handler stored so it can be removed when the screen is hidden. */
   private readonly _onKeyUp: (e: KeyboardEvent) => void;
+  /** Bound resize handler stored so it can be removed when the screen is hidden. */
+  private readonly _onResize: () => void;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   /** Ambient decorations for empty cells, keyed by "row,col". */
   private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
+
+  // ─── Touch state ────────────────────────────────────────────────────────
+  /** Client x where the most recent touch on this canvas started. */
+  private _touchStartX = 0;
+  /** Client y where the most recent touch on this canvas started. */
+  private _touchStartY = 0;
+  /** Whether the touch has moved beyond the tap threshold. */
+  private _touchMoved = false;
+  /** Timer ID for long-press tooltip on touch devices. */
+  private _touchLongPressTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ─── Animation state ──────────────────────────────────────────────────────
   private _animFrameId: number | null = null;
@@ -213,6 +227,19 @@ export class ChapterMapScreen {
         this._ctrlHeld = false;
         this._hideTooltip();
       }
+    };
+
+    // Re-populate the chapter map when the viewport size changes (e.g. orientation change).
+    // Debounced at 100 ms to avoid layout thrash during the resize animation.
+    let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    this._onResize = () => {
+      if (_resizeTimer !== null) clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => {
+        _resizeTimer = null;
+        if (this.screenEl.style.display !== 'none' && this._chapter && this._campaign) {
+          this.repopulate(this._campaign);
+        }
+      }, 100);
     };
   }
 
@@ -443,14 +470,17 @@ export class ChapterMapScreen {
     this._nextFlowerSide = 0;
     this._chapter = chapter;
     this._chapterIdx = chapterIdx;
+    this._campaign = campaign;
     this._hover = null;
 
     this._populate(campaign, chapterIdx, chapter);
     this.screenEl.style.display = 'flex';
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
+    window.removeEventListener('resize', this._onResize);
     document.addEventListener('keydown', this._onKeyDown);
     document.addEventListener('keyup', this._onKeyUp);
+    window.addEventListener('resize', this._onResize);
     this._startAnimLoop();
   }
 
@@ -462,8 +492,14 @@ export class ChapterMapScreen {
     this.screenEl.style.display = 'none';
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
+    window.removeEventListener('resize', this._onResize);
     this._ctrlHeld = false;
     this._hideTooltip();
+    // Clear any pending long-press timer.
+    if (this._touchLongPressTimer !== null) {
+      clearTimeout(this._touchLongPressTimer);
+      this._touchLongPressTimer = null;
+    }
   }
 
   /**
@@ -474,6 +510,7 @@ export class ChapterMapScreen {
   repopulate(campaign: CampaignDef): void {
     const chapter = this._chapter;
     if (!chapter) return;
+    this._campaign = campaign;
     this._populate(campaign, this._chapterIdx, chapter);
     this._startAnimLoop();
   }
@@ -588,6 +625,70 @@ export class ChapterMapScreen {
     });
     canvas.addEventListener('click', (e) => this._onClick(e, campaign, chapter));
 
+    // Touch events for mobile/tablet devices.
+    canvas.style.touchAction = 'none'; // prevent scroll/zoom on the canvas
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      this._touchStartX = touch.clientX;
+      this._touchStartY = touch.clientY;
+      this._touchMoved = false;
+      // Start long-press timer to show tooltip (500 ms).
+      if (this._touchLongPressTimer !== null) clearTimeout(this._touchLongPressTimer);
+      this._touchLongPressTimer = setTimeout(() => {
+        this._touchLongPressTimer = null;
+        if (!this._touchMoved) {
+          this._showTooltip(this._touchStartX, this._touchStartY);
+        }
+      }, 500);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const dx = touch.clientX - this._touchStartX;
+      const dy = touch.clientY - this._touchStartY;
+      if (Math.sqrt(dx * dx + dy * dy) > 8) {
+        this._touchMoved = true;
+        if (this._touchLongPressTimer !== null) {
+          clearTimeout(this._touchLongPressTimer);
+          this._touchLongPressTimer = null;
+        }
+        this._hideTooltip();
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (this._touchLongPressTimer !== null) {
+        clearTimeout(this._touchLongPressTimer);
+        this._touchLongPressTimer = null;
+      }
+      if (this._touchMoved) return; // was a scroll/swipe, not a tap
+      const changedTouch = e.changedTouches[0];
+      if (!changedTouch) return;
+      // Synthesize a click at the touch coordinates.
+      const pos = this._canvasPosFromCoords(changedTouch.clientX, changedTouch.clientY, chapter);
+      if (!pos || !chapter.grid) return;
+      const def = chapter.grid[pos.row]?.[pos.col];
+      if (!def) return;
+      if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
+      const levelIdx = def.levelIdx ?? 0;
+      const levelDef = chapter.levels[levelIdx];
+      if (!levelDef) return;
+      const displayProgress = this._callbacks.getDisplayProgress();
+      const filledKeys = this._computeFilledCells(chapter, displayProgress);
+      if (!filledKeys.has(`${pos.row},${pos.col}`)) {
+        this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
+        sfxManager.play(SfxId.InvalidSelection);
+        return;
+      }
+      sfxManager.play(SfxId.LevelSelect);
+      this._callbacks.onLevelSelected(levelDef);
+    }, { passive: false });
+
     canvasWrap.appendChild(canvas);
     el.appendChild(canvasWrap);
 
@@ -668,16 +769,29 @@ export class ChapterMapScreen {
     this._tooltipEl.style.display = 'none';
   }
 
-  private _canvasPos(e: MouseEvent, chapter: ChapterDef): { row: number; col: number } | null {
+  /**
+   * Convert a (clientX, clientY) pair into a grid cell position relative to the
+   * chapter canvas.  Returns null when the point is outside the canvas bounds or
+   * the canvas is not available.
+   */
+  private _canvasPosFromCoords(
+    clientX: number,
+    clientY: number,
+    chapter: ChapterDef,
+  ): { row: number; col: number } | null {
     const canvas = this._canvas;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    const col = Math.floor((e.clientX - rect.left) * cols / rect.width);
-    const row = Math.floor((e.clientY - rect.top)  * rows / rect.height);
+    const col = Math.floor((clientX - rect.left) * cols / rect.width);
+    const row = Math.floor((clientY - rect.top)  * rows / rect.height);
     if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
     return { row, col };
+  }
+
+  private _canvasPos(e: MouseEvent, chapter: ChapterDef): { row: number; col: number } | null {
+    return this._canvasPosFromCoords(e.clientX, e.clientY, chapter);
   }
 
   private _onMouseMove(e: MouseEvent, chapter: ChapterDef): void {

@@ -2,6 +2,7 @@
 
 import { shapeIcon } from './renderer';
 import { PipeShape } from './types';
+import { isTouchDevice } from './deviceUtils';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -148,6 +149,18 @@ const CONTROL_ROWS: ControlRow[] = [
   { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/snow/sandstone tile values: raw temperature threshold and unmodified cost.' },
   { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
   { input: 'Escape',             action: 'Return to the level-select screen.' },
+];
+
+/** Controls reference table rows for touch / mobile devices. */
+const TOUCH_CONTROL_ROWS: ControlRow[] = [
+  { input: 'Tap',                    action: 'Place the selected pipe on an empty cell, or rotate an existing pipe.' },
+  { input: 'Tap inventory item',     action: 'Select that pipe piece. Tap it again to deselect.' },
+  { input: 'Drag from inventory',    action: 'Drag a pipe from the inventory bar and drop it onto a grid cell to place it.' },
+  { input: 'Swipe left on tile',     action: 'Rotate a placed pipe counter-clockwise.' },
+  { input: 'Swipe right on tile',    action: 'Rotate a placed pipe clockwise.' },
+  { input: 'Long-press placed pipe', action: 'Remove the pipe and return it to the inventory.' },
+  { input: 'Two-finger tap',         action: 'Deselect the currently selected inventory piece.' },
+  { input: 'Long-press map tile',    action: 'Show level name tooltip on the chapter map.' },
 ];
 
 /** Legend rows covering every tile type players will encounter. */
@@ -306,13 +319,22 @@ export function createGameRulesModal(): HTMLElement {
   // ── Play loop ──────────────────────────────────────────────────────────────
   const playLoop = document.createElement('p');
   playLoop.style.cssText = 'font-size:0.9rem;color:#aaa;line-height:1.5;';
-  playLoop.textContent =
-    'Select a pipe piece from the inventory panel, then click an empty cell to place it. ' +
-    'Scroll the mouse wheel to rotate the piece before placing. ' +
-    'Rotate placed pipes to update your route. ' +
-    'Water flows automatically once a complete path exists. ' +
-    'Some chambers add water, waste it, or grant extra pieces when reached. ' +
-    'Removing pieces returns water and reverts connections to their original state.';
+  if (isTouchDevice()) {
+    playLoop.textContent =
+      'Select a pipe from the inventory bar, then tap an empty cell to place it. ' +
+      'You can also drag a pipe from the inventory directly to a grid cell. ' +
+      'Swipe left or right on a placed pipe to rotate it. ' +
+      'Water flows automatically once a complete path exists. ' +
+      'Long-press a placed pipe to remove it and return it to your inventory.';
+  } else {
+    playLoop.textContent =
+      'Select a pipe piece from the inventory panel, then click an empty cell to place it. ' +
+      'Scroll the mouse wheel to rotate the piece before placing. ' +
+      'Rotate placed pipes to update your route. ' +
+      'Water flows automatically once a complete path exists. ' +
+      'Some chambers add water, waste it, or grant extra pieces when reached. ' +
+      'Removing pieces returns water and reverts connections to their original state.';
+  }
 
   // ── Controls header ────────────────────────────────────────────────────────
   const controlsHeader = document.createElement('h3');
@@ -323,7 +345,8 @@ export function createGameRulesModal(): HTMLElement {
   const controlsTable = document.createElement('table');
   controlsTable.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.88rem;';
 
-  for (const row of CONTROL_ROWS) {
+  const activeControlRows = isTouchDevice() ? TOUCH_CONTROL_ROWS : CONTROL_ROWS;
+  for (const row of activeControlRows) {
     const tr = document.createElement('tr');
     tr.style.cssText = 'border-bottom:1px solid #2a3a5e;';
 

@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Cool Pipes</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     /* Allow the page to scroll horizontally on narrow viewports so that the
-       level editor's three-column layout never clips off-screen. */
-    html { min-width: min-content; }
+       level editor's three-column layout never clips off-screen.
+       Only apply when the editor overlay is active (.editor-open class set on <body>). */
+    body.editor-open { min-width: min-content; }
 
     body {
       background: #1a1a2e;
@@ -344,6 +345,97 @@
       100% { box-shadow: 0 0  0px  0px rgba(100,180,255,0),   0 0  0px  0px rgba(100,180,255,0);   border-color: #4a90d9; }
     }
     .modal-box.sparkle-blue { animation: modal-sparkle-blue 3s ease-in-out infinite; border-color: #4a90d9; }
+
+    /* ── Mobile / Touch overrides ─────────────────────────────────────── */
+
+    /* Prevent canvas from triggering browser scroll/zoom gestures. */
+    #game-canvas {
+      touch-action: none;
+    }
+
+    /* Suppress persistent :hover highlights on touch devices (a tap would
+       leave an element stuck in the hover state). */
+    body.is-touch .level-btn:hover:not(:disabled),
+    body.is-touch .inv-item:hover:not(.depleted):not(.negative):not(.selected),
+    body.is-touch .inv-item.gold:hover:not(.depleted):not(.negative):not(.selected),
+    body.is-touch #undo-btn:hover:not(:disabled),
+    body.is-touch #redo-btn:hover:not(:disabled),
+    body.is-touch #restart-btn:hover,
+    body.is-touch #rules-btn:hover,
+    body.is-touch #exit-btn:hover {
+      background: unset;
+      color: unset;
+      border-color: unset;
+    }
+
+    /* Larger touch targets for HUD buttons on touch devices. */
+    body.is-touch #undo-btn,
+    body.is-touch #redo-btn,
+    body.is-touch #restart-btn,
+    body.is-touch #rules-btn,
+    body.is-touch #exit-btn {
+      padding: 10px 14px;
+      min-height: 44px;
+    }
+
+    /* Make modal buttons touch-friendly. */
+    .modal-btn {
+      min-height: 44px;
+    }
+
+    /* Wrap modal action buttons when horizontal space is tight. */
+    .modal-actions {
+      flex-wrap: wrap;
+    }
+
+    /* Constrain modal box width so it never overflows the viewport. */
+    .modal-box {
+      max-width: calc(100vw - 32px);
+    }
+
+    /* ── Portrait / narrow-screen play layout ─────────────────────────── */
+    @media (max-width: 599px), (orientation: portrait) and (max-width: 800px) {
+      /* Stack game canvas above the right panel on narrow/portrait screens. */
+      #play-area {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* Right panel becomes a horizontal row wrapping under the canvas. */
+      #right-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      /* Inventory bar scrolls horizontally when there are many items. */
+      #inventory-bar {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        min-width: 0;
+        max-width: 100%;
+        padding: 6px 8px;
+        gap: 6px;
+        align-items: center;
+      }
+
+      /* Keep inventory title at the start of the bar. */
+      #inventory-bar .inv-title {
+        writing-mode: horizontal-tb;
+        margin-right: 4px;
+        white-space: nowrap;
+      }
+
+      /* Compact stats and best-score boxes. */
+      #stats-box,
+      #best-score-box {
+        min-width: unset;
+      }
+    }
   </style>
 </head>
 <body>
