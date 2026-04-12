@@ -42,6 +42,7 @@ import {
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
   SEA_COLOR, SEA_BORDER_COLOR,
+  lighten, darken,
 } from './colors';
 
 /** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
@@ -921,6 +922,7 @@ function _drawPipeArmInRotatedFrame(
   tileRotation: number,
   half: number,
   color: string,
+  capStyle: CanvasLineCap,
 ): void {
   // Convert the absolute direction to the local coordinate-system direction by
   // rotating it CCW by (tileRotation / 90) steps.  The canvas coordinate frame
@@ -944,11 +946,27 @@ function _drawPipeArmInRotatedFrame(
     default:              ex = -half; ey =    0; break; // West
   }
 
+  const path = new Path2D();
+  path.moveTo(0, 0);
+  path.lineTo(ex, ey);
+
+  // 1. Shadow: full width, darker color — peeks out at edges of the base layer
+  ctx.strokeStyle = darken(color, 0.30);
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.lineCap = capStyle;
+  ctx.stroke(path);
+
+  // 2. Base color: slightly narrower, revealing the shadow at the edges
   ctx.strokeStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(ex, ey);
-  ctx.stroke();
+  ctx.lineWidth = LINE_WIDTH - Math.max(2, _s(2));
+  ctx.lineCap = capStyle;
+  ctx.stroke(path);
+
+  // 3. Highlight: thin bright center line for tube/cylinder illusion
+  ctx.strokeStyle = lighten(color, 0.40);
+  ctx.lineWidth = Math.max(1, _s(1.5));
+  ctx.lineCap = capStyle;
+  ctx.stroke(path);
 }
 
 /**
@@ -1481,37 +1499,36 @@ export function drawTile(
   const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater && isPipeShape;
 
   if (isBlockedPipe) {
-    // Arm-by-arm drawing for one-way blocked pipes: draw ALL black outlines
-    // first, then ALL color fills.  This ordering prevents a later arm's black
-    // outline from overwriting an already-painted arm's color at the junction.
+    // Arm-by-arm drawing for one-way blocked pipes.  Each arm is drawn with
+    // the triple-stroke (shadow/base/highlight) to match the tube shading of
+    // regular pipes.  The blocked arm is drawn first so the dominant water
+    // color is painted last and sits on top at the junction.
     const dryColor = _resolveTileColor(tile, false, currentPressure);
     // Sort blocked arm first so the dominant (water) color is painted last.
     const sortedArms = [...tile.connections].sort(
       (a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0),
     );
-    // Step 1: all arm black outlines
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
-    for (const armDir of tile.connections) {
-      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black');
-    }
-    // Step 2: black center cap covers the junction seam between arm outlines
-    ctx.fillStyle = 'black';
-    ctx.beginPath();
-    ctx.arc(0, 0, (LINE_WIDTH + _s(3)) / 2, 0, Math.PI * 2);
-    ctx.fill();
-    // Step 3: all arm color fills (blocked arm first; dominant water color last)
-    ctx.lineWidth = LINE_WIDTH;
+    // Draw each arm with triple-stroke (shadow → base → highlight)
     for (const armDir of sortedArms) {
       const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
-      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+      const capStyle: CanvasLineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
+      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor, capStyle);
     }
-    // Step 4: pipe-color center cap fills the junction interior
-    ctx.fillStyle = color;
+    // Center nub: triple-stroke filled circles cover the junction seam.
+    // Shadow layer (full radius)
+    ctx.fillStyle = darken(color, 0.30);
     ctx.beginPath();
     ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Base layer (slightly smaller, reveals shadow ring)
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, LINE_WIDTH / 2 - Math.max(1, _s(1)), 0, Math.PI * 2);
+    ctx.fill();
+    // Highlight dot (thin bright center)
+    ctx.fillStyle = lighten(color, 0.40);
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(1, _s(0.75)), 0, Math.PI * 2);
     ctx.fill();
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
