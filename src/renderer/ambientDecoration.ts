@@ -51,6 +51,21 @@ const CRYSTAL_COLORS = [
 /** Highlight facet color applied to crystal shards. */
 const CRYSTAL_HIGHLIGHT = 'rgba(225,242,255,0.55)';
 
+/** Dandelion stalk and grass-blade color. */
+const DANDELION_STALK_COLOR = 'rgba(72,115,58,0.92)';
+
+/** Dandelion puff center color (inner, opaque white). */
+const DANDELION_PUFF_CENTER = 'rgba(240,240,235,0.90)';
+
+/** Sunflower petal color. */
+const SUNFLOWER_PETAL_COLOR = 'rgba(240,195,28,0.92)';
+
+/** Sunflower inner petal ring / shading color. */
+const SUNFLOWER_PETAL_INNER = 'rgba(200,140,20,0.85)';
+
+/** Sunflower disk center color. */
+const SUNFLOWER_CENTER_COLOR = 'rgba(75,40,12,0.92)';
+
 // ─── Ambient decoration drawing helpers ──────────────────────────────────────
 
 /** Draw a small cluster of pebbles centered at the current canvas origin.
@@ -193,7 +208,97 @@ function _drawCrystal(ctx: CanvasRenderingContext2D, variant: number, count = 2)
 }
 
 /**
- * Draw a single ambient decoration onto the canvas.
+ * Draw a side-view dandelion centered at the current canvas origin.
+ * Composed of: a vertical green stalk, one grass blade angled to each side,
+ * and a soft white seed-puff at the top.
+ */
+function _drawDandelion(ctx: CanvasRenderingContext2D): void {
+  const stalkH  = _s(11);   // stalk height above origin
+  const stalkW  = _s(1.4);  // half-width of stalk
+
+  // Stalk
+  ctx.fillStyle = DANDELION_STALK_COLOR;
+  ctx.beginPath();
+  ctx.rect(-stalkW, -stalkH, stalkW * 2, stalkH);
+  ctx.fill();
+
+  // Side grass blades (like the grass tuft helper but just two, angled outward)
+  ctx.strokeStyle = DANDELION_STALK_COLOR;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  const bladeLen = _s(6.5);
+  const bladeSpread = Math.PI * 0.30;   // ~54° from vertical
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(0, -_s(3));
+    ctx.lineTo(Math.sin(bladeSpread * side) * bladeLen, -_s(3) - Math.cos(bladeSpread) * bladeLen);
+    ctx.stroke();
+  }
+
+  // Seed puff: soft radial gradient circle sitting on top of the stalk
+  const puffR  = _s(5.5);
+  const puffCY = -stalkH - puffR * 0.55;   // overlap slightly with stalk tip
+  const grad = ctx.createRadialGradient(0, puffCY, 0, 0, puffCY, puffR);
+  grad.addColorStop(0,   DANDELION_PUFF_CENTER);
+  grad.addColorStop(0.6, 'rgba(230,230,220,0.70)');
+  grad.addColorStop(1,   'rgba(215,215,205,0.00)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, puffCY, puffR, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Draw a top-down sunflower centered at the current canvas origin.
+ * Yellow petals radiate from a dark brown disk center.
+ */
+function _drawSunflower(ctx: CanvasRenderingContext2D, variant: number): void {
+  const petals    = 10 + (variant % 3) * 2;   // 10, 12, or 14 petals
+  const diskR     = _s(4.0);
+  const petalDist = _s(5.0);
+  const petalRx   = _s(2.6);   // petal half-width
+  const petalRy   = _s(4.5);   // petal half-height
+
+  // Outer petal ring
+  for (let i = 0; i < petals; i++) {
+    const angle = (i / petals) * Math.PI * 2;
+    const px = Math.cos(angle) * petalDist;
+    const py = Math.sin(angle) * petalDist;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle);
+    ctx.fillStyle = SUNFLOWER_PETAL_COLOR;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, petalRx, petalRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner shading stripe for depth
+    ctx.fillStyle = SUNFLOWER_PETAL_INNER;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, petalRx * 0.35, petalRy * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Disk center
+  ctx.fillStyle = SUNFLOWER_CENTER_COLOR;
+  ctx.beginPath();
+  ctx.arc(0, 0, diskR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small seed-dot highlights on the disk
+  ctx.fillStyle = 'rgba(120,72,22,0.70)';
+  const dotR = _s(0.9);
+  const seedRing = diskR * 0.55;
+  const dots = 6;
+  for (let i = 0; i < dots; i++) {
+    const a = (i / dots) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a) * seedRing, Math.sin(a) * seedRing, dotR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
  * The canvas context should NOT have any prior transforms applied;
  * this function handles its own save/restore cycle.
  */
@@ -205,18 +310,20 @@ export function drawAmbientDecoration(
   const cy = dec.row * TILE_SIZE + dec.offsetY * TILE_SIZE;
   ctx.save();
   ctx.translate(cx, cy);
-  if (dec.type !== 'grass') {
+  if (dec.type !== 'grass' && dec.type !== 'dandelion') {
     ctx.rotate((dec.rotation * Math.PI) / 180);
   }
   if (dec.scale !== undefined && dec.scale !== 1) {
     ctx.scale(dec.scale, dec.scale);
   }
   switch (dec.type) {
-    case 'pebbles':  _drawPebbles(ctx, dec.variant);  break;
-    case 'flower':   _drawFlower(ctx, dec.variant);   break;
-    case 'grass':    _drawGrass(ctx, dec.variant);    break;
-    case 'mushroom': _drawMushroom(ctx, dec.variant); break;
-    case 'crystal':  _drawCrystal(ctx, dec.variant, dec.count);  break;
+    case 'pebbles':   _drawPebbles(ctx, dec.variant);  break;
+    case 'flower':    _drawFlower(ctx, dec.variant);   break;
+    case 'grass':     _drawGrass(ctx, dec.variant);    break;
+    case 'mushroom':  _drawMushroom(ctx, dec.variant); break;
+    case 'crystal':   _drawCrystal(ctx, dec.variant, dec.count);  break;
+    case 'dandelion': _drawDandelion(ctx);              break;
+    case 'sunflower': _drawSunflower(ctx, dec.variant); break;
   }
   ctx.restore();
 }
