@@ -41,14 +41,26 @@ export const CHAMBER_FILL_COLOR      = '#1c2e3a';
 export const CHAMBER_FILL_WATER_COLOR = '#2a3f4f';
 export const GRANITE_COLOR           = '#9ca3af';
 export const GRANITE_FILL_COLOR      = '#374151';
-/** Border/line color for Tree tiles (dark green outline). */
+/** Border/line color for Tree tiles (dark green outline) — Grass style. */
 export const TREE_COLOR              = '#2d6e1a';
-/** Leaf canopy fill color for Tree tiles (medium green). */
+/** Leaf canopy fill color for Tree tiles (medium green) — Grass style. */
 export const TREE_LEAF_COLOR         = '#3a8c24';
-/** Secondary leaf cluster color for Tree tiles (lighter green). */
+/** Secondary leaf cluster color for Tree tiles (lighter green) — Grass style. */
 export const TREE_LEAF_ALT_COLOR     = '#56b03a';
 /** Trunk color for Tree tiles (warm brown). */
 export const TREE_TRUNK_COLOR        = '#6b3a2a';
+/** Border/line color for Tree tiles — Dirt style (dark brown). */
+export const TREE_DIRT_COLOR         = '#3d2008';
+/** Leaf canopy fill color for Tree tiles — Dirt style (medium dark brown). */
+export const TREE_DIRT_LEAF_COLOR    = '#5a2e0c';
+/** Secondary leaf cluster color for Tree tiles — Dirt style (slightly lighter brown). */
+export const TREE_DIRT_LEAF_ALT_COLOR = '#7a3f14';
+/** Border/line color for Tree tiles — Dark style (dark blue-green). */
+export const TREE_DARK_COLOR         = '#0a2a28';
+/** Leaf canopy fill color for Tree tiles — Dark style (medium dark blue-green). */
+export const TREE_DARK_LEAF_COLOR    = '#0f3d38';
+/** Secondary leaf cluster color for Tree tiles — Dark style (slightly lighter blue-green). */
+export const TREE_DARK_LEAF_ALT_COLOR = '#165448';
 /** Border/line color for Cement tiles (medium gray). */
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */

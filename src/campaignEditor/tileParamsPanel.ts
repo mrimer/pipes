@@ -7,7 +7,7 @@
  * the level editor when visual updates are needed.
  */
 
-import { PipeShape, TEMP_CHAMBER_CONTENTS } from '../types';
+import { PipeShape, TEMP_CHAMBER_CONTENTS, LevelStyle } from '../types';
 import { PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import {
   EditorPalette,
@@ -141,6 +141,67 @@ const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
   { palette: PipeShape.OneWay,    label: '→ One-Way' },
 ];
 
+// ─── Shared style section panel ────────────────────────────────────────────────
+
+/** Label/emoji for each LevelStyle option. */
+export const STYLE_OPTION_LABELS: Array<{ value: LevelStyle; label: string }> = [
+  { value: 'Grass', label: '🟩 Grass' },
+  { value: 'Dirt',  label: '🟫 Dirt' },
+  { value: 'Dark',  label: '⬛ Dark' },
+];
+
+/**
+ * Build a collapsible Style section panel used by both the level editor
+ * ({@link TileParamsPanel}) and the chapter map editor ({@link ChapterEditorUI}).
+ *
+ * @param panelId     The element id to assign (e.g. 'editor-style-panel').
+ * @param expanded    Whether the section is currently expanded.
+ * @param currentStyle The currently selected style (undefined → 'Grass').
+ * @param onToggle    Called when the toggle button is clicked (should flip `expanded`
+ *                    and replace the panel by calling this function again).
+ * @param onSelect    Called when a style option is selected.  Responsible for
+ *                    persisting the change and replacing the panel.
+ */
+export function buildStyleSectionPanel(
+  panelId: string,
+  expanded: boolean,
+  currentStyle: LevelStyle | undefined,
+  onToggle: () => void,
+  onSelect: (style: LevelStyle) => void,
+): HTMLElement {
+  const resolvedStyle: LevelStyle = currentStyle ?? 'Grass';
+  const panel = document.createElement('div');
+  panel.id = panelId;
+  panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:4px;';
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.textContent = (expanded ? '▾' : '▸') + ' Style';
+  toggle.style.cssText =
+    'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+    'border:1px solid #7a5a2a;background:#1a1208;color:#c8a060;font-weight:bold;margin-top:2px;';
+  toggle.addEventListener('click', onToggle);
+  panel.appendChild(toggle);
+
+  if (expanded) {
+    for (const item of STYLE_OPTION_LABELS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = item.label;
+      const isSelected = resolvedStyle === item.value;
+      btn.style.cssText =
+        'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;margin-left:12px;' +
+        'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
+        'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
+        'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
+      btn.addEventListener('click', () => onSelect(item.value));
+      panel.appendChild(btn);
+    }
+  }
+
+  return panel;
+}
+
 // ─── TileParamsPanel class ────────────────────────────────────────────────────
 
 export class TileParamsPanel {
@@ -151,8 +212,41 @@ export class TileParamsPanel {
   pipesSectionExpanded = false;
   floorSectionExpanded = false;
   spinSectionExpanded = false;
+  styleSectionExpanded = false;
 
   constructor(private readonly _cb: TileParamsPanelCallbacks) {}
+
+  /**
+   * Build the collapsible Style panel shown above the Tile Palette.
+   * The returned element has id='editor-style-panel'.
+   */
+  buildStylePanel(): HTMLElement {
+    const state = this._cb.getState();
+    return buildStyleSectionPanel(
+      'editor-style-panel',
+      this.styleSectionExpanded,
+      state.levelStyle,
+      () => {
+        this.styleSectionExpanded = !this.styleSectionExpanded;
+        document.getElementById('editor-style-panel')?.replaceWith(this.buildStylePanel());
+      },
+      (style) => {
+        if (state.levelStyle !== style) {
+          state.levelStyle = style;
+          state.recordSnapshot();
+          this._cb.updateUndoRedoButtons();
+          this._cb.renderCanvas();
+        }
+        document.getElementById('editor-style-panel')?.replaceWith(this.buildStylePanel());
+      },
+    );
+  }
+
+  /** Rebuild the style panel in place (e.g. after undo/redo). */
+  refreshStylePanel(): void {
+    const existing = document.getElementById('editor-style-panel');
+    if (existing) existing.replaceWith(this.buildStylePanel());
+  }
 
   /**
    * Build the full palette panel with collapsible sections.

@@ -461,7 +461,7 @@ export class ChapterMapScreen {
     if (this._chapter !== chapter) {
       // Compute floor types first so decoration generation selects the correct
       // types per cell (pebbles on dirt/dark, no crystals on grass, etc.).
-      this._floorTypes = computeChapterFloorTypes(chapter.grid, rows, cols);
+      this._floorTypes = computeChapterFloorTypes(chapter.grid, rows, cols, chapter.style);
       const floorTypes = this._floorTypes;
       this._decorations = generateAmbientDecorations(rows, cols, (r, c) => floorTypes.get(`${r},${c}`) ?? PipeShape.Empty);
       // Reset animation state when switching chapters
@@ -890,6 +890,7 @@ export class ChapterMapScreen {
       this._decorations,
       jitterCell,
       this._floorTypes,
+      chapter.style,
     );
 
     return { filledKeys, displayProgress };

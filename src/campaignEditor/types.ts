@@ -3,7 +3,7 @@
  * Campaign Editor. Kept separate to reduce the size of campaignEditor.ts.
  */
 
-import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction } from '../types';
+import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction, LevelStyle } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR } from '../colors';
 
@@ -188,6 +188,8 @@ export interface EditorSnapshot {
   rows: number;
   cols: number;
   inventory: InventoryItem[];
+  /** Visual style for the level or chapter, captured for undo/redo support. */
+  levelStyle?: LevelStyle;
 }
 
 // ─── Validation result ────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
  * re-renders.
  */
 
-import { TileDef, InventoryItem, PipeShape, Direction, Rotation, LevelDef } from '../types';
+import { TileDef, InventoryItem, PipeShape, Direction, Rotation, LevelDef, LevelStyle } from '../types';
 import { SPIN_CEMENT_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import {
   EditorPalette,
@@ -41,6 +41,8 @@ export class LevelEditorState {
   levelNote: string = '';
   levelHints: string[] = [''];
   levelChallenge: boolean = false;
+  /** Visual style for this level, controlling the default empty floor tile type. */
+  levelStyle: LevelStyle | undefined = undefined;
 
   // ── Palette & params ───────────────────────────────────────────────────────
   palette: EditorPalette = PipeShape.Source;
@@ -81,6 +83,7 @@ export class LevelEditorState {
     this.levelNote = level.note ?? '';
     this.levelHints = level.hints?.length ? [...level.hints] : [''];
     this.levelChallenge = level.challenge ?? false;
+    this.levelStyle = level.style;
     this.rows = level.rows;
     this.cols = level.cols;
     this.grid = JSON.parse(JSON.stringify(level.grid)) as (TileDef | null)[][];
@@ -107,6 +110,7 @@ export class LevelEditorState {
       rows: this.rows,
       cols: this.cols,
       inventory: this.inventory,
+      levelStyle: this.levelStyle,
     };
     this._hist.record(snapshot);
   }
@@ -527,6 +531,7 @@ export class LevelEditorState {
     this.rows = snapshot.rows;
     this.cols = snapshot.cols;
     this.inventory = snapshot.inventory as InventoryItem[];
+    this.levelStyle = snapshot.levelStyle;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;
   }

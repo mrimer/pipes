@@ -4,7 +4,7 @@
  * explicit data parameters and write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
+import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle, styleToFloorShape } from '../types';
 import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, computeFloorTypesFromGrid } from '../board';
@@ -306,17 +306,19 @@ export function drawLevelChamberTile(
  * Pre-compute the display floor type (Empty / EmptyDirt / EmptyDark) for every
  * cell in a chapter map grid.  Delegates to the shared {@link computeFloorTypesFromGrid}
  * algorithm: empty-floor cells are resolved immediately from their own shape (null cells
- * count as {@link PipeShape.Empty}), and all other tile types (source, sink, tree, chamber,
+ * default to the style's floor shape), and all other tile types (source, sink, tree, chamber,
  * granite, pipe tiles, etc.) are resolved via BFS propagation from neighbouring resolved cells.
  */
 export function computeChapterFloorTypes(
   grid: (TileDef | null)[][],
   rows: number,
   cols: number,
+  style?: LevelStyle,
 ): ReadonlyMap<string, PipeShape> {
+  const defaultFloor = styleToFloorShape(style);
   return computeFloorTypesFromGrid(rows, cols, (r, c) => {
     const def = grid[r]?.[c] ?? null;
-    if (def === null) return PipeShape.Empty;
+    if (def === null) return defaultFloor;
     return isEmptyFloor(def.shape) ? def.shape : null;
   });
 }
@@ -384,14 +386,14 @@ function _drawChapterMapGranite(
 }
 
 /** Draw Tree tile like in-game. */
-function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty): void {
+function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
   drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
-  drawTree(ctx, CELL / 2);
+  drawTree(ctx, CELL / 2, style);
   ctx.restore();
 }
 
@@ -491,6 +493,7 @@ function _renderChapterMapPass2NonPipeTiles(
   completedLevelCount: number,
   jitterCell?: { row: number; col: number; dx: number; dy: number },
   floorTypes?: ReadonlyMap<string, PipeShape>,
+  style?: LevelStyle,
 ): void {
   const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
@@ -535,7 +538,7 @@ function _renderChapterMapPass2NonPipeTiles(
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c, floorType);
       } else if (def.shape === PipeShape.Tree) {
-        _drawChapterMapTree(ctx, x, y, r, c, floorType);
+        _drawChapterMapTree(ctx, x, y, r, c, floorType, style);
       } else if (def.shape === PipeShape.Sea) {
         _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c);
       }
@@ -617,6 +620,7 @@ export function renderChapterMapCanvas(
   decorations?: ReadonlyMap<string, AmbientDecoration>,
   jitterCell?: { row: number; col: number; dx: number; dy: number },
   floorTypes?: ReadonlyMap<string, PipeShape>,
+  style?: LevelStyle,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -627,7 +631,7 @@ export function renderChapterMapCanvas(
   _renderChapterMapGridLines(ctx, rows, cols);
   _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations, floorTypes);
   _renderChapterMapPass2NonPipeTiles(
-    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes,
+    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes, style,
   );
   _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys, floorTypes);
 

@@ -3,7 +3,7 @@
  * methods that were previously part of CampaignEditor in index.ts.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation } from '../types';
+import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation, LevelStyle } from '../types';
 import { PIPE_SHAPES, isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize, BASE_TILE_SIZE } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
@@ -174,6 +174,7 @@ export class ChapterMapEditorSection {
     const leftCol = document.createElement('div');
     leftCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:140px;';
     this._ui = new ChapterEditorUI(this._makeUICallbacks());
+    leftCol.appendChild(this._ui.buildStylePanel(chapter, campaign));
     leftCol.appendChild(this._ui.buildPalettePanel(chapter, campaign));
     leftCol.appendChild(this._ui.buildTileParamsPanel(chapter, campaign));
     layout.appendChild(leftCol);
@@ -226,6 +227,12 @@ export class ChapterMapEditorSection {
       getChapterEditRows:         () => this._chapterEditRows,
       getChapterEditCols:         () => this._chapterEditCols,
       getChapterFocusedTilePos:   () => this._chapterFocusedTilePos,
+      getChapterStyle: (ch) => ch.style,
+      setChapterStyle: (style: LevelStyle, ch: ChapterDef, camp: CampaignDef) => {
+        ch.style = style;
+        this._recordChapterSnapshot(ch);
+        this._renderChapterCanvas();
+      },
       recordSnapshot: (ch, mark?) => this._recordChapterSnapshot(ch, mark),
       saveGridState:  (ch, camp)  => this._saveChapterGridState(ch, camp),
       resizeGrid: (r, c, ch, camp) => this._resizeChapterGrid(r, c, camp, ch),
@@ -539,6 +546,7 @@ export class ChapterMapEditorSection {
       levelDefs,
       undefined,
       filledKeys,
+      chapter?.style,
     );
 
     if (this._chapterFocusedTilePos && this._chapterCtx) {
@@ -771,7 +779,7 @@ export class ChapterMapEditorSection {
 
   // ─── Chapter editor undo/redo ────────────────────────────────────────────
 
-  private _recordChapterSnapshot(_chapter: ChapterDef, markChanged = true): void {
+  private _recordChapterSnapshot(chapter: ChapterDef, markChanged = true): void {
     // Passing live reference is intentional: HistoryManager.record() deep-clones
     // via JSON.parse(JSON.stringify()) so the stored copy is independent.
     const snapshot: EditorSnapshot = {
@@ -779,6 +787,7 @@ export class ChapterMapEditorSection {
       rows: this._chapterEditRows,
       cols: this._chapterEditCols,
       inventory: [],
+      levelStyle: chapter.style,
     };
     this._chapterHist.record(snapshot);
     if (markChanged) {
@@ -809,10 +818,12 @@ export class ChapterMapEditorSection {
     this._chapterEditGrid = snap.grid as (TileDef | null)[][];
     this._chapterEditRows = snap.rows;
     this._chapterEditCols = snap.cols;
+    chapter.style = snap.levelStyle as typeof chapter.style;
     this._updateChapterCanvasDisplaySize();
     this._saveChapterGridState(chapter, campaign);
     this._ui!.rebuildLevelInventory(chapter, campaign);
     this._ui!.rebuildGridSizePanel(chapter, campaign);
+    this._ui!.rebuildStylePanel(chapter, campaign);
     this._updateChapterUndoRedoButtons();
     this._renderChapterCanvas();
   }
