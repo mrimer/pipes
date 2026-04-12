@@ -117,7 +117,6 @@ export class ChapterEditorUI {
       { palette: PipeShape.Elbow,        label: '┗ Elbow' },
       { palette: PipeShape.Tee,          label: '┣ Tee' },
       { palette: PipeShape.Cross,        label: '╋ Cross' },
-      { palette: 'erase',                label: '🗑 Erase' },
     ];
 
     for (const item of CHAPTER_PALETTE_ITEMS) {
