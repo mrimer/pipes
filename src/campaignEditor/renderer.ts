@@ -859,10 +859,13 @@ function _drawChapterEditorPipeTile(
   }
 
   // Center junction dot: triple-stroke filled circles cover the seam between arms
+  const dotShadowR = _s(5);
+  const dotBaseR   = dotShadowR - Math.max(1, _s(1)); // slightly smaller to reveal shadow ring
+  const dotHighR   = Math.max(1, _s(0.75));
   ctx.fillStyle = shadowColor;
-  ctx.beginPath(); ctx.arc(cx, cy, _s(5), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, dotShadowR, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = pipeColor;
-  ctx.beginPath(); ctx.arc(cx, cy, _s(5) - Math.max(1, _s(1)), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, dotBaseR,   0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = highlightColor;
-  ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, _s(0.75)), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, dotHighR,   0, Math.PI * 2); ctx.fill();
 }
