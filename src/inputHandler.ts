@@ -18,9 +18,6 @@ export interface InputCallbacks {
   setSelectedShape(shape: PipeShape | null): void;
   getPendingRotation(): Rotation;
   setPendingRotation(r: Rotation): void;
-  getFocusPos(): GridPos;
-  setFocusPos(pos: GridPos): void;
-
   // ── Actions ─────────────────────────────────────────────────────────────────
   /** Place or replace the currently selected shape at pos. Returns true when a board op was attempted. */
   tryPlaceOrReplace(pos: GridPos, tile: Tile, filledBefore: Set<string>): boolean;
@@ -678,34 +675,8 @@ export class InputHandler {
     if (this._cb.getScreen() !== GameScreen.Play) return;
     const board = this._cb.getBoard();
     if (!board) return;
-    const focusPos = this._cb.getFocusPos();
 
     switch (e.key) {
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        if (this._cb.getGameState() !== GameState.Playing) break;
-        if (this._cb.getSelectedShape() !== null) {
-          const tile = board.getTile(focusPos);
-          const filledBefore = board.getFilledPositions();
-          if (tile) this._cb.tryPlaceOrReplace(focusPos, tile, filledBefore);
-        } else {
-          const tile = board.getTile(focusPos);
-          const filledBefore = board.getFilledPositions();
-          // Capture before calling rotateTile – the rotation mutates tile.rotation in-place.
-          const oldRotation = tile?.rotation;
-          const rotResult = board.rotateTile(focusPos);
-          if (rotResult.success) {
-            this._cb.afterTileRotated(filledBefore, rotResult, oldRotation !== undefined
-              ? { row: focusPos.row, col: focusPos.col, oldRotation }
-              : undefined);
-            this._cb.refreshUI();
-            this._cb.checkWinLose();
-          } else if (rotResult.error) {
-            this._cb.handleBoardError(rotResult);
-          }
-        }
-        break;
       case 'q':
       case 'Q':
         e.preventDefault();

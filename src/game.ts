@@ -149,7 +149,6 @@ export class Game implements InputCallbacks {
   private gameState: GameState = GameState.Playing;
   private board: Board | null = null;
   private currentLevel: LevelDef | null = null;
-  private focusPos: GridPos = { row: 0, col: 0 };
 
   /** The pipe shape currently selected from the inventory, ready to be placed. */
   private selectedShape: PipeShape | null = null;
@@ -494,7 +493,6 @@ export class Game implements InputCallbacks {
   private _enterPlayScreenState(level: LevelDef): void {
     this.board!.initHistory();
     this.gameState = GameState.Playing;
-    this.focusPos = { ...this.board!.source };
     this.selectedShape = null;
     this.pendingRotation = 0;
     this._input.hoverRotationDelta = 0;
@@ -1445,8 +1443,6 @@ export class Game implements InputCallbacks {
   setSelectedShape(shape: PipeShape | null): void { this.selectedShape = shape; }
   getPendingRotation(): Rotation { return this.pendingRotation; }
   setPendingRotation(r: Rotation): void { this.pendingRotation = r; }
-  getFocusPos(): GridPos { return this.focusPos; }
-  setFocusPos(pos: GridPos): void { this.focusPos = pos; }
 
   renderInventoryBar(): void { this._renderInventoryBar(); }
 
