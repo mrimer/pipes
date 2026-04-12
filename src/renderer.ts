@@ -9,7 +9,7 @@ import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState } from './renderer/chamberRenderers';
 import { drawAmbientDecoration } from './renderer/ambientDecoration';
 export { drawAmbientDecoration };
-export { LINE_WIDTH, TILE_SIZE, _s, setTileSize } from './renderer/rendererState';
+export { LINE_WIDTH, TILE_SIZE, _s, setTileSize, BASE_TILE_SIZE } from './renderer/rendererState';
 import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererState';
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
