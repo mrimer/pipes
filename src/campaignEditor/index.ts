@@ -944,7 +944,7 @@ export class CampaignEditor {
    */
   private _buildEditorCanvasSection(readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
-    setTileSize(computeTileSize(this._state.rows, this._state.cols));
+    setTileSize(computeTileSize(this._state.rows, this._state.cols, 0, 0, false));
     canvas.width  = this._state.cols * TILE_SIZE;
     canvas.height = this._state.rows * TILE_SIZE;
     canvas.style.cssText =
@@ -1090,7 +1090,7 @@ export class CampaignEditor {
    */
   private _onStateRestored(): void {
     if (this._editorCanvas) {
-      setTileSize(computeTileSize(this._state.rows, this._state.cols));
+      setTileSize(computeTileSize(this._state.rows, this._state.cols, 0, 0, false));
       this._editorCanvas.width  = this._state.cols * TILE_SIZE;
       this._editorCanvas.height = this._state.rows * TILE_SIZE;
     }
@@ -1121,7 +1121,7 @@ export class CampaignEditor {
     this._state.resize(newRows, newCols);
     this._updateEditorUndoRedoButtons();
     if (this._editorCanvas) {
-      setTileSize(computeTileSize(newRows, newCols));
+      setTileSize(computeTileSize(newRows, newCols, 0, 0, false));
       this._editorCanvas.width  = newCols * TILE_SIZE;
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
@@ -1156,7 +1156,7 @@ export class CampaignEditor {
     const newRows = this._state.rows;
     const newCols = this._state.cols;
     if (this._editorCanvas) {
-      setTileSize(computeTileSize(newRows, newCols));
+      setTileSize(computeTileSize(newRows, newCols, 0, 0, false));
       this._editorCanvas.width  = newCols * TILE_SIZE;
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
@@ -1178,7 +1178,7 @@ export class CampaignEditor {
     const newRows = this._state.rows;
     const newCols = this._state.cols;
     if (this._editorCanvas) {
-      setTileSize(computeTileSize(newRows, newCols));
+      setTileSize(computeTileSize(newRows, newCols, 0, 0, false));
       this._editorCanvas.width  = newCols * TILE_SIZE;
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
