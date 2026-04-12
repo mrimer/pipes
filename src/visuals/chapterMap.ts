@@ -7,7 +7,7 @@
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
 import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
-import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, EMPTY_FLOOR_SHAPES, computeFloorTypesFromGrid } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, computeFloorTypesFromGrid } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
@@ -15,7 +15,6 @@ import {
   SINK_CONNECTOR_LIT, SINK_WATER_CONNECTOR_LIT,
   CHAMBER_FILL_COLOR,
   WATER_COLOR, PIPE_COLOR, FOCUS_COLOR, LOW_WATER_COLOR,
-  EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK,
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
