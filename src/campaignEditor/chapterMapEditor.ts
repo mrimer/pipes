@@ -223,7 +223,7 @@ export class ChapterMapEditorSection {
     layout.appendChild(midCol);
 
     const rightCol = document.createElement('div');
-    rightCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:160px;';
+    rightCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:210px;';
     rightCol.appendChild(this._ui.buildLevelInventoryPanel(chapter, campaign));
     rightCol.appendChild(this._ui.buildGridSizePanel(chapter, campaign));
     layout.appendChild(rightCol);
