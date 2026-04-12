@@ -723,6 +723,10 @@ export class Game implements InputCallbacks {
           this._animMgr.renderDrySourcePulseOverlay(this.board!, now);
         }
       },
+      // Vortex callback: rendered inside drawSourceOrSink after the outer circle
+      // but before the connector arms, so particles appear above the sink backdrop
+      // and underneath the arms.
+      () => this._animMgr.tickVortex(this.board!),
     );
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).

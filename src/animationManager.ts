@@ -377,7 +377,9 @@ export class AnimationManager {
     this._tickBubbles(board);
     this._tickLeakySpray(board, gameState);
     this._tickWinFlow(board, gameState);
-    this._tickVortex(board);
+    // Note: vortex is NOT ticked here – it is rendered during board drawing
+    // (inside drawSourceOrSink) so it appears above the sink circles but below
+    // the connector arms.  See AnimationManager.tickVortex / game._renderBoard.
     this._tickGoldenTwinkles(board);
     this._tickIdlePulse(board, gameState);
     this._tickHeatWaves(board);
@@ -639,8 +641,11 @@ export class AnimationManager {
    * Spawn and render the spinning vortex particle effect over the sink tile.
    * Runs every frame to give a visual cue that water flows into the sink.
    * Uses the sink tile's current color (filled vs unfilled).
+   *
+   * Called during board rendering (via a callback from drawSourceOrSink) so the
+   * vortex appears above the outer sink circle but below the connector arms.
    */
-  private _tickVortex(board: Board): void {
+  tickVortex(board: Board): void {
     const { sink } = board;
     const sinkCx = sink.col * TILE_SIZE + TILE_SIZE / 2;
     const sinkCy = sink.row * TILE_SIZE + TILE_SIZE / 2;
