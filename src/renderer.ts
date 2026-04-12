@@ -13,7 +13,7 @@ export { LINE_WIDTH, TILE_SIZE, _s, setTileSize, BASE_TILE_SIZE } from './render
 import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererState';
 import {
   BG_COLOR, TILE_BG,
-  EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK, EMPTY_TARGET_COLOR,
+  EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK,
   EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR_DARK,
   GOLD_SPACE_BASE_COLOR, GOLD_SPACE_SHIMMER_COLOR, GOLD_SPACE_BORDER_COLOR,
@@ -55,15 +55,6 @@ const CARDINAL_DIRS: [Direction, number, number][] = [
   [Direction.East,  1,  0],
   [Direction.West, -1,  0],
 ];
-
-/** Translucent blue-gray overlay drawn over empty cement cells that are valid placement targets. */
-const CEMENT_TARGET_OVERLAY = 'rgba(140,160,200,0.22)';
-
-/** Translucent gold overlay drawn over empty gold-space cells that are valid placement targets. */
-const GOLD_TARGET_OVERLAY = 'rgba(255,215,0,0.2)';
-
-/** Translucent red overlay drawn over empty one-way cells that are valid placement targets. */
-const ONE_WAY_TARGET_OVERLAY = 'rgba(220,60,60,0.22)';
 
 /** Border color used for error-highlighted sandstone tiles. */
 const ERROR_HIGHLIGHT_BORDER = '#ff2020';
@@ -1864,18 +1855,6 @@ export function renderContainerFillAnims(
 }
 
 /**
- * Draw a semi-transparent placement-target overlay over a tile cell.
- * Used to shade cells that are valid replacement targets, or cement cells
- * with an identical piece where replacement is disallowed.
- */
-function _drawCellTargetOverlay(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-  ctx.fillStyle = EMPTY_TARGET_COLOR;
-  ctx.globalAlpha = 0.35;
-  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-  ctx.globalAlpha = 1;
-}
-
-/**
  * Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
  * is never covered by a neighboring empty tile's background fill.
  */
@@ -1898,56 +1877,13 @@ function _renderPass1Backgrounds(
       const oneWayDir = board.oneWayData.get(posKey(r, c));
       const isOneWayCell = oneWayDir !== undefined;
 
-      // A cell is a valid placement target when it's empty and either:
-      // it's not a gold space (any pipe fits), or it IS a gold space (gold pipe required)
-      const isTarget = selectedShape !== null &&
-        isEmptyFloor(tile.shape) &&
-        (!isGoldCell || selectedIsGold);
-
-      // A non-empty cell is a valid replacement target when the selected shape can replace it:
-      // the tile must be a player-placed (non-fixed) regular or gold pipe, and satisfy
-      // the gold-space constraint.
-      const isReplaceTarget = selectedShape !== null &&
-        isReplaceableByShape(tile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
-
       // Tile background
       if (isOneWayCell) {
         // One-way cell: always show arrow background regardless of tile on top
         drawOneWayArrow(ctx, x, y, oneWayDir!);
-        if (isTarget) {
-          ctx.fillStyle = ONE_WAY_TARGET_OVERLAY;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        }
-        if (isReplaceTarget) {
-          _drawCellTargetOverlay(ctx, x, y);
-        } else if (
-          selectedShape !== null &&
-          !isEmptyFloor(tile.shape) &&
-          tile.shape === selectedShape &&
-          tile.rotation === pendingRotation
-        ) {
-          _drawCellTargetOverlay(ctx, x, y);
-        }
       } else if (isCementCell) {
         // Cement cell: always show cement background regardless of tile on top
         _drawCementBackground(ctx, x, y);
-        if (isTarget) {
-          ctx.fillStyle = CEMENT_TARGET_OVERLAY;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        }
-        if (isReplaceTarget) {
-          _drawCellTargetOverlay(ctx, x, y);
-        } else if (
-          selectedShape !== null &&
-          !isEmptyFloor(tile.shape) &&
-          tile.shape === selectedShape &&
-          tile.rotation === pendingRotation
-        ) {
-          // Darken cement cells that have the same piece and orientation as the
-          // selected shape: replacing with an identical tile is not a valid move,
-          // so shade the cell to indicate it is not a placement target.
-          _drawCellTargetOverlay(ctx, x, y);
-        }
       } else if (isEmptyFloor(tile.shape)) {
         if (isGoldCell) {
           // Shimmering gold background
@@ -1959,16 +1895,11 @@ function _renderPass1Backgrounds(
           ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
           ctx.lineWidth = 2;
           ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-          // Brighten when it's a valid drop target
-          if (isTarget) {
-            ctx.fillStyle = GOLD_TARGET_OVERLAY;
-            ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          }
         } else {
           const paritySum = (r % 2) + (c % 2);
           const [gc_light, gc_mid, gc_dark] = ginghamColorsForFloor(tile.shape);
           const ginghamColor = paritySum === 0 ? gc_light : paritySum === 2 ? gc_dark : gc_mid;
-          ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : ginghamColor;
+          ctx.fillStyle = ginghamColor;
           ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
           // Draw any ambient decoration on this empty non-gold cell
           const dec = board.ambientDecorations.get(posKey(r, c));
@@ -1988,10 +1919,6 @@ function _renderPass1Backgrounds(
             (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
           ctx.fillStyle = isRemovable ? REMOVABLE_BG_COLOR : TILE_BG;
           ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        }
-        // Overlay a target highlight when this tile is a valid replacement target
-        if (isReplaceTarget) {
-          _drawCellTargetOverlay(ctx, x, y);
         }
       }
 
