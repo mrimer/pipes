@@ -310,6 +310,7 @@ export function computeChapterFloorTypes(
 ): ReadonlyMap<string, PipeShape> {
   const map = new Map<string, PipeShape>();
 
+  // Helper: the intrinsic floor type of a cell (only for empty-floor cells).
   const rawFloorType = (r: number, c: number): PipeShape | null => {
     if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
     const def = grid[r]?.[c] ?? null;
@@ -318,6 +319,7 @@ export function computeChapterFloorTypes(
     return null;
   };
 
+  // Helper: majority empty-floor type from cardinal neighbors already in the map.
   const majorityAdjacentFloor = (r: number, c: number): PipeShape => {
     const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0]]);
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
@@ -335,7 +337,7 @@ export function computeChapterFloorTypes(
     return best;
   };
 
-  // Pass 1: empty cells
+  // Pass 1: assign floor type for all empty-floor cells.
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const ft = rawFloorType(r, c);
@@ -343,24 +345,19 @@ export function computeChapterFloorTypes(
     }
   }
 
-  // Pass 2: Source, Sink, Tree
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const def = grid[r]?.[c] ?? null;
-      if (def !== null && (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Tree)) {
-        map.set(`${r},${c}`, majorityAdjacentFloor(r, c));
-      }
-    }
-  }
-
-  // Pass 3: Granite BFS
+  // Pass 2: BFS for ALL remaining non-empty-floor cells (source, sink, tree, chamber,
+  // granite, pipe tiles, etc.).  Seed with any unresolved cell that borders an already-
+  // resolved cell, then expand through every unresolved neighbour regardless of tile type.
   const queue: [number, number][] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (grid[r]?.[c]?.shape !== PipeShape.Granite) continue;
+      if (map.has(`${r},${c}`)) continue; // already resolved
       for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
         const nr = r + dr, nc = c + dc;
-        if (map.has(`${nr},${nc}`)) { queue.push([r, c]); break; }
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && map.has(`${nr},${nc}`)) {
+          queue.push([r, c]);
+          break;
+        }
       }
     }
   }
@@ -372,7 +369,7 @@ export function computeChapterFloorTypes(
     map.set(key, majorityAdjacentFloor(r, c));
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
       const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr]?.[nc]?.shape === PipeShape.Granite && !map.has(`${nr},${nc}`)) {
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !map.has(`${nr},${nc}`)) {
         queue.push([nr, nc]);
       }
     }

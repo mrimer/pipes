@@ -456,7 +456,7 @@ export class Board {
       return best;
     };
 
-    // Pass 1: assign floor type for all empty floor cells
+    // Pass 1: all empty-floor cells get their own shape.
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const shape = this.grid[r][c].shape;
@@ -464,21 +464,16 @@ export class Board {
       }
     }
 
-    // Pass 2: Source, Sink, Tree – majority of adjacent empty floor tiles
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        const shape = this.grid[r][c].shape;
-        if (shape === PipeShape.Source || shape === PipeShape.Sink || shape === PipeShape.Tree) {
-          map.set(posKey(r, c), majorityFromNeighbors(r, c));
-        }
-      }
-    }
-
-    // Pass 3: Granite BFS flood-fill from granite cells adjacent to known-floor cells
+    // Pass 2: BFS for ALL remaining non-empty-floor cells (source, sink, tree, chamber,
+    // granite, fixed pipes, etc.).  Seed the queue with any unresolved cell that borders
+    // at least one already-resolved cell, then expand through every unresolved neighbour
+    // regardless of tile type.  This lets source/sink/tree/chamber/fixed-pipe regions
+    // that do not directly touch an empty floor cell inherit their floor type via the
+    // same incremental BFS used for granite.
     const queue: [number, number][] = [];
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        if (this.grid[r][c].shape !== PipeShape.Granite) continue;
+        if (map.has(posKey(r, c))) continue; // already resolved (empty floor)
         for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
           const nr = r + dr, nc = c + dc;
           if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols && map.has(posKey(nr, nc))) {
@@ -496,8 +491,7 @@ export class Board {
       map.set(key, majorityFromNeighbors(r, c));
       for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
         const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols &&
-            this.grid[nr][nc].shape === PipeShape.Granite && !map.has(posKey(nr, nc))) {
+        if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols && !map.has(posKey(nr, nc))) {
           queue.push([nr, nc]);
         }
       }
