@@ -1,4 +1,4 @@
-import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
@@ -1418,7 +1418,7 @@ export class Game implements InputCallbacks {
     if (!this.board || this.selectedShape === null) return false;
     let replacedTile: Tile | undefined;
     let result: MoveResult;
-    if (currentTile.shape === PipeShape.Empty) {
+    if (isEmptyFloor(currentTile.shape)) {
       result = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
     } else if (currentTile.shape !== this.selectedShape || currentTile.rotation !== this.pendingRotation) {
       replacedTile = currentTile;
