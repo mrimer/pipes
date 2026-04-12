@@ -323,6 +323,10 @@ export function generateAmbientDecorations(
   getFloorType?: (r: number, c: number) => PipeShape,
 ): ReadonlyMap<string, AmbientDecoration> {
   const map = new Map<string, AmbientDecoration>();
+  // Counters per type for golden-angle rotation distribution (pebbles & crystals).
+  const typeCount: Partial<Record<AmbientDecorationType, number>> = {};
+  // Golden angle in degrees – gives the best uniform distribution of rotations.
+  const GOLDEN_ANGLE = 137.50776405003785;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (Math.random() >= DECORATION_DENSITY) continue;
@@ -335,6 +339,13 @@ export function generateAmbientDecorations(
                   : undefined;
       // Crystals randomly show either one or two shards.
       const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
+      // Pebbles and crystals: distribute rotations using the golden angle so that
+      // each instance of the same type has a visually distinct orientation.
+      const idx = typeCount[type] ?? 0;
+      typeCount[type] = idx + 1;
+      const rotation = (type === 'pebbles' || type === 'crystal')
+        ? (idx * GOLDEN_ANGLE) % 360
+        : Math.random() * 360;
       map.set(`${r},${c}`, {
         row: r,
         col: c,
@@ -342,7 +353,7 @@ export function generateAmbientDecorations(
         // Keep decorations away from cell edges for a natural look
         offsetX: 0.15 + Math.random() * 0.70,
         offsetY: 0.15 + Math.random() * 0.70,
-        rotation: Math.random() * 360,
+        rotation,
         variant: Math.floor(Math.random() * 3),
         scale,
         count,
@@ -555,6 +566,15 @@ export class Board {
   /** Pre-compute the floor type (Empty/EmptyDirt/EmptyDark) for every cell. */
   private _computeFloorTypes(): ReadonlyMap<string, PipeShape> {
     return computeFloorTypesFromGrid(this.rows, this.cols, (r, c) => {
+      const key = posKey(r, c);
+      // Gold spaces, one-way tiles, and cement tiles are stored as PipeShape.Empty
+      // at runtime, but their floor type should be inferred from their region
+      // (Empty / EmptyDirt / EmptyDark) via BFS propagation from neighbours.
+      // Fixed pipe tile types (Source, Sink, Straight, etc.) also return null
+      // here so that BFS propagates the correct floor type to them.
+      if (this.goldSpaces.has(key) || this.oneWayData.has(key) || this.cementData.has(key)) {
+        return null;
+      }
       const shape = this.grid[r][c].shape;
       return isEmptyFloor(shape) ? shape : null;
     });

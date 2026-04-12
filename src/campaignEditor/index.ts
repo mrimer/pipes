@@ -793,7 +793,7 @@ export class CampaignEditor {
     );
 
     const toolbar = this._buildToolbar(
-      readOnly ? `👁 View Level: ${this._state.levelName}` : `✏️ Level Editor`,
+      readOnly ? `👁 View Level: ${this._state.levelName}` : `✏️ Level Editor (${this._activeChapterIdx + 1}-${this._activeLevelIdx + 1})`,
       () => {
         if (!readOnly && this._state.hasUnsavedChanges) {
           this._dialogs.showUnsavedChanges(
@@ -902,7 +902,9 @@ export class CampaignEditor {
       const chapter = campaign.chapters[this._activeChapterIdx];
       const level = chapter?.levels[this._activeLevelIdx];
       if (!level) return;
-      this._onPlaytest(level);
+      const chapterNum = this._activeChapterIdx + 1;
+      const levelNum = this._activeLevelIdx + 1;
+      this._onPlaytest({ ...level, name: `${chapterNum}-${levelNum}: ${level.name}` });
     }));
 
     // Save
