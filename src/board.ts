@@ -341,8 +341,7 @@ export function generateAmbientDecorations(
       const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
       // Pebbles and crystals: distribute rotations using the golden angle so that
       // each instance of the same type has a visually distinct orientation.
-      // A random base angle is chosen per type on first encounter so that different
-      // board instances do not show the same starting orientations.
+      // A random base angle is chosen so board instances show different orientations.
       const idx = typeCount[type] ?? 0;
       typeCount[type] = idx + 1;
       const baseAngle = Math.random() * 360;
