@@ -6,7 +6,7 @@
  * is surrounded by a 2px white border.
  */
 
-import { Direction, LevelDef, PipeShape, Rotation, TileDef } from './types';
+import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef } from './types';
 import { getConnections } from './tile';
 import {
   EMPTY_COLOR,
@@ -34,6 +34,8 @@ import {
   SANDSTONE_COLOR,
   STAR_COLOR,
   TREE_COLOR,
+  TREE_DIRT_COLOR,
+  TREE_DARK_COLOR,
   ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
@@ -63,12 +65,26 @@ export function minimapDimensions(rows: number, cols: number): { width: number; 
   };
 }
 
+/** Returns the style-dependent color for default empty floor tiles. */
+function emptyColor(style: LevelStyle | undefined): string {
+  if (style === 'Dirt') return EMPTY_DIRT_COLOR_DARK;
+  if (style === 'Dark') return EMPTY_DARK_COLOR_DARK;
+  return EMPTY_COLOR_DARK;
+}
+
+/** Returns the darker tree color for the given level style. */
+function treeColor(style: LevelStyle | undefined): string {
+  if (style === 'Dirt') return TREE_DIRT_COLOR;
+  if (style === 'Dark') return TREE_DARK_COLOR;
+  return TREE_COLOR;
+}
+
 /** Returns the fill color to use for a grid tile on the minimap. */
-function tileColor(tile: TileDef | null): string {
-  if (!tile) return EMPTY_COLOR_DARK;
+function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string {
+  if (!tile) return emptyColor(style);
   if (tile.shape === PipeShape.EmptyDirt) return EMPTY_DIRT_COLOR_DARK;
   if (tile.shape === PipeShape.EmptyDark) return EMPTY_DARK_COLOR_DARK;
-  if (tile.shape === PipeShape.Empty) return EMPTY_COLOR_DARK;
+  if (tile.shape === PipeShape.Empty) return emptyColor(style);
   switch (tile.shape) {
     case PipeShape.Straight:
     case PipeShape.Elbow:
@@ -108,7 +124,7 @@ function tileColor(tile: TileDef | null): string {
     case PipeShape.Granite:
       return GRANITE_COLOR;
     case PipeShape.Tree:
-      return TREE_COLOR;
+      return treeColor(style);
     case PipeShape.Sea:
       return SEA_FILL_COLOR;
     case PipeShape.Cement:
@@ -255,6 +271,27 @@ function drawPipeLines(
 }
 
 /**
+ * Draws a tree tile as a tiny filled circle on the minimap.
+ * The circle is centered in the tile cell and sized to fill most of it.
+ */
+function drawTree(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  px: number,
+  style: LevelStyle | undefined,
+): void {
+  const color = treeColor(style);
+  const cx = x + px / 2;
+  const cy = y + px / 2;
+  const radius = Math.max(0.5, (px - 1) / 2);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
  * Render a minimap preview for the given level definition.
  *
  * @returns An HTMLCanvasElement containing the minimap image.
@@ -276,6 +313,8 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
     return canvas;
   }
 
+  const style = level.style;
+
   // White border (fill the entire canvas, then overwrite the interior)
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, totalW, totalH);
@@ -290,8 +329,13 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
         drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0) as Rotation);
       } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay) {
         drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0) as Rotation);
+      } else if (tile && tile.shape === PipeShape.Tree) {
+        // Fill the cell with the empty background color first, then draw a circle on top.
+        ctx.fillStyle = emptyColor(style);
+        ctx.fillRect(tx, ty, px, px);
+        drawTree(ctx, tx, ty, px, style);
       } else {
-        ctx.fillStyle = tileColor(tile);
+        ctx.fillStyle = tileColor(tile, style);
         ctx.fillRect(tx, ty, px, px);
       }
     }

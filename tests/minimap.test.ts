@@ -24,6 +24,7 @@ class FakeContext {
   lineWidth = 0;
   fills: FillCall[] = [];
   strokes: Array<unknown[]> = [];
+  arcs: Array<{ style: string; cx: number; cy: number; r: number }> = [];
 
   fillRect(x: number, y: number, w: number, h: number): void {
     this.fills.push({ style: this.fillStyle, x, y, w, h });
@@ -32,6 +33,10 @@ class FakeContext {
   moveTo(): void { /* no-op */ }
   lineTo(): void { /* no-op */ }
   stroke(): void { this.strokes.push([]); }
+  arc(cx: number, cy: number, r: number): void {
+    this.arcs.push({ style: this.fillStyle, cx, cy, r });
+  }
+  fill(): void { /* no-op */ }
 }
 
 function installCanvasMock(): FakeContext {
@@ -137,7 +142,9 @@ describe('renderMinimap: tileColor coverage via fills', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Tree }]]);
     renderMinimap(level);
+    // Tree tiles: background fill + arc (circle) call
     expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.arcs.length).toBeGreaterThanOrEqual(1);
   });
 
   it('draws chamber tiles with appropriate fills', () => {
