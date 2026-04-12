@@ -11,7 +11,6 @@
 
 import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape } from '../types';
 import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from '../persistence';
-import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
 import { LevelEditorState } from './levelEditorState';
@@ -944,9 +943,6 @@ export class CampaignEditor {
    */
   private _buildEditorCanvasSection(readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
-    setTileSize(computeTileSize(this._state.rows, this._state.cols, 0, 0, false));
-    canvas.width  = this._state.cols * TILE_SIZE;
-    canvas.height = this._state.rows * TILE_SIZE;
     canvas.style.cssText =
       `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:4px;cursor:` + (readOnly ? 'default' : 'crosshair') + ';' +
       'display:block;';
@@ -1089,11 +1085,6 @@ export class CampaignEditor {
    * rebuilds the inventory panel to reflect the newly restored state.
    */
   private _onStateRestored(): void {
-    if (this._editorCanvas) {
-      setTileSize(computeTileSize(this._state.rows, this._state.cols, 0, 0, false));
-      this._editorCanvas.width  = this._state.cols * TILE_SIZE;
-      this._editorCanvas.height = this._state.rows * TILE_SIZE;
-    }
     this._updateCanvasDisplaySize();
     const invPanel = document.getElementById('editor-inventory-panel');
     if (invPanel) invPanel.replaceWith(this._metadataPanel!.buildInventoryEditor());
@@ -1120,11 +1111,6 @@ export class CampaignEditor {
   private _resizeGrid(newRows: number, newCols: number): void {
     this._state.resize(newRows, newCols);
     this._updateEditorUndoRedoButtons();
-    if (this._editorCanvas) {
-      setTileSize(computeTileSize(newRows, newCols, 0, 0, false));
-      this._editorCanvas.width  = newCols * TILE_SIZE;
-      this._editorCanvas.height = newRows * TILE_SIZE;
-    }
     this._updateCanvasDisplaySize();
     this._renderEditorCanvas();
   }
@@ -1153,13 +1139,6 @@ export class CampaignEditor {
     this._state.rotate(clockwise);
     sfxManager.play(SfxId.BoardSlide);
     this._updateEditorUndoRedoButtons();
-    const newRows = this._state.rows;
-    const newCols = this._state.cols;
-    if (this._editorCanvas) {
-      setTileSize(computeTileSize(newRows, newCols, 0, 0, false));
-      this._editorCanvas.width  = newCols * TILE_SIZE;
-      this._editorCanvas.height = newRows * TILE_SIZE;
-    }
     this._updateCanvasDisplaySize();
     this._refreshPaletteUI();
     this._metadataPanel?.rebuildGridSizePanel();
@@ -1175,13 +1154,6 @@ export class CampaignEditor {
     this._state.reflect();
     sfxManager.play(SfxId.BoardSlide);
     this._updateEditorUndoRedoButtons();
-    const newRows = this._state.rows;
-    const newCols = this._state.cols;
-    if (this._editorCanvas) {
-      setTileSize(computeTileSize(newRows, newCols, 0, 0, false));
-      this._editorCanvas.width  = newCols * TILE_SIZE;
-      this._editorCanvas.height = newRows * TILE_SIZE;
-    }
     this._updateCanvasDisplaySize();
     this._refreshPaletteUI();
     this._metadataPanel?.rebuildGridSizePanel();
