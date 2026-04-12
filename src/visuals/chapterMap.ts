@@ -19,7 +19,7 @@ import {
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
 import { tileDefConnections } from '../chapterMapUtils';
-import { renderMinimap, minimapDimensions } from '../minimap';
+import { renderMinimap, minimapDimensions } from './minimap';
 import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export function computeMinimapRect(
   const mw = Math.round(mmW * scale);
   const mh = Math.round(mmH * scale);
   const mx = Math.round(cx - mw / 2);
-  const my = contentY + Math.round((contentH - mh) / 2);
+  const my = contentY + Math.round((contentH - mh) / 2) - _s(2);
 
   return { x: mx, y: my, width: mw, height: mh };
 }
