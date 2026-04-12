@@ -1536,7 +1536,8 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    drawSourceOrSink(ctx, tile.connections, color, half, shape === PipeShape.Source, effectiveButtEndDirs, shape === PipeShape.Source ? { text: String(currentWater), color: LABEL_COLOR } : undefined);
+    const isSource = shape === PipeShape.Source;
+    drawSourceOrSink(ctx, tile.connections, color, half, isSource, effectiveButtEndDirs, isSource ? { text: String(currentWater), color: LABEL_COLOR } : undefined);
   } else if (shape === PipeShape.Chamber) {
     // Chamber – a steel-blue enclosure whose interior display varies by content
     ctx.restore();
