@@ -312,6 +312,11 @@ export function drawConnectorGlow(
  * @param buttEndDirs Optional set of arm directions that should use flat (butt) end caps.
  * @param centerLabel Optional label to draw at the centre. When omitted no label is drawn.
  * @param bgColor     Fill colour for the outer-circle background (defaults to TILE_BG).
+ * @param afterOuterCircleFn  Optional callback invoked after the outer circle (fill +
+ *                            outline) is drawn and before the connector arms are drawn.
+ *                            Use this to render effects (e.g. vortex particles) that
+ *                            should appear above the tile circle backdrop but below the
+ *                            arms.  Only called for the Sink tile (when isSource=false).
  */
 export function drawSourceOrSink(
   ctx: CanvasRenderingContext2D,
@@ -322,6 +327,7 @@ export function drawSourceOrSink(
   buttEndDirs?: Set<Direction>,
   centerLabel?: { text: string; color: string },
   bgColor?: string,
+  afterOuterCircleFn?: () => void,
 ): void {
   // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
   const outerR = isSource ? half * 0.5 : half * 0.45;
@@ -341,21 +347,37 @@ export function drawSourceOrSink(
   ctx.arc(0, 0, outerR, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Radiating lines – drawn after the circle fill so they sit on top of it;
-  // centre decorations render on top of everything.
+  // For the sink, invoke the optional overlay callback (e.g. vortex particles) now
+  // so it appears above the outer-circle backdrop but below the connector arms.
+  if (!isSource) afterOuterCircleFn?.();
+
+  // Radiating lines – drawn as two passes (all black outlines first, then all
+  // coloured fills) so that no arm's black outline overwrites an already-painted
+  // arm's colour at the centre junction, which would leave visible black artefacts.
+
+  // Pass 1: all arm black outlines.
+  ctx.lineWidth = LINE_WIDTH + _s(3);
+  ctx.strokeStyle = 'black';
   for (const [dir, nx, ny] of CARDINAL_DIRS) {
     if (!connections.has(dir)) continue;
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    // Black outline for the arm
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
     ctx.stroke();
-    // Colored arm
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.strokeStyle = color;
+  }
+  // Black filled centre cap to cover the junction seam between arm outlines.
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.arc(0, 0, (LINE_WIDTH + _s(3)) / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pass 2: all arm coloured fills, then landing-strip triangles.
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.strokeStyle = color;
+  for (const [dir, nx, ny] of CARDINAL_DIRS) {
+    if (!connections.has(dir)) continue;
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
@@ -363,6 +385,11 @@ export function drawSourceOrSink(
     // 3 small dark triangles along the arm (landing-strip base markers)
     drawArmTriangles(ctx, nx, ny, half, isSource);
   }
+  // Coloured filled centre cap to fill the junction interior.
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
+  ctx.fill();
 
   if (isSource) {
     // Central circle with radial gradient – bright glow at centre fading to the tile colour
@@ -382,7 +409,8 @@ export function drawSourceOrSink(
     ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
     ctx.stroke();
   } else {
-    // Sink: bullseye / drain pattern – concentric stroke rings with a solid innermost dot
+    // Sink: bullseye / drain pattern – concentric stroke rings with a solid innermost dot.
+    // Drawn after the arms so the rings remain visible on top of the arm fills.
     ctx.strokeStyle = color;
     ctx.lineWidth = _s(1.5);
     ctx.beginPath();
@@ -1453,6 +1481,7 @@ export function drawTile(
   buttEndDirs?: Set<Direction>,
   seaNeighbors?: SeaNeighbors,
   graniteNeighbors?: GraniteNeighbors,
+  afterOuterCircleFn?: () => void,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -1537,7 +1566,7 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     const isSource = shape === PipeShape.Source;
-    drawSourceOrSink(ctx, tile.connections, color, half, isSource, effectiveButtEndDirs, isSource ? { text: String(currentWater), color: LABEL_COLOR } : undefined);
+    drawSourceOrSink(ctx, tile.connections, color, half, isSource, effectiveButtEndDirs, isSource ? { text: String(currentWater), color: LABEL_COLOR } : undefined, undefined, afterOuterCircleFn);
   } else if (shape === PipeShape.Chamber) {
     // Chamber – a steel-blue enclosure whose interior display varies by content
     ctx.restore();
@@ -1682,6 +1711,7 @@ export function renderBoard(
   rotationOverrides?: Map<string, number>,
   fillExclude?: Set<string>,
   winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void,
+  sinkVortexFn?: () => void,
 ): void {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1702,7 +1732,7 @@ export function renderBoard(
   _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
   // Win tile glow overlay: rendered above backgrounds but beneath all tile content.
   winTileOverlayFn?.(ctx);
-  _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure);
+  _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);
@@ -1966,6 +1996,7 @@ function _renderPass2NonPipeTiles(
   shiftHeld: boolean,
   currentTemp: number,
   currentPressure: number,
+  sinkVortexFn?: () => void,
 ): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
@@ -2036,7 +2067,23 @@ function _renderPass2NonPipeTiles(
         drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c);
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors);
+      // For the sink tile, build an overlay callback that renders the vortex effect
+      // after the outer circle but before the connector arms.  The callback must
+      // temporarily undo the translation that drawTile/drawSourceOrSink applies to
+      // the context so that renderVortex can use absolute canvas coordinates.
+      let afterOuterCircleFn: (() => void) | undefined;
+      if (tile.shape === PipeShape.Sink && sinkVortexFn !== undefined) {
+        const tileCx = x + TILE_SIZE / 2;
+        const tileCy = y + TILE_SIZE / 2;
+        afterOuterCircleFn = () => {
+          ctx.save();
+          ctx.translate(-tileCx, -tileCy);
+          sinkVortexFn();
+          ctx.restore();
+        };
+      }
+
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn);
     }
   }
 }
