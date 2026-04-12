@@ -42,7 +42,6 @@ import {
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
   SEA_COLOR, SEA_BORDER_COLOR,
-  lighten, darken,
 } from './colors';
 
 /** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
@@ -357,13 +356,6 @@ export function drawSourceOrSink(
     // Colored arm
     ctx.lineWidth = LINE_WIDTH;
     ctx.strokeStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(nx * half, ny * half);
-    ctx.stroke();
-    // Highlight: thin bright center line for tube depth
-    ctx.lineWidth = Math.max(1, _s(1.5));
-    ctx.strokeStyle = lighten(color, 0.35);
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(nx * half, ny * half);
@@ -1304,13 +1296,8 @@ export function drawPipeBody(
   ctx.lineJoin = 'round';
   ctx.lineCap = 'butt';
   ctx.stroke();
-  // Slightly darkened fill gives the shadow base for the tube illusion.
-  ctx.fillStyle = darken(fillColor, 0.10);
+  ctx.fillStyle = fillColor;
   ctx.fill();
-  // Highlight stroke: thin bright line traces the shape edge for tube depth.
-  ctx.strokeStyle = lighten(fillColor, 0.35);
-  ctx.lineWidth = Math.max(1, _s(1.5));
-  ctx.stroke();
   ctx.restore();
 }
 
@@ -1525,18 +1512,6 @@ export function drawTile(
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
-    ctx.fill();
-    // Step 5: highlight pass — thin bright center line on each arm for tube depth
-    ctx.lineWidth = Math.max(1, _s(1.5));
-    for (const armDir of sortedArms) {
-      const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
-      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, lighten(armColor, 0.35));
-    }
-    // Step 6: highlight center dot
-    ctx.fillStyle = lighten(color, 0.35);
-    ctx.beginPath();
-    ctx.arc(0, 0, Math.max(1, _s(0.75)), 0, Math.PI * 2);
     ctx.fill();
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);

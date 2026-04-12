@@ -14,8 +14,8 @@
 import { Direction } from '../types';
 import { Board, NEIGHBOUR_DELTA, posKey } from '../board';
 import { oppositeDirection } from '../tile';
-import { WATER_COLOR, lighten } from '../colors';
-import { TILE_SIZE, _s } from '../renderer';
+import { WATER_COLOR } from '../colors';
+import { TILE_SIZE } from '../renderer';
 
 /** Duration of the pipe-rotation animation in milliseconds. */
 export const ROTATION_ANIM_DURATION = 300;
@@ -275,15 +275,14 @@ function _drawFillOverlay(
   // Phase 2 (0.5 → 1): all other arms fill from the center outward.
   const otherP = Math.max(0, (progress - 0.5) * 2);
 
-  const highlightColor = lighten(color, 0.35);
-  const highlightWidth = Math.max(1, _s(1.5));
-
   ctx.save();
   // Clip to this tile's bounds so that the rounded line-cap nubs on Phase 2
   // arms never extend into adjacent tiles and paint over content there.
   ctx.beginPath();
   ctx.rect(anim.col * TILE_SIZE, anim.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
   ctx.clip();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
 
   // Entry arm: fill from the outer edge inward toward the center.
@@ -296,15 +295,10 @@ function _drawFillOverlay(
     const startY = cy + dy * half;
     const endX = cx + dx * half * (1 - entryP);
     const endY = cy + dy * half * (1 - entryP);
-    const entryPath = new Path2D();
-    entryPath.moveTo(startX, startY);
-    entryPath.lineTo(endX, endY);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke(entryPath);
-    ctx.strokeStyle = highlightColor;
-    ctx.lineWidth = highlightWidth;
-    ctx.stroke(entryPath);
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
   }
 
   // Other arms: fill from the center outward (skip entry arm and blocked arm).
@@ -314,15 +308,10 @@ function _drawFillOverlay(
       if (anim.blockedDir !== null && dir === anim.blockedDir) continue;
       const dx = NEIGHBOUR_DELTA[dir].col;
       const dy = NEIGHBOUR_DELTA[dir].row;
-      const armPath = new Path2D();
-      armPath.moveTo(cx, cy);
-      armPath.lineTo(cx + dx * half * otherP, cy + dy * half * otherP);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      ctx.stroke(armPath);
-      ctx.strokeStyle = highlightColor;
-      ctx.lineWidth = highlightWidth;
-      ctx.stroke(armPath);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + dx * half * otherP, cy + dy * half * otherP);
+      ctx.stroke();
     }
   }
 

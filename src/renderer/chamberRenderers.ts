@@ -696,14 +696,6 @@ export function drawChamberButtStubs(
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     }
   }
-  // Highlight pass: thin bright center line for tube/cylinder illusion
-  ctx.strokeStyle = lighten(color, 0.35);
-  ctx.lineWidth = Math.max(1, _s(1.5));
-  for (const [dir, x1, y1, x2, y2] of stubDirs) {
-    if (shouldDraw(dir)) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -747,9 +739,6 @@ function _drawChamberDisconnectedStubs(
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       ctx.strokeStyle = color;
       ctx.lineWidth = LINE_WIDTH;
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-      ctx.strokeStyle = lighten(color, 0.35);
-      ctx.lineWidth = Math.max(1, _s(1.5));
       ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       ctx.restore();
     }
