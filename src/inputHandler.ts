@@ -366,23 +366,6 @@ export class InputHandler {
     return false;
   }
 
-  /**
-   * Move the keyboard focus position by one step along the given axis.
-   * Clamps to the board boundaries and calls `e.preventDefault()` to
-   * suppress scroll.
-   */
-  private _moveFocusPos(e: KeyboardEvent, axis: 'row' | 'col', delta: -1 | 1): void {
-    const board = this._cb.getBoard();
-    if (!board) return;
-    e.preventDefault();
-    const pos = this._cb.getFocusPos();
-    const max = axis === 'row' ? board.rows : board.cols;
-    const next = pos[axis] + delta;
-    if (next >= 0 && next < max) {
-      this._cb.setFocusPos({ ...pos, [axis]: next });
-    }
-  }
-
   // ── Event handlers ──────────────────────────────────────────────────────────
 
   private _handleCanvasMouseDown(e: MouseEvent): void {
@@ -698,10 +681,6 @@ export class InputHandler {
     const focusPos = this._cb.getFocusPos();
 
     switch (e.key) {
-      case 'ArrowUp':    this._moveFocusPos(e, 'row', -1); break;
-      case 'ArrowDown':  this._moveFocusPos(e, 'row',  1); break;
-      case 'ArrowLeft':  this._moveFocusPos(e, 'col', -1); break;
-      case 'ArrowRight': this._moveFocusPos(e, 'col',  1); break;
       case 'Enter':
       case ' ':
         e.preventDefault();
