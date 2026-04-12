@@ -44,6 +44,8 @@ export interface ChapterEditorUICallbacks {
   slideGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void;
   rotateGrid(clockwise: boolean, chapter: ChapterDef): void;
   reflectGrid(chapter: ChapterDef): void;
+  flipGridHorizontal(chapter: ChapterDef): void;
+  flipGridVertical(chapter: ChapterDef): void;
   renderCanvas(): void;
 
   // Parent callbacks (forwarded from ChapterMapEditorCallbacks)
@@ -231,6 +233,8 @@ export class ChapterEditorUI {
         slide:  (dir)  => this._cb.slideGrid(dir, chapter),
         rotate: (cw)   => this._cb.rotateGrid(cw, chapter),
         reflect: ()    => this._cb.reflectGrid(chapter),
+        flipHorizontal: () => this._cb.flipGridHorizontal(chapter),
+        flipVertical:   () => this._cb.flipGridVertical(chapter),
         rebuildPanel: () => this.rebuildGridSizePanel(chapter, campaign),
       },
       (l, bg, fg, cb) => this._cb.buildBtn(l, bg, fg, cb),
