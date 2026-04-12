@@ -4,8 +4,8 @@
  * write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel } from '../renderer';
+import { PipeShape, TileDef, Direction, LevelDef, Rotation } from '../types';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
@@ -55,7 +55,6 @@ export interface DragState {
  * @param levelDefs     Optional list of level definitions for rendering level-chamber tiles.
  * @param levelProgress Optional progress data for level-chamber display (completed, stars).
  * @param filledKeys    Optional set of "row,col" keys water-filled from source (for chapter map editor).
- * @param decorations   Optional ambient decorations for empty cells (for chapter map editor).
  */
 export function renderEditorCanvas(
   ctx: CanvasRenderingContext2D,
@@ -68,7 +67,6 @@ export function renderEditorCanvas(
   levelDefs?: readonly LevelDef[],
   levelProgress?: LevelProgressMap,
   filledKeys?: ReadonlySet<string>,
-  decorations?: ReadonlyMap<string, AmbientDecoration>,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -109,11 +107,7 @@ export function renderEditorCanvas(
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
       ctx.setLineDash([]);
-      // Ambient decoration (chapter map editor only)
-      const dec = decorations?.get(`${r},${c}`);
-      if (def === null && dec) {
-        drawAmbientDecoration(ctx, dec);
-      } else if (def === null) {
+      if (def === null) {
         // Subtle dot for level editor
         ctx.fillStyle = '#2a3a5e';
         ctx.beginPath();
