@@ -14,7 +14,7 @@
 import { Direction } from '../types';
 import { Board, NEIGHBOUR_DELTA, posKey } from '../board';
 import { oppositeDirection } from '../tile';
-import { WATER_COLOR, lighten, darken } from '../colors';
+import { WATER_COLOR, lighten } from '../colors';
 import { TILE_SIZE, _s } from '../renderer';
 
 /** Duration of the pipe-rotation animation in milliseconds. */
@@ -275,18 +275,8 @@ function _drawFillOverlay(
   // Phase 2 (0.5 → 1): all other arms fill from the center outward.
   const otherP = Math.max(0, (progress - 0.5) * 2);
 
-  // Pre-compute triple-stroke widths and colors once per call.
-  const shadowColor    = darken(color, 0.30);
-  const highlightColor = lighten(color, 0.40);
-  const baseWidth      = lineWidth - Math.max(2, _s(2));
+  const highlightColor = lighten(color, 0.35);
   const highlightWidth = Math.max(1, _s(1.5));
-
-  /** Apply the three-pass stroke (shadow → base → highlight) to a pre-built path. */
-  function _tripleStroke(path: Path2D): void {
-    ctx.strokeStyle = shadowColor;    ctx.lineWidth = lineWidth;    ctx.stroke(path);
-    ctx.strokeStyle = color;          ctx.lineWidth = baseWidth;    ctx.stroke(path);
-    ctx.strokeStyle = highlightColor; ctx.lineWidth = highlightWidth; ctx.stroke(path);
-  }
 
   ctx.save();
   // Clip to this tile's bounds so that the rounded line-cap nubs on Phase 2
@@ -309,7 +299,12 @@ function _drawFillOverlay(
     const entryPath = new Path2D();
     entryPath.moveTo(startX, startY);
     entryPath.lineTo(endX, endY);
-    _tripleStroke(entryPath);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke(entryPath);
+    ctx.strokeStyle = highlightColor;
+    ctx.lineWidth = highlightWidth;
+    ctx.stroke(entryPath);
   }
 
   // Other arms: fill from the center outward (skip entry arm and blocked arm).
@@ -322,7 +317,12 @@ function _drawFillOverlay(
       const armPath = new Path2D();
       armPath.moveTo(cx, cy);
       armPath.lineTo(cx + dx * half * otherP, cy + dy * half * otherP);
-      _tripleStroke(armPath);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke(armPath);
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = highlightWidth;
+      ctx.stroke(armPath);
     }
   }
 
