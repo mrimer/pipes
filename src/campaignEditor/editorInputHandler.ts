@@ -115,9 +115,9 @@ export class EditorInputHandler {
 
   private _paintCell(pos: { row: number; col: number }): void {
     const state = this._cb.getState();
-    // Empty-Grass palette: clear to null using erase-floor algorithm
+    // Empty-Grass palette: clear to null (grass)
     if (state.palette === PipeShape.Empty) {
-      state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
+      state.grid[pos.row][pos.col] = null;
       return;
     }
     state.grid[pos.row][pos.col] = state.buildTileDef();

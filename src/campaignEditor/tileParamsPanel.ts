@@ -350,9 +350,6 @@ export class TileParamsPanel {
       '#74b9ff', '#0a1520', '#74b9ff', CHAMBER_PALETTE_ITEMS, makeItemBtn,
     );
 
-    // Erase at the end of the palette
-    panel.appendChild(makeItemBtn({ palette: 'erase', label: '🗑 Erase (→ Empty)' }));
-
     return panel;
   }
 

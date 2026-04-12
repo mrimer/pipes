@@ -289,7 +289,7 @@ export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
   PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
-  PipeShape.EmptyDirt, PipeShape.EmptyDark,
+  PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
   PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
 ]);

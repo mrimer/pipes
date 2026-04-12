@@ -321,6 +321,12 @@ describe('REPEATABLE_EDITOR_TILES', () => {
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.Granite)).toBe(true);
   });
 
+  it('includes all empty floor types for drag-paint', () => {
+    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.Empty)).toBe(true);
+    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyDirt)).toBe(true);
+    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyDark)).toBe(true);
+  });
+
   it('does NOT include Source or Sink (placed singly, not by drag)', () => {
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.Source)).toBe(false);
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.Sink)).toBe(false);
