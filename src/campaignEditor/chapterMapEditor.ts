@@ -5,6 +5,7 @@
 
 import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation } from '../types';
 import { PIPE_SHAPES, generateAmbientDecorations, isEmptyFloor } from '../board';
+import { computeChapterFloorTypes } from '../visuals/chapterMap';
 import { TILE_SIZE, setTileSize, computeTileSize, BASE_TILE_SIZE } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { computeChapterMapReachable, findChapterMapTile, editorTileConns } from '../chapterMapUtils';
@@ -119,7 +120,7 @@ export class ChapterMapEditorSection {
       this._chapterEditGrid = grid;
     }
     // Generate ambient decorations for the grid
-    this._chapterDecorations = generateAmbientDecorations(this._chapterEditRows, this._chapterEditCols);
+    this._chapterDecorations = this._generateChapterDecorations();
     // Reset chapter editor state
     this._chapterHist.clear();
     this._chapterSelectedLevelIdx = null;
@@ -134,6 +135,19 @@ export class ChapterMapEditorSection {
     chapter.grid = JSON.parse(JSON.stringify(this._chapterEditGrid)) as (TileDef | null)[][];
     this._callbacks.touchCampaign(campaign);
     this._callbacks.saveCampaigns();
+  }
+
+  /**
+   * Generate ambient decorations for the current chapter grid, selecting
+   * decoration types appropriate for each cell's floor type.
+   */
+  private _generateChapterDecorations(): ReadonlyMap<string, import('../types').AmbientDecoration> {
+    const floorTypes = computeChapterFloorTypes(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols);
+    return generateAmbientDecorations(
+      this._chapterEditRows,
+      this._chapterEditCols,
+      (r, c) => floorTypes.get(`${r},${c}`) ?? PipeShape.Empty,
+    );
   }
 
   /**
@@ -298,7 +312,7 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     this._chapterEditGrid = newGrid;
-    this._chapterDecorations = generateAmbientDecorations(newRows, newCols);
+    this._chapterDecorations = this._generateChapterDecorations();
 
     // Update focused tile position to follow the rotation.
     if (this._chapterFocusedTilePos) {
@@ -325,7 +339,7 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     this._chapterEditGrid = newGrid;
-    this._chapterDecorations = generateAmbientDecorations(newRows, newCols);
+    this._chapterDecorations = this._generateChapterDecorations();
 
     if (this._chapterFocusedTilePos) {
       this._chapterFocusedTilePos = reflectPositionAboutDiagonal(this._chapterFocusedTilePos);
@@ -791,7 +805,7 @@ export class ChapterMapEditorSection {
     this._chapterEditRows = newRows;
     this._chapterEditCols = newCols;
     // Regenerate decorations for the new grid dimensions
-    this._chapterDecorations = generateAmbientDecorations(newRows, newCols);
+    this._chapterDecorations = this._generateChapterDecorations();
     this._recordChapterSnapshot(chapter);
     this._updateChapterCanvasDisplaySize();
     this._saveChapterGridState(chapter, campaign);

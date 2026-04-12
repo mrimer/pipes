@@ -53,18 +53,42 @@ const CRYSTAL_HIGHLIGHT = 'rgba(225,242,255,0.55)';
 
 // ─── Ambient decoration drawing helpers ──────────────────────────────────────
 
-/** Draw a small cluster of pebbles centered at the current canvas origin. */
+/** Draw a small cluster of pebbles centered at the current canvas origin.
+ * Each rock is drawn as an irregular 5-sided polygon for a more natural look.
+ * Rocks are spaced further apart than the old oval layout.
+ */
 function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
   const color = PEBBLE_COLORS[variant % PEBBLE_COLORS.length];
-  const stones: Array<[number, number, number, number]> = [
-    [0, 0, _s(5.25), _s(3.75)],
-    [_s(7.5), -_s(3.75), _s(4.2), _s(3.0)],
-  ];
-  if (variant < 2) stones.push([-_s(6), _s(4.5), _s(3.3), _s(2.4)]);
   ctx.fillStyle = color;
-  for (const [dx, dy, rx, ry] of stones) {
+
+  // Three rock positions, spaced well apart so they read as distinct pebbles.
+  // Positions are in _s() units relative to the cell-centred canvas origin.
+  const rocks: Array<{ cx: number; cy: number; rx: number; ry: number }> = [
+    { cx:  0,       cy:  0,      rx: _s(4.8), ry: _s(3.6) },
+    { cx:  _s(9.5), cy: -_s(4), rx: _s(3.9), ry: _s(3.0) },
+  ];
+  if (variant < 2) {
+    rocks.push({ cx: -_s(8), cy: _s(5.5), rx: _s(3.3), ry: _s(2.6) });
+  }
+
+  for (const { cx, cy, rx, ry } of rocks) {
+    // Build an irregular 5-gon by displacing each vertex slightly from a regular pentagon.
+    const sides = 5;
     ctx.beginPath();
-    ctx.ellipse(dx, dy, rx, ry, 0, 0, Math.PI * 2);
+    for (let i = 0; i < sides; i++) {
+      // Use per-variant, per-rock, per-vertex deterministic jitter so shapes look
+      // irregular but are stable (no flicker on re-render within a frame).
+      const baseAngle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+      // Alternate small inward/outward nudges to break the regular outline.
+      const radiusFactor = 1 + (((i * 7 + variant * 3) % 5) - 2) * 0.09;
+      const angleDelta   = (((i * 5 + variant * 7) % 3) - 1) * 0.07;
+      const angle = baseAngle + angleDelta;
+      const x = cx + Math.cos(angle) * rx * radiusFactor;
+      const y = cy + Math.sin(angle) * ry * radiusFactor;
+      if (i === 0) ctx.moveTo(x, y);
+      else         ctx.lineTo(x, y);
+    }
+    ctx.closePath();
     ctx.fill();
   }
 }

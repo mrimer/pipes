@@ -473,11 +473,9 @@ function _renderChapterMapPass1Backgrounds(
       const ginghamColor = paritySum === 0 ? colorLight : paritySum === 2 ? colorDark : colorMid;
       ctx.fillStyle = ginghamColor;
       ctx.fillRect(x, y, CELL, CELL);
-      // Ambient decoration on null (default grass) cells only
-      if (def === null) {
-        const dec = decorations?.get(`${r},${c}`);
-        if (dec) drawAmbientDecoration(ctx, dec);
-      }
+      // Ambient decoration on all empty-floor cells (null = default grass, EmptyDirt, EmptyDark)
+      const dec = decorations?.get(`${r},${c}`);
+      if (dec) drawAmbientDecoration(ctx, dec);
     }
   }
 }
