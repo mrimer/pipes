@@ -1603,7 +1603,10 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    drawChamber(ctx, tile, color, isWater, half, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, effectiveButtEndDirs);
+    // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the
+    // clip and stub endpoints land precisely on the tile edge at every tile size,
+    // consistent with the pipe-body path approach above.
+    drawChamber(ctx, tile, color, isWater, TILE_SIZE / 2, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, effectiveButtEndDirs);
   } else if (shape === PipeShape.Granite) {
     // Granite – solid impassable stone block; no connections
     ctx.restore();
