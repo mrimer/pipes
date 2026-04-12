@@ -275,6 +275,19 @@ function _drawFillOverlay(
   // Phase 2 (0.5 → 1): all other arms fill from the center outward.
   const otherP = Math.max(0, (progress - 0.5) * 2);
 
+  // Pre-compute triple-stroke widths and colors once per call.
+  const shadowColor    = darken(color, 0.30);
+  const highlightColor = lighten(color, 0.40);
+  const baseWidth      = lineWidth - Math.max(2, _s(2));
+  const highlightWidth = Math.max(1, _s(1.5));
+
+  /** Apply the three-pass stroke (shadow → base → highlight) to a pre-built path. */
+  function _tripleStroke(path: Path2D): void {
+    ctx.strokeStyle = shadowColor;    ctx.lineWidth = lineWidth;    ctx.stroke(path);
+    ctx.strokeStyle = color;          ctx.lineWidth = baseWidth;    ctx.stroke(path);
+    ctx.strokeStyle = highlightColor; ctx.lineWidth = highlightWidth; ctx.stroke(path);
+  }
+
   ctx.save();
   // Clip to this tile's bounds so that the rounded line-cap nubs on Phase 2
   // arms never extend into adjacent tiles and paint over content there.
@@ -296,18 +309,7 @@ function _drawFillOverlay(
     const entryPath = new Path2D();
     entryPath.moveTo(startX, startY);
     entryPath.lineTo(endX, endY);
-    // Shadow
-    ctx.strokeStyle = darken(color, 0.30);
-    ctx.lineWidth = lineWidth;
-    ctx.stroke(entryPath);
-    // Base
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth - Math.max(2, _s(2));
-    ctx.stroke(entryPath);
-    // Highlight
-    ctx.strokeStyle = lighten(color, 0.40);
-    ctx.lineWidth = Math.max(1, _s(1.5));
-    ctx.stroke(entryPath);
+    _tripleStroke(entryPath);
   }
 
   // Other arms: fill from the center outward (skip entry arm and blocked arm).
@@ -320,18 +322,7 @@ function _drawFillOverlay(
       const armPath = new Path2D();
       armPath.moveTo(cx, cy);
       armPath.lineTo(cx + dx * half * otherP, cy + dy * half * otherP);
-      // Shadow
-      ctx.strokeStyle = darken(color, 0.30);
-      ctx.lineWidth = lineWidth;
-      ctx.stroke(armPath);
-      // Base
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth - Math.max(2, _s(2));
-      ctx.stroke(armPath);
-      // Highlight
-      ctx.strokeStyle = lighten(color, 0.40);
-      ctx.lineWidth = Math.max(1, _s(1.5));
-      ctx.stroke(armPath);
+      _tripleStroke(armPath);
     }
   }
 
