@@ -9,7 +9,6 @@
 
 import { Board } from './board';
 import { TILE_SIZE, renderBoard } from './renderer';
-import { GridPos } from './types';
 import { CHAPTER_MAP_BG } from './colors';
 
 
@@ -92,8 +91,7 @@ export function playLevelTransition(
   }
 
   // Render a clean board snapshot (no hover, no selection, no highlights).
-  const defaultFocus: GridPos = { ...board.source };
-  renderBoard(offCtx, offscreen, board, defaultFocus, null, 0, null);
+  renderBoard(offCtx, offscreen, board, null, 0, null);
 
   // ── 2. Compute the target rect (where the game canvas content area is) ──
 

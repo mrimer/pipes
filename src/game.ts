@@ -706,7 +706,6 @@ export class Game implements InputCallbacks {
       this.ctx,
       this.canvas,
       this.board,
-      this.focusPos,
       this.selectedShape,
       this.pendingRotation,
       this._input.mouseCanvasPos,
@@ -1666,7 +1665,7 @@ export class Game implements InputCallbacks {
         offscreen.height = this.board.rows * TILE_SIZE;
         const offCtx = offscreen.getContext('2d');
         if (offCtx) {
-          renderBoard(offCtx, offscreen, this.board, { ...this.board.source }, null, 0, null);
+          renderBoard(offCtx, offscreen, this.board, null, 0, null);
           boardSnapshot = offscreen;
         }
       }

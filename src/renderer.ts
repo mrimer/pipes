@@ -12,7 +12,7 @@ export { drawAmbientDecoration };
 export { LINE_WIDTH, TILE_SIZE, _s, setTileSize, BASE_TILE_SIZE } from './renderer/rendererState';
 import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererState';
 import {
-  BG_COLOR, TILE_BG, FOCUS_COLOR,
+  BG_COLOR, TILE_BG,
   EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK, EMPTY_TARGET_COLOR,
   EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR_DARK,
@@ -1730,7 +1730,6 @@ export function renderBoard(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   board: Board,
-  focusPos: GridPos,
   selectedShape: PipeShape | null,
   pendingRotation: number,
   mouseCanvasPos: { x: number; y: number } | null,
@@ -1760,7 +1759,7 @@ export function renderBoard(
 
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
-  _renderPass1Backgrounds(ctx, board, focusPos, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
+  _renderPass1Backgrounds(ctx, board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
   // Win tile glow overlay: rendered above backgrounds but beneath all tile content.
   winTileOverlayFn?.(ctx);
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn);
@@ -1880,7 +1879,6 @@ function _drawCellTargetOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
 function _renderPass1Backgrounds(
   ctx: CanvasRenderingContext2D,
   board: Board,
-  focusPos: GridPos,
   selectedShape: PipeShape | null,
   pendingRotation: number,
   selectedIsGold: boolean,
@@ -1892,7 +1890,6 @@ function _renderPass1Backgrounds(
       const tile = board.grid[r][c];
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
-      const isFocused  = focusPos.row === r && focusPos.col === c;
       const isGoldCell = board.goldSpaces.has(posKey(r, c));
       const isCementCell = board.cementData.has(posKey(r, c));
       const oneWayDir = board.oneWayData.get(posKey(r, c));
@@ -1993,13 +1990,6 @@ function _renderPass1Backgrounds(
         if (isReplaceTarget) {
           _drawCellTargetOverlay(ctx, x, y);
         }
-      }
-
-      // Focus highlight
-      if (isFocused) {
-        ctx.strokeStyle = FOCUS_COLOR;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
 
       // Sandstone error highlight (pulsing red overlay)
