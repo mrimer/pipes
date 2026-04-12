@@ -1293,12 +1293,13 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   }
 
   it('canvas CSS size equals intrinsic size for small grids (no scaling needed)', () => {
-    // 4×4 grid → intrinsic 256×256 px, within 512 px limit → scale = 1
+    // 4×4 grid, no mainLayout → availW=512, tile size expands to 512/4=128 px
+    // → intrinsic 512×512 px, within 512 px limit → scale = 1 → CSS 512×512 px
     const state = makeEditorWithCanvas(makeLevel(4, 4));
     const canvas = state._editorCanvas!;
     expect(canvas).not.toBeNull();
-    expect(canvas.style.width).toBe('256px');
-    expect(canvas.style.height).toBe('256px');
+    expect(canvas.style.width).toBe('512px');
+    expect(canvas.style.height).toBe('512px');
   });
 
   it('canvas CSS size is capped at MAX_EDITOR_CANVAS_PX for large grids', () => {
@@ -1311,8 +1312,9 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   });
 
   it('canvas CSS size updates after _resizeGrid to a large grid', () => {
+    // 4×4 grid → tile size 128px → CSS 512px (fills MAX_EDITOR_CANVAS_PX)
     const state = makeEditorWithCanvas(makeLevel(4, 4));
-    expect(state._editorCanvas!.style.width).toBe('256px');
+    expect(state._editorCanvas!.style.width).toBe('512px');
     // Grow to 10×10
     state._resizeGrid(10, 10);
     expect(state._editorCanvas!.style.width).toBe('512px');
@@ -1322,10 +1324,10 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   it('canvas CSS size updates after _resizeGrid back to a small grid', () => {
     const state = makeEditorWithCanvas(makeLevel(10, 10));
     expect(state._editorCanvas!.style.width).toBe('512px');
-    // Shrink back to 4×4
+    // Shrink back to 4×4 → tile size expands to 128px → CSS 512px
     state._resizeGrid(4, 4);
-    expect(state._editorCanvas!.style.width).toBe('256px');
-    expect(state._editorCanvas!.style.height).toBe('256px');
+    expect(state._editorCanvas!.style.width).toBe('512px');
+    expect(state._editorCanvas!.style.height).toBe('512px');
   });
 
   it('_canvasPos maps mouse coords using actual displayed tile size (CSS-scaled canvas)', () => {
