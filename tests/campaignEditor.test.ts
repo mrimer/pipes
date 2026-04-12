@@ -808,7 +808,7 @@ describe('CampaignEditor – import version comparison', () => {
 
     // The onPlaytest callback must have been called.
     expect(playtestCalls).toHaveLength(1);
-    expect(playtestCalls[0].name).toBe('Playtest Level');
+    expect(playtestCalls[0].name).toBe('1-1: Playtest Level');
   });
 });
 
