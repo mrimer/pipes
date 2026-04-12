@@ -300,7 +300,7 @@ const DECORATION_DENSITY = 0.30;
  */
 export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
   switch (floorType) {
-    case PipeShape.EmptyDirt: return ['grass', 'crystal', 'pebbles'];
+    case PipeShape.EmptyDirt: return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower'];
     case PipeShape.EmptyDark: return ['mushroom', 'crystal', 'pebbles'];
     default:                  return ['flower', 'grass', 'mushroom'];  // Empty / grass
   }
@@ -333,9 +333,12 @@ export function generateAmbientDecorations(
       const floorType = getFloorType ? getFloorType(r, c) : PipeShape.Empty;
       const types = decorationTypesForFloor(floorType);
       const type = types[Math.floor(Math.random() * types.length)];
-      // Mushrooms scale 0.7–1.5 (up to 50 % larger); crystals scale 0.75–1.25 (±25 %).
-      const scale = type === 'mushroom' ? 0.7 + Math.random() * 0.8
-                  : type === 'crystal'  ? 0.75 + Math.random() * 0.5
+      // Mushrooms scale 0.7–1.5 (up to 50 % larger); crystals scale 0.75–1.25 (±25 %);
+      // dandelions and sunflowers scale 0.65–1.35 (random factor as per design).
+      const scale = type === 'mushroom'   ? 0.7 + Math.random() * 0.8
+                  : type === 'crystal'    ? 0.75 + Math.random() * 0.5
+                  : type === 'dandelion'  ? 0.65 + Math.random() * 0.7
+                  : type === 'sunflower'  ? 0.65 + Math.random() * 0.7
                   : undefined;
       // Crystals randomly show either one or two shards.
       const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
