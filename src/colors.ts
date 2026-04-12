@@ -187,3 +187,16 @@ export function darken(hex: string, amount: number): string {
     Math.round(b * (1 - amount)),
   );
 }
+
+/** Base color for the Dirt empty-floor gingham pattern (medium brown). */
+export const EMPTY_DIRT_COLOR       = '#7b5230';
+/** Light shade for Dirt gingham (top-left of 2×2 cell). */
+export const EMPTY_DIRT_COLOR_LIGHT = lighten(EMPTY_DIRT_COLOR, 0.15);
+/** Dark shade for Dirt gingham (bottom-right of 2×2 cell). */
+export const EMPTY_DIRT_COLOR_DARK  = darken(EMPTY_DIRT_COLOR, 0.20);
+/** Base color for the Dark empty-floor gingham pattern (matches BG_COLOR). */
+export const EMPTY_DARK_COLOR       = '#1a1a2e';
+/** Light shade for Dark gingham (top-left of 2×2 cell). */
+export const EMPTY_DARK_COLOR_LIGHT = lighten(EMPTY_DARK_COLOR, 0.25);
+/** Dark shade for Dark gingham (bottom-right of 2×2 cell). */
+export const EMPTY_DARK_COLOR_DARK  = darken(EMPTY_DARK_COLOR, 0.15);

@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA } from './board';
+import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA, isEmptyFloor, EMPTY_FLOOR_SHAPES } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
@@ -14,6 +14,8 @@ import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererSt
 import {
   BG_COLOR, TILE_BG, FOCUS_COLOR,
   EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK, EMPTY_TARGET_COLOR,
+  EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR_DARK,
+  EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR_DARK,
   GOLD_SPACE_BASE_COLOR, GOLD_SPACE_SHIMMER_COLOR, GOLD_SPACE_BORDER_COLOR,
   PIPE_COLOR, WATER_COLOR,
   SOURCE_COLOR, SOURCE_WATER_COLOR,
@@ -475,19 +477,29 @@ export function computeGraniteNeighbors(board: Board, row: number, col: number):
   };
 }
 
+/** Return [light, mid, dark] gingham colors for the given empty floor type. */
+export function ginghamColorsForFloor(floorType: PipeShape): [string, string, string] {
+  if (floorType === PipeShape.EmptyDirt) return [EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_DARK];
+  if (floorType === PipeShape.EmptyDark) return [EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_DARK];
+  return [EMPTY_COLOR_LIGHT, EMPTY_COLOR, EMPTY_COLOR_DARK];
+}
+
 /**
- * Draw a 50% transparent green gingham overlay in the given rectangle.
+ * Draw a 50% transparent gingham overlay in the given rectangle.
  * Tile parity (r, c) determines which gingham shade to use.
+ * floorType controls the gingham color palette (default: grass green).
  */
 export function drawGinghamOverlay(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number,
   r: number, c: number,
+  floorType: PipeShape = PipeShape.Empty,
 ): void {
+  const [colorLight, colorMid, colorDark] = ginghamColorsForFloor(floorType);
   const paritySum = (r % 2) + (c % 2);
-  const ginghamBase = paritySum === 0 ? EMPTY_COLOR_LIGHT
-    : paritySum === 2 ? EMPTY_COLOR_DARK
-    : EMPTY_COLOR;
+  const ginghamBase = paritySum === 0 ? colorLight
+    : paritySum === 2 ? colorDark
+    : colorMid;
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = ginghamBase;
@@ -880,7 +892,7 @@ export function drawOneWayArrow(ctx: CanvasRenderingContext2D, x: number, y: num
  *  - One-way cells             (tracked separately in board.oneWayData)
  */
 function _isOpenFloorCell(board: Board, nr: number, nc: number): boolean {
-  return board.grid[nr][nc].shape === PipeShape.Empty;
+  return isEmptyFloor(board.grid[nr][nc].shape);
 }
 
 /**
@@ -1870,7 +1882,7 @@ function _renderPass1Backgrounds(
       // A cell is a valid placement target when it's empty and either:
       // it's not a gold space (any pipe fits), or it IS a gold space (gold pipe required)
       const isTarget = selectedShape !== null &&
-        tile.shape === PipeShape.Empty &&
+        isEmptyFloor(tile.shape) &&
         (!isGoldCell || selectedIsGold);
 
       // A non-empty cell is a valid replacement target when the selected shape can replace it:
@@ -1891,7 +1903,7 @@ function _renderPass1Backgrounds(
           _drawCellTargetOverlay(ctx, x, y);
         } else if (
           selectedShape !== null &&
-          tile.shape !== PipeShape.Empty &&
+          !isEmptyFloor(tile.shape) &&
           tile.shape === selectedShape &&
           tile.rotation === pendingRotation
         ) {
@@ -1908,7 +1920,7 @@ function _renderPass1Backgrounds(
           _drawCellTargetOverlay(ctx, x, y);
         } else if (
           selectedShape !== null &&
-          tile.shape !== PipeShape.Empty &&
+          !isEmptyFloor(tile.shape) &&
           tile.shape === selectedShape &&
           tile.rotation === pendingRotation
         ) {
@@ -1917,7 +1929,7 @@ function _renderPass1Backgrounds(
           // so shade the cell to indicate it is not a placement target.
           _drawCellTargetOverlay(ctx, x, y);
         }
-      } else if (tile.shape === PipeShape.Empty) {
+      } else if (isEmptyFloor(tile.shape)) {
         if (isGoldCell) {
           // Shimmering gold background
           ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
@@ -1935,9 +1947,8 @@ function _renderPass1Backgrounds(
           }
         } else {
           const paritySum = (r % 2) + (c % 2);
-          const ginghamColor = paritySum === 0 ? EMPTY_COLOR_LIGHT
-            : paritySum === 2 ? EMPTY_COLOR_DARK
-            : EMPTY_COLOR;
+          const [gc_light, gc_mid, gc_dark] = ginghamColorsForFloor(tile.shape);
+          const ginghamColor = paritySum === 0 ? gc_light : paritySum === 2 ? gc_dark : gc_mid;
           ctx.fillStyle = isTarget ? EMPTY_TARGET_COLOR : ginghamColor;
           ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
           // Draw any ambient decoration on this empty non-gold cell
@@ -2006,7 +2017,7 @@ function _renderPass2NonPipeTiles(
 
       // Skip drawing the empty-tile dot on cement or one-way cells – their
       // background texture/arrow is already clearly visible.
-      if (tile.shape === PipeShape.Empty && (isCementCell || board.oneWayData.has(posKey(r, c)))) continue;
+      if (isEmptyFloor(tile.shape) && (isCementCell || board.oneWayData.has(posKey(r, c)))) continue;
 
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
@@ -2063,8 +2074,10 @@ function _renderPass2NonPipeTiles(
 
       // Gingham overlay for Granite, Tree, and Chamber tiles: 50% transparent green
       // gingham pattern drawn on top of the tile background color.
-      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber) {
-        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c);
+      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber
+          || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
+        const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
+        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, floorType);
       }
 
       // For the sink tile, build an overlay callback that renders the vortex effect
@@ -2322,7 +2335,7 @@ function _renderHoverPreview(
 
   if (selectedShape !== null) {
     // Inventory item placement preview
-    const canPlace = hoverTile.shape === PipeShape.Empty && (!isGoldCell || selectedIsGold);
+    const canPlace = isEmptyFloor(hoverTile.shape) && (!isGoldCell || selectedIsGold);
     const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
     if (canPlace || canReplace) {
       const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
@@ -2331,7 +2344,7 @@ function _renderHoverPreview(
     }
   } else if (hoverRotationDelta > 0) {
     // Rotation preview on an existing tile (no inventory item selected, Q/W or scroll)
-    if (!hoverTile.isFixed && hoverTile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(hoverTile.shape)) {
+    if (!hoverTile.isFixed && !isEmptyFloor(hoverTile.shape) && !SPIN_PIPE_SHAPES.has(hoverTile.shape)) {
       const previewRotation = ((hoverTile.rotation + hoverRotationDelta * 90) % 360) as 0 | 90 | 180 | 270;
       const previewTile = new Tile(
         hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,

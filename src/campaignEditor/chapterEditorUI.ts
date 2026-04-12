@@ -69,6 +69,9 @@ export class ChapterEditorUI {
     panel.appendChild(title);
 
     const CHAPTER_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+      { palette: PipeShape.Empty,        label: '🟩 Empty - Grass' },
+      { palette: PipeShape.EmptyDirt,    label: '🟫 Empty - Dirt' },
+      { palette: PipeShape.EmptyDark,    label: '⬛ Empty - Dark' },
       { palette: PipeShape.Source,       label: '💧 Source' },
       { palette: PipeShape.Sink,         label: '🏁 Sink' },
       { palette: LEVEL_CHAMBER_PALETTE,  label: '🚪 Level' },

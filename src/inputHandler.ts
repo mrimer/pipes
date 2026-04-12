@@ -1,4 +1,4 @@
-import { Board, MoveResult, SPIN_PIPE_SHAPES } from './board';
+import { Board, MoveResult, SPIN_PIPE_SHAPES, isEmptyFloor } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, PipeShape, Rotation } from './types';
 import { TILE_SIZE } from './renderer';
@@ -335,7 +335,7 @@ export class InputHandler {
     if (!this.mouseCanvasPos || !board) return false;
     const hPos = this._getHoverGridPos()!;
     const hTile = board.getTile(hPos);
-    if (!hTile || hTile.isFixed || hTile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(hTile.shape)) {
+    if (!hTile || hTile.isFixed || isEmptyFloor(hTile.shape) || SPIN_PIPE_SHAPES.has(hTile.shape)) {
       return false;
     }
     this.hoverRotationDelta = ((this.hoverRotationDelta + steps + 4) % 4);
@@ -416,7 +416,7 @@ export class InputHandler {
           this._cb.getGameState() === GameState.Playing &&
           this._cb.getScreen() === GameScreen.Play) {
         const tile = board.getTile(this._rightDragLastTile);
-        if (!tile || tile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(tile.shape)) {
+        if (!tile || isEmptyFloor(tile.shape) || SPIN_PIPE_SHAPES.has(tile.shape)) {
           // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
           if (this._cb.getSelectedShape() !== null) {
             this._cb.setSelectedShape(null);
@@ -490,13 +490,13 @@ export class InputHandler {
         this._cb.handleBoardError(spinResult);
       }
     } else if (this._cb.getSelectedShape() !== null &&
-               (tile.shape === PipeShape.Empty ||
+               (isEmptyFloor(tile.shape) ||
                 tile.shape !== this._cb.getSelectedShape() ||
                 tile.rotation !== this._cb.getPendingRotation())) {
       // Place on an empty cell or replace a tile with a different shape/rotation.
       // When tile already matches exactly (same shape+rotation), fall through to rotate.
       this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
-    } else if (tile.shape !== PipeShape.Empty) {
+    } else if (!isEmptyFloor(tile.shape)) {
       // Rotate existing pipe (no inventory item selected, or same shape+rotation as selected).
       // If the user has previewed multiple rotations via Q/W/wheel, apply all of them
       // as a single game turn; otherwise fall back to a standard single 90° rotation.
@@ -547,7 +547,7 @@ export class InputHandler {
     const tile = board.getTile(pos);
 
     // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
-    if (tile && (tile.shape === PipeShape.Empty || SPIN_PIPE_SHAPES.has(tile.shape))) {
+    if (tile && (isEmptyFloor(tile.shape) || SPIN_PIPE_SHAPES.has(tile.shape))) {
       if (this._cb.getSelectedShape() !== null) {
         this._cb.setSelectedShape(null);
         this._cb.renderInventoryBar();
@@ -929,7 +929,7 @@ export class InputHandler {
         if (!board) return;
         const lp = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
         const tile = board.getTile(lp);
-        if (tile && tile.shape !== PipeShape.Empty && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+        if (tile && !isEmptyFloor(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
           this._longPressTriggered = true;
           // Optional haptic feedback.
           if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
@@ -984,7 +984,7 @@ export class InputHandler {
         // Rotate a placed non-fixed tile at the touch-start position.
         const startPos = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
         const startTile = board.getTile(startPos);
-        if (startTile && startTile.shape !== PipeShape.Empty &&
+        if (startTile && !isEmptyFloor(startTile.shape) &&
             !startTile.isFixed && !SPIN_PIPE_SHAPES.has(startTile.shape)) {
           const filledBefore = board.getFilledPositions();
           const oldRotation = startTile.rotation;
@@ -1084,12 +1084,12 @@ export class InputHandler {
           this._cb.handleBoardError(spinResult);
         }
       } else if (this._cb.getSelectedShape() !== null &&
-                 (tile.shape === PipeShape.Empty ||
+                 (isEmptyFloor(tile.shape) ||
                   tile.shape !== this._cb.getSelectedShape() ||
                   tile.rotation !== this._cb.getPendingRotation())) {
         // Place or replace.
         this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
-      } else if (tile.shape !== PipeShape.Empty) {
+      } else if (!isEmptyFloor(tile.shape)) {
         // Tap on a placed non-selected tile: rotate CW.
         const oldRotation = tile.rotation;
         const rotResult = board.rotateTile(pos);

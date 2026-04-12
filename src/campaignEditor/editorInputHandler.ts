@@ -8,7 +8,7 @@
  */
 
 import { TileDef, PipeShape, Rotation } from '../types';
-import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
+import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
 import { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { LevelEditorState } from './levelEditorState';
@@ -115,6 +115,11 @@ export class EditorInputHandler {
 
   private _paintCell(pos: { row: number; col: number }): void {
     const state = this._cb.getState();
+    // Empty-Grass palette: clear to null using erase-floor algorithm
+    if (state.palette === PipeShape.Empty) {
+      state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
+      return;
+    }
     state.grid[pos.row][pos.col] = state.buildTileDef();
     if (state.paletteHasNonRotationParams()) {
       state.linkTile(pos);
@@ -137,7 +142,7 @@ export class EditorInputHandler {
       this._rightEraseDragActive = true;
       this._suppressNextContextMenu = false;
       if (state.grid[pos.row][pos.col] !== null) {
-        state.grid[pos.row][pos.col] = null;
+        state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
         state.clearLinkAt(pos);
         sfxManager.play(SfxId.Delete);
         this._cb.renderCanvas();
@@ -149,9 +154,10 @@ export class EditorInputHandler {
     if (!pos) return;
 
     const existingTile = state.grid[pos.row][pos.col];
+    const existingIsEmpty = existingTile === null || (existingTile !== null && isEmptyFloor(existingTile.shape));
 
     // Repeatable tile on an empty cell: start a paint-drag session.
-    if (existingTile === null && REPEATABLE_EDITOR_TILES.has(state.palette)) {
+    if (existingIsEmpty && REPEATABLE_EDITOR_TILES.has(state.palette)) {
       this._paintDragActive = true;
       this._paintCell(pos);
       this._playPlacementSfx(pos);
@@ -159,7 +165,7 @@ export class EditorInputHandler {
       return;
     }
 
-    if (existingTile !== null && state.palette !== 'erase') {
+    if (existingTile !== null && !existingIsEmpty && state.palette !== 'erase') {
       // Start a drag: track the tile but don't modify the grid yet
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._cb.renderCanvas();
@@ -178,8 +184,13 @@ export class EditorInputHandler {
       // the placed/erased tile is captured in the new history entry.
       if (state.palette === 'erase') {
         if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
-        state.grid[pos.row][pos.col] = null;
+        state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
         // Clear the link if the erased tile was linked
+        state.clearLinkAt(pos);
+      } else if (state.palette === PipeShape.Empty) {
+        // Empty-Grass palette: clear to floor-type-aware null
+        if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
+        state.grid[pos.row][pos.col] = null;
         state.clearLinkAt(pos);
       } else {
         state.grid[pos.row][pos.col] = state.buildTileDef();
@@ -262,7 +273,7 @@ export class EditorInputHandler {
         // Ctrl+click: force-overwrite; snapshot recorded after the change.
         if (state.palette === 'erase') {
           sfxManager.play(SfxId.Delete);
-          state.grid[startPos.row][startPos.col] = null;
+          state.grid[startPos.row][startPos.col] = state.eraseFloorTileDefAt(startPos.row, startPos.col);
           // Clear the link if the erased tile was linked
           state.clearLinkAt(startPos);
         } else {
@@ -307,7 +318,7 @@ export class EditorInputHandler {
     state.recordSnapshot();
     this._cb.updateUndoRedoButtons();
     if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
-    state.grid[pos.row][pos.col] = null;
+    state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
     // Clear the link if the erased tile was linked
     state.clearLinkAt(pos);
     this._cb.renderCanvas();
@@ -319,14 +330,15 @@ export class EditorInputHandler {
     state.hover = pos;
 
     if (this._paintDragActive && pos) {
-      // Paint each new empty cell the cursor enters during a paint-drag.
-      if (state.grid[pos.row][pos.col] === null) {
+      // Paint each empty (or empty-floor-typed) cell the cursor enters during a paint-drag.
+      const cur = state.grid[pos.row][pos.col];
+      if (cur === null || (cur !== null && isEmptyFloor(cur.shape))) {
         this._paintCell(pos);
       }
     } else if (this._rightEraseDragActive && pos) {
       // Erase each non-empty cell the cursor enters during a right-erase-drag.
       if (state.grid[pos.row][pos.col] !== null) {
-        state.grid[pos.row][pos.col] = null;
+        state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
         state.clearLinkAt(pos);
       }
     } else if (this._dragState && pos) {

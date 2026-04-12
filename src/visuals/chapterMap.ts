@@ -5,9 +5,9 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
-import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
+import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
-import { PIPE_SHAPES, NEIGHBOUR_DELTA } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
@@ -297,6 +297,91 @@ export function drawLevelChamberTile(
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
 /**
+ * Pre-compute the "display floor type" for every cell in a chapter map grid.
+ * null / EmptyDirt / EmptyDark cells: their own shape (null → PipeShape.Empty).
+ * Source, Sink, Tree: majority of adjacent empty floor type.
+ * Granite: BFS flood-fill from edges touching empty cells.
+ * Other: PipeShape.Empty fallback.
+ */
+export function computeChapterFloorTypes(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+): ReadonlyMap<string, PipeShape> {
+  const map = new Map<string, PipeShape>();
+
+  const rawFloorType = (r: number, c: number): PipeShape | null => {
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
+    const def = grid[r]?.[c] ?? null;
+    if (def === null) return PipeShape.Empty;
+    if (isEmptyFloor(def.shape)) return def.shape;
+    return null;
+  };
+
+  const majorityAdjacentFloor = (r: number, c: number): PipeShape => {
+    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0]]);
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+      const nr = r + dr, nc = c + dc;
+      const fromMap = map.get(`${nr},${nc}`);
+      const ft = fromMap ?? rawFloorType(nr, nc);
+      if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
+    }
+    let best: PipeShape = PipeShape.Empty;
+    let bestCount = -1;
+    for (const shape of EMPTY_FLOOR_SHAPES) {
+      const cnt = counts.get(shape) ?? 0;
+      if (cnt > bestCount) { bestCount = cnt; best = shape; }
+    }
+    return best;
+  };
+
+  // Pass 1: empty cells
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ft = rawFloorType(r, c);
+      if (ft !== null) map.set(`${r},${c}`, ft);
+    }
+  }
+
+  // Pass 2: Source, Sink, Tree
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const def = grid[r]?.[c] ?? null;
+      if (def !== null && (def.shape === PipeShape.Source || def.shape === PipeShape.Sink || def.shape === PipeShape.Tree)) {
+        map.set(`${r},${c}`, majorityAdjacentFloor(r, c));
+      }
+    }
+  }
+
+  // Pass 3: Granite BFS
+  const queue: [number, number][] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r]?.[c]?.shape !== PipeShape.Granite) continue;
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+        const nr = r + dr, nc = c + dc;
+        if (map.has(`${nr},${nc}`)) { queue.push([r, c]); break; }
+      }
+    }
+  }
+  let queueIndex = 0;
+  while (queueIndex < queue.length) {
+    const [r, c] = queue[queueIndex++];
+    const key = `${r},${c}`;
+    if (map.has(key)) continue;
+    map.set(key, majorityAdjacentFloor(r, c));
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr]?.[nc]?.shape === PipeShape.Granite && !map.has(`${nr},${nc}`)) {
+        queue.push([nr, nc]);
+      }
+    }
+  }
+
+  return map;
+}
+
+/**
  * Draw a Source or Sink endpoint tile on the chapter map at tile position (r, c).
  * Fills the tile background, draws the gingham overlay, then delegates to the shared
  * drawSourceOrSink renderer (translated to the tile centre).
@@ -312,11 +397,12 @@ function _drawChapterMapEndpointTile(
   isSource: boolean,
   buttEndDirs: Set<Direction> | undefined,
   centerLabel: { text: string; color: string },
+  floorType: PipeShape = PipeShape.Empty,
 ): void {
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawSourceOrSink(ctx, connections, color, CELL / 2, isSource, buttEndDirs, centerLabel, CHAPTER_MAP_TILE_BG);
@@ -333,6 +419,7 @@ function _drawChapterMapGranite(
   cols: number,
   r: number,
   c: number,
+  floorType: PipeShape = PipeShape.Empty,
 ): void {
   const CELL = TILE_SIZE;
   const _isGranite = (rr: number, cc: number): boolean =>
@@ -349,7 +436,7 @@ function _drawChapterMapGranite(
   };
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawGranite(ctx, CELL / 2, neighbors);
@@ -357,11 +444,11 @@ function _drawChapterMapGranite(
 }
 
 /** Draw Tree tile like in-game. */
-function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number): void {
+function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty): void {
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawTree(ctx, CELL / 2);
@@ -429,23 +516,27 @@ function _renderChapterMapPass1Backgrounds(
   rows: number,
   cols: number,
   decorations?: ReadonlyMap<string, AmbientDecoration>,
+  floorTypes?: ReadonlyMap<string, PipeShape>,
 ): void {
   const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
-      if (def !== null) continue;
+      const isEmptyCell = def === null || isEmptyFloor(def.shape);
+      if (!isEmptyCell) continue;
+      const floorType = floorTypes?.get(`${r},${c}`) ?? (def !== null ? def.shape : PipeShape.Empty);
       const x = c * CELL;
       const y = r * CELL;
       const paritySum = (r % 2) + (c % 2);
-      const ginghamColor = paritySum === 0 ? EMPTY_COLOR_LIGHT
-        : paritySum === 2 ? EMPTY_COLOR_DARK
-        : EMPTY_COLOR;
+      const [colorLight, colorMid, colorDark] = ginghamColorsForFloor(floorType);
+      const ginghamColor = paritySum === 0 ? colorLight : paritySum === 2 ? colorDark : colorMid;
       ctx.fillStyle = ginghamColor;
       ctx.fillRect(x, y, CELL, CELL);
-      // Ambient decoration on empty cells
-      const dec = decorations?.get(`${r},${c}`);
-      if (dec) drawAmbientDecoration(ctx, dec);
+      // Ambient decoration on null (default grass) cells only
+      if (def === null) {
+        const dec = decorations?.get(`${r},${c}`);
+        if (dec) drawAmbientDecoration(ctx, dec);
+      }
     }
   }
 }
@@ -461,15 +552,17 @@ function _renderChapterMapPass2NonPipeTiles(
   progress: LevelProgressMap,
   completedLevelCount: number,
   jitterCell?: { row: number; col: number; dx: number; dy: number },
+  floorTypes?: ReadonlyMap<string, PipeShape>,
 ): void {
   const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const def = grid[r]?.[c] ?? null;
-      if (def === null || PIPE_SHAPES.has(def.shape)) continue;
+      if (def === null || PIPE_SHAPES.has(def.shape) || isEmptyFloor(def.shape)) continue;
       const x = c * CELL;
       const y = r * CELL;
       const isFilled = filledKeys.has(`${r},${c}`);
+      const floorType = floorTypes?.get(`${r},${c}`) ?? PipeShape.Empty;
 
       if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
         const levelIdx = def.levelIdx ?? 0;
@@ -491,7 +584,7 @@ function _renderChapterMapPass2NonPipeTiles(
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
-        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, true, buttEndDirs, { text: String(completedLevelCount), color: '#fff' });
+        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, true, buttEndDirs, { text: String(completedLevelCount), color: '#fff' }, floorType);
       } else if (def.shape === PipeShape.Sink) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
@@ -500,11 +593,11 @@ function _renderChapterMapPass2NonPipeTiles(
         const centerLabel = remaining === 0 && isFilled
           ? { text: '★', color: '#f0c040' }
           : { text: String(remaining), color: '#fff' };
-        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, false, buttEndDirs, centerLabel);
+        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, false, buttEndDirs, centerLabel, floorType);
       } else if (def.shape === PipeShape.Granite) {
-        _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c);
+        _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c, floorType);
       } else if (def.shape === PipeShape.Tree) {
-        _drawChapterMapTree(ctx, x, y, r, c);
+        _drawChapterMapTree(ctx, x, y, r, c, floorType);
       } else if (def.shape === PipeShape.Sea) {
         _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c);
       }
@@ -522,6 +615,7 @@ function _renderChapterMapPass3PipeTiles(
   rows: number,
   cols: number,
   filledKeys: ReadonlySet<string>,
+  floorTypes?: ReadonlyMap<string, PipeShape>,
 ): void {
   const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
@@ -533,13 +627,14 @@ function _renderChapterMapPass3PipeTiles(
       const cx = x + CELL / 2;
       const cy = y + CELL / 2;
       const isFilled = filledKeys.has(`${r},${c}`);
+      const floorType = floorTypes?.get(`${r},${c}`) ?? PipeShape.Empty;
 
       // Background
       ctx.fillStyle = CHAPTER_MAP_TILE_BG;
       ctx.fillRect(x, y, CELL, CELL);
 
       // Gingham overlay for pipe tiles on the chapter map
-      drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c);
+      drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
 
       const tileConns = tileDefConnections(def);
       const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
@@ -583,6 +678,7 @@ export function renderChapterMapCanvas(
   accessibleLevelIdxs?: ReadonlySet<number>,
   decorations?: ReadonlyMap<string, AmbientDecoration>,
   jitterCell?: { row: number; col: number; dx: number; dy: number },
+  floorTypes?: ReadonlyMap<string, PipeShape>,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -591,11 +687,11 @@ export function renderChapterMapCanvas(
   const completedLevelCount = levelDefs.filter(l => progress.completedLevels.has(l.id)).length;
 
   _renderChapterMapGridLines(ctx, rows, cols);
-  _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations);
+  _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations, floorTypes);
   _renderChapterMapPass2NonPipeTiles(
-    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell,
+    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes,
   );
-  _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys);
+  _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys, floorTypes);
 
   // Hover highlight – only on level chamber tiles
   if (hoverPos) {

@@ -119,6 +119,20 @@ export function isObstacleTile(shape: PipeShape): boolean {
   return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Sea;
 }
 
+/** All empty-floor shapes that a player may fill with a pipe from inventory. */
+export const EMPTY_FLOOR_SHAPES: readonly PipeShape[] = [
+  PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark,
+];
+
+/**
+ * Returns true when shape is any empty floor type (Grass, Dirt, or Dark).
+ * Use this instead of `=== PipeShape.Empty` for all game-rule checks so that
+ * future empty floor types require no additional code changes.
+ */
+export function isEmptyFloor(shape: PipeShape): boolean {
+  return shape === PipeShape.Empty || shape === PipeShape.EmptyDirt || shape === PipeShape.EmptyDark;
+}
+
 /**
  * Returns true for tile shapes that have connector arms: ordinary pipe shapes
  * as well as Source and Sink tiles.  These are the shapes that use a black
@@ -274,6 +288,16 @@ export class Board {
   readonly ambientDecorations: ReadonlyMap<string, AmbientDecoration>;
 
   /**
+   * Pre-computed "background floor type" for every cell, used for rendering.
+   * Empty cells: their own PipeShape (Empty / EmptyDirt / EmptyDark).
+   * Source, Sink, Tree: majority of adjacent empty-floor tiles' shapes.
+   * Granite: BFS flood-fill from edges touching empty tiles.
+   * Other tiles: PipeShape.Empty fallback.
+   * Computed once in _initFromLevel and never changes during play.
+   */
+  floorTypes: ReadonlyMap<string, PipeShape> = new Map();
+
+  /**
    * Total water units that have been frozen by ice blocks during play.
    * Not used in game logic; intended for display purposes.
    * Backed by {@link _turnState}.
@@ -344,6 +368,7 @@ export class Board {
       this.grid = this._emptyGrid();
       this._initFromLevel(level);
       this.ambientDecorations = existingDecorations ?? generateAmbientDecorations(this.rows, this.cols);
+      this.floorTypes = this._computeFloorTypes();
     } else {
       this.grid = this._buildGrid();
       this.ambientDecorations = new Map();
@@ -365,6 +390,9 @@ export class Board {
         const def = level.grid[r]?.[c] ?? null;
         if (def === null) {
           this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+        } else if (def.shape === PipeShape.EmptyDirt || def.shape === PipeShape.EmptyDark) {
+          // Dirt and Dark empty floor tiles are stored with their shape for rendering
+          this.grid[r][c] = new Tile(def.shape, 0);
         } else if (def.shape === PipeShape.GoldSpace) {
           // Gold spaces are tracked separately; the cell behaves like Empty
           this.goldSpaces.add(posKey(r, c));
@@ -403,6 +431,79 @@ export class Board {
     }
 
     this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
+  }
+
+  /** Pre-compute the floor type (Empty/EmptyDirt/EmptyDark) for every cell. */
+  private _computeFloorTypes(): ReadonlyMap<string, PipeShape> {
+    const map = new Map<string, PipeShape>();
+
+    // Helper: majority empty-floor type from cardinal neighbors already in map or directly empty
+    const majorityFromNeighbors = (r: number, c: number): PipeShape => {
+      const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0]]);
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue;
+        const nShape = this.grid[nr][nc].shape;
+        const ft = map.get(posKey(nr, nc)) ?? (isEmptyFloor(nShape) ? nShape : null);
+        if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
+      }
+      let best: PipeShape = PipeShape.Empty;
+      let bestCount = -1;
+      for (const shape of EMPTY_FLOOR_SHAPES) {
+        const cnt = counts.get(shape) ?? 0;
+        if (cnt > bestCount) { bestCount = cnt; best = shape; }
+      }
+      return best;
+    };
+
+    // Pass 1: assign floor type for all empty floor cells
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const shape = this.grid[r][c].shape;
+        if (isEmptyFloor(shape)) map.set(posKey(r, c), shape);
+      }
+    }
+
+    // Pass 2: Source, Sink, Tree – majority of adjacent empty floor tiles
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const shape = this.grid[r][c].shape;
+        if (shape === PipeShape.Source || shape === PipeShape.Sink || shape === PipeShape.Tree) {
+          map.set(posKey(r, c), majorityFromNeighbors(r, c));
+        }
+      }
+    }
+
+    // Pass 3: Granite BFS flood-fill from granite cells adjacent to known-floor cells
+    const queue: [number, number][] = [];
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (this.grid[r][c].shape !== PipeShape.Granite) continue;
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols && map.has(posKey(nr, nc))) {
+            queue.push([r, c]);
+            break;
+          }
+        }
+      }
+    }
+    let queueIndex = 0;
+    while (queueIndex < queue.length) {
+      const [r, c] = queue[queueIndex++];
+      const key = posKey(r, c);
+      if (map.has(key)) continue;
+      map.set(key, majorityFromNeighbors(r, c));
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols &&
+            this.grid[nr][nc].shape === PipeShape.Granite && !map.has(posKey(nr, nc))) {
+          queue.push([nr, nc]);
+        }
+      }
+    }
+
+    return map;
   }
 
   // ─── Undo / redo support ───────────────────────────────────────────────────
@@ -647,7 +748,7 @@ export class Board {
     }
 
     this._reclaimInventory(tile.shape);
-    this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+    this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
     return { success: true };
   }
 
@@ -659,7 +760,7 @@ export class Board {
    */
   placeInventoryTile(pos: GridPos, shape: PipeShape, rotation: Rotation = 0): MoveResult {
     const tile = this.getTile(pos);
-    if (!tile || tile.shape !== PipeShape.Empty) return { success: false };
+    if (!tile || !isEmptyFloor(tile.shape)) return { success: false };
 
     const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
     const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
@@ -685,7 +786,7 @@ export class Board {
     const { error, positions } = this._validateConstraints(filled);
     if (error) {
       // Roll back placement.
-      this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
       this._unspendInventory(shape);
       return { success: false, error, errorTilePositions: positions ?? undefined };
     }
@@ -1137,7 +1238,7 @@ export class Board {
    * non-empty, and is not a Source, Sink, Chamber, obstacle, or spinner pipe.
    */
   private _isReplaceableTile(tile: Tile | null | undefined): tile is Tile {
-    if (!tile || tile.isFixed || tile.shape === PipeShape.Empty) return false;
+    if (!tile || tile.isFixed || isEmptyFloor(tile.shape)) return false;
     return (
       tile.shape !== PipeShape.Source &&
       tile.shape !== PipeShape.Sink &&
@@ -1339,7 +1440,7 @@ export class Board {
   rotateTileBy(pos: GridPos, steps: number): MoveResult {
     const tile = this.getTile(pos);
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
-    if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || tile.shape === PipeShape.Empty) {
+    if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || isEmptyFloor(tile.shape)) {
       return { success: false };
     }
 

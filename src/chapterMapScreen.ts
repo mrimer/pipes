@@ -11,7 +11,7 @@
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from './board';
-import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights } from './visuals/chapterMap';
+import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -137,6 +137,8 @@ export class ChapterMapScreen {
   private _statusEl: HTMLElement | null = null;
   /** Ambient decorations for empty cells, keyed by "row,col". */
   private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
+  /** Pre-computed floor types for chapter map cells. */
+  private _floorTypes: ReadonlyMap<string, PipeShape> = new Map();
 
   // ─── Touch state ────────────────────────────────────────────────────────
   /** Client x where the most recent touch on this canvas started. */
@@ -455,9 +457,10 @@ export class ChapterMapScreen {
 
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    // Regenerate decorations when showing a new chapter
+    // Regenerate decorations and floor types when showing a new chapter
     if (this._chapter !== chapter) {
       this._decorations = generateAmbientDecorations(rows, cols);
+      this._floorTypes = computeChapterFloorTypes(chapter.grid, rows, cols);
       // Reset animation state when switching chapters
       this._vortexParticles = [];
       this._sourceSprayDrops = [];
@@ -883,6 +886,7 @@ export class ChapterMapScreen {
       accessibleLevelIdxs,
       this._decorations,
       jitterCell,
+      this._floorTypes,
     );
 
     return { filledKeys, displayProgress };

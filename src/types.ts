@@ -15,6 +15,10 @@ export enum Direction {
 export enum PipeShape {
   /** Empty tile: no pipe placed; players may fill these with inventory pieces */
   Empty = 'EMPTY',
+  /** Empty - Dirt tile: aesthetically brown empty floor; functionally identical to Empty */
+  EmptyDirt = 'EMPTY_DIRT',
+  /** Empty - Dark tile: aesthetically dark empty floor; functionally identical to Empty */
+  EmptyDark = 'EMPTY_DARK',
   /** Straight pipe: North–South */
   Straight = 'STRAIGHT',
   /** Elbow pipe: North–East */

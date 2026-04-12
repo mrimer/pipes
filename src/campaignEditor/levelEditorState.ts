@@ -8,7 +8,7 @@
  */
 
 import { TileDef, InventoryItem, PipeShape, Direction, Rotation, LevelDef } from '../types';
-import { SPIN_CEMENT_SHAPES } from '../board';
+import { SPIN_CEMENT_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import {
   EditorPalette,
   EditorSnapshot,
@@ -277,6 +277,9 @@ export class LevelEditorState {
   buildTileDef(): TileDef {
     const palette = this.palette;
     if (palette === 'erase') return { shape: PipeShape.Empty };
+    if (palette === PipeShape.EmptyDirt) return { shape: PipeShape.EmptyDirt };
+    if (palette === PipeShape.EmptyDark) return { shape: PipeShape.EmptyDark };
+    if (palette === PipeShape.Empty) return { shape: PipeShape.Empty };
 
     const isChm = isChamberPalette(palette);
     const effectiveShape = isChm ? PipeShape.Chamber : (palette as PipeShape);
@@ -340,8 +343,8 @@ export class LevelEditorState {
 
   /** Populate palette and params from an existing TileDef. */
   selectTileFromDef(def: TileDef, pos?: { row: number; col: number }): void {
-    if (def.shape === PipeShape.Empty) {
-      this.palette = 'erase';
+    if (isEmptyFloor(def.shape)) {
+      this.palette = def.shape; // PipeShape.Empty, EmptyDirt, or EmptyDark
     } else if (def.shape === PipeShape.Chamber) {
       const cc = def.chamberContent ?? 'tank';
       this.palette = `chamber:${cc}` as ChamberPalette;
@@ -392,7 +395,7 @@ export class LevelEditorState {
    */
   rotatePalette(clockwise: boolean): void {
     const p = this.palette;
-    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.Empty) return;
+    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.Empty || p === PipeShape.EmptyDirt || p === PipeShape.EmptyDark) return;
 
     if (p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)) {
       const c = this.params.connections;
@@ -436,6 +439,30 @@ export class LevelEditorState {
    */
   hasSinkElsewhere(exceptPos?: { row: number; col: number }): boolean {
     return hasShapeElsewhere(this.grid, this.rows, this.cols, PipeShape.Sink, exceptPos);
+  }
+
+  /**
+   * Compute the TileDef to restore when erasing a tile at (row, col).
+   * Uses majority-adjacent algorithm: the most common empty floor type among
+   * cardinal neighbors wins; tie-break by EMPTY_FLOOR_SHAPES order.
+   * Returns null for grass (PipeShape.Empty), or a TileDef for Dirt/Dark.
+   */
+  eraseFloorTileDefAt(row: number, col: number): TileDef | null {
+    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0]]);
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
+      const nr = row + dr, nc = col + dc;
+      if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue;
+      const def = this.grid[nr]?.[nc] ?? null;
+      const ft = def === null ? PipeShape.Empty : (isEmptyFloor(def.shape) ? def.shape : null);
+      if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
+    }
+    let best: PipeShape = PipeShape.Empty;
+    let bestCount = -1;
+    for (const shape of EMPTY_FLOOR_SHAPES) {
+      const cnt = counts.get(shape) ?? 0;
+      if (cnt > bestCount) { bestCount = cnt; best = shape; }
+    }
+    return best === PipeShape.Empty ? null : { shape: best };
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────

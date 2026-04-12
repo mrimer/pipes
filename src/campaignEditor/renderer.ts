@@ -8,7 +8,7 @@ import { PipeShape, TileDef, Direction, LevelDef, Rotation, AmbientDecoration } 
 import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawAmbientDecoration, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
-import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
   WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
@@ -96,7 +96,8 @@ export function renderEditorCanvas(
     for (let c = 0; c < cols; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
-      if (def !== null) continue;
+      const isEmptyCell = def === null || isEmptyFloor(def.shape);
+      if (!isEmptyCell) continue;
       const x = c * CELL;
       const y = r * CELL;
       // Empty (player-fillable) – light grid cell
@@ -110,14 +111,28 @@ export function renderEditorCanvas(
       ctx.setLineDash([]);
       // Ambient decoration (chapter map editor only)
       const dec = decorations?.get(`${r},${c}`);
-      if (dec) {
+      if (def === null && dec) {
         drawAmbientDecoration(ctx, dec);
-      } else {
+      } else if (def === null) {
         // Subtle dot for level editor
         ctx.fillStyle = '#2a3a5e';
         ctx.beginPath();
         ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
         ctx.fill();
+      } else {
+        // EmptyDirt or EmptyDark: show dot + label
+        ctx.fillStyle = '#2a3a5e';
+        ctx.beginPath();
+        ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
+        ctx.fill();
+        const label = def.shape === PipeShape.EmptyDirt ? 'Dirt' : 'Dark';
+        ctx.save();
+        ctx.font = `bold ${_s(8)}px Arial`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = def.shape === PipeShape.EmptyDirt ? '#c4926a' : '#8888aa';
+        ctx.fillText(label, x + _s(3), y + _s(3));
+        ctx.restore();
       }
     }
   }
@@ -127,7 +142,7 @@ export function renderEditorCanvas(
     for (let c = 0; c < cols; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
-      if (def === null || PIPE_SHAPES.has(def.shape)) continue;
+      if (def === null || PIPE_SHAPES.has(def.shape) || isEmptyFloor(def.shape)) continue;
       const x = c * CELL;
       const y = r * CELL;
 
@@ -401,6 +416,42 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     return;
   }
 
+  // EmptyDirt/EmptyDark: render as empty cell with label
+  if (isEmptyFloor(shape) && shape !== PipeShape.Empty) {
+    ctx.fillStyle = '#1a2840';
+    ctx.fillRect(x, y, CELL, CELL);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#2a3a5e';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#2a3a5e';
+    ctx.beginPath();
+    ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
+    ctx.fill();
+    const label = shape === PipeShape.EmptyDirt ? 'Dirt' : 'Dark';
+    ctx.save();
+    ctx.font = `bold ${_s(8)}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = shape === PipeShape.EmptyDirt ? '#c4926a' : '#8888aa';
+    ctx.fillText(label, x + _s(3), y + _s(3));
+    ctx.restore();
+    return;
+  }
+
+  // PipeShape.Empty: render as empty cell (no label)
+  if (shape === PipeShape.Empty) {
+    ctx.fillStyle = '#1a2840';
+    ctx.fillRect(x, y, CELL, CELL);
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = '#2a3a5e';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+    ctx.setLineDash([]);
+    return;
+  }
+
   // Background color
   let bgColor: string;
   if (shape === PipeShape.Chamber) {
@@ -474,6 +525,8 @@ const CHAMBER_TYPES_WITH_LARGER_FONT: ReadonlySet<string> = new Set([
 /** Distinct short labels for each pipe shape shown in the container item tile text. */
 const ITEM_SHAPE_LABEL: Readonly<Record<PipeShape, string>> = {
   [PipeShape.Empty]:             'EMPT',
+  [PipeShape.EmptyDirt]:         'EDRT',
+  [PipeShape.EmptyDark]:         'EDRK',
   [PipeShape.Straight]:          'STR',
   [PipeShape.Elbow]:             'ELB',
   [PipeShape.Tee]:               'TEE',

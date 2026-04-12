@@ -10,6 +10,8 @@ import { Direction, LevelDef, PipeShape, Rotation, TileDef } from './types';
 import { getConnections } from './tile';
 import {
   EMPTY_COLOR,
+  EMPTY_DIRT_COLOR,
+  EMPTY_DARK_COLOR,
   PIPE_COLOR,
   SOURCE_COLOR,
   SINK_COLOR,
@@ -62,7 +64,10 @@ export function minimapDimensions(rows: number, cols: number): { width: number; 
 
 /** Returns the fill color to use for a grid tile on the minimap. */
 function tileColor(tile: TileDef | null): string {
-  if (!tile || tile.shape === PipeShape.Empty) return EMPTY_COLOR;
+  if (!tile) return EMPTY_COLOR;
+  if (tile.shape === PipeShape.EmptyDirt) return EMPTY_DIRT_COLOR;
+  if (tile.shape === PipeShape.EmptyDark) return EMPTY_DARK_COLOR;
+  if (tile.shape === PipeShape.Empty) return EMPTY_COLOR;
   switch (tile.shape) {
     case PipeShape.Straight:
     case PipeShape.Elbow:
