@@ -188,7 +188,7 @@ export type MoveResult = {
 // ─── Ambient decoration generation ───────────────────────────────────────────
 
 const DECORATION_DENSITY = 0.30;
-const DECORATION_TYPES: AmbientDecorationType[] = ['pebbles', 'flower', 'grass', 'mushroom', 'crystal'];
+const DECORATION_TYPES: AmbientDecorationType[] = [/*'pebbles',*/ 'flower', 'grass', 'mushroom', 'crystal'];
 
 /**
  * Generate a map of ambient background decorations spread across a `rows × cols`
