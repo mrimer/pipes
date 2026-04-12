@@ -459,8 +459,11 @@ export class ChapterMapScreen {
     const cols = chapter.cols ?? 6;
     // Regenerate decorations and floor types when showing a new chapter
     if (this._chapter !== chapter) {
-      this._decorations = generateAmbientDecorations(rows, cols);
+      // Compute floor types first so decoration generation selects the correct
+      // types per cell (pebbles on dirt/dark, no crystals on grass, etc.).
       this._floorTypes = computeChapterFloorTypes(chapter.grid, rows, cols);
+      const floorTypes = this._floorTypes;
+      this._decorations = generateAmbientDecorations(rows, cols, (r, c) => floorTypes.get(`${r},${c}`) ?? PipeShape.Empty);
       // Reset animation state when switching chapters
       this._vortexParticles = [];
       this._sourceSprayDrops = [];

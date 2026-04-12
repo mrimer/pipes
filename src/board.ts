@@ -286,20 +286,49 @@ export type MoveResult = {
 // ─── Ambient decoration generation ───────────────────────────────────────────
 
 const DECORATION_DENSITY = 0.30;
-const DECORATION_TYPES: AmbientDecorationType[] = [/*'pebbles',*/ 'flower', 'grass', 'mushroom', 'crystal'];
+
+/**
+ * Return the decoration types appropriate for the given empty floor type.
+ *
+ * - **Grass** (Empty):     flowers, grass tufts, mushrooms — organic surface.
+ * - **Dirt** (EmptyDirt):  grass tufts, crystals, pebbles — no flowers/mushrooms.
+ * - **Dark** (EmptyDark):  pebbles only — stone-like surface.
+ *
+ * This is the single authoritative source for floor-type ↔ decoration mapping,
+ * used by {@link generateAmbientDecorations} so the logic is not duplicated
+ * across the game board and chapter-map contexts.
+ */
+export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
+  switch (floorType) {
+    case PipeShape.EmptyDirt: return ['grass', 'crystal', 'pebbles'];
+    case PipeShape.EmptyDark: return ['pebbles'];
+    default:                  return ['flower', 'grass', 'mushroom'];  // Empty / grass
+  }
+}
 
 /**
  * Generate a map of ambient background decorations spread across a `rows × cols`
  * grid.  Each cell has an independent ~30 % chance of receiving one decoration.
  * Returned as a Map keyed by "row,col" for O(1) lookup.
  * This is a shared helper used by both the game board and the chapter-map renderer.
+ *
+ * @param getFloorType - Optional callback that returns the floor type for a cell.
+ *   When provided, only decoration types appropriate for that floor type are
+ *   generated (see {@link decorationTypesForFloor}).  Defaults to grass (Empty)
+ *   for every cell when omitted.
  */
-export function generateAmbientDecorations(rows: number, cols: number): ReadonlyMap<string, AmbientDecoration> {
+export function generateAmbientDecorations(
+  rows: number,
+  cols: number,
+  getFloorType?: (r: number, c: number) => PipeShape,
+): ReadonlyMap<string, AmbientDecoration> {
   const map = new Map<string, AmbientDecoration>();
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (Math.random() >= DECORATION_DENSITY) continue;
-      const type = DECORATION_TYPES[Math.floor(Math.random() * DECORATION_TYPES.length)];
+      const floorType = getFloorType ? getFloorType(r, c) : PipeShape.Empty;
+      const types = decorationTypesForFloor(floorType);
+      const type = types[Math.floor(Math.random() * types.length)];
       // Mushrooms scale 0.7–1.5 (up to 50 % larger); crystals scale 0.75–1.25 (±25 %).
       const scale = type === 'mushroom' ? 0.7 + Math.random() * 0.8
                   : type === 'crystal'  ? 0.75 + Math.random() * 0.5
@@ -451,8 +480,14 @@ export class Board {
     if (level) {
       this.grid = this._emptyGrid();
       this._initFromLevel(level);
-      this.ambientDecorations = existingDecorations ?? generateAmbientDecorations(this.rows, this.cols);
+      // Compute floor types first so decoration generation can select the correct
+      // decoration types for each cell (e.g. pebbles on dirt/dark, no crystals on grass).
       this.floorTypes = this._computeFloorTypes();
+      this.ambientDecorations = existingDecorations ?? generateAmbientDecorations(
+        this.rows,
+        this.cols,
+        (r, c) => this.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty,
+      );
     } else {
       this.grid = this._buildGrid();
       this.ambientDecorations = new Map();
