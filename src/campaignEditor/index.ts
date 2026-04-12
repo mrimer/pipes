@@ -788,6 +788,8 @@ export class CampaignEditor {
         slideGrid: (d) => this._slideGrid(d),
         rotateGrid: (cw) => this._rotateGrid(cw),
         reflectGrid: () => this._reflectGrid(),
+        flipGridHorizontal: () => this._flipGridHorizontal(),
+        flipGridVertical:   () => this._flipGridVertical(),
       },
       this._btn.bind(this),
     );
@@ -1181,6 +1183,34 @@ export class CampaignEditor {
       this._editorCanvas.height = newRows * TILE_SIZE;
     }
     this._updateCanvasDisplaySize();
+    this._refreshPaletteUI();
+    this._metadataPanel?.rebuildGridSizePanel();
+    this._renderEditorCanvas();
+  }
+
+  /**
+   * Flip the entire board horizontally (left–right reflection), updating tile
+   * positions, connections, and orientations.  Refreshes the palette/param
+   * panel and records an undo snapshot.
+   */
+  private _flipGridHorizontal(): void {
+    this._state.flipHorizontal();
+    sfxManager.play(SfxId.BoardSlide);
+    this._updateEditorUndoRedoButtons();
+    this._refreshPaletteUI();
+    this._metadataPanel?.rebuildGridSizePanel();
+    this._renderEditorCanvas();
+  }
+
+  /**
+   * Flip the entire board vertically (top–bottom reflection), updating tile
+   * positions, connections, and orientations.  Refreshes the palette/param
+   * panel and records an undo snapshot.
+   */
+  private _flipGridVertical(): void {
+    this._state.flipVertical();
+    sfxManager.play(SfxId.BoardSlide);
+    this._updateEditorUndoRedoButtons();
     this._refreshPaletteUI();
     this._metadataPanel?.rebuildGridSizePanel();
     this._renderEditorCanvas();

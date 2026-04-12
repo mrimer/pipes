@@ -27,6 +27,10 @@ export interface GridSizePanelCallbacks {
   rotate(clockwise: boolean): void;
   /** Reflect the board about its main diagonal. */
   reflect(): void;
+  /** Flip the board horizontally (left–right). */
+  flipHorizontal(): void;
+  /** Flip the board vertically (top–bottom). */
+  flipVertical(): void;
   /** Called after rotate/reflect so the panel can refresh the dimension inputs. */
   rebuildPanel(): void;
 }
@@ -146,7 +150,9 @@ export function buildGridSizePanel(
   panel.appendChild(buildSlideAndRotateControls(
     (dir) => callbacks.slide(dir),
     (cw)  => { callbacks.rotate(cw); callbacks.rebuildPanel(); },
-    ()    => { callbacks.reflect();  callbacks.rebuildPanel(); },
+    ()    => { callbacks.reflect();        callbacks.rebuildPanel(); },
+    ()    => { callbacks.flipHorizontal(); callbacks.rebuildPanel(); },
+    ()    => { callbacks.flipVertical();   callbacks.rebuildPanel(); },
   ));
 
   return panel;

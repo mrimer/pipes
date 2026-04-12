@@ -20,6 +20,10 @@ import {
   rotatePositionBy90,
   reflectGridAboutDiagonal,
   reflectPositionAboutDiagonal,
+  flipGridHorizontal,
+  flipGridVertical,
+  flipPositionHorizontal,
+  flipPositionVertical,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
@@ -246,6 +250,8 @@ export class ChapterMapEditorSection {
       slideGrid:  (d, ch)         => this._slideChapterGrid(d, ch),
       rotateGrid: (cw, ch)        => this._rotateChapterGrid(cw, ch),
       reflectGrid: (ch)           => this._reflectChapterGrid(ch),
+      flipGridHorizontal: (ch)    => this._flipChapterGridHorizontal(ch),
+      flipGridVertical:   (ch)    => this._flipChapterGridVertical(ch),
       renderCanvas: () => this._renderChapterCanvas(),
       buildBtn: (...args) => this._callbacks.buildBtn(...args),
     };
@@ -348,6 +354,54 @@ export class ChapterMapEditorSection {
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._updateChapterCanvasDisplaySize();
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Flip the entire chapter map board horizontally (left–right reflection).
+   * Mirrors column positions and updates each tile's connections/rotation.
+   * Records an undo snapshot.
+   */
+  private _flipChapterGridHorizontal(chapter: ChapterDef): void {
+    const { newGrid } = flipGridHorizontal(
+      this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols,
+    );
+
+    this._chapterEditGrid = newGrid;
+    this._chapterDecorations = this._generateChapterDecorations();
+
+    if (this._chapterFocusedTilePos) {
+      this._chapterFocusedTilePos = flipPositionHorizontal(
+        this._chapterFocusedTilePos, this._chapterEditCols,
+      );
+    }
+
+    this._recordChapterSnapshot(chapter);
+    sfxManager.play(SfxId.BoardSlide);
+    this._renderChapterCanvas();
+  }
+
+  /**
+   * Flip the entire chapter map board vertically (top–bottom reflection).
+   * Mirrors row positions and updates each tile's connections/rotation.
+   * Records an undo snapshot.
+   */
+  private _flipChapterGridVertical(chapter: ChapterDef): void {
+    const { newGrid } = flipGridVertical(
+      this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols,
+    );
+
+    this._chapterEditGrid = newGrid;
+    this._chapterDecorations = this._generateChapterDecorations();
+
+    if (this._chapterFocusedTilePos) {
+      this._chapterFocusedTilePos = flipPositionVertical(
+        this._chapterFocusedTilePos, this._chapterEditRows,
+      );
+    }
+
+    this._recordChapterSnapshot(chapter);
+    sfxManager.play(SfxId.BoardSlide);
     this._renderChapterCanvas();
   }
 

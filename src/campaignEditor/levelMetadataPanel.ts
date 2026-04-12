@@ -26,6 +26,8 @@ export interface LevelMetadataPanelCallbacks {
   slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void;
   rotateGrid(clockwise: boolean): void;
   reflectGrid(): void;
+  flipGridHorizontal(): void;
+  flipGridVertical(): void;
 }
 
 // ─── LevelMetadataPanel class ─────────────────────────────────────────────────
@@ -197,6 +199,8 @@ export class LevelMetadataPanel {
         slide:  (dir)  => this._cb.slideGrid(dir),
         rotate: (cw)   => this._cb.rotateGrid(cw),
         reflect: ()    => this._cb.reflectGrid(),
+        flipHorizontal: () => this._cb.flipGridHorizontal(),
+        flipVertical:   () => this._cb.flipGridVertical(),
         rebuildPanel: () => this.rebuildGridSizePanel(),
       },
       this._btn.bind(this),
@@ -339,6 +343,8 @@ export function buildSlideAndRotateControls(
   onSlide:   (dir: 'N' | 'E' | 'S' | 'W') => void,
   onRotate:  (clockwise: boolean) => void,
   onReflect: () => void,
+  onFlipH:   () => void,
+  onFlipV:   () => void,
 ): DocumentFragment {
   const frag = document.createDocumentFragment();
 
@@ -435,6 +441,23 @@ export function buildSlideAndRotateControls(
   reflectBtn.style.cssText = arrowBtnStyle;
   reflectBtn.addEventListener('click', () => onReflect());
   reflectRow.appendChild(reflectBtn);
+
+  const flipHBtn = document.createElement('button');
+  flipHBtn.type = 'button';
+  flipHBtn.textContent = '↔';
+  flipHBtn.title = 'Flip board horizontally (left–right)';
+  flipHBtn.style.cssText = arrowBtnStyle;
+  flipHBtn.addEventListener('click', () => onFlipH());
+  reflectRow.appendChild(flipHBtn);
+
+  const flipVBtn = document.createElement('button');
+  flipVBtn.type = 'button';
+  flipVBtn.textContent = '↕';
+  flipVBtn.title = 'Flip board vertically (top–bottom)';
+  flipVBtn.style.cssText = arrowBtnStyle;
+  flipVBtn.addEventListener('click', () => onFlipV());
+  reflectRow.appendChild(flipVBtn);
+
   rightCol.appendChild(reflectRow);
 
   twoCol.appendChild(rightCol);

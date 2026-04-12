@@ -530,3 +530,199 @@ export function reflectPositionAboutDiagonal(
 ): { row: number; col: number } {
   return { row: pos.col, col: pos.row };
 }
+
+// ── Grid flip helpers (horizontal and vertical reflections) ──────────────────
+
+/**
+ * Map a direction through a horizontal flip (left–right reflection).
+ *
+ * East ↔ West; North and South are unchanged.
+ */
+export function flipDirectionHorizontal(dir: Direction): Direction {
+  switch (dir) {
+    case Direction.East:  return Direction.West;
+    case Direction.West:  return Direction.East;
+    case Direction.North: return Direction.North;
+    case Direction.South: return Direction.South;
+  }
+}
+
+/**
+ * Map a direction through a vertical flip (top–bottom reflection).
+ *
+ * North ↔ South; East and West are unchanged.
+ */
+export function flipDirectionVertical(dir: Direction): Direction {
+  switch (dir) {
+    case Direction.North: return Direction.South;
+    case Direction.South: return Direction.North;
+    case Direction.East:  return Direction.East;
+    case Direction.West:  return Direction.West;
+  }
+}
+
+/**
+ * The rotation value transformation under a horizontal flip (left–right).
+ *
+ * Straight/Cross – rotationally symmetric under H flip: unchanged
+ * Elbow          – NE ↔ NW, SE ↔ SW:  new = (270 − R + 360) % 360
+ * Tee            – T opening flips E ↔ W: new = (180 − R + 360) % 360
+ * OneWay         – single direction, E ↔ W: new = (360 − R) % 360
+ */
+function _flipRotationHorizontal(shape: PipeShape, rotation: Rotation): Rotation {
+  const isElbowLike = new Set<PipeShape>([
+    PipeShape.Elbow, PipeShape.GoldElbow,
+    PipeShape.SpinElbow, PipeShape.SpinElbowCement, PipeShape.LeakyElbow,
+  ]).has(shape);
+  const isTeeLike = new Set<PipeShape>([
+    PipeShape.Tee, PipeShape.GoldTee,
+    PipeShape.SpinTee, PipeShape.SpinTeeCement, PipeShape.LeakyTee,
+  ]).has(shape);
+  const isOneWay = shape === PipeShape.OneWay;
+
+  if (isElbowLike) return ((270 - rotation + 360) % 360) as Rotation;
+  if (isTeeLike)   return ((180 - rotation + 360) % 360) as Rotation;
+  if (isOneWay)    return ((360 - rotation) % 360) as Rotation;
+  // Straight-like (including Cross) – unchanged under horizontal flip
+  return rotation;
+}
+
+/**
+ * The rotation value transformation under a vertical flip (top–bottom).
+ *
+ * Straight/Cross – rotationally symmetric under V flip: unchanged
+ * Elbow          – NE ↔ SE, NW ↔ SW: new = (90 − R + 360) % 360
+ * Tee            – T opening flips N ↔ S: new = (360 − R) % 360
+ * OneWay         – single direction, N ↔ S: new = (180 − R + 360) % 360
+ */
+function _flipRotationVertical(shape: PipeShape, rotation: Rotation): Rotation {
+  const isElbowLike = new Set<PipeShape>([
+    PipeShape.Elbow, PipeShape.GoldElbow,
+    PipeShape.SpinElbow, PipeShape.SpinElbowCement, PipeShape.LeakyElbow,
+  ]).has(shape);
+  const isTeeLike = new Set<PipeShape>([
+    PipeShape.Tee, PipeShape.GoldTee,
+    PipeShape.SpinTee, PipeShape.SpinTeeCement, PipeShape.LeakyTee,
+  ]).has(shape);
+  const isOneWay = shape === PipeShape.OneWay;
+
+  if (isElbowLike) return (( 90 - rotation + 360) % 360) as Rotation;
+  if (isTeeLike)   return ((360 - rotation)       % 360) as Rotation;
+  if (isOneWay)    return ((180 - rotation + 360) % 360) as Rotation;
+  // Straight-like (including Cross) – unchanged under vertical flip
+  return rotation;
+}
+
+/**
+ * Return a shallow-copy of `tile` with its orientation flipped horizontally
+ * (left–right reflection: East ↔ West).
+ */
+export function flipTileDefHorizontal(tile: TileDef): TileDef {
+  const flipped: TileDef = { ...tile };
+
+  if (flipped.connections) {
+    flipped.connections = flipped.connections.map(flipDirectionHorizontal);
+  }
+
+  if (flipped.rotation !== undefined) {
+    flipped.rotation = _flipRotationHorizontal(flipped.shape, flipped.rotation);
+  }
+
+  return flipped;
+}
+
+/**
+ * Return a shallow-copy of `tile` with its orientation flipped vertically
+ * (top–bottom reflection: North ↔ South).
+ */
+export function flipTileDefVertical(tile: TileDef): TileDef {
+  const flipped: TileDef = { ...tile };
+
+  if (flipped.connections) {
+    flipped.connections = flipped.connections.map(flipDirectionVertical);
+  }
+
+  if (flipped.rotation !== undefined) {
+    flipped.rotation = _flipRotationVertical(flipped.shape, flipped.rotation);
+  }
+
+  return flipped;
+}
+
+/**
+ * Flip a 2-D grid of TileDefs horizontally (left–right).
+ * Grid dimensions are preserved; column indices are mirrored.
+ *
+ * Transform: (r, c) → (r, oldCols − 1 − c)
+ */
+export function flipGridHorizontal(
+  grid: (TileDef | null)[][],
+  oldRows: number,
+  oldCols: number,
+): { newGrid: (TileDef | null)[][]; newRows: number; newCols: number } {
+  const newGrid: (TileDef | null)[][] = Array.from(
+    { length: oldRows },
+    () => Array(oldCols).fill(null) as null[],
+  );
+
+  for (let r = 0; r < oldRows; r++) {
+    for (let c = 0; c < oldCols; c++) {
+      const tile = grid[r]?.[c];
+      if (!tile) continue;
+      newGrid[r][oldCols - 1 - c] = flipTileDefHorizontal(tile);
+    }
+  }
+
+  return { newGrid, newRows: oldRows, newCols: oldCols };
+}
+
+/**
+ * Flip a 2-D grid of TileDefs vertically (top–bottom).
+ * Grid dimensions are preserved; row indices are mirrored.
+ *
+ * Transform: (r, c) → (oldRows − 1 − r, c)
+ */
+export function flipGridVertical(
+  grid: (TileDef | null)[][],
+  oldRows: number,
+  oldCols: number,
+): { newGrid: (TileDef | null)[][]; newRows: number; newCols: number } {
+  const newGrid: (TileDef | null)[][] = Array.from(
+    { length: oldRows },
+    () => Array(oldCols).fill(null) as null[],
+  );
+
+  for (let r = 0; r < oldRows; r++) {
+    for (let c = 0; c < oldCols; c++) {
+      const tile = grid[r]?.[c];
+      if (!tile) continue;
+      newGrid[oldRows - 1 - r][c] = flipTileDefVertical(tile);
+    }
+  }
+
+  return { newGrid, newRows: oldRows, newCols: oldCols };
+}
+
+/**
+ * Return a grid position transformed by a horizontal flip.
+ *
+ * (r, c) → (r, oldCols − 1 − c)
+ */
+export function flipPositionHorizontal(
+  pos: { row: number; col: number },
+  oldCols: number,
+): { row: number; col: number } {
+  return { row: pos.row, col: oldCols - 1 - pos.col };
+}
+
+/**
+ * Return a grid position transformed by a vertical flip.
+ *
+ * (r, c) → (oldRows − 1 − r, c)
+ */
+export function flipPositionVertical(
+  pos: { row: number; col: number },
+  oldRows: number,
+): { row: number; col: number } {
+  return { row: oldRows - 1 - pos.row, col: pos.col };
+}

@@ -325,6 +325,8 @@ export function generateAmbientDecorations(
   const map = new Map<string, AmbientDecoration>();
   // Counters per type for golden-angle rotation distribution (pebbles & crystals).
   const typeCount: Partial<Record<AmbientDecorationType, number>> = {};
+  // Random base angle per type so different board instances show different orientations.
+  const typeBaseAngle: Partial<Record<AmbientDecorationType, number>> = {};
   // Golden angle in degrees – gives the best uniform distribution of rotations.
   const GOLDEN_ANGLE = 137.50776405003785;
   for (let r = 0; r < rows; r++) {
@@ -341,10 +343,13 @@ export function generateAmbientDecorations(
       const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
       // Pebbles and crystals: distribute rotations using the golden angle so that
       // each instance of the same type has a visually distinct orientation.
+      // A random base angle is chosen per type on first encounter so that different
+      // board instances do not show the same starting orientations.
       const idx = typeCount[type] ?? 0;
       typeCount[type] = idx + 1;
+      if (typeBaseAngle[type] === undefined) typeBaseAngle[type] = Math.random() * 360;
       const rotation = (type === 'pebbles' || type === 'crystal')
-        ? (idx * GOLDEN_ANGLE) % 360
+        ? (typeBaseAngle[type]! + idx * GOLDEN_ANGLE) % 360
         : Math.random() * 360;
       map.set(`${r},${c}`, {
         row: r,

@@ -21,6 +21,10 @@ import {
   rotatePositionBy90,
   reflectGridAboutDiagonal,
   reflectPositionAboutDiagonal,
+  flipGridHorizontal,
+  flipGridVertical,
+  flipPositionHorizontal,
+  flipPositionVertical,
 } from './types';
 import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
 import { HistoryManager } from './historyManager';
@@ -263,6 +267,52 @@ export class LevelEditorState {
 
     this.rows = newRows;
     this.cols = newCols;
+    this.grid = newGrid;
+
+    if (this._linkedTilePos) {
+      const t = this.grid[this._linkedTilePos.row]?.[this._linkedTilePos.col];
+      if (t) this.populateParamsFromDef(t);
+    }
+
+    this.recordSnapshot();
+  }
+
+  /**
+   * Flip the entire board horizontally (left–right reflection).
+   * Mirrors column positions, updates each tile's connections/rotation
+   * to match the new orientation, and updates the linked-tile position.
+   * Records an undo snapshot.
+   */
+  flipHorizontal(): void {
+    const { newGrid } = flipGridHorizontal(this.grid, this.rows, this.cols);
+
+    if (this._linkedTilePos) {
+      this._linkedTilePos = flipPositionHorizontal(this._linkedTilePos, this.cols);
+    }
+
+    this.grid = newGrid;
+
+    if (this._linkedTilePos) {
+      const t = this.grid[this._linkedTilePos.row]?.[this._linkedTilePos.col];
+      if (t) this.populateParamsFromDef(t);
+    }
+
+    this.recordSnapshot();
+  }
+
+  /**
+   * Flip the entire board vertically (top–bottom reflection).
+   * Mirrors row positions, updates each tile's connections/rotation
+   * to match the new orientation, and updates the linked-tile position.
+   * Records an undo snapshot.
+   */
+  flipVertical(): void {
+    const { newGrid } = flipGridVertical(this.grid, this.rows, this.cols);
+
+    if (this._linkedTilePos) {
+      this._linkedTilePos = flipPositionVertical(this._linkedTilePos, this.rows);
+    }
+
     this.grid = newGrid;
 
     if (this._linkedTilePos) {
