@@ -463,7 +463,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   } else if (shape === PipeShape.Granite) {
     bgColor = '#4a5568';
   } else if (shape === PipeShape.Tree) {
-    bgColor = '#1a4a0e';
+    bgColor = '#1a2840';
   } else if (shape === PipeShape.Sea) {
     bgColor = '#2a7fbf';
   } else {
@@ -592,8 +592,6 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     strokeFillText(ctx, 'GRANITE', cx, cy);
   } else if (shape === PipeShape.Tree) {
     // Render tree using the shared drawTree function (same as in-game rendering)
-    ctx.fillStyle = '#1a4a0e';
-    ctx.fillRect(x, y, CELL, CELL);
     ctx.save();
     ctx.translate(cx, cy);
     drawTree(ctx, CELL / 2, style);
