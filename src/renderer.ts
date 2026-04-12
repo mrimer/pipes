@@ -126,20 +126,33 @@ export function scalePx(n: number): number {
  * Returns BASE_TILE_SIZE (64) when no window is available or the grid already
  * overflows at the base size.
  *
- * @param vOverhead  Vertical pixels already consumed by UI elements outside
- *                   the grid (e.g. title, header buttons, panels below the
- *                   grid).  Subtracted from the available height before the
- *                   tile size is computed so that those elements can all fit
- *                   on screen at once.
- * @param hOverhead  Horizontal pixels already consumed by UI elements beside
- *                   the grid (e.g. canvas CSS border left + right).
- *                   Subtracted from the available width so the grid's full
- *                   border-box stays within the viewport and does not trigger
- *                   a horizontal scrollbar.
+ * @param vOverhead         Vertical pixels already consumed by UI elements
+ *                          outside the grid (e.g. title, header buttons,
+ *                          panels below the grid).  Subtracted from the
+ *                          available height before the tile size is computed
+ *                          so that those elements can all fit on screen at
+ *                          once.  Ignored when {@link constrainVertical} is
+ *                          `false`.
+ * @param hOverhead         Horizontal pixels already consumed by UI elements
+ *                          beside the grid (e.g. canvas CSS border left +
+ *                          right).  Subtracted from the available width so
+ *                          the grid's full border-box stays within the
+ *                          viewport and does not trigger a horizontal
+ *                          scrollbar.
+ * @param constrainVertical When `true` (the default) the tile size is also
+ *                          constrained so the grid fits vertically in the
+ *                          viewport (intended for the chapter map screen).
+ *                          Pass `false` to size purely by available width,
+ *                          e.g. on the level editor screen where the board
+ *                          can scroll vertically.
  */
-export function computeTileSize(rows: number, cols: number, vOverhead = 0, hOverhead = 0): number {
+export function computeTileSize(rows: number, cols: number, vOverhead = 0, hOverhead = 0, constrainVertical = true): number {
   if (typeof window === 'undefined') return BASE_TILE_SIZE;
   const avW = window.innerWidth - hOverhead;
+  const maxFitW = Math.floor(avW / cols);
+  if (!constrainVertical) {
+    return Math.max(BASE_TILE_SIZE, Math.min(128, maxFitW));
+  }
   const avH = window.innerHeight - vOverhead;
   const maxFit = Math.floor(Math.min(avW / cols, avH / rows));
   return Math.max(BASE_TILE_SIZE, Math.min(128, maxFit));
