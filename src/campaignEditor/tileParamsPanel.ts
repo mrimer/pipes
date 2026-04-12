@@ -130,6 +130,9 @@ const LEAKY_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
 ];
 
 const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+  { palette: PipeShape.Empty,     label: '🟩 Empty - Grass' },
+  { palette: PipeShape.EmptyDirt, label: '🟫 Empty - Dirt' },
+  { palette: PipeShape.EmptyDark, label: '⬛ Empty - Dark' },
   { palette: PipeShape.Granite,   label: '▪ Granite' },
   { palette: PipeShape.Tree,      label: '🌿 Tree' },
   { palette: PipeShape.Sea,       label: '🌊 Sea' },

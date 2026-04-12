@@ -8,7 +8,7 @@
  */
 
 import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
-import { PIPE_SHAPES } from '../board';
+import { PIPE_SHAPES, isEmptyFloor } from '../board';
 import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -211,7 +211,12 @@ export class ChapterMapInput {
     }
 
     // Regular tile placement / dragging
-    if (existingTile !== null && this._cb.getPalette() !== 'erase') {
+    const isEmptyFloorPalette = this._cb.getPalette() === PipeShape.Empty ||
+      this._cb.getPalette() === PipeShape.EmptyDirt ||
+      this._cb.getPalette() === PipeShape.EmptyDark;
+    const existingIsEmptyFloor = existingTile === null ||
+      (existingTile !== null && isEmptyFloor(existingTile.shape));
+    if (existingTile !== null && !existingIsEmptyFloor && this._cb.getPalette() !== 'erase' && !isEmptyFloorPalette) {
       // Start dragging the existing tile
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._cb.renderCanvas();
@@ -223,7 +228,7 @@ export class ChapterMapInput {
         this._cb.showSinkError();
         return; // Only one sink allowed
       }
-      if (existingTile === null && REPEATABLE_EDITOR_TILES.has(this._cb.getPalette())) {
+      if (existingIsEmptyFloor && REPEATABLE_EDITOR_TILES.has(this._cb.getPalette())) {
         this._paintDragActive = true;
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
         this._playChapterPlacementSfx(pos);
@@ -231,6 +236,12 @@ export class ChapterMapInput {
         return;
       }
       if (this._cb.getPalette() === 'erase') {
+        if (existingTile !== null) sfxManager.play(SfxId.Delete);
+        this._cb.getEditGrid()[pos.row][pos.col] = null;
+        this._cb.clearFocusIfAt(pos);
+        this._cb.rebuildLevelInventory(chapter, campaign);
+      } else if (this._cb.getPalette() === PipeShape.Empty) {
+        // Empty-Grass palette: clear to null
         if (existingTile !== null) sfxManager.play(SfxId.Delete);
         this._cb.getEditGrid()[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
@@ -306,7 +317,9 @@ export class ChapterMapInput {
 
     if (this._paintDragActive && pos) {
       const grid = this._cb.getEditGrid();
-      if ((grid[pos.row]?.[pos.col] ?? null) === null) {
+      const cur = grid[pos.row]?.[pos.col] ?? null;
+      const curIsEmpty = cur === null || (cur !== null && isEmptyFloor(cur.shape));
+      if (curIsEmpty) {
         grid[pos.row][pos.col] = this._cb.buildTileDef();
       }
     } else if (this._rightEraseDragActive && pos) {

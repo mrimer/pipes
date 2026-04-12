@@ -4,7 +4,7 @@
  */
 
 import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation } from '../types';
-import { PIPE_SHAPES, generateAmbientDecorations } from '../board';
+import { PIPE_SHAPES, generateAmbientDecorations, isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { computeChapterMapReachable, findChapterMapTile, editorTileConns } from '../chapterMapUtils';
@@ -410,11 +410,13 @@ export class ChapterMapEditorSection {
 
     if (!drag && hover) {
       if (this._chapterPalette === 'erase') {
-        const isEmpty = (this._chapterEditGrid[hover.row]?.[hover.col] ?? null) === null;
+        const hoverCell = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
+        const isEmpty = hoverCell === null;
         overlay = { pos: hover, def: null, alpha: isEmpty ? 0.2 : 1 };
       } else if (this._chapterSelectedLevelIdx !== null) {
         // Preview: level chamber placeholder – only on empty cells
-        const isEmpty = (this._chapterEditGrid[hover.row]?.[hover.col] ?? null) === null;
+        const hoverCell = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
+        const isEmpty = hoverCell === null || (hoverCell !== null && isEmptyFloor(hoverCell.shape));
         if (isEmpty) {
           const levelDef: TileDef = {
             shape: PipeShape.Chamber,
@@ -424,8 +426,9 @@ export class ChapterMapEditorSection {
           overlay = { pos: hover, def: levelDef, alpha: 0.55 };
         }
       } else {
-        // Only show placement ghost on empty cells; occupied cells cannot be overwritten
-        const isEmpty = (this._chapterEditGrid[hover.row]?.[hover.col] ?? null) === null;
+        // Show placement ghost on empty or empty-floor cells
+        const hoverCell = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
+        const isEmpty = hoverCell === null || (hoverCell !== null && isEmptyFloor(hoverCell.shape));
         if (isEmpty) {
           overlay = { pos: hover, def: this._buildChapterTileDef(), alpha: 0.55 };
         }
@@ -470,6 +473,9 @@ export class ChapterMapEditorSection {
   /** Build a TileDef from the current chapter palette selection and params. */
   private _buildChapterTileDef(): TileDef {
     if (this._chapterPalette === 'erase') return { shape: PipeShape.Empty };
+    if (this._chapterPalette === PipeShape.EmptyDirt) return { shape: PipeShape.EmptyDirt };
+    if (this._chapterPalette === PipeShape.EmptyDark) return { shape: PipeShape.EmptyDark };
+    if (this._chapterPalette === PipeShape.Empty) return { shape: PipeShape.Empty };
     const p = this._chapterParams;
     const shape = this._chapterPalette as PipeShape;
     const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
