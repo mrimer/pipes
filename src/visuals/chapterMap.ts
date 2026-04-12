@@ -7,7 +7,7 @@
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration } from '../types';
 import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
-import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
+import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, EMPTY_FLOOR_SHAPES, computeFloorTypesFromGrid } from '../board';
 import { oppositeDirection } from '../tile';
 import {
   SOURCE_COLOR, SOURCE_WATER_COLOR, SINK_COLOR, SINK_WATER_COLOR,
@@ -303,79 +303,23 @@ export function drawLevelChamberTile(
  * Granite: BFS flood-fill from edges touching empty cells.
  * Other: PipeShape.Empty fallback.
  */
+/**
+ * Pre-compute the display floor type (Empty / EmptyDirt / EmptyDark) for every
+ * cell in a chapter map grid.  Delegates to the shared {@link computeFloorTypesFromGrid}
+ * algorithm: empty-floor cells are resolved immediately from their own shape (null cells
+ * count as {@link PipeShape.Empty}), and all other tile types (source, sink, tree, chamber,
+ * granite, pipe tiles, etc.) are resolved via BFS propagation from neighbouring resolved cells.
+ */
 export function computeChapterFloorTypes(
   grid: (TileDef | null)[][],
   rows: number,
   cols: number,
 ): ReadonlyMap<string, PipeShape> {
-  const map = new Map<string, PipeShape>();
-
-  // Helper: the intrinsic floor type of a cell (only for empty-floor cells).
-  const rawFloorType = (r: number, c: number): PipeShape | null => {
-    if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
+  return computeFloorTypesFromGrid(rows, cols, (r, c) => {
     const def = grid[r]?.[c] ?? null;
     if (def === null) return PipeShape.Empty;
-    if (isEmptyFloor(def.shape)) return def.shape;
-    return null;
-  };
-
-  // Helper: majority empty-floor type from cardinal neighbors already in the map.
-  const majorityAdjacentFloor = (r: number, c: number): PipeShape => {
-    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0]]);
-    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
-      const nr = r + dr, nc = c + dc;
-      const fromMap = map.get(`${nr},${nc}`);
-      const ft = fromMap ?? rawFloorType(nr, nc);
-      if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
-    }
-    let best: PipeShape = PipeShape.Empty;
-    let bestCount = -1;
-    for (const shape of EMPTY_FLOOR_SHAPES) {
-      const cnt = counts.get(shape) ?? 0;
-      if (cnt > bestCount) { bestCount = cnt; best = shape; }
-    }
-    return best;
-  };
-
-  // Pass 1: assign floor type for all empty-floor cells.
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const ft = rawFloorType(r, c);
-      if (ft !== null) map.set(`${r},${c}`, ft);
-    }
-  }
-
-  // Pass 2: BFS for ALL remaining non-empty-floor cells (source, sink, tree, chamber,
-  // granite, pipe tiles, etc.).  Seed with any unresolved cell that borders an already-
-  // resolved cell, then expand through every unresolved neighbour regardless of tile type.
-  const queue: [number, number][] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (map.has(`${r},${c}`)) continue; // already resolved
-      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && map.has(`${nr},${nc}`)) {
-          queue.push([r, c]);
-          break;
-        }
-      }
-    }
-  }
-  let queueIndex = 0;
-  while (queueIndex < queue.length) {
-    const [r, c] = queue[queueIndex++];
-    const key = `${r},${c}`;
-    if (map.has(key)) continue;
-    map.set(key, majorityAdjacentFloor(r, c));
-    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
-      const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !map.has(`${nr},${nc}`)) {
-        queue.push([nr, nc]);
-      }
-    }
-  }
-
-  return map;
+    return isEmptyFloor(def.shape) ? def.shape : null;
+  });
 }
 
 /**
