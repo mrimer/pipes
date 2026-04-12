@@ -4,8 +4,8 @@
  * write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, Rotation } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel } from '../renderer';
+import { PipeShape, TileDef, Direction, LevelDef, Rotation, LevelStyle } from '../types';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel, drawTree } from '../renderer';
 import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
@@ -67,6 +67,7 @@ export function renderEditorCanvas(
   levelDefs?: readonly LevelDef[],
   levelProgress?: LevelProgressMap,
   filledKeys?: ReadonlySet<string>,
+  style?: LevelStyle,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -161,7 +162,7 @@ export function renderEditorCanvas(
         ctx.restore();
       } else {
         const isFilled = filledKeys?.has(`${r},${c}`) ?? false;
-        _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined);
+        _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined, style);
       }
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
@@ -282,6 +283,7 @@ function _drawEditorTileWithLevel(
   levelProgress?: LevelProgressMap,
   isFilled = false,
   isChapterMap = false,
+  style?: LevelStyle,
 ): void {
   if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
     const levelIdx = def.levelIdx ?? 0;
@@ -296,7 +298,7 @@ function _drawEditorTileWithLevel(
     drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, starsCollected, totalStars, isFilled);
     return;
   }
-  drawEditorTile(ctx, x, y, def, isChapterMap);
+  drawEditorTile(ctx, x, y, def, isChapterMap, style);
 }
 
 /** Draw the OneWay editor tile overlay (arrow + label + border) at canvas pixel (x, y). */
@@ -396,7 +398,7 @@ function _drawSpinCementOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
 }
 
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */
-export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef, isChapterMap = false): void {
+export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef, isChapterMap = false, style?: LevelStyle): void {
   const CELL = TILE_SIZE;
   const { shape } = def;
   const chamberContent = def.chamberContent ?? 'tank';
@@ -503,7 +505,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     def.shatter ?? 0,
   );
 
-  drawTileOnEditor(ctx, x, y, tile, def, isChapterMap);
+  drawTileOnEditor(ctx, x, y, tile, def, isChapterMap, style);
 
   // For spin-cement tiles, draw the cement wavy-line overlay and drying-time label on top.
   if (SPIN_CEMENT_SHAPES.has(shape)) {
@@ -560,7 +562,7 @@ function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, 
 }
 
 /** Simplified tile drawing for the editor canvas. */
-function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false): void {
+function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false, style?: LevelStyle): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
@@ -589,32 +591,13 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'GRANITE', cx, cy);
   } else if (shape === PipeShape.Tree) {
-    // Render tree as a green canopy with leaf lobes (top-down view)
+    // Render tree using the shared drawTree function (same as in-game rendering)
     ctx.fillStyle = '#1a4a0e';
     ctx.fillRect(x, y, CELL, CELL);
-    const r = CELL * 0.38;
-    ctx.fillStyle = '#3a8c24';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#56b03a';
-    const lobeR = r * 0.48;
-    const lobeOff = r * 0.52;
-    for (let i = 0; i < 4; i++) {
-      const a = (i * Math.PI) / 2;
-      ctx.beginPath();
-      ctx.arc(cx + Math.cos(a) * lobeOff, cy + Math.sin(a) * lobeOff, lobeR, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = '#6b3a2a';
-    ctx.beginPath();
-    ctx.arc(cx, cy, CELL * 0.07, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#2d6e1a';
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree(ctx, CELL / 2, style);
+    ctx.restore();
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'TREE', cx, cy);
   } else if (shape === PipeShape.Sea) {

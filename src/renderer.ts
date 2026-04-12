@@ -4,7 +4,7 @@
 
 import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
 import { Tile, oppositeDirection } from './tile';
-import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS } from './types';
+import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS, LevelStyle } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState } from './renderer/chamberRenderers';
 import { drawAmbientDecoration } from './renderer/ambientDecoration';
@@ -27,6 +27,8 @@ import {
   CHAMBER_COLOR, CHAMBER_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR,
+  TREE_DIRT_COLOR, TREE_DIRT_LEAF_COLOR, TREE_DIRT_LEAF_ALT_COLOR,
+  TREE_DARK_COLOR, TREE_DARK_LEAF_COLOR, TREE_DARK_LEAF_ALT_COLOR,
   CEMENT_COLOR, CEMENT_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
@@ -604,17 +606,20 @@ export function drawGranite(
 }
 
 /** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
-export function drawTree(ctx: CanvasRenderingContext2D, half: number): void {
+export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
+  const leafColor    = style === 'Dirt' ? TREE_DIRT_LEAF_COLOR     : style === 'Dark' ? TREE_DARK_LEAF_COLOR     : TREE_LEAF_COLOR;
+  const leafAltColor = style === 'Dirt' ? TREE_DIRT_LEAF_ALT_COLOR : style === 'Dark' ? TREE_DARK_LEAF_ALT_COLOR : TREE_LEAF_ALT_COLOR;
+  const outlineColor = style === 'Dirt' ? TREE_DIRT_COLOR          : style === 'Dark' ? TREE_DARK_COLOR          : TREE_COLOR;
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
   // Main canopy – large dark-green filled circle
-  ctx.fillStyle = TREE_LEAF_COLOR;
+  ctx.fillStyle = leafColor;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
   // Leaf clusters – four overlapping lighter-green lobes around the edge
   const lobeR = r * 0.48;
   const lobeOff = r * 0.52;
-  ctx.fillStyle = TREE_LEAF_ALT_COLOR;
+  ctx.fillStyle = leafAltColor;
   for (let i = 0; i < 4; i++) {
     const angle = (i * Math.PI) / 2;
     ctx.beginPath();
@@ -624,7 +629,7 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number): void {
   // Diagonal leaf clusters (45°) – smaller, medium green
   const dLobeR = lobeR * 0.72;
   const dLobeOff = lobeOff * 0.88;
-  ctx.fillStyle = TREE_LEAF_COLOR;
+  ctx.fillStyle = leafColor;
   for (let i = 0; i < 4; i++) {
     const angle = Math.PI / 4 + (i * Math.PI) / 2;
     ctx.beginPath();
@@ -634,7 +639,7 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number): void {
   // Small brown trunk circle in the center – omitted as the trunk would not be
   // visible from a top-down aerial perspective; the canopy fully covers it.
   // Dark green outline around the whole canopy
-  ctx.strokeStyle = TREE_COLOR;
+  ctx.strokeStyle = outlineColor;
   ctx.lineWidth = _s(2);
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -1507,6 +1512,7 @@ export function drawTile(
   seaNeighbors?: SeaNeighbors,
   graniteNeighbors?: GraniteNeighbors,
   afterOuterCircleFn?: () => void,
+  levelStyle?: LevelStyle,
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -1609,7 +1615,7 @@ export function drawTile(
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    drawTree(ctx, half);
+    drawTree(ctx, half, levelStyle);
   } else if (shape === PipeShape.Sea) {
     // Sea – impassable water tile with animated ripples and land border
     ctx.restore();
@@ -2109,7 +2115,7 @@ function _renderPass2NonPipeTiles(
         };
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, board.style);
     }
   }
 }

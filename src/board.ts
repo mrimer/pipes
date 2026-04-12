@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
@@ -424,6 +424,12 @@ export class Board {
   floorTypes: ReadonlyMap<string, PipeShape> = new Map();
 
   /**
+   * Visual style for this level, controlling the default empty floor tile type
+   * and tree rendering colors.  Matches the source {@link LevelDef.style}.
+   */
+  readonly style: LevelStyle | undefined;
+
+  /**
    * Total water units that have been frozen by ice blocks during play.
    * Not used in game logic; intended for display purposes.
    * Backed by {@link _turnState}.
@@ -487,6 +493,7 @@ export class Board {
     this.inventory = [];
     this.oneWayData = new Map();
     this.goldSpaces = new Set();
+    this.style = level?.style;
 
     // Initialise sub-modules (cement must be created before _initFromLevel populates it).
     this._cement = new CementSystem(new Map());
@@ -516,29 +523,30 @@ export class Board {
   /** Initialize the board from a level definition. */
   private _initFromLevel(level: LevelDef): void {
     this.inventory = level.inventory.map((item) => ({ ...item }));
+    const defaultFloor = styleToFloorShape(level.style);
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const def = level.grid[r]?.[c] ?? null;
         if (def === null) {
-          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+          this.grid[r][c] = new Tile(defaultFloor, 0);
         } else if (def.shape === PipeShape.EmptyDirt || def.shape === PipeShape.EmptyDark) {
           // Dirt and Dark empty floor tiles are stored with their shape for rendering
           this.grid[r][c] = new Tile(def.shape, 0);
         } else if (def.shape === PipeShape.GoldSpace) {
           // Gold spaces are tracked separately; the cell behaves like Empty
           this.goldSpaces.add(posKey(r, c));
-          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+          this.grid[r][c] = new Tile(defaultFloor, 0);
         } else if (def.shape === PipeShape.OneWay) {
           // One-way tiles are tracked separately; the cell behaves like Empty
           const rot = (def.rotation ?? 0) as Rotation;
           const owDir = ([Direction.North, Direction.East, Direction.South, Direction.West] as Direction[])[rot / 90];
           this.oneWayData.set(posKey(r, c), owDir);
-          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+          this.grid[r][c] = new Tile(defaultFloor, 0);
         } else if (def.shape === PipeShape.Cement) {
           // Cement tiles are tracked separately; the cell behaves like Empty
           this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
-          this.grid[r][c] = new Tile(PipeShape.Empty, 0);
+          this.grid[r][c] = new Tile(defaultFloor, 0);
         } else {
           const rot = (def.rotation ?? 0) as Rotation;
           const itemShape = def.itemShape ?? null;

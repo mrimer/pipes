@@ -3,7 +3,7 @@
  * editor.  Extracted from ChapterMapEditorSection to reduce file size.
  */
 
-import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
+import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction, LevelStyle } from '../types';
 import {
   EditorPalette,
   TileParams,
@@ -16,6 +16,7 @@ import {
   PALETTE_ITEM_SELECTED_COLOR,
   PALETTE_ITEM_UNSELECTED_COLOR,
 } from './types';
+import { buildStyleSectionPanel } from './tileParamsPanel';
 import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
@@ -36,6 +37,8 @@ export interface ChapterEditorUICallbacks {
   getChapterEditRows(): number;
   getChapterEditCols(): number;
   getChapterFocusedTilePos(): { row: number; col: number } | null;
+  getChapterStyle(chapter: ChapterDef): LevelStyle | undefined;
+  setChapterStyle(style: LevelStyle, chapter: ChapterDef, campaign: CampaignDef): void;
 
   // Actions
   recordSnapshot(chapter: ChapterDef, markChanged?: boolean): void;
@@ -55,9 +58,39 @@ export interface ChapterEditorUICallbacks {
 // ─── ChapterEditorUI ──────────────────────────────────────────────────────────
 
 export class ChapterEditorUI {
+  styleSectionExpanded = false;
+
   constructor(private readonly _cb: ChapterEditorUICallbacks) {}
 
   // ── Panel builders (called from _buildChapterMapSection layout) ────────────
+
+  /**
+   * Build the collapsible Style panel for the chapter map editor.
+   * The returned element has id='chapter-style-panel'.
+   */
+  buildStylePanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
+    return buildStyleSectionPanel(
+      'chapter-style-panel',
+      this.styleSectionExpanded,
+      this._cb.getChapterStyle(chapter),
+      () => {
+        this.styleSectionExpanded = !this.styleSectionExpanded;
+        document.getElementById('chapter-style-panel')?.replaceWith(this.buildStylePanel(chapter, campaign));
+      },
+      (style) => {
+        if (this._cb.getChapterStyle(chapter) !== style) {
+          this._cb.setChapterStyle(style, chapter, campaign);
+        }
+        document.getElementById('chapter-style-panel')?.replaceWith(this.buildStylePanel(chapter, campaign));
+      },
+    );
+  }
+
+  /** Re-render the style panel in place. */
+  rebuildStylePanel(chapter: ChapterDef, campaign: CampaignDef): void {
+    const existing = document.getElementById('chapter-style-panel');
+    if (existing) existing.replaceWith(this.buildStylePanel(chapter, campaign));
+  }
 
   /** Build the palette panel for the chapter map editor. */
   buildPalettePanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {

@@ -824,6 +824,7 @@ export class CampaignEditor {
       'display:flex;flex-direction:column;gap:12px;min-width:220px;';
 
     if (!readOnly) {
+      leftCol.appendChild(this._paramsPanel.buildStylePanel());
       leftCol.appendChild(this._paramsPanel.buildPalette());
     }
 
@@ -1021,7 +1022,7 @@ export class CampaignEditor {
       }
     }
 
-    renderEditorCanvas(ctx, this._state.grid, this._state.rows, this._state.cols, overlay, drag, this._state.linkedTilePos);
+    renderEditorCanvas(ctx, this._state.grid, this._state.rows, this._state.cols, overlay, drag, this._state.linkedTilePos, undefined, undefined, undefined, this._state.levelStyle);
   }
 
   // ─── Editor canvas mouse events ────────────────────────────────────────────
@@ -1089,6 +1090,7 @@ export class CampaignEditor {
     const invPanel = document.getElementById('editor-inventory-panel');
     if (invPanel) invPanel.replaceWith(this._metadataPanel!.buildInventoryEditor());
     this._metadataPanel?.rebuildGridSizePanel();
+    this._paramsPanel.refreshStylePanel();
   }
 
   private _updateEditorUndoRedoButtons(): void {
@@ -1236,6 +1238,7 @@ export class CampaignEditor {
     if (activeHints.length > 0) def.hints = activeHints;
     if (starCount > 0) def.starCount = starCount;
     if (this._state.levelChallenge) def.challenge = true;
+    if (this._state.levelStyle) def.style = this._state.levelStyle;
     return def;
   }
 
