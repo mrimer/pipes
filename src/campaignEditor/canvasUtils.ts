@@ -3,7 +3,7 @@
  * editor and the chapter map editor.
  */
 
-import { TILE_SIZE } from '../renderer';
+import { TILE_SIZE, setTileSize, BASE_TILE_SIZE } from '../renderer';
 import { MAX_EDITOR_CANVAS_PX, EDITOR_CANVAS_BORDER } from './types';
 
 /**
@@ -24,8 +24,10 @@ export function canvasPos(
 }
 
 /**
- * Update the CSS display size of `canvas` so it fits within the available
- * space in `mainLayout` while never scaling above 1:1.
+ * Update the tile size and canvas dimensions so the board fills the available
+ * horizontal space in `mainLayout`, then set the CSS display size accordingly.
+ * The tile size is expanded up to 128 px to fill the room, or scaled down
+ * (CSS-only) when the grid would otherwise overflow the container.
  *
  * @param canvas           The canvas element to resize.
  * @param rows             Current grid row count.
@@ -48,10 +50,9 @@ export function updateCanvasDisplaySize(
   layoutPadding: number,
   constrainHeight: boolean,
 ): void {
-  const intrinsicW = cols * TILE_SIZE;
-  const intrinsicH = rows * TILE_SIZE;
-  let maxW = MAX_EDITOR_CANVAS_PX;
-  let maxH = MAX_EDITOR_CANVAS_PX;
+  const MAX_TILE_SIZE = 128;
+  let availW = MAX_EDITOR_CANVAS_PX;
+  let availH = MAX_EDITOR_CANVAS_PX;
 
   if (mainLayout) {
     const layoutW = mainLayout.clientWidth;
@@ -73,9 +74,9 @@ export function updateCanvasDisplaySize(
         }
       }
     }
-    const availW =
+    const computedAvailW =
       layoutW - otherW - colCount * layoutGap - 2 * layoutPadding - 2 * EDITOR_CANVAS_BORDER;
-    if (availW > 0) maxW = availW;
+    if (computedAvailW > 0) availW = computedAvailW;
 
     if (constrainHeight) {
       let absTop = 0;
@@ -86,14 +87,32 @@ export function updateCanvasDisplaySize(
       }
       if (absTop > 0) {
         const BOTTOM_MARGIN = 16;
-        const availH =
+        const computedAvailH =
           window.innerHeight + window.scrollY - absTop - 2 * EDITOR_CANVAS_BORDER - BOTTOM_MARGIN;
-        if (availH > 0) maxH = availH;
+        if (computedAvailH > 0) availH = computedAvailH;
       }
     }
   }
 
-  const scale = Math.min(1, maxW / intrinsicW, maxH / intrinsicH);
+  // Choose the largest whole-pixel tile size that fills the available space,
+  // capped at MAX_TILE_SIZE and floored at BASE_TILE_SIZE.  This expands the
+  // grid to fill the horizontal (and optionally vertical) room rather than
+  // leaving a blank strip beside it.
+  const fitW = Math.floor(availW / cols);
+  const fit = constrainHeight ? Math.floor(Math.min(fitW, availH / rows)) : fitW;
+  const newTileSize = Math.max(BASE_TILE_SIZE, Math.min(MAX_TILE_SIZE, fit));
+  setTileSize(newTileSize);
+
+  const intrinsicW = cols * TILE_SIZE;
+  const intrinsicH = rows * TILE_SIZE;
+  canvas.width  = intrinsicW;
+  canvas.height = intrinsicH;
+
+  // CSS scale: only downscale if the base tile size forces the canvas to
+  // overflow the available space (should be rare).
+  const scale = constrainHeight
+    ? Math.min(1, availW / intrinsicW, availH / intrinsicH)
+    : Math.min(1, availW / intrinsicW);
   canvas.style.width  = Math.round(intrinsicW * scale) + 'px';
   canvas.style.height = Math.round(intrinsicH * scale) + 'px';
 }
