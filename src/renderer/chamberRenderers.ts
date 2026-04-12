@@ -668,9 +668,12 @@ export function drawChamberButtStubs(
   color: string,
   dirFilter?: ReadonlySet<Direction>,
 ): void {
-  // Offset the stub start outward by a quarter of the line-width so the stroke
-  // overlaps the box border edge without entering the chamber fill area.
-  const gap = Math.round(LINE_WIDTH / 4);
+  // Offset the stub start inward (toward the box) by rounding down so the
+  // stroke overlaps the box border edge without entering the chamber fill area.
+  // Using Math.floor ensures the stub always starts inside the border (not at
+  // its outer edge), which prevents a thin dark gap from appearing between the
+  // box colored outline and the connector for small tile sizes such as 64 px.
+  const gap = Math.floor(LINE_WIDTH / 4);
   ctx.lineCap = 'butt';
   const stubDirs = [
     [Direction.North, 0,        -(bh + gap), 0,     -half],
