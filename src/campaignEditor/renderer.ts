@@ -10,7 +10,8 @@ import { Tile } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
-  WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
+  WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR,
+  lighten, darken } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
 import { tileDefConnections } from '../chapterMapUtils';
 
@@ -830,23 +831,38 @@ function _drawChapterEditorPipeTile(
                  : isLeaky ? (isFilled ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
                  : (isFilled ? WATER_COLOR : PIPE_COLOR);
 
-  // Draw each arm center-to-edge with per-arm linecap (butt or round)
-  ctx.strokeStyle = pipeColor;
-  ctx.lineWidth = LINE_WIDTH;
+  // Draw each arm center-to-edge with per-arm linecap (butt or round) using
+  // triple-stroke (shadow → base → highlight) for tube depth.
+  const shadowColor    = darken(pipeColor, 0.25);
+  const highlightColor = lighten(pipeColor, 0.35);
+  const baseWidth      = LINE_WIDTH - Math.max(2, _s(2));
+  const highlightWidth = Math.max(1, _s(1.5));
   for (const dir of connections) {
     ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    if (dir === Direction.North) ctx.lineTo(cx, y);
-    else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
-    else if (dir === Direction.East)  ctx.lineTo(x + CELL, cy);
-    else if (dir === Direction.West)  ctx.lineTo(x, cy);
-    ctx.stroke();
+    let ex = cx, ey = cy;
+    if (dir === Direction.North) ey = y;
+    else if (dir === Direction.South) ey = y + CELL;
+    else if (dir === Direction.East)  ex = x + CELL;
+    else if (dir === Direction.West)  ex = x;
+    // Shadow pass
+    ctx.strokeStyle = shadowColor;
+    ctx.lineWidth = LINE_WIDTH;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+    // Base pass
+    ctx.strokeStyle = pipeColor;
+    ctx.lineWidth = baseWidth;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+    // Highlight pass
+    ctx.strokeStyle = highlightColor;
+    ctx.lineWidth = highlightWidth;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
   }
 
-  // Center junction dot fills the seam between arms
+  // Center junction dot: triple-stroke filled circles cover the seam between arms
+  ctx.fillStyle = shadowColor;
+  ctx.beginPath(); ctx.arc(cx, cy, _s(5), 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = pipeColor;
-  ctx.beginPath();
-  ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, _s(5) - Math.max(1, _s(1)), 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = highlightColor;
+  ctx.beginPath(); ctx.arc(cx, cy, Math.max(1, _s(0.75)), 0, Math.PI * 2); ctx.fill();
 }
