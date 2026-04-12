@@ -8,7 +8,7 @@
  */
 
 import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
-import { PIPE_SHAPES, isEmptyFloor } from '../board';
+import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { DragState } from './renderer';
 import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -211,36 +211,35 @@ export class ChapterMapInput {
     }
 
     // Regular tile placement / dragging
-    const isEmptyFloorPalette = this._cb.getPalette() === PipeShape.Empty ||
-      this._cb.getPalette() === PipeShape.EmptyDirt ||
-      this._cb.getPalette() === PipeShape.EmptyDark;
+    const palette = this._cb.getPalette();
+    const isEmptyFloorPalette = palette !== 'erase' && EMPTY_FLOOR_SHAPES.includes(palette as PipeShape);
     const existingIsEmptyFloor = existingTile === null ||
       (existingTile !== null && isEmptyFloor(existingTile.shape));
-    if (existingTile !== null && !existingIsEmptyFloor && this._cb.getPalette() !== 'erase' && !isEmptyFloorPalette) {
+    if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette) {
       // Start dragging the existing tile
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._cb.renderCanvas();
     } else {
-      if (this._cb.getPalette() === PipeShape.Source && this._cb.hasSourceElsewhere()) {
+      if (palette === PipeShape.Source && this._cb.hasSourceElsewhere()) {
         return; // Only one source allowed
       }
-      if (this._cb.getPalette() === PipeShape.Sink && this._cb.hasSinkElsewhere()) {
+      if (palette === PipeShape.Sink && this._cb.hasSinkElsewhere()) {
         this._cb.showSinkError();
         return; // Only one sink allowed
       }
-      if (existingIsEmptyFloor && REPEATABLE_EDITOR_TILES.has(this._cb.getPalette())) {
+      if (existingIsEmptyFloor && REPEATABLE_EDITOR_TILES.has(palette)) {
         this._paintDragActive = true;
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
         this._playChapterPlacementSfx(pos);
         this._cb.renderCanvas();
         return;
       }
-      if (this._cb.getPalette() === 'erase') {
+      if (palette === 'erase') {
         if (existingTile !== null) sfxManager.play(SfxId.Delete);
         this._cb.getEditGrid()[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
-      } else if (this._cb.getPalette() === PipeShape.Empty) {
+      } else if (palette === PipeShape.Empty) {
         // Empty-Grass palette: clear to null
         if (existingTile !== null) sfxManager.play(SfxId.Delete);
         this._cb.getEditGrid()[pos.row][pos.col] = null;
