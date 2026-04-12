@@ -26,7 +26,6 @@ export const EMPTY_COLOR_LIGHT       = '#386038';
 export const EMPTY_COLOR             = '#2a4a2a';
 /** Dark shade for gingham empty-tile pattern (bottom-right of 2x2 cell). */
 export const EMPTY_COLOR_DARK        = '#203820';
-export const EMPTY_TARGET_COLOR      = '#1e3a1e';
 export const LOW_WATER_COLOR         = '#e74c3c';
 export const MEDIUM_WATER_COLOR      = '#f0c040';
 export const LABEL_COLOR             = '#fff';
