@@ -301,7 +301,7 @@ const DECORATION_DENSITY = 0.30;
 export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
   switch (floorType) {
     case PipeShape.EmptyDirt: return ['grass', 'crystal', 'pebbles'];
-    case PipeShape.EmptyDark: return ['pebbles'];
+    case PipeShape.EmptyDark: return ['mushroom', 'crystal', 'pebbles'];
     default:                  return ['flower', 'grass', 'mushroom'];  // Empty / grass
   }
 }
