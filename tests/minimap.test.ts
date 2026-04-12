@@ -12,7 +12,7 @@
 
 import { PipeShape, Direction } from '../src/types';
 import { LevelDef } from '../src/types';
-import { renderMinimap } from '../src/minimap';
+import { renderMinimap } from '../src/visuals/minimap';
 
 // ─── Canvas mock setup ────────────────────────────────────────────────────────
 
@@ -72,16 +72,16 @@ describe('renderMinimap: return value', () => {
   });
 
   it('canvas dimensions include border pixels on each side', () => {
-    // 3 rows × 3 cols; with TARGET_SIZE=60 and maxDim=3, px = floor(60/3) = 20
-    // totalW = 3*20 + 2*2 = 64; totalH = 3*20 + 2*2 = 64
+    // 3 rows × 3 cols; with TARGET_SIZE=100 and maxDim=3, px = floor(100/3) = 33
+    // totalW = 3*33 + 2*2 = 103; totalH = 3*33 + 2*2 = 103
     const level = makeLevel(3, 3, [
       [null, null, null],
       [null, null, null],
       [null, null, null],
     ]);
     const canvas = renderMinimap(level);
-    expect(canvas.width).toBe(64);
-    expect(canvas.height).toBe(64);
+    expect(canvas.width).toBe(103);
+    expect(canvas.height).toBe(103);
   });
 
   it('handles a 1×1 grid', () => {

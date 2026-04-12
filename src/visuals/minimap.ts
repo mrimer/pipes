@@ -6,14 +6,15 @@
  * is surrounded by a 2px white border.
  */
 
-import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef } from './types';
-import { getConnections } from './tile';
+import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef } from '../types';
+import { getConnections } from '../tile';
 import {
   EMPTY_COLOR,
   EMPTY_COLOR_DARK,
   EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR_DARK,
   PIPE_COLOR,
+  FIXED_PIPE_COLOR,
   SOURCE_COLOR,
   SINK_COLOR,
   TANK_COLOR,
@@ -40,16 +41,19 @@ import {
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
   SEA_FILL_COLOR,
-} from './colors';
+} from '../colors';
 
 /** Width and height of the white border drawn around the minimap (px). */
 const BORDER_PX = 2;
 
 /**
- * Target inner dimension (width and height) for the minimap in CSS pixels.
- * The actual size may differ slightly due to integer pixels-per-tile rounding.
+ * Target inner dimension (width and height) for the minimap canvas in CSS pixels.
+ * Sized to be larger than the maximum renderable chamber area (≈82 px at TILE_SIZE 128)
+ * so the minimap only ever needs to be scaled down, never up, when fitting it into
+ * the level-chamber tile.  The actual rendered size may differ slightly due to
+ * integer pixels-per-tile rounding.
  */
-const TARGET_SIZE = 60;
+const TARGET_SIZE = 100;
 
 /**
  * Compute the total pixel dimensions (width × height) of a minimap canvas
@@ -90,7 +94,7 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
     case PipeShape.Elbow:
     case PipeShape.Tee:
     case PipeShape.Cross:
-      return PIPE_COLOR;
+      return FIXED_PIPE_COLOR;
     case PipeShape.SpinStraight:
     case PipeShape.SpinElbow:
     case PipeShape.SpinTee:
@@ -232,7 +236,7 @@ function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
       shape === PipeShape.LeakyTee || shape === PipeShape.LeakyCross) {
     return { bg: EMPTY_COLOR, line: LEAKY_PIPE_COLOR };
   }
-  return { bg: EMPTY_COLOR, line: PIPE_COLOR };
+  return { bg: FIXED_PIPE_COLOR, line: PIPE_COLOR };
 }
 
 /**

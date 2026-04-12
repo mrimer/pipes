@@ -34,7 +34,7 @@ import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { EditorInputHandler } from './editorInputHandler';
 import { DataValidationDialog } from './dataValidationDialog';
 import { EditorDialogs } from './editorDialogs';
-import { renderMinimap } from '../minimap';
+import { renderMinimap } from '../visuals/minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { updateCanvasDisplaySize } from './canvasUtils';
