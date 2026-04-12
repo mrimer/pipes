@@ -16,7 +16,7 @@ export const VALID_CAMPAIGN_KEYS: ReadonlySet<string> = new Set([
 
 /** Valid keys for a ChapterDef record. */
 export const VALID_CHAPTER_KEYS: ReadonlySet<string> = new Set([
-  'id', 'name', 'levels', 'rows', 'cols', 'grid',
+  'id', 'name', 'levels', 'rows', 'cols', 'grid', 'style',
 ]);
 
 /** Valid keys for a LevelDef record. */

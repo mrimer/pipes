@@ -220,6 +220,25 @@ export interface TileDef {
   completion?: number;
 }
 
+/**
+ * Visual style for a level or chapter map, controlling the default empty floor
+ * tile type (and associated tree colors).
+ * - 'Grass' → green (default)
+ * - 'Dirt'  → warm brown
+ * - 'Dark'  → dark blue-green
+ */
+export type LevelStyle = 'Grass' | 'Dirt' | 'Dark';
+
+/** Valid LevelStyle values for runtime validation. */
+export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Dirt', 'Dark']);
+
+/** Map a LevelStyle to its corresponding empty-floor PipeShape. */
+export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
+  if (style === 'Dirt') return PipeShape.EmptyDirt;
+  if (style === 'Dark') return PipeShape.EmptyDark;
+  return PipeShape.Empty;
+}
+
 /** Complete definition of a game level. */
 export interface LevelDef {
   id: number;
@@ -249,6 +268,11 @@ export interface LevelDef {
    * do NOT need to be completed in order to unlock the next chapter.
    */
   challenge?: boolean;
+  /**
+   * Visual style for this level, controlling the default empty floor tile type
+   * and tree rendering colors.  Defaults to 'Grass' when absent or invalid.
+   */
+  style?: LevelStyle;
 }
 
 /** Possible types of ambient decorative element drawn under grid tiles. */
@@ -294,6 +318,11 @@ export interface ChapterDef {
   rows?: number;
   cols?: number;
   grid?: (TileDef | null)[][];
+  /**
+   * Visual style for this chapter map, controlling the default empty floor tile
+   * type and tree rendering colors.  Defaults to 'Grass' when absent or invalid.
+   */
+  style?: LevelStyle;
 }
 
 /**
