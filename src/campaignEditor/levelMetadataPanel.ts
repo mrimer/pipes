@@ -210,7 +210,7 @@ export class LevelMetadataPanel {
         inputWidth: '60px',
         inputRowStyle: 'gap:6px;font-size:0.85rem;',
         requireOneAxisAbove1: true,
-        minWidth: '180px',
+        minWidth: '210px',
       },
     );
   }

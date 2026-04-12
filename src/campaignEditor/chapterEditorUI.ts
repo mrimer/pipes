@@ -243,6 +243,7 @@ export class ChapterEditorUI {
         title: 'MAP SIZE',
         inputWidth: '52px',
         inputRowStyle: 'gap:4px;font-size:0.8rem;',
+        minWidth: '210px',
       },
     );
   }
