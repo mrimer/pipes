@@ -176,7 +176,7 @@ export function buildStyleSectionPanel(
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
-  toggle.textContent = (expanded ? '▾' : '▸') + ' Style';
+  toggle.textContent = (expanded ? '▾' : '▸') + ' Style - ' + resolvedStyle;
   toggle.style.cssText =
     'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
     'border:1px solid #7a5a2a;background:#1a1208;color:#c8a060;font-weight:bold;margin-top:2px;';
