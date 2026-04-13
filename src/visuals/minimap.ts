@@ -15,6 +15,7 @@ import {
   EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR_DARK,
   PIPE_COLOR,
+  FIXED_PIPE_COLOR,
   SOURCE_COLOR,
   SINK_COLOR,
   TANK_COLOR,
@@ -102,7 +103,7 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
     case PipeShape.Elbow:
     case PipeShape.Tee:
     case PipeShape.Cross:
-      return TILE_BG;
+      return FIXED_PIPE_COLOR;
     case PipeShape.SpinStraight:
     case PipeShape.SpinElbow:
     case PipeShape.SpinTee:
