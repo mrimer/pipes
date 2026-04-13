@@ -1400,11 +1400,11 @@ export class CampaignEditor {
       },
       done(ok: boolean) {
         if (ok) {
-          title.textContent = '📤 Export log  ✅ Success';
+          title.textContent = '📤 Export log ✅ Success';
           title.style.color = '#7ed321';
           timerId = setTimeout(() => { overlay.remove(); }, 8_000);
         } else {
-          title.textContent = '📤 Export log  ❌ Failed (click to dismiss)';
+          title.textContent = '📤 Export log ❌ Failed (click to dismiss)';
           title.style.color = '#e74c3c';
         }
         overlay.style.cursor = 'pointer';
