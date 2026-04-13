@@ -601,9 +601,12 @@ export function drawGranite(
 
 /** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
 export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const leafColor    = style === 'Dirt' ? TREE_DIRT_LEAF_COLOR     : style === 'Dark' ? TREE_DARK_LEAF_COLOR     : style === 'Winter' ? TREE_WINTER_LEAF_COLOR     : TREE_LEAF_COLOR;
-  const leafAltColor = style === 'Dirt' ? TREE_DIRT_LEAF_ALT_COLOR : style === 'Dark' ? TREE_DARK_LEAF_ALT_COLOR : style === 'Winter' ? TREE_WINTER_LEAF_ALT_COLOR : TREE_LEAF_ALT_COLOR;
-  const outlineColor = style === 'Dirt' ? TREE_DIRT_COLOR          : style === 'Dark' ? TREE_DARK_COLOR          : style === 'Winter' ? TREE_WINTER_COLOR          : TREE_COLOR;
+  const treeColors: Record<string, [string, string, string]> = {
+    Dirt:   [TREE_DIRT_LEAF_COLOR,    TREE_DIRT_LEAF_ALT_COLOR,    TREE_DIRT_COLOR],
+    Dark:   [TREE_DARK_LEAF_COLOR,    TREE_DARK_LEAF_ALT_COLOR,    TREE_DARK_COLOR],
+    Winter: [TREE_WINTER_LEAF_COLOR,  TREE_WINTER_LEAF_ALT_COLOR,  TREE_WINTER_COLOR],
+  };
+  const [leafColor, leafAltColor, outlineColor] = (style && treeColors[style]) ?? [TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_COLOR];
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
   // Main canopy – large dark-green filled circle
   ctx.fillStyle = leafColor;
