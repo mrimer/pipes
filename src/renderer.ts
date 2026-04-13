@@ -844,18 +844,13 @@ function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: numb
 }
 
 /**
- * Draw the one-way floor tile background: a dark-red cell with a large red
- * directional arrow/chevron pointing in `dir`.
- * The tile edge at pixel (x, y) is used as the top-left origin.
+ * Draw the one-way floor arrow/chevron pointing in `dir` on top of the current
+ * background.  The tile edge at pixel (x, y) is used as the top-left origin.
  */
 export function drawOneWayArrow(ctx: CanvasRenderingContext2D, x: number, y: number, dir: Direction): void {
   const half = TILE_SIZE / 2;
   const cx = x + half;
   const cy = y + half;
-
-  // Dark-red background
-  ctx.fillStyle = ONE_WAY_BG_COLOR;
-  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
 
   // Rotation angle: 0 = North (up), 90° CW = East, etc.
   const angle = dir === Direction.East  ?  Math.PI / 2
@@ -1886,7 +1881,13 @@ function _renderPass1Backgrounds(
 
       // Tile background
       if (isOneWayCell) {
-        // One-way cell: always show arrow background regardless of tile on top
+        // One-way cell: gingham background (inferred floor type) + directional arrow on top
+        const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
+        const paritySum = (r % 2) + (c % 2);
+        const [gc_light, gc_mid, gc_dark] = ginghamColorsForFloor(floorType);
+        const ginghamColor = paritySum === 0 ? gc_light : paritySum === 2 ? gc_dark : gc_mid;
+        ctx.fillStyle = ginghamColor;
+        ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
         drawOneWayArrow(ctx, x, y, oneWayDir!);
       } else if (isCementCell) {
         // Cement cell: always show cement background regardless of tile on top
