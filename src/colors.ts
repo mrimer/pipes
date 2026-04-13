@@ -223,3 +223,9 @@ export const EMPTY_WINTER_COLOR       = '#d8e4ec';
 export const EMPTY_WINTER_COLOR_LIGHT = lighten(EMPTY_WINTER_COLOR, 0.25);
 /** Dark shade for Winter gingham (bottom-right of 2×2 cell). */
 export const EMPTY_WINTER_COLOR_DARK  = darken(EMPTY_WINTER_COLOR, 0.12);
+/** Minimap fill color for sea tiles — Winter style (pale blue, lightened). */
+export const SEA_FILL_COLOR_WINTER  = lighten(SEA_FILL_COLOR, 0.35);
+/** Minimap fill color for sea tiles — Dirt style (slightly darker blue). */
+export const SEA_FILL_COLOR_DIRT    = darken(SEA_FILL_COLOR, 0.15);
+/** Minimap fill color for sea tiles — Dark style (dark blue-purple). */
+export const SEA_FILL_COLOR_DARK    = '#1c1a3e';

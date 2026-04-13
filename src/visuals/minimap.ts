@@ -42,10 +42,14 @@ import {
   TREE_COLOR,
   TREE_DIRT_COLOR,
   TREE_DARK_COLOR,
+  TREE_WINTER_COLOR,
   ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
   SEA_FILL_COLOR,
+  SEA_FILL_COLOR_WINTER,
+  SEA_FILL_COLOR_DIRT,
+  SEA_FILL_COLOR_DARK,
 } from '../colors';
 
 
@@ -76,6 +80,7 @@ export function minimapDimensions(rows: number, cols: number): { width: number; 
 function emptyColor(style: LevelStyle | undefined): string {
   if (style === 'Dirt') return EMPTY_DIRT_COLOR_DARK;
   if (style === 'Dark') return EMPTY_DARK_COLOR_DARK;
+  if (style === 'Winter') return EMPTY_WINTER_COLOR_DARK;
   return EMPTY_COLOR_DARK;
 }
 
@@ -83,7 +88,16 @@ function emptyColor(style: LevelStyle | undefined): string {
 function treeColor(style: LevelStyle | undefined): string {
   if (style === 'Dirt') return TREE_DIRT_COLOR;
   if (style === 'Dark') return TREE_DARK_COLOR;
+  if (style === 'Winter') return TREE_WINTER_COLOR;
   return TREE_COLOR;
+}
+
+/** Returns the style-dependent fill color for Sea (water) tiles. */
+function seaColor(style: LevelStyle | undefined): string {
+  if (style === 'Winter') return SEA_FILL_COLOR_WINTER;
+  if (style === 'Dirt') return SEA_FILL_COLOR_DIRT;
+  if (style === 'Dark') return SEA_FILL_COLOR_DARK;
+  return SEA_FILL_COLOR;
 }
 
 /** Returns the stroke color used to draw a Chamber-item (container) tile on the minimap. */
@@ -161,7 +175,7 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
     case PipeShape.Tree:
       return treeColor(style);
     case PipeShape.Sea:
-      return SEA_FILL_COLOR;
+      return seaColor(style);
     case PipeShape.Cement:
       return CEMENT_FILL_COLOR;
     case PipeShape.OneWay:
