@@ -695,7 +695,7 @@ export class CampaignEditor {
     const starSuffix = (level.starCount ?? 0) > 0 ? ` ⭐×${level.starCount}` : '';
     name.textContent = `Level ${levelIdx + 1}: ${level.name}${level.challenge ? ' 💀' : ''}${starSuffix}`;
     const minimap = renderMinimap(level);
-    minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;cursor:pointer;';
+    minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;cursor:pointer;border:2px solid white;';
     minimap.addEventListener('click', () => {
       this._activeLevelIdx = levelIdx;
       this._openLevelEditor(level, readOnly);
