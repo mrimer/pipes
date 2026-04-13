@@ -450,7 +450,11 @@ export class LevelEditorState {
    */
   rotatePalette(clockwise: boolean): void {
     const p = this.palette;
-    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.Empty || p === PipeShape.EmptyDirt || p === PipeShape.EmptyDark || p === PipeShape.EmptyWinter) return;
+    const nonRotatable = new Set<EditorPalette>([
+      'erase', PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
+      PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark, PipeShape.EmptyWinter,
+    ]);
+    if (nonRotatable.has(p)) return;
 
     if (p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)) {
       const c = this.params.connections;
