@@ -6,7 +6,7 @@
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, LevelStyle } from '../types';
 import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel, drawTree } from '../renderer';
-import { Tile } from '../tile';
+import { Tile, rotateDirection } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
@@ -189,7 +189,9 @@ export function renderEditorCanvas(
         const isFilled = filledKeys.has(`${r},${c}`);
         _drawChapterEditorPipeTile(ctx, x, y, def, tileConns, buttEndDirs, isFilled);
       } else {
-        drawEditorTile(ctx, x, y, def);
+        const tileConns = tileDefConnections(def);
+        const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, tileConns);
+        drawEditorTile(ctx, x, y, def, false, undefined, buttEndDirs);
       }
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
@@ -398,7 +400,7 @@ function _drawSpinCementOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
 }
 
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */
-export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef, isChapterMap = false, style?: LevelStyle): void {
+export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef, isChapterMap = false, style?: LevelStyle, buttEndDirs?: ReadonlySet<Direction>): void {
   const CELL = TILE_SIZE;
   const { shape } = def;
   const chamberContent = def.chamberContent ?? 'tank';
@@ -505,7 +507,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     def.shatter ?? 0,
   );
 
-  drawTileOnEditor(ctx, x, y, tile, def, isChapterMap, style);
+  drawTileOnEditor(ctx, x, y, tile, def, isChapterMap, style, buttEndDirs);
 
   // For spin-cement tiles, draw the cement wavy-line overlay and drying-time label on top.
   if (SPIN_CEMENT_SHAPES.has(shape)) {
@@ -562,7 +564,7 @@ function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, 
 }
 
 /** Simplified tile drawing for the editor canvas. */
-function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false, style?: LevelStyle): void {
+function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false, style?: LevelStyle, buttEndDirs?: ReadonlySet<Direction>): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
@@ -738,21 +740,47 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     // Draw pipe lines
     ctx.strokeStyle = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
     ctx.lineWidth = LINE_WIDTH;
-    ctx.lineCap = 'round';
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((tile.rotation * Math.PI) / 180);
     const h = CELL / 2;
-    if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight || shape === PipeShape.SpinStraightCement) {
-      ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-    } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.LeakyElbow || shape === PipeShape.SpinElbowCement) {
-      ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-    } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.LeakyTee || shape === PipeShape.SpinTeeCement) {
-      ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-    } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross || shape === PipeShape.LeakyCross) {
-      ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
+    if (buttEndDirs !== undefined) {
+      // Per-arm drawing: draw each arm individually from center to edge so each
+      // can have its own lineCap (butt for reciprocal connections, round for open ends).
+      // The canvas is already rotated by tile.rotation, so we convert each absolute
+      // direction back to a local canvas direction by un-rotating CCW.
+      const rotSteps = ((tile.rotation / 90) % 4 + 4) % 4;
+      const ccwSteps = (4 - rotSteps) % 4;
+      for (const absDir of tile.connections) {
+        ctx.lineCap = buttEndDirs.has(absDir) ? 'butt' : 'round';
+        let localDir = absDir;
+        for (let i = 0; i < ccwSteps; i++) localDir = rotateDirection(localDir);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        if (localDir === Direction.North)      ctx.lineTo(0, -h);
+        else if (localDir === Direction.East)  ctx.lineTo(h, 0);
+        else if (localDir === Direction.South) ctx.lineTo(0, h);
+        else                                   ctx.lineTo(-h, 0);
+        ctx.stroke();
+      }
+      // Center junction dot fills the seam between arms
+      ctx.fillStyle = ctx.strokeStyle as string;
+      ctx.beginPath();
+      ctx.arc(0, 0, _s(5), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.lineCap = 'round';
+      if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight || shape === PipeShape.SpinStraightCement) {
+        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
+      } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.LeakyElbow || shape === PipeShape.SpinElbowCement) {
+        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
+      } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.LeakyTee || shape === PipeShape.SpinTeeCement) {
+        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
+      } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross || shape === PipeShape.LeakyCross) {
+        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
+      }
     }
     // Draw rust spots on leaky pipes (two dots along each arm at 1/3 and 2/3)
     if (isLeaky) {
