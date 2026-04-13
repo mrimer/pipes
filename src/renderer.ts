@@ -48,6 +48,7 @@ import {
   ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
   SEA_COLOR, SEA_BORDER_COLOR,
+  SEA_FILL_COLOR, SEA_FILL_COLOR_WINTER, SEA_FILL_COLOR_DIRT, SEA_FILL_COLOR_DARK,
 } from './colors';
 
 /** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
@@ -663,6 +664,26 @@ export interface SeaNeighbors {
   se: boolean;
 }
 
+/** Returns the style-dependent fill color for Sea (water) tiles. */
+export function seaFillColor(style?: LevelStyle): string {
+  if (style === 'Winter') return SEA_FILL_COLOR_WINTER;
+  if (style === 'Dirt')   return SEA_FILL_COLOR_DIRT;
+  if (style === 'Dark')   return SEA_FILL_COLOR_DARK;
+  return SEA_FILL_COLOR;
+}
+
+/**
+ * Parse a '#rrggbb' hex color string into [r, g, b] components.
+ * Used to compute style-specific oscillation centers for sea tile animation.
+ */
+function _seaParseHex(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
 /**
  * Draw a sea tile at the origin (caller must translate ctx to tile center).
  * The water color oscillates gently.  Land borders are drawn on edges where
@@ -672,21 +693,33 @@ export interface SeaNeighbors {
  * @param ctx       Canvas 2D context (translated so origin = tile center).
  * @param half      Half tile size in pixels.
  * @param neighbors Which adjacent cells are also sea tiles (or outside the grid).
+ * @param fillColor Optional base fill color (hex '#rrggbb') for the style-specific water tint.
+ *                  When provided the oscillation is centered on this color; when absent the
+ *                  default Grass-style blue is used.
  */
 export function drawSea(
   ctx: CanvasRenderingContext2D,
   half: number,
   neighbors: SeaNeighbors,
+  fillColor?: string,
 ): void {
   const now = Date.now();
 
   // ── Water fill with gentle color oscillation ────────────────────────────
-  // Oscillate hue between a medium and slightly lighter blue
+  // Oscillate hue ±9/±14/±11 channels around the style-specific fill color.
   const osc = Math.sin(now / 1200) * 0.5 + 0.5; // 0..1
-  const r = Math.round(30 + osc * 18);   // 30..48
-  const g = Math.round(110 + osc * 28);  // 110..138
-  const b = Math.round(175 + osc * 22);  // 175..197
-  const waterColor = `rgb(${r},${g},${b})`;
+  let wr: number, wg: number, wb: number;
+  if (fillColor) {
+    const [fr, fg, fb] = _seaParseHex(fillColor);
+    wr = Math.round(Math.max(0, Math.min(255, fr - 9  + osc * 18)));
+    wg = Math.round(Math.max(0, Math.min(255, fg - 14 + osc * 28)));
+    wb = Math.round(Math.max(0, Math.min(255, fb - 11 + osc * 22)));
+  } else {
+    wr = Math.round(30 + osc * 18);   // 30..48
+    wg = Math.round(110 + osc * 28);  // 110..138
+    wb = Math.round(175 + osc * 22);  // 175..197
+  }
+  const waterColor = `rgb(${wr},${wg},${wb})`;
   ctx.fillStyle = waterColor;
   ctx.fillRect(-half, -half, half * 2, half * 2);
 
@@ -1618,7 +1651,7 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
-    drawSea(ctx, half, seaNeighbors ?? defaultNeighbors);
+    drawSea(ctx, half, seaNeighbors ?? defaultNeighbors, seaFillColor(levelStyle));
   }
 
   ctx.restore();
