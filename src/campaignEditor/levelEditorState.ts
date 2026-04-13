@@ -333,6 +333,7 @@ export class LevelEditorState {
     if (palette === 'erase') return { shape: PipeShape.Empty };
     if (palette === PipeShape.EmptyDirt) return { shape: PipeShape.EmptyDirt };
     if (palette === PipeShape.EmptyDark) return { shape: PipeShape.EmptyDark };
+    if (palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
     if (palette === PipeShape.Empty) return { shape: PipeShape.Empty };
 
     const isChm = isChamberPalette(palette);
@@ -449,7 +450,7 @@ export class LevelEditorState {
    */
   rotatePalette(clockwise: boolean): void {
     const p = this.palette;
-    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.Empty || p === PipeShape.EmptyDirt || p === PipeShape.EmptyDark) return;
+    if (p === 'erase' || p === PipeShape.GoldSpace || p === PipeShape.Granite || p === PipeShape.Tree || p === PipeShape.Sea || p === PipeShape.Empty || p === PipeShape.EmptyDirt || p === PipeShape.EmptyDark || p === PipeShape.EmptyWinter) return;
 
     if (p === PipeShape.Source || p === PipeShape.Sink || isChamberPalette(p)) {
       const c = this.params.connections;
@@ -499,10 +500,10 @@ export class LevelEditorState {
    * Compute the TileDef to restore when erasing a tile at (row, col).
    * Uses majority-adjacent algorithm: the most common empty floor type among
    * cardinal neighbors wins; tie-break by EMPTY_FLOOR_SHAPES order.
-   * Returns null for grass (PipeShape.Empty), or a TileDef for Dirt/Dark.
+   * Returns null for grass (PipeShape.Empty), or a TileDef for Dirt/Dark/Winter.
    */
   eraseFloorTileDefAt(row: number, col: number): TileDef | null {
-    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0]]);
+    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0]]);
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
       const nr = row + dr, nc = col + dc;
       if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue;

@@ -15,6 +15,7 @@ import {
   EMPTY_COLOR_DARK,
   EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR_DARK,
+  EMPTY_WINTER_COLOR_DARK,
   PIPE_COLOR,
   FIXED_PIPE_COLOR,
   SOURCE_COLOR,
@@ -117,6 +118,7 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
   if (!tile) return emptyColor(style);
   if (tile.shape === PipeShape.EmptyDirt) return EMPTY_DIRT_COLOR_DARK;
   if (tile.shape === PipeShape.EmptyDark) return EMPTY_DARK_COLOR_DARK;
+  if (tile.shape === PipeShape.EmptyWinter) return EMPTY_WINTER_COLOR_DARK;
   if (tile.shape === PipeShape.Empty) return emptyColor(style);
   switch (tile.shape) {
     case PipeShape.Straight:

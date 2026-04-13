@@ -115,17 +115,17 @@ export function renderEditorCanvas(
         ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // EmptyDirt or EmptyDark: show dot + label
+        // EmptyDirt, EmptyDark, or EmptyWinter: show dot + label
         ctx.fillStyle = '#2a3a5e';
         ctx.beginPath();
         ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
         ctx.fill();
-        const label = def.shape === PipeShape.EmptyDirt ? 'Dirt' : 'Dark';
+        const label = def.shape === PipeShape.EmptyDirt ? 'Dirt' : def.shape === PipeShape.EmptyWinter ? 'Winter' : 'Dark';
         ctx.save();
         ctx.font = `bold ${_s(8)}px Arial`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillStyle = def.shape === PipeShape.EmptyDirt ? '#c4926a' : '#8888aa';
+        ctx.fillStyle = def.shape === PipeShape.EmptyDirt ? '#c4926a' : def.shape === PipeShape.EmptyWinter ? '#8ab0cc' : '#8888aa';
         ctx.fillText(label, x + _s(3), y + _s(3));
         ctx.restore();
       }
@@ -414,7 +414,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     return;
   }
 
-  // EmptyDirt/EmptyDark: render as empty cell with label
+  // EmptyDirt/EmptyDark/EmptyWinter: render as empty cell with label
   if (isEmptyFloor(shape) && shape !== PipeShape.Empty) {
     ctx.fillStyle = '#1a2840';
     ctx.fillRect(x, y, CELL, CELL);
@@ -427,12 +427,12 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     ctx.beginPath();
     ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
     ctx.fill();
-    const label = shape === PipeShape.EmptyDirt ? 'Dirt' : 'Dark';
+    const label = shape === PipeShape.EmptyDirt ? 'Dirt' : shape === PipeShape.EmptyWinter ? 'Winter' : 'Dark';
     ctx.save();
     ctx.font = `bold ${_s(8)}px Arial`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = shape === PipeShape.EmptyDirt ? '#c4926a' : '#8888aa';
+    ctx.fillStyle = shape === PipeShape.EmptyDirt ? '#c4926a' : shape === PipeShape.EmptyWinter ? '#8ab0cc' : '#8888aa';
     ctx.fillText(label, x + _s(3), y + _s(3));
     ctx.restore();
     return;
@@ -525,6 +525,7 @@ const ITEM_SHAPE_LABEL: Readonly<Record<PipeShape, string>> = {
   [PipeShape.Empty]:             'EMPT',
   [PipeShape.EmptyDirt]:         'EDRT',
   [PipeShape.EmptyDark]:         'EDRK',
+  [PipeShape.EmptyWinter]:       'EWNT',
   [PipeShape.Straight]:          'STR',
   [PipeShape.Elbow]:             'ELB',
   [PipeShape.Tee]:               'TEE',

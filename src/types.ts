@@ -19,6 +19,8 @@ export enum PipeShape {
   EmptyDirt = 'EMPTY_DIRT',
   /** Empty - Dark tile: aesthetically dark empty floor; functionally identical to Empty */
   EmptyDark = 'EMPTY_DARK',
+  /** Empty - Winter tile: aesthetically off-white snowy empty floor; functionally identical to Empty */
+  EmptyWinter = 'EMPTY_WINTER',
   /** Straight pipe: North–South */
   Straight = 'STRAIGHT',
   /** Elbow pipe: North–East */
@@ -223,19 +225,21 @@ export interface TileDef {
 /**
  * Visual style for a level or chapter map, controlling the default empty floor
  * tile type (and associated tree colors).
- * - 'Grass' → green (default)
- * - 'Dirt'  → warm brown
- * - 'Dark'  → dark blue-green
+ * - 'Grass'  → green (default)
+ * - 'Dirt'   → warm brown
+ * - 'Dark'   → dark blue-green
+ * - 'Winter' → off-white snowy
  */
-export type LevelStyle = 'Grass' | 'Dirt' | 'Dark';
+export type LevelStyle = 'Grass' | 'Dirt' | 'Dark' | 'Winter';
 
 /** Valid LevelStyle values for runtime validation. */
-export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Dirt', 'Dark']);
+export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Dirt', 'Dark', 'Winter']);
 
 /** Map a LevelStyle to its corresponding empty-floor PipeShape. */
 export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
   if (style === 'Dirt') return PipeShape.EmptyDirt;
   if (style === 'Dark') return PipeShape.EmptyDark;
+  if (style === 'Winter') return PipeShape.EmptyWinter;
   return PipeShape.Empty;
 }
 

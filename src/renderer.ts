@@ -16,6 +16,7 @@ import {
   EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK,
   EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR_DARK,
+  EMPTY_WINTER_COLOR, EMPTY_WINTER_COLOR_LIGHT, EMPTY_WINTER_COLOR_DARK,
   GOLD_SPACE_BASE_COLOR, GOLD_SPACE_SHIMMER_COLOR, GOLD_SPACE_BORDER_COLOR,
   PIPE_COLOR, WATER_COLOR,
   SOURCE_COLOR, SOURCE_WATER_COLOR,
@@ -29,6 +30,7 @@ import {
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR,
   TREE_DIRT_COLOR, TREE_DIRT_LEAF_COLOR, TREE_DIRT_LEAF_ALT_COLOR,
   TREE_DARK_COLOR, TREE_DARK_LEAF_COLOR, TREE_DARK_LEAF_ALT_COLOR,
+  TREE_WINTER_COLOR, TREE_WINTER_LEAF_COLOR, TREE_WINTER_LEAF_ALT_COLOR,
   CEMENT_COLOR, CEMENT_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
@@ -487,6 +489,7 @@ export function computeGraniteNeighbors(board: Board, row: number, col: number):
 export function ginghamColorsForFloor(floorType: PipeShape): [string, string, string] {
   if (floorType === PipeShape.EmptyDirt) return [EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_DARK];
   if (floorType === PipeShape.EmptyDark) return [EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_DARK];
+  if (floorType === PipeShape.EmptyWinter) return [EMPTY_WINTER_COLOR_LIGHT, EMPTY_WINTER_COLOR, EMPTY_WINTER_COLOR_DARK];
   return [EMPTY_COLOR_LIGHT, EMPTY_COLOR, EMPTY_COLOR_DARK];
 }
 
@@ -598,9 +601,9 @@ export function drawGranite(
 
 /** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
 export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const leafColor    = style === 'Dirt' ? TREE_DIRT_LEAF_COLOR     : style === 'Dark' ? TREE_DARK_LEAF_COLOR     : TREE_LEAF_COLOR;
-  const leafAltColor = style === 'Dirt' ? TREE_DIRT_LEAF_ALT_COLOR : style === 'Dark' ? TREE_DARK_LEAF_ALT_COLOR : TREE_LEAF_ALT_COLOR;
-  const outlineColor = style === 'Dirt' ? TREE_DIRT_COLOR          : style === 'Dark' ? TREE_DARK_COLOR          : TREE_COLOR;
+  const leafColor    = style === 'Dirt' ? TREE_DIRT_LEAF_COLOR     : style === 'Dark' ? TREE_DARK_LEAF_COLOR     : style === 'Winter' ? TREE_WINTER_LEAF_COLOR     : TREE_LEAF_COLOR;
+  const leafAltColor = style === 'Dirt' ? TREE_DIRT_LEAF_ALT_COLOR : style === 'Dark' ? TREE_DARK_LEAF_ALT_COLOR : style === 'Winter' ? TREE_WINTER_LEAF_ALT_COLOR : TREE_LEAF_ALT_COLOR;
+  const outlineColor = style === 'Dirt' ? TREE_DIRT_COLOR          : style === 'Dark' ? TREE_DARK_COLOR          : style === 'Winter' ? TREE_WINTER_COLOR          : TREE_COLOR;
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
   // Main canopy – large dark-green filled circle
   ctx.fillStyle = leafColor;

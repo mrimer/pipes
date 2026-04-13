@@ -5,6 +5,7 @@ const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.Empty]:     [],
   [PipeShape.EmptyDirt]: [],
   [PipeShape.EmptyDark]: [],
+  [PipeShape.EmptyWinter]: [],
   [PipeShape.Straight]:  [Direction.North, Direction.South],
   [PipeShape.Elbow]:     [Direction.North, Direction.East],
   [PipeShape.Tee]:       [Direction.North, Direction.East, Direction.South],

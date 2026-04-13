@@ -568,6 +568,7 @@ export class ChapterMapEditorSection {
     if (this._chapterPalette === 'erase') return { shape: PipeShape.Empty };
     if (this._chapterPalette === PipeShape.EmptyDirt) return { shape: PipeShape.EmptyDirt };
     if (this._chapterPalette === PipeShape.EmptyDark) return { shape: PipeShape.EmptyDark };
+    if (this._chapterPalette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
     if (this._chapterPalette === PipeShape.Empty) return { shape: PipeShape.Empty };
     const p = this._chapterParams;
     const shape = this._chapterPalette as PipeShape;
