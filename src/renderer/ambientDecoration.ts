@@ -257,7 +257,7 @@ function _drawSunflower(ctx: CanvasRenderingContext2D, variant: number): void {
   const diskR     = _s(4.0);
   const petalDist = _s(5.0);
   const petalRx   = _s(2.6);   // petal half-width
-  const petalRy   = _s(4.5);   // petal half-height
+  const petalRy   = _s(3.5);   // petal half-height
 
   // Outer petal ring
   for (let i = 0; i < petals; i++) {

@@ -88,7 +88,7 @@ export function computeMinimapRect(
   const contentH = bh * 2 - labelH;
 
   const { width: mmW, height: mmH } = minimapDimensions(levelDef.rows, levelDef.cols);
-  const maxW = bw * 2 - _s(6);
+  const maxW = bw * 2 - _s(10);
   const maxH = contentH - _s(6);
   const scale = Math.min(maxW / mmW, maxH / mmH, 1);
   const mw = Math.round(mmW * scale);

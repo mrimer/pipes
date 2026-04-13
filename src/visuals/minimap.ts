@@ -92,6 +92,25 @@ function containerColor(tile: TileDef): string {
     ? CONTAINER_COLOR : PIPE_COLOR;
 }
 
+/** Returns the stroke outline color used to draw any Chamber tile on the minimap.
+ *  Matches the color used for the chamber type rectangle on the level screen.
+ */
+function chamberOutlineColor(tile: TileDef): string {
+  switch (tile.chamberContent) {
+    case 'tank':      return TANK_COLOR;
+    case 'dirt':      return DIRT_COLOR;
+    case 'item':      return containerColor(tile);
+    case 'heater':    return HEATER_COLOR;
+    case 'ice':       return ICE_COLOR;
+    case 'pump':      return PUMP_COLOR;
+    case 'snow':      return SNOW_COLOR;
+    case 'hot_plate': return HOT_PLATE_COLOR;
+    case 'sandstone': return SANDSTONE_COLOR;
+    case 'star':      return STAR_COLOR;
+    default:          return CHAMBER_COLOR;
+  }
+}
+
 /** Returns the fill color to use for a grid tile on the minimap.
  * Used for drawing a uniform pixel when tile size < MIN_PX_FOR_LINES.
  */
@@ -372,9 +391,8 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
         ctx.fillStyle = emptyColor(style);
         ctx.fillRect(tx, ty, px, px);
         drawTree(ctx, tx, ty, px, style);
-      } else if (tile && px >= MIN_PX_FOR_LINES &&
-                 tile.shape === PipeShape.Chamber && tile.chamberContent === 'item') {
-        drawContainer(ctx, tx, ty, px, containerColor(tile));
+      } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.Chamber) {
+        drawContainer(ctx, tx, ty, px, chamberOutlineColor(tile));
       } else {
         // Draw the tile as a uniform pixel.
         ctx.fillStyle = tileColor(tile, style);
