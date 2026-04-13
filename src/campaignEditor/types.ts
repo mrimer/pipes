@@ -6,6 +6,7 @@
 import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction, LevelStyle } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR } from '../colors';
+import { UI_BG, UI_BORDER } from '../uiConstants';
 
 // ─── Valid field sets for data validation ─────────────────────────────────────
 
@@ -274,7 +275,7 @@ export const PALETTE_ITEM_SELECTED_COLOR = '#f0c040';
 export const PALETTE_ITEM_UNSELECTED_COLOR = '#eee';
 /** Base CSS for a side-panel box in the level editor (background, border, radius, padding). */
 export const EDITOR_PANEL_BASE_CSS =
-  'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:10px;';
+  `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:10px;`;
 /** CSS for the all-caps section-title label inside an editor side-panel. */
 export const EDITOR_PANEL_TITLE_CSS = 'font-size:0.8rem;color:#7ed321;font-weight:bold;letter-spacing:1px;';
 /** CSS for a flex row that centers items and adds a small gap (used for label+input pairs). */

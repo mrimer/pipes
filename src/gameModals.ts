@@ -1,3 +1,4 @@
+import { RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
 /**
  * Factory functions for building the game's modal overlay elements.
  *
@@ -86,7 +87,7 @@ export function buildResetModal(
   const el = createModalOverlay(0.7);
   const box = document.createElement('div');
   box.style.cssText =
-    'background:#16213e;border:3px solid #e74c3c;border-radius:10px;' +
+    `background:${UI_BG};border:3px solid #e74c3c;border-radius:${RADIUS_LG};` +
     'padding:32px 40px;text-align:center;display:flex;flex-direction:column;' +
     'gap:16px;min-width:280px;max-width:420px;';
   const title = document.createElement('h2');
@@ -107,13 +108,13 @@ export function buildResetModal(
   cancelBtn.textContent = 'Cancel';
   cancelBtn.style.cssText =
     'padding:10px 24px;font-size:1rem;background:#2a2a4a;color:#aaa;' +
-    'border:1px solid #555;border-radius:6px;cursor:pointer;';
+    `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
   cancelBtn.addEventListener('click', () => onCancel());
   const confirmBtn = document.createElement('button');
   confirmBtn.textContent = 'Reset';
   confirmBtn.style.cssText =
     'padding:10px 24px;font-size:1rem;background:#e74c3c;color:#fff;' +
-    'border:none;border-radius:6px;cursor:pointer;';
+    `border:none;border-radius:${RADIUS_MD};cursor:pointer;`;
   confirmBtn.addEventListener('click', () => onConfirm());
   actions.appendChild(cancelBtn);
   actions.appendChild(confirmBtn);
@@ -341,8 +342,7 @@ export function buildCampaignMasteredModal(
 ): HTMLElement {
   const el = document.createElement('div');
   el.style.cssText =
-    'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-    'justify-content:center;z-index:200;';
+    `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:200;`;
 
   const box = document.createElement('div');
   box.style.cssText =
@@ -372,7 +372,7 @@ export function buildCampaignMasteredModal(
   const kudosBtn = document.createElement('button');
   kudosBtn.textContent = 'Kudos!';
   kudosBtn.style.cssText =
-    'padding:10px 28px;font-size:1rem;border-radius:6px;cursor:pointer;' +
+    `padding:10px 28px;font-size:1rem;border-radius:${RADIUS_MD};cursor:pointer;` +
     'background:#1a3a10;border:1px solid #f0c040;color:#f0c040;';
   kudosBtn.addEventListener('click', () => onKudos());
   box.appendChild(kudosBtn);

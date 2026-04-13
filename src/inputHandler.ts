@@ -3,6 +3,7 @@ import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, PipeShape, Rotation } from './types';
 import { TILE_SIZE } from './renderer';
 import { sfxManager, SfxId } from './sfxManager';
+import { RADIUS_MD, UI_BG, UI_BORDER } from './uiConstants';
 
 /**
  * Callback interface that {@link InputHandler} calls into Game for all board
@@ -734,7 +735,7 @@ export class InputHandler {
       ghostEl = document.createElement('div');
       ghostEl.style.cssText =
         'position:fixed;pointer-events:none;z-index:200;' +
-        'background:#16213e;border:2px solid #4a90d9;border-radius:6px;' +
+        `background:${UI_BG};border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
         'padding:6px 8px;opacity:0.85;font-size:1rem;color:#eee;white-space:nowrap;' +
         `left:${touch.clientX + 12}px;top:${touch.clientY + 12}px;`;
       ghostEl.innerHTML = el.innerHTML;

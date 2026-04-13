@@ -10,6 +10,7 @@
 import { Board } from './board';
 import { TILE_SIZE, renderBoard } from './renderer';
 import { CHAPTER_MAP_BG } from './colors';
+import { RADIUS_SM } from './uiConstants';
 
 
 /** Width (px) of the CSS border around the game canvas (#game-canvas). */
@@ -148,7 +149,7 @@ export function playLevelTransition(
   snapshotEl.height = snapshotH;
   snapshotEl.style.cssText =
     'position:absolute;image-rendering:auto;' +
-    `outline:${GAME_CANVAS_BORDER_PX}px solid ${GAME_CANVAS_BORDER_COLOR};border-radius:4px;` +
+    `outline:${GAME_CANVAS_BORDER_PX}px solid ${GAME_CANVAS_BORDER_COLOR};border-radius:${RADIUS_SM};` +
     `left:${minimapRect.x}px;top:${minimapRect.y}px;` +
     `width:${minimapRect.width}px;height:${minimapRect.height}px;`;
   const snapshotCtx = snapshotEl.getContext('2d');
@@ -256,7 +257,7 @@ export function playLevelExitTransition(
   snapshotEl.height = boardSnapshot.height;
   snapshotEl.style.cssText =
     'position:absolute;image-rendering:auto;' +
-    `outline:${GAME_CANVAS_BORDER_PX}px solid ${GAME_CANVAS_BORDER_COLOR};border-radius:4px;` +
+    `outline:${GAME_CANVAS_BORDER_PX}px solid ${GAME_CANVAS_BORDER_COLOR};border-radius:${RADIUS_SM};` +
     `left:${startRect.x}px;top:${startRect.y}px;` +
     `width:${startRect.width}px;height:${startRect.height}px;`;
   const snapshotCtx = snapshotEl.getContext('2d');

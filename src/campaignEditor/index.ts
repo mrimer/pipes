@@ -42,6 +42,7 @@ import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
+import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -215,7 +216,7 @@ export class CampaignEditor {
     const toolbar = document.createElement('div');
     toolbar.style.cssText =
       'width:100%;max-width:900px;display:flex;align-items:center;gap:12px;' +
-      'padding:14px 20px;background:#16213e;border-bottom:2px solid #4a90d9;' +
+      `padding:14px 20px;background:${UI_BG};border-bottom:2px solid ${UI_BORDER};` +
       'box-sizing:border-box;position:sticky;top:0;z-index:10;';
 
     if (onBack) {
@@ -242,7 +243,7 @@ export class CampaignEditor {
     b.textContent = label;
     b.style.cssText =
       `padding:8px 16px;font-size:0.9rem;background:${bg};color:${color};` +
-      `border:1px solid ${color};border-radius:6px;cursor:pointer;${extraStyle}`;
+      `border:1px solid ${color};border-radius:${RADIUS_MD};cursor:pointer;${extraStyle}`;
     b.addEventListener('click', () => {
       if (!suppressClick) sfxManager.play(SfxId.Click);
       onClick();
@@ -268,7 +269,7 @@ export class CampaignEditor {
     onReorder?: (fromIdx: number, toIdx: number) => void,
   ): void {
     if (idx > 0) {
-      btns.appendChild(this._btn('▲', '#16213e', '#aaa', () => {
+      btns.appendChild(this._btn('▲', UI_BG, '#aaa', () => {
         if (onReorder) {
           onReorder(idx, idx - 1);
         } else {
@@ -280,7 +281,7 @@ export class CampaignEditor {
       }));
     }
     if (idx < items.length - 1) {
-      btns.appendChild(this._btn('▼', '#16213e', '#aaa', () => {
+      btns.appendChild(this._btn('▼', UI_BG, '#aaa', () => {
         if (onReorder) {
           onReorder(idx, idx + 1);
         } else {
@@ -310,7 +311,7 @@ export class CampaignEditor {
   ): { row: HTMLElement; info: HTMLElement; btns: HTMLElement } {
     const row = document.createElement('div');
     row.style.cssText =
-      `background:#16213e;border:2px solid ${borderColor};border-radius:8px;` +
+      `background:${UI_BG};border:2px solid ${borderColor};border-radius:8px;` +
       `padding:${padding};display:flex;align-items:center;gap:12px;`;
     const info = document.createElement('div');
     info.style.cssText = 'flex:1;';
@@ -334,7 +335,7 @@ export class CampaignEditor {
   private _createInfoBox(borderColor: string, text: string): HTMLDivElement {
     const el = document.createElement('div');
     el.style.cssText =
-      `background:#16213e;border:1px solid ${borderColor};border-radius:6px;` +
+      `background:${UI_BG};border:1px solid ${borderColor};border-radius:${RADIUS_MD};` +
       'padding:10px 14px;font-size:0.85rem;color:#eee;';
     el.textContent = text;
     return el;
@@ -371,7 +372,7 @@ export class CampaignEditor {
     if (isTouchDevice()) {
       const notice = document.createElement('div');
       notice.style.cssText =
-        'background:#2a1a00;border:1px solid #ffa500;border-radius:6px;padding:12px 16px;' +
+        `background:#2a1a00;border:1px solid #ffa500;border-radius:${RADIUS_MD};padding:12px 16px;` +
         'color:#ffa500;font-size:0.9rem;line-height:1.5;';
       notice.textContent =
         '⚠️ The Campaign Editor is designed for desktop use and may be difficult to operate on touch devices. ' +
@@ -383,10 +384,10 @@ export class CampaignEditor {
     const actionBar = document.createElement('div');
     actionBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;';
     actionBar.appendChild(
-      this._btn('➕ New Campaign', '#16213e', '#7ed321', () => this._createCampaign()),
+      this._btn('➕ New Campaign', UI_BG, '#7ed321', () => this._createCampaign()),
     );
     actionBar.appendChild(
-      this._btn('📥 Import', '#16213e', '#4a90d9', () => this._importCampaign()),
+      this._btn('📥 Import', UI_BG, '#4a90d9', () => this._importCampaign()),
     );
     content.appendChild(actionBar);
 
@@ -428,11 +429,11 @@ export class CampaignEditor {
 
     // Play or Active button (shared for both official and user campaigns)
     if (isActive) {
-      const activeBtn = this._btn('Active', '#16213e', '#888', () => {}, 'cursor:default;');
+      const activeBtn = this._btn('Active', UI_BG, '#888', () => {}, 'cursor:default;');
       activeBtn.disabled = true;
       btns.appendChild(activeBtn);
     } else {
-      btns.appendChild(this._btn('▶ Play', '#16213e', '#7ed321', () => {
+      btns.appendChild(this._btn('▶ Play', UI_BG, '#7ed321', () => {
         sfxManager.play(SfxId.ChapterSelect);
         this.hide();
         this._onPlayCampaign(campaign);
@@ -440,24 +441,24 @@ export class CampaignEditor {
     }
 
     if (!isOfficial) {
-      btns.appendChild(this._btn('✏️ Edit', '#16213e', '#f0c040', () => {
+      btns.appendChild(this._btn('✏️ Edit', UI_BG, '#f0c040', () => {
         sfxManager.play(SfxId.ChapterSelect);
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
       }));
     } else {
-      btns.appendChild(this._btn('👁 View', '#16213e', '#aaa', () => {
+      btns.appendChild(this._btn('👁 View', UI_BG, '#aaa', () => {
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
       }));
     }
 
-    btns.appendChild(this._btn('📤 Export', '#16213e', '#4a90d9', () => {
+    btns.appendChild(this._btn('📤 Export', UI_BG, '#4a90d9', () => {
       this._exportCampaign(campaign);
     }));
 
     if (!isOfficial) {
-      btns.appendChild(this._btn('🗑 Delete', '#16213e', '#e74c3c', () => {
+      btns.appendChild(this._btn('🗑 Delete', UI_BG, '#e74c3c', () => {
         this._deleteCampaign(campaign.id);
       }));
     }
@@ -486,8 +487,8 @@ export class CampaignEditor {
       () => this._showCampaignList(),
     );
     if (!isOfficial) {
-      toolbar.appendChild(this._btn('📤 Export', '#16213e', '#4a90d9', () => this._exportCampaign(campaign)));
-      toolbar.appendChild(this._btn('🔍 Dev – Validate data', '#16213e', '#f0c040',
+      toolbar.appendChild(this._btn('📤 Export', UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
+      toolbar.appendChild(this._btn('🔍 Dev – Validate data', UI_BG, '#f0c040',
         () => this._dataValidator.show(this._el, campaign)));
     }
     this._el.appendChild(toolbar);
@@ -501,7 +502,7 @@ export class CampaignEditor {
     if (isUserCampaign) {
       const toggleWrap = document.createElement('div');
       toggleWrap.style.cssText =
-        'background:#16213e;border:1px solid #f0c040;border-radius:8px;padding:12px 16px;' +
+        `background:${UI_BG};border:1px solid ${UI_GOLD};border-radius:8px;padding:12px 16px;` +
         'display:flex;align-items:center;gap:10px;';
       const toggleCb = document.createElement('input');
       toggleCb.type = 'checkbox';
@@ -526,7 +527,7 @@ export class CampaignEditor {
       // Name and author fields
       const fields = document.createElement('div');
       fields.style.cssText =
-        'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:16px;' +
+        `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
         'display:flex;flex-direction:column;gap:10px;';
 
       fields.appendChild(this._labeledInput('Name', campaign.name, (v) => {
@@ -547,7 +548,7 @@ export class CampaignEditor {
     chaptersHeader.appendChild(chapTitle);
 
     if (!isOfficial) {
-      chaptersHeader.appendChild(this._btn('➕ Add Chapter', '#16213e', '#7ed321', () => {
+      chaptersHeader.appendChild(this._btn('➕ Add Chapter', UI_BG, '#7ed321', () => {
         sfxManager.play(SfxId.ChapterSelect);
         this._addChapter(campaign);
       }));
@@ -587,14 +588,14 @@ export class CampaignEditor {
     info.appendChild(meta);
 
     const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
-    btns.appendChild(this._btn(editOrViewLabel, '#16213e', '#f0c040', () => {
+    btns.appendChild(this._btn(editOrViewLabel, UI_BG, '#f0c040', () => {
       this._activeChapterIdx = chapterIdx;
       this._showChapterDetail();
     }));
 
     if (!readOnly) {
       this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail());
-      btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
+      btns.appendChild(this._btn('🗑', UI_BG, '#e74c3c', () => {
         if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
           this._service.deleteChapter(campaign, chapterIdx);
           this._showCampaignDetail();
@@ -637,7 +638,7 @@ export class CampaignEditor {
       // Chapter name field
       const nameWrap = document.createElement('div');
       nameWrap.style.cssText =
-        'background:#16213e;border:1px solid #4a90d9;border-radius:8px;padding:16px;';
+        `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;`;
       nameWrap.appendChild(this._labeledInput('Chapter Name', chapter.name, (v) => {
         this._service.renameChapter(campaign, this._activeChapterIdx, v);
       }));
@@ -656,7 +657,7 @@ export class CampaignEditor {
     levelsHeader.appendChild(lvlTitle);
 
     if (!isOfficial) {
-      levelsHeader.appendChild(this._btn('➕ Add Level', '#16213e', '#7ed321', () => {
+      levelsHeader.appendChild(this._btn('➕ Add Level', UI_BG, '#7ed321', () => {
         this._addLevel(campaign, this._activeChapterIdx);
       }));
     }
@@ -707,20 +708,20 @@ export class CampaignEditor {
     info.appendChild(minimap);
 
     const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
-    btns.appendChild(this._btn(editOrViewLabel, '#16213e', '#f0c040', () => {
+    btns.appendChild(this._btn(editOrViewLabel, UI_BG, '#f0c040', () => {
       this._activeLevelIdx = levelIdx;
       this._openLevelEditor(level, readOnly);
     }));
 
     if (!readOnly) {
-      btns.appendChild(this._btn('📋 Duplicate', '#16213e', '#aaa', () => {
+      btns.appendChild(this._btn('📋 Duplicate', UI_BG, '#aaa', () => {
         this._service.duplicateLevel(campaign, chapterIdx, levelIdx);
         this._showChapterDetail();
       }));
 
       this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail(),
         (fromIdx, toIdx) => this._service.reorderLevels(campaign, chapterIdx, fromIdx, toIdx));
-      btns.appendChild(this._btn('🗑', '#16213e', '#e74c3c', () => {
+      btns.appendChild(this._btn('🗑', UI_BG, '#e74c3c', () => {
         if (confirm(`Delete level "${level.name}"?`)) {
           this._service.deleteLevel(campaign, chapterIdx, levelIdx);
           this._showChapterDetail();
@@ -730,8 +731,8 @@ export class CampaignEditor {
       if (campaign.chapters.length > 1) {
         const sel = document.createElement('select');
         sel.style.cssText =
-          'background:#16213e;color:#aaa;border:1px solid #4a90d9;' +
-          'border-radius:6px;padding:6px 8px;font-size:0.85rem;cursor:pointer;';
+          `background:${UI_BG};color:#aaa;border:1px solid ${UI_BORDER};` +
+          `border-radius:${RADIUS_MD};padding:6px 8px;font-size:0.85rem;cursor:pointer;`;
         const placeholder = document.createElement('option');
         placeholder.value = '';
         placeholder.textContent = '↪ Move to…';
@@ -888,7 +889,7 @@ export class CampaignEditor {
     toolbar.appendChild(redoBtn);
 
     // Validate
-    toolbar.appendChild(this._btn('✔ Validate', '#16213e', '#7ed321', () => {
+    toolbar.appendChild(this._btn('✔ Validate', UI_BG, '#7ed321', () => {
       const levelDef = this._buildCurrentLevelDef();
       const result = this._validateLevel(levelDef);
       const icon = result.ok ? '✅' : '❌';
@@ -896,7 +897,7 @@ export class CampaignEditor {
     }));
 
     // Playtest
-    toolbar.appendChild(this._btn('▶ Playtest', '#16213e', '#f0c040', () => {
+    toolbar.appendChild(this._btn('▶ Playtest', UI_BG, '#f0c040', () => {
       const levelDef = this._buildCurrentLevelDef();
       const result = this._validateLevel(levelDef);
       if (!result.ok) {
@@ -948,7 +949,7 @@ export class CampaignEditor {
   private _buildEditorCanvasSection(readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
     canvas.style.cssText =
-      `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:4px;cursor:` + (readOnly ? 'default' : 'crosshair') + ';' +
+      `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:${RADIUS_SM};cursor:` + (readOnly ? 'default' : 'crosshair') + ';' +
       'display:block;';
     this._editorCanvas = canvas;
     this._updateCanvasDisplaySize();

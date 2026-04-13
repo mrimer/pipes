@@ -7,6 +7,7 @@
  */
 
 import { CampaignDef } from '../types';
+import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS } from '../uiConstants';
 
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 export const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -143,13 +144,10 @@ export class EditorDialogs {
   private _createOverlay(maxWidth = '460px'): { overlay: HTMLDivElement; dialog: HTMLDivElement } {
     const overlay = document.createElement('div');
     overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
+      MODAL_OVERLAY_CSS;
     const dialog = document.createElement('div');
     dialog.style.cssText =
-      `background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;` +
-      `display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:${maxWidth};` +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+      MODAL_DIALOG_CSS + `min-width:300px;max-width:${maxWidth};`;
     overlay.appendChild(dialog);
     this._container.appendChild(overlay);
     return { overlay, dialog };

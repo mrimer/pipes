@@ -20,6 +20,7 @@ import { buildStyleSectionPanel } from './tileParamsPanel';
 import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
+import { RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -126,7 +127,7 @@ export class ChapterEditorUI {
       btn.textContent = item.label;
       const isSelected = this._cb.getChapterPalette() === item.palette;
       btn.style.cssText =
-        'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
         'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
         'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
@@ -190,7 +191,7 @@ export class ChapterEditorUI {
       btn.title = isPlaced ? 'Already placed on the map' : `Select to place L-${li + 1}`;
       btn.disabled = isPlaced;
       btn.style.cssText =
-        'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;' +
+        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};` +
         (isPlaced
           ? 'border:1px solid #555;background:#1a1a1a;color:#555;cursor:default;opacity:0.6;'
           : isSelected
@@ -365,7 +366,7 @@ export class ChapterEditorUI {
     inp.step = '1';
     inp.value = String(getValue());
     inp.style.cssText =
-      'padding:4px;width:60px;background:#0d1a30;color:#eee;border:1px solid #4a90d9;border-radius:4px;';
+      `padding:4px;width:60px;background:#0d1a30;color:${UI_TEXT};border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
     inp.addEventListener('change', () => {
       const v = Math.max(0, Math.round(parseFloat(inp.value) || 0));
       inp.value = String(v);

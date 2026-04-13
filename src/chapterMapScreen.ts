@@ -20,6 +20,7 @@ import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, S
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
+import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -213,8 +214,8 @@ export class ChapterMapScreen {
     // Tooltip element for Ctrl+hover level name display
     this._tooltipEl = document.createElement('div');
     this._tooltipEl.style.cssText =
-      'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
-      'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;';
+      `display:none;position:fixed;background:${UI_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};` +
+      `border-radius:${RADIUS_SM};padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;`;
     document.body.appendChild(this._tooltipEl);
 
     this._onKeyDown = (e: KeyboardEvent) => {
@@ -562,8 +563,8 @@ export class ChapterMapScreen {
     const backBtn = document.createElement('button');
     backBtn.textContent = '← Chapter Select';
     backBtn.style.cssText =
-      `padding:8px 16px;font-size:0.9rem;background:#16213e;color:${SUCCESS_COLOR};` +
-      `border:1px solid ${SUCCESS_COLOR};border-radius:6px;cursor:pointer;`;
+      `padding:8px 16px;font-size:0.9rem;background:${UI_BG};color:${SUCCESS_COLOR};` +
+      `border:1px solid ${SUCCESS_COLOR};border-radius:${RADIUS_MD};cursor:pointer;`;
     backBtn.addEventListener('click', () => {
       this._callbacks.onShowLevelSelect(); // stopAll() is called inside; play Back after
       sfxManager.play(SfxId.Back);
@@ -584,7 +585,7 @@ export class ChapterMapScreen {
     canvas.width  = cols * TILE_SIZE;
     canvas.height = rows * TILE_SIZE;
     canvas.style.cssText =
-      'border:2px solid #4a90d9;border-radius:6px;cursor:pointer;' +
+      `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};cursor:pointer;` +
       'display:block;max-width:100%;height:auto;margin:0 auto;';
 
     // Mouse events for hover and click

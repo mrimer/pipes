@@ -15,6 +15,7 @@ import {
 } from './types';
 import { LevelEditorState } from './levelEditorState';
 import { buildGridSizePanel } from './gridSizePanel';
+import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from '../uiConstants';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export class LevelMetadataPanel {
       nameInp.value = state.levelName;
       nameInp.style.cssText =
         'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
-        'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+        `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
       nameInp.addEventListener('input', () => { state.levelName = nameInp.value; });
       nameWrap.appendChild(nameLbl);
       nameWrap.appendChild(nameInp);
@@ -78,7 +79,7 @@ export class LevelMetadataPanel {
 
     const textareaStyle =
       'padding:6px 10px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;resize:vertical;min-height:52px;font-family:inherit;';
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};resize:vertical;min-height:52px;font-family:inherit;`;
 
     const noteWrap = document.createElement('div');
     noteWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
@@ -122,7 +123,7 @@ export class LevelMetadataPanel {
         removeBtn.title = 'Remove this hint';
         removeBtn.style.cssText =
           'padding:4px 7px;font-size:0.8rem;background:#2c1a00;color:#f0c040;' +
-          'border:1px solid #f0c040;border-radius:4px;cursor:pointer;flex-shrink:0;';
+          `border:1px solid ${UI_GOLD};border-radius:${RADIUS_SM};cursor:pointer;flex-shrink:0;`;
         removeBtn.addEventListener('click', () => {
           state.levelHints.splice(idx, 1);
           if (state.levelHints.length === 0) state.levelHints = [''];
@@ -142,7 +143,7 @@ export class LevelMetadataPanel {
     addHintBtn.textContent = '+ Add Hint';
     addHintBtn.style.cssText =
       'align-self:flex-start;padding:4px 10px;font-size:0.8rem;background:#1a1400;color:#f0c040;' +
-      'border:1px solid #f0c040;border-radius:4px;cursor:pointer;';
+      `border:1px solid ${UI_GOLD};border-radius:${RADIUS_SM};cursor:pointer;`;
     addHintBtn.addEventListener('click', () => {
       state.levelHints.push('');
       rebuildHintList();
@@ -244,7 +245,7 @@ export class LevelMetadataPanel {
     const shapeSel = document.createElement('select');
     shapeSel.style.cssText =
       'padding:4px 6px;font-size:0.8rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
                        PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
                        PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross]) {
@@ -255,7 +256,7 @@ export class LevelMetadataPanel {
     }
 
     addRow.appendChild(shapeSel);
-    addRow.appendChild(this._btn('+ Add', '#16213e', '#7ed321', () => {
+    addRow.appendChild(this._btn('+ Add', UI_BG, '#7ed321', () => {
       const shp = shapeSel.value as PipeShape;
       const existing = state.inventory.find((it) => it.shape === shp);
       if (existing) {
@@ -280,7 +281,7 @@ export class LevelMetadataPanel {
     const row = document.createElement('div');
     row.style.cssText =
       'display:flex;align-items:center;gap:6px;background:#0d1a30;' +
-      'border-radius:4px;padding:4px 6px;';
+      `border-radius:${RADIUS_SM};padding:4px 6px;`;
 
     const lbl = document.createElement('span');
     lbl.style.cssText = 'flex:1;font-size:0.8rem;';
@@ -291,7 +292,7 @@ export class LevelMetadataPanel {
     countInp.type = 'number';
     countInp.min = '0';
     countInp.value = String(item.count);
-    countInp.style.cssText = 'width:44px;padding:2px 4px;background:#16213e;color:#eee;border:1px solid #4a90d9;border-radius:3px;font-size:0.8rem;';
+    countInp.style.cssText = `width:44px;padding:2px 4px;background:${UI_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};border-radius:3px;font-size:0.8rem;`;
     countInp.addEventListener('change', () => {
       state.inventory[idx].count = Math.max(0, parseInt(countInp.value) || 0);
       state.recordSnapshot();
@@ -319,8 +320,8 @@ export class LevelMetadataPanel {
   private _createInfoBox(borderColor: string, text: string): HTMLDivElement {
     const el = document.createElement('div');
     el.style.cssText =
-      `background:#16213e;border:1px solid ${borderColor};border-radius:6px;` +
-      'padding:10px 14px;font-size:0.85rem;color:#eee;';
+      `background:${UI_BG};border:1px solid ${borderColor};border-radius:${RADIUS_MD};` +
+      `padding:10px 14px;font-size:0.85rem;color:${UI_TEXT};`;
     el.textContent = text;
     return el;
   }
@@ -350,7 +351,7 @@ export function buildSlideAndRotateControls(
 
   const arrowBtnStyle =
     'width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center;' +
-    'background:#0d1a30;color:#7ed321;border:1px solid #4a90d9;border-radius:4px;cursor:pointer;padding:0;';
+    `background:#0d1a30;color:#7ed321;border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};cursor:pointer;padding:0;`;
 
   // ── Two-column layout: left = slide, right = rotate + reflect ─────────────
 

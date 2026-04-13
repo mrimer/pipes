@@ -31,6 +31,7 @@ import { TILE_SIZE } from '../renderer';
 import { drawEditorTile } from './renderer';
 import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
+import { RADIUS_SM, UI_BORDER } from '../uiConstants';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ export function buildStyleSectionPanel(
   toggle.type = 'button';
   toggle.textContent = (expanded ? '▾' : '▸') + ' Style - ' + resolvedStyle;
   toggle.style.cssText =
-    'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+    `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
     'border:1px solid #7a5a2a;background:#1a1208;color:#c8a060;font-weight:bold;margin-top:2px;';
   toggle.addEventListener('click', onToggle);
   panel.appendChild(toggle);
@@ -192,7 +193,7 @@ export function buildStyleSectionPanel(
       btn.textContent = item.label;
       const isSelected = resolvedStyle === item.value;
       btn.style.cssText =
-        'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;margin-left:12px;' +
+        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;margin-left:12px;` +
         'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
         'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
@@ -289,7 +290,7 @@ export class TileParamsPanel {
       btn.dataset['palette'] = String(item.palette);
       const isSelected = state.palette === item.palette;
       btn.style.cssText =
-        'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
         (indent ? 'margin-left:12px;' : '') +
         'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
         'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
@@ -469,7 +470,7 @@ export class TileParamsPanel {
     inp.value = value;
     inp.style.cssText =
       'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;' +
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};` +
       (inputWidth ? `width:${inputWidth};` : 'flex:1;');
     inp.addEventListener('input', () => onInput(inp.value));
     wrap.appendChild(lbl);
@@ -497,7 +498,7 @@ export class TileParamsPanel {
     toggle.type = 'button';
     toggle.textContent = (expanded ? '▾' : '▸') + ' ' + label;
     toggle.style.cssText =
-      'padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:4px;cursor:pointer;' +
+      `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
       `border:1px solid ${borderColor};background:${bgColor};color:${textColor};font-weight:bold;margin-top:2px;`;
     toggle.addEventListener('click', onToggle);
     parent.appendChild(toggle);
@@ -519,7 +520,7 @@ export class TileParamsPanel {
     const sel = document.createElement('select');
     sel.style.cssText =
       'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
       tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
       ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
@@ -593,7 +594,7 @@ export class TileParamsPanel {
     const itemSel = document.createElement('select');
     itemSel.style.cssText =
       'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
-      'border:1px solid #4a90d9;border-radius:4px;flex:1;';
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
                        PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
                        PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross]) {
@@ -630,7 +631,7 @@ export class TileParamsPanel {
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = TILE_SIZE;
     previewCanvas.height = TILE_SIZE;
-    previewCanvas.style.cssText = 'width:28px;height:28px;border:1px solid #4a90d9;border-radius:4px;';
+    previewCanvas.style.cssText = `width:28px;height:28px;border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
     const previewCtx = previewCanvas.getContext('2d');
     if (previewCtx) {
       drawEditorTile(previewCtx, 0, 0, state.buildTileDef());
