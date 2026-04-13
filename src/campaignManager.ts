@@ -26,7 +26,7 @@ import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
-import { RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
+import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
 
@@ -928,7 +928,7 @@ export class CampaignManager {
     }
     if (challengesTotal > 0) {
       const c = document.createElement('span');
-      c.style.color = '#e74c3c';
+      c.style.color = ERROR_COLOR;
       c.textContent = `💀 ${challengesDone}/${challengesTotal}`;
       statsDiv.appendChild(c);
     }

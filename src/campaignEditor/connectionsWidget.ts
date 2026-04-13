@@ -5,7 +5,7 @@
  */
 
 import { Direction } from '../types';
-import { RADIUS_SM } from '../uiConstants';
+import { EDITOR_INPUT_BG, RADIUS_SM } from '../uiConstants';
 
 /**
  * Build a compass-layout N/E/S/W toggle widget.
@@ -47,7 +47,7 @@ export function buildCompassConnectionsWidget(
     b.title = `Toggle ${label} connection`;
     b.style.cssText =
       'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
-      'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
+      'background:' + (active ? '#1a3a1a' : EDITOR_INPUT_BG) + ';' +
       'color:'      + (active ? '#7ed321' : '#555')    + ';' +
       'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
       `border-radius:${RADIUS_SM};cursor:pointer;padding:0;`;

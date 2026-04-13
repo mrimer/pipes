@@ -1,4 +1,4 @@
-import { RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
+import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 /**
  * Factory functions for building the game's modal overlay elements.
@@ -88,7 +88,7 @@ export function buildResetModal(
   const el = createModalOverlay(0.7);
   const box = document.createElement('div');
   box.style.cssText =
-    `background:${UI_BG};border:3px solid #e74c3c;border-radius:${RADIUS_LG};` +
+    `background:${UI_BG};border:3px solid ${ERROR_COLOR};border-radius:${RADIUS_LG};` +
     'padding:32px 40px;text-align:center;display:flex;flex-direction:column;' +
     'gap:16px;min-width:280px;max-width:420px;';
   const title = document.createElement('h2');
@@ -108,13 +108,13 @@ export function buildResetModal(
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = 'Cancel';
   cancelBtn.style.cssText =
-    'padding:10px 24px;font-size:1rem;background:#2a2a4a;color:#aaa;' +
+    'padding:10px 24px;font-size:1rem;background:' + MUTED_BTN_BG + ';color:#aaa;' +
     `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
   cancelBtn.addEventListener('click', () => onCancel());
   const confirmBtn = document.createElement('button');
   confirmBtn.textContent = 'Reset';
   confirmBtn.style.cssText =
-    'padding:10px 24px;font-size:1rem;background:#e74c3c;color:#fff;' +
+    'padding:10px 24px;font-size:1rem;background:' + ERROR_COLOR + ';color:#fff;' +
     `border:none;border-radius:${RADIUS_MD};cursor:pointer;`;
   confirmBtn.addEventListener('click', () => onConfirm());
   actions.appendChild(cancelBtn);

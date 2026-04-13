@@ -30,7 +30,7 @@ import { validateChapterMap } from './chapterMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
 import { HistoryManager } from './historyManager';
-import { RADIUS_SM, UI_BG } from '../uiConstants';
+import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
 import { showTimedMessage } from '../uiHelpers';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ export class ChapterMapEditorSection {
   private _buildChapterMapSection(campaign: CampaignDef, chapter: ChapterDef, isOfficial: boolean): HTMLElement {
     const section = document.createElement('div');
     section.style.cssText =
-      'background:#0d1a30;border:1px solid #4a90d9;border-radius:8px;padding:16px;' +
+      `background:${EDITOR_INPUT_BG};border:1px solid #4a90d9;border-radius:8px;padding:16px;` +
       'display:flex;flex-direction:column;gap:12px;';
 
     const sectionHeader = document.createElement('div');
@@ -188,10 +188,10 @@ export class ChapterMapEditorSection {
     const midToolbar = document.createElement('div');
     midToolbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
-    const undoBtn = this._callbacks.buildBtn('↩ Undo', '#2a2a4a', '#aaa', () => this._chapterUndo(campaign, chapter), true);
+    const undoBtn = this._callbacks.buildBtn('↩ Undo', MUTED_BTN_BG, '#aaa', () => this._chapterUndo(campaign, chapter), true);
     undoBtn.id = 'chapter-undo-btn';
     midToolbar.appendChild(undoBtn);
-    const redoBtn = this._callbacks.buildBtn('↪ Redo', '#2a2a4a', '#aaa', () => this._chapterRedo(campaign, chapter), true);
+    const redoBtn = this._callbacks.buildBtn('↪ Redo', MUTED_BTN_BG, '#aaa', () => this._chapterRedo(campaign, chapter), true);
     redoBtn.id = 'chapter-redo-btn';
     midToolbar.appendChild(redoBtn);
 

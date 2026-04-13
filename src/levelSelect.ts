@@ -3,7 +3,7 @@
 import { ChapterDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
-import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from './uiConstants';
+import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from './uiConstants';
 import { createButton } from './uiHelpers';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
@@ -277,7 +277,7 @@ export function renderLevelList(
     progressLabel.textContent = `Progress: ${activeCampaign.completionPct}%`;
     const progressBar = document.createElement('div');
     progressBar.style.cssText =
-      `flex:1;height:8px;background:#0d1a30;border-radius:${RADIUS_SM};overflow:hidden;`;
+      `flex:1;height:8px;background:${EDITOR_INPUT_BG};border-radius:${RADIUS_SM};overflow:hidden;`;
     const progressFill = document.createElement('div');
     progressFill.style.cssText =
       `height:100%;width:${activeCampaign.completionPct}%;background:#7ed321;border-radius:${RADIUS_SM};` +
@@ -312,7 +312,7 @@ export function renderLevelList(
 
       if (campaignChallengeTotal > 0 && campaignChallengeCompleted > 0) {
         const challengeEl = document.createElement('span');
-        challengeEl.style.color = '#e74c3c';
+        challengeEl.style.color = ERROR_COLOR;
         challengeEl.textContent = allNonChallengeCompleted
           ? `💀 ${campaignChallengeCompleted}/${campaignChallengeTotal}`
           : `💀 ${campaignChallengeCompleted}`;
@@ -505,7 +505,7 @@ export function renderLevelList(
         const noMapError = document.createElement('p');
         noMapError.classList.add('chapter-no-map-error');
         noMapError.style.cssText =
-          'color:#e74c3c;font-size:0.85rem;padding:4px 16px;margin:0;display:none;';
+          'color:' + ERROR_COLOR + ';font-size:0.85rem;padding:4px 16px;margin:0;display:none;';
         noMapError.textContent = 'Error: This chapter has no map.';
         let noMapErrorTimeout: ReturnType<typeof setTimeout> | null = null;
         chapterHeader.addEventListener('click', () => {
@@ -554,9 +554,9 @@ export function renderLevelList(
     resetBtn.textContent = '🔄 Reset Progress';
     resetBtn.disabled = !hasProgress;
     resetBtn.style.cssText =
-      `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;width:100%;` +
-      `border-radius:${RADIUS_MD};border:1px solid ` + (hasProgress ? '#e74c3c' : '#555') + ';' +
-      'color:' + (hasProgress ? '#e74c3c' : '#888') + ';' +
+      `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${MUTED_BTN_BG};width:100%;` +
+      `border-radius:${RADIUS_MD};border:1px solid ` + (hasProgress ? ERROR_COLOR : '#555') + ';' +
+      'color:' + (hasProgress ? ERROR_COLOR : '#888') + ';' +
       'cursor:' + (hasProgress ? 'pointer' : 'default') + ';';
     if (hasProgress) {
       resetBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onResetClick(); });
@@ -566,7 +566,7 @@ export function renderLevelList(
 
   // Dev cheat button: mark all levels completed and unlock all chapters/levels
   const unlockAllBtn = createButton(
-    '🛠️ [Dev] Unlock All', '#2a2a4a', '#f39c12',
+    '🛠️ [Dev] Unlock All', MUTED_BTN_BG, '#f39c12',
     () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); },
     'margin-top:8px;padding:10px 20px;width:100%;',
   );

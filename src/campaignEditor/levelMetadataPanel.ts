@@ -15,7 +15,7 @@ import {
 } from './types';
 import { LevelEditorState } from './levelEditorState';
 import { buildGridSizePanel } from './gridSizePanel';
-import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from '../uiConstants';
+import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from '../uiConstants';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ export class LevelMetadataPanel {
       nameInp.type = 'text';
       nameInp.value = state.levelName;
       nameInp.style.cssText =
-        'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
+        'padding:6px 10px;font-size:0.9rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
         `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
       nameInp.addEventListener('input', () => { state.levelName = nameInp.value; });
       nameWrap.appendChild(nameLbl);
@@ -78,7 +78,7 @@ export class LevelMetadataPanel {
     container.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
 
     const textareaStyle =
-      'padding:6px 10px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+      'padding:6px 10px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};resize:vertical;min-height:52px;font-family:inherit;`;
 
     const noteWrap = document.createElement('div');
@@ -183,7 +183,7 @@ export class LevelMetadataPanel {
       container.appendChild(this._createInfoBox('#f0c040', `💡 ${activeHints.join(' → ')}`));
     }
     if (state.levelChallenge) {
-      container.appendChild(this._createInfoBox('#e74c3c', '💀 Challenge level'));
+      container.appendChild(this._createInfoBox(ERROR_COLOR, '💀 Challenge level'));
     }
     return container;
   }
@@ -244,7 +244,7 @@ export class LevelMetadataPanel {
 
     const shapeSel = document.createElement('select');
     shapeSel.style.cssText =
-      'padding:4px 6px;font-size:0.8rem;background:#0d1a30;color:#eee;' +
+      'padding:4px 6px;font-size:0.8rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
                        PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
@@ -280,7 +280,7 @@ export class LevelMetadataPanel {
     const state = this._cb.getState();
     const row = document.createElement('div');
     row.style.cssText =
-      'display:flex;align-items:center;gap:6px;background:#0d1a30;' +
+      'display:flex;align-items:center;gap:6px;background:' + EDITOR_INPUT_BG + ';' +
       `border-radius:${RADIUS_SM};padding:4px 6px;`;
 
     const lbl = document.createElement('span');
@@ -304,8 +304,8 @@ export class LevelMetadataPanel {
     delBtn.type = 'button';
     delBtn.textContent = '✕';
     delBtn.style.cssText =
-      'padding:2px 6px;font-size:0.75rem;background:#2a2a4a;color:#e74c3c;' +
-      'border:1px solid #e74c3c;border-radius:3px;cursor:pointer;';
+      'padding:2px 6px;font-size:0.75rem;background:' + MUTED_BTN_BG + ';color:' + ERROR_COLOR + ';' +
+      'border:1px solid ' + ERROR_COLOR + ';border-radius:3px;cursor:pointer;';
     delBtn.addEventListener('click', () => {
       state.inventory.splice(idx, 1);
       state.recordSnapshot();
@@ -351,7 +351,7 @@ export function buildSlideAndRotateControls(
 
   const arrowBtnStyle =
     'width:28px;height:28px;font-size:1rem;display:flex;align-items:center;justify-content:center;' +
-    `background:#0d1a30;color:#7ed321;border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};cursor:pointer;padding:0;`;
+    `background:${EDITOR_INPUT_BG};color:#7ed321;border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};cursor:pointer;padding:0;`;
 
   // ── Two-column layout: left = slide, right = rotate + reflect ─────────────
 
