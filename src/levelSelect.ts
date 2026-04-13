@@ -4,6 +4,7 @@ import { ChapterDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from './uiConstants';
+import { createButton } from './uiHelpers';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -528,21 +529,19 @@ export function renderLevelList(
   }
 
   // Campaign Editor button at the top of the controls
-  const campaignEditorBtn = document.createElement('button');
-  campaignEditorBtn.textContent = '🗺️ Campaign Editor';
-  campaignEditorBtn.style.cssText =
-    `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${UI_BG};color:${UI_GOLD};` +
-    `border:1px solid ${UI_GOLD};border-radius:${RADIUS_MD};cursor:pointer;width:100%;`;
-  campaignEditorBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignEditorClick(); });
+  const campaignEditorBtn = createButton(
+    '🗺️ Campaign Editor', UI_BG, UI_GOLD,
+    () => { sfxManager.play(SfxId.ChapterSelect); onCampaignEditorClick(); },
+    'margin-top:8px;padding:10px 20px;width:100%;',
+  );
   levelListEl.appendChild(campaignEditorBtn);
 
   // Game Rules button above the reset button
-  const rulesBtn = document.createElement('button');
-  rulesBtn.textContent = '📋 Game Rules';
-  rulesBtn.style.cssText =
-    `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${UI_BG};color:#7ed321;` +
-    `border:1px solid #7ed321;border-radius:${RADIUS_MD};cursor:pointer;width:100%;`;
-  rulesBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onRulesClick(); });
+  const rulesBtn = createButton(
+    '📋 Game Rules', UI_BG, '#7ed321',
+    () => { sfxManager.play(SfxId.ChapterSelect); onRulesClick(); },
+    'margin-top:8px;padding:10px 20px;width:100%;',
+  );
   levelListEl.appendChild(rulesBtn);
 
   // Reset-progress button: hidden when no campaign is active; disabled when there is no
@@ -566,11 +565,10 @@ export function renderLevelList(
   }
 
   // Dev cheat button: mark all levels completed and unlock all chapters/levels
-  const unlockAllBtn = document.createElement('button');
-  unlockAllBtn.textContent = '🛠️ [Dev] Unlock All';
-  unlockAllBtn.style.cssText =
-    `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#f39c12;` +
-    `border:1px solid #f39c12;border-radius:${RADIUS_MD};cursor:pointer;width:100%;`;
-  unlockAllBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); });
+  const unlockAllBtn = createButton(
+    '🛠️ [Dev] Unlock All', '#2a2a4a', '#f39c12',
+    () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); },
+    'margin-top:8px;padding:10px 20px;width:100%;',
+  );
   levelListEl.appendChild(unlockAllBtn);
 }

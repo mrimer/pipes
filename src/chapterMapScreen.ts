@@ -21,6 +21,7 @@ import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
+import { createButton } from './uiHelpers';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -560,12 +561,7 @@ export class ChapterMapScreen {
     el.appendChild(statsEl);
 
     // Back button
-    const backBtn = document.createElement('button');
-    backBtn.textContent = '← Chapter Select';
-    backBtn.style.cssText =
-      `padding:8px 16px;font-size:0.9rem;background:${UI_BG};color:${SUCCESS_COLOR};` +
-      `border:1px solid ${SUCCESS_COLOR};border-radius:${RADIUS_MD};cursor:pointer;`;
-    backBtn.addEventListener('click', () => {
+    const backBtn = createButton('← Chapter Select', UI_BG, SUCCESS_COLOR, () => {
       this._callbacks.onShowLevelSelect(); // stopAll() is called inside; play Back after
       sfxManager.play(SfxId.Back);
     });

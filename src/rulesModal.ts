@@ -3,7 +3,8 @@
 import { shapeIcon } from './renderer';
 import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
-import { RADIUS_LG, RADIUS_MD, UI_BG, UI_BORDER } from './uiConstants';
+import { RADIUS_LG, UI_BG, UI_BORDER } from './uiConstants';
+import { createButton } from './uiHelpers';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -400,15 +401,11 @@ export function createGameRulesModal(): HTMLElement {
   }
 
   // ── Close button ──────────────────────────────────────────────────────────
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'Close';
-  closeBtn.style.cssText =
-    'align-self:center;padding:10px 32px;font-size:1rem;' +
-    `background:${UI_BORDER};color:#fff;border:none;border-radius:${RADIUS_MD};` +
-    'cursor:pointer;margin-top:4px;';
-  closeBtn.addEventListener('click', () => {
-    overlay.style.display = 'none';
-  });
+  const closeBtn = createButton(
+    'Close', UI_BORDER, '#fff',
+    () => { overlay.style.display = 'none'; },
+    'align-self:center;padding:10px 32px;font-size:1rem;border:none;margin-top:4px;',
+  );
 
   // Allow closing by clicking the backdrop
   overlay.addEventListener('click', (e) => {
