@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle, styleToFloorShape } from '../types';
-import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
+import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, seaFillColor, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, computeFloorTypesFromGrid } from '../board';
 import { oppositeDirection } from '../tile';
@@ -411,6 +411,7 @@ function _drawChapterMapSea(
   cols: number,
   r: number,
   c: number,
+  style?: LevelStyle,
 ): void {
   const CELL = TILE_SIZE;
   const _isSea = (rr: number, cc: number): boolean =>
@@ -427,7 +428,7 @@ function _drawChapterMapSea(
   };
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
-  drawSea(ctx, CELL / 2, neighbors);
+  drawSea(ctx, CELL / 2, neighbors, seaFillColor(style));
   ctx.restore();
 }
 
@@ -544,7 +545,7 @@ function _renderChapterMapPass2NonPipeTiles(
       } else if (def.shape === PipeShape.Tree) {
         _drawChapterMapTree(ctx, x, y, r, c, floorType, style);
       } else if (def.shape === PipeShape.Sea) {
-        _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c);
+        _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c, style);
       }
     }
   }

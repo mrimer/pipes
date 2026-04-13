@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, LevelStyle } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, drawOneWayArrow, drawCementLabel, drawTree } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree } from '../renderer';
 import { Tile, rotateDirection } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
@@ -151,7 +151,7 @@ export function renderEditorCanvas(
         const cy = y + CELL / 2;
         ctx.save();
         ctx.translate(cx, cy);
-        drawSea(ctx, CELL / 2, neighbors);
+        drawSea(ctx, CELL / 2, neighbors, seaFillColor(style));
         ctx.restore();
         ctx.save();
         ctx.font = `bold ${_s(11)}px Arial`;
@@ -467,7 +467,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   } else if (shape === PipeShape.Tree) {
     bgColor = '#1a2840';
   } else if (shape === PipeShape.Sea) {
-    bgColor = '#2a7fbf';
+    bgColor = seaFillColor(style);
   } else {
     bgColor = EDITOR_COLORS[shape] ?? '#4a90d9';
   }
@@ -607,7 +607,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.translate(cx, cy);
     // In editor, we don't have neighbor info in drawTileOnEditor; use default (no neighbors)
     const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
-    drawSea(ctx, CELL / 2, defaultNeighbors);
+    drawSea(ctx, CELL / 2, defaultNeighbors, seaFillColor(style));
     ctx.restore();
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'SEA', cx, cy);
