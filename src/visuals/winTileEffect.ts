@@ -25,8 +25,14 @@ export const WIN_TILE_GLOW_DURATION = 500;
 /** Fraction of {@link WIN_TILE_GLOW_DURATION} spent ramping UP to peak alpha. */
 const PEAK_FRAC = 0.35;
 
-/** Delay in milliseconds between consecutive BFS layers. */
+/** Delay in milliseconds between consecutive BFS layers on the level screen. */
 export const WIN_TILE_LAYER_DELAY_MS = 100;
+
+/**
+ * Delay in milliseconds between consecutive BFS layers on the chapter map screen.
+ * Slower than the level-screen rate so each new wave of tiles fires once per second.
+ */
+export const CHAPTER_MAP_WIN_LAYER_DELAY_MS = 1000;
 
 /** Peak fill alpha of the glow square. */
 const FILL_PEAK_ALPHA = 0.55;
@@ -87,17 +93,18 @@ function _bfsDepths(
  * `filledKeys`.
  *
  * Depth 0 and 1 both fire at `baseTime` (no delay); depth d ≥ 2 fires at
- * `baseTime + (d − 1) * WIN_TILE_LAYER_DELAY_MS`.
+ * `baseTime + (d − 1) * layerDelayMs`.
  */
 function _buildGlowsFromDepths(
   filledKeys: Iterable<string>,
   depths: Map<string, number>,
   baseTime: number,
+  layerDelayMs: number,
 ): WinTileGlow[] {
   const glows: WinTileGlow[] = [];
   for (const key of filledKeys) {
     const depth = depths.get(key) ?? 0;
-    const delayMs = Math.max(0, depth - 1) * WIN_TILE_LAYER_DELAY_MS;
+    const delayMs = Math.max(0, depth - 1) * layerDelayMs;
     const [row, col] = key.split(',').map(Number);
     glows.push({ row, col, startTime: baseTime + delayMs });
   }
@@ -137,16 +144,16 @@ export function computeWinTileGlows(board: Board, baseTime: number): WinTileGlow
     },
   );
 
-  return _buildGlowsFromDepths(filled, depths, baseTime);
+  return _buildGlowsFromDepths(filled, depths, baseTime, WIN_TILE_LAYER_DELAY_MS);
 }
 
 /**
  * Build `WinTileGlow` entries for all water-filled cells on the chapter map,
- * with start times spaced {@link WIN_TILE_LAYER_DELAY_MS} apart by BFS layer.
+ * with start times spaced {@link CHAPTER_MAP_WIN_LAYER_DELAY_MS} apart by BFS layer.
  *
  * Uses the same depth-stagger rules as {@link computeWinTileGlows}: BFS depth 0
  * (source) and depth 1 fire at `baseTime`; depth d ≥ 2 fires at
- * `baseTime + (d − 1) * WIN_TILE_LAYER_DELAY_MS`.
+ * `baseTime + (d − 1) * CHAPTER_MAP_WIN_LAYER_DELAY_MS`.
  *
  * @param filledKeys  Set of `"row,col"` strings for water-reachable cells.
  * @param sourceRow   Row index of the source tile.
@@ -183,7 +190,7 @@ export function computeChapterMapWinGlows(
     },
   );
 
-  return _buildGlowsFromDepths(filledKeys, depths, baseTime);
+  return _buildGlowsFromDepths(filledKeys, depths, baseTime, CHAPTER_MAP_WIN_LAYER_DELAY_MS);
 }
 
 /**
