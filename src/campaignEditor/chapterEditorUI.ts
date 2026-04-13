@@ -20,7 +20,7 @@ import { buildStyleSectionPanel } from './tileParamsPanel';
 import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
-import { RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
+import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -366,7 +366,7 @@ export class ChapterEditorUI {
     inp.step = '1';
     inp.value = String(getValue());
     inp.style.cssText =
-      `padding:4px;width:60px;background:#0d1a30;color:${UI_TEXT};border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
+      `padding:4px;width:60px;background:${EDITOR_INPUT_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
     inp.addEventListener('change', () => {
       const v = Math.max(0, Math.round(parseFloat(inp.value) || 0));
       inp.value = String(v);

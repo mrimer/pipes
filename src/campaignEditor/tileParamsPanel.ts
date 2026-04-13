@@ -31,7 +31,7 @@ import { TILE_SIZE } from '../renderer';
 import { drawEditorTile } from './renderer';
 import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
-import { RADIUS_SM, UI_BORDER } from '../uiConstants';
+import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER } from '../uiConstants';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -469,7 +469,7 @@ export class TileParamsPanel {
     inp.type = type;
     inp.value = value;
     inp.style.cssText =
-      'padding:6px 10px;font-size:0.9rem;background:#0d1a30;color:#eee;' +
+      'padding:6px 10px;font-size:0.9rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};` +
       (inputWidth ? `width:${inputWidth};` : 'flex:1;');
     inp.addEventListener('input', () => onInput(inp.value));
@@ -519,7 +519,7 @@ export class TileParamsPanel {
     const state = this._cb.getState();
     const sel = document.createElement('select');
     sel.style.cssText =
-      'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+      'padding:5px 8px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
       tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
@@ -593,7 +593,7 @@ export class TileParamsPanel {
     const state = this._cb.getState();
     const itemSel = document.createElement('select');
     itemSel.style.cssText =
-      'padding:5px 8px;font-size:0.85rem;background:#0d1a30;color:#eee;' +
+      'padding:5px 8px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     for (const shp of [PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
                        PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,

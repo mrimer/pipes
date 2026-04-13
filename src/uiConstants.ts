@@ -10,6 +10,12 @@ export const UI_TEXT       = '#eee';
 export const UI_GOLD       = '#f0c040';
 export const UI_OVERLAY_BG = 'rgba(0,0,0,0.7)';
 
+// Editor colors
+export const EDITOR_INPUT_BG = '#0d1a30';
+export const MUTED_BTN_BG    = '#2a2a4a';
+export const ERROR_COLOR     = '#e74c3c';
+export const ERROR_DARK      = '#c0392b';
+
 // Border radii
 export const RADIUS_SM = '4px';
 export const RADIUS_MD = '6px';

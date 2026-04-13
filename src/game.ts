@@ -21,7 +21,7 @@ import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { isPortrait } from './deviceUtils';
-import { RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
+import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -67,7 +67,7 @@ const HINT_BOX_CSS =
 /** CSS style for the brief error-flash message shown when an action is blocked. */
 const ERROR_FLASH_CSS =
   'display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);' +
-  'background:#c0392b;color:#fff;border:2px solid #e74c3c;' +
+  'background:' + ERROR_DARK + ';color:#fff;border:2px solid ' + ERROR_COLOR + ';' +
   `border-radius:${RADIUS_MD};padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;` +
   'text-align:center;max-width:360px;';
 

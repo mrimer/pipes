@@ -7,7 +7,7 @@
  */
 
 import { CampaignDef } from '../types';
-import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS } from '../uiConstants';
+import { ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG } from '../uiConstants';
 
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 export const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -91,7 +91,7 @@ export class EditorDialogs {
       overlay.remove();
       onConfirm();
     });
-    const cancelBtn = this._btn('Cancel', '#2a2a4a', '#aaa', () => overlay.remove());
+    const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => overlay.remove());
 
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(confirmBtn);
@@ -118,11 +118,11 @@ export class EditorDialogs {
       overlay.remove();
       onSave();
     });
-    const discardBtn = this._btn('🗑 Discard', '#c0392b', '#fff', () => {
+    const discardBtn = this._btn('🗑 Discard', ERROR_DARK, '#fff', () => {
       overlay.remove();
       onDiscard();
     });
-    const cancelBtn = this._btn('Cancel', '#2a2a4a', '#aaa', () => {
+    const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => {
       overlay.remove();
     });
 

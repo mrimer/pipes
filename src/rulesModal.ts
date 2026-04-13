@@ -3,7 +3,7 @@
 import { shapeIcon } from './renderer';
 import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
-import { RADIUS_LG, UI_BG, UI_BORDER } from './uiConstants';
+import { RADIUS_LG, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
@@ -296,7 +296,7 @@ const LEGEND_ROWS: LegendRow[] = [
 export function createGameRulesModal(): HTMLElement {
   const overlay = document.createElement('div');
   overlay.style.cssText =
-    'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);' +
+    'display:none;position:fixed;inset:0;background:' + UI_OVERLAY_BG + ';' +
     'justify-content:center;align-items:flex-start;z-index:100;' +
     'overflow-y:auto;padding:24px 16px;';
 

@@ -42,7 +42,7 @@ import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
-import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
+import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
 import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
 
@@ -222,7 +222,7 @@ export class CampaignEditor {
       'box-sizing:border-box;position:sticky;top:0;z-index:10;';
 
     if (onBack) {
-      const backBtn = this._btn('← Back', '#2a2a4a', '#aaa', () => {
+      const backBtn = this._btn('← Back', MUTED_BTN_BG, '#aaa', () => {
         sfxManager.play(SfxId.Back);
         onBack();
       }, '', true);
@@ -453,7 +453,7 @@ export class CampaignEditor {
     }));
 
     if (!isOfficial) {
-      btns.appendChild(this._btn('🗑 Delete', UI_BG, '#e74c3c', () => {
+      btns.appendChild(this._btn('🗑 Delete', UI_BG, ERROR_COLOR, () => {
         this._deleteCampaign(campaign.id);
       }));
     }
@@ -590,7 +590,7 @@ export class CampaignEditor {
 
     if (!readOnly) {
       this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail());
-      btns.appendChild(this._btn('🗑', UI_BG, '#e74c3c', () => {
+      btns.appendChild(this._btn('🗑', UI_BG, ERROR_COLOR, () => {
         if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
           this._service.deleteChapter(campaign, chapterIdx);
           this._showCampaignDetail();
@@ -716,7 +716,7 @@ export class CampaignEditor {
 
       this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail(),
         (fromIdx, toIdx) => this._service.reorderLevels(campaign, chapterIdx, fromIdx, toIdx));
-      btns.appendChild(this._btn('🗑', UI_BG, '#e74c3c', () => {
+      btns.appendChild(this._btn('🗑', UI_BG, ERROR_COLOR, () => {
         if (confirm(`Delete level "${level.name}"?`)) {
           this._service.deleteLevel(campaign, chapterIdx, levelIdx);
           this._showChapterDetail();
@@ -876,10 +876,10 @@ export class CampaignEditor {
     if (readOnly) return;
 
     // Undo/redo
-    const undoBtn = this._btn('↩ Undo', '#2a2a4a', '#aaa', () => this._editorUndo(), '', true);
+    const undoBtn = this._btn('↩ Undo', MUTED_BTN_BG, '#aaa', () => this._editorUndo(), '', true);
     undoBtn.id = 'editor-undo-btn';
     toolbar.appendChild(undoBtn);
-    const redoBtn = this._btn('↪ Redo', '#2a2a4a', '#aaa', () => this._editorRedo(), '', true);
+    const redoBtn = this._btn('↪ Redo', MUTED_BTN_BG, '#aaa', () => this._editorRedo(), '', true);
     redoBtn.id = 'editor-redo-btn';
     toolbar.appendChild(redoBtn);
 
@@ -1394,7 +1394,7 @@ export class CampaignEditor {
           return;
         }
         title.textContent = '📤 Export log ❌ Failed (click to dismiss)';
-        title.style.color = '#e74c3c';
+        title.style.color = ERROR_COLOR;
         overlay.style.cursor = 'pointer';
         overlay.addEventListener('click', () => { overlay.remove(); }, { once: true });
         document.body.appendChild(overlay);
