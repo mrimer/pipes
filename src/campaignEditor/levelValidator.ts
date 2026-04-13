@@ -1,6 +1,7 @@
 import { Board, parseKey } from '../board';
 import { LevelDef, PipeShape } from '../types';
 import { ValidationResult } from './types';
+import { MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 /**
  * Validates a level definition and returns a structured result.
@@ -18,15 +19,15 @@ export function validateLevel(levelDef: LevelDef): ValidationResult {
       const def = levelDef.grid[r]?.[c];
       if (!def) continue;
       if (def.shape === PipeShape.Source) {
-        if (sourcePos) { msgs.push('Multiple Source tiles found – only one is allowed.'); ok = false; }
+        if (sourcePos) { msgs.push(MULTIPLE_SOURCES); ok = false; }
         else { sourcePos = { row: r, col: c }; }
       }
       if (def.shape === PipeShape.Sink) sinkPositions.push({ row: r, col: c });
     }
   }
 
-  if (!sourcePos) { msgs.push('No Source tile found – add one to the grid.'); ok = false; }
-  if (sinkPositions.length === 0) { msgs.push('No Sink tile found – add at least one.'); ok = false; }
+  if (!sourcePos) { msgs.push(NO_SOURCE); ok = false; }
+  if (sinkPositions.length === 0) { msgs.push(NO_SINK); ok = false; }
   if (!ok) return { ok, messages: msgs };
 
   // Check that inventory has at least one item (otherwise level may be impossible)

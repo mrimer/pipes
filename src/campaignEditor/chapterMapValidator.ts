@@ -1,6 +1,7 @@
 import { ChapterDef, TileDef, PipeShape } from '../types';
 import { computeChapterMapReachable, editorTileConns } from '../chapterMapUtils';
 import { ValidationResult } from './types';
+import { MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 export function validateChapterMap(
   grid: (TileDef | null)[][],
@@ -20,7 +21,7 @@ export function validateChapterMap(
       const def = grid[r]?.[c];
       if (!def) continue;
       if (def.shape === PipeShape.Source) {
-        if (sourcePos) { msgs.push('Multiple Source tiles found.'); ok = false; }
+        if (sourcePos) { msgs.push(MULTIPLE_SOURCES); ok = false; }
         else sourcePos = { row: r, col: c };
       }
       if (def.shape === PipeShape.Sink) {
@@ -33,8 +34,8 @@ export function validateChapterMap(
     }
   }
 
-  if (!sourcePos) { msgs.push('❌ No Source tile found.'); ok = false; }
-  if (!sinkPos) { msgs.push('❌ No Sink tile found.'); ok = false; }
+  if (!sourcePos) { msgs.push(`❌ ${NO_SOURCE}`); ok = false; }
+  if (!sinkPos) { msgs.push(`❌ ${NO_SINK}`); ok = false; }
 
   // Check sink completion threshold is not greater than the number of levels
   if (sinkPos) {

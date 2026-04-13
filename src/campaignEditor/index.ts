@@ -44,6 +44,7 @@ import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
 import { createButton, showTimedMessage } from '../uiHelpers';
+import { ONLY_ONE_SOURCE } from './validationMessages';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -1029,7 +1030,7 @@ export class CampaignEditor {
   private _showSourceError(): void {
     const el = this._editorSourceErrorEl;
     if (!el) return;
-    showTimedMessage(el, 'Only one source tile is allowed.');
+    showTimedMessage(el, ONLY_ONE_SOURCE);
   }
 
   /** Flashes an error message below the canvas when the Sink placement constraint is violated. */
