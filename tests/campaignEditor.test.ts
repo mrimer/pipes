@@ -472,6 +472,121 @@ describe('CampaignEditor – note and hint in level definitions', () => {
   });
 });
 
+// ─── gzip export ─────────────────────────────────────────────────────────────
+
+describe('CampaignEditor – _exportCampaign', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    if (!URL.createObjectURL) URL.createObjectURL = () => 'blob:fake';
+    if (!URL.revokeObjectURL) URL.revokeObjectURL = () => undefined;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('appends the anchor to document.body, clicks it, removes it, then defers revokeObjectURL', async () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_exp1',
+      name: 'My Campaign',
+      author: 'Tester',
+      chapters: [],
+    };
+    const editor = makeEditor([campaign]);
+
+    // Mock gzipString to resolve immediately with a trivial Uint8Array.
+    const typesModule = await import('../src/campaignEditor/types');
+    const gzipSpy = jest.spyOn(typesModule, 'gzipString').mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+    const appendedAnchors: HTMLAnchorElement[] = [];
+    const removedAnchors: HTMLAnchorElement[] = [];
+    const clickedAnchors: HTMLAnchorElement[] = [];
+
+    const origAppendChild = document.body.appendChild.bind(document.body);
+    const origRemoveChild = document.body.removeChild.bind(document.body);
+    jest.spyOn(document.body, 'appendChild').mockImplementation((node) => {
+      if ((node as HTMLElement).tagName === 'A') appendedAnchors.push(node as HTMLAnchorElement);
+      return origAppendChild(node);
+    });
+    jest.spyOn(document.body, 'removeChild').mockImplementation((node) => {
+      if ((node as HTMLElement).tagName === 'A') removedAnchors.push(node as HTMLAnchorElement);
+      return origRemoveChild(node);
+    });
+
+    const fakeUrl = 'blob:fake-url';
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue(fakeUrl);
+    jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    const origCreate = document.createElement.bind(document);
+    jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === 'a') {
+        Object.defineProperty(el, 'click', {
+          value: () => { clickedAnchors.push(el as HTMLAnchorElement); },
+          writable: true,
+        });
+      }
+      return el;
+    });
+
+    jest.useFakeTimers();
+    (editor as unknown as { _exportCampaign(c: CampaignDef): void })._exportCampaign(campaign);
+
+    // Flush the microtask queue so the gzipString mock resolves.
+    await Promise.resolve();
+
+    expect(gzipSpy).toHaveBeenCalled();
+    expect(appendedAnchors).toHaveLength(1);
+    expect(clickedAnchors).toHaveLength(1);
+    expect(removedAnchors).toHaveLength(1);
+    expect(appendedAnchors[0]).toBe(clickedAnchors[0]);
+
+    // revokeObjectURL should not have been called yet (deferred via setTimeout).
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
+    // After advancing timers the URL should be revoked.
+    jest.runAllTimers();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeUrl);
+  });
+
+  it('sets the download filename from the campaign name', async () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_exp2',
+      name: 'My Cool Campaign',
+      author: 'Tester',
+      chapters: [],
+    };
+    const editor = makeEditor([campaign]);
+
+    const typesModule = await import('../src/campaignEditor/types');
+    jest.spyOn(typesModule, 'gzipString').mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+    const downloadNames: string[] = [];
+    const origCreate = document.createElement.bind(document);
+    jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === 'a') {
+        Object.defineProperty(el, 'click', {
+          value: () => { downloadNames.push((el as HTMLAnchorElement).download); },
+          writable: true,
+        });
+      }
+      return el;
+    });
+    jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake');
+    jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    jest.useFakeTimers();
+
+    (editor as unknown as { _exportCampaign(c: CampaignDef): void })._exportCampaign(campaign);
+    await Promise.resolve();
+
+    expect(downloadNames).toHaveLength(1);
+    expect(downloadNames[0]).toBe('My_Cool_Campaign.pipes.json.gz');
+  });
+});
+
 // ─── gzip import ─────────────────────────────────────────────────────────────
 
 describe('CampaignEditor – gzip import', () => {
