@@ -205,7 +205,7 @@ export class CampaignService {
     const level = chapter.levels[levelIdx];
     if (!level) throw new Error(`Level index ${levelIdx} does not exist.`);
     const copy: LevelDef = {
-      ...(JSON.parse(JSON.stringify(level)) as LevelDef),
+      ...(structuredClone(level) as LevelDef),
       id: generateLevelId(),
       name: `${level.name} (copy)`,
     };
@@ -307,7 +307,7 @@ export class CampaignService {
    * and return the resulting JSON string.
    */
   exportToJson(campaign: CampaignDef): string {
-    const clean = JSON.parse(JSON.stringify(campaign)) as CampaignDef;
+    const clean = structuredClone(campaign) as CampaignDef;
     this.scanData(clean, false);
     return JSON.stringify(clean, null, 2);
   }

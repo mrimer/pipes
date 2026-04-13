@@ -1207,7 +1207,7 @@ export class CampaignEditor {
       }
     }
 
-    const rawGrid = JSON.parse(JSON.stringify(this._state.grid)) as (TileDef | null)[][];
+    const rawGrid = structuredClone(this._state.grid);
     // Strip any fields not supported by each tile's shape to keep saved data clean.
     const cleanGrid: (TileDef | null)[][] = rawGrid.map(row =>
       row.map(tile => {
@@ -1225,7 +1225,7 @@ export class CampaignEditor {
       rows: this._state.rows,
       cols: this._state.cols,
       grid: cleanGrid,
-      inventory: JSON.parse(JSON.stringify(this._state.inventory)) as InventoryItem[],
+      inventory: structuredClone(this._state.inventory),
     };
     if (this._state.levelNote.trim()) def.note = this._state.levelNote.trim();
     const activeHints = this._state.levelHints.map(h => h.trim()).filter(h => h.length > 0);

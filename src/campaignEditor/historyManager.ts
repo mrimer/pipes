@@ -24,7 +24,7 @@ export class HistoryManager<T> {
    * changes when the index advances past 0 (i.e. past the initial snapshot).
    */
   record(snapshot: T): void {
-    const clone = JSON.parse(JSON.stringify(snapshot)) as T;
+    const clone = structuredClone(snapshot);
     if (this._idx < this._history.length - 1) {
       this._history = this._history.slice(0, this._idx + 1);
     }
@@ -71,7 +71,7 @@ export class HistoryManager<T> {
 
   private _cloneCurrent(): T {
     this._unsavedChanges = this._idx !== this._savedIdx;
-    return JSON.parse(JSON.stringify(this._history[this._idx])) as T;
+    return structuredClone(this._history[this._idx]);
   }
 
   // ── Test / debug accessors ──────────────────────────────────────────────────
