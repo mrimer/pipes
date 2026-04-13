@@ -75,17 +75,17 @@ describe('renderMinimap: return value', () => {
     expect(canvas).toBeInstanceOf(HTMLCanvasElement);
   });
 
-  it('canvas dimensions include border pixels on each side', () => {
+  it('canvas dimensions do not include border pixels', () => {
     // 3 rows × 3 cols; with TARGET_SIZE=100 and maxDim=3, px = floor(100/3) = 33
-    // totalW = 3*33 + 2*2 = 103; totalH = 3*33 + 2*2 = 103
+    // totalW = 3*33 = 99; totalH = 3*33 = 99 (border is drawn separately after scaling)
     const level = makeLevel(3, 3, [
       [null, null, null],
       [null, null, null],
       [null, null, null],
     ]);
     const canvas = renderMinimap(level);
-    expect(canvas.width).toBe(103);
-    expect(canvas.height).toBe(103);
+    expect(canvas.width).toBe(99);
+    expect(canvas.height).toBe(99);
   });
 
   it('handles a 1×1 grid', () => {
@@ -102,44 +102,44 @@ describe('renderMinimap: tileColor coverage via fills', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(2, 2, [[null, null], [null, null]]);
     renderMinimap(level);
-    // Should have a white border fill + 4 tile fills
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(5);
+    // Should have 4 tile fills (border is drawn separately after scaling)
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(4);
   });
 
   it('draws a fill for a Source tile', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Source }]]);
     renderMinimap(level);
-    // Should include at least two fills: border + the source tile
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    // Should include at least one fill: the source tile
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(1);
   });
 
   it('draws a fill for a Sink tile', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Sink }]]);
     renderMinimap(level);
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(1);
   });
 
   it('draws a fill for a Granite tile', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Granite }]]);
     renderMinimap(level);
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(1);
   });
 
   it('draws a fill for a Cement tile', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Cement }]]);
     renderMinimap(level);
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(1);
   });
 
   it('draws a fill for a GoldSpace tile', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.GoldSpace }]]);
     renderMinimap(level);
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(1);
   });
 
   it('draws a fill for a Tree tile', () => {
@@ -147,7 +147,7 @@ describe('renderMinimap: tileColor coverage via fills', () => {
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Tree }]]);
     renderMinimap(level);
     // Tree tiles: background fill + arc (circle) call
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(1);
     expect(ctx.arcs.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -160,7 +160,7 @@ describe('renderMinimap: tileColor coverage via fills', () => {
       { shape: PipeShape.Chamber, chamberContent: 'ice' },
     ]]);
     renderMinimap(level);
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(5);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(4);
   });
 
   it('draws chamber pump/snow/hot_plate/sandstone/star tiles', () => {
@@ -173,7 +173,7 @@ describe('renderMinimap: tileColor coverage via fills', () => {
       { shape: PipeShape.Chamber, chamberContent: 'star' },
     ]]);
     renderMinimap(level);
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(6);
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(5);
   });
 
   it('draws chamber item tiles as a hollow rounded rectangle (stroke)', () => {
@@ -237,7 +237,7 @@ describe('renderMinimap: pipe line art paths', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Straight, rotation: 0 }]]);
     renderMinimap(level);
-    // Border + bg fill + line fill(s) for connected directions
+    // bg fill + line fill(s) for connected directions
     expect(ctx.fills.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -252,8 +252,8 @@ describe('renderMinimap: pipe line art paths', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[{ shape: PipeShape.Cross, rotation: 0 }]]);
     renderMinimap(level);
-    // border + bg + 4 line fills = at least 6
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(6);
+    // bg + 4 line fills = at least 5
+    expect(ctx.fills.length).toBeGreaterThanOrEqual(5);
   });
 
   it('draws pipe line art for GoldElbow tile', () => {

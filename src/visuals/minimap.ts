@@ -2,8 +2,9 @@
  * Minimap rendering helpers.
  *
  * Renders a tiny pixel-art preview of a level grid onto an HTMLCanvasElement.
- * Each grid tile is represented by 1 or more colored pixels, and the minimap
- * is surrounded by a 2px white border.
+ * Each grid tile is represented by 1 or more colored pixels.  The white border
+ * that frames the minimap on the chapter map is drawn separately after the image
+ * has been scaled, so it remains crisp at any display size.
  */
 
 import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef } from '../types';
@@ -46,8 +47,6 @@ import {
   SEA_FILL_COLOR,
 } from '../colors';
 
-/** Width and height of the white border drawn around the minimap (px). */
-const BORDER_PX = 2;
 
 /**
  * Target inner dimension (width and height) for the minimap canvas in CSS pixels.
@@ -61,14 +60,14 @@ const TARGET_SIZE = 100;
 /**
  * Compute the total pixel dimensions (width × height) of a minimap canvas
  * for a level grid with the given row and column counts.
- * Includes the surrounding border.
+ * Does not include the surrounding border (border is drawn separately after scaling).
  */
 export function minimapDimensions(rows: number, cols: number): { width: number; height: number } {
   const maxDim = Math.max(rows, cols);
   const px = Math.max(1, Math.floor(TARGET_SIZE / maxDim));
   return {
-    width: cols * px + 2 * BORDER_PX,
-    height: rows * px + 2 * BORDER_PX,
+    width: cols * px,
+    height: rows * px,
   };
 }
 
@@ -372,16 +371,12 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
 
   const style = level.style;
 
-  // White border (fill the entire canvas, then overwrite the interior)
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, totalW, totalH);
-
   // Draw each tile as a colored rectangle; pipe tiles get connection-line art when large enough.
   for (let r = 0; r < level.rows; r++) {
     for (let c = 0; c < level.cols; c++) {
       const tile = (level.grid[r]?.[c]) ?? null;
-      const tx = BORDER_PX + c * px;
-      const ty = BORDER_PX + r * px;
+      const tx = c * px;
+      const ty = r * px;
       if (tile && px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape)) {
         drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0) as Rotation);
       } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay) {
