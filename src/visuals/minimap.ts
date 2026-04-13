@@ -92,7 +92,9 @@ function containerColor(tile: TileDef): string {
     ? CONTAINER_COLOR : PIPE_COLOR;
 }
 
-/** Returns the fill color to use for a grid tile on the minimap. */
+/** Returns the fill color to use for a grid tile on the minimap.
+ * Used for drawing a uniform pixel when tile size < MIN_PX_FOR_LINES.
+ */
 function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string {
   if (!tile) return emptyColor(style);
   if (tile.shape === PipeShape.EmptyDirt) return EMPTY_DIRT_COLOR_DARK;
@@ -374,6 +376,7 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
                  tile.shape === PipeShape.Chamber && tile.chamberContent === 'item') {
         drawContainer(ctx, tx, ty, px, containerColor(tile));
       } else {
+        // Draw the tile as a uniform pixel.
         ctx.fillStyle = tileColor(tile, style);
         ctx.fillRect(tx, ty, px, px);
       }
