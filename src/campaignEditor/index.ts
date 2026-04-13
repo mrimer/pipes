@@ -1323,8 +1323,14 @@ export class CampaignEditor {
       const a = document.createElement('a');
       a.href = url;
       a.download = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
+      // Attach to document so Firefox triggers the download on programmatic click.
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      // Defer revocation so the browser has time to initiate the download.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }).catch(() => {
+      alert('Export failed. Your browser may not support the required compression API.');
     });
   }
 
