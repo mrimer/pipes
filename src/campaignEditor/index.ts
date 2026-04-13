@@ -24,7 +24,10 @@ const EDITOR_LAYOUT_GAP = 16;
 import {
   EditorScreen,
   generateLevelId,
-  ungzipBlob,
+  gzipString,
+  ungzipBytes,
+  blobToBytes,
+  isGzipBytes,
   getValidTileDefKeys,
   EDITOR_CANVAS_BORDER,
   EDITOR_PANEL_BASE_CSS,
@@ -1308,28 +1311,32 @@ export class CampaignEditor {
     return this._service.scanData(campaign, dryRun);
   }
 
-  /** Export a campaign by triggering a JSON file download.
+  /** Export a campaign by compressing the JSON with gzip and triggering a download.
    *  Unrecognized fields are stripped from the output via a clean pass. */
   private _exportCampaign(campaign: CampaignDef): void {
     const json = this._service.exportToJson(campaign);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${campaign.name.replace(/\s+/g, '_')}.pipes.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    gzipString(json).then((compressed) => {
+      // Copy to a plain ArrayBuffer to satisfy strict BlobPart typing.
+      const buf = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength) as ArrayBuffer;
+      const blob = new Blob([buf], { type: 'application/gzip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
   }
 
-  /** Import a campaign from a JSON or gzip-compressed JSON (.gz) file. */
+  /** Import a campaign from a JSON or gzip-compressed JSON file.
+   *  Compression is detected automatically by inspecting the gzip magic bytes. */
   private _importCampaign(): void {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.gz,application/json,application/gzip';
+    input.accept = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
     input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (!file) return;
-      const isGzip = file.name.endsWith('.gz');
       const processText = (text: string) => {
         let result: ImportResult;
         try {
@@ -1361,15 +1368,16 @@ export class CampaignEditor {
         this.hide();
         this._onPlayCampaign(result.campaign);
       };
-      if (isGzip) {
-        ungzipBlob(file).then(processText).catch(() => {
-          alert('Failed to decompress campaign file. The .gz file may be corrupted or invalid.');
-        });
-      } else {
-        const reader = new FileReader();
-        reader.onload = () => { processText(reader.result as string); };
-        reader.readAsText(file);
-      }
+
+      blobToBytes(file).then((bytes) => {
+        if (isGzipBytes(bytes)) {
+          return ungzipBytes(bytes).then(processText);
+        }
+        processText(new TextDecoder().decode(bytes));
+        return undefined;
+      }).catch(() => {
+        alert('Failed to read campaign file. The file may be corrupted or invalid.');
+      });
     });
     input.click();
   }
