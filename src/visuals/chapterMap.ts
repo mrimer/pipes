@@ -26,10 +26,11 @@ import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
 /**
  * Compute which arm directions of the tile at (r, c) should use a flat (butt)
- * end cap.  An arm gets a butt end when the adjacent cell is non-empty AND the
- * neighbor has a connection pointing back (so the arms visually join flush at the
- * tile boundary).  Arms pointing into empty cells or at pipe tiles without a
- * reciprocal arm keep their round nubs.
+ * end cap.  An arm gets a butt end when the adjacent cell is a non-empty,
+ * non-open-floor tile AND the neighbor has a connection pointing back (so the
+ * arms visually join flush at the tile boundary).  Arms pointing into empty
+ * cells, EmptyDirt, EmptyDark, or pipe tiles without a reciprocal arm keep
+ * their round nubs.
  */
 export function computeChapterButtEndDirs(
   grid: (TileDef | null)[][],
@@ -44,7 +45,7 @@ export function computeChapterButtEndDirs(
     const nr = r + delta.row, nc = c + delta.col;
     if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return null;
     const neighbor = grid[nr]?.[nc];
-    if (!neighbor) return null; // null = empty cell → round end
+    if (!neighbor || isEmptyFloor(neighbor.shape)) return null; // null / empty floor → round end
     return { shape: neighbor.shape, connections: tileDefConnections(neighbor) };
   });
 }
