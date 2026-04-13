@@ -1374,7 +1374,6 @@ export class CampaignEditor {
           return ungzipBytes(bytes).then(processText);
         }
         processText(new TextDecoder().decode(bytes));
-        return undefined;
       }).catch(() => {
         alert('Failed to read campaign file. The file may be corrupted or invalid.');
       });
