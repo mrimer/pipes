@@ -25,6 +25,7 @@ import {
   PUMP_COLOR,
   SNOW_COLOR,
   CHAMBER_COLOR,
+  CHAMBER_FILL_COLOR,
   GRANITE_COLOR,
   CEMENT_FILL_COLOR,
   GOLD_SPACE_BASE_COLOR,
@@ -304,8 +305,8 @@ function drawTree(
 
 /**
  * Draws a thin hollow rounded rectangle for a container (Chamber-item) tile.
- * The background is filled with the empty floor color first, then a 1px stroke
- * with a very slight corner radius is drawn.
+ * The background is filled with the chamber interior color (matching the level screen),
+ * then a 1px stroke with a very slight corner radius is drawn.
  */
 function drawContainer(
   ctx: CanvasRenderingContext2D,
@@ -313,9 +314,8 @@ function drawContainer(
   y: number,
   px: number,
   color: string,
-  bgColor: string,
 ): void {
-  ctx.fillStyle = bgColor;
+  ctx.fillStyle = CHAMBER_FILL_COLOR;
   ctx.fillRect(x, y, px, px);
   const radius = Math.max(0.5, Math.min(1.5, px * 0.15));
   const inset = 0.5;
@@ -371,7 +371,7 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
         drawTree(ctx, tx, ty, px, style);
       } else if (tile && px >= MIN_PX_FOR_LINES &&
                  tile.shape === PipeShape.Chamber && tile.chamberContent === 'item') {
-        drawContainer(ctx, tx, ty, px, containerColor(tile), emptyColor(style));
+        drawContainer(ctx, tx, ty, px, containerColor(tile));
       } else {
         ctx.fillStyle = tileColor(tile, style);
         ctx.fillRect(tx, ty, px, px);

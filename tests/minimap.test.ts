@@ -177,13 +177,14 @@ describe('renderMinimap: tileColor coverage via fills', () => {
   });
 
   it('draws chamber item tiles as a hollow rounded rectangle (stroke)', () => {
+    const { CHAMBER_FILL_COLOR } = jest.requireActual<typeof import('../src/colors')>('../src/colors');
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[
       { shape: PipeShape.Chamber, chamberContent: 'item' },
     ]]);
     renderMinimap(level);
-    // Container is drawn with a background fill + roundRect + stroke
-    expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    // Container is drawn with CHAMBER_FILL_COLOR background fill + roundRect + stroke
+    expect(ctx.fills.some(f => f.style === CHAMBER_FILL_COLOR)).toBe(true);
     expect(ctx.roundRects.length).toBeGreaterThanOrEqual(1);
     expect(ctx.strokes.length).toBeGreaterThanOrEqual(1);
   });
