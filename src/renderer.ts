@@ -2019,12 +2019,12 @@ function _renderPass2NonPipeTiles(
         graniteNeighbors = computeGraniteNeighbors(board, r, c);
       }
 
-      // Gingham overlay on non-empty, non-pipe tiles: 75% alpha
-      // pattern drawn on top of the tile background color.
+      // Gingham overlay on non-empty, non-pipe tiles: 100% alpha (i.e. opacity)
+      // pattern drawn over the tile background color.
       if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber
           || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
         const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
-        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, floorType, 0.75);
+        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, floorType, 1.0); //alpha
       }
 
       // For the sink tile, build an overlay callback that renders the vortex effect
