@@ -183,7 +183,8 @@ export class ChapterMapScreen {
   private _borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
   private static readonly VORTEX_SPAWN_INTERVAL_MS  = 80;
   private static readonly SPRAY_SPAWN_INTERVAL_MS   = 150;
-  private static readonly FLOW_SPAWN_INTERVAL_MS    = 350;
+  /** One new flow-drop pulse per second when the chapter is completed. */
+  private static readonly FLOW_SPAWN_INTERVAL_MS    = 1000;
   private static readonly BUBBLE_SPAWN_INTERVAL_MS  = 120;
   /** How often (ms) a new edge flower is spawned when the chapter is completed. */
   private static readonly FLOWER_SPAWN_INTERVAL_MS  = 800;
