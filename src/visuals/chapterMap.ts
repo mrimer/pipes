@@ -144,7 +144,7 @@ export function drawLevelChamberTile(
   // Gingham overlay: derive row/col from pixel position
   const tileR = Math.round(y / CELL);
   const tileC = Math.round(x / CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC, PipeShape.Empty, 1);
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -348,7 +348,7 @@ function _drawChapterMapEndpointTile(
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawSourceOrSink(ctx, connections, color, CELL / 2, isSource, buttEndDirs, centerLabel, CHAPTER_MAP_TILE_BG);
@@ -382,7 +382,7 @@ function _drawChapterMapGranite(
   };
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawGranite(ctx, CELL / 2, neighbors);
@@ -394,7 +394,7 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
   drawTree(ctx, CELL / 2, style);
@@ -579,7 +579,7 @@ function _renderChapterMapPass3PipeTiles(
       ctx.fillRect(x, y, CELL, CELL);
 
       // Gingham overlay for pipe tiles on the chapter map
-      drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType);
+      drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
 
       const tileConns = tileDefConnections(def);
       const pipeColor = isFilled ? WATER_COLOR : PIPE_COLOR;
