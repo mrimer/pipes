@@ -31,6 +31,7 @@ import { sfxManager, SfxId } from '../sfxManager';
 import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
 import { HistoryManager } from './historyManager';
 import { RADIUS_SM, UI_BG } from '../uiConstants';
+import { showTimedMessage } from '../uiHelpers';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -606,9 +607,7 @@ export class ChapterMapEditorSection {
   private _showChapterSinkError(): void {
     const el = this._chapterErrorEl;
     if (!el) return;
-    el.textContent = 'Only one sink tile is allowed.';
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 2000);
+    showTimedMessage(el, 'Only one sink tile is allowed.');
   }
 
   /**

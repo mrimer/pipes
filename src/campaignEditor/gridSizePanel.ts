@@ -12,6 +12,7 @@ import {
 } from './types';
 import { buildSlideAndRotateControls } from './levelMetadataPanel';
 import { RADIUS_SM, UI_BG, UI_BORDER } from '../uiConstants';
+import { showTimedMessage } from '../uiHelpers';
 
 // ─── Public interfaces ────────────────────────────────────────────────────────
 
@@ -116,9 +117,7 @@ export function buildGridSizePanel(
   panel.appendChild(errDiv);
 
   const showErr = (msg: string): void => {
-    errDiv.textContent = msg;
-    errDiv.style.display = 'block';
-    setTimeout(() => { errDiv.style.display = 'none'; }, 2000);
+    showTimedMessage(errDiv, msg);
   };
 
   panel.appendChild(btnFactory('↔ Resize', UI_BG, '#f0c040', () => {

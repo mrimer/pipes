@@ -15,6 +15,21 @@ import { RADIUS_MD } from './uiConstants';
  * @param extraStyle - Optional additional CSS text appended after the defaults
  *                     (can override padding, font-size, border, etc.).
  */
+/**
+ * Show `element` with the given `message` and auto-hide it after `durationMs`
+ * milliseconds (default 2000).  Returns the timer ID so callers can cancel it
+ * early with `clearTimeout` if needed.
+ */
+export function showTimedMessage(
+  element: HTMLElement,
+  message: string,
+  durationMs = 2000,
+): ReturnType<typeof setTimeout> {
+  element.textContent = message;
+  element.style.display = 'block';
+  return setTimeout(() => { element.style.display = 'none'; }, durationMs);
+}
+
 export function createButton(
   label: string,
   bg: string,
