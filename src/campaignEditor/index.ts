@@ -1371,8 +1371,9 @@ export class CampaignEditor {
 
   /**
    * Create a small on-screen diagnostic overlay that accumulates timestamped
-   * log lines.  The overlay auto-dismisses after 8 s on success; on failure it
-   * stays visible until the user clicks it.
+   * log lines.  The overlay is only shown onscreen if there was a failure;
+   * on success it is never attached to the DOM.  On failure it stays visible
+   * until the user clicks it.
    */
   private _createExportLog(): { append(msg: string): void; done(ok: boolean): void } {
     const overlay = document.createElement('div');
@@ -1385,10 +1386,8 @@ export class CampaignEditor {
     title.textContent = '📤 Export log';
     title.style.cssText = 'font-weight:bold;color:#4a90d9;margin-bottom:6px;';
     overlay.appendChild(title);
-    document.body.appendChild(overlay);
 
     const t0 = performance.now();
-    let timerId: ReturnType<typeof setTimeout> | null = null;
 
     return {
       append(msg: string) {
@@ -1400,18 +1399,13 @@ export class CampaignEditor {
       },
       done(ok: boolean) {
         if (ok) {
-          title.textContent = '📤 Export log ✅ Success';
-          title.style.color = '#7ed321';
-          timerId = setTimeout(() => { overlay.remove(); }, 8_000);
-        } else {
-          title.textContent = '📤 Export log ❌ Failed (click to dismiss)';
-          title.style.color = '#e74c3c';
+          return;
         }
+        title.textContent = '📤 Export log ❌ Failed (click to dismiss)';
+        title.style.color = '#e74c3c';
         overlay.style.cursor = 'pointer';
-        overlay.addEventListener('click', () => {
-          if (timerId) clearTimeout(timerId);
-          overlay.remove();
-        });
+        overlay.addEventListener('click', () => { overlay.remove(); });
+        document.body.appendChild(overlay);
       },
     };
   }
