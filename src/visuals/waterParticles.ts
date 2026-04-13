@@ -210,6 +210,7 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
   }
 
   const queue: GridPos[] = [];
+  let qi = 0;
 
   // Seed: for each tile adjacent to the sink that is mutually connected to it,
   // the direction from that tile towards the sink is "good".
@@ -231,8 +232,8 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
   // We check areMutuallyConnected from the *neighbor* going *toward* current
   // (i.e. the forward-flow direction) rather than from current going toward
   // the neighbor, so that one-way tiles are traversed correctly in reverse.
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  while (qi < queue.length) {
+    const current = queue[qi++];
 
     // Do not propagate backward through the source.  The source's own good
     // directions have already been recorded when it was encountered as a

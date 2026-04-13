@@ -13,9 +13,10 @@
  * triggered.
  */
 
-import { Board, posKey, NEIGHBOUR_DELTA } from '../board';
-import { Direction } from '../types';
+import { Board, NEIGHBOUR_DELTA } from '../board';
+import { Direction, GridPos } from '../types';
 import { TILE_SIZE } from '../renderer';
+import { bfsWithDepth } from '../bfs';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -48,39 +49,6 @@ export interface WinTileGlow {
 }
 
 // ── BFS layer computation ─────────────────────────────────────────────────────
-
-/**
- * BFS from `sourceKey`, recording the minimum graph distance (depth) from the
- * source to every reachable node.
- *
- * @param sourceKey         The `"row,col"` key of the BFS start node.
- * @param sourceRow         Row index of the start node.
- * @param sourceCol         Column index of the start node.
- * @param getNeighborKeys   Given a `(row, col)`, returns the `{ row, col, key }`
- *                          entries for all nodes directly reachable from that cell.
- * @returns A map from `"row,col"` key → BFS depth.
- */
-function _bfsDepths(
-  sourceKey: string,
-  sourceRow: number,
-  sourceCol: number,
-  getNeighborKeys: (row: number, col: number) => Array<{ row: number; col: number; key: string }>,
-): Map<string, number> {
-  const depths = new Map<string, number>();
-  depths.set(sourceKey, 0);
-  const queue: Array<{ row: number; col: number; depth: number }> = [
-    { row: sourceRow, col: sourceCol, depth: 0 },
-  ];
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
-    for (const { row, col, key } of getNeighborKeys(cur.row, cur.col)) {
-      if (depths.has(key)) continue;
-      depths.set(key, cur.depth + 1);
-      queue.push({ row, col, depth: cur.depth + 1 });
-    }
-  }
-  return depths;
-}
 
 /**
  * Convert a BFS depth-map to `WinTileGlow` entries for every key in
@@ -118,20 +86,15 @@ function _buildGlowsFromDepths(
  */
 export function computeWinTileGlows(board: Board, baseTime: number): WinTileGlow[] {
   const filled = board.getFilledPositions();
-  const sourceKey = posKey(board.source.row, board.source.col);
 
-  const depths = _bfsDepths(
-    sourceKey,
-    board.source.row,
-    board.source.col,
-    (row, col) => {
-      const neighbors: Array<{ row: number; col: number; key: string }> = [];
+  const depths = bfsWithDepth(
+    board.source,
+    (pos: GridPos) => {
+      const neighbors: GridPos[] = [];
       for (const dir of Object.values(Direction)) {
-        if (!board.areMutuallyConnected({ row, col }, dir)) continue;
+        if (!board.areMutuallyConnected(pos, dir)) continue;
         const delta = NEIGHBOUR_DELTA[dir];
-        const nr = row + delta.row;
-        const nc = col + delta.col;
-        neighbors.push({ row: nr, col: nc, key: posKey(nr, nc) });
+        neighbors.push({ row: pos.row + delta.row, col: pos.col + delta.col });
       }
       return neighbors;
     },
@@ -167,17 +130,14 @@ export function computeChapterMapWinGlows(
     { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
   ];
 
-  const depths = _bfsDepths(
-    srcKey,
-    sourceRow,
-    sourceCol,
-    (row, col) => {
-      const neighbors: Array<{ row: number; col: number; key: string }> = [];
+  const depths = bfsWithDepth(
+    { row: sourceRow, col: sourceCol },
+    (pos: GridPos) => {
+      const neighbors: GridPos[] = [];
       for (const { dr, dc } of DIRS) {
-        const nr = row + dr;
-        const nc = col + dc;
-        const key = `${nr},${nc}`;
-        if (filledKeys.has(key)) neighbors.push({ row: nr, col: nc, key });
+        const nr = pos.row + dr;
+        const nc = pos.col + dc;
+        if (filledKeys.has(`${nr},${nc}`)) neighbors.push({ row: nr, col: nc });
       }
       return neighbors;
     },
