@@ -43,6 +43,7 @@ import { sfxManager, SfxId } from '../sfxManager';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
+import { createButton } from '../uiHelpers';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -238,17 +239,10 @@ export class CampaignEditor {
   // ─── Button helpers ────────────────────────────────────────────────────────
 
   private _btn(label: string, bg: string, color: string, onClick: () => void, extraStyle = '', suppressClick = false): HTMLButtonElement {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = label;
-    b.style.cssText =
-      `padding:8px 16px;font-size:0.9rem;background:${bg};color:${color};` +
-      `border:1px solid ${color};border-radius:${RADIUS_MD};cursor:pointer;${extraStyle}`;
-    b.addEventListener('click', () => {
+    return createButton(label, bg, color, () => {
       if (!suppressClick) sfxManager.play(SfxId.Click);
       onClick();
-    });
-    return b;
+    }, extraStyle);
   }
 
   /**

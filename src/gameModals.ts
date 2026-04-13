@@ -1,4 +1,5 @@
 import { RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
+import { createButton } from './uiHelpers';
 /**
  * Factory functions for building the game's modal overlay elements.
  *
@@ -369,12 +370,7 @@ export function buildCampaignMasteredModal(
   msgEl.style.cssText = 'color:#eee;font-size:1rem;margin:0 0 20px;';
   box.appendChild(msgEl);
 
-  const kudosBtn = document.createElement('button');
-  kudosBtn.textContent = 'Kudos!';
-  kudosBtn.style.cssText =
-    `padding:10px 28px;font-size:1rem;border-radius:${RADIUS_MD};cursor:pointer;` +
-    'background:#1a3a10;border:1px solid #f0c040;color:#f0c040;';
-  kudosBtn.addEventListener('click', () => onKudos());
+  const kudosBtn = createButton('Kudos!', '#1a3a10', '#f0c040', () => onKudos(), 'padding:10px 28px;font-size:1rem;');
   box.appendChild(kudosBtn);
 
   el.appendChild(box);
