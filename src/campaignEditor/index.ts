@@ -43,7 +43,7 @@ import { sfxManager, SfxId } from '../sfxManager';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
-import { createButton } from '../uiHelpers';
+import { createButton, showTimedMessage } from '../uiHelpers';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -1029,18 +1029,14 @@ export class CampaignEditor {
   private _showSourceError(): void {
     const el = this._editorSourceErrorEl;
     if (!el) return;
-    el.textContent = 'Only one source tile is allowed.';
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 2000);
+    showTimedMessage(el, 'Only one source tile is allowed.');
   }
 
   /** Flashes an error message below the canvas when the Sink placement constraint is violated. */
   private _showSinkError(): void {
     const el = this._editorSourceErrorEl;
     if (!el) return;
-    el.textContent = 'Only one sink tile is allowed.';
-    el.style.display = 'block';
-    setTimeout(() => { el.style.display = 'none'; }, 2000);
+    showTimedMessage(el, 'Only one sink tile is allowed.');
   }
 
   /** Rebuild and replace the palette and param panels in the DOM. */

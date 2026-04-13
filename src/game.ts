@@ -22,6 +22,7 @@ import { playLevelTransition, playLevelExitTransition } from './levelTransition'
 import { sfxManager, SfxId } from './sfxManager';
 import { isPortrait } from './deviceUtils';
 import { RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
+import { showTimedMessage } from './uiHelpers';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -1044,13 +1045,8 @@ export class Game implements InputCallbacks {
 
   /** Show a brief error message that auto-dismisses after ~2 seconds. */
   private _showErrorFlash(message: string): void {
-    this.errorFlashEl.textContent = message;
-    this.errorFlashEl.style.display = 'block';
     if (this._errorFlashTimer !== null) clearTimeout(this._errorFlashTimer);
-    this._errorFlashTimer = setTimeout(() => {
-      this.errorFlashEl.style.display = 'none';
-      this._errorFlashTimer = null;
-    }, ERROR_DISPLAY_MS);
+    this._errorFlashTimer = showTimedMessage(this.errorFlashEl, message, ERROR_DISPLAY_MS);
   }
 
   /**
