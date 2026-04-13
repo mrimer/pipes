@@ -524,21 +524,23 @@ describe('CampaignEditor – gzip import', () => {
 
 describe('CampaignEditor – import version comparison', () => {
   /**
-   * Simulate importing a campaign from a JSON string by wiring up a mock FileReader
-   * and dispatching a change event on the hidden file input.
+   * Create a File whose `arrayBuffer()` resolves immediately via a pre-allocated
+   * buffer, so that `blobToBytes` resolves as a microtask (before any setTimeout)
+   * and tests can `await simulateImportJson(...)` reliably.
    */
-  function simulateImportJson(editor: CampaignEditor, json: string): void {
-    const origFileReader = (globalThis as unknown as Record<string, unknown>).FileReader;
-    class MockFileReader {
-      result: string = json;
-      onload: (() => void) | null = null;
-      readAsText(_file: File): void {
-        // Deliver content synchronously to keep tests simple.
-        this.onload?.();
-      }
-    }
-    (globalThis as unknown as Record<string, unknown>).FileReader = MockFileReader;
+  function makeJsonFile(json: string, name = 'test.pipes.json'): File {
+    const file = new File([json], name, { type: 'application/json' });
+    const buf = new TextEncoder().encode(json).buffer;
+    Object.defineProperty(file, 'arrayBuffer', { value: () => Promise.resolve(buf) });
+    return file;
+  }
 
+  /**
+   * Simulate importing a campaign from a JSON string by dispatching a change
+   * event on the hidden file input.  Returns a promise that resolves once all
+   * async file-reading microtasks have settled.
+   */
+  function simulateImportJson(editor: CampaignEditor, json: string): Promise<void> {
     const origCreate = document.createElement.bind(document) as (tag: string) => HTMLElement;
     const createSpy = jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       const el = origCreate(tag);
@@ -547,7 +549,7 @@ describe('CampaignEditor – import version comparison', () => {
         Object.defineProperty(input, 'click', {
           value: () => {
             Object.defineProperty(input, 'files', {
-              value: [new File([json], 'test.pipes.json', { type: 'application/json' })],
+              value: [makeJsonFile(json)],
               configurable: true,
             });
             input.dispatchEvent(new Event('change'));
@@ -562,8 +564,10 @@ describe('CampaignEditor – import version comparison', () => {
       (editor as unknown as { _importCampaign(): void })._importCampaign();
     } finally {
       createSpy.mockRestore();
-      (globalThis as unknown as Record<string, unknown>).FileReader = origFileReader;
     }
+    // Flush microtasks – arrayBuffer() resolves immediately, so one Promise.resolve()
+    // tick is enough for the full blobToBytes → isGzipBytes → processText chain.
+    return Promise.resolve().then(() => Promise.resolve());
   }
 
   beforeEach(() => {
@@ -575,12 +579,12 @@ describe('CampaignEditor – import version comparison', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows "same version" dialog and does not replace when timestamps match', () => {
+  it('shows "same version" dialog and does not replace when timestamps match', async () => {
     const ts = '2024-06-01T12:00:00.000Z';
     const existing: CampaignDef = { id: 'cmp_v1', name: 'My Campaign', author: 'A', chapters: [], lastUpdated: ts };
     const editor = makeEditor([existing]);
 
-    simulateImportJson(editor, JSON.stringify({ ...existing }));
+    await simulateImportJson(editor, JSON.stringify({ ...existing }));
 
     expect(document.body.innerHTML).toContain('Same Version');
     expect(document.body.innerHTML).toContain('already up to date');
@@ -588,45 +592,45 @@ describe('CampaignEditor – import version comparison', () => {
     expect(loadImportedCampaigns()).toHaveLength(1);
   });
 
-  it('does not modify the campaign when "same version" dialog is shown', () => {
+  it('does not modify the campaign when "same version" dialog is shown', async () => {
     const ts = '2024-06-01T12:00:00.000Z';
     const existing: CampaignDef = { id: 'cmp_v2', name: 'Original', author: 'A', chapters: [], lastUpdated: ts };
     const editor = makeEditor([existing]);
 
-    simulateImportJson(editor, JSON.stringify({ ...existing, name: 'Renamed' }));
+    await simulateImportJson(editor, JSON.stringify({ ...existing, name: 'Renamed' }));
 
     // The "same version" path triggers on equal timestamps; name should be untouched
     const campaigns = loadImportedCampaigns();
     expect(campaigns[0].name).toBe('Original');
   });
 
-  it('shows "Import Newer Version?" dialog when imported timestamp is more recent', () => {
+  it('shows "Import Newer Version?" dialog when imported timestamp is more recent', async () => {
     const existing: CampaignDef = {
       id: 'cmp_v3', name: 'Campaign', author: 'A', chapters: [],
       lastUpdated: '2024-01-01T00:00:00.000Z',
     };
     const editor = makeEditor([existing]);
 
-    simulateImportJson(editor, JSON.stringify({ ...existing, lastUpdated: '2024-06-01T00:00:00.000Z' }));
+    await simulateImportJson(editor, JSON.stringify({ ...existing, lastUpdated: '2024-06-01T00:00:00.000Z' }));
 
     expect(document.body.innerHTML).toContain('Import Newer Version?');
     expect(document.body.innerHTML).toContain('Import newer version');
   });
 
-  it('shows "Import Older Version?" dialog when imported timestamp is earlier', () => {
+  it('shows "Import Older Version?" dialog when imported timestamp is earlier', async () => {
     const existing: CampaignDef = {
       id: 'cmp_v4', name: 'Campaign', author: 'A', chapters: [],
       lastUpdated: '2024-06-01T00:00:00.000Z',
     };
     const editor = makeEditor([existing]);
 
-    simulateImportJson(editor, JSON.stringify({ ...existing, lastUpdated: '2024-01-01T00:00:00.000Z' }));
+    await simulateImportJson(editor, JSON.stringify({ ...existing, lastUpdated: '2024-01-01T00:00:00.000Z' }));
 
     expect(document.body.innerHTML).toContain('Import Older Version?');
     expect(document.body.innerHTML).toContain('Overwrite with older version');
   });
 
-  it('replaces campaign and retains player progress when confirming a newer import', () => {
+  it('replaces campaign and retains player progress when confirming a newer import', async () => {
     const existing: CampaignDef = {
       id: 'cmp_v5', name: 'Campaign', author: 'A',
       chapters: [{ id: 1, name: 'Old Chapter', levels: [] }],
@@ -638,7 +642,7 @@ describe('CampaignEditor – import version comparison', () => {
     const prog = loadCampaignProgress('cmp_v5');
     markCampaignLevelCompleted('cmp_v5', 42, prog);
 
-    simulateImportJson(editor, JSON.stringify({
+    await simulateImportJson(editor, JSON.stringify({
       ...existing,
       chapters: [{ id: 1, name: 'New Chapter', levels: [] }],
       lastUpdated: '2024-06-01T00:00:00.000Z',
@@ -657,7 +661,7 @@ describe('CampaignEditor – import version comparison', () => {
     expect(loadCampaignProgress('cmp_v5').has(42)).toBe(true);
   });
 
-  it('does not replace campaign when user cancels the version conflict dialog', () => {
+  it('does not replace campaign when user cancels the version conflict dialog', async () => {
     const existing: CampaignDef = {
       id: 'cmp_v6', name: 'Campaign', author: 'A',
       chapters: [{ id: 1, name: 'Original Chapter', levels: [] }],
@@ -665,7 +669,7 @@ describe('CampaignEditor – import version comparison', () => {
     };
     const editor = makeEditor([existing]);
 
-    simulateImportJson(editor, JSON.stringify({
+    await simulateImportJson(editor, JSON.stringify({
       ...existing,
       chapters: [{ id: 1, name: 'New Chapter', levels: [] }],
       lastUpdated: '2024-06-01T00:00:00.000Z',
@@ -679,7 +683,7 @@ describe('CampaignEditor – import version comparison', () => {
     expect(loadImportedCampaigns()[0].chapters[0].name).toBe('Original Chapter');
   });
 
-  it('treats missing lastUpdated as epoch 0 – local with timestamp is "newer" than import without', () => {
+  it('treats missing lastUpdated as epoch 0 – local with timestamp is "newer" than import without', async () => {
     const existing: CampaignDef = {
       id: 'cmp_v7', name: 'Campaign', author: 'A', chapters: [],
       lastUpdated: '2024-01-01T00:00:00.000Z',
@@ -689,7 +693,7 @@ describe('CampaignEditor – import version comparison', () => {
     // Imported file has no lastUpdated at all (older pre-timestamp campaign)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { lastUpdated: _, ...noTs } = existing;
-    simulateImportJson(editor, JSON.stringify(noTs));
+    await simulateImportJson(editor, JSON.stringify(noTs));
 
     expect(document.body.innerHTML).toContain('Import Older Version?');
     expect(document.body.innerHTML).toContain('Overwrite with older version');
@@ -824,16 +828,9 @@ describe('CampaignEditor – import activates the campaign', () => {
     jest.restoreAllMocks();
   });
 
-  /** Simulate importing a JSON string through the file-input flow on an existing editor. */
-  function simulateImportOn(editor: CampaignEditor, json: string): void {
-    const origFileReader = (globalThis as unknown as Record<string, unknown>).FileReader;
-    class MockFileReader {
-      result: string = json;
-      onload: (() => void) | null = null;
-      readAsText(_file: File): void { this.onload?.(); }
-    }
-    (globalThis as unknown as Record<string, unknown>).FileReader = MockFileReader;
-
+  /** Simulate importing a JSON string through the file-input flow on an existing editor.
+   *  Returns a promise that resolves once all async file-reading microtasks have settled. */
+  function simulateImportOn(editor: CampaignEditor, json: string): Promise<void> {
     const origCreate = document.createElement.bind(document) as (tag: string) => HTMLElement;
     const createSpy = jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       const el = origCreate(tag);
@@ -841,8 +838,11 @@ describe('CampaignEditor – import activates the campaign', () => {
         const input = el as HTMLInputElement;
         Object.defineProperty(input, 'click', {
           value: () => {
+            const file = new File([json], 'test.json', { type: 'application/json' });
+            const buf = new TextEncoder().encode(json).buffer;
+            Object.defineProperty(file, 'arrayBuffer', { value: () => Promise.resolve(buf) });
             Object.defineProperty(input, 'files', {
-              value: [new File([json], 'test.json', { type: 'application/json' })],
+              value: [file],
               configurable: true,
             });
             input.dispatchEvent(new Event('change'));
@@ -857,8 +857,8 @@ describe('CampaignEditor – import activates the campaign', () => {
       (editor as unknown as { _importCampaign(): void })._importCampaign();
     } finally {
       createSpy.mockRestore();
-      (globalThis as unknown as Record<string, unknown>).FileReader = origFileReader;
     }
+    return Promise.resolve().then(() => Promise.resolve());
   }
 
   /** Create a CampaignEditor whose onPlayCampaign calls are captured in the returned array. */
@@ -873,23 +873,23 @@ describe('CampaignEditor – import activates the campaign', () => {
     return [editor, playCalls];
   }
 
-  it('calls onPlayCampaign with the imported campaign when importing a new campaign', () => {
+  it('calls onPlayCampaign with the imported campaign when importing a new campaign', async () => {
     const campaign: CampaignDef = { id: 'cmp_new_import', name: 'Imported', author: 'A', chapters: [] };
     const [editor, playCalls] = makeEditorWithCapture();
-    simulateImportOn(editor, JSON.stringify(campaign));
+    await simulateImportOn(editor, JSON.stringify(campaign));
     expect(playCalls).toHaveLength(1);
     expect(playCalls[0].id).toBe('cmp_new_import');
     expect(playCalls[0].name).toBe('Imported');
   });
 
-  it('calls onPlayCampaign when a version-conflict import is confirmed', () => {
+  it('calls onPlayCampaign when a version-conflict import is confirmed', async () => {
     const existing: CampaignDef = {
       id: 'cmp_conflict', name: 'Old', author: 'A', chapters: [],
       lastUpdated: '2024-01-01T00:00:00.000Z',
     };
     const [editor, playCalls] = makeEditorWithCapture([existing]);
 
-    simulateImportOn(editor, JSON.stringify({
+    await simulateImportOn(editor, JSON.stringify({
       ...existing, name: 'New', lastUpdated: '2024-06-01T00:00:00.000Z',
     }));
 
@@ -905,14 +905,14 @@ describe('CampaignEditor – import activates the campaign', () => {
     expect(playCalls[0].name).toBe('New');
   });
 
-  it('does not call onPlayCampaign when import is canceled in version conflict dialog', () => {
+  it('does not call onPlayCampaign when import is canceled in version conflict dialog', async () => {
     const existing: CampaignDef = {
       id: 'cmp_cancel', name: 'Old', author: 'A', chapters: [],
       lastUpdated: '2024-01-01T00:00:00.000Z',
     };
     const [editor, playCalls] = makeEditorWithCapture([existing]);
 
-    simulateImportOn(editor, JSON.stringify({
+    await simulateImportOn(editor, JSON.stringify({
       ...existing, name: 'New', lastUpdated: '2024-06-01T00:00:00.000Z',
     }));
 
