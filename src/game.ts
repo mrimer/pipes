@@ -21,6 +21,7 @@ import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { isPortrait } from './deviceUtils';
+import { RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -50,23 +51,23 @@ const HINT_TOGGLE_BTN_STYLE =
 
 /** CSS style for the collapsible text area of each hint in the hint box. */
 const HINT_TEXT_STYLE =
-  'display:none;padding:12px 16px;font-size:0.9rem;color:#eee;background:#16213e;';
+  `display:none;padding:12px 16px;font-size:0.9rem;color:${UI_TEXT};background:${UI_BG};`;
 
 /** CSS style for the note box shown beneath the grid when a level has a note. */
 const NOTE_BOX_CSS =
-  'display:none;background:#16213e;border:1px solid #4a90d9;border-radius:6px;' +
+  `display:none;background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
   'padding:12px 16px;font-size:0.9rem;color:#eee;max-width:600px;width:100%;box-sizing:border-box;';
 
 /** CSS style for the collapsible hint box shown beneath the grid when a level has hints. */
 const HINT_BOX_CSS =
-  'display:none;border:1px solid #f0c040;border-radius:6px;' +
+  `display:none;border:1px solid ${UI_GOLD};border-radius:${RADIUS_MD};` +
   'max-width:600px;width:100%;box-sizing:border-box;overflow:hidden;';
 
 /** CSS style for the brief error-flash message shown when an action is blocked. */
 const ERROR_FLASH_CSS =
   'display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);' +
   'background:#c0392b;color:#fff;border:2px solid #e74c3c;' +
-  'border-radius:6px;padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;' +
+  `border-radius:${RADIUS_MD};padding:8px 18px;font-size:0.95rem;pointer-events:none;z-index:60;` +
   'text-align:center;max-width:360px;';
 
 // ── Play-screen layout overhead estimates ────────────────────────────────────

@@ -26,6 +26,7 @@ import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
+import { RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
 
@@ -809,8 +810,7 @@ export class CampaignManager {
 
     const modal = document.createElement('div');
     modal.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:200;';
+      `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:200;`;
 
     const box = document.createElement('div');
     box.style.cssText =
@@ -835,7 +835,7 @@ export class CampaignManager {
     const congratsBtn = document.createElement('button');
     congratsBtn.textContent = 'Congrats!';
     congratsBtn.style.cssText =
-      'padding:10px 28px;font-size:1rem;border-radius:6px;cursor:pointer;' +
+      `padding:10px 28px;font-size:1rem;border-radius:${RADIUS_MD};cursor:pointer;` +
       'background:#1a3a10;border:1px solid #f0c040;color:#f0c040;';
     congratsBtn.addEventListener('click', () => {
       modal.remove();
@@ -902,7 +902,7 @@ export class CampaignManager {
 
     const modal = document.createElement('div');
     modal.id = 'chapter-complete-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100;';
+    modal.style.cssText = `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:100;`;
 
     const box = document.createElement('div');
     box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:400px;width:90%;text-align:center;';
@@ -934,16 +934,16 @@ export class CampaignManager {
     }
     if (statsDiv.children.length > 0) box.appendChild(statsDiv);
 
-    const btnStyle = 'padding:10px 20px;font-size:0.9rem;border-radius:6px;cursor:pointer;border:1px solid;margin:4px;';
+    const btnStyle = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid;margin:4px;`;
 
     const remainBtn = document.createElement('button');
     remainBtn.textContent = 'Remain here';
-    remainBtn.style.cssText = btnStyle + 'background:#16213e;border-color:#4a90d9;color:#7ed321;';
+    remainBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#7ed321;`;
     remainBtn.addEventListener('click', () => { modal.remove(); });
 
     const menuBtn = document.createElement('button');
     menuBtn.textContent = 'Main Menu';
-    menuBtn.style.cssText = btnStyle + 'background:#16213e;border-color:#4a90d9;color:#aaa;';
+    menuBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#aaa;`;
     menuBtn.addEventListener('click', () => { modal.remove(); this._callbacks.showLevelSelect(); });
 
     const btnRow = document.createElement('div');

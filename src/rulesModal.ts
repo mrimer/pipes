@@ -3,6 +3,7 @@
 import { shapeIcon } from './renderer';
 import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
+import { RADIUS_LG, RADIUS_MD, UI_BG, UI_BORDER } from './uiConstants';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -300,7 +301,7 @@ export function createGameRulesModal(): HTMLElement {
 
   const box = document.createElement('div');
   box.style.cssText =
-    'background:#16213e;border:3px solid #4a90d9;border-radius:10px;' +
+    `background:${UI_BG};border:3px solid ${UI_BORDER};border-radius:${RADIUS_LG};` +
     'padding:28px 32px;max-width:560px;width:100%;' +
     'display:flex;flex-direction:column;gap:16px;margin:auto;';
 
@@ -403,7 +404,7 @@ export function createGameRulesModal(): HTMLElement {
   closeBtn.textContent = 'Close';
   closeBtn.style.cssText =
     'align-self:center;padding:10px 32px;font-size:1rem;' +
-    'background:#4a90d9;color:#fff;border:none;border-radius:6px;' +
+    `background:${UI_BORDER};color:#fff;border:none;border-radius:${RADIUS_MD};` +
     'cursor:pointer;margin-top:4px;';
   closeBtn.addEventListener('click', () => {
     overlay.style.display = 'none';

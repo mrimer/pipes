@@ -11,6 +11,7 @@ import {
   GRID_MAX_DIM,
 } from './types';
 import { buildSlideAndRotateControls } from './levelMetadataPanel';
+import { RADIUS_SM, UI_BG, UI_BORDER } from '../uiConstants';
 
 // ─── Public interfaces ────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export function buildGridSizePanel(
 
   const inpStyle =
     `padding:4px;width:${inputWidth};background:#0d1a30;color:#eee;` +
-    'border:1px solid #4a90d9;border-radius:4px;';
+    `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
 
   const rowsInp = document.createElement('input');
   rowsInp.type = 'number';
@@ -120,7 +121,7 @@ export function buildGridSizePanel(
     setTimeout(() => { errDiv.style.display = 'none'; }, 2000);
   };
 
-  panel.appendChild(btnFactory('↔ Resize', '#16213e', '#f0c040', () => {
+  panel.appendChild(btnFactory('↔ Resize', UI_BG, '#f0c040', () => {
     const rVal = parseInt(rowsInp.value);
     const cVal = parseInt(colsInp.value);
     let outOfRange = false;

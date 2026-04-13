@@ -8,6 +8,7 @@
 
 import { CampaignDef } from '../types';
 import { CampaignService } from './campaignService';
+import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS } from '../uiConstants';
 
 /** CSS for a button row aligned to the trailing edge (mirrors EDITOR_BTN_ROW_CSS). */
 const BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -27,8 +28,7 @@ export class DataValidationDialog {
   show(container: HTMLElement, campaign: CampaignDef): void {
     const overlay = document.createElement('div');
     overlay.style.cssText =
-      'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;' +
-      'justify-content:center;z-index:300;';
+      MODAL_OVERLAY_CSS;
 
     this._render(overlay, campaign, this._service.scanData(campaign, true), false);
     container.appendChild(overlay);
@@ -91,9 +91,7 @@ export class DataValidationDialog {
 
     const dialog = document.createElement('div');
     dialog.style.cssText =
-      'background:#16213e;border:2px solid #4a90d9;border-radius:10px;padding:28px 32px;' +
-      'display:flex;flex-direction:column;gap:18px;min-width:300px;max-width:520px;' +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.6);';
+      MODAL_DIALOG_CSS + 'min-width:300px;max-width:520px;';
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';

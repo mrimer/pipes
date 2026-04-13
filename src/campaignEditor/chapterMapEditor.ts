@@ -30,6 +30,7 @@ import { validateChapterMap } from './chapterMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
 import { HistoryManager } from './historyManager';
+import { RADIUS_SM, UI_BG } from '../uiConstants';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ export class ChapterMapEditorSection {
     redoBtn.id = 'chapter-redo-btn';
     midToolbar.appendChild(redoBtn);
 
-    midToolbar.appendChild(this._callbacks.buildBtn('✔ Validate', '#16213e', '#7ed321', () => {
+    midToolbar.appendChild(this._callbacks.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
       const result = validateChapterMap(
         this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, chapter,
       );
@@ -400,7 +401,7 @@ export class ChapterMapEditorSection {
     canvas.width  = this._chapterEditCols * TILE_SIZE;
     canvas.height = this._chapterEditRows * TILE_SIZE;
     canvas.style.cssText =
-      `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:4px;` +
+      `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:${RADIUS_SM};` +
       'cursor:' + (readOnly ? 'default' : 'crosshair') + ';display:block;';
     this._chapterCanvas = canvas;
     this._updateChapterCanvasDisplaySize();

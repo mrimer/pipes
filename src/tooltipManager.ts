@@ -2,11 +2,12 @@ import { Board, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCos
 import { Tile } from './tile';
 import { GameScreen, PipeShape, COLD_CHAMBER_CONTENTS } from './types';
 import { TILE_SIZE, getTileDisplayName } from './renderer';
+import { RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 
 /** CSS style for the Ctrl-hover coordinate tooltip element. */
 const TOOLTIP_CSS =
-  'display:none;position:fixed;background:#16213e;color:#eee;border:1px solid #4a90d9;' +
-  'border-radius:4px;padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;';
+  `display:none;position:fixed;background:${UI_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};` +
+  `border-radius:${RADIUS_SM};padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;`;
 
 /** Manages the Ctrl-hover tooltip that displays grid coordinates and tile info. */
 export class TooltipManager {

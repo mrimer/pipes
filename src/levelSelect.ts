@@ -3,6 +3,7 @@
 import { ChapterDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
+import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from './uiConstants';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -257,7 +258,7 @@ export function renderLevelList(
 
     const header = document.createElement('div');
     header.style.cssText =
-      'background:#16213e;border:2px solid ' + headerAccentColor + ';border-radius:8px;' +
+      `background:${UI_BG};border:2px solid ` + headerAccentColor + `;border-radius:8px;` +
       'padding:14px 16px;display:flex;flex-direction:column;gap:8px;';
 
     const titleEl = document.createElement('div');
@@ -275,10 +276,10 @@ export function renderLevelList(
     progressLabel.textContent = `Progress: ${activeCampaign.completionPct}%`;
     const progressBar = document.createElement('div');
     progressBar.style.cssText =
-      'flex:1;height:8px;background:#0d1a30;border-radius:4px;overflow:hidden;';
+      `flex:1;height:8px;background:#0d1a30;border-radius:${RADIUS_SM};overflow:hidden;`;
     const progressFill = document.createElement('div');
     progressFill.style.cssText =
-      `height:100%;width:${activeCampaign.completionPct}%;background:#7ed321;border-radius:4px;` +
+      `height:100%;width:${activeCampaign.completionPct}%;background:#7ed321;border-radius:${RADIUS_SM};` +
       'transition:width 0.3s;';
     progressBar.appendChild(progressFill);
     progressRow.appendChild(progressLabel);
@@ -364,10 +365,10 @@ export function renderLevelList(
     }
     continueBtn.disabled = !showMastered && !continueActive;
     continueBtn.style.cssText =
-      'padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:6px;' +
+      `padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:${RADIUS_MD};` +
       'border:1px solid ' + (showMastered || continueActive ? '#f0c040' : '#555') + ';' +
       'background:' + (showMastered || continueActive ? '#f0c040' : '#333') + ';' +
-      'color:' + (showMastered || continueActive ? '#16213e' : '#888') + ';' +
+      'color:' + (showMastered || continueActive ? UI_BG : '#888') + ';' +
       'cursor:' + (showMastered ? 'default' : continueActive ? 'pointer' : 'default') + ';' +
       'width:100%;';
     if (!showMastered) {
@@ -450,7 +451,7 @@ export function renderLevelList(
     const isIndigo = !chapterLocked && allLevelsCompleted && !allStarsCollected;
 
     const borderColor = chapterLocked ? '#555' : isGold ? '#f0c040' : isIndigo ? '#5c6bc0' : '#4a90d9';
-    const headerBg    = chapterLocked ? '#1e1e2e' : isGold ? '#1e1800' : isIndigo ? '#151030' : '#16213e';
+    const headerBg    = chapterLocked ? '#1e1e2e' : isGold ? '#1e1800' : isIndigo ? '#151030' : UI_BG;
 
     // ── Chapter container ──────────────────────────────────────────────────
     const chapterBox = document.createElement('div');
@@ -530,8 +531,8 @@ export function renderLevelList(
   const campaignEditorBtn = document.createElement('button');
   campaignEditorBtn.textContent = '🗺️ Campaign Editor';
   campaignEditorBtn.style.cssText =
-    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#16213e;color:#f0c040;' +
-    'border:1px solid #f0c040;border-radius:6px;cursor:pointer;width:100%;';
+    `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${UI_BG};color:${UI_GOLD};` +
+    `border:1px solid ${UI_GOLD};border-radius:${RADIUS_MD};cursor:pointer;width:100%;`;
   campaignEditorBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignEditorClick(); });
   levelListEl.appendChild(campaignEditorBtn);
 
@@ -539,8 +540,8 @@ export function renderLevelList(
   const rulesBtn = document.createElement('button');
   rulesBtn.textContent = '📋 Game Rules';
   rulesBtn.style.cssText =
-    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#16213e;color:#7ed321;' +
-    'border:1px solid #7ed321;border-radius:6px;cursor:pointer;width:100%;';
+    `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${UI_BG};color:#7ed321;` +
+    `border:1px solid #7ed321;border-radius:${RADIUS_MD};cursor:pointer;width:100%;`;
   rulesBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onRulesClick(); });
   levelListEl.appendChild(rulesBtn);
 
@@ -554,8 +555,8 @@ export function renderLevelList(
     resetBtn.textContent = '🔄 Reset Progress';
     resetBtn.disabled = !hasProgress;
     resetBtn.style.cssText =
-      'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;width:100%;' +
-      'border-radius:6px;border:1px solid ' + (hasProgress ? '#e74c3c' : '#555') + ';' +
+      `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;width:100%;` +
+      `border-radius:${RADIUS_MD};border:1px solid ` + (hasProgress ? '#e74c3c' : '#555') + ';' +
       'color:' + (hasProgress ? '#e74c3c' : '#888') + ';' +
       'cursor:' + (hasProgress ? 'pointer' : 'default') + ';';
     if (hasProgress) {
@@ -568,8 +569,8 @@ export function renderLevelList(
   const unlockAllBtn = document.createElement('button');
   unlockAllBtn.textContent = '🛠️ [Dev] Unlock All';
   unlockAllBtn.style.cssText =
-    'margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#f39c12;' +
-    'border:1px solid #f39c12;border-radius:6px;cursor:pointer;width:100%;';
+    `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:#2a2a4a;color:#f39c12;` +
+    `border:1px solid #f39c12;border-radius:${RADIUS_MD};cursor:pointer;width:100%;`;
   unlockAllBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); });
   levelListEl.appendChild(unlockAllBtn);
 }

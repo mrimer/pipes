@@ -5,6 +5,7 @@
  */
 
 import { Direction } from '../types';
+import { RADIUS_SM } from '../uiConstants';
 
 /**
  * Build a compass-layout N/E/S/W toggle widget.
@@ -49,7 +50,7 @@ export function buildCompassConnectionsWidget(
       'background:' + (active ? '#1a3a1a' : '#0d1a30') + ';' +
       'color:'      + (active ? '#7ed321' : '#555')    + ';' +
       'border:1px solid ' + (active ? '#7ed321' : '#4a90d9') + ';' +
-      'border-radius:4px;cursor:pointer;padding:0;';
+      `border-radius:${RADIUS_SM};cursor:pointer;padding:0;`;
     b.addEventListener('click', () => onToggle(dir));
     return b;
   };

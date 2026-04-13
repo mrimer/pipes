@@ -1,3 +1,4 @@
+import { UI_BG } from '../uiConstants';
 /**
  * Water-wave ripple animation for chapter-box headers on the level-select screen.
  *
@@ -219,7 +220,7 @@ function _renderWaveFrame(
 export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolean, triggerEl?: HTMLElement): void {
   const hoverEl = triggerEl ?? headerEl;
   // The background color shown while the animation is not running.
-  const staticBg = isGold ? '#1e1800' : '#16213e';
+  const staticBg = isGold ? '#1e1800' : UI_BG;
 
   // ── Canvas setup ────────────────────────────────────────────────────────────
   const canvas = document.createElement('canvas');
