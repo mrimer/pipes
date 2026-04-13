@@ -125,9 +125,10 @@ function _renderOneHeatWave(
   const bw = half * 0.7 + 2;
   const bh = half * 0.7 + 2;
 
-  // Leading edge: sweeps from the bottom of the chamber (cy + bh) to the top
-  // (cy - bh) over the full animation duration.
-  const leadY = cy + bh - progress * bh * 2;
+  // Leading edge: starts one chamber-height below the clip rectangle
+  // (cy + 2*bh) so the shimmer lines rise up into the clip rectangle rather
+  // than appearing instantly inside it.  Sweeps to the top (cy - bh).
+  const leadY = cy + bh * 2 - progress * bh * 3;
 
   ctx.save();
   // Clip to the chamber inner box so shimmer doesn't bleed outside.
