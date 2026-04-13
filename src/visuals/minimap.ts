@@ -8,6 +8,7 @@
 
 import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef } from '../types';
 import { getConnections } from '../tile';
+import { GOLD_PIPE_SHAPES } from '../board';
 import {
   EMPTY_COLOR,
   EMPTY_COLOR_DARK,
@@ -83,6 +84,12 @@ function treeColor(style: LevelStyle | undefined): string {
   return TREE_COLOR;
 }
 
+/** Returns the stroke color used to draw a Chamber-item (container) tile on the minimap. */
+function containerColor(tile: TileDef): string {
+  return tile.itemShape != null && GOLD_PIPE_SHAPES.has(tile.itemShape)
+    ? CONTAINER_COLOR : PIPE_COLOR;
+}
+
 /** Returns the fill color to use for a grid tile on the minimap. */
 function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string {
   if (!tile) return emptyColor(style);
@@ -115,7 +122,7 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
       switch (tile.chamberContent) {
         case 'tank':      return TANK_COLOR;
         case 'dirt':      return DIRT_COLOR;
-        case 'item':      return CONTAINER_COLOR;
+        case 'item':      return containerColor(tile);
         case 'heater':    return HEATER_COLOR;
         case 'ice':       return ICE_COLOR;
         case 'pump':      return PUMP_COLOR;
@@ -296,6 +303,30 @@ function drawTree(
 }
 
 /**
+ * Draws a thin hollow rounded rectangle for a container (Chamber-item) tile.
+ * The background is filled with the empty floor color first, then a 1px stroke
+ * with a very slight corner radius is drawn.
+ */
+function drawContainer(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  px: number,
+  color: string,
+  bgColor: string,
+): void {
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(x, y, px, px);
+  const radius = Math.max(0.5, Math.min(1.5, px * 0.15));
+  const inset = 0.5;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x + inset, y + inset, px - 2 * inset, px - 2 * inset, radius);
+  ctx.stroke();
+}
+
+/**
  * Render a minimap preview for the given level definition.
  *
  * @returns An HTMLCanvasElement containing the minimap image.
@@ -338,6 +369,9 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
         ctx.fillStyle = emptyColor(style);
         ctx.fillRect(tx, ty, px, px);
         drawTree(ctx, tx, ty, px, style);
+      } else if (tile && px >= MIN_PX_FOR_LINES &&
+                 tile.shape === PipeShape.Chamber && tile.chamberContent === 'item') {
+        drawContainer(ctx, tx, ty, px, containerColor(tile), emptyColor(style));
       } else {
         ctx.fillStyle = tileColor(tile, style);
         ctx.fillRect(tx, ty, px, px);
