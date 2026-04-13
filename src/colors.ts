@@ -60,6 +60,12 @@ export const TREE_DARK_COLOR         = '#0a2a28';
 export const TREE_DARK_LEAF_COLOR    = '#0f3d38';
 /** Secondary leaf cluster color for Tree tiles — Dark style (slightly lighter blue-green). */
 export const TREE_DARK_LEAF_ALT_COLOR = '#165448';
+/** Border/line color for Tree tiles — Winter style (medium blue-gray, snow-laden). */
+export const TREE_WINTER_COLOR         = '#8090a8';
+/** Leaf canopy fill color for Tree tiles — Winter style (light off-white, snow-covered). */
+export const TREE_WINTER_LEAF_COLOR    = '#c8d8e8';
+/** Secondary leaf cluster color for Tree tiles — Winter style (slightly brighter off-white). */
+export const TREE_WINTER_LEAF_ALT_COLOR = '#dce8f0';
 /** Border/line color for Cement tiles (medium gray). */
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */
@@ -211,3 +217,9 @@ export const EMPTY_DARK_COLOR       = '#1a1a2e';
 export const EMPTY_DARK_COLOR_LIGHT = lighten(EMPTY_DARK_COLOR, 0.05);
 /** Dark shade for Dark gingham (bottom-right of 2×2 cell). */
 export const EMPTY_DARK_COLOR_DARK  = darken(EMPTY_DARK_COLOR, 0.15);
+/** Base color for the Winter empty-floor gingham pattern (off-white). */
+export const EMPTY_WINTER_COLOR       = '#d8e4ec';
+/** Light shade for Winter gingham (top-left of 2×2 cell). */
+export const EMPTY_WINTER_COLOR_LIGHT = lighten(EMPTY_WINTER_COLOR, 0.25);
+/** Dark shade for Winter gingham (bottom-right of 2×2 cell). */
+export const EMPTY_WINTER_COLOR_DARK  = darken(EMPTY_WINTER_COLOR, 0.12);

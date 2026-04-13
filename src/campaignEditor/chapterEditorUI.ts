@@ -107,6 +107,7 @@ export class ChapterEditorUI {
       { palette: PipeShape.Empty,        label: '🟩 Empty - Grass' },
       { palette: PipeShape.EmptyDirt,    label: '🟫 Empty - Dirt' },
       { palette: PipeShape.EmptyDark,    label: '⬛ Empty - Dark' },
+      { palette: PipeShape.EmptyWinter,  label: '🤍 Empty - Winter' },
       { palette: PipeShape.Source,       label: '💧 Source' },
       { palette: PipeShape.Sink,         label: '🏁 Sink' },
       { palette: LEVEL_CHAMBER_PALETTE,  label: '🚪 Level' },
