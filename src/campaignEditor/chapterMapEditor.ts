@@ -108,7 +108,7 @@ export class ChapterMapEditorSection {
     if (chapter.grid && chapter.rows && chapter.cols) {
       this._chapterEditRows = chapter.rows;
       this._chapterEditCols = chapter.cols;
-      this._chapterEditGrid = JSON.parse(JSON.stringify(chapter.grid)) as (TileDef | null)[][];
+      this._chapterEditGrid = structuredClone(chapter.grid);
     } else {
       // Create default 3×6 grid
       const rows = ChapterMapEditorSection.CHAPTER_DEFAULT_ROWS;
@@ -133,7 +133,7 @@ export class ChapterMapEditorSection {
   private _saveChapterGridState(chapter: ChapterDef, campaign: CampaignDef): void {
     chapter.rows = this._chapterEditRows;
     chapter.cols = this._chapterEditCols;
-    chapter.grid = JSON.parse(JSON.stringify(this._chapterEditGrid)) as (TileDef | null)[][];
+    chapter.grid = structuredClone(this._chapterEditGrid);
     this._callbacks.touchCampaign(campaign);
     this._callbacks.saveCampaigns();
   }
@@ -782,7 +782,7 @@ export class ChapterMapEditorSection {
 
   private _recordChapterSnapshot(chapter: ChapterDef, markChanged = true): void {
     // Passing live reference is intentional: HistoryManager.record() deep-clones
-    // via JSON.parse(JSON.stringify()) so the stored copy is independent.
+    // via structuredClone() so the stored copy is independent.
     const snapshot: EditorSnapshot = {
       grid: this._chapterEditGrid,
       rows: this._chapterEditRows,

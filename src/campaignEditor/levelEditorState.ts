@@ -86,8 +86,8 @@ export class LevelEditorState {
     this.levelStyle = level.style;
     this.rows = level.rows;
     this.cols = level.cols;
-    this.grid = JSON.parse(JSON.stringify(level.grid)) as (TileDef | null)[][];
-    this.inventory = JSON.parse(JSON.stringify(level.inventory)) as InventoryItem[];
+    this.grid = structuredClone(level.grid);
+    this.inventory = structuredClone(level.inventory);
     this.palette = PipeShape.Source;
     this.params = { ...DEFAULT_PARAMS };
     this._hist.clear();
@@ -102,7 +102,7 @@ export class LevelEditorState {
   /**
    * Capture the current grid/inventory into the undo history.
    * Passing live references is intentional: HistoryManager.record() deep-clones
-   * via JSON.parse(JSON.stringify()) so the stored copy is independent.
+   * via structuredClone() so the stored copy is independent.
    */
   recordSnapshot(): void {
     const snapshot: EditorSnapshot = {
