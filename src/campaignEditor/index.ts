@@ -1404,7 +1404,7 @@ export class CampaignEditor {
         title.textContent = '📤 Export log ❌ Failed (click to dismiss)';
         title.style.color = '#e74c3c';
         overlay.style.cursor = 'pointer';
-        overlay.addEventListener('click', () => { overlay.remove(); });
+        overlay.addEventListener('click', () => { overlay.remove(); }, { once: true });
         document.body.appendChild(overlay);
       },
     };
