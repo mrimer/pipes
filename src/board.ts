@@ -1,5 +1,6 @@
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
+import { bfs } from './bfs';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
@@ -1659,24 +1660,16 @@ export class Board {
    * @returns Set of stringified "row,col" keys that are water-filled.
    */
   getFilledPositions(): Set<string> {
-    const visited = new Set<string>();
-    const queue: GridPos[] = [this.source];
-    visited.add(posKey(this.source.row, this.source.col));
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    const reached = bfs(this.source, (pos) => {
+      const neighbors: GridPos[] = [];
       for (const dir of Object.values(Direction)) {
-        if (!this.areMutuallyConnected(current, dir)) continue;
+        if (!this.areMutuallyConnected(pos, dir)) continue;
         const delta = NEIGHBOUR_DELTA[dir];
-        const next: GridPos = { row: current.row + delta.row, col: current.col + delta.col };
-        const key = posKey(next.row, next.col);
-        if (!visited.has(key)) {
-          visited.add(key);
-          queue.push(next);
-        }
+        neighbors.push({ row: pos.row + delta.row, col: pos.col + delta.col });
       }
-    }
-    return visited;
+      return neighbors;
+    });
+    return new Set(reached.keys());
   }
 
   /**

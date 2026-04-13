@@ -105,9 +105,10 @@ export function computePulseLayers(board: Board): IdlePulseLayer[] {
   // Queue entries: { row, col, depth } — depth -1 for the source itself.
   const queue: Array<{ row: number; col: number; depth: number }> = [];
   queue.push({ row: board.source.row, col: board.source.col, depth: -1 });
+  let qi = 0;
 
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
+  while (qi < queue.length) {
+    const cur = queue[qi++];
 
     for (const dir of Object.values(Direction)) {
       if (!board.areMutuallyConnected(cur, dir)) continue;

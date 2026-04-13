@@ -6,6 +6,7 @@
 import { Direction, TileDef, Rotation, PipeShape } from './types';
 import { Tile } from './tile';
 import { PIPE_SHAPES } from './board';
+import { bfs } from './bfs';
 
 /** Grid-delta for each cardinal direction. */
 export const CHAPTER_MAP_DELTAS: Record<Direction, { dr: number; dc: number }> = {
@@ -117,30 +118,23 @@ export function computeChapterMapReachable(
   sourcePos: { row: number; col: number },
   getConns: (def: TileDef, isEntry: boolean) => Set<Direction>,
 ): Set<string> {
-  const reached = new Set<string>();
-  const queue: Array<{ row: number; col: number }> = [sourcePos];
-  reached.add(`${sourcePos.row},${sourcePos.col}`);
-
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
+  const reached = bfs(sourcePos, (cur) => {
     const curDef = grid[cur.row]?.[cur.col];
-    if (!curDef) continue;
+    if (!curDef) return [];
     const curConns = getConns(curDef, false);
+    const neighbors: Array<{ row: number; col: number }> = [];
     for (const dir of curConns) {
       const d = CHAPTER_MAP_DELTAS[dir];
       const nr = cur.row + d.dr;
       const nc = cur.col + d.dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-      const key = `${nr},${nc}`;
-      if (reached.has(key)) continue;
       const nbDef = grid[nr]?.[nc];
       if (!nbDef) continue;
       const nbConns = getConns(nbDef, true);
       if (!nbConns.has(CHAPTER_MAP_OPPOSITE[dir])) continue;
-      reached.add(key);
-      queue.push({ row: nr, col: nc });
+      neighbors.push({ row: nr, col: nc });
     }
-  }
-
-  return reached;
+    return neighbors;
+  });
+  return new Set(reached.keys());
 }

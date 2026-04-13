@@ -1,4 +1,5 @@
 import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent, TileDef } from './types';
+import { bfs } from './bfs';
 
 /** Base connections for each pipe shape (at 0° rotation). */
 const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
@@ -212,7 +213,7 @@ const DIRECTION_DELTA: Record<Direction, { row: number; col: number }> = {
 
 /**
  * Returns true when the tile at `pos` in `grid` is reachable from the
- * Source tile via mutually-connected pipe paths.  Uses a simple BFS over
+ * Source tile via mutually-connected pipe paths.  Uses a BFS over
  * the TileDef grid, so it can be called in editor contexts where no Board
  * instance is available.
  *
@@ -237,28 +238,22 @@ export function isTileConnectedToSource(
   }
   if (!sourcePos) return false;
 
-  const visited = new Set<string>();
-  const queue: Array<{ row: number; col: number }> = [sourcePos];
-  visited.add(`${sourcePos.row},${sourcePos.col}`);
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
+  const reached = bfs(sourcePos, (current) => {
     const currentTile = grid[current.row]?.[current.col];
-    if (!currentTile) continue;
+    if (!currentTile) return [];
     const currentConns = getConnections(currentTile.shape, (currentTile.rotation ?? 0) as Rotation);
+    const neighbors: Array<{ row: number; col: number }> = [];
     for (const dir of currentConns) {
       const delta = DIRECTION_DELTA[dir];
       const next = { row: current.row + delta.row, col: current.col + delta.col };
-      const key = `${next.row},${next.col}`;
-      if (visited.has(key)) continue;
       const nextTile = grid[next.row]?.[next.col];
       if (!nextTile) continue;
       const nextConns = getConnections(nextTile.shape, (nextTile.rotation ?? 0) as Rotation);
       if (!nextConns.has(oppositeDirection(dir))) continue;
-      visited.add(key);
-      queue.push(next);
+      neighbors.push(next);
     }
-  }
+    return neighbors;
+  });
 
-  return visited.has(`${pos.row},${pos.col}`);
+  return reached.has(`${pos.row},${pos.col}`);
 }

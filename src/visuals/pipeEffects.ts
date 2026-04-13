@@ -180,9 +180,10 @@ export function computeFillOrder(
   const bfsVisited = new Set<string>();
   bfsVisited.add(sourceKey);
   queue.push({ row: board.source.row, col: board.source.col, animDepth: -1 });
+  let qi = 0;
 
-  while (queue.length > 0) {
-    const cur = queue.shift()!;
+  while (qi < queue.length) {
+    const cur = queue[qi++];
 
     for (const dir of Object.values(Direction)) {
       if (!board.areMutuallyConnected(cur, dir)) continue;
