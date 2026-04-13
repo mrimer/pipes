@@ -1327,8 +1327,9 @@ export class CampaignEditor {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      // Defer revocation so the browser has time to initiate the download.
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      // Defer revocation long enough for the browser to initiate the download.
+      // A 0 ms delay is too short for Chrome; use 10 s as a safe margin.
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
     }).catch(() => {
       alert('Export failed. Your browser may not support the required compression API.');
     });

@@ -365,9 +365,12 @@ export function generateAmbientDecorations(
       const rotation = (type === 'pebbles' || type === 'crystal')
         ? (baseAngle + idx * GOLDEN_ANGLE) % 360
         : baseAngle;
-      // Sunflowers are positioned lower so their tops don't draw up onto the tile above.
-      const offsetY = type === 'sunflower'
-        ? 0.40 + Math.random() * 0.45   // center in lower 40–85 % of tile
+      // Sunflowers and dandelions are positioned lower so their tops don't draw
+      // up onto the tile above. Dandelions extend ~20–26 px above their origin
+      // (stalk + puff, accounting for max scale 1.35), so offsetY ≥ 0.45 keeps
+      // them within the tile at TILE_SIZE = 64 px.
+      const offsetY = (type === 'sunflower' || type === 'dandelion')
+        ? 0.45 + Math.random() * 0.45   // center in lower 45–90 % of tile
         : 0.15 + Math.random() * 0.70;
       map.set(`${r},${c}`, {
         row: r,
