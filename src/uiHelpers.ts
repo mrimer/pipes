@@ -19,6 +19,11 @@ import { RADIUS_MD } from './uiConstants';
  * Show `element` with the given `message` and auto-hide it after `durationMs`
  * milliseconds (default 2000).  Returns the timer ID so callers can cancel it
  * early with `clearTimeout` if needed.
+ *
+ * @param element    - The element to show/hide.
+ * @param message    - Text content to display.
+ * @param durationMs - How long to keep the element visible, in milliseconds.
+ * @returns The timer ID returned by `setTimeout`.
  */
 export function showTimedMessage(
   element: HTMLElement,
