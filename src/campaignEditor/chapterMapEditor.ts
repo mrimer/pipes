@@ -228,7 +228,7 @@ export class ChapterMapEditorSection {
       getChapterEditCols:         () => this._chapterEditCols,
       getChapterFocusedTilePos:   () => this._chapterFocusedTilePos,
       getChapterStyle: (ch) => ch.style,
-      setChapterStyle: (style: LevelStyle, ch: ChapterDef, camp: CampaignDef) => {
+      setChapterStyle: (style: LevelStyle, ch: ChapterDef) => {
         ch.style = style;
         this._recordChapterSnapshot(ch);
         this._renderChapterCanvas();

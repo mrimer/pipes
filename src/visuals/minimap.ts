@@ -15,7 +15,6 @@ import {
   EMPTY_DIRT_COLOR_DARK,
   EMPTY_DARK_COLOR_DARK,
   PIPE_COLOR,
-  FIXED_PIPE_COLOR,
   SOURCE_COLOR,
   SINK_COLOR,
   TANK_COLOR,
@@ -33,6 +32,7 @@ import {
   CONTAINER_COLOR,
   SPIN_PIPE_COLOR,
   BG_COLOR,
+  TILE_BG,
   HOT_PLATE_COLOR,
   SANDSTONE_COLOR,
   STAR_COLOR,
@@ -102,7 +102,7 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
     case PipeShape.Elbow:
     case PipeShape.Tee:
     case PipeShape.Cross:
-      return FIXED_PIPE_COLOR;
+      return TILE_BG;
     case PipeShape.SpinStraight:
     case PipeShape.SpinElbow:
     case PipeShape.SpinTee:
@@ -244,7 +244,7 @@ function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
       shape === PipeShape.LeakyTee || shape === PipeShape.LeakyCross) {
     return { bg: EMPTY_COLOR, line: LEAKY_PIPE_COLOR };
   }
-  return { bg: FIXED_PIPE_COLOR, line: PIPE_COLOR };
+  return { bg: TILE_BG, line: PIPE_COLOR };
 }
 
 /**
