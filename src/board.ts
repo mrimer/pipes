@@ -157,6 +157,7 @@ export function computeFloorTypesFromGrid(
   rows: number,
   cols: number,
   getCellFloorType: (r: number, c: number) => PipeShape | null,
+  defaultFloor: PipeShape = PipeShape.Empty,
 ): ReadonlyMap<string, PipeShape> {
   const map = new Map<string, PipeShape>();
 
@@ -210,6 +211,17 @@ export function computeFloorTypesFromGrid(
       const nr = r + dr, nc = c + dc;
       if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !map.has(posKey(nr, nc))) {
         queue.push([nr, nc]);
+      }
+    }
+  }
+
+  // Pass 3: fill any cells still unresolved (e.g. when the board has no empty-floor
+  // tiles at all and BFS had nothing to propagate from) with the default floor type.
+  if (defaultFloor !== PipeShape.Empty) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const key = posKey(r, c);
+        if (!map.has(key)) map.set(key, defaultFloor);
       }
     }
   }
@@ -351,13 +363,17 @@ export function generateAmbientDecorations(
       const rotation = (type === 'pebbles' || type === 'crystal')
         ? (baseAngle + idx * GOLDEN_ANGLE) % 360
         : baseAngle;
+      // Sunflowers are positioned lower so their tops don't draw up onto the tile above.
+      const offsetY = type === 'sunflower'
+        ? 0.40 + Math.random() * 0.45   // center in lower 40–85 % of tile
+        : 0.15 + Math.random() * 0.70;
       map.set(`${r},${c}`, {
         row: r,
         col: c,
         type,
         // Keep decorations away from cell edges for a natural look
         offsetX: 0.15 + Math.random() * 0.70,
-        offsetY: 0.15 + Math.random() * 0.70,
+        offsetY,
         rotation,
         variant: Math.floor(Math.random() * 3),
         scale,
@@ -590,7 +606,7 @@ export class Board {
       }
       const shape = this.grid[r][c].shape;
       return isEmptyFloor(shape) ? shape : null;
-    });
+    }, styleToFloorShape(this.style));
   }
 
   // ─── Undo / redo support ───────────────────────────────────────────────────
