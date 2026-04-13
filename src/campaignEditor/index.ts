@@ -1312,27 +1312,108 @@ export class CampaignEditor {
   }
 
   /** Export a campaign by compressing the JSON with gzip and triggering a download.
-   *  Unrecognized fields are stripped from the output via a clean pass. */
+   *  Unrecognized fields are stripped from the output via a clean pass.
+   *
+   *  An on-screen diagnostic overlay is shown so users can identify the step
+   *  that fails if the download does not start. */
   private _exportCampaign(campaign: CampaignDef): void {
-    const json = this._service.exportToJson(campaign);
+    const log = this._createExportLog();
+
+    let json: string;
+    try {
+      json = this._service.exportToJson(campaign);
+      log.append(`✅ JSON serialised (${json.length} chars)`);
+    } catch (err) {
+      log.append(`❌ JSON serialisation failed: ${String(err)}`);
+      log.done(false);
+      return;
+    }
+
+    log.append('⏳ Compressing with gzip …');
+
     gzipString(json).then((compressed) => {
-      // Copy to a plain ArrayBuffer to satisfy strict BlobPart typing.
-      const buf = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength) as ArrayBuffer;
-      const blob = new Blob([buf], { type: 'application/gzip' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
-      // Attach to document so Firefox triggers the download on programmatic click.
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      // Defer revocation long enough for the browser to initiate the download.
-      // A 0 ms delay is too short for Chrome; use 10 s as a safe margin.
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    }).catch(() => {
-      alert('Export failed. Your browser may not support the required compression API.');
+      log.append(`✅ gzip complete (${compressed.byteLength} bytes)`);
+
+      try {
+        // Copy to a plain ArrayBuffer to satisfy strict BlobPart typing.
+        const buf = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength) as ArrayBuffer;
+        const blob = new Blob([buf], { type: 'application/gzip' });
+        log.append(`✅ Blob created (${blob.size} bytes, type=${blob.type})`);
+
+        const url = URL.createObjectURL(blob);
+        log.append(`✅ Object URL: ${url}`);
+
+        const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        // Attach to document so Firefox triggers the download on programmatic click.
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        log.append(`✅ Anchor click fired (filename="${filename}")`);
+
+        // Defer revocation long enough for the browser to initiate the download.
+        // A 0 ms delay is too short for Chrome; use 10 s as a safe margin.
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+
+        log.append('✅ Export complete – download should have started.');
+        log.done(true);
+      } catch (err) {
+        log.append(`❌ Post-compression step failed: ${String(err)}`);
+        log.done(false);
+      }
+    }).catch((err) => {
+      log.append(`❌ gzip compression failed: ${String(err)}`);
+      log.done(false);
     });
+  }
+
+  /**
+   * Create a small on-screen diagnostic overlay that accumulates timestamped
+   * log lines.  The overlay auto-dismisses after 8 s on success; on failure it
+   * stays visible until the user clicks it.
+   */
+  private _createExportLog(): { append(msg: string): void; done(ok: boolean): void } {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;bottom:12px;right:12px;z-index:99999;max-width:480px;' +
+      'background:#1a1a2e;color:#ccc;font:12px/1.5 monospace;' +
+      'padding:10px 14px;border-radius:8px;border:1px solid #4a90d9;' +
+      'box-shadow:0 4px 20px rgba(0,0,0,.6);max-height:50vh;overflow-y:auto;';
+    const title = document.createElement('div');
+    title.textContent = '📤 Export log';
+    title.style.cssText = 'font-weight:bold;color:#4a90d9;margin-bottom:6px;';
+    overlay.appendChild(title);
+    document.body.appendChild(overlay);
+
+    const t0 = performance.now();
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+
+    return {
+      append(msg: string) {
+        const ms = (performance.now() - t0).toFixed(0);
+        const line = document.createElement('div');
+        line.textContent = `[${ms} ms] ${msg}`;
+        overlay.appendChild(line);
+        overlay.scrollTop = overlay.scrollHeight;
+      },
+      done(ok: boolean) {
+        if (ok) {
+          title.textContent = '📤 Export log  ✅ Success';
+          title.style.color = '#7ed321';
+          timerId = setTimeout(() => { overlay.remove(); }, 8_000);
+        } else {
+          title.textContent = '📤 Export log  ❌ Failed (click to dismiss)';
+          title.style.color = '#e74c3c';
+        }
+        overlay.style.cursor = 'pointer';
+        overlay.addEventListener('click', () => {
+          if (timerId) clearTimeout(timerId);
+          overlay.remove();
+        });
+      },
+    };
   }
 
   /** Import a campaign from a JSON or gzip-compressed JSON file.

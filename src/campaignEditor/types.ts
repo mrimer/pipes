@@ -315,13 +315,20 @@ export function generateLevelId(): number {
  * Compress a string to gzip and return the result as a `Uint8Array`.
  * Uses the Web Streams `CompressionStream` API (available in all modern browsers
  * and Node.js 18+).
+ *
+ * Writing and reading happen concurrently so that the readable side is drained
+ * while the writable side is still flushing.  This avoids a backpressure
+ * deadlock that can occur when all data is written (and the stream closed)
+ * before any compressed output is consumed.
  */
 export async function gzipString(text: string): Promise<Uint8Array> {
   const input = new TextEncoder().encode(text);
   const cs = new CompressionStream('gzip');
+
+  // Kick off writing without awaiting – reading will proceed in parallel.
   const writer = cs.writable.getWriter();
-  await writer.write(input);
-  await writer.close();
+  const writeFinished = writer.write(input).then(() => writer.close());
+
   const chunks: Uint8Array[] = [];
   const reader = cs.readable.getReader();
   for (;;) {
@@ -329,6 +336,10 @@ export async function gzipString(text: string): Promise<Uint8Array> {
     if (done) break;
     chunks.push(value);
   }
+
+  // Ensure the write side completed without error.
+  await writeFinished;
+
   const totalLen = chunks.reduce((s, c) => s + c.length, 0);
   const merged = new Uint8Array(totalLen);
   let offset = 0;
@@ -342,6 +353,8 @@ export async function gzipString(text: string): Promise<Uint8Array> {
 /**
  * Decompress a gzip `Blob` or raw bytes and return the contained text.
  * Uses the Web Streams `DecompressionStream` API.
+ *
+ * Reading and writing proceed concurrently (same rationale as {@link gzipString}).
  */
 export async function ungzipBytes(bytes: Uint8Array): Promise<string> {
   const ds = new DecompressionStream('gzip');
@@ -349,8 +362,10 @@ export async function ungzipBytes(bytes: Uint8Array): Promise<string> {
   // Copy to a plain ArrayBuffer to satisfy strict BufferSource typing.
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
-  await writer.write(copy as unknown as BufferSource);
-  await writer.close();
+
+  // Kick off writing without awaiting – reading will proceed in parallel.
+  const writeFinished = writer.write(copy as unknown as BufferSource).then(() => writer.close());
+
   const chunks: Uint8Array[] = [];
   const reader = ds.readable.getReader();
   for (;;) {
@@ -358,6 +373,10 @@ export async function ungzipBytes(bytes: Uint8Array): Promise<string> {
     if (done) break;
     chunks.push(value);
   }
+
+  // Ensure the write side completed without error.
+  await writeFinished;
+
   const totalLen = chunks.reduce((s, c) => s + c.length, 0);
   const merged = new Uint8Array(totalLen);
   let offset = 0;
