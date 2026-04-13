@@ -270,6 +270,9 @@ export function drawLevelChamberTile(
     try {
       const minimap = renderMinimap(levelDef);
       const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(x, y, levelDef);
+      // Draw a clean 1px white border around the minimap at canvas scale, independent of image scale
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(mx - 1, my - 1, mw + 2, mh + 2);
       ctx.drawImage(minimap, mx, my, mw, mh);
     } catch {
       // If minimap rendering fails, show a placeholder
