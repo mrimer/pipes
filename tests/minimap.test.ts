@@ -25,6 +25,7 @@ class FakeContext {
   fills: FillCall[] = [];
   strokes: Array<unknown[]> = [];
   arcs: Array<{ style: string; cx: number; cy: number; r: number }> = [];
+  roundRects: Array<{ x: number; y: number; w: number; h: number; radius: number | number[] }> = [];
 
   fillRect(x: number, y: number, w: number, h: number): void {
     this.fills.push({ style: this.fillStyle, x, y, w, h });
@@ -37,6 +38,9 @@ class FakeContext {
     this.arcs.push({ style: this.fillStyle, cx, cy, r });
   }
   fill(): void { /* no-op */ }
+  roundRect(x: number, y: number, w: number, h: number, radius: number | number[]): void {
+    this.roundRects.push({ x, y, w, h, radius });
+  }
 }
 
 function installCanvasMock(): FakeContext {
@@ -172,13 +176,34 @@ describe('renderMinimap: tileColor coverage via fills', () => {
     expect(ctx.fills.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('draws chamber item tiles (uses CONTAINER_COLOR)', () => {
+  it('draws chamber item tiles as a hollow rounded rectangle (stroke)', () => {
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[
       { shape: PipeShape.Chamber, chamberContent: 'item' },
     ]]);
     renderMinimap(level);
+    // Container is drawn with a background fill + roundRect + stroke
     expect(ctx.fills.length).toBeGreaterThanOrEqual(2);
+    expect(ctx.roundRects.length).toBeGreaterThanOrEqual(1);
+    expect(ctx.strokes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('uses CONTAINER_COLOR for gold item containers and PIPE_COLOR for regular ones', () => {
+    const { CONTAINER_COLOR, PIPE_COLOR } = jest.requireActual<typeof import('../src/colors')>('../src/colors');
+
+    const ctxGold = installCanvasMock();
+    const levelGold = makeLevel(1, 1, [[
+      { shape: PipeShape.Chamber, chamberContent: 'item', itemShape: PipeShape.GoldStraight },
+    ]]);
+    renderMinimap(levelGold);
+    expect(ctxGold.strokeStyle).toBe(CONTAINER_COLOR);
+
+    const ctxReg = installCanvasMock();
+    const levelReg = makeLevel(1, 1, [[
+      { shape: PipeShape.Chamber, chamberContent: 'item', itemShape: PipeShape.Straight },
+    ]]);
+    renderMinimap(levelReg);
+    expect(ctxReg.strokeStyle).toBe(PIPE_COLOR);
   });
 
   it('draws SpinStraight tile', () => {
