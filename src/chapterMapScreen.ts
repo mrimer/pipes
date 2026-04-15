@@ -13,7 +13,7 @@ import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from './board';
 import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
-import { computeChapterMapReachable, tileDefConnections, findChapterMapTile } from './chapterMapUtils';
+import { computeMapReachable, tileDefConnections, findMapTile } from './mapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
@@ -411,7 +411,7 @@ export class ChapterMapScreen {
     const filledKeys = this._computeFilledCells(chapter, displayProgress);
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    const sourcePos = findChapterMapTile(chapter.grid, rows, cols, PipeShape.Source);
+    const sourcePos = findMapTile(chapter.grid, rows, cols, PipeShape.Source);
 
     // Wait for both the WinChapter sfx AND the glow animation to finish before
     // calling onComplete, so mastery effects don't overlap the chapter-win sfx.
@@ -990,7 +990,7 @@ export class ChapterMapScreen {
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
 
-    const sourcePos = findChapterMapTile(grid, rows, cols, PipeShape.Source);
+    const sourcePos = findMapTile(grid, rows, cols, PipeShape.Source);
     if (!sourcePos) return new Set();
 
     const getConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
@@ -1013,7 +1013,7 @@ export class ChapterMapScreen {
       return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
     };
 
-    return computeChapterMapReachable(grid, rows, cols, sourcePos, getConns);
+    return computeMapReachable(grid, rows, cols, sourcePos, getConns);
   }
 
   // ─── Animation loop ──────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, i
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
   WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
-import { tileDefConnections } from '../chapterMapUtils';
+import { tileDefConnections } from '../mapUtils';
 
 export type { LevelProgressMap };
 

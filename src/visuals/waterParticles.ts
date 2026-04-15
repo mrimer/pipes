@@ -12,7 +12,7 @@ import { Board, NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPE
 import { oppositeDirection } from '../tile';
 import { Direction, GridPos, TileDef } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
-import { tileDefConnections } from '../chapterMapUtils';
+import { tileDefConnections } from '../mapUtils';
 import { drawIdlePulseGlow } from './idlePulse';
 
 // ──────────────────────────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ import {
   VALID_INVENTORY_ITEM_KEYS,
   getValidTileDefKeys,
   getValidChapterMapTileDefKeys,
+  getValidCampaignMapTileDefKeys,
 } from './types';
 
 // ─── ImportResult ─────────────────────────────────────────────────────────────
@@ -398,6 +399,19 @@ export class CampaignService {
     };
 
     checkKeys(campaign as unknown as Record<string, unknown>, VALID_CAMPAIGN_KEYS, 'Campaign');
+
+    if (campaign.grid) {
+      for (const row of campaign.grid) {
+        for (const tile of row) {
+          if (!tile) continue;
+          checkKeys(
+            tile as unknown as Record<string, unknown>,
+            getValidCampaignMapTileDefKeys(tile),
+            'CampaignMapTile',
+          );
+        }
+      }
+    }
 
     for (const chapter of campaign.chapters) {
       checkKeys(chapter as unknown as Record<string, unknown>, VALID_CHAPTER_KEYS, 'Chapter');

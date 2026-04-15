@@ -7,7 +7,7 @@ import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotat
 import { PIPE_SHAPES, isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize, BASE_TILE_SIZE } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
-import { computeChapterMapReachable, findChapterMapTile, editorTileConns } from '../chapterMapUtils';
+import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 import {
   EditorPalette,
   TileParams,
@@ -616,11 +616,11 @@ export class ChapterMapEditorSection {
    * (water flows through unconditionally, simulating an ideal path).
    */
   private _computeChapterEditorFilledCells(): Set<string> {
-    const sourcePos = findChapterMapTile(
+    const sourcePos = findMapTile(
       this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Source);
     if (!sourcePos) return new Set();
 
-    return computeChapterMapReachable(
+    return computeMapReachable(
       this._chapterEditGrid,
       this._chapterEditRows,
       this._chapterEditCols,
@@ -854,5 +854,4 @@ export class ChapterMapEditorSection {
   }
 
 }
-
 

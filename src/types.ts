@@ -85,7 +85,7 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level' | 'chapter';
 
 /**
  * Chamber content types that apply a cold (temperature-delta) water cost.
@@ -213,6 +213,11 @@ export interface TileDef {
    * References the level that this chamber represents on the chapter map.
    */
   levelIdx?: number;
+  /**
+   * Chapter index (0-based, within the campaign) for Chamber tiles with chamberContent='chapter'.
+   * References the chapter that this chamber represents on the campaign map.
+   */
+  chapterIdx?: number;
   /**
    * Completion threshold for Sink tiles on chapter maps.
    * The sink's displayed value = max(0, completion − completedLevels).
@@ -351,4 +356,17 @@ export interface CampaignDef {
    * Used for versioning during import to detect newer/older/same versions.
    */
   lastUpdated?: string;
+  /**
+   * Optional 2-D campaign map grid, stored as a row-major array.
+   * When present, the level-select screen can start from this campaign map.
+   * Chapter chambers on this grid reference campaign chapters by `chapterIdx` (0-based).
+   */
+  rows?: number;
+  cols?: number;
+  grid?: (TileDef | null)[][];
+  /**
+   * Visual style for this campaign map, controlling the default empty floor tile
+   * type and tree rendering colors. Defaults to 'Grass' when absent or invalid.
+   */
+  style?: LevelStyle;
 }
