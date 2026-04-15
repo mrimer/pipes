@@ -581,6 +581,19 @@ export class CampaignEditor {
     meta.textContent = metaParts.join('  ');
     info.appendChild(name);
     info.appendChild(meta);
+    if (chapter.grid && chapter.rows && chapter.cols) {
+      const pseudoLevel: LevelDef = {
+        id: chapter.id,
+        name: chapter.name,
+        rows: chapter.rows,
+        cols: chapter.cols,
+        grid: chapter.grid,
+        inventory: [],
+      };
+      const minimap = renderMinimap(pseudoLevel);
+      minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;border:2px solid white;';
+      info.appendChild(minimap);
+    }
 
     const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
     btns.appendChild(this._btn(editOrViewLabel, UI_BG, '#f0c040', () => {

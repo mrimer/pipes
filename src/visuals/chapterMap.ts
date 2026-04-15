@@ -63,6 +63,34 @@ export interface LevelProgressMap {
   levelWater?: Readonly<Record<number, number>>;
 }
 
+export interface MapChamberInfo {
+  label: string;
+  minimap?: { grid: (TileDef | null)[][]; rows: number; cols: number };
+  stats?: { water?: number; stars?: string; challenge?: boolean };
+  isCompleted: boolean;
+  isAccessible: boolean;
+  bgVariant: 'default' | 'gold' | 'challenge';
+}
+
+function _drawLockIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.strokeStyle = '#d9d9d9';
+  ctx.fillStyle = '#7a7a7a';
+  ctx.lineWidth = Math.max(1, Math.round(size * 0.08));
+  ctx.beginPath();
+  ctx.arc(0, -size * 0.2, size * 0.22, Math.PI, 0);
+  ctx.stroke();
+  ctx.fillRect(-size * 0.25, -size * 0.1, size * 0.5, size * 0.42);
+  ctx.strokeRect(-size * 0.25, -size * 0.1, size * 0.5, size * 0.42);
+  ctx.restore();
+}
+
 // ─── Level chamber tile ────────────────────────────────────────────────────────
 
 /**
@@ -265,8 +293,11 @@ export function drawLevelChamberTile(
 
   ctx.restore();
 
-  // Minimap (centered in the content area inside the chamber box)
-  if (levelDef) {
+  // Inaccessible chamber: lock icon instead of minimap.
+  if (!isFilled) {
+    _drawLockIcon(ctx, cx, contentY + contentH / 2, _s(20));
+  } else if (levelDef) {
+    // Minimap (centered in the content area inside the chamber box)
     try {
       const minimap = renderMinimap(levelDef);
       const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(x, y, levelDef);
@@ -295,6 +326,48 @@ export function drawLevelChamberTile(
     ctx.restore();
   }
 
+}
+
+export function drawMapChamberTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  half: number,
+  chamberInfo: MapChamberInfo,
+  connections: Set<Direction>,
+  buttEndDirs?: ReadonlySet<Direction>,
+  filled = false,
+): void {
+  const minimap = chamberInfo.minimap;
+  const pseudoLevel: LevelDef | undefined = minimap ? {
+    id: -1,
+    name: chamberInfo.label,
+    rows: minimap.rows,
+    cols: minimap.cols,
+    grid: minimap.grid,
+    inventory: [],
+    challenge: chamberInfo.stats?.challenge,
+  } : undefined;
+
+  const labelNum = Number(chamberInfo.label.replace(/\D+/g, '')) || 0;
+  const starsCollected = chamberInfo.stats?.stars ? Number((chamberInfo.stats.stars.match(/\d+/)?.[0] ?? '0')) : 0;
+  const waterScored = chamberInfo.stats?.water;
+  const totalStars = 0;
+  void buttEndDirs;
+  void half; // preserved for API compatibility
+  drawLevelChamberTile(
+    ctx,
+    x,
+    y,
+    pseudoLevel,
+    labelNum,
+    connections,
+    chamberInfo.isCompleted,
+    starsCollected,
+    totalStars,
+    filled && chamberInfo.isAccessible,
+    waterScored,
+  );
 }
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
