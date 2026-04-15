@@ -3,7 +3,7 @@
 import { ChapterDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
-import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from './uiConstants';
+import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from './uiConstants';
 import { createButton } from './uiHelpers';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
@@ -201,6 +201,7 @@ export function renderLevelList(
   // campaignChapters is always provided by game.ts (via the active campaign).
   // The empty-array fallback guards against callers that omit the parameter.
   const chapters = campaignChapters ?? [];
+  let chapterListParent: HTMLElement = levelListEl;
 
   // ── Campaign-state header ──────────────────────────────────────────────────
   if (!activeCampaign) {
@@ -395,6 +396,27 @@ export function renderLevelList(
     // Attach the hover water-wave background animation (gold when fully complete).
     attachChapterWaveAnimation(header, campaignAllComplete);
 
+    const chapterToggleBtn = document.createElement('button');
+    chapterToggleBtn.type = 'button';
+    chapterToggleBtn.style.cssText =
+      `padding:8px 12px;font-size:0.9rem;font-weight:bold;border-radius:${RADIUS_MD};` +
+      `border:1px solid ${UI_GOLD};background:${UI_BG};color:${UI_GOLD};cursor:pointer;width:100%;`;
+    let chaptersExpanded = false;
+    chapterToggleBtn.textContent = '▶ Show Chapters';
+
+    const chapterListWrap = document.createElement('div');
+    chapterListWrap.style.cssText = 'display:none;flex-direction:column;gap:8px;padding-top:4px;';
+
+    chapterToggleBtn.addEventListener('click', () => {
+      chaptersExpanded = !chaptersExpanded;
+      chapterListWrap.style.display = chaptersExpanded ? 'flex' : 'none';
+      chapterToggleBtn.textContent = chaptersExpanded ? '▼ Hide Chapters' : '▶ Show Chapters';
+    });
+
+    header.appendChild(chapterToggleBtn);
+    header.appendChild(chapterListWrap);
+    chapterListParent = chapterListWrap;
+
     levelListEl.appendChild(header);
   }
 
@@ -530,7 +552,7 @@ export function renderLevelList(
     }
 
     chapterBox.appendChild(chapterHeader);
-    levelListEl.appendChild(chapterBox);
+    chapterListParent.appendChild(chapterBox);
   }
 
   // Campaign Editor button at the top of the controls

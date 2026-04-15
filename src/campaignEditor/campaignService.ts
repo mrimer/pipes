@@ -6,7 +6,7 @@
  * (prompt/confirm dialogs) and tells CampaignService what to do.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape } from '../types';
+import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction } from '../types';
 import {
   loadImportedCampaigns,
   saveImportedCampaigns,
@@ -47,9 +47,39 @@ export interface ImportResult {
 
 export class CampaignService {
   private _campaigns: CampaignDef[];
+  private static readonly CAMPAIGN_DEFAULT_ROWS = 3;
+  private static readonly CAMPAIGN_DEFAULT_COLS = 6;
 
   constructor(campaigns?: CampaignDef[]) {
     this._campaigns = campaigns ?? loadImportedCampaigns();
+  }
+
+  private _buildDefaultCampaignMap(): Pick<CampaignDef, 'rows' | 'cols' | 'grid'> {
+    const rows = CampaignService.CAMPAIGN_DEFAULT_ROWS;
+    const cols = CampaignService.CAMPAIGN_DEFAULT_COLS;
+    const grid: (TileDef | null)[][] = Array.from(
+      { length: rows },
+      () => Array(cols).fill(null) as null[],
+    );
+    grid[1][0] = { shape: PipeShape.Source, capacity: 10, connections: [Direction.East] };
+    grid[1][cols - 1] = { shape: PipeShape.Sink, connections: [Direction.West] };
+    return { rows, cols, grid };
+  }
+
+  /** Ensure every campaign has at least a default empty campaign map. */
+  ensureCampaignMaps(): boolean {
+    let changed = false;
+    for (const campaign of this._campaigns) {
+      if (campaign.grid && campaign.rows && campaign.cols) continue;
+      const defaults = this._buildDefaultCampaignMap();
+      campaign.rows = defaults.rows;
+      campaign.cols = defaults.cols;
+      campaign.grid = defaults.grid;
+      this.touch(campaign);
+      changed = true;
+    }
+    if (changed) this.save();
+    return changed;
   }
 
   // ── Campaign access ──────────────────────────────────────────────────────────
@@ -78,11 +108,15 @@ export class CampaignService {
 
   /** Create a new campaign, persist it, and return it. */
   createCampaign(name: string, author: string): CampaignDef {
+    const defaults = this._buildDefaultCampaignMap();
     const campaign: CampaignDef = {
       id: generateCampaignId(),
       name: name.trim(),
       author: author.trim(),
       chapters: [],
+      rows: defaults.rows,
+      cols: defaults.cols,
+      grid: defaults.grid,
       lastUpdated: new Date().toISOString(),
     };
     this._campaigns.push(campaign);
