@@ -66,7 +66,7 @@ function lerp(a: number, b: number, t: number): number {
  * @param playScreenEl       The play-screen element.
  * @param onComplete         Callback invoked when the animation finishes.
  */
-export function playLevelTransition(
+export function playMapTransition(
   minimapRect: ScreenRect,
   gameCanvas: HTMLCanvasElement,
   board: Board,
@@ -228,7 +228,7 @@ export function playLevelTransition(
  * @param playScreenEl       The play-screen element to fade out.
  * @param onComplete         Callback invoked when the animation finishes.
  */
-export function playLevelExitTransition(
+export function playMapExitTransition(
   minimapRect: ScreenRect,
   chapterMapScreenEl: HTMLElement,
   gameCanvas: HTMLCanvasElement,
@@ -315,3 +315,7 @@ export function playLevelExitTransition(
 
   requestAnimationFrame(tick);
 }
+
+// Backward-compatible aliases.
+export const playLevelTransition = playMapTransition;
+export const playLevelExitTransition = playMapExitTransition;

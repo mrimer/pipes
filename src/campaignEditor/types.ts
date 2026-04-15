@@ -12,7 +12,7 @@ import { UI_BG, UI_BORDER } from '../uiConstants';
 
 /** Valid keys for a CampaignDef record. */
 export const VALID_CAMPAIGN_KEYS: ReadonlySet<string> = new Set([
-  'id', 'name', 'author', 'chapters', 'official', 'lastUpdated',
+  'id', 'name', 'author', 'chapters', 'official', 'lastUpdated', 'rows', 'cols', 'grid', 'style',
 ]);
 
 /** Valid keys for a ChapterDef record. */
@@ -98,6 +98,30 @@ export function getValidChapterMapTileDefKeys(tile: TileDef): ReadonlySet<string
     valid.add('chamberContent');
     valid.add('connections');
     if (tile.chamberContent === 'level') valid.add('levelIdx');
+  }
+
+  return valid;
+}
+
+/**
+ * Return the set of valid TileDef field names for the given tile definition
+ * on a **campaign map** grid.
+ */
+export function getValidCampaignMapTileDefKeys(tile: TileDef): ReadonlySet<string> {
+  const valid = new Set<string>(['shape']);
+  const shape = tile.shape;
+
+  if (ROTATION_SHAPES.has(shape)) valid.add('rotation');
+
+  if (shape === PipeShape.Source) {
+    valid.add('connections');
+  } else if (shape === PipeShape.Sink) {
+    valid.add('connections');
+    valid.add('completion');
+  } else if (shape === PipeShape.Chamber) {
+    valid.add('chamberContent');
+    valid.add('connections');
+    if (tile.chamberContent === 'chapter') valid.add('chapterIdx');
   }
 
   return valid;
@@ -247,6 +271,7 @@ export function chamberColor(content: string): string {
     case 'star':      return '#f0c040';
     case 'hot_plate': return '#e44';
     case 'level':    return '#2a3a5e';
+    case 'chapter':  return '#5a2a5e';
     default:         return '#b2bec3';
   }
 }

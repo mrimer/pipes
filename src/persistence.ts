@@ -421,6 +421,33 @@ export function clearCampaignMasteredShown(campaignId: string): void {
   } catch { /* ignore storage errors */ }
 }
 
+// ─── Campaign complete shown flag ─────────────────────────────────────────────
+
+function campaignCompleteShownKey(campaignId: string): string {
+  return `pipes_campaign_complete_shown_${campaignId}`;
+}
+
+/** Returns true if the full-campaign complete modal has already been shown. */
+export function loadCampaignCompleteShown(campaignId: string): boolean {
+  try {
+    return localStorage.getItem(campaignCompleteShownKey(campaignId)) === '1';
+  } catch { return false; }
+}
+
+/** Record that the full-campaign complete modal has been shown. */
+export function markCampaignCompleteShown(campaignId: string): void {
+  try {
+    localStorage.setItem(campaignCompleteShownKey(campaignId), '1');
+  } catch { /* ignore storage errors */ }
+}
+
+/** Clear the campaign complete shown flag (e.g. on progress reset). */
+export function clearCampaignCompleteShown(campaignId: string): void {
+  try {
+    localStorage.removeItem(campaignCompleteShownKey(campaignId));
+  } catch { /* ignore storage errors */ }
+}
+
 // ─── Settings persistence ─────────────────────────────────────────────────────
 
 const SFX_VOLUME_KEY = 'pipes_sfx_volume';

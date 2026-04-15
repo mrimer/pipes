@@ -18,7 +18,7 @@ import {
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
-import { tileDefConnections } from '../chapterMapUtils';
+import { tileDefConnections } from '../mapUtils';
 import { renderMinimap, minimapDimensions } from './minimap';
 import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
