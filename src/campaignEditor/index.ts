@@ -9,7 +9,7 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, LevelDef, TileDef, InventoryItem, PipeShape } from '../types';
+import { CampaignDef, LevelDef, TileDef, PipeShape } from '../types';
 import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from '../persistence';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
@@ -171,6 +171,7 @@ export class CampaignEditor {
 
   /** Show the campaign editor (campaign list screen). */
   show(): void {
+    this._service.ensureCampaignMaps();
     this._el.style.display = 'flex';
     document.body.classList.add('editor-open');
     this._showCampaignList();
@@ -181,6 +182,7 @@ export class CampaignEditor {
    * Use this after playtesting to return the user to the level they were editing.
    */
   showAndRestore(): void {
+    this._service.ensureCampaignMaps();
     this._el.style.display = 'flex';
     document.body.classList.add('editor-open');
     switch (this._screen) {
