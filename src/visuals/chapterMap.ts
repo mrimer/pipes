@@ -332,10 +332,10 @@ export function drawMapChamberTile(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  half: number,
+  _half: number,
   chamberInfo: MapChamberInfo,
   connections: Set<Direction>,
-  buttEndDirs?: ReadonlySet<Direction>,
+  _buttEndDirs?: ReadonlySet<Direction>,
   filled = false,
 ): void {
   const minimap = chamberInfo.minimap;
@@ -350,11 +350,10 @@ export function drawMapChamberTile(
   } : undefined;
 
   const labelNum = Number(chamberInfo.label.replace(/\D+/g, '')) || 0;
-  const starsCollected = chamberInfo.stats?.stars ? Number((chamberInfo.stats.stars.match(/\d+/)?.[0] ?? '0')) : 0;
+  const starsTokens = chamberInfo.stats?.stars?.match(/\d+/g) ?? [];
+  const starsCollected = Number(starsTokens[0] ?? '0');
   const waterScored = chamberInfo.stats?.water;
-  const totalStars = 0;
-  void buttEndDirs;
-  void half; // preserved for API compatibility
+  const totalStars = Number(starsTokens[1] ?? '0');
   drawLevelChamberTile(
     ctx,
     x,

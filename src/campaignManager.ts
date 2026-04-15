@@ -650,8 +650,16 @@ export class CampaignManager {
       levelStars,
       levelWater,
       (ci) => {
-        if (this._activeCampaign?.grid) this.showCampaignMap();
-        else this.showChapterMap(ci);
+        if (this._activeCampaign?.grid) {
+          const chapter = this._activeCampaign.chapters[ci];
+          if (chapter && this._activeCampaignCompletedChapters.has(chapter.id)) {
+            this.showChapterMap(ci);
+          } else {
+            this.showCampaignMap();
+          }
+        } else {
+          this.showChapterMap(ci);
+        }
       },
       this._activeCampaignCompletedChapters,
       () => this._callbacks.showSettings(),
@@ -874,7 +882,10 @@ export class CampaignManager {
       const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
       const levelStars = loadLevelStars(campaign.id);
       const levelWater = loadLevelWater(campaign.id);
-      const chaptersDone = campaign.chapters.filter(ch => this._activeCampaignCompletedChapters.has(ch.id)).length;
+      const chaptersDone = campaign.chapters.reduce(
+        (sum, ch) => sum + (this._activeCampaignCompletedChapters.has(ch.id) ? 1 : 0),
+        0,
+      );
       const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
       const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
       const waterTotal = allLevels.reduce((sum, l) => sum + (this._activeCampaignProgress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);

@@ -22,6 +22,7 @@ export class CampaignMapScreen {
       onLevelSelected: (levelDef) => {
         const chapterIdx = this._pseudoLevels.findIndex((l) => l.id === levelDef.id);
         if (chapterIdx >= 0) callbacks.onChapterSelected(chapterIdx);
+        else console.warn('CampaignMapScreen: selected chamber could not be mapped to chapter index.', levelDef.id);
       },
     };
     this._inner = new ChapterMapScreen(chapterCallbacks);
@@ -67,20 +68,20 @@ export class CampaignMapScreen {
   }
 
   private _buildPseudoChapter(campaign: CampaignDef): ChapterDef {
-    const levels: LevelDef[] = campaign.chapters.map((chapter) => {
+    const levels: LevelDef[] = campaign.chapters.map((chapter, chapterIdx) => {
       const rows = chapter.rows ?? 1;
       const cols = chapter.cols ?? 1;
       const grid = chapter.grid ?? [[{ shape: PipeShape.Empty } as TileDef]];
-      const starCount = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+      const totalStars = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
       const challenge = chapter.levels.some((l) => l.challenge === true);
       return {
-        id: chapter.id,
+        id: -1000 - chapterIdx,
         name: chapter.name,
         rows,
         cols,
         grid,
         inventory: [],
-        starCount,
+        starCount: totalStars,
         challenge,
       };
     });
