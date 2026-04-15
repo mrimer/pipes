@@ -194,6 +194,7 @@ export function renderLevelList(
   completedChapters?: ReadonlySet<number>,
   onSettingsClick?: () => void,
   onCampaignMastered?: () => void,
+  campaignHasMap = false,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -327,7 +328,9 @@ export function renderLevelList(
     // ── Continue button ────────────────────────────────────────────────────
     // When chapter maps are available, navigate to the latest unlocked chapter map.
     // Otherwise fall back to the level-based continue behaviour.
-    const continueChapterIdx = onChapterMap
+    const continueChapterIdx = campaignHasMap
+      ? 0
+      : onChapterMap
       ? findContinueChapterIdx(chapters, completedLevels, completedChapters)
       : null;
     const continueId = continueChapterIdx === null
@@ -343,6 +346,8 @@ export function renderLevelList(
     const continueBtn = document.createElement('button');
     if (showMastered) {
       continueBtn.textContent = '🏆 Mastered!';
+    } else if (campaignHasMap) {
+      continueBtn.textContent = '▶ Campaign Map';
     } else if (continueChapterIdx !== null) {
       const noProgress = completedLevels.size === 0 && (!completedChapters || completedChapters.size === 0);
       continueBtn.textContent = noProgress ? '▶ Start' : `▶ Chapter ${continueChapterIdx + 1}`;
@@ -373,8 +378,8 @@ export function renderLevelList(
       'cursor:' + (showMastered ? 'default' : continueActive ? 'pointer' : 'default') + ';' +
       'width:100%;';
     if (!showMastered) {
-      if (continueChapterIdx !== null && onChapterMap) {
-        continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx); });
+      if ((campaignHasMap || continueChapterIdx !== null) && onChapterMap) {
+        continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx ?? 0); });
       } else if (continueId !== null) {
         continueBtn.addEventListener('click', () => startLevel(continueId));
       }
@@ -497,7 +502,7 @@ export function renderLevelList(
 
     if (!chapterLocked) {
       chapterHeader.style.cursor = 'pointer';
-      if (chapter.grid && onChapterMap) {
+      if ((campaignHasMap || chapter.grid) && onChapterMap) {
         // Chapter has a map: clicking navigates to the chapter map screen
         chapterHeader.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(ci); });
       } else {

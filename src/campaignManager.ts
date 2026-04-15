@@ -9,6 +9,7 @@
 
 import { CampaignDef, ChapterDef, LevelDef, GameScreen } from './types';
 import { ChapterMapScreen } from './chapterMapScreen';
+import { CampaignMapScreen } from './campaignMapScreen';
 import { CampaignEditor } from './campaignEditor';
 import {
   loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
@@ -19,7 +20,8 @@ import {
   loadCompletedChapters, markChapterCompleted, clearCompletedChapters, removeChapterCompleted,
   markLevelCompleted, clearCompletedLevels,
   loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown, removeMasteredChapterShown,
-  loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
+   loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
+   loadCampaignCompleteShown, markCampaignCompleteShown, clearCampaignCompleteShown,
 } from './persistence';
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
@@ -114,10 +116,13 @@ export class CampaignManager {
   private _activeCampaignMasteredChaptersShown: Set<number> = new Set();
   /** True when the full-campaign mastery sequence has already been shown. */
   private _campaignMasteredShown = false;
+  /** True when the full-campaign complete sequence has already been shown. */
+  private _campaignCompleteShown = false;
 
   // ── Chapter map ───────────────────────────────────────────────────────────
 
   private _chapterMapScreen: ChapterMapScreen | null = null;
+  private _campaignMapScreen: CampaignMapScreen | null = null;
   private _winFromChapterMap = false;
 
   // ── Chapter/challenge modals ──────────────────────────────────────────────
@@ -180,6 +185,7 @@ export class CampaignManager {
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
     this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
     this._campaignMasteredShown = loadCampaignMasteredShown(campaign.id);
+    this._campaignCompleteShown = loadCampaignCompleteShown(campaign.id);
     saveActiveCampaignId(campaign.id);
     this._callbacks.showLevelSelect();
   }
@@ -188,6 +194,7 @@ export class CampaignManager {
   deactivate(): void {
     this._activeCampaign = null;
     this._activeCampaignProgress = new Set();
+    this._campaignCompleteShown = false;
     clearActiveCampaignId();
     this._callbacks.showLevelSelect();
   }
@@ -221,13 +228,20 @@ export class CampaignManager {
     if (!campaign) return;
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter?.grid) return;
+    this._campaignMapScreen?.hide();
 
     if (!this._chapterMapScreen) {
       this._chapterMapScreen = new ChapterMapScreen({
         getDisplayProgress: () =>
           this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels,
         getActiveCampaignId: () => this._activeCampaign?.id ?? null,
-        onShowLevelSelect: () => this._callbacks.showLevelSelect(),
+        onShowLevelSelect: () => {
+          if (this._activeCampaign?.grid && this._campaignMapScreen) {
+            this.reshowCampaignMap();
+          } else {
+            this._callbacks.showLevelSelect();
+          }
+        },
         onLevelSelected: (levelDef) => {
           this._winFromChapterMap = true;
           this._callbacks.exitBtnEl.textContent = '← Chapter Map';
@@ -294,6 +308,49 @@ export class CampaignManager {
     if (this._chapterMapScreen) {
       this._chapterMapScreen.hide();
     }
+  }
+
+  /** Show the campaign map when the active campaign defines a campaign-level grid. */
+  showCampaignMap(): void {
+    const campaign = this._activeCampaign;
+    if (!campaign?.grid) return;
+
+    if (!this._campaignMapScreen) {
+      this._campaignMapScreen = new CampaignMapScreen({
+        getCompletedChapters: () => this._activeCampaignCompletedChapters,
+        getActiveCampaignId: () => this._activeCampaign?.id ?? null,
+        onShowLevelSelect: () => this._callbacks.showLevelSelect(),
+        onChapterSelected: (chapterIdx) => this.showChapterMap(chapterIdx),
+      });
+    }
+
+    this.hideChapterMap();
+    this._winFromChapterMap = false;
+    this._campaignMapScreen.show(campaign);
+    this._callbacks.setLevelSelectVisible(false);
+    this._callbacks.setPlayScreenVisible(false);
+    this._callbacks.setScreen(GameScreen.ChapterMap);
+    if (this._campaignCompleteShown && !this._campaignMapScreen.isCampaignComplete()) {
+      clearCampaignCompleteShown(campaign.id);
+      this._campaignCompleteShown = false;
+    }
+    this._checkAutoCompleteCampaign();
+  }
+
+  /** Re-show the campaign map after returning from a chapter map. */
+  reshowCampaignMap(): void {
+    if (this._campaignMapScreen && this._activeCampaign?.grid) {
+      this._campaignMapScreen.repopulate(this._activeCampaign);
+      this._callbacks.setLevelSelectVisible(false);
+      this._callbacks.setPlayScreenVisible(false);
+      this._callbacks.setScreen(GameScreen.ChapterMap);
+      this._checkAutoCompleteCampaign();
+    }
+  }
+
+  /** Hide the campaign map screen element (if it exists). */
+  hideCampaignMap(): void {
+    this._campaignMapScreen?.hide();
   }
 
   /**
@@ -538,7 +595,9 @@ export class CampaignManager {
       clearCompletedChapters(this._activeCampaign.id, this._activeCampaignCompletedChapters);
       clearMasteredChaptersShown(this._activeCampaign.id, this._activeCampaignMasteredChaptersShown);
       clearCampaignMasteredShown(this._activeCampaign.id);
+      clearCampaignCompleteShown(this._activeCampaign.id);
       this._campaignMasteredShown = false;
+      this._campaignCompleteShown = false;
     } else {
       clearCompletedLevels(this._callbacks.completedLevels);
       clearLevelStars();
@@ -590,10 +649,14 @@ export class CampaignManager {
       campaignChapters,
       levelStars,
       levelWater,
-      (ci) => this.showChapterMap(ci),
+      (ci) => {
+        if (this._activeCampaign?.grid) this.showCampaignMap();
+        else this.showChapterMap(ci);
+      },
       this._activeCampaignCompletedChapters,
       () => this._callbacks.showSettings(),
       this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
+      this._activeCampaign?.grid !== undefined,
     );
   }
 
@@ -628,6 +691,7 @@ export class CampaignManager {
    */
   prepareForLevelSelect(): void {
     this.hideChapterMap();
+    this.hideCampaignMap();
     this._newChapterModalEl.style.display = 'none';
     this._challengeModalEl.style.display = 'none';
     clearModalSparkle(this._newChapterModalEl);
@@ -788,6 +852,83 @@ export class CampaignManager {
       } else {
         this._showChapterCompleteModal(chapterIdx, campaign);
       }
+    }
+  }
+
+  /** Auto-trigger campaign completion on campaign-map entry when newly complete. */
+  private _checkAutoCompleteCampaign(): void {
+    const campaign = this._activeCampaign;
+    if (!campaign?.grid || this._campaignCompleteShown) return;
+    if (this._campaignMapScreen?.isCampaignComplete()) {
+      this._completeCampaign();
+    }
+  }
+
+  private _completeCampaign(): void {
+    const campaign = this._activeCampaign;
+    if (!campaign || this._campaignCompleteShown) return;
+    this._campaignCompleteShown = true;
+    markCampaignCompleteShown(campaign.id);
+
+    const showModal = () => {
+      const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
+      const levelStars = loadLevelStars(campaign.id);
+      const levelWater = loadLevelWater(campaign.id);
+      const chaptersDone = campaign.chapters.filter(ch => this._activeCampaignCompletedChapters.has(ch.id)).length;
+      const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+      const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+      const waterTotal = allLevels.reduce((sum, l) => sum + (this._activeCampaignProgress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);
+      const challengesDone = allLevels.filter(l => l.challenge && this._activeCampaignProgress.has(l.id)).length;
+      const challengesTotal = allLevels.filter(l => l.challenge).length;
+
+      const modal = document.createElement('div');
+      modal.style.cssText = `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:100;`;
+      const box = document.createElement('div');
+      box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:430px;width:90%;text-align:center;';
+      const titleEl = document.createElement('h2');
+      titleEl.textContent = '🎉 Campaign Complete!';
+      titleEl.style.cssText = 'color:#7ed321;margin:0 0 16px;font-size:1.5rem;';
+      box.appendChild(titleEl);
+
+      const stats = document.createElement('div');
+      stats.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:1rem;margin-bottom:16px;';
+      const ch = document.createElement('span');
+      ch.style.color = '#7ed321';
+      ch.textContent = `📘 ${chaptersDone}/${campaign.chapters.length}`;
+      stats.appendChild(ch);
+      if (waterTotal > 0) { const el = document.createElement('span'); el.style.color = '#4fc3f7'; el.textContent = `💧 ${waterTotal}`; stats.appendChild(el); }
+      if (starsTotal > 0) { const el = document.createElement('span'); el.style.color = '#f0c040'; el.textContent = `⭐ ${starsCollected}/${starsTotal}`; stats.appendChild(el); }
+      if (challengesTotal > 0) { const el = document.createElement('span'); el.style.color = ERROR_COLOR; el.textContent = `💀 ${challengesDone}/${challengesTotal}`; stats.appendChild(el); }
+      box.appendChild(stats);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;justify-content:center;gap:8px;flex-wrap:wrap;';
+      const remainBtn = document.createElement('button');
+      remainBtn.textContent = 'Remain here';
+      remainBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#7ed321;`;
+      remainBtn.addEventListener('click', () => modal.remove());
+      const menuBtn = document.createElement('button');
+      menuBtn.textContent = 'Main Menu';
+      menuBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#aaa;`;
+      menuBtn.addEventListener('click', () => { modal.remove(); this._callbacks.showLevelSelect(); });
+      btnRow.appendChild(menuBtn);
+      btnRow.appendChild(remainBtn);
+      box.appendChild(btnRow);
+      modal.appendChild(box);
+      document.body.appendChild(modal);
+      spawnConfetti(() => {});
+    };
+
+    const allChaptersMastered = campaign.chapters.every((ch) => this._isCampaignChapterMastered(ch));
+    if (allChaptersMastered && !this._campaignMasteredShown) {
+      this._showCampaignMasterySequence();
+    }
+
+    if (this._campaignMapScreen) {
+      this._campaignMapScreen.playWinAnimation(showModal);
+    } else {
+      sfxManager.play(SfxId.WinChapter);
+      showModal();
     }
   }
 
@@ -984,6 +1125,7 @@ export class CampaignManager {
     this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
     this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
     this._campaignMasteredShown = loadCampaignMasteredShown(campaign.id);
+    this._campaignCompleteShown = loadCampaignCompleteShown(campaign.id);
     saveActiveCampaignId(campaign.id);
   }
 
@@ -996,6 +1138,7 @@ export class CampaignManager {
       this._activeCampaignCompletedChapters = loadCompletedChapters(campaign.id);
       this._activeCampaignMasteredChaptersShown = loadMasteredChaptersShown(campaign.id);
       this._campaignMasteredShown = loadCampaignMasteredShown(campaign.id);
+      this._campaignCompleteShown = loadCampaignCompleteShown(campaign.id);
     } else {
       clearActiveCampaignId();
     }
