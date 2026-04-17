@@ -9,7 +9,7 @@
  *   • Validation uses validateCampaignMap().
  */
 
-import { CampaignDef, TileDef, PipeShape, Direction, Rotation, LevelStyle } from '../types';
+import { CampaignDef, TileDef, PipeShape, Direction, Rotation, LevelStyle, LevelDef } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize, BASE_TILE_SIZE } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
@@ -175,8 +175,16 @@ export class CampaignMapEditorSection {
       }
       this._rotatePalette(clockwise);
     }
-    if (key === 'z' && e.ctrlKey) { e.preventDefault(); const c = this._cbs.getActiveCampaign(); if (c) this._undo(c); }
-    if (key === 'y' && e.ctrlKey) { e.preventDefault(); const c = this._cbs.getActiveCampaign(); if (c) this._redo(c); }
+    if (key === 'z' && e.ctrlKey) {
+      e.preventDefault();
+      const c = this._cbs.getActiveCampaign();
+      if (c) this._undo(c);
+    }
+    if (key === 'y' && e.ctrlKey) {
+      e.preventDefault();
+      const c = this._cbs.getActiveCampaign();
+      if (c) this._redo(c);
+    }
   }
 
   // ── Private: initialization ────────────────────────────────────────────────
@@ -414,7 +422,9 @@ export class CampaignMapEditorSection {
             this._selectedChapterIdx = null;
           } else {
             this._selectedChapterIdx = ci;
-            this._palette = PipeShape.Source; // deselect palette
+            // Clear any active palette tool selection so the palette panel
+            // reflects "no tile active" while the chapter placement is pending.
+            this._palette = CHAPTER_CHAMBER_PALETTE;
             document.getElementById('campaign-map-palette-panel')
               ?.replaceWith(this._buildPalettePanel(campaign));
             sfxManager.play(SfxId.LevelSelect);
@@ -625,6 +635,18 @@ export class CampaignMapEditorSection {
 
     const filledKeys = this._computeFilledCells();
 
+    // Build pseudo-LevelDefs from campaign chapters so that chapter chambers
+    // render with the chapter's own map minimap inside the tile.
+    const campaign = this._cbs.getActiveCampaign();
+    const chapterDefs: LevelDef[] = (campaign?.chapters ?? []).map(ch => ({
+      id: ch.id,
+      name: ch.name,
+      rows: ch.rows ?? 0,
+      cols: ch.cols ?? 0,
+      grid: ch.grid ?? [],
+      inventory: [],
+    }));
+
     renderEditorCanvas(
       ctx,
       this._editGrid,
@@ -633,10 +655,11 @@ export class CampaignMapEditorSection {
       overlay,
       drag,
       null,
-      undefined,   // no level defs needed – chapter chambers rendered via drawEditorTile
-      undefined,
+      undefined,  // levelDefs: not needed on the campaign map
+      undefined,  // levelProgress
       filledKeys,
-      this._cbs.getActiveCampaign()?.style,
+      campaign?.style,
+      chapterDefs,
     );
 
     if (this._focusedTilePos && this._ctx) {

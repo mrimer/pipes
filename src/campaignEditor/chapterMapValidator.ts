@@ -1,7 +1,6 @@
-import { ChapterDef, TileDef, PipeShape } from '../types';
-import { computeMapReachable, editorTileConns } from '../mapUtils';
+import { ChapterDef, TileDef } from '../types';
 import { ValidationResult } from './types';
-import { MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
+import { validateMapGrid } from './mapValidator';
 
 export function validateChapterMap(
   grid: (TileDef | null)[][],
@@ -9,85 +8,12 @@ export function validateChapterMap(
   cols: number,
   chapter: ChapterDef,
 ): ValidationResult {
-  const msgs: string[] = [];
-  let ok = true;
-
-  let sourcePos: { row: number; col: number } | null = null;
-  let sinkPos: { row: number; col: number } | null = null;
-  const levelChamberIdxs = new Set<number>();
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const def = grid[r]?.[c];
-      if (!def) continue;
-      if (def.shape === PipeShape.Source) {
-        if (sourcePos) { msgs.push(MULTIPLE_SOURCES); ok = false; }
-        else sourcePos = { row: r, col: c };
-      }
-      if (def.shape === PipeShape.Sink) {
-        if (sinkPos) msgs.push('⚠️ Multiple Sink tiles found – only first is checked.');
-        else sinkPos = { row: r, col: c };
-      }
-      if (def.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-        levelChamberIdxs.add(def.levelIdx);
-      }
-    }
-  }
-
-  if (!sourcePos) { msgs.push(`❌ ${NO_SOURCE}`); ok = false; }
-  if (!sinkPos) { msgs.push(`❌ ${NO_SINK}`); ok = false; }
-
-  // Check sink completion threshold is not greater than the number of levels
-  if (sinkPos) {
-    const sinkDef = grid[sinkPos.row]?.[sinkPos.col];
-    const completion = sinkDef?.completion ?? 0;
-    if (completion > chapter.levels.length) {
-      msgs.push(
-        `⚠️ Sink completion threshold (${completion}) exceeds the number of levels in this chapter (${chapter.levels.length}).`,
-      );
-      ok = false;
-    }
-  }
-
-  // Check all levels are placed
-  for (let li = 0; li < chapter.levels.length; li++) {
-    if (!levelChamberIdxs.has(li)) {
-      msgs.push(`❌ Level ${li + 1} (${chapter.levels[li].name}) is not placed on the map.`);
-      ok = false;
-    }
-  }
-
-  if (!sourcePos || !sinkPos) return { ok, messages: msgs };
-
-  // BFS reachability check
-  const reached = computeMapReachable(
-    grid,
-    rows,
-    cols,
-    sourcePos,
-    (def) => editorTileConns(def),
-  );
-
-  // Check sink reachable
-  const sinkKey = `${sinkPos.row},${sinkPos.col}`;
-  if (!reached.has(sinkKey)) {
-    msgs.push('❌ Sink is not reachable from the Source through connections.');
-    ok = false;
-  }
-
-  // Check all level chambers reachable
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const def = grid[r]?.[c];
-      if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-        if (!reached.has(`${r},${c}`)) {
-          msgs.push(`❌ Level ${def.levelIdx + 1} chamber at (${r},${c}) is not reachable from the Source.`);
-          ok = false;
-        }
-      }
-    }
-  }
-
-  if (msgs.length === 0 && ok) msgs.push('✅ Chapter map structure looks valid.');
-  return { ok, messages: msgs };
+  return validateMapGrid(grid, rows, cols, {
+    chamberContent: 'level',
+    entityIdxField: 'levelIdx',
+    entityCount: chapter.levels.length,
+    entityName: (i) => `Level ${i + 1} (${chapter.levels[i]?.name ?? '?'})`,
+    sinkCompletionMax: chapter.levels.length,
+  });
 }
+
