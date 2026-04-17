@@ -773,4 +773,35 @@ describe('CampaignService – scanData', () => {
     const issues = svc.scanData(campaign, true);
     expect(issues.get('Tile')?.has('unknownTileField')).toBe(true);
   });
+
+  it('does not flag Level.style as unrecognized', () => {
+    const campaign = campaignWithChapter();
+    campaign.chapters[0].levels[0].style = 'Dark';
+    const svc = new CampaignService([campaign]);
+    const issues = svc.scanData(campaign, true);
+    expect(issues.get('Level')?.has('style') ?? false).toBe(false);
+  });
+
+  it('does not flag map Source.capacity or map pipe rotation as unrecognized', () => {
+    const campaign = campaignWithChapter();
+    campaign.rows = 1;
+    campaign.cols = 2;
+    campaign.grid = [[
+      { shape: PipeShape.Source, capacity: 10 },
+      { shape: PipeShape.Cross, rotation: 90 },
+    ]];
+    campaign.chapters[0].rows = 1;
+    campaign.chapters[0].cols = 2;
+    campaign.chapters[0].grid = [[
+      { shape: PipeShape.Source, capacity: 10 },
+      { shape: PipeShape.Cross, rotation: 180 },
+    ]];
+
+    const svc = new CampaignService([campaign]);
+    const issues = svc.scanData(campaign, true);
+    expect(issues.get('CampaignMapTile')?.has('capacity') ?? false).toBe(false);
+    expect(issues.get('CampaignMapTile')?.has('rotation') ?? false).toBe(false);
+    expect(issues.get('ChapterMapTile')?.has('capacity') ?? false).toBe(false);
+    expect(issues.get('ChapterMapTile')?.has('rotation') ?? false).toBe(false);
+  });
 });

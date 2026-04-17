@@ -23,7 +23,7 @@ export const VALID_CHAPTER_KEYS: ReadonlySet<string> = new Set([
 /** Valid keys for a LevelDef record. */
 export const VALID_LEVEL_KEYS: ReadonlySet<string> = new Set([
   'id', 'name', 'rows', 'cols', 'grid', 'inventory',
-  'note', 'hints', 'starCount', 'challenge',
+  'note', 'hints', 'starCount', 'challenge', 'style',
 ]);
 /** Valid keys for an InventoryItem record. */
 export const VALID_INVENTORY_ITEM_KEYS: ReadonlySet<string> = new Set(['shape', 'count']);
@@ -79,17 +79,17 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
 
 /**
  * Return the set of valid TileDef field names for the given tile definition
- * on a **chapter map** grid.  Chapter map tiles use a more restricted field
- * set than level tiles (e.g. Source has no capacity; Sink has completion).
+ * on a **chapter map** grid.
  */
 export function getValidChapterMapTileDefKeys(tile: TileDef): ReadonlySet<string> {
   const valid = new Set<string>(['shape']);
   const shape = tile.shape;
 
-  if (ROTATION_SHAPES.has(shape)) valid.add('rotation');
+  if (PIPE_SHAPES.has(shape)) valid.add('rotation');
 
   if (shape === PipeShape.Source) {
-    // Chapter map Source: connections only – no capacity, temperature or pressure
+    // Keep Source capacity allowed for compatibility with existing chapter-map data.
+    valid.add('capacity');
     valid.add('connections');
   } else if (shape === PipeShape.Sink) {
     valid.add('connections');
@@ -111,9 +111,11 @@ export function getValidCampaignMapTileDefKeys(tile: TileDef): ReadonlySet<strin
   const valid = new Set<string>(['shape']);
   const shape = tile.shape;
 
-  if (ROTATION_SHAPES.has(shape)) valid.add('rotation');
+  if (PIPE_SHAPES.has(shape)) valid.add('rotation');
 
   if (shape === PipeShape.Source) {
+    // Keep Source capacity allowed for compatibility with existing campaign-map data.
+    valid.add('capacity');
     valid.add('connections');
   } else if (shape === PipeShape.Sink) {
     valid.add('connections');
