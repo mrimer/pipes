@@ -85,6 +85,9 @@ export function getValidChapterMapTileDefKeys(tile: TileDef): ReadonlySet<string
   const valid = new Set<string>(['shape']);
   const shape = tile.shape;
 
+  // Chapter map editor currently persists `rotation` on any pipe-shape tile,
+  // including symmetric shapes where rotation has no gameplay effect.
+  // Treat this as valid for backward-compatible data validation/cleanup.
   if (PIPE_SHAPES.has(shape)) valid.add('rotation');
 
   if (shape === PipeShape.Source) {
@@ -111,6 +114,8 @@ export function getValidCampaignMapTileDefKeys(tile: TileDef): ReadonlySet<strin
   const valid = new Set<string>(['shape']);
   const shape = tile.shape;
 
+  // Campaign map data can include `rotation` on any pipe-shape tile from editor
+  // saves/imports, so accept it during validation to avoid false positives.
   if (PIPE_SHAPES.has(shape)) valid.add('rotation');
 
   if (shape === PipeShape.Source) {
