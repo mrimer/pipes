@@ -21,6 +21,8 @@ import { LevelMetadataPanel } from './levelMetadataPanel';
 const EDITOR_LAYOUT_PADDING = 16;
 /** Gap (px) between flex columns in the main editor layout. */
 const EDITOR_LAYOUT_GAP = 16;
+/** Synthetic level id used only for campaign-map preview minimap rendering. */
+const CAMPAIGN_PREVIEW_LEVEL_ID = -999_999;
 import {
   EditorScreen,
   generateLevelId,
@@ -550,7 +552,7 @@ export class CampaignEditor {
       mapWrap.appendChild(mapTitle);
 
       const pseudoLevel: LevelDef = {
-        id: -1,
+        id: CAMPAIGN_PREVIEW_LEVEL_ID,
         name: campaign.name,
         rows: campaign.rows,
         cols: campaign.cols,
