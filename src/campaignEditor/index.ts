@@ -536,6 +536,34 @@ export class CampaignEditor {
       content.appendChild(fields);
     }
 
+    // Campaign map preview
+    if (campaign.grid && campaign.rows && campaign.cols) {
+      const mapWrap = document.createElement('div');
+      mapWrap.id = 'campaign-map-preview-section';
+      mapWrap.style.cssText =
+        `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
+        'display:flex;flex-direction:column;gap:8px;';
+
+      const mapTitle = document.createElement('h3');
+      mapTitle.textContent = 'Campaign Map';
+      mapTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;';
+      mapWrap.appendChild(mapTitle);
+
+      const pseudoLevel: LevelDef = {
+        id: -1,
+        name: campaign.name,
+        rows: campaign.rows,
+        cols: campaign.cols,
+        grid: campaign.grid,
+        inventory: [],
+      };
+      const minimap = renderMinimap(pseudoLevel);
+      minimap.id = 'campaign-map-preview-canvas';
+      minimap.style.cssText = 'display:block;image-rendering:pixelated;border:2px solid white;';
+      mapWrap.appendChild(minimap);
+      content.appendChild(mapWrap);
+    }
+
     // Chapters section
     const chaptersHeader = document.createElement('div');
     chaptersHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
