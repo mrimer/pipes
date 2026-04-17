@@ -6,6 +6,7 @@ import { PipeShape, Direction } from '../src/types';
 import {
   getValidTileDefKeys,
   getValidChapterMapTileDefKeys,
+  getValidCampaignMapTileDefKeys,
   chamberColor,
   isChamberPalette,
   chamberPaletteContent,
@@ -233,10 +234,10 @@ describe('getValidChapterMapTileDefKeys', () => {
     expect(keys.has('rotation')).toBe(true);
   });
 
-  it('Source tile has connections but not capacity/temperature/pressure', () => {
+  it('Source tile has connections and capacity (compat), but not temperature/pressure', () => {
     const keys = getValidChapterMapTileDefKeys({ shape: PipeShape.Source });
     expect(keys.has('connections')).toBe(true);
-    expect(keys.has('capacity')).toBe(false);
+    expect(keys.has('capacity')).toBe(true);
     expect(keys.has('temperature')).toBe(false);
     expect(keys.has('pressure')).toBe(false);
   });
@@ -264,6 +265,27 @@ describe('getValidChapterMapTileDefKeys', () => {
     const keys = getValidChapterMapTileDefKeys({ shape: PipeShape.Granite });
     expect(keys.has('shape')).toBe(true);
     expect(keys.size).toBe(1);
+  });
+
+  it('Cross tile includes rotation on chapter maps (compat with saved editor output)', () => {
+    const keys = getValidChapterMapTileDefKeys({ shape: PipeShape.Cross });
+    expect(keys.has('shape')).toBe(true);
+    expect(keys.has('rotation')).toBe(true);
+  });
+});
+
+// ─── getValidCampaignMapTileDefKeys ───────────────────────────────────────────
+
+describe('getValidCampaignMapTileDefKeys', () => {
+  it('Source tile has connections and capacity (compat)', () => {
+    const keys = getValidCampaignMapTileDefKeys({ shape: PipeShape.Source });
+    expect(keys.has('connections')).toBe(true);
+    expect(keys.has('capacity')).toBe(true);
+  });
+
+  it('Cross tile includes rotation on campaign maps (compat with saved editor output)', () => {
+    const keys = getValidCampaignMapTileDefKeys({ shape: PipeShape.Cross });
+    expect(keys.has('rotation')).toBe(true);
   });
 });
 
