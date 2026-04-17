@@ -414,6 +414,16 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     return;
   }
 
+  // Chapter chambers (campaign map editor) – render identically to level chambers,
+  // using chapterIdx + 1 as the display number.
+  if (shape === PipeShape.Chamber && chamberContent === 'chapter') {
+    const connections = def.connections ? new Set(def.connections) : new Set([
+      Direction.North, Direction.East, Direction.South, Direction.West,
+    ]);
+    drawLevelChamberTile(ctx, x, y, undefined, (def.chapterIdx ?? 0) + 1, connections);
+    return;
+  }
+
   // EmptyDirt/EmptyDark/EmptyWinter: render as empty cell with label
   if (isEmptyFloor(shape) && shape !== PipeShape.Empty) {
     ctx.fillStyle = '#1a2840';

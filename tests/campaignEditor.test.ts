@@ -2290,7 +2290,7 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
     state._showCampaignDetail();
   }
 
-  it('renders a campaign map preview on the campaign detail page when map data exists', () => {
+  it('renders a campaign map editor on the campaign detail page when map data exists', () => {
     const campaign: CampaignDef = {
       id: 'cmp_map_preview_1',
       name: 'Map Preview Campaign',
@@ -2304,8 +2304,11 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
     editor.show();
     openCampaignDetail(editor, 'cmp_map_preview_1');
 
-    expect(document.querySelector('#campaign-map-preview-section')).not.toBeNull();
-    expect(document.querySelector('#campaign-map-preview-canvas')).not.toBeNull();
+    // The full campaign map editor section (not just a static preview) should be rendered.
+    expect(document.querySelector('#campaign-map-editor-section')).not.toBeNull();
+    // Should contain the interactive canvas for the campaign map editor.
+    const section = document.querySelector('#campaign-map-editor-section');
+    expect(section!.querySelector('canvas')).not.toBeNull();
   });
 
   it('shows the official toggle for user campaigns on the detail page', () => {

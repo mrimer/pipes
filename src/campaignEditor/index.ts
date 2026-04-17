@@ -12,15 +12,11 @@
 import { CampaignDef, LevelDef, TileDef, PipeShape } from '../types';
 import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from '../persistence';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
+import { CampaignMapEditorSection, CampaignMapEditorCallbacks } from './campaignMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
 import { LevelEditorState } from './levelEditorState';
 import { TileParamsPanel } from './tileParamsPanel';
 import { LevelMetadataPanel } from './levelMetadataPanel';
-
-/** Horizontal padding (px) of the main editor layout container. */
-const EDITOR_LAYOUT_PADDING = 16;
-/** Gap (px) between flex columns in the main editor layout. */
-const EDITOR_LAYOUT_GAP = 16;
 import {
   EditorScreen,
   generateLevelId,
@@ -46,20 +42,10 @@ import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_G
 import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
 
-/** Synthetic level id used only for campaign-map preview minimap rendering. */
-const CAMPAIGN_PREVIEW_LEVEL_ID = -999_999;
-/** Accent color for section titles in campaign-detail content cards. */
-const CAMPAIGN_SECTION_TITLE_COLOR = '#7ed321';
-/** Shared CSS for the campaign map preview section wrapper. */
-const CAMPAIGN_MAP_PREVIEW_SECTION_CSS =
-  `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
-  'display:flex;flex-direction:column;gap:8px;';
-/** Shared CSS for the campaign map preview title. */
-const CAMPAIGN_MAP_PREVIEW_TITLE_CSS =
-  `margin:0;font-size:1rem;color:${CAMPAIGN_SECTION_TITLE_COLOR};`;
-/** Shared CSS for the campaign map preview minimap canvas. */
-const CAMPAIGN_MAP_PREVIEW_CANVAS_CSS =
-  `display:block;image-rendering:pixelated;border:2px solid ${UI_BORDER};`;
+/** Horizontal padding (px) of the main editor layout container. */
+const EDITOR_LAYOUT_PADDING = 16;
+/** Gap (px) between flex columns in the main editor layout. */
+const EDITOR_LAYOUT_GAP = 16;
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -98,6 +84,9 @@ export class CampaignEditor {
   /** Chapter map editor sub-section (manages grid, palette, canvas, undo/redo). */
   private readonly _chapterMapEditor: ChapterMapEditorSection;
 
+  /** Campaign map editor sub-section (manages grid, palette, canvas, undo/redo). */
+  private readonly _campaignMapEditor: CampaignMapEditorSection;
+
   /** Data validation dialog (dev tool). */
   private readonly _dataValidator: DataValidationDialog;
 
@@ -134,6 +123,22 @@ export class CampaignEditor {
     };
     this._chapterMapEditor = new ChapterMapEditorSection(chapterCallbacks);
 
+    const campaignMapCallbacks: CampaignMapEditorCallbacks = {
+      buildBtn: (l, bg, c, cb, suppressClick) => this._btn(l, bg, c, cb, '', suppressClick),
+      getActiveCampaign: () => this._getActiveCampaign(),
+      touchCampaign: (campaign) => this._touchCampaign(campaign),
+      saveCampaigns: () => this._saveCampaigns(),
+      openChapterEditor: (chapterIdx, readOnly) => {
+        this._activeChapterIdx = chapterIdx;
+        if (readOnly) {
+          this._showChapterDetail();
+        } else {
+          this._showChapterDetail();
+        }
+      },
+    };
+    this._campaignMapEditor = new CampaignMapEditorSection(campaignMapCallbacks);
+
     this._dataValidator = new DataValidationDialog(this._service, this._btn.bind(this));
 
     this._paramsPanel = new TileParamsPanel({
@@ -156,6 +161,11 @@ export class CampaignEditor {
       // Chapter map editor: Q/W rotation
       if (this._screen === EditorScreen.Chapter) {
         this._chapterMapEditor.handleChapterEditorKeyDown(e);
+        return;
+      }
+      // Campaign map editor: Q/W rotation + Ctrl+Z/Y undo/redo
+      if (this._screen === EditorScreen.Campaign) {
+        this._campaignMapEditor.handleCampaignEditorKeyDown(e);
         return;
       }
       if (this._screen !== EditorScreen.LevelEditor) return;
@@ -494,6 +504,9 @@ export class CampaignEditor {
     // Determine whether this is a user campaign that can have its official flag toggled
     const isUserCampaign = this._service.campaigns.includes(campaign);
 
+    // Initialize campaign map editor grid state before building the section
+    this._campaignMapEditor.init(campaign);
+
     const toolbar = this._buildToolbar(
       isOfficial ? `📋 ${campaign.name} (read-only)` : `✏️ Edit Campaign: ${campaign.name}`,
       () => this._showCampaignList(),
@@ -507,7 +520,7 @@ export class CampaignEditor {
 
     const content = document.createElement('div');
     content.style.cssText =
-      'width:100%;max-width:900px;padding:20px;box-sizing:border-box;display:flex;' +
+      'width:100%;max-width:1200px;padding:20px;box-sizing:border-box;display:flex;' +
       'flex-direction:column;gap:16px;';
 
     // ── Dev – Official Campaign toggle (user campaigns only) ──────────────────
@@ -551,31 +564,8 @@ export class CampaignEditor {
       content.appendChild(fields);
     }
 
-    // Campaign map preview
-    if (campaign.grid && campaign.rows && campaign.cols) {
-      const mapWrap = document.createElement('div');
-      mapWrap.id = 'campaign-map-preview-section';
-      mapWrap.style.cssText = CAMPAIGN_MAP_PREVIEW_SECTION_CSS;
-
-      const mapTitle = document.createElement('h3');
-      mapTitle.textContent = 'Campaign Map';
-      mapTitle.style.cssText = CAMPAIGN_MAP_PREVIEW_TITLE_CSS;
-      mapWrap.appendChild(mapTitle);
-
-      const pseudoLevel: LevelDef = {
-        id: CAMPAIGN_PREVIEW_LEVEL_ID,
-        name: campaign.name,
-        rows: campaign.rows,
-        cols: campaign.cols,
-        grid: campaign.grid,
-        inventory: [],
-      };
-      const minimap = renderMinimap(pseudoLevel);
-      minimap.id = 'campaign-map-preview-canvas';
-      minimap.style.cssText = CAMPAIGN_MAP_PREVIEW_CANVAS_CSS;
-      mapWrap.appendChild(minimap);
-      content.appendChild(mapWrap);
-    }
+    // Campaign map editor section (full canvas editor, not just a static preview)
+    content.appendChild(this._campaignMapEditor.buildSection(campaign, isOfficial));
 
     // Chapters section
     const chaptersHeader = document.createElement('div');
