@@ -21,8 +21,6 @@ import { LevelMetadataPanel } from './levelMetadataPanel';
 const EDITOR_LAYOUT_PADDING = 16;
 /** Gap (px) between flex columns in the main editor layout. */
 const EDITOR_LAYOUT_GAP = 16;
-/** Synthetic level id used only for campaign-map preview minimap rendering. */
-const CAMPAIGN_PREVIEW_LEVEL_ID = -999_999;
 import {
   EditorScreen,
   generateLevelId,
@@ -47,6 +45,21 @@ import { isTouchDevice } from '../deviceUtils';
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
 import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
+
+/** Synthetic level id used only for campaign-map preview minimap rendering. */
+const CAMPAIGN_PREVIEW_LEVEL_ID = -999_999;
+/** Accent color for section titles in campaign-detail content cards. */
+const CAMPAIGN_SECTION_TITLE_COLOR = '#7ed321';
+/** Shared CSS for the campaign map preview section wrapper. */
+const CAMPAIGN_MAP_PREVIEW_SECTION_CSS =
+  `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
+  'display:flex;flex-direction:column;gap:8px;';
+/** Shared CSS for the campaign map preview title. */
+const CAMPAIGN_MAP_PREVIEW_TITLE_CSS =
+  `margin:0;font-size:1rem;color:${CAMPAIGN_SECTION_TITLE_COLOR};`;
+/** Shared CSS for the campaign map preview minimap canvas. */
+const CAMPAIGN_MAP_PREVIEW_CANVAS_CSS =
+  `display:block;image-rendering:pixelated;border:2px solid ${UI_BORDER};`;
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -542,13 +555,11 @@ export class CampaignEditor {
     if (campaign.grid && campaign.rows && campaign.cols) {
       const mapWrap = document.createElement('div');
       mapWrap.id = 'campaign-map-preview-section';
-      mapWrap.style.cssText =
-        `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
-        'display:flex;flex-direction:column;gap:8px;';
+      mapWrap.style.cssText = CAMPAIGN_MAP_PREVIEW_SECTION_CSS;
 
       const mapTitle = document.createElement('h3');
       mapTitle.textContent = 'Campaign Map';
-      mapTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;';
+      mapTitle.style.cssText = CAMPAIGN_MAP_PREVIEW_TITLE_CSS;
       mapWrap.appendChild(mapTitle);
 
       const pseudoLevel: LevelDef = {
@@ -561,7 +572,7 @@ export class CampaignEditor {
       };
       const minimap = renderMinimap(pseudoLevel);
       minimap.id = 'campaign-map-preview-canvas';
-      minimap.style.cssText = 'display:block;image-rendering:pixelated;border:2px solid white;';
+      minimap.style.cssText = CAMPAIGN_MAP_PREVIEW_CANVAS_CSS;
       mapWrap.appendChild(minimap);
       content.appendChild(mapWrap);
     }
