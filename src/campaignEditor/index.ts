@@ -128,13 +128,9 @@ export class CampaignEditor {
       getActiveCampaign: () => this._getActiveCampaign(),
       touchCampaign: (campaign) => this._touchCampaign(campaign),
       saveCampaigns: () => this._saveCampaigns(),
-      openChapterEditor: (chapterIdx, readOnly) => {
+      openChapterEditor: (chapterIdx, _readOnly) => {
         this._activeChapterIdx = chapterIdx;
-        if (readOnly) {
-          this._showChapterDetail();
-        } else {
-          this._showChapterDetail();
-        }
+        this._showChapterDetail();
       },
     };
     this._campaignMapEditor = new CampaignMapEditorSection(campaignMapCallbacks);

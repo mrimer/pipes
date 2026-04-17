@@ -55,6 +55,8 @@ export interface DragState {
  * @param levelDefs     Optional list of level definitions for rendering level-chamber tiles.
  * @param levelProgress Optional progress data for level-chamber display (completed, stars).
  * @param filledKeys    Optional set of "row,col" keys water-filled from source (for chapter map editor).
+ * @param chapterDefs   Optional list of chapter pseudo-LevelDefs for rendering chapter-chamber minimap tiles
+ *                      (campaign map editor only; indexed by chapterIdx).
  */
 export function renderEditorCanvas(
   ctx: CanvasRenderingContext2D,
@@ -68,6 +70,7 @@ export function renderEditorCanvas(
   levelProgress?: LevelProgressMap,
   filledKeys?: ReadonlySet<string>,
   style?: LevelStyle,
+  chapterDefs?: readonly LevelDef[],
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -162,7 +165,7 @@ export function renderEditorCanvas(
         ctx.restore();
       } else {
         const isFilled = filledKeys?.has(`${r},${c}`) ?? false;
-        _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined, style);
+        _drawEditorTileWithLevel(ctx, x, y, def, levelDefs, levelProgress, isFilled, filledKeys !== undefined, style, chapterDefs);
       }
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
@@ -286,6 +289,7 @@ function _drawEditorTileWithLevel(
   isFilled = false,
   isChapterMap = false,
   style?: LevelStyle,
+  chapterDefs?: readonly LevelDef[],
 ): void {
   if (def.shape === PipeShape.Chamber && def.chamberContent === 'level') {
     const levelIdx = def.levelIdx ?? 0;
@@ -298,6 +302,16 @@ function _drawEditorTileWithLevel(
       Direction.North, Direction.East, Direction.South, Direction.West,
     ]);
     drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, starsCollected, totalStars, isFilled);
+    return;
+  }
+  // Chapter chambers (campaign map editor): render with a minimap of the chapter's own map grid.
+  if (def.shape === PipeShape.Chamber && def.chamberContent === 'chapter') {
+    const chapterIdx = def.chapterIdx ?? 0;
+    const chapterDef = chapterDefs?.[chapterIdx];
+    const connections = def.connections ? new Set(def.connections) : new Set([
+      Direction.North, Direction.East, Direction.South, Direction.West,
+    ]);
+    drawLevelChamberTile(ctx, x, y, chapterDef, chapterIdx + 1, connections, false, 0, 0, isFilled);
     return;
   }
   drawEditorTile(ctx, x, y, def, isChapterMap, style);
