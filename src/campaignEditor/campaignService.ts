@@ -66,11 +66,28 @@ export class CampaignService {
     return { rows, cols, grid };
   }
 
+  private _hasUsableCampaignMap(campaign: CampaignDef): boolean {
+    const rows = campaign.rows;
+    const cols = campaign.cols;
+    const grid = campaign.grid;
+
+    if (
+      typeof rows !== 'number' || typeof cols !== 'number' ||
+      !Number.isInteger(rows) || !Number.isInteger(cols) ||
+      rows <= 0 || cols <= 0 ||
+      !Array.isArray(grid) || grid.length !== rows
+    ) {
+      return false;
+    }
+
+    return grid.every((row) => Array.isArray(row) && row.length === cols);
+  }
+
   /** Ensure every campaign has at least a default empty campaign map. */
   ensureCampaignMaps(): boolean {
     let changed = false;
     for (const campaign of this._campaigns) {
-      if (campaign.grid && campaign.rows && campaign.cols) continue;
+      if (this._hasUsableCampaignMap(campaign)) continue;
       const defaults = this._buildDefaultCampaignMap();
       campaign.rows = defaults.rows;
       campaign.cols = defaults.cols;

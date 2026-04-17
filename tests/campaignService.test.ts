@@ -98,6 +98,62 @@ describe('CampaignService – campaigns / getAllCampaigns / getCampaign', () => 
   });
 });
 
+// ─── ensureCampaignMaps ────────────────────────────────────────────────────────
+
+describe('CampaignService – ensureCampaignMaps', () => {
+  it('adds a default map when map fields are missing', () => {
+    const campaign = emptyCampaign('cmp_missing_map');
+    const svc = makeService([campaign]);
+
+    const changed = svc.ensureCampaignMaps();
+
+    expect(changed).toBe(true);
+    expect(campaign.rows).toBe(3);
+    expect(campaign.cols).toBe(6);
+    expect(campaign.grid).toHaveLength(3);
+    expect(campaign.grid?.[1][0]?.shape).toBe(PipeShape.Source);
+    expect(campaign.grid?.[1][5]?.shape).toBe(PipeShape.Sink);
+  });
+
+  it('replaces structurally invalid campaign maps with a default map', () => {
+    const campaign: CampaignDef = {
+      ...emptyCampaign('cmp_invalid_map'),
+      rows: 3,
+      cols: 6,
+      grid: [],
+    };
+    const svc = makeService([campaign]);
+
+    const changed = svc.ensureCampaignMaps();
+
+    expect(changed).toBe(true);
+    expect(campaign.grid).toHaveLength(3);
+    expect(campaign.grid?.every((row) => row.length === 6)).toBe(true);
+    expect(campaign.grid?.[1][0]?.shape).toBe(PipeShape.Source);
+    expect(campaign.grid?.[1][5]?.shape).toBe(PipeShape.Sink);
+  });
+
+  it('does not modify campaigns that already have a valid campaign map', () => {
+    const grid: (TileDef | null)[][] = Array.from({ length: 3 }, () => Array(6).fill(null) as null[]);
+    grid[1][0] = { shape: PipeShape.Source };
+    grid[1][5] = { shape: PipeShape.Sink };
+    const campaign: CampaignDef = {
+      ...emptyCampaign('cmp_valid_map'),
+      rows: 3,
+      cols: 6,
+      grid,
+      lastUpdated: '2020-01-01T00:00:00.000Z',
+    };
+    const svc = makeService([campaign]);
+
+    const changed = svc.ensureCampaignMaps();
+
+    expect(changed).toBe(false);
+    expect(campaign.grid).toBe(grid);
+    expect(campaign.lastUpdated).toBe('2020-01-01T00:00:00.000Z');
+  });
+});
+
 // ─── reload ───────────────────────────────────────────────────────────────────
 
 describe('CampaignService – reload', () => {
