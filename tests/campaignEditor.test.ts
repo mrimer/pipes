@@ -2290,6 +2290,24 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
     state._showCampaignDetail();
   }
 
+  it('renders a campaign map preview on the campaign detail page when map data exists', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_map_preview_1',
+      name: 'Map Preview Campaign',
+      author: 'Tester',
+      rows: 3,
+      cols: 6,
+      grid: Array.from({ length: 3 }, () => Array(6).fill(null)),
+      chapters: [],
+    };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    openCampaignDetail(editor, 'cmp_map_preview_1');
+
+    expect(document.querySelector('#campaign-map-preview-section')).not.toBeNull();
+    expect(document.querySelector('#campaign-map-preview-canvas')).not.toBeNull();
+  });
+
   it('shows the official toggle for user campaigns on the detail page', () => {
     const campaign: CampaignDef = { id: 'cmp_t1', name: 'My Campaign', author: 'Tester', chapters: [] };
     const editor = makeEditor([campaign]);
