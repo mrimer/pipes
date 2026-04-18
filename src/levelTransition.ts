@@ -479,9 +479,13 @@ export function playMapScreenExitTransition(
   document.body.appendChild(overlay);
 
   const originalFromScreenVisibility = fromScreenEl.style.visibility;
+  const originalToScreenVisibility = toScreenEl.style.visibility;
   fromScreenEl.style.opacity = '1';
   fromScreenEl.style.visibility = 'hidden';
   toScreenEl.style.opacity = '0';
+  // Keep the live destination map hidden during the zoom so any concurrent
+  // TILE_SIZE recalculation (e.g. resize/repopulate) cannot appear mid-animation.
+  toScreenEl.style.visibility = 'hidden';
 
   const startTime = performance.now();
 
@@ -508,6 +512,7 @@ export function playMapScreenExitTransition(
       overlay.remove();
       fromScreenEl.style.opacity = '';
       fromScreenEl.style.visibility = originalFromScreenVisibility;
+      toScreenEl.style.visibility = originalToScreenVisibility;
       toScreenEl.style.opacity = '';
       onComplete();
     }

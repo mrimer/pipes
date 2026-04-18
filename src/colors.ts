@@ -154,8 +154,8 @@ export const SEA_BORDER_COLOR       = '#c8a96e';
 export const SEA_FILL_COLOR         = '#2a7fbf';
 /** Success/completion green color used for completed status indicators. */
 export const SUCCESS_COLOR          = '#7ed321';
-/** Chapter map screen root background color (darker than main BG). */
-export const CHAPTER_MAP_BG         = '#0a0e1a';
+/** Chapter/campaign map screen root background color (matches main/level background). */
+export const CHAPTER_MAP_BG         = BG_COLOR;
 /** Background fill for chapter map tile cells (non-empty, slightly lighter than CHAPTER_MAP_BG). */
 export const CHAPTER_MAP_TILE_BG    = '#1a2840';
 /** Background fill for chapter map empty (null) cells. */
