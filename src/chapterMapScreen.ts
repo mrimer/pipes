@@ -863,7 +863,8 @@ export class ChapterMapScreen {
       const def = chapter.grid[pos.row]?.[pos.col];
       if (!def) return;
       if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
-      const levelIdx = def.levelIdx ?? 0;
+      const levelIdx = def.levelIdx;
+      if (levelIdx === undefined) return;
       const levelDef = chapter.levels[levelIdx];
       if (!levelDef) return;
       const displayProgress = this._callbacks.getDisplayProgress();
@@ -1028,7 +1029,8 @@ export class ChapterMapScreen {
     // Handle level chamber click
     if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
 
-    const levelIdx = def.levelIdx ?? 0;
+    const levelIdx = def.levelIdx;
+    if (levelIdx === undefined) return;
     const levelDef = chapter.levels[levelIdx];
     if (!levelDef) return;
 

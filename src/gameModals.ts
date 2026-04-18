@@ -262,6 +262,9 @@ export function buildSettingsModal(
   getVolume: () => number,
   onVolumeChange: (v: number) => void,
   onVolumePreview: () => void,
+  getTouchUiEnabled: () => boolean,
+  isTouchUiToggleEnabled: () => boolean,
+  onTouchUiChange: (enabled: boolean) => void,
   onConfirm: (el: HTMLElement) => void,
 ): HTMLElement {
   const el = createModalOverlay(0.5);
@@ -310,6 +313,32 @@ export function buildSettingsModal(
   sfxSection.appendChild(sfxLabel);
   sfxSection.appendChild(slider);
   box.appendChild(sfxSection);
+
+  // ── Touch Device row ─────────────────────────────────────────────────────
+  const touchSection = document.createElement('div');
+  touchSection.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%;margin-top:4px;';
+
+  const touchRow = document.createElement('label');
+  touchRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;';
+  touchRow.title = 'Enables touch-optimized UI behavior (larger tap-friendly interactions). Disable this on touchscreen laptops to keep desktop-style hover controls.';
+
+  const touchLabelText = document.createElement('span');
+  touchLabelText.textContent = '📱 Touch Device';
+
+  const touchToggle = document.createElement('input');
+  touchToggle.type = 'checkbox';
+  touchToggle.dataset.touchUiToggle = '1';
+  touchToggle.checked = getTouchUiEnabled();
+  touchToggle.disabled = !isTouchUiToggleEnabled();
+  touchToggle.title = touchRow.title;
+  touchToggle.addEventListener('change', () => {
+    onTouchUiChange(touchToggle.checked);
+  });
+
+  touchRow.appendChild(touchLabelText);
+  touchRow.appendChild(touchToggle);
+  touchSection.appendChild(touchRow);
+  box.appendChild(touchSection);
 
   // ── Command key assignments ───────────────────────────────────────────────
   const commandsSection = document.createElement('div');

@@ -23,7 +23,7 @@ export class CampaignMapScreen {
       getActiveCampaignId: () => callbacks.getActiveCampaignId(),
       onShowLevelSelect: () => callbacks.onShowLevelSelect(),
       onLevelSelected: (levelDef) => {
-        const chapterIdx = this._pseudoLevels.findIndex((l) => l.id === levelDef.id);
+        const chapterIdx = this._pseudoLevels.indexOf(levelDef);
         if (chapterIdx >= 0) callbacks.onChapterSelected(chapterIdx);
         else console.warn('CampaignMapScreen: selected chamber could not be mapped to chapter index.', levelDef.id);
       },
@@ -38,12 +38,17 @@ export class CampaignMapScreen {
         const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
         const nonChallengeLevels = allLevels.filter((l) => !l.challenge);
         const completedNonChallenge = nonChallengeLevels.filter((l) => completedLevels.has(l.id)).length;
+        const challengeLevels = allLevels.filter((l) => l.challenge);
+        const completedChallenges = challengeLevels.filter((l) => completedLevels.has(l.id)).length;
         const isComplete = this.isCampaignComplete();
         const levelWater = loadLevelWater(callbacks.getActiveCampaignId() ?? undefined);
+        const levelStars = loadLevelStars(callbacks.getActiveCampaignId() ?? undefined);
         const waterTotal = allLevels.reduce(
           (sum, level) => sum + (completedLevels.has(level.id) ? (levelWater[level.id] ?? 0) : 0),
           0,
         );
+        const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+        const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
 
         const parts: string[] = [
           isComplete
@@ -51,10 +56,9 @@ export class CampaignMapScreen {
             : `✅ ${completedNonChallenge}`,
           `💧 ${waterTotal}`,
         ];
+        if (starsTotal > 0) parts.push(`⭐ ${starsCollected}/${starsTotal}`);
+        if (challengeLevels.length > 0) parts.push(`💀 ${completedChallenges}/${challengeLevels.length}`);
         if (isComplete) {
-          const levelStars = loadLevelStars(callbacks.getActiveCampaignId() ?? undefined);
-          const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
-          const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
           const allLevelsCompleted = allLevels.every((l) => completedLevels.has(l.id));
           // Mirrors chapter-map mastery semantics: when no stars exist in the campaign,
           // full level completion alone is enough for "Mastered!".
@@ -130,10 +134,11 @@ export class CampaignMapScreen {
     const grid = campaign.grid!.map((row) => row.map((tile): TileDef | null => {
       if (!tile) return null;
       if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter') {
+        const chapterIdx = typeof tile.chapterIdx === 'number' ? tile.chapterIdx : undefined;
         return {
           ...tile,
           chamberContent: 'level' as const,
-          levelIdx: tile.chapterIdx ?? 0,
+          levelIdx: chapterIdx,
         } as TileDef;
       }
       return tile;

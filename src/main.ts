@@ -1,16 +1,18 @@
 import { Game } from './game';
 import { sfxManager, SfxId } from './sfxManager';
-import { loadSfxVolume } from './persistence';
+import { loadSfxVolume, loadTouchUiEnabled } from './persistence';
 import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
-import { isTouchDevice } from './deviceUtils';
+import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 
 sfxManager.setVolume(loadSfxVolume());
 sfxManager.preload();
 
 // Mark the body so CSS touch-specific rules can apply.
-if (isTouchDevice()) {
-  document.body.classList.add('is-touch');
+const savedTouchUiEnabled = loadTouchUiEnabled();
+if (savedTouchUiEnabled !== null && hasTouchUiSupport()) {
+  setTouchUiEnabledOverride(savedTouchUiEnabled);
 }
+document.body.classList.toggle('is-touch', isTouchDevice());
 
 function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;
@@ -79,4 +81,3 @@ exitBtnEl.addEventListener('click', () => {
 
 // Rules button on play screen
 rulesBtnEl.addEventListener('click', () => { sfxManager.play(SfxId.Click); game.showRules(); });
-

@@ -32,6 +32,8 @@ import {
   loadCommandKeyAssignments,
   saveCommandKeyAssignments,
   clearCommandKeyAssignments,
+  loadTouchUiEnabled,
+  saveTouchUiEnabled,
 } from '../src/persistence';
 import { CampaignDef } from '../src/types';
 
@@ -301,6 +303,22 @@ describe('loadCommandKeyAssignments / saveCommandKeyAssignments / clearCommandKe
     saveCommandKeyAssignments({ undo: 'Ctrl+Z' });
     clearCommandKeyAssignments();
     expect(loadCommandKeyAssignments()).toBeNull();
+  });
+});
+
+describe('loadTouchUiEnabled / saveTouchUiEnabled', () => {
+  it('returns null when no touch-ui preference is stored', () => {
+    expect(loadTouchUiEnabled()).toBeNull();
+  });
+
+  it('saves and loads enabled touch-ui preference', () => {
+    saveTouchUiEnabled(true);
+    expect(loadTouchUiEnabled()).toBe(true);
+  });
+
+  it('saves and loads disabled touch-ui preference', () => {
+    saveTouchUiEnabled(false);
+    expect(loadTouchUiEnabled()).toBe(false);
   });
 });
 

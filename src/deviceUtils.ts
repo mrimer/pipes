@@ -4,15 +4,36 @@
  */
 
 /**
- * Returns true when the device supports touch input.
- * Uses `navigator.maxTouchPoints > 0` which is supported by all modern
- * iOS and Android browsers, and correctly returns 0 in desktop environments.
- * (The older `'ontouchstart' in window` check is not used because some
- * headless and testing environments report it as present without real touch
- * support.)
+ * Returns true when the environment exposes any touch capability.
  */
+export function hasTouchUiSupport(): boolean {
+  if (navigator.maxTouchPoints > 0) return true;
+  return window.matchMedia?.('(any-pointer: coarse)').matches ?? false;
+}
+
+/**
+ * Returns the default touch-UI mode for this device.
+ *
+ * Touch-first devices (phones/tablets) generally have coarse pointers and
+ * cannot hover, while touchscreen laptops usually still report fine pointer +
+ * hover capability. We default to desktop UI in that mixed-input case.
+ */
+export function detectDefaultTouchUiEnabled(): boolean {
+  if (!hasTouchUiSupport()) return false;
+  const hasFinePointer = window.matchMedia?.('(any-pointer: fine)').matches ?? false;
+  const canHover = window.matchMedia?.('(any-hover: hover)').matches ?? false;
+  return !(hasFinePointer && canHover);
+}
+
+/** Returns true when touch UI should be active for gameplay/UI rendering. */
 export function isTouchDevice(): boolean {
-  return navigator.maxTouchPoints > 0;
+  if (touchUiEnabledOverride !== null) return touchUiEnabledOverride;
+  return detectDefaultTouchUiEnabled();
+}
+
+/** Set or clear a runtime override for touch UI behavior. */
+export function setTouchUiEnabledOverride(enabled: boolean | null): void {
+  touchUiEnabledOverride = enabled;
 }
 
 /**
@@ -29,3 +50,4 @@ export function isPortrait(): boolean {
 export function isNarrowScreen(): boolean {
   return window.innerWidth < 600;
 }
+let touchUiEnabledOverride: boolean | null = null;
