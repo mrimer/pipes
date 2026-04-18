@@ -597,6 +597,14 @@ export class CampaignEditor {
     }
 
     this._el.appendChild(content);
+
+    // Resize and render campaign map canvas after layout is in the DOM, and
+    // ensure undo/redo button state reflects current history on entry.
+    requestAnimationFrame(() => {
+      this._campaignMapEditor.updateCanvasDisplaySize();
+      this._campaignMapEditor.renderCanvas();
+      this._campaignMapEditor.syncUndoRedoButtons();
+    });
   }
 
   private _buildChapterRow(campaign: CampaignDef, chapterIdx: number, readOnly: boolean): HTMLElement {
@@ -723,6 +731,7 @@ export class CampaignEditor {
     requestAnimationFrame(() => {
       this._chapterMapEditor.updateCanvasDisplaySize();
       this._chapterMapEditor.renderCanvas();
+      this._chapterMapEditor.syncUndoRedoButtons();
     });
   }
 
