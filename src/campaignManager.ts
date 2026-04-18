@@ -455,6 +455,7 @@ export class CampaignManager {
         campaignMapScreen.hide();
         chapterMapScreen.startAnimLoop();
       },
+      campaignSnapshot,
     );
   }
 
