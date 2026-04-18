@@ -451,6 +451,7 @@ export function clearCampaignCompleteShown(campaignId: string): void {
 // ─── Settings persistence ─────────────────────────────────────────────────────
 
 const SFX_VOLUME_KEY = 'pipes_sfx_volume';
+const COMMAND_KEYS_KEY = 'pipes_command_keys';
 
 /**
  * Load the persisted SFX volume setting.
@@ -472,4 +473,38 @@ export function saveSfxVolume(volume: number): void {
   try {
     localStorage.setItem(SFX_VOLUME_KEY, String(Math.round(Math.max(0, Math.min(100, volume)))));
   } catch { /* ignore */ }
+}
+
+/** Load persisted command key assignments (action -> binding string), or null when unset/invalid. */
+export function loadCommandKeyAssignments(): Record<string, string> | null {
+  try {
+    const raw = localStorage.getItem(COMMAND_KEYS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof v === 'string') out[k] = v;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist command key assignments (action -> binding string). */
+export function saveCommandKeyAssignments(bindings: Record<string, string>): void {
+  try {
+    localStorage.setItem(COMMAND_KEYS_KEY, JSON.stringify(bindings));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Clear persisted custom command key assignments. */
+export function clearCommandKeyAssignments(): void {
+  try {
+    localStorage.removeItem(COMMAND_KEYS_KEY);
+  } catch {
+    // ignore storage errors
+  }
 }

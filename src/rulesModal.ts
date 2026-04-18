@@ -5,6 +5,7 @@ import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
 import { RADIUS_LG, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
+import { CommandAction, CommandKeyManager, commandKeyManager } from './commandKeyManager';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -35,6 +36,8 @@ interface ControlRow {
   input: string;
   /** What the control does. */
   action: string;
+  /** Command action key when this row should reflect a rebindable command. */
+  commandAction?: CommandAction;
 }
 
 /** Return a small colored square as an inline HTML string. */
@@ -136,22 +139,24 @@ function leakyPipeSwatch(): string {
 }
 
 /** Controls reference table rows. */
-const CONTROL_ROWS: ControlRow[] = [
-  { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
-  { input: 'Shift + Left Click', action: 'Rotate a placed pipe counter-clockwise.' },
-  { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory. Right-clicking a selected inventory tile deselects it.' },
-  { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
-  { input: 'Hover + Scroll Wheel', action: 'Queue a placed pipe for rotation when no inventory item is selected.' },
-  { input: 'Q',                  action: 'Rotate the selected pipe piece counter-clockwise.' },
-  { input: 'W',                  action: 'Rotate the selected pipe piece clockwise.' },
-  { input: 'R',                  action: 'Retry the current level from scratch.' },
-  { input: 'Ctrl+Z',             action: 'Undo the last move.' },
-  { input: 'Ctrl+Y',             action: 'Redo the last undone move.' },
-  { input: 'Shift',              action: 'Selects the next inventory piece.' },
-  { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/snow/sandstone tile values: raw temperature threshold and unmodified cost.' },
-  { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
-  { input: 'Escape',             action: 'Return to the level-select screen.' },
-];
+function getControlRows(manager: CommandKeyManager): ControlRow[] {
+  return [
+    { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
+    { input: 'Shift + Left Click', action: 'Rotate a placed pipe counter-clockwise.' },
+    { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory. Right-clicking a selected inventory tile deselects it.' },
+    { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
+    { input: 'Hover + Scroll Wheel', action: 'Queue a placed pipe for rotation when no inventory item is selected.' },
+    { input: manager.getBindingDisplay('rotateCCW'), action: 'Rotate the selected pipe piece counter-clockwise.', commandAction: 'rotateCCW' },
+    { input: manager.getBindingDisplay('rotateCW'), action: 'Rotate the selected pipe piece clockwise.', commandAction: 'rotateCW' },
+    { input: manager.getBindingDisplay('restartLevel'), action: 'Retry the current level from scratch.', commandAction: 'restartLevel' },
+    { input: manager.getBindingDisplay('undo'), action: 'Undo the last move.', commandAction: 'undo' },
+    { input: manager.getBindingDisplay('redo'), action: 'Redo the last undone move.', commandAction: 'redo' },
+    { input: 'Shift',              action: 'Selects the next inventory piece.' },
+    { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/snow/sandstone tile values: raw temperature threshold and unmodified cost.' },
+    { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
+    { input: 'Escape',             action: 'Return to the level-select screen.' },
+  ];
+}
 
 /** Controls reference table rows for touch / mobile devices. */
 const TOUCH_CONTROL_ROWS: ControlRow[] = [
@@ -293,7 +298,7 @@ const LEGEND_ROWS: LegendRow[] = [
  * Create the game-rules modal element and append it to the document body.
  * Returns the overlay element so the caller can show/hide it.
  */
-export function createGameRulesModal(): HTMLElement {
+export function createGameRulesModal(manager: CommandKeyManager = commandKeyManager): HTMLElement {
   const overlay = document.createElement('div');
   overlay.style.cssText =
     'display:none;position:fixed;inset:0;background:' + UI_OVERLAY_BG + ';' +
@@ -347,7 +352,7 @@ export function createGameRulesModal(): HTMLElement {
   const controlsTable = document.createElement('table');
   controlsTable.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.88rem;';
 
-  const activeControlRows = isTouchDevice() ? TOUCH_CONTROL_ROWS : CONTROL_ROWS;
+  const activeControlRows = isTouchDevice() ? TOUCH_CONTROL_ROWS : getControlRows(manager);
   for (const row of activeControlRows) {
     const tr = document.createElement('tr');
     tr.style.cssText = 'border-bottom:1px solid #2a3a5e;';
@@ -356,6 +361,7 @@ export function createGameRulesModal(): HTMLElement {
     tdInput.style.cssText =
       'padding:6px 12px 6px 0;white-space:nowrap;color:#eee;font-weight:bold;vertical-align:middle;';
     tdInput.textContent = row.input;
+    if (row.commandAction) tdInput.dataset.commandAction = row.commandAction;
 
     const tdAction = document.createElement('td');
     tdAction.style.cssText = 'padding:6px 0;color:#aaa;vertical-align:middle;';
@@ -424,4 +430,17 @@ export function createGameRulesModal(): HTMLElement {
   document.body.appendChild(overlay);
 
   return overlay;
+}
+
+/** Refresh command-key rows in an existing rules modal after assignments change. */
+export function refreshGameRulesModalCommands(
+  modalEl: HTMLElement,
+  manager: CommandKeyManager = commandKeyManager,
+): void {
+  const commandCells = modalEl.querySelectorAll<HTMLElement>('td[data-command-action]');
+  commandCells.forEach((cell) => {
+    const action = cell.dataset.commandAction as CommandAction | undefined;
+    if (!action) return;
+    cell.textContent = manager.getBindingDisplay(action);
+  });
 }

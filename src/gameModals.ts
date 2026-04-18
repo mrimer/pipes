@@ -1,5 +1,8 @@
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
+import { CommandAction, COMMAND_LABELS, commandKeyManager } from './commandKeyManager';
+
+const PURE_MODIFIER_KEYS = new Set(['shift', 'control', 'ctrl', 'alt', 'meta', 'os']);
 /**
  * Factory functions for building the game's modal overlay elements.
  *
@@ -310,6 +313,99 @@ export function buildSettingsModal(
   sfxSection.appendChild(slider);
   box.appendChild(sfxSection);
 
+  // ── Command key assignments ───────────────────────────────────────────────
+  const commandsSection = document.createElement('div');
+  commandsSection.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;';
+
+  const commandsHeader = document.createElement('div');
+  commandsHeader.style.cssText = 'font-weight:bold;color:#7ed321;margin-top:4px;';
+  commandsHeader.textContent = '⌨️ Command Keys';
+  commandsSection.appendChild(commandsHeader);
+
+  const commandActions: CommandAction[] = ['rotateCW', 'rotateCCW', 'restartLevel', 'undo', 'redo'];
+  const rowMap = new Map<CommandAction, { valueEl: HTMLElement; buttonEl: HTMLButtonElement }>();
+  let capturing: CommandAction | null = null;
+
+  function renderCommandRows(): void {
+    for (const action of commandActions) {
+      const row = rowMap.get(action);
+      if (!row) continue;
+      row.valueEl.textContent = capturing === action
+        ? 'Press keys...'
+        : commandKeyManager.getBindingDisplay(action);
+      row.buttonEl.textContent = capturing === action ? '✖️' : '⌨️';
+    }
+  }
+
+  for (const action of commandActions) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;';
+
+    const label = document.createElement('span');
+    label.textContent = COMMAND_LABELS[action];
+    label.style.cssText = 'color:#eee;font-size:0.9rem;';
+
+    const right = document.createElement('div');
+    right.style.cssText = 'display:flex;align-items:center;gap:8px;';
+
+    const valueEl = document.createElement('span');
+    valueEl.style.cssText =
+      'font-size:0.85rem;color:#ddd;background:#0d1a30;border:1px solid #2a3a5e;border-radius:6px;padding:4px 8px;min-width:95px;text-align:center;';
+
+    const assignBtn = document.createElement('button');
+    assignBtn.type = 'button';
+    assignBtn.title = `Reassign ${COMMAND_LABELS[action]}`;
+    assignBtn.style.cssText =
+      'padding:4px 8px;font-size:0.9rem;background:#2a2a4a;color:#ddd;border:1px solid #555;border-radius:4px;cursor:pointer;';
+    assignBtn.addEventListener('click', () => {
+      capturing = capturing === action ? null : action;
+      renderCommandRows();
+    });
+
+    right.appendChild(valueEl);
+    right.appendChild(assignBtn);
+    row.appendChild(label);
+    row.appendChild(right);
+    commandsSection.appendChild(row);
+    rowMap.set(action, { valueEl, buttonEl: assignBtn });
+  }
+
+  const resetCommandsBtn = document.createElement('button');
+  resetCommandsBtn.type = 'button';
+  resetCommandsBtn.textContent = 'Reset Commands';
+  resetCommandsBtn.style.cssText =
+    'padding:8px 12px;font-size:0.9rem;background:#2a2a4a;color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:flex-start;';
+  resetCommandsBtn.addEventListener('click', () => {
+    const confirmed = window.confirm('Reset all command key assignments to defaults?');
+    if (!confirmed) return;
+    commandKeyManager.resetToDefaults();
+    capturing = null;
+    renderCommandRows();
+  });
+  commandsSection.appendChild(resetCommandsBtn);
+  box.appendChild(commandsSection);
+
+  const onDocKeyDown = (e: KeyboardEvent) => {
+    if (capturing === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      capturing = null;
+      renderCommandRows();
+      return;
+    }
+    if (PURE_MODIFIER_KEYS.has(e.key.toLowerCase())) return;
+    const result = commandKeyManager.assignFromEvent(capturing, e);
+    if (!result.ok) {
+      window.alert(result.error ?? 'Could not assign that key.');
+      return;
+    }
+    capturing = null;
+    renderCommandRows();
+  };
+  document.addEventListener('keydown', onDocKeyDown);
+  renderCommandRows();
+
   // ── Confirm button ───────────────────────────────────────────────────────
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
@@ -318,7 +414,11 @@ export function buildSettingsModal(
   confirmBtn.textContent = 'Confirm';
   confirmBtn.className = 'modal-btn primary';
   confirmBtn.type = 'button';
-  confirmBtn.addEventListener('click', () => onConfirm(el));
+  confirmBtn.addEventListener('click', () => {
+    capturing = null;
+    renderCommandRows();
+    onConfirm(el);
+  });
 
   actions.appendChild(confirmBtn);
   box.appendChild(actions);

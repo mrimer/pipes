@@ -8,12 +8,13 @@
 
 import { TileDef } from '../types';
 import { PIPE_SHAPES } from '../board';
+import { commandKeyManager } from '../commandKeyManager';
 
 // ─── Keyboard handler ──────────────────────────────────────────────────────────
 
 /**
- * Callbacks supplied by each map editor to respond to the shared Q/W/Ctrl-Z/Y
- * keyboard shortcuts.
+ * Callbacks supplied by each map editor to respond to the shared command-key
+ * shortcuts (rotate CW/CCW + undo/redo).
  */
 export interface MapEditorKeydownCallbacks {
   /** Undo the last edit. */
@@ -46,12 +47,8 @@ export function isTextEntryShortcutTarget(e: KeyboardEvent): boolean {
 }
 
 /**
- * Handle keyboard input that is common across both map editors:
- *
- * - **Ctrl+Z** → `onUndo`
- * - **Ctrl+Y** → `onRedo`
- * - **Q**      → rotate CCW (tile under cursor, or palette ghost)
- * - **W**      → rotate CW  (tile under cursor, or palette ghost)
+ * Handle keyboard input that is common across both map editors using the
+ * current command key assignments managed by {@link commandKeyManager}.
  *
  * Returns without action when an input / textarea / select element has focus
  * or when Alt is held down (which denotes OS/browser shortcuts).
@@ -61,29 +58,30 @@ export function handleMapEditorKeyDown(
   cbs: MapEditorKeydownCallbacks,
 ): void {
   if (e.altKey || isTextEntryShortcutTarget(e)) return;
-
-  const key = e.key.toLowerCase();
-
-  if (e.ctrlKey) {
-    if (key === 'z') { e.preventDefault(); cbs.onUndo(); }
-    if (key === 'y') { e.preventDefault(); cbs.onRedo(); }
+  if (commandKeyManager.matches('undo', e)) {
+    e.preventDefault();
+    cbs.onUndo();
     return;
   }
-
-  if (key === 'q' || key === 'w') {
+  if (commandKeyManager.matches('redo', e)) {
     e.preventDefault();
-    const clockwise = key === 'w';
-    const hit = cbs.getHoverTileAndPos();
-    if (hit) {
-      if (PIPE_SHAPES.has(hit.tile.shape)) {
-        cbs.rotateTileAt(hit.pos, clockwise);
-        return;
-      }
-      if (cbs.isConnectableForRotation(hit.tile)) {
-        cbs.rotateSourceSinkAt(hit.pos, clockwise);
-        return;
-      }
-    }
-    cbs.rotatePalette(clockwise);
+    cbs.onRedo();
+    return;
   }
+  if (!commandKeyManager.matches('rotateCCW', e) && !commandKeyManager.matches('rotateCW', e)) return;
+
+  e.preventDefault();
+  const clockwise = commandKeyManager.matches('rotateCW', e);
+  const hit = cbs.getHoverTileAndPos();
+  if (hit) {
+    if (PIPE_SHAPES.has(hit.tile.shape)) {
+      cbs.rotateTileAt(hit.pos, clockwise);
+      return;
+    }
+    if (cbs.isConnectableForRotation(hit.tile)) {
+      cbs.rotateSourceSinkAt(hit.pos, clockwise);
+      return;
+    }
+  }
+  cbs.rotatePalette(clockwise);
 }

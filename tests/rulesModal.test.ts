@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { createGameRulesModal } from '../src/rulesModal';
+import { createGameRulesModal, refreshGameRulesModalCommands } from '../src/rulesModal';
+import { CommandKeyManager } from '../src/commandKeyManager';
 
 describe('createGameRulesModal', () => {
   beforeEach(() => {
@@ -84,5 +85,15 @@ describe('createGameRulesModal', () => {
     const cells = Array.from(document.body.querySelectorAll('td')).map(td => td.textContent ?? '');
     expect(cells).toContain('Ctrl+Z');
     expect(cells).toContain('Ctrl+Y');
+  });
+
+  it('updates displayed command assignments after rebinding', () => {
+    const mgr = new CommandKeyManager();
+    const modal = createGameRulesModal(mgr);
+    mgr.assignBinding('undo', { key: 'u', ctrl: false, shift: false, alt: false, meta: false });
+    refreshGameRulesModalCommands(modal, mgr);
+    const cells = Array.from(document.body.querySelectorAll('td')).map(td => td.textContent ?? '');
+    expect(cells).toContain('U');
+    expect(cells).not.toContain('Ctrl+Z');
   });
 });

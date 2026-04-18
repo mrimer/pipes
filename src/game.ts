@@ -4,7 +4,7 @@ import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Cam
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
 import { loadCompletedLevels, saveSfxVolume } from './persistence';
-import { createGameRulesModal } from './rulesModal';
+import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
 import { CampaignManager, CampaignCallbacks } from './campaignManager';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
@@ -371,7 +371,7 @@ export class Game implements InputCallbacks {
         this._updateResetModalInfo(info);
         this.resetConfirmModalEl.style.display = 'flex';
       },
-      showRules: () => { this._rulesModalEl.style.display = 'flex'; },
+      showRules: () => this.showRules(),
       showSettings: () => {
         // Sync slider and value display to current volume before showing.
         const v = sfxManager.getVolume();
@@ -1712,6 +1712,7 @@ export class Game implements InputCallbacks {
 
   /** Show the game-rules modal overlay. */
   showRules(): void {
+    refreshGameRulesModalCommands(this._rulesModalEl);
     this._rulesModalEl.style.display = 'flex';
   }
 
