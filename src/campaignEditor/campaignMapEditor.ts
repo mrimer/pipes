@@ -881,11 +881,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
       this._panDrag = null;
       return;
     }
-    if (e.button === 0 && this._leftPanCandidate?.moved) {
+    if (e.button === 0) {
+      const leftPanMoved = this._leftPanCandidate?.moved === true;
       this._leftPanCandidate = null;
-      return;
+      if (leftPanMoved) return;
     }
-    if (e.button === 0) this._leftPanCandidate = null;
     if (e.button === 2) {
       if (!this._rightEraseDragActive) return;
       this._rightEraseDragActive = false;
