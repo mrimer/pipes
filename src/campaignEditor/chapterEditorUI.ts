@@ -25,6 +25,42 @@ import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
 
+// ─── Shared widget builder ─────────────────────────────────────────────────────
+
+/**
+ * Build a labeled number input for editing a Completion threshold value (≥ 0).
+ * Shared between the chapter map editor (via ChapterEditorUI) and the
+ * campaign map editor.
+ *
+ * @param getValue  Returns the current numeric value to display.
+ * @param setValue  Called with the validated (≥ 0, integer) value on change.
+ */
+export function buildCompletionInputWidget(
+  getValue: () => number,
+  setValue: (val: number) => void,
+): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px;';
+  const lbl = document.createElement('div');
+  lbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
+  lbl.textContent = 'Completion';
+  wrap.appendChild(lbl);
+  const inp = document.createElement('input');
+  inp.type = 'number';
+  inp.min = '0';
+  inp.step = '1';
+  inp.value = String(getValue());
+  inp.style.cssText =
+    `padding:4px;width:60px;background:${EDITOR_INPUT_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
+  inp.addEventListener('change', () => {
+    const v = Math.max(0, Math.round(parseFloat(inp.value) || 0));
+    inp.value = String(v);
+    setValue(v);
+  });
+  wrap.appendChild(inp);
+  return wrap;
+}
+
 // ─── Callback interface ────────────────────────────────────────────────────────
 
 export interface ChapterEditorUICallbacks {
@@ -307,7 +343,7 @@ export class ChapterEditorUI {
   // ── Private widget builders ────────────────────────────────────────────────
 
   /**
-   * Build a number input widget for the Sink palette's completion parameter.
+   * Build a labeled number input for the Sink palette's completion parameter.
    * Reads from and writes to `_chapterParams.completion`.
    */
   private _buildSinkCompletionParamWidget(
@@ -315,7 +351,7 @@ export class ChapterEditorUI {
     chapter: ChapterDef,
     campaign: CampaignDef,
   ): HTMLElement {
-    return this._buildCompletionInputWidget(
+    return buildCompletionInputWidget(
       () => this._cb.getChapterParams().completion,
       (val) => {
         this._cb.getChapterParams().completion = val;
@@ -335,7 +371,7 @@ export class ChapterEditorUI {
     chapter: ChapterDef,
     campaign: CampaignDef,
   ): HTMLElement {
-    return this._buildCompletionInputWidget(
+    return buildCompletionInputWidget(
       () => tile.completion ?? 0,
       (val) => {
         tile.completion = val > 0 ? val : undefined;
@@ -345,35 +381,6 @@ export class ChapterEditorUI {
         this._cb.renderCanvas();
       },
     );
-  }
-
-  /**
-   * Build a labeled number input for a Completion threshold value (≥ 0).
-   */
-  private _buildCompletionInputWidget(
-    getValue: () => number,
-    setValue: (val: number) => void,
-  ): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px;';
-    const lbl = document.createElement('div');
-    lbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-    lbl.textContent = 'Completion';
-    wrap.appendChild(lbl);
-    const inp = document.createElement('input');
-    inp.type = 'number';
-    inp.min = '0';
-    inp.step = '1';
-    inp.value = String(getValue());
-    inp.style.cssText =
-      `padding:4px;width:60px;background:${EDITOR_INPUT_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};`;
-    inp.addEventListener('change', () => {
-      const v = Math.max(0, Math.round(parseFloat(inp.value) || 0));
-      inp.value = String(v);
-      setValue(v);
-    });
-    wrap.appendChild(inp);
-    return wrap;
   }
 
   /** @see buildCompassConnectionsWidget */

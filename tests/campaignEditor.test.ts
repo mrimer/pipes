@@ -3698,3 +3698,42 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
     }).not.toThrow();
   });
 });
+
+// ─── updateUndoRedoButtonPair ─────────────────────────────────────────────────
+
+import { updateUndoRedoButtonPair } from '../src/uiHelpers';
+
+describe('updateUndoRedoButtonPair', () => {
+  function makeBtn(id: string): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.id = id;
+    document.body.appendChild(btn);
+    return btn;
+  }
+
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('disables undo and enables redo when canUndo=false, canRedo=true', () => {
+    const undo = makeBtn('test-undo');
+    const redo = makeBtn('test-redo');
+    updateUndoRedoButtonPair('test-undo', 'test-redo', false, true);
+    expect(undo.disabled).toBe(true);
+    expect(undo.style.opacity).toBe('0.4');
+    expect(redo.disabled).toBe(false);
+    expect(redo.style.opacity).toBe('1');
+  });
+
+  it('enables both when canUndo=true, canRedo=true', () => {
+    const undo = makeBtn('test-undo2');
+    const redo = makeBtn('test-redo2');
+    updateUndoRedoButtonPair('test-undo2', 'test-redo2', true, true);
+    expect(undo.disabled).toBe(false);
+    expect(redo.disabled).toBe(false);
+  });
+
+  it('silently ignores missing button ids', () => {
+    expect(() =>
+      updateUndoRedoButtonPair('does-not-exist-undo', 'does-not-exist-redo', true, false),
+    ).not.toThrow();
+  });
+});
