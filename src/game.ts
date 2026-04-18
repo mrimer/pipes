@@ -3,7 +3,7 @@ import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
-import { loadCompletedLevels, saveSfxVolume } from './persistence';
+import { loadCompletedLevels, loadTouchUiEnabled, saveSfxVolume, saveTouchUiEnabled } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
 import { CampaignManager, CampaignCallbacks } from './campaignManager';
@@ -20,7 +20,7 @@ import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
-import { isPortrait } from './deviceUtils';
+import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 
@@ -312,8 +312,15 @@ export class Game implements InputCallbacks {
       () => sfxManager.getVolume(),
       (v) => { sfxManager.setVolume(v); },
       () => { sfxManager.play(SfxId.PipePlacement); },
+      () => isTouchDevice(),
+      () => hasTouchUiSupport(),
+      (enabled) => {
+        setTouchUiEnabledOverride(enabled);
+        document.body.classList.toggle('is-touch', enabled);
+      },
       (el) => {
         saveSfxVolume(sfxManager.getVolume());
+        saveTouchUiEnabled(isTouchDevice());
         el.style.display = 'none';
       },
     );
@@ -375,10 +382,17 @@ export class Game implements InputCallbacks {
       showSettings: () => {
         // Sync slider and value display to current volume before showing.
         const v = sfxManager.getVolume();
+        const savedTouchUiEnabled = loadTouchUiEnabled();
+        const effectiveTouchEnabled = hasTouchUiSupport() ? (savedTouchUiEnabled ?? isTouchDevice()) : false;
         const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
         const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
+        const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
         if (slider) slider.value = String(v);
         if (valueEl) valueEl.textContent = String(v);
+        if (touchToggle) {
+          touchToggle.checked = effectiveTouchEnabled;
+          touchToggle.disabled = !hasTouchUiSupport();
+        }
         this._settingsModalEl.style.display = 'flex';
       },
     };

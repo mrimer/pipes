@@ -452,6 +452,7 @@ export function clearCampaignCompleteShown(campaignId: string): void {
 
 const SFX_VOLUME_KEY = 'pipes_sfx_volume';
 const COMMAND_KEYS_KEY = 'pipes_command_keys';
+const TOUCH_UI_ENABLED_KEY = 'pipes_touch_ui_enabled';
 
 /**
  * Load the persisted SFX volume setting.
@@ -472,6 +473,28 @@ export function loadSfxVolume(): number {
 export function saveSfxVolume(volume: number): void {
   try {
     localStorage.setItem(SFX_VOLUME_KEY, String(Math.round(Math.max(0, Math.min(100, volume)))));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Load the persisted Touch UI setting.
+ * @returns
+ * - true/false when the user has explicitly chosen a value
+ * - null when no explicit choice has been saved yet
+ */
+export function loadTouchUiEnabled(): boolean | null {
+  try {
+    const raw = localStorage.getItem(TOUCH_UI_ENABLED_KEY);
+    if (raw === '1') return true;
+    if (raw === '0') return false;
+  } catch { /* ignore */ }
+  return null;
+}
+
+/** Persist the Touch UI setting. */
+export function saveTouchUiEnabled(enabled: boolean): void {
+  try {
+    localStorage.setItem(TOUCH_UI_ENABLED_KEY, enabled ? '1' : '0');
   } catch { /* ignore */ }
 }
 
