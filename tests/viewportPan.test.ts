@@ -177,65 +177,83 @@ describe('viewport clamp (pure logic)', () => {
 // ─── Connected-bbox clamp logic (pure logic test) ─────────────────────────────
 
 /**
- * Mirrors the connected-bbox clamp math from MapScreenBase._clampPan, including
- * the fix for the case where bboxMax ≤ 0 (the far-side constraint is impossible).
+ * Mirrors the connected-bbox clamp math from MapScreenBase._clampPan after the
+ * upward-drag fix: when the strict far-side formula is negative, fall back to
+ * (rMax+1)*TILE_SIZE so upward drag cannot push all connected tiles off the top.
  */
 function clampPanBBox(
   panY: number,
   maxPanY: number,
-  bboxMinY: number,
-  bboxMaxY: number,
+  rMin: number,
+  rMax: number,
+  viewRows: number,
+  tileSize = 64,
 ): number {
-  if (bboxMaxY > 0) {
-    return clampPanAxisWithFallback(panY, bboxMinY, bboxMaxY);
-  }
-  // bboxMaxY ≤ 0: connected tiles always fit in the viewport; enforce only bboxMinY.
-  return Math.min(maxPanY, Math.max(bboxMinY, panY));
+  const bboxMinY = Math.max(0, (rMin - 1) * tileSize);
+  const strictBboxMaxY = (rMax + 2 - viewRows) * tileSize;
+  const bboxMaxY = Math.min(maxPanY,
+    strictBboxMaxY >= 0 ? strictBboxMaxY : (rMax + 1) * tileSize);
+  return clampPanAxisWithFallback(panY, bboxMinY, bboxMaxY);
 }
 
 describe('connected-bbox clamp (pure logic)', () => {
   const TS = 64; // tile size
 
-  it('enforces bboxMinY when bboxMaxY < 0 and pan is below bboxMinY', () => {
-    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 → bboxMinY=2*TS, bboxMaxY=-TS
+  it('enforces bboxMinY when strict bboxMaxY < 0 and pan is below bboxMinY', () => {
+    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 → bboxMinY=2*TS
+    // strictBboxMaxY = (6+2-9)*TS = -TS → fallback bboxMaxY = min(3*TS, 7*TS) = 3*TS
     const maxPanY = 3 * TS;
-    const bboxMinY = 2 * TS;
-    const bboxMaxY = -TS;
-    // pan=0 should be forced up to bboxMinY
-    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
-    expect(clampPanBBox(TS, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
+    // pan=0 should be forced up to bboxMinY=2*TS
+    expect(clampPanBBox(0, maxPanY, 3, 6, 9, TS)).toBe(2 * TS);
+    expect(clampPanBBox(TS, maxPanY, 3, 6, 9, TS)).toBe(2 * TS);
   });
 
-  it('enforces bboxMinY when bboxMaxY = 0 and pan is below bboxMinY', () => {
-    // boundary case: bboxMaxY exactly 0
-    const maxPanY = 3 * TS;
-    const bboxMinY = 2 * TS;
-    const bboxMaxY = 0;
-    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
+  it('caps upward drag at (rMax+1)*TILE_SIZE when strict bboxMaxY is negative', () => {
+    // 22-row map, viewRows=9, connected only at rows 0-2 (rMin=0, rMax=2).
+    // maxPanY = (22-9)*TS = 13*TS.
+    // strictBboxMaxY = (2+2-9)*TS = -5*TS → fallback bboxMaxY = min(13*TS, 3*TS) = 3*TS.
+    // bboxMinY = max(0, -TS) = 0.
+    // Upward drag (pan increasing) must stop at 3*TS, not 13*TS.
+    const maxPanY = 13 * TS;
+    expect(clampPanBBox(13 * TS, maxPanY, 0, 2, 9, TS)).toBe(3 * TS);
+    expect(clampPanBBox(4 * TS,  maxPanY, 0, 2, 9, TS)).toBe(3 * TS);
+    expect(clampPanBBox(3 * TS,  maxPanY, 0, 2, 9, TS)).toBe(3 * TS);
+    expect(clampPanBBox(2 * TS,  maxPanY, 0, 2, 9, TS)).toBe(2 * TS);
+    expect(clampPanBBox(0,        maxPanY, 0, 2, 9, TS)).toBe(0);
   });
 
   it('does not exceed maxPanY when bboxMinY > maxPanY', () => {
-    // Connected tiles near the bottom of a short grid
+    // Connected tiles near the bottom of a short grid (rMin=5, rMax=5).
+    // maxPanY = 2*TS; bboxMinY = 4*TS > maxPanY → inverted range resolved to maxPanY.
     const maxPanY = 2 * TS;
-    const bboxMinY = 5 * TS;   // impossible: bboxMinY > maxPanY
-    const bboxMaxY = -TS;
-    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(maxPanY);
+    const result = clampPanBBox(0, maxPanY, 5, 5, 9, TS);
+    expect(result).toBeLessThanOrEqual(maxPanY);
   });
 
   it('normal case (bboxMin ≤ bboxMax > 0): clamps to [bboxMin, bboxMax]', () => {
+    // rows=20, viewRows=9, connected rows 5-14 → bboxMinY=4*TS, strictBboxMaxY=7*TS.
     const maxPanY = 11 * TS;
-    const bboxMinY = 4 * TS;
-    const bboxMaxY = 8 * TS;
-    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
-    expect(clampPanBBox(6 * TS, maxPanY, bboxMinY, bboxMaxY)).toBe(6 * TS);
-    expect(clampPanBBox(99 * TS, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMaxY);
+    expect(clampPanBBox(0,       maxPanY, 5, 14, 9, TS)).toBe(4 * TS);
+    expect(clampPanBBox(6 * TS,  maxPanY, 5, 14, 9, TS)).toBe(6 * TS);
+    expect(clampPanBBox(99 * TS, maxPanY, 5, 14, 9, TS)).toBe(7 * TS);
+  });
+
+  it('inverted range (connected region smaller than viewport): pan stays within [bboxMax, bboxMin]', () => {
+    // 22-row map, viewRows=9, connected only at row 10 (rMin=rMax=10).
+    // bboxMinY=9*TS, strictBboxMaxY=(10+2-9)*TS=3*TS → inverted → [3*TS, 9*TS].
+    const maxPanY = 13 * TS;
+    expect(clampPanBBox(0,       maxPanY, 10, 10, 9, TS)).toBe(3 * TS);
+    expect(clampPanBBox(6 * TS,  maxPanY, 10, 10, 9, TS)).toBe(6 * TS);
+    expect(clampPanBBox(13 * TS, maxPanY, 10, 10, 9, TS)).toBe(9 * TS);
   });
 });
 
 // ─── Initial snap logic (pure logic test) ─────────────────────────────────────
 
 /**
- * Mirrors the initial-snap math from ChapterMapScreen._computeInitialSnap.
+ * Mirrors the initial-snap math from MapScreenBase._computeInitialSnap.
+ * Uses edge-clamp only (no bbox clamping) so the focused tile is centred as
+ * much as the map boundaries allow.
  */
 function computeInitialSnapCenter(
   targetRow: number, targetCol: number,
@@ -243,13 +261,12 @@ function computeInitialSnapCenter(
   viewRows: number, viewCols: number,
   tileSize = 64,
 ): { x: number; y: number } {
-  let panX = (targetCol + 0.5) * tileSize - (viewCols * tileSize) / 2;
-  let panY = (targetRow + 0.5) * tileSize - (viewRows * tileSize) / 2;
-  // Edge clamp only.
   const maxX = Math.max(0, (cols - viewCols) * tileSize);
   const maxY = Math.max(0, (rows - viewRows) * tileSize);
-  panX = Math.max(0, Math.min(maxX, panX));
-  panY = Math.max(0, Math.min(maxY, panY));
+  const panX = Math.max(0, Math.min(maxX,
+    (targetCol + 0.5) * tileSize - (viewCols * tileSize) / 2));
+  const panY = Math.max(0, Math.min(maxY,
+    (targetRow + 0.5) * tileSize - (viewRows * tileSize) / 2));
   return { x: panX, y: panY };
 }
 
@@ -279,6 +296,15 @@ describe('initial snap (pure logic)', () => {
     const maxY = (rows - MAP_VIEW_MAX_ROWS) * 64;
     expect(result.x).toBe(maxX);
     expect(result.y).toBe(maxY);
+  });
+
+  it('centers upper-part target using edge-only clamp (no bbox push-down)', () => {
+    // 22-row map, connected tiles at row 2. Ideal pan = (2.5 - 4.5)*TS = -2*TS.
+    // Edge clamp → 0.  Without the fix, bbox clamp would push it to (rMin-1)*TS = TS.
+    const TS = 64;
+    const result = computeInitialSnapCenter(2, 5, 22, 12, MAP_VIEW_MAX_ROWS, MAP_VIEW_MAX_COLS, TS);
+    // panY should be 0 (best centering), not TS (old bbox-pushed value).
+    expect(result.y).toBe(0);
   });
 });
 

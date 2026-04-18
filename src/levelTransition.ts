@@ -532,6 +532,12 @@ export function playMapScreenExitTransition(
  *
  * Zooms the destination snapshot from `startRect` up to its captured CSS rect while
  * fading `fromScreenEl` out and `toScreenEl` in.
+ *
+ * @param fromSnapshot  Optional pre-captured snapshot of the source map canvas.  When
+ *                      provided, a static pixel-accurate fade overlay is created for the
+ *                      source canvas so it fades out smoothly (matching the behaviour of
+ *                      {@link playMapTransition} for chapter-to-level transitions) rather
+ *                      than disappearing abruptly when the live canvas is hidden.
  */
 export function playMapScreenEnterTransition(
   startRect: ScreenRect,
@@ -539,6 +545,7 @@ export function playMapScreenEnterTransition(
   fromScreenEl: HTMLElement,
   toScreenEl: HTMLElement,
   onComplete: () => void,
+  fromSnapshot?: ChapterMapSnapshot | null,
 ): void {
   const targetRect: ScreenRect = {
     x: toSnapshot.cssRect.left,
@@ -547,6 +554,7 @@ export function playMapScreenEnterTransition(
     height: toSnapshot.cssRect.height,
   };
 
+  // ── Zooming destination-snapshot overlay (z-index 15) ──────────────────────
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
 
@@ -562,15 +570,51 @@ export function playMapScreenEnterTransition(
   overlay.appendChild(snapshotEl);
   document.body.appendChild(overlay);
 
-  fromScreenEl.style.opacity = '1';
+  // ── Source-map fade overlay (z-index 12, below the zooming snapshot) ───────
+  //
+  // When a source snapshot is provided, build a pixel-accurate fade overlay for
+  // the source canvas – identical in technique to the chapterMapFadeEl in
+  // playMapTransition.  This ensures the source canvas fades out smoothly as a
+  // static image rather than vanishing abruptly when the live canvas is hidden.
+  let fromFadeEl: HTMLElement | null = null;
+  if (fromSnapshot) {
+    const { canvas: snapSrc, cssRect } = fromSnapshot;
+    const fadeOverlay = document.createElement('div');
+    fadeOverlay.style.cssText =
+      `position:fixed;inset:0;z-index:12;pointer-events:none;background:${CHAPTER_MAP_BG};`;
+    const snapEl = document.createElement('canvas');
+    snapEl.width  = snapSrc.width;
+    snapEl.height = snapSrc.height;
+    const snapCtx = snapEl.getContext('2d');
+    if (snapCtx) snapCtx.drawImage(snapSrc, 0, 0);
+    snapEl.style.cssText =
+      `position:absolute;left:${cssRect.left}px;top:${cssRect.top}px;` +
+      `width:${cssRect.width}px;height:${cssRect.height}px;`;
+    fadeOverlay.appendChild(snapEl);
+    document.body.appendChild(fadeOverlay);
+    fromFadeEl = fadeOverlay;
+  }
+
+  // ── Prepare screen-element styles ─────────────────────────────────────────
+
   toScreenEl.style.opacity = '0';
 
-  // Hide only the live canvas inside fromScreenEl so that any concurrent
-  // render in that screen's animation loop cannot corrupt the transition
-  // visuals.  Mirrors the equivalent fromCanvas hide in playMapScreenExitTransition.
+  // Hide the live canvas inside fromScreenEl to prevent any mouse-move or
+  // touch-move handler from re-rendering it at the wrong TILE_SIZE during the
+  // transition.  When a fromSnapshot overlay is present it visually replaces
+  // the canvas, so the hidden canvas is not visible to the user.
   const fromCanvas = fromScreenEl.querySelector<HTMLCanvasElement>('canvas');
   const originalFromCanvasVisibility = fromCanvas?.style.visibility ?? '';
   if (fromCanvas) fromCanvas.style.visibility = 'hidden';
+
+  // When we have a snapshot overlay covering the source screen, hide the live
+  // screen element immediately so only the snapshot is visible.  Otherwise fall
+  // back to fading the live screen element via opacity (legacy path).
+  if (fromFadeEl) {
+    fromScreenEl.style.opacity = '0';
+  } else {
+    fromScreenEl.style.opacity = '1';
+  }
 
   const startTime = performance.now();
 
@@ -588,13 +632,20 @@ export function playMapScreenEnterTransition(
     snapshotEl.style.width = `${w}px`;
     snapshotEl.style.height = `${h}px`;
 
-    fromScreenEl.style.opacity = `${1 - rawT}`;
+    // Fade the source: use the snapshot overlay when available, otherwise the
+    // live screen element (legacy path).
+    if (fromFadeEl) {
+      fromFadeEl.style.opacity = `${1 - rawT}`;
+    } else {
+      fromScreenEl.style.opacity = `${1 - rawT}`;
+    }
     toScreenEl.style.opacity = `${rawT}`;
 
     if (rawT < 1) {
       requestAnimationFrame(tick);
     } else {
       overlay.remove();
+      if (fromFadeEl) fromFadeEl.remove();
       if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
       fromScreenEl.style.opacity = '';
       toScreenEl.style.opacity = '';

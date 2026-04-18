@@ -1204,24 +1204,26 @@ export abstract class MapScreenBase {
 
     // Allowed pan range: left edge ≥ (cMin-1)*TILE_SIZE; right edge ≤ (cMax+2)*TILE_SIZE.
     const bboxMinX = Math.max(0, (cMin - 1) * TILE_SIZE);
-    const bboxMaxX = Math.min(maxPanX, (cMax + 2 - viewCols) * TILE_SIZE);
     const bboxMinY = Math.max(0, (rMin - 1) * TILE_SIZE);
-    const bboxMaxY = Math.min(maxPanY, (rMax + 2 - viewRows) * TILE_SIZE);
 
-    // When bboxMax ≤ 0 the far-side constraint is impossible given the edge-clamped
-    // pan range [0, maxPan]; in that case only the near-side (bboxMin) bound is
-    // enforced, clamped within the edge bounds.  Otherwise use the shared helper
-    // which handles the regular case and the inverted (bboxMin > bboxMax > 0) case.
-    if (bboxMaxX > 0) {
-      this._panPixelX = clampPanAxisWithFallback(this._panPixelX, bboxMinX, bboxMaxX);
-    } else {
-      this._panPixelX = Math.min(maxPanX, Math.max(bboxMinX, this._panPixelX));
-    }
-    if (bboxMaxY > 0) {
-      this._panPixelY = clampPanAxisWithFallback(this._panPixelY, bboxMinY, bboxMaxY);
-    } else {
-      this._panPixelY = Math.min(maxPanY, Math.max(bboxMinY, this._panPixelY));
-    }
+    // The strict far-side formula keeps the bbox bottom/right row/col within the
+    // viewport.  When it goes negative (connected tiles are near the top/left of a
+    // large map and viewRows/viewCols is larger than the connected region + 2), the
+    // viewport-bottom/right constraint can never be satisfied, so we fall back to the
+    // looser viewport-top/left constraint: pan ≤ (rMax+1)*TILE_SIZE (or cMax+1 for X).
+    // This prevents upward/rightward drag from pushing all connected tiles off-screen.
+    const strictBboxMaxX = (cMax + 2 - viewCols) * TILE_SIZE;
+    const strictBboxMaxY = (rMax + 2 - viewRows) * TILE_SIZE;
+    const bboxMaxX = Math.min(maxPanX,
+      strictBboxMaxX >= 0 ? strictBboxMaxX : (cMax + 1) * TILE_SIZE);
+    const bboxMaxY = Math.min(maxPanY,
+      strictBboxMaxY >= 0 ? strictBboxMaxY : (rMax + 1) * TILE_SIZE);
+
+    // Use the shared helper which handles both the normal case (bboxMin ≤ bboxMax)
+    // and the inverted case (bboxMin > bboxMax, e.g. connected region is small
+    // relative to the viewport).
+    this._panPixelX = clampPanAxisWithFallback(this._panPixelX, bboxMinX, bboxMaxX);
+    this._panPixelY = clampPanAxisWithFallback(this._panPixelY, bboxMinY, bboxMaxY);
   }
 
   /**
@@ -1266,10 +1268,15 @@ export abstract class MapScreenBase {
       else { this._panPixelX = 0; this._panPixelY = 0; return; }
     }
 
-    // Center the target tile in the view window.
-    this._panPixelX = (targetCol + 0.5) * TILE_SIZE - (viewCols * TILE_SIZE) / 2;
-    this._panPixelY = (targetRow + 0.5) * TILE_SIZE - (viewRows * TILE_SIZE) / 2;
-    this._clampPan(chapter, viewRows, viewCols);
+    // Center the target tile in the view window, clamped to the edge bounds only
+    // (no bbox clamping here – bbox constraints apply only during interactive
+    // dragging so that the initial view is as centred as possible).
+    const maxPanX = Math.max(0, (cols - viewCols) * TILE_SIZE);
+    const maxPanY = Math.max(0, (rows - viewRows) * TILE_SIZE);
+    this._panPixelX = Math.max(0, Math.min(maxPanX,
+      (targetCol + 0.5) * TILE_SIZE - (viewCols * TILE_SIZE) / 2));
+    this._panPixelY = Math.max(0, Math.min(maxPanY,
+      (targetRow + 0.5) * TILE_SIZE - (viewRows * TILE_SIZE) / 2));
   }
 
   /**
