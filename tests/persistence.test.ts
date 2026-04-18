@@ -29,6 +29,9 @@ import {
   loadCampaignProgress,
   markCampaignLevelCompleted,
   clearCampaignProgress,
+  loadCommandKeyAssignments,
+  saveCommandKeyAssignments,
+  clearCommandKeyAssignments,
 } from '../src/persistence';
 import { CampaignDef } from '../src/types';
 
@@ -281,6 +284,23 @@ describe('loadCampaignProgress / markCampaignLevelCompleted / clearCampaignProgr
     expect(loadCampaignProgress('cmp_A').has(10)).toBe(true);
     expect(loadCampaignProgress('cmp_A').has(20)).toBe(false);
     expect(loadCampaignProgress('cmp_B').has(20)).toBe(true);
+  });
+});
+
+describe('loadCommandKeyAssignments / saveCommandKeyAssignments / clearCommandKeyAssignments', () => {
+  it('returns null when no command keys are stored', () => {
+    expect(loadCommandKeyAssignments()).toBeNull();
+  });
+
+  it('saves and loads command key assignments', () => {
+    saveCommandKeyAssignments({ undo: 'Ctrl+Z', redo: 'Ctrl+Y' });
+    expect(loadCommandKeyAssignments()).toEqual({ undo: 'Ctrl+Z', redo: 'Ctrl+Y' });
+  });
+
+  it('clears stored command key assignments', () => {
+    saveCommandKeyAssignments({ undo: 'Ctrl+Z' });
+    clearCommandKeyAssignments();
+    expect(loadCommandKeyAssignments()).toBeNull();
   });
 });
 

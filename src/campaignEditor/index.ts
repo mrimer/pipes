@@ -42,6 +42,7 @@ import { isTouchDevice } from '../deviceUtils';
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
 import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
+import { commandKeyManager } from '../commandKeyManager';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
@@ -166,8 +167,8 @@ export class CampaignEditor {
         return;
       }
       if (this._screen !== EditorScreen.LevelEditor) return;
-      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); this._editorUndo(); }
-      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); this._editorRedo(); }
+      if (commandKeyManager.matches('undo', e)) { e.preventDefault(); this._editorUndo(); }
+      if (commandKeyManager.matches('redo', e)) { e.preventDefault(); this._editorRedo(); }
       if (e.key === 'Escape' && this._state.linkedTilePos !== null) {
         // Unlink the linked tile
         e.preventDefault();
@@ -175,11 +176,12 @@ export class CampaignEditor {
         this._renderEditorCanvas();
       }
       // Q = rotate counter-clockwise, W = rotate clockwise (mirrors in-game mouse wheel)
-      if (!e.ctrlKey && !e.altKey && !isTextEntryShortcutTarget(e)) {
-        const key = e.key.toLowerCase();
-        if (key === 'q' || key === 'w') {
+      if (!e.altKey && !isTextEntryShortcutTarget(e)) {
+        const isCcw = commandKeyManager.matches('rotateCCW', e);
+        const isCw = commandKeyManager.matches('rotateCW', e);
+        if (isCcw || isCw) {
           e.preventDefault();
-          this._state.rotatePalette(key === 'w');
+          this._state.rotatePalette(isCw);
           if (this._state.linkedTilePos) this._state.applyParamsToLinkedTile();
           this._refreshPaletteUI();
           this._renderEditorCanvas();

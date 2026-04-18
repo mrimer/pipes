@@ -4,6 +4,7 @@ import { GameScreen, GameState, GridPos, PipeShape, Rotation } from './types';
 import { TILE_SIZE } from './renderer';
 import { sfxManager, SfxId } from './sfxManager';
 import { RADIUS_MD, UI_BG, UI_BORDER } from './uiConstants';
+import { commandKeyManager } from './commandKeyManager';
 
 /**
  * Callback interface that {@link InputHandler} calls into Game for all board
@@ -644,21 +645,17 @@ export class InputHandler {
         this._cb.selectNextAvailableInventory();
       }
     }
-    if (e.ctrlKey && e.key === 'z' && this._cb.getScreen() === GameScreen.Play) {
-      e.preventDefault();
-      if (this._cb.getGameState() === GameState.Playing) this._cb.performUndo();
-    }
-    if (e.ctrlKey && e.key === 'y' && this._cb.getScreen() === GameScreen.Play) {
-      e.preventDefault();
-      if (this._cb.getGameState() === GameState.Playing) this._cb.performRedo();
-    }
-    if (e.key === 'Backspace' && this._cb.getScreen() === GameScreen.Play) {
+    if (this._cb.getScreen() === GameScreen.Play && commandKeyManager.matches('undo', e)) {
       e.preventDefault();
       if (this._cb.getGameState() === GameState.Playing ||
           this._cb.getGameState() === GameState.GameOver ||
           this._cb.getGameState() === GameState.Won) {
         this._cb.performUndo();
       }
+    }
+    if (this._cb.getScreen() === GameScreen.Play && commandKeyManager.matches('redo', e)) {
+      e.preventDefault();
+      if (this._cb.getGameState() === GameState.Playing) this._cb.performRedo();
     }
   }
 
@@ -677,34 +674,35 @@ export class InputHandler {
     const board = this._cb.getBoard();
     if (!board) return;
 
+    if (commandKeyManager.matches('rotateCCW', e)) {
+      e.preventDefault();
+      if (this._cb.getGameState() !== GameState.Playing) return;
+      if (this._cb.getSelectedShape() !== null) {
+        this._rotatePendingCCW();
+      } else if (!this._tryRotateHoverSpinner(3)) {
+        // 3 CW steps = 1 CCW step
+        this._tryAdjustHoverRotation(-1);
+      }
+      return;
+    }
+    if (commandKeyManager.matches('rotateCW', e)) {
+      e.preventDefault();
+      if (this._cb.getGameState() !== GameState.Playing) return;
+      if (this._cb.getSelectedShape() !== null) {
+        this._rotatePendingCW();
+      } else if (!this._tryRotateHoverSpinner(1)) {
+        this._tryAdjustHoverRotation(1);
+      }
+      return;
+    }
     switch (e.key) {
-      case 'q':
-      case 'Q':
-        e.preventDefault();
-        if (this._cb.getGameState() !== GameState.Playing) break;
-        if (this._cb.getSelectedShape() !== null) {
-          this._rotatePendingCCW();
-        } else if (!this._tryRotateHoverSpinner(3)) {
-          // 3 CW steps = 1 CCW step
-          this._tryAdjustHoverRotation(-1);
-        }
-        break;
-      case 'w':
-      case 'W':
-        e.preventDefault();
-        if (this._cb.getGameState() !== GameState.Playing) break;
-        if (this._cb.getSelectedShape() !== null) {
-          this._rotatePendingCW();
-        } else if (!this._tryRotateHoverSpinner(1)) {
-          this._tryAdjustHoverRotation(1);
-        }
-        break;
       case 'Escape':
         this._cb.handleEscapeKey();
         break;
-      case 'r':
-      case 'R':
-        if (this._cb.getGameState() === GameState.Playing) this._cb.retryLevel();
+      default:
+        if (commandKeyManager.matches('restartLevel', e) && this._cb.getGameState() === GameState.Playing) {
+          this._cb.retryLevel();
+        }
         break;
     }
   }
