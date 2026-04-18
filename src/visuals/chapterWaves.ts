@@ -221,12 +221,15 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   const hoverEl = triggerEl ?? headerEl;
   // The background color shown while the animation is not running.
   const staticBg = isGold ? '#1e1800' : UI_BG;
+  const idleAlpha = 0.5;
+  const hoverAlpha = 0.7;
 
   // ── Canvas setup ────────────────────────────────────────────────────────────
   const canvas = document.createElement('canvas');
   canvas.style.cssText =
     'position:absolute;inset:0;width:100%;height:100%;' +
-    'pointer-events:none;border-radius:inherit;z-index:-1;';
+    `pointer-events:none;border-radius:inherit;z-index:-1;opacity:${idleAlpha};` +
+    'transition:opacity 120ms ease-out;';
 
   // position:relative + z-index:0 creates a stacking context so that the
   // canvas's z-index:-1 places it behind the header's inline content (tier 7
@@ -275,12 +278,14 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
 
   // ── Hover handlers ──────────────────────────────────────────────────────────
   hoverEl.addEventListener('mouseenter', () => {
+    canvas.style.opacity = String(hoverAlpha);
     if (animId === null) {
       animId = requestAnimationFrame(_frame);
     }
   });
 
   hoverEl.addEventListener('mouseleave', () => {
+    canvas.style.opacity = String(idleAlpha);
     if (animId !== null) {
       cancelAnimationFrame(animId);
       animId = null;
@@ -330,4 +335,3 @@ export function attachInventoryWaveAnimation(el: HTMLElement): void {
   // Start the animation immediately.
   requestAnimationFrame(_frame);
 }
-

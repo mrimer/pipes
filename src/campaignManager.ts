@@ -665,6 +665,7 @@ export class CampaignManager {
       () => this._callbacks.showSettings(),
       this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
       this._activeCampaign?.grid !== undefined,
+      () => this.showCampaignMap(),
     );
   }
 

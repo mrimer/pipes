@@ -177,6 +177,8 @@ function chapterWaterTotal(
  *   campaign box is rendered in the fully-mastered state.  The caller is
  *   responsible for tracking whether the sequence has already fired and only
  *   passing a non-null callback when the sequence should run.
+ * @param onCampaignMapClick - Optional callback invoked when the top-level
+ *   "Campaign Map" button is clicked.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -195,6 +197,7 @@ export function renderLevelList(
   onSettingsClick?: () => void,
   onCampaignMastered?: () => void,
   campaignHasMap = false,
+  onCampaignMapClick?: () => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -379,7 +382,9 @@ export function renderLevelList(
       'cursor:' + (showMastered ? 'default' : continueActive ? 'pointer' : 'default') + ';' +
       'width:100%;';
     if (!showMastered) {
-      if ((campaignHasMap || continueChapterIdx !== null) && onChapterMap) {
+      if (campaignHasMap && onCampaignMapClick) {
+        continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignMapClick(); });
+      } else if ((campaignHasMap || continueChapterIdx !== null) && onChapterMap) {
         continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx ?? 0); });
       } else if (continueId !== null) {
         continueBtn.addEventListener('click', () => startLevel(continueId));
@@ -557,7 +562,7 @@ export function renderLevelList(
 
   // Campaign Editor button at the top of the controls
   const campaignEditorBtn = createButton(
-    '🗺️ Campaign Editor', UI_BG, UI_GOLD,
+    '🗺️ Select Campaign', UI_BG, UI_GOLD,
     () => { sfxManager.play(SfxId.ChapterSelect); onCampaignEditorClick(); },
     'margin-top:8px;padding:10px 20px;width:100%;',
   );
