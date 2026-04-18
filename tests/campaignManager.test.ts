@@ -148,29 +148,44 @@ describe('CampaignManager campaign-map exit transition', () => {
     jest.restoreAllMocks();
   });
 
-  it('falls back to showLevelSelect when campaign map screen is unavailable', () => {
-    const showLevelSelect = jest.fn();
-    const callbacks = makeCallbacks({ showLevelSelect });
+  function getMainMenuBackButton(): HTMLButtonElement | undefined {
+    return Array.from(document.querySelectorAll<HTMLButtonElement>('button'))
+      .find((btn) => btn.textContent === '← Main Menu');
+  }
+
+  it('falls back to showLevelSelect when campaign map screen is hidden', () => {
+    const callbacks = makeCallbacks();
+    const showLevelSelect = jest.fn(() => {
+      callbacks.levelSelectEl.style.display = 'flex';
+    });
+    callbacks.showLevelSelect = showLevelSelect;
     const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
     const swirlSpy = jest.spyOn(levelTransition, 'playSwirlScreenTransition');
 
-    (manager as unknown as { _exitCampaignMapToMainScreen(): void })._exitCampaignMapToMainScreen();
+    manager.activate(campaign);
+    manager.showCampaignMap();
+    showLevelSelect.mockClear();
+    manager.hideCampaignMap();
+
+    const backButton = getMainMenuBackButton();
+    expect(backButton).toBeDefined();
+    backButton!.click();
 
     expect(showLevelSelect).toHaveBeenCalledTimes(1);
     expect(swirlSpy).not.toHaveBeenCalled();
   });
 
   it('uses swirl transition when exiting from a visible campaign map screen', () => {
+    const callbacks = makeCallbacks();
     const showLevelSelect = jest.fn(() => {
-      // Mimic main-screen show behavior.
       callbacks.levelSelectEl.style.display = 'flex';
     });
-    const callbacks = makeCallbacks({ showLevelSelect });
+    callbacks.showLevelSelect = showLevelSelect;
     const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const swirlSpy = jest.spyOn(levelTransition, 'playSwirlScreenTransition')
-      .mockImplementation((fromScreenEl, showDestination, onComplete) => {
-        expect(fromScreenEl).toBe((manager as unknown as { _campaignMapScreen?: { screenEl: HTMLElement } })._campaignMapScreen?.screenEl);
+      .mockImplementation((_fromScreenEl, showDestination, onComplete) => {
         const toEl = showDestination();
         expect(toEl).toBe(callbacks.levelSelectEl);
         onComplete();
@@ -179,8 +194,10 @@ describe('CampaignManager campaign-map exit transition', () => {
     manager.activate(campaign);
     manager.showCampaignMap();
     showLevelSelect.mockClear();
+    const backButton = getMainMenuBackButton();
+    expect(backButton).toBeDefined();
 
-    (manager as unknown as { _exitCampaignMapToMainScreen(): void })._exitCampaignMapToMainScreen();
+    backButton!.click();
 
     expect(swirlSpy).toHaveBeenCalledTimes(1);
     expect(showLevelSelect).toHaveBeenCalledTimes(1);
