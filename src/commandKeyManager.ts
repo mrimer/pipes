@@ -82,6 +82,10 @@ function isPureModifierBinding(binding: CommandBinding): boolean {
   return PURE_MODIFIER_KEYS.has(binding.key);
 }
 
+export function isPureModifierKey(key: string): boolean {
+  return PURE_MODIFIER_KEYS.has(normalizeKey(key));
+}
+
 function eventToBinding(e: KeyboardEvent): CommandBinding {
   return {
     key: normalizeKey(e.key),

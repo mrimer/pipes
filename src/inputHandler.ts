@@ -647,11 +647,7 @@ export class InputHandler {
     }
     if (this._cb.getScreen() === GameScreen.Play && commandKeyManager.matches('undo', e)) {
       e.preventDefault();
-      if (this._cb.getGameState() === GameState.Playing ||
-          this._cb.getGameState() === GameState.GameOver ||
-          this._cb.getGameState() === GameState.Won) {
-        this._cb.performUndo();
-      }
+      if (this._cb.getGameState() === GameState.Playing) this._cb.performUndo();
     }
     if (this._cb.getScreen() === GameScreen.Play && commandKeyManager.matches('redo', e)) {
       e.preventDefault();
@@ -707,11 +703,9 @@ export class InputHandler {
       case 'Escape':
         this._cb.handleEscapeKey();
         break;
-      default:
-        if (commandKeyManager.matches('restartLevel', e) && this._cb.getGameState() === GameState.Playing) {
-          this._cb.retryLevel();
-        }
-        break;
+    }
+    if (commandKeyManager.matches('restartLevel', e) && this._cb.getGameState() === GameState.Playing) {
+      this._cb.retryLevel();
     }
   }
 
