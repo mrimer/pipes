@@ -32,7 +32,6 @@ import {
   REPEATABLE_EDITOR_TILES,
   isPipePlacementPalette,
   buildMapTileDef,
-  computeEditorFilledCells,
   CAMPAIGN_MAP_MAX_DIM,
 } from './types';
 import { validateCampaignMap } from './campaignMapValidator';
@@ -676,8 +675,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
       if (this._suppressContextMenu) { this._suppressContextMenu = false; return; }
       this._onRightClick(e, campaign);
     });
-    canvas.addEventListener('mouseleave',  () => this._onMouseLeave(campaign));
-    canvas.addEventListener('wheel',       (e) => this._onWheel(e, campaign), { passive: false });
+    canvas.addEventListener('mouseleave',  () => this._onMouseLeave());
+    canvas.addEventListener('wheel',       (e) => this._onWheel(e), { passive: false });
 
     if (this._windowMouseUpHandler) window.removeEventListener('mouseup', this._windowMouseUpHandler);
     this._windowMouseUpHandler = (e: MouseEvent) => this._onMouseUp(e, campaign);
@@ -974,7 +973,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._cbs.openChapterEditor(tile.chapterIdx, readOnly);
   }
 
-  private _onMouseLeave(campaign: CampaignDef): void {
+  private _onMouseLeave(): void {
     this._hover = null;
     this._panDrag = null;
     if (this._dragState) this._dragState = null;
@@ -989,7 +988,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._renderCanvas();
   }
 
-  private _onWheel(e: WheelEvent, campaign: CampaignDef): void {
+  private _onWheel(e: WheelEvent): void {
     e.preventDefault();
     const pos = this._canvasPos(e);
     if (!pos) return;

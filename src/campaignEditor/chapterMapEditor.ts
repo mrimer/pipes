@@ -11,7 +11,6 @@ import { isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import {
-  EditorPalette,
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
   buildMapTileDef,
@@ -100,6 +99,11 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const campaign = this._callbacks.getActiveCampaign();
     const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
     this._recordSnapshotBase(chapter?.style, markChanged);
+  }
+
+  /** Backward-compatible test hook retained for legacy callers. */
+  _recordChapterSnapshot(): void {
+    this._recordSnapshot();
   }
 
   protected _saveGrid(): void {
@@ -253,14 +257,17 @@ export class ChapterMapEditorSection extends MapEditorBase {
         this._recordSnapshot();
         this._renderCanvas();
       },
-      recordSnapshot: (_ch, mark?) => this._recordSnapshot(mark),
-      saveGridState:  (_ch, _camp) => this._saveGrid(),
-      resizeGrid: (r, c, _ch, _camp) => this._resizeGrid(r, c),
-      slideGrid:  (d, _ch)         => this._slideGrid(d),
-      rotateGrid: (cw, _ch)        => this._rotateGrid(cw),
-      reflectGrid: (_ch)           => this._reflectGrid(),
-      flipGridHorizontal: (_ch)    => this._flipGridHorizontal(),
-      flipGridVertical:   (_ch)    => this._flipGridVertical(),
+      recordSnapshot: (chapter, mark?) => {
+        void chapter;
+        this._recordSnapshot(mark);
+      },
+      saveGridState:  () => this._saveGrid(),
+      resizeGrid: (r, c) => this._resizeGrid(r, c),
+      slideGrid:  (d)    => this._slideGrid(d),
+      rotateGrid: (cw)   => this._rotateGrid(cw),
+      reflectGrid: () => this._reflectGrid(),
+      flipGridHorizontal: () => this._flipGridHorizontal(),
+      flipGridVertical:   () => this._flipGridVertical(),
       renderCanvas: () => this._renderCanvas(),
       buildBtn: (...args) => this._callbacks.buildBtn(...args),
     };
@@ -282,11 +289,11 @@ export class ChapterMapEditorSection extends MapEditorBase {
       hasSourceElsewhere:   () => this._chapterHasSourceElsewhere(),
       hasSinkElsewhere:     () => this._chapterHasSinkElsewhere(),
       showSinkError:        () => this._showSinkError(),
-      rotateTileAt:         (pos, cw, _ch, _camp) => this._rotateTileAt(pos, cw),
-      rotateSourceSinkAt:   (pos, cw, _ch, _camp) => this._rotateSourceSinkAt(pos, cw),
+      rotateTileAt:         (pos, cw) => this._rotateTileAt(pos, cw),
+      rotateSourceSinkAt:   (pos, cw) => this._rotateSourceSinkAt(pos, cw),
       rotatePalette:        (cw) => this._rotatePalette(cw),
-      recordSnapshot:       (_ch) => this._recordSnapshot(),
-      saveGridState:        (_ch, _camp) => this._saveGrid(),
+      recordSnapshot:       () => this._recordSnapshot(),
+      saveGridState:        () => this._saveGrid(),
       renderCanvas:         () => this._renderCanvas(),
       rebuildPalette:       (ch, camp) => this._ui!.rebuildPalette(ch, camp),
       rebuildLevelInventory: (ch, camp) => this._ui!.rebuildLevelInventory(ch, camp),
