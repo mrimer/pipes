@@ -343,8 +343,9 @@ export function renderLevelList(
 
     // When all chapters are mastered (every level, star, and challenge done)
     // and chapter maps are in use, replace the continue button with a
-    // "Mastered!" trophy indicator that does nothing on click.
+    // "Mastered!" trophy indicator.
     const showMastered = onChapterMap !== undefined && campaignAllComplete;
+    const masteredCanOpenCampaignMap = showMastered && campaignHasMap && onCampaignMapClick !== undefined;
 
     const continueActive = continueChapterIdx !== null || continueId !== null;
     const continueBtn = document.createElement('button');
@@ -379,9 +380,11 @@ export function renderLevelList(
       'border:1px solid ' + (showMastered || continueActive ? '#f0c040' : '#555') + ';' +
       'background:' + (showMastered || continueActive ? '#f0c040' : '#333') + ';' +
       'color:' + (showMastered || continueActive ? UI_BG : '#888') + ';' +
-      'cursor:' + (showMastered ? 'default' : continueActive ? 'pointer' : 'default') + ';' +
+      'cursor:' + (masteredCanOpenCampaignMap || (!showMastered && continueActive) ? 'pointer' : 'default') + ';' +
       'width:100%;';
-    if (!showMastered) {
+    if (masteredCanOpenCampaignMap) {
+      continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignMapClick(); });
+    } else if (!showMastered) {
       if (campaignHasMap && onCampaignMapClick) {
         continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignMapClick(); });
       } else if ((campaignHasMap || continueChapterIdx !== null) && onChapterMap) {
