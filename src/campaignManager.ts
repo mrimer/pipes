@@ -344,14 +344,16 @@ export class CampaignManager {
     const campaign = this._activeCampaign;
     if (!campaign?.grid) return;
     this._ensureCampaignMapScreen();
+    const campaignMapScreen = this._campaignMapScreen;
+    if (!campaignMapScreen) return;
 
     this.hideChapterMap();
     this._winFromChapterMap = false;
-    this._campaignMapScreen.show(campaign);
+    campaignMapScreen.show(campaign);
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
-    if (this._campaignCompleteShown && !this._campaignMapScreen.isCampaignComplete()) {
+    if (this._campaignCompleteShown && !campaignMapScreen.isCampaignComplete()) {
       clearCampaignCompleteShown(campaign.id);
       this._campaignCompleteShown = false;
     }
