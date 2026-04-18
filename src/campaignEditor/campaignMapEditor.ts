@@ -952,11 +952,16 @@ export class CampaignMapEditorSection extends MapEditorBase {
       return;
     }
 
-    if (this._leftPanCandidate && this._dragState && this._advancePanDrag(this._leftPanCandidate, e)) {
-      this._dragState = null;
-      this._hover = null;
-      this._renderCanvas();
-      return;
+    // Allow pan to continue once it has started (moved === true) even after
+    // _dragState is cleared, so a long left-drag pan is not cut short.
+    if (this._leftPanCandidate) {
+      const canContinuePan = this._dragState !== null || this._leftPanCandidate.moved;
+      if (canContinuePan && this._advancePanDrag(this._leftPanCandidate, e)) {
+        this._dragState = null;
+        this._hover = null;
+        this._renderCanvas();
+        return;
+      }
     }
 
     const pos = this._canvasPos(e);
