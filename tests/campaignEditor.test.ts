@@ -2115,6 +2115,154 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
   });
 });
 
+// ─── CampaignEditor – context-menu (right-click) erase snapshot timing ────────
+
+describe('CampaignEditor – context-menu right-click erase snapshot is recorded after mutation', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  type EditorRightClickState = {
+    _state: {
+      rows: number;
+      cols: number;
+      grid: (import('../src/types').TileDef | null)[][];
+      palette: import('../src/campaignEditor/types').EditorPalette;
+      historyLength: number;
+      historyIndex: number;
+      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
+      recordSnapshot(): void;
+      undo(): boolean;
+      redo(): boolean;
+    };
+    _activeCampaignId: string | null;
+    _activeChapterIdx: number;
+    _activeLevelIdx: number;
+    _editorCanvas: HTMLCanvasElement | null;
+    _editorInput: {
+      onRightClick(e: MouseEvent): void;
+      canvasPos(e: MouseEvent): { row: number; col: number } | null;
+    } | null;
+    _openLevelEditor(level: LevelDef, readOnly: boolean): void;
+  };
+
+  function makeLevel(rows: number, cols: number): LevelDef {
+    return {
+      id: 99914,
+      name: 'RightClick Snapshot Test',
+      rows,
+      cols,
+      grid: Array.from({ length: rows }, () => Array(cols).fill(null) as null[]),
+      inventory: [],
+    };
+  }
+
+  function makeRightClickEditor(level: LevelDef): EditorRightClickState {
+    const camp: CampaignDef = {
+      id: 'cmp_rc_test',
+      name: 'RightClick Snapshot Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [level] }],
+    };
+    const editor = makeEditor([camp]);
+    const state = editor as unknown as EditorRightClickState;
+    state._activeCampaignId = 'cmp_rc_test';
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
+    state._openLevelEditor(level, false);
+    state._editorCanvas!.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 256, bottom: 256,
+      width: 256, height: 256, x: 0, y: 0,
+      toJSON: () => ({}),
+    });
+    return state;
+  }
+
+  function rightClickEvent(clientX: number, clientY: number): MouseEvent {
+    return new MouseEvent('contextmenu', { clientX, clientY, button: 2, bubbles: true });
+  }
+
+  it('erased tile IS absent in the snapshot after right-click', () => {
+    const state = makeRightClickEditor(makeLevel(4, 4));
+    state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    const historyLenBefore = state._state.historyLength;
+
+    state._editorInput!.onRightClick(rightClickEvent(32, 32)); // row 0, col 0
+
+    // Exactly one new snapshot should have been added.
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    // The new snapshot must record the erased (post-mutation) state.
+    const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
+    expect(newSnapshot.grid[0][0]).toBeNull();
+  });
+
+  it('previous snapshot retains the pre-erase tile', () => {
+    const state = makeRightClickEditor(makeLevel(4, 4));
+    // Seed a tile and record a snapshot to simulate a prior placement action.
+    state._state.grid[0][0] = { shape: PipeShape.Straight, rotation: 0 };
+    state._state.recordSnapshot();
+
+    state._editorInput!.onRightClick(rightClickEvent(32, 32));
+
+    // The snapshot one step back must still contain the original tile.
+    const prevSnapshot = state._state.historyEntryAt(state._state.historyIndex - 1);
+    expect(prevSnapshot.grid[0][0]?.shape).toBe(PipeShape.Straight);
+  });
+
+  it('redo after undo restores the erased state', () => {
+    const state = makeRightClickEditor(makeLevel(4, 4));
+    // Seed a tile and record a snapshot to simulate a prior placement action.
+    state._state.grid[0][0] = { shape: PipeShape.Elbow, rotation: 0 };
+    state._state.recordSnapshot();
+
+    // Right-click to erase.
+    state._editorInput!.onRightClick(rightClickEvent(32, 32));
+    expect(state._state.grid[0][0]).toBeNull();
+
+    // Undo: tile should come back.
+    state._state.undo();
+    expect(state._state.grid[0][0]?.shape).toBe(PipeShape.Elbow);
+
+    // Redo: tile should be erased again.
+    state._state.redo();
+    expect(state._state.grid[0][0]).toBeNull();
+  });
+
+  it('right-clicking an empty cell records a snapshot but leaves cell null', () => {
+    const state = makeRightClickEditor(makeLevel(4, 4));
+    const historyLenBefore = state._state.historyLength;
+
+    state._editorInput!.onRightClick(rightClickEvent(32, 32)); // row 0, col 0 is already empty
+
+    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    expect(state._state.grid[0][0]).toBeNull();
+  });
+});
+
 // ─── CampaignEditor – Source tile placement constraint ────────────────────────
 
 describe('CampaignEditor – Source tile placement constraint', () => {
