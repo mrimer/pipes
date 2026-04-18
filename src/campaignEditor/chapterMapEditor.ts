@@ -57,6 +57,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
   protected get _chamberContentType(): 'level' { return 'level'; }
   protected get _undoBtnId(): string { return 'chapter-undo-btn'; }
   protected get _redoBtnId(): string { return 'chapter-redo-btn'; }
+  get _chapterHist() { return this._hist; }
 
   constructor(callbacks: ChapterMapEditorCallbacks) {
     super(
