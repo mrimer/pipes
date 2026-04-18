@@ -9,7 +9,7 @@
  *   • Validation uses validateCampaignMap().
  */
 
-import { CampaignDef, TileDef, PipeShape, Direction, Rotation, LevelStyle, LevelDef } from '../types';
+import { CampaignDef, TileDef, PipeShape, Direction, Rotation, LevelDef } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
@@ -591,7 +591,7 @@ export class CampaignMapEditorSection {
 
   private _attachInput(canvas: HTMLCanvasElement, campaign: CampaignDef): void {
     canvas.addEventListener('mousedown',   (e) => this._onMouseDown(e, campaign));
-    canvas.addEventListener('mousemove',   (e) => this._onMouseMove(e, campaign));
+    canvas.addEventListener('mousemove',   (e) => this._onMouseMove(e));
     canvas.addEventListener('dblclick',    (e) => this._onDblClick(e));
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -770,7 +770,7 @@ export class CampaignMapEditorSection {
     this._renderCanvas();
   }
 
-  private _onMouseMove(e: MouseEvent, campaign: CampaignDef): void {
+  private _onMouseMove(e: MouseEvent): void {
     const pos = this._canvasPos(e);
     this._hover = pos;
 

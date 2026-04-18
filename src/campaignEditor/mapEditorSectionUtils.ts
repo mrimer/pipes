@@ -39,6 +39,12 @@ export interface MapEditorKeydownCallbacks {
   rotatePalette(clockwise: boolean): void;
 }
 
+/** True when the keyboard event originated from a text-entry element. */
+export function isTextEntryShortcutTarget(e: KeyboardEvent): boolean {
+  const tag = (e.target as HTMLElement | null)?.tagName ?? '';
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
 /**
  * Handle keyboard input that is common across both map editors:
  *
@@ -54,8 +60,7 @@ export function handleMapEditorKeyDown(
   e: KeyboardEvent,
   cbs: MapEditorKeydownCallbacks,
 ): void {
-  const tag = (e.target as HTMLElement | null)?.tagName ?? '';
-  if (e.altKey || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.altKey || isTextEntryShortcutTarget(e)) return;
 
   const key = e.key.toLowerCase();
 
