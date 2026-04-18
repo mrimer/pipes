@@ -478,14 +478,21 @@ export function playMapScreenExitTransition(
   overlay.appendChild(snapshotEl);
   document.body.appendChild(overlay);
 
-  const originalFromScreenVisibility = fromScreenEl.style.visibility;
-  const originalToScreenVisibility = toScreenEl.style.visibility;
+  // Hide only the live canvas inside fromScreenEl, not the whole screen element.
+  // This mirrors the technique in playMapExitTransition where the game canvas is
+  // hidden with visibility:hidden while the play-screen container fades out via
+  // opacity.  The canvas is replaced visually by the zooming snapshot overlay, so
+  // any concurrent TILE_SIZE change in the chapter-map animation loop cannot
+  // appear during the animation.  The campaign map (toScreenEl) remains fully
+  // visible and just fades in from opacity 0.
+  // The canvas is always present when the chapter map screen is shown; the null
+  // guard is a safety fallback so the transition still runs (without canvas hiding)
+  // in the unlikely event that the DOM structure differs.
+  const fromCanvas = fromScreenEl.querySelector<HTMLCanvasElement>('canvas');
+  const originalFromCanvasVisibility = fromCanvas?.style.visibility ?? '';
+  if (fromCanvas) fromCanvas.style.visibility = 'hidden';
   fromScreenEl.style.opacity = '1';
-  fromScreenEl.style.visibility = 'hidden';
   toScreenEl.style.opacity = '0';
-  // Keep the live destination map hidden during the zoom so any concurrent
-  // TILE_SIZE recalculation (e.g. resize/repopulate) cannot appear mid-animation.
-  toScreenEl.style.visibility = 'hidden';
 
   const startTime = performance.now();
 
@@ -510,9 +517,8 @@ export function playMapScreenExitTransition(
       requestAnimationFrame(tick);
     } else {
       overlay.remove();
+      if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
       fromScreenEl.style.opacity = '';
-      fromScreenEl.style.visibility = originalFromScreenVisibility;
-      toScreenEl.style.visibility = originalToScreenVisibility;
       toScreenEl.style.opacity = '';
       onComplete();
     }

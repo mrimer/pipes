@@ -258,6 +258,10 @@ export class CampaignManager {
             const campaignEl = campaignMapScreen.screenEl;
             chapterEl.style.overflow = 'hidden';
             campaignEl.style.overflow = 'hidden';
+            // Stop the chapter map animation loop before the transition to prevent
+            // it from rendering at the (now campaign-map) TILE_SIZE and corrupting
+            // the destination canvas – mirrors stopAnimLoop() in the zoom-in path.
+            chapterMapScreen.stopAnimLoop();
             playMapScreenExitTransition(
               minimapRect,
               chapterSnapshot,
