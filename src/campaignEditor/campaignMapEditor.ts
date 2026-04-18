@@ -111,6 +111,14 @@ export class CampaignMapEditorSection extends MapEditorBase {
     startPanY: number;
     moved: boolean;
   } | null = null;
+  /** Left-button drag candidate used to prioritize map panning over tile-drag actions. */
+  private _leftPanCandidate: {
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    moved: boolean;
+  } | null = null;
 
   /** Default campaign grid dimensions (same as chapter map defaults). */
   private static readonly DEFAULT_ROWS = 3;
@@ -578,6 +586,24 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._panPixelY = Math.max(0, Math.min(maxPanY, this._panPixelY));
   }
 
+  private _canPan(): boolean {
+    return this._gridState.rows > this._viewRows || this._gridState.cols > this._viewCols;
+  }
+
+  private _beginLeftPanCandidate(e: MouseEvent): void {
+    if (!this._canPan()) {
+      this._leftPanCandidate = null;
+      return;
+    }
+    this._leftPanCandidate = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPanX: this._panPixelX,
+      startPanY: this._panPixelY,
+      moved: false,
+    };
+  }
+
   private _renderCampaignCanvas(): void {
     const ctx = this._ctx;
     if (!ctx) return;
@@ -725,6 +751,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
   private _onMouseDown(e: MouseEvent, campaign: CampaignDef): void {
     // Middle-mouse button starts pan drag.
     if (e.button === 1) {
+      this._leftPanCandidate = null;
       e.preventDefault();
       this._panDrag = {
         startClientX: e.clientX,
@@ -736,6 +763,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       return;
     }
     if (e.button === 2) {
+      this._leftPanCandidate = null;
       const pos = this._canvasPos(e);
       if (!pos) return;
       this._rightEraseDragActive = true;
@@ -749,6 +777,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       return;
     }
     if (e.button !== 0) return;
+    this._leftPanCandidate = null;
     const pos = this._canvasPos(e);
     if (!pos) return;
 
@@ -791,6 +820,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
         this._renderCanvas();
       } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'chapter') {
         this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+        this._beginLeftPanCandidate(e);
         this._renderCanvas();
       }
       return;
@@ -799,6 +829,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (this._palette === CHAPTER_CHAMBER_PALETTE) {
       if (existingTile !== null) {
         this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+        this._beginLeftPanCandidate(e);
         this._renderCanvas();
       }
       return;
@@ -811,6 +842,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette) {
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+      this._beginLeftPanCandidate(e);
       this._renderCanvas();
     } else {
       if (palette === PipeShape.Source && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Source)) {
@@ -849,6 +881,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
       this._panDrag = null;
       return;
     }
+    if (e.button === 0 && this._leftPanCandidate?.moved) {
+      this._leftPanCandidate = null;
+      return;
+    }
+    if (e.button === 0) this._leftPanCandidate = null;
     if (e.button === 2) {
       if (!this._rightEraseDragActive) return;
       this._rightEraseDragActive = false;
@@ -904,6 +941,26 @@ export class CampaignMapEditorSection extends MapEditorBase {
           this._panPixelY = this._panDrag.startPanY - dy * scale.scaleY;
         }
         this._clampPan();
+        this._renderCanvas();
+        return;
+      }
+    }
+
+    if (this._leftPanCandidate && this._dragState) {
+      const dx = e.clientX - this._leftPanCandidate.startClientX;
+      const dy = e.clientY - this._leftPanCandidate.startClientY;
+      if (!this._leftPanCandidate.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        this._leftPanCandidate.moved = true;
+      }
+      if (this._leftPanCandidate.moved) {
+        const scale = this._canvasScale();
+        if (scale) {
+          this._panPixelX = this._leftPanCandidate.startPanX - dx * scale.scaleX;
+          this._panPixelY = this._leftPanCandidate.startPanY - dy * scale.scaleY;
+        }
+        this._clampPan();
+        this._dragState = null;
+        this._hover = null;
         this._renderCanvas();
         return;
       }
@@ -976,6 +1033,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
   private _onMouseLeave(): void {
     this._hover = null;
     this._panDrag = null;
+    this._leftPanCandidate = null;
     if (this._dragState) this._dragState = null;
     if (this._paintDragActive) {
       this._paintDragActive = false;

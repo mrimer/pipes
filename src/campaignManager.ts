@@ -258,7 +258,6 @@ export class CampaignManager {
             const campaignEl = campaignMapScreen.screenEl;
             chapterEl.style.overflow = 'hidden';
             campaignEl.style.overflow = 'hidden';
-            campaignEl.style.visibility = 'hidden';
             playMapScreenExitTransition(
               minimapRect,
               chapterSnapshot,
@@ -267,7 +266,6 @@ export class CampaignManager {
               () => {
                 chapterEl.style.overflow = '';
                 campaignEl.style.overflow = '';
-                campaignEl.style.visibility = '';
                 chapterMapScreen.hide();
               },
             );
