@@ -3,6 +3,8 @@
  * Used to tailor input handling and layout for mobile/tablet devices.
  */
 
+let touchUiEnabledOverride: boolean | null = null;
+
 /**
  * Returns true when the environment exposes any touch capability.
  */
@@ -50,4 +52,3 @@ export function isPortrait(): boolean {
 export function isNarrowScreen(): boolean {
   return window.innerWidth < 600;
 }
-let touchUiEnabledOverride: boolean | null = null;
