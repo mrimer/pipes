@@ -145,6 +145,32 @@ function clampPanEdgeOnly(
   };
 }
 
+function clampPanWithConnectedBounds(
+  panX: number, panY: number,
+  rows: number, cols: number,
+  viewRows: number, viewCols: number,
+  rMin: number, rMax: number,
+  cMin: number, cMax: number,
+  tileSize = 64,
+): { x: number; y: number } {
+  const maxX = Math.max(0, (cols - viewCols) * tileSize);
+  const maxY = Math.max(0, (rows - viewRows) * tileSize);
+  let x = Math.max(0, Math.min(maxX, panX));
+  let y = Math.max(0, Math.min(maxY, panY));
+  const bboxMinX = Math.max(0, (cMin - 1) * tileSize);
+  const bboxMaxX = Math.min(maxX, (cMax + 2 - viewCols) * tileSize);
+  const bboxMinY = Math.max(0, (rMin - 1) * tileSize);
+  const bboxMaxY = Math.min(maxY, (rMax + 2 - viewRows) * tileSize);
+  const clampAxis = (value: number, min: number, max: number): number => (
+    min <= max
+      ? Math.max(min, Math.min(max, value))
+      : Math.max(max, Math.min(min, value))
+  );
+  x = clampAxis(x, bboxMinX, bboxMaxX);
+  y = clampAxis(y, bboxMinY, bboxMaxY);
+  return { x, y };
+}
+
 describe('viewport clamp (pure logic)', () => {
   it('clamps pan to (0,0) when map fits within view', () => {
     expect(clampPanEdgeOnly(-100, -50, 5, 8, MAP_VIEW_MAX_ROWS, MAP_VIEW_MAX_COLS)).toEqual({ x: 0, y: 0 });
@@ -165,6 +191,23 @@ describe('viewport clamp (pure logic)', () => {
   it('max pan is zero when map equals view size', () => {
     const result = clampPanEdgeOnly(100, 100, MAP_VIEW_MAX_ROWS, MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS, MAP_VIEW_MAX_COLS);
     expect(result).toEqual({ x: 0, y: 0 });
+  });
+
+  it('still constrains vertical panning when connected-bounds range is inverted', () => {
+    const result = clampPanWithConnectedBounds(
+      0,
+      9999,
+      20,
+      20,
+      MAP_VIEW_MAX_ROWS,
+      MAP_VIEW_MAX_COLS,
+      10,
+      11,
+      2,
+      17,
+    );
+    expect(result.y).toBeLessThanOrEqual((10 - 1) * 64);
+    expect(result.y).toBeGreaterThanOrEqual((11 + 2 - MAP_VIEW_MAX_ROWS) * 64);
   });
 });
 

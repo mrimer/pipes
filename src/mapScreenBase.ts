@@ -1188,12 +1188,15 @@ export abstract class MapScreenBase {
     const bboxMinY = Math.max(0, (rMin - 1) * TILE_SIZE);
     const bboxMaxY = Math.min(maxPanY, (rMax + 2 - viewRows) * TILE_SIZE);
 
-    if (bboxMinX <= bboxMaxX) {
-      this._panPixelX = Math.max(bboxMinX, Math.min(bboxMaxX, this._panPixelX));
+    this._panPixelX = this._clampPanAxis(this._panPixelX, bboxMinX, bboxMaxX);
+    this._panPixelY = this._clampPanAxis(this._panPixelY, bboxMinY, bboxMaxY);
+  }
+
+  private _clampPanAxis(current: number, preferredMin: number, preferredMax: number): number {
+    if (preferredMin <= preferredMax) {
+      return Math.max(preferredMin, Math.min(preferredMax, current));
     }
-    if (bboxMinY <= bboxMaxY) {
-      this._panPixelY = Math.max(bboxMinY, Math.min(bboxMaxY, this._panPixelY));
-    }
+    return Math.max(preferredMax, Math.min(preferredMin, current));
   }
 
   /**

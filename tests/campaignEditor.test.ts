@@ -3748,6 +3748,90 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
   });
 });
 
+describe('CampaignEditor – campaign map editor pan-drag precedence', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  it('prioritizes panning over tile-drag when dragging on an oversized campaign map', () => {
+    const bigRows = 20;
+    const bigCols = 20;
+    const grid = Array.from({ length: bigRows }, () => Array.from({ length: bigCols }, () => null as TileDef | null));
+    grid[0][0] = { shape: PipeShape.Source };
+    const campaign: CampaignDef = {
+      id: 'cmp_pan_priority',
+      name: 'Pan Priority',
+      author: 'Tester',
+      rows: bigRows,
+      cols: bigCols,
+      grid,
+      chapters: [{ id: 1, name: 'Chapter 1', levels: [] }],
+    };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    const state = editor as unknown as {
+      _el: HTMLElement;
+      _activeCampaignId: string | null;
+      _showCampaignDetail(): void;
+      _campaignMapEditor: {
+        _dragState: unknown;
+        _panPixelX: number;
+      };
+    };
+    state._activeCampaignId = 'cmp_pan_priority';
+    state._showCampaignDetail();
+    state._el.style.display = 'flex';
+
+    const canvas = document.querySelector<HTMLCanvasElement>('#campaign-map-editor-section canvas');
+    expect(canvas).toBeTruthy();
+    Object.defineProperty(canvas!, 'getBoundingClientRect', {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: canvas!.width || 768,
+        height: canvas!.height || 576,
+        right: canvas!.width || 768,
+        bottom: canvas!.height || 576,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+      configurable: true,
+    });
+
+    canvas!.dispatchEvent(new MouseEvent('mousedown', { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+    expect(state._campaignMapEditor._dragState).toBeTruthy();
+    canvas!.dispatchEvent(new MouseEvent('mousemove', { buttons: 1, clientX: -80, clientY: 10, bubbles: true }));
+
+    expect(state._campaignMapEditor._dragState).toBeNull();
+    expect(state._campaignMapEditor._panPixelX).toBeGreaterThan(0);
+  });
+});
+
 // ─── CampaignEditor – Ctrl+Z/Y on chapter map screen ─────────────────────────
 
 describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
