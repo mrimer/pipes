@@ -3503,7 +3503,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
     _campaignMapEditor: {
       handleCampaignEditorKeyDown(e: KeyboardEvent): void;
       _hist: { canUndo: boolean; canRedo: boolean };
-      _editGrid: (TileDef | null)[][];
+      _gridState: { grid: (TileDef | null)[][] };
       _recordSnapshot(campaign: CampaignDef): void;
     };
     _showCampaignDetail(): void;
@@ -3534,7 +3534,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_kd_test')!;
 
     // Place a tile and record a snapshot to give undo history
-    state._campaignMapEditor._editGrid[0][0] = { shape: PipeShape.Granite };
+    state._campaignMapEditor._gridState.grid[0][0] = { shape: PipeShape.Granite };
     state._campaignMapEditor._recordSnapshot(campaign);
 
     expect(state._campaignMapEditor._hist.canUndo).toBe(true);
@@ -3545,7 +3545,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
     );
 
     // After undo, the tile should be removed
-    expect(state._campaignMapEditor._editGrid[0][0]).toBeNull();
+    expect(state._campaignMapEditor._gridState.grid[0][0]).toBeNull();
   });
 
   it('Ctrl+Y on campaign screen triggers redo after undo', () => {
@@ -3553,20 +3553,20 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_kd_test')!;
 
     // Place a tile and record a snapshot
-    state._campaignMapEditor._editGrid[0][0] = { shape: PipeShape.Granite };
+    state._campaignMapEditor._gridState.grid[0][0] = { shape: PipeShape.Granite };
     state._campaignMapEditor._recordSnapshot(campaign);
 
     // Undo via Ctrl+Z
     state._campaignMapEditor.handleCampaignEditorKeyDown(
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
     );
-    expect(state._campaignMapEditor._editGrid[0][0]).toBeNull();
+    expect(state._campaignMapEditor._gridState.grid[0][0]).toBeNull();
 
     // Redo via Ctrl+Y
     state._campaignMapEditor.handleCampaignEditorKeyDown(
       new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true }),
     );
-    expect(state._campaignMapEditor._editGrid[0][0]?.shape).toBe(PipeShape.Granite);
+    expect(state._campaignMapEditor._gridState.grid[0][0]?.shape).toBe(PipeShape.Granite);
   });
 
   it('other Ctrl+key combinations are ignored by the campaign map handler', () => {
@@ -3619,7 +3619,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
     _chapterMapEditor: {
       handleChapterEditorKeyDown(e: KeyboardEvent): void;
       _chapterHist: { canUndo: boolean; canRedo: boolean };
-      _chapterEditGrid: (TileDef | null)[][];
+      _gridState: { grid: (TileDef | null)[][] };
       _recordChapterSnapshot(chapter: import('../src/types').ChapterDef): void;
     };
     _showChapterDetail(chapterIdx: number): void;
@@ -3656,7 +3656,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
     const chapter = campaign.chapters[0];
 
     // Place a tile and record a snapshot to give undo history
-    state._chapterMapEditor._chapterEditGrid[0][0] = { shape: PipeShape.Granite };
+    state._chapterMapEditor._gridState.grid[0][0] = { shape: PipeShape.Granite };
     state._chapterMapEditor._recordChapterSnapshot(chapter);
 
     expect(state._chapterMapEditor._chapterHist.canUndo).toBe(true);
@@ -3665,7 +3665,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
     );
 
-    expect(state._chapterMapEditor._chapterEditGrid[0][0]).toBeNull();
+    expect(state._chapterMapEditor._gridState.grid[0][0]).toBeNull();
   });
 
   it('Ctrl+Y on chapter screen triggers redo after undo', () => {
@@ -3673,20 +3673,20 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
     const campaign = state._service.campaigns.find(c => c.id === 'cmp_ch_kd_test')!;
     const chapter = campaign.chapters[0];
 
-    state._chapterMapEditor._chapterEditGrid[0][0] = { shape: PipeShape.Granite };
+    state._chapterMapEditor._gridState.grid[0][0] = { shape: PipeShape.Granite };
     state._chapterMapEditor._recordChapterSnapshot(chapter);
 
     // Undo
     state._chapterMapEditor.handleChapterEditorKeyDown(
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }),
     );
-    expect(state._chapterMapEditor._chapterEditGrid[0][0]).toBeNull();
+    expect(state._chapterMapEditor._gridState.grid[0][0]).toBeNull();
 
     // Redo
     state._chapterMapEditor.handleChapterEditorKeyDown(
       new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, bubbles: true }),
     );
-    expect(state._chapterMapEditor._chapterEditGrid[0][0]?.shape).toBe(PipeShape.Granite);
+    expect(state._chapterMapEditor._gridState.grid[0][0]?.shape).toBe(PipeShape.Granite);
   });
 
   it('other Ctrl+key combinations are ignored by the chapter map handler', () => {

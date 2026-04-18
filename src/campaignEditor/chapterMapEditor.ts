@@ -13,14 +13,6 @@ import {
   DEFAULT_PARAMS,
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
-  rotateGridBy90,
-  rotatePositionBy90,
-  reflectGridAboutDiagonal,
-  reflectPositionAboutDiagonal,
-  flipGridHorizontal,
-  flipGridVertical,
-  flipPositionHorizontal,
-  flipPositionVertical,
   buildMapTileDef,
   rotateConnectionsBy90,
   computeEditorFilledCells,
@@ -29,11 +21,17 @@ import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
 import { validateChapterMap } from './chapterMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
-import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
+import { hasShapeElsewhere } from './gridUtils';
 import { HistoryManager } from './historyManager';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
 import { showTimedMessage, updateUndoRedoButtonPair } from '../uiHelpers';
-import { updateMapEditorCanvas } from './canvasUtils';
+import {
+  updateMapEditorCanvas,
+  drawFocusedTileOverlay,
+  buildCanvasWithErrorDiv,
+} from './canvasUtils';
+import { MapEditorGridState } from './mapEditorGridState';
+import { handleMapEditorKeyDown } from './mapEditorSectionUtils';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -53,10 +51,10 @@ export class ChapterMapEditorSection {
   private _ui: ChapterEditorUI | null = null;
   private _input: ChapterMapInput | null = null;
 
+  // ── Grid state (delegated to MapEditorGridState) ──────────────────────────
+  private readonly _gridState: MapEditorGridState;
+
   // ── State fields ──────────────────────────────────────────────────────────
-  private _chapterEditRows = 3;
-  private _chapterEditCols = 6;
-  private _chapterEditGrid: (TileDef | null)[][] = [];
   private _chapterPalette: EditorPalette = PipeShape.Source;
   private _chapterParams: TileParams = { ...DEFAULT_PARAMS };
   private _chapterCanvas: HTMLCanvasElement | null = null;
@@ -64,7 +62,6 @@ export class ChapterMapEditorSection {
   private readonly _chapterHist = new HistoryManager<EditorSnapshot>();
   private _chapterSelectedLevelIdx: number | null = null;
   private _chapterEditorMainLayout: HTMLDivElement = document.createElement('div');
-  private _chapterFocusedTilePos: { row: number; col: number } | null = null;
   /** Error flash element shown below the chapter map canvas. */
   private _chapterErrorEl: HTMLDivElement | null = null;
 
@@ -74,6 +71,10 @@ export class ChapterMapEditorSection {
 
   constructor(callbacks: ChapterMapEditorCallbacks) {
     this._callbacks = callbacks;
+    this._gridState = new MapEditorGridState(
+      ChapterMapEditorSection.CHAPTER_DEFAULT_ROWS,
+      ChapterMapEditorSection.CHAPTER_DEFAULT_COLS,
+    );
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -107,35 +108,17 @@ export class ChapterMapEditorSection {
    * the chapter's saved grid data, or create a default 3×6 grid with source/sink.
    */
   private _initChapterGridState(chapter: ChapterDef): void {
-    if (chapter.grid && chapter.rows && chapter.cols) {
-      this._chapterEditRows = chapter.rows;
-      this._chapterEditCols = chapter.cols;
-      this._chapterEditGrid = structuredClone(chapter.grid);
-    } else {
-      // Create default 3×6 grid
-      const rows = ChapterMapEditorSection.CHAPTER_DEFAULT_ROWS;
-      const cols = ChapterMapEditorSection.CHAPTER_DEFAULT_COLS;
-      const grid: (TileDef | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null) as null[]);
-      // Source at [1, 0] with connection to the right
-      grid[1][0] = { shape: PipeShape.Source, connections: [Direction.East] };
-      // Sink at [1, 5] with connection to the left
-      grid[1][cols - 1] = { shape: PipeShape.Sink, connections: [Direction.West] };
-      this._chapterEditRows = rows;
-      this._chapterEditCols = cols;
-      this._chapterEditGrid = grid;
-    }
-    // Reset chapter editor state
+    this._gridState.init(chapter.rows, chapter.cols, chapter.grid);
     this._chapterHist.clear();
     this._chapterSelectedLevelIdx = null;
-    this._chapterFocusedTilePos = null;
     this._recordChapterSnapshot(chapter, false);
   }
 
   /** Write current chapter grid state back to the chapter object and persist. */
   private _saveChapterGridState(chapter: ChapterDef, campaign: CampaignDef): void {
-    chapter.rows = this._chapterEditRows;
-    chapter.cols = this._chapterEditCols;
-    chapter.grid = structuredClone(this._chapterEditGrid);
+    chapter.rows = this._gridState.rows;
+    chapter.cols = this._gridState.cols;
+    chapter.grid = structuredClone(this._gridState.grid);
     this._callbacks.touchCampaign(campaign);
     this._callbacks.saveCampaigns();
   }
@@ -199,7 +182,7 @@ export class ChapterMapEditorSection {
 
     midToolbar.appendChild(this._callbacks.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
       const result = validateChapterMap(
-        this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, chapter,
+        this._gridState.grid, this._gridState.rows, this._gridState.cols, chapter,
       );
       const icon = result.ok ? '✅' : '❌';
       alert(`${icon} Chapter Map Validation\n\n${result.messages.join('\n')}`);
@@ -227,10 +210,10 @@ export class ChapterMapEditorSection {
       getChapterParams:           () => this._chapterParams,
       getChapterSelectedLevelIdx: () => this._chapterSelectedLevelIdx,
       setChapterSelectedLevelIdx: (i) => { this._chapterSelectedLevelIdx = i; },
-      getChapterEditGrid:         () => this._chapterEditGrid,
-      getChapterEditRows:         () => this._chapterEditRows,
-      getChapterEditCols:         () => this._chapterEditCols,
-      getChapterFocusedTilePos:   () => this._chapterFocusedTilePos,
+      getChapterEditGrid:         () => this._gridState.grid,
+      getChapterEditRows:         () => this._gridState.rows,
+      getChapterEditCols:         () => this._gridState.cols,
+      getChapterFocusedTilePos:   () => this._gridState.focusedTilePos,
       getChapterStyle: (ch) => ch.style,
       setChapterStyle: (style: LevelStyle, ch: ChapterDef) => {
         ch.style = style;
@@ -253,15 +236,15 @@ export class ChapterMapEditorSection {
   /** Build the callback object that wires ChapterMapInput to this section's state. */
   private _makeInputCallbacks(): ChapterMapInputCallbacks {
     return {
-      getEditGrid:          () => this._chapterEditGrid,
-      getEditRows:          () => this._chapterEditRows,
-      getEditCols:          () => this._chapterEditCols,
+      getEditGrid:          () => this._gridState.grid,
+      getEditRows:          () => this._gridState.rows,
+      getEditCols:          () => this._gridState.cols,
       getPalette:           () => this._chapterPalette,
       setPalette:           (p) => { this._chapterPalette = p; },
       getSelectedLevelIdx:  () => this._chapterSelectedLevelIdx,
       setSelectedLevelIdx:  (i) => { this._chapterSelectedLevelIdx = i; },
-      getFocusedTilePos:    () => this._chapterFocusedTilePos,
-      setFocusedTilePos:    (pos) => { this._chapterFocusedTilePos = pos; },
+      getFocusedTilePos:    () => this._gridState.focusedTilePos,
+      setFocusedTilePos:    (pos) => { this._gridState.focusedTilePos = pos; },
       buildTileDef:         () => this._buildChapterTileDef(),
       hasSourceElsewhere:   () => this._chapterHasSourceElsewhere(),
       hasSinkElsewhere:     () => this._chapterHasSinkElsewhere(),
@@ -278,117 +261,45 @@ export class ChapterMapEditorSection {
         const el = document.getElementById('chapter-tile-params-panel');
         if (el) el.replaceWith(this._ui!.buildTileParamsPanel(ch, camp));
       },
-      clearFocusIfAt:       (pos) => this._clearFocusIfAt(pos),
+      clearFocusIfAt:       (pos) => this._gridState.clearFocusIfAt(pos),
       getActiveCampaign:    () => this._callbacks.getActiveCampaign(),
       getActiveChapterIdx:  () => this._callbacks.getActiveChapterIdx(),
       openLevelEditor:      (idx, ro) => this._callbacks.openLevelEditor(idx, ro),
     };
   }
 
-  /**
-   * Slide all chapter map tiles one cell in the given direction.  Tiles that
-   * would fall off the edge of the grid are discarded.  The operation is
-   * recorded as an undo snapshot.
-   */
   private _slideChapterGrid(dir: 'N' | 'E' | 'S' | 'W', chapter: ChapterDef): void {
-    this._chapterEditGrid = slideGrid(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, dir);
+    this._gridState.slide(dir);
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._renderChapterCanvas();
   }
 
-  /**
-   * Rotate the entire chapter map board 90° CW or CCW.  Swaps rows/cols,
-   * repositions all tiles, and rotates each tile's connections/rotation
-   * to match the new orientation.  Records an undo snapshot.
-   */
   private _rotateChapterGrid(clockwise: boolean, chapter: ChapterDef): void {
-    const oldRows = this._chapterEditRows;
-    const oldCols = this._chapterEditCols;
-
-    const { newGrid, newRows, newCols } = rotateGridBy90(this._chapterEditGrid, oldRows, oldCols, clockwise);
-
-    this._chapterEditRows = newRows;
-    this._chapterEditCols = newCols;
-    this._chapterEditGrid = newGrid;
-
-    // Update focused tile position to follow the rotation.
-    if (this._chapterFocusedTilePos) {
-      this._chapterFocusedTilePos = rotatePositionBy90(this._chapterFocusedTilePos, oldRows, oldCols, clockwise);
-    }
-
+    this._gridState.rotate(clockwise);
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._updateChapterCanvasDisplaySize();
     this._renderChapterCanvas();
   }
 
-  /**
-   * Reflect the entire chapter map board about the main diagonal (x=y /
-   * transpose).  Swaps rows/cols, repositions all tiles, and reflects each
-   * tile's connections/rotation.  Records an undo snapshot.
-   */
   private _reflectChapterGrid(chapter: ChapterDef): void {
-    const oldRows = this._chapterEditRows;
-    const oldCols = this._chapterEditCols;
-
-    const { newGrid, newRows, newCols } = reflectGridAboutDiagonal(this._chapterEditGrid, oldRows, oldCols);
-
-    this._chapterEditRows = newRows;
-    this._chapterEditCols = newCols;
-    this._chapterEditGrid = newGrid;
-
-    if (this._chapterFocusedTilePos) {
-      this._chapterFocusedTilePos = reflectPositionAboutDiagonal(this._chapterFocusedTilePos);
-    }
-
+    this._gridState.reflect();
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._updateChapterCanvasDisplaySize();
     this._renderChapterCanvas();
   }
 
-  /**
-   * Flip the entire chapter map board horizontally (left–right reflection).
-   * Mirrors column positions and updates each tile's connections/rotation.
-   * Records an undo snapshot.
-   */
   private _flipChapterGridHorizontal(chapter: ChapterDef): void {
-    const { newGrid } = flipGridHorizontal(
-      this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols,
-    );
-
-    this._chapterEditGrid = newGrid;
-
-    if (this._chapterFocusedTilePos) {
-      this._chapterFocusedTilePos = flipPositionHorizontal(
-        this._chapterFocusedTilePos, this._chapterEditCols,
-      );
-    }
-
+    this._gridState.flipHorizontal();
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._renderChapterCanvas();
   }
 
-  /**
-   * Flip the entire chapter map board vertically (top–bottom reflection).
-   * Mirrors row positions and updates each tile's connections/rotation.
-   * Records an undo snapshot.
-   */
   private _flipChapterGridVertical(chapter: ChapterDef): void {
-    const { newGrid } = flipGridVertical(
-      this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols,
-    );
-
-    this._chapterEditGrid = newGrid;
-
-    if (this._chapterFocusedTilePos) {
-      this._chapterFocusedTilePos = flipPositionVertical(
-        this._chapterFocusedTilePos, this._chapterEditRows,
-      );
-    }
-
+    this._gridState.flipVertical();
     this._recordChapterSnapshot(chapter);
     sfxManager.play(SfxId.BoardSlide);
     this._renderChapterCanvas();
@@ -400,9 +311,9 @@ export class ChapterMapEditorSection {
    */
   private _buildChapterMapCanvas(campaign: CampaignDef, chapter: ChapterDef, readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
-    setTileSize(computeTileSize(this._chapterEditRows, this._chapterEditCols));
-    canvas.width  = this._chapterEditCols * TILE_SIZE;
-    canvas.height = this._chapterEditRows * TILE_SIZE;
+    setTileSize(computeTileSize(this._gridState.rows, this._gridState.cols));
+    canvas.width  = this._gridState.cols * TILE_SIZE;
+    canvas.height = this._gridState.rows * TILE_SIZE;
     canvas.style.cssText =
       `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:${RADIUS_SM};` +
       'cursor:' + (readOnly ? 'default' : 'crosshair') + ';display:block;';
@@ -417,14 +328,9 @@ export class ChapterMapEditorSection {
     }
 
     if (!readOnly) {
-      const wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
-      wrap.appendChild(canvas);
-      const errorDiv = document.createElement('div');
-      errorDiv.style.cssText = 'font-size:0.85rem;color:#f44;display:none;font-weight:bold;';
-      this._chapterErrorEl = errorDiv;
-      wrap.appendChild(errorDiv);
-      return wrap;
+      const { wrapper, errorEl } = buildCanvasWithErrorDiv(canvas);
+      this._chapterErrorEl = errorEl;
+      return wrapper;
     }
 
     return canvas;
@@ -435,8 +341,8 @@ export class ChapterMapEditorSection {
     if (!this._chapterCanvas) return;
     updateMapEditorCanvas(
       this._chapterCanvas,
-      this._chapterEditRows,
-      this._chapterEditCols,
+      this._gridState.rows,
+      this._gridState.cols,
       this._chapterEditorMainLayout,
     );
   }
@@ -454,12 +360,12 @@ export class ChapterMapEditorSection {
 
     if (!drag && hover) {
       if (this._chapterPalette === 'erase') {
-        const hoverCell = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
+        const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
         const isEmpty = hoverCell === null;
         overlay = { pos: hover, def: null, alpha: isEmpty ? 0.2 : 1 };
       } else if (this._chapterSelectedLevelIdx !== null) {
         // Preview: level chamber placeholder – only on empty cells
-        const hoverCell = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
+        const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
         const isEmpty = hoverCell === null || (hoverCell !== null && isEmptyFloor(hoverCell.shape));
         if (isEmpty) {
           const levelDef: TileDef = {
@@ -471,7 +377,7 @@ export class ChapterMapEditorSection {
         }
       } else {
         // Show placement ghost on empty or empty-floor cells
-        const hoverCell = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
+        const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
         const isEmpty = hoverCell === null || (hoverCell !== null && isEmptyFloor(hoverCell.shape));
         if (isEmpty) {
           overlay = { pos: hover, def: this._buildChapterTileDef(), alpha: 0.55 };
@@ -488,9 +394,9 @@ export class ChapterMapEditorSection {
 
     renderEditorCanvas(
       ctx,
-      this._chapterEditGrid,
-      this._chapterEditRows,
-      this._chapterEditCols,
+      this._gridState.grid,
+      this._gridState.rows,
+      this._gridState.cols,
       overlay,
       drag,
       null,
@@ -500,18 +406,7 @@ export class ChapterMapEditorSection {
       chapter?.style,
     );
 
-    if (this._chapterFocusedTilePos && this._chapterCtx) {
-      const { row, col } = this._chapterFocusedTilePos;
-      const x = col * TILE_SIZE;
-      const y = row * TILE_SIZE;
-      this._chapterCtx.save();
-      this._chapterCtx.strokeStyle = '#f0c040';
-      this._chapterCtx.lineWidth = 3;
-      this._chapterCtx.setLineDash([5, 3]);
-      this._chapterCtx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-      this._chapterCtx.setLineDash([]);
-      this._chapterCtx.restore();
-    }
+    drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);
   }
 
   /** Build a TileDef from the current chapter palette selection and params. */
@@ -520,11 +415,11 @@ export class ChapterMapEditorSection {
   }
 
   private _chapterHasSourceElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    return hasShapeElsewhere(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Source, exceptPos);
+    return hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Source, exceptPos);
   }
 
   private _chapterHasSinkElsewhere(exceptPos?: { row: number; col: number }): boolean {
-    return hasShapeElsewhere(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Sink, exceptPos);
+    return hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Sink, exceptPos);
   }
 
   /** Flash an error below the chapter map canvas when the Sink placement constraint is violated. */
@@ -534,31 +429,17 @@ export class ChapterMapEditorSection {
     showTimedMessage(el, 'Only one sink tile is allowed.');
   }
 
-  /**
-   * Compute which cells are water-reachable from the source in the editor grid.
-   */
   private _computeChapterEditorFilledCells(): Set<string> {
-    return computeEditorFilledCells(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols);
+    return computeEditorFilledCells(this._gridState.grid, this._gridState.rows, this._gridState.cols);
   }
 
-  /** Clear the focus tile if it matches the given position. */
-  private _clearFocusIfAt(pos: { row: number; col: number }): void {
-    if (this._chapterFocusedTilePos?.row === pos.row && this._chapterFocusedTilePos?.col === pos.col) {
-      this._chapterFocusedTilePos = null;
-    }
-  }
-
-  /**
-   * Rotate a placed pipe tile at the given position clockwise or counterclockwise.
-   * No-op if the tile at pos is not a rotatable pipe shape.
-   */
   private _rotateChapterTileAt(
     pos: { row: number; col: number },
     clockwise: boolean,
     chapter: ChapterDef,
     campaign: CampaignDef,
   ): void {
-    const tile = this._chapterEditGrid[pos.row]?.[pos.col];
+    const tile = this._gridState.grid[pos.row]?.[pos.col];
     if (!tile || !PIPE_SHAPES.has(tile.shape)) return;
     sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
     const cur = (tile.rotation ?? 0) as Rotation;
@@ -584,18 +465,13 @@ export class ChapterMapEditorSection {
     this._renderChapterCanvas();
   }
 
-  /**
-   * Rotate a placed Source or Sink tile at the given position by rotating its connections CW/CCW.
-   * Also updates `_chapterParams.connections` when the palette matches the tile shape,
-   * and rebuilds the Tile Params panel so it reflects the new orientation.
-   */
   private _rotateChapterSourceSinkAt(
     pos: { row: number; col: number },
     clockwise: boolean,
     chapter: ChapterDef,
     campaign: CampaignDef,
   ): void {
-    const tile = this._chapterEditGrid[pos.row]?.[pos.col];
+    const tile = this._gridState.grid[pos.row]?.[pos.col];
     if (!tile) return;
     const isConnectable =
       tile.shape === PipeShape.Source ||
@@ -618,7 +494,7 @@ export class ChapterMapEditorSection {
     }
 
     // Update focused tile and rebuild params panel
-    this._chapterFocusedTilePos = pos;
+    this._gridState.focusedTilePos = pos;
     const existingParams = document.getElementById('chapter-tile-params-panel');
     if (existingParams && this._ui) existingParams.replaceWith(this._ui.buildTileParamsPanel(chapter, campaign));
 
@@ -632,52 +508,39 @@ export class ChapterMapEditorSection {
    * Called from the campaign editor's global keyboard handler when on the Chapter screen.
    */
   handleChapterEditorKeyDown(e: KeyboardEvent): void {
-    const tag = (e.target as HTMLElement | null)?.tagName ?? '';
-    const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    if (e.altKey || isInputFocused) return;
-    const key = e.key.toLowerCase();
-    if (e.ctrlKey) {
-      if (key === 'z') {
-        e.preventDefault();
+    handleMapEditorKeyDown(e, {
+      onUndo: () => {
         const campaign = this._callbacks.getActiveCampaign();
         const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
         if (campaign && chapter) this._chapterUndo(campaign, chapter);
-      }
-      if (key === 'y') {
-        e.preventDefault();
+      },
+      onRedo: () => {
         const campaign = this._callbacks.getActiveCampaign();
         const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
         if (campaign && chapter) this._chapterRedo(campaign, chapter);
-      }
-      return;
-    }
-    if (key === 'q' || key === 'w') {
-      e.preventDefault();
-      const clockwise = key === 'w';
-      // If hovering over a tile with connections, rotate it; otherwise rotate the palette ghost
-      const hover = this._input?.hover ?? null;
-      if (hover) {
-        const tile = this._chapterEditGrid[hover.row]?.[hover.col] ?? null;
-        if (tile) {
-          const campaign = this._callbacks.getActiveCampaign();
-          const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
-          if (campaign && chapter) {
-            if (PIPE_SHAPES.has(tile.shape)) {
-              this._rotateChapterTileAt(hover, clockwise, chapter, campaign);
-              return;
-            } else if (
-              tile.shape === PipeShape.Source ||
-              tile.shape === PipeShape.Sink ||
-              (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level')
-            ) {
-              this._rotateChapterSourceSinkAt(hover, clockwise, chapter, campaign);
-              return;
-            }
-          }
-        }
-      }
-      this._rotateChapterPalette(clockwise);
-    }
+      },
+      getHoverTileAndPos: () => {
+        const pos = this._input?.hover ?? null;
+        if (!pos) return null;
+        const tile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
+        return tile ? { tile, pos } : null;
+      },
+      isConnectableForRotation: (tile) =>
+        tile.shape === PipeShape.Source ||
+        tile.shape === PipeShape.Sink ||
+        (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level'),
+      rotateTileAt: (pos, cw) => {
+        const campaign = this._callbacks.getActiveCampaign();
+        const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
+        if (campaign && chapter) this._rotateChapterTileAt(pos, cw, chapter, campaign);
+      },
+      rotateSourceSinkAt: (pos, cw) => {
+        const campaign = this._callbacks.getActiveCampaign();
+        const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
+        if (campaign && chapter) this._rotateChapterSourceSinkAt(pos, cw, chapter, campaign);
+      },
+      rotatePalette: (cw) => this._rotateChapterPalette(cw),
+    });
   }
 
   // ─── Chapter editor undo/redo ────────────────────────────────────────────
@@ -686,9 +549,9 @@ export class ChapterMapEditorSection {
     // Passing live reference is intentional: HistoryManager.record() deep-clones
     // via structuredClone() so the stored copy is independent.
     const snapshot: EditorSnapshot = {
-      grid: this._chapterEditGrid,
-      rows: this._chapterEditRows,
-      cols: this._chapterEditCols,
+      grid: this._gridState.grid,
+      rows: this._gridState.rows,
+      cols: this._gridState.cols,
       inventory: [],
       levelStyle: chapter.style,
     };
@@ -712,15 +575,10 @@ export class ChapterMapEditorSection {
     this._applyChapterSnapshot(snap, chapter, campaign);
   }
 
-  /**
-   * Apply a saved snapshot: restore grid dimensions, resize canvas, save, and re-render.
-   * Direct assignment is intentional: HistoryManager.undo()/redo() return deep clones
-   * so the snapshot is independent of stored history entries.
-   */
   private _applyChapterSnapshot(snap: EditorSnapshot, chapter: ChapterDef, campaign: CampaignDef): void {
-    this._chapterEditGrid = snap.grid as (TileDef | null)[][];
-    this._chapterEditRows = snap.rows;
-    this._chapterEditCols = snap.cols;
+    this._gridState.grid = snap.grid as (TileDef | null)[][];
+    this._gridState.rows = snap.rows;
+    this._gridState.cols = snap.cols;
     chapter.style = snap.levelStyle as typeof chapter.style;
     this._updateChapterCanvasDisplaySize();
     this._saveChapterGridState(chapter, campaign);
@@ -737,9 +595,7 @@ export class ChapterMapEditorSection {
 
   /** Resize the chapter grid. */
   private _resizeChapterGrid(newRows: number, newCols: number, campaign: CampaignDef, chapter: ChapterDef): void {
-    this._chapterEditGrid = resizeGrid(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, newRows, newCols);
-    this._chapterEditRows = newRows;
-    this._chapterEditCols = newCols;
+    this._gridState.resize(newRows, newCols);
     this._recordChapterSnapshot(chapter);
     this._updateChapterCanvasDisplaySize();
     this._saveChapterGridState(chapter, campaign);

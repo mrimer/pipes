@@ -7,6 +7,44 @@ import { TILE_SIZE, setTileSize, BASE_TILE_SIZE, computeTileSize } from '../rend
 import { MAX_EDITOR_CANVAS_PX, EDITOR_CANVAS_BORDER } from './types';
 
 /**
+ * Draw a dashed gold focus-outline around the tile at `focusedPos`.
+ * No-op when `focusedPos` is `null`.
+ */
+export function drawFocusedTileOverlay(
+  ctx: CanvasRenderingContext2D,
+  focusedPos: { row: number; col: number } | null,
+): void {
+  if (!focusedPos) return;
+  const { row, col } = focusedPos;
+  const x = col * TILE_SIZE;
+  const y = row * TILE_SIZE;
+  ctx.save();
+  ctx.strokeStyle = '#f0c040';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([5, 3]);
+  ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/**
+ * Wrap `canvas` in a flex-column `<div>` and append a hidden error-message
+ * element below it.  Returns both the wrapper div and the error element so
+ * callers can keep direct references to them.
+ */
+export function buildCanvasWithErrorDiv(
+  canvas: HTMLCanvasElement,
+): { wrapper: HTMLDivElement; errorEl: HTMLDivElement } {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+  wrapper.appendChild(canvas);
+  const errorEl = document.createElement('div');
+  errorEl.style.cssText = 'font-size:0.85rem;color:#f44;display:none;font-weight:bold;';
+  wrapper.appendChild(errorEl);
+  return { wrapper, errorEl };
+}
+
+/**
  * Convert a mouse event to a grid cell position on the given canvas.
  * Returns `null` when the pointer is outside the grid bounds.
  */
