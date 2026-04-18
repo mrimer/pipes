@@ -258,10 +258,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
         this._recordSnapshot();
         this._renderCanvas();
       },
-      recordSnapshot: (chapter, mark?) => {
-        void chapter;
-        this._recordSnapshot(mark);
-      },
+      recordSnapshot: (...args) => this._recordSnapshot(args[1] as boolean | undefined),
       saveGridState:  () => this._saveGrid(),
       resizeGrid: (r, c) => this._resizeGrid(r, c),
       slideGrid:  (d)    => this._slideGrid(d),
