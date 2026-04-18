@@ -33,6 +33,7 @@ import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import { EditorInputHandler } from './editorInputHandler';
 import { DataValidationDialog } from './dataValidationDialog';
 import { EditorDialogs } from './editorDialogs';
+import { isTextEntryShortcutTarget } from './mapEditorSectionUtils';
 import { renderMinimap } from '../visuals/minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -128,7 +129,7 @@ export class CampaignEditor {
       getActiveCampaign: () => this._getActiveCampaign(),
       touchCampaign: (campaign) => this._touchCampaign(campaign),
       saveCampaigns: () => this._saveCampaigns(),
-      openChapterEditor: (chapterIdx, _readOnly) => {
+      openChapterEditor: (chapterIdx) => {
         this._activeChapterIdx = chapterIdx;
         this._showChapterDetail();
       },
@@ -174,9 +175,7 @@ export class CampaignEditor {
         this._renderEditorCanvas();
       }
       // Q = rotate counter-clockwise, W = rotate clockwise (mirrors in-game mouse wheel)
-      const tag = (e.target as HTMLElement | null)?.tagName ?? '';
-      const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-      if (!e.ctrlKey && !e.altKey && !isInputFocused) {
+      if (!e.ctrlKey && !e.altKey && !isTextEntryShortcutTarget(e)) {
         const key = e.key.toLowerCase();
         if (key === 'q' || key === 'w') {
           e.preventDefault();
