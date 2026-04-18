@@ -478,7 +478,7 @@ export function playMapScreenExitTransition(
   overlay.appendChild(snapshotEl);
   document.body.appendChild(overlay);
 
-  const fromVisibilityBefore = fromScreenEl.style.visibility;
+  const originalFromScreenVisibility = fromScreenEl.style.visibility;
   fromScreenEl.style.opacity = '1';
   fromScreenEl.style.visibility = 'hidden';
   toScreenEl.style.opacity = '0';
@@ -507,7 +507,7 @@ export function playMapScreenExitTransition(
     } else {
       overlay.remove();
       fromScreenEl.style.opacity = '';
-      fromScreenEl.style.visibility = fromVisibilityBefore;
+      fromScreenEl.style.visibility = originalFromScreenVisibility;
       toScreenEl.style.opacity = '';
       onComplete();
     }
