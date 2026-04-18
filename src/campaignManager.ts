@@ -240,8 +240,8 @@ export class CampaignManager {
           if (this._activeCampaign?.grid) {
             const chapterMapScreen = this._chapterMapScreen;
             if (!chapterMapScreen) return;
-            const chapterSnapshot = chapterMapScreen.captureCanvasSnapshot();
             const chapterIdx = chapterMapScreen.chapterIdx;
+            const chapterSnapshot = chapterMapScreen.captureCanvasSnapshot();
             this._ensureCampaignMapScreen();
             this.reshowCampaignMap();
             const campaignMapScreen = this._campaignMapScreen;
