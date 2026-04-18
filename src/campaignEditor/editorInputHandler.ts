@@ -315,12 +315,13 @@ export class EditorInputHandler {
     const state = this._cb.getState();
     const pos = this.canvasPos(e);
     if (!pos) return;
-    state.recordSnapshot();
-    this._cb.updateUndoRedoButtons();
     if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
     state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
     // Clear the link if the erased tile was linked
     state.clearLinkAt(pos);
+    // Snapshot after mutation so the erased state is captured and redo restores it correctly.
+    state.recordSnapshot();
+    this._cb.updateUndoRedoButtons();
     this._cb.renderCanvas();
   }
 
