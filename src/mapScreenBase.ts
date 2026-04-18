@@ -576,6 +576,11 @@ export abstract class MapScreenBase {
     }
   }
 
+  /** Resume the animation loop after it has been stopped (e.g. after a screen transition). */
+  startAnimLoop(): void {
+    this._startAnimLoop();
+  }
+
   /**
    * Rebuild the screen content without changing visibility.
    * Used when returning to the chapter map after winning a level (the screen
@@ -1203,8 +1208,20 @@ export abstract class MapScreenBase {
     const bboxMinY = Math.max(0, (rMin - 1) * TILE_SIZE);
     const bboxMaxY = Math.min(maxPanY, (rMax + 2 - viewRows) * TILE_SIZE);
 
-    this._panPixelX = clampPanAxisWithFallback(this._panPixelX, bboxMinX, bboxMaxX);
-    this._panPixelY = clampPanAxisWithFallback(this._panPixelY, bboxMinY, bboxMaxY);
+    // When bboxMax ≤ 0 the far-side constraint is impossible given the edge-clamped
+    // pan range [0, maxPan]; in that case only the near-side (bboxMin) bound is
+    // enforced, clamped within the edge bounds.  Otherwise use the shared helper
+    // which handles the regular case and the inverted (bboxMin > bboxMax > 0) case.
+    if (bboxMaxX > 0) {
+      this._panPixelX = clampPanAxisWithFallback(this._panPixelX, bboxMinX, bboxMaxX);
+    } else {
+      this._panPixelX = Math.min(maxPanX, Math.max(bboxMinX, this._panPixelX));
+    }
+    if (bboxMaxY > 0) {
+      this._panPixelY = clampPanAxisWithFallback(this._panPixelY, bboxMinY, bboxMaxY);
+    } else {
+      this._panPixelY = Math.min(maxPanY, Math.max(bboxMinY, this._panPixelY));
+    }
   }
 
   /**

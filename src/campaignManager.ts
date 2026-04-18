@@ -432,6 +432,12 @@ export class CampaignManager {
       return;
     }
 
+    // Stop the chapter map animation loop for the duration of the zoom-in
+    // transition – mirrors stopAnimLoop() in the zoom-out path.  This prevents
+    // any concurrent TILE_SIZE change or sparkle rendering from corrupting the
+    // transition visuals on the destination canvas.
+    chapterMapScreen.stopAnimLoop();
+
     const campaignEl = campaignMapScreen.screenEl;
     const chapterEl = chapterMapScreen.screenEl;
     chapterEl.style.visibility = 'hidden';
@@ -447,6 +453,7 @@ export class CampaignManager {
         campaignEl.style.overflow = '';
         chapterEl.style.overflow = '';
         campaignMapScreen.hide();
+        chapterMapScreen.startAnimLoop();
       },
     );
   }

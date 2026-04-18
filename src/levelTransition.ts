@@ -565,6 +565,13 @@ export function playMapScreenEnterTransition(
   fromScreenEl.style.opacity = '1';
   toScreenEl.style.opacity = '0';
 
+  // Hide only the live canvas inside fromScreenEl so that any concurrent
+  // render in that screen's animation loop cannot corrupt the transition
+  // visuals.  Mirrors the equivalent fromCanvas hide in playMapScreenExitTransition.
+  const fromCanvas = fromScreenEl.querySelector<HTMLCanvasElement>('canvas');
+  const originalFromCanvasVisibility = fromCanvas?.style.visibility ?? '';
+  if (fromCanvas) fromCanvas.style.visibility = 'hidden';
+
   const startTime = performance.now();
 
   function tick(): void {
@@ -588,6 +595,7 @@ export function playMapScreenEnterTransition(
       requestAnimationFrame(tick);
     } else {
       overlay.remove();
+      if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
       fromScreenEl.style.opacity = '';
       toScreenEl.style.opacity = '';
       onComplete();

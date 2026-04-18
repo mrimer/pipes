@@ -111,7 +111,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     startPanY: number;
     moved: boolean;
   } | null = null;
-  /** Left-button drag candidate used to prioritize map panning over tile-drag actions. */
+  /** Left-button drag candidate for Shift+left-drag map panning. */
   private _leftPanCandidate: {
     startClientX: number;
     startClientY: number;
@@ -568,6 +568,17 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (!readOnly) {
       const { wrapper, errorEl } = buildCanvasWithErrorDiv(canvas);
       this._errorEl = errorEl;
+
+      if (this._canPan()) {
+        const container = document.createElement('div');
+        container.appendChild(wrapper);
+        const panHint = document.createElement('p');
+        panHint.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:4px 0 0;';
+        panHint.textContent = 'Hold Shift and drag with the left mouse button to pan the map.';
+        container.appendChild(panHint);
+        return container;
+      }
+
       return wrapper;
     }
 
@@ -590,11 +601,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
     return this._gridState.rows > this._viewRows || this._gridState.cols > this._viewCols;
   }
 
-  private _beginLeftPanCandidate(e: MouseEvent): void {
-    if (!this._canPan()) {
-      this._leftPanCandidate = null;
-      return;
-    }
+  /** Start a Shift+left-drag pan candidate.  Only called when Shift is held and the map is oversized. */
+  private _beginShiftPanCandidate(e: MouseEvent): void {
     this._leftPanCandidate = {
       startClientX: e.clientX,
       startClientY: e.clientY,
@@ -797,6 +805,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
     }
     if (e.button !== 0) return;
     this._leftPanCandidate = null;
+
+    // Shift+left: pan the map (takes priority over all tile-editing operations).
+    if (e.shiftKey && this._canPan()) {
+      this._beginShiftPanCandidate(e);
+      return;
+    }
+
     const pos = this._canvasPos(e);
     if (!pos) return;
 
@@ -839,7 +854,6 @@ export class CampaignMapEditorSection extends MapEditorBase {
         this._renderCanvas();
       } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'chapter') {
         this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-        this._beginLeftPanCandidate(e);
         this._renderCanvas();
       }
       return;
@@ -848,7 +862,6 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (this._palette === CHAPTER_CHAMBER_PALETTE) {
       if (existingTile !== null) {
         this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-        this._beginLeftPanCandidate(e);
         this._renderCanvas();
       }
       return;
@@ -861,7 +874,6 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette) {
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-      this._beginLeftPanCandidate(e);
       this._renderCanvas();
     } else {
       if (palette === PipeShape.Source && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Source)) {
@@ -952,11 +964,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
       return;
     }
 
-    // Allow pan to continue once it has started (moved === true) even after
-    // _dragState is cleared, so a long left-drag pan is not cut short.
+    // Shift+left-drag pan: the candidate may have been started without a dragState
+    // (e.g. on an empty cell), so allow pan to begin as soon as the pointer moves
+    // far enough, regardless of whether _dragState is set.
     if (this._leftPanCandidate) {
-      const canContinuePan = this._dragState !== null || this._leftPanCandidate.moved;
-      if (canContinuePan && this._advancePanDrag(this._leftPanCandidate, e)) {
+      if (this._advancePanDrag(this._leftPanCandidate, e)) {
         this._dragState = null;
         this._hover = null;
         this._renderCanvas();
