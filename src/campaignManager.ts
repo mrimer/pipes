@@ -32,6 +32,7 @@ import { sfxManager, SfxId } from './sfxManager';
 import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
+const NO_OP = (): void => {};
 
 /**
  * Callbacks that {@link CampaignManager} uses to interact with {@link Game}.
@@ -456,7 +457,7 @@ export class CampaignManager {
     playSwirlScreenTransition(
       this._callbacks.levelSelectEl,
       showDestination,
-      () => {},
+      NO_OP,
     );
   }
 
@@ -473,7 +474,7 @@ export class CampaignManager {
         this._callbacks.showLevelSelect();
         return this._callbacks.levelSelectEl;
       },
-      () => {},
+      NO_OP,
     );
   }
 
