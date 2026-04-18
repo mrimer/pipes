@@ -18,6 +18,8 @@ import {
   reflectTileDefAboutDiagonal,
   reflectGridAboutDiagonal,
   reflectPositionAboutDiagonal,
+  buildMapTileDef,
+  DEFAULT_PARAMS,
 } from '../src/campaignEditor/types';
 
 // ─── isChamberPalette ─────────────────────────────────────────────────────────
@@ -234,10 +236,10 @@ describe('getValidChapterMapTileDefKeys', () => {
     expect(keys.has('rotation')).toBe(true);
   });
 
-  it('Source tile has connections and capacity (compat), but not temperature/pressure', () => {
+  it('Source tile has connections but NOT capacity (capacity is not used on chapter maps)', () => {
     const keys = getValidChapterMapTileDefKeys({ shape: PipeShape.Source });
     expect(keys.has('connections')).toBe(true);
-    expect(keys.has('capacity')).toBe(true);
+    expect(keys.has('capacity')).toBe(false);
     expect(keys.has('temperature')).toBe(false);
     expect(keys.has('pressure')).toBe(false);
   });
@@ -517,5 +519,75 @@ describe('reflectPositionAboutDiagonal', () => {
   it('is its own inverse', () => {
     const pos = { row: 3, col: 7 };
     expect(reflectPositionAboutDiagonal(reflectPositionAboutDiagonal(pos))).toEqual(pos);
+  });
+});
+
+// ─── buildMapTileDef ──────────────────────────────────────────────────────────
+
+describe('buildMapTileDef', () => {
+  it('erase palette returns empty-grass tile', () => {
+    expect(buildMapTileDef('erase', { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.Empty });
+  });
+
+  it('EmptyDirt palette returns EmptyDirt tile', () => {
+    expect(buildMapTileDef(PipeShape.EmptyDirt, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyDirt });
+  });
+
+  it('EmptyDark palette returns EmptyDark tile', () => {
+    expect(buildMapTileDef(PipeShape.EmptyDark, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyDark });
+  });
+
+  it('EmptyWinter palette returns EmptyWinter tile', () => {
+    expect(buildMapTileDef(PipeShape.EmptyWinter, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyWinter });
+  });
+
+  it('Empty palette returns Empty tile', () => {
+    expect(buildMapTileDef(PipeShape.Empty, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.Empty });
+  });
+
+  it('Source with all connections produces no connections array', () => {
+    const params = { ...DEFAULT_PARAMS, connections: { N: true, E: true, S: true, W: true } };
+    const def = buildMapTileDef(PipeShape.Source, params);
+    expect(def.shape).toBe(PipeShape.Source);
+    expect(def.connections).toBeUndefined();
+    expect((def as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
+  });
+
+  it('Source with only East connection produces [East] connections array', () => {
+    const params = { ...DEFAULT_PARAMS, connections: { N: false, E: true, S: false, W: false } };
+    const def = buildMapTileDef(PipeShape.Source, params);
+    expect(def.connections).toEqual([Direction.East]);
+  });
+
+  it('Sink with completion=0 omits completion field', () => {
+    const params = { ...DEFAULT_PARAMS, connections: { N: true, E: true, S: true, W: true }, completion: 0 };
+    const def = buildMapTileDef(PipeShape.Sink, params);
+    expect(def.shape).toBe(PipeShape.Sink);
+    expect((def as unknown as Record<string, unknown>)['completion']).toBeUndefined();
+  });
+
+  it('Sink with completion>0 includes completion field', () => {
+    const params = { ...DEFAULT_PARAMS, connections: { N: true, E: true, S: true, W: true }, completion: 3 };
+    const def = buildMapTileDef(PipeShape.Sink, params);
+    expect(def.completion).toBe(3);
+  });
+
+  it('Tree, Granite, Sea return shape-only tiles', () => {
+    for (const shape of [PipeShape.Tree, PipeShape.Granite, PipeShape.Sea]) {
+      expect(buildMapTileDef(shape, { ...DEFAULT_PARAMS })).toEqual({ shape });
+    }
+  });
+
+  it('Pipe shape returns tile with rotation', () => {
+    const params = { ...DEFAULT_PARAMS, rotation: 90 as const };
+    const def = buildMapTileDef(PipeShape.Straight, params);
+    expect(def.shape).toBe(PipeShape.Straight);
+    expect(def.rotation).toBe(90);
+  });
+
+  it('Source never includes capacity field', () => {
+    const params = { ...DEFAULT_PARAMS, capacity: 10 };
+    const def = buildMapTileDef(PipeShape.Source, params);
+    expect((def as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
   });
 });

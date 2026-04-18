@@ -39,6 +39,7 @@ import {
   flipGridVertical,
   flipPositionHorizontal,
   flipPositionVertical,
+  buildMapTileDef,
 } from './types';
 import { validateCampaignMap } from './campaignMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -149,8 +150,21 @@ export class CampaignMapEditorSection {
   handleCampaignEditorKeyDown(e: KeyboardEvent): void {
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    if (e.ctrlKey || e.altKey || isInputFocused) return;
+    if (e.altKey || isInputFocused) return;
     const key = e.key.toLowerCase();
+    if (e.ctrlKey) {
+      if (key === 'z') {
+        e.preventDefault();
+        const c = this._cbs.getActiveCampaign();
+        if (c) this._undo(c);
+      }
+      if (key === 'y') {
+        e.preventDefault();
+        const c = this._cbs.getActiveCampaign();
+        if (c) this._redo(c);
+      }
+      return;
+    }
     if (key === 'q' || key === 'w') {
       e.preventDefault();
       const clockwise = key === 'w';
@@ -174,16 +188,6 @@ export class CampaignMapEditorSection {
         }
       }
       this._rotatePalette(clockwise);
-    }
-    if (key === 'z' && e.ctrlKey) {
-      e.preventDefault();
-      const c = this._cbs.getActiveCampaign();
-      if (c) this._undo(c);
-    }
-    if (key === 'y' && e.ctrlKey) {
-      e.preventDefault();
-      const c = this._cbs.getActiveCampaign();
-      if (c) this._redo(c);
     }
   }
 
@@ -679,29 +683,7 @@ export class CampaignMapEditorSection {
   // ── Private: tile building ─────────────────────────────────────────────────
 
   private _buildTileDef(): TileDef {
-    if (this._palette === 'erase') return { shape: PipeShape.Empty };
-    if (this._palette === PipeShape.EmptyDirt)   return { shape: PipeShape.EmptyDirt };
-    if (this._palette === PipeShape.EmptyDark)   return { shape: PipeShape.EmptyDark };
-    if (this._palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
-    if (this._palette === PipeShape.Empty)       return { shape: PipeShape.Empty };
-    const p = this._params;
-    const shape = this._palette as PipeShape;
-    const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
-    if (needsConn) {
-      const connDirs: Direction[] = [];
-      if (p.connections.N) connDirs.push(Direction.North);
-      if (p.connections.E) connDirs.push(Direction.East);
-      if (p.connections.S) connDirs.push(Direction.South);
-      if (p.connections.W) connDirs.push(Direction.West);
-      const def: TileDef = { shape };
-      if (shape === PipeShape.Sink && p.completion > 0) def.completion = p.completion;
-      if (connDirs.length < 4) def.connections = connDirs;
-      return def;
-    }
-    if (shape === PipeShape.Tree || shape === PipeShape.Granite || shape === PipeShape.Sea) {
-      return { shape };
-    }
-    return { shape, rotation: p.rotation };
+    return buildMapTileDef(this._palette, this._params);
   }
 
   // ── Private: mouse input ───────────────────────────────────────────────────

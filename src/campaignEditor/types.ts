@@ -91,8 +91,6 @@ export function getValidChapterMapTileDefKeys(tile: TileDef): ReadonlySet<string
   if (PIPE_SHAPES.has(shape)) valid.add('rotation');
 
   if (shape === PipeShape.Source) {
-    // Keep Source capacity allowed for compatibility with existing chapter-map data.
-    valid.add('capacity');
     valid.add('connections');
   } else if (shape === PipeShape.Sink) {
     valid.add('connections');
@@ -212,6 +210,38 @@ export const DEFAULT_PARAMS: TileParams = {
   dryingTime: 0,
   completion: 0,
 };
+
+// ─── Shared tile-def builder ──────────────────────────────────────────────────
+
+/**
+ * Build a TileDef from the current palette selection and tile parameters.
+ * Pure function – contains no class or module state.
+ * Used by both the chapter map editor and the campaign map editor.
+ */
+export function buildMapTileDef(palette: EditorPalette, params: TileParams): TileDef {
+  if (palette === 'erase') return { shape: PipeShape.Empty };
+  if (palette === PipeShape.EmptyDirt)   return { shape: PipeShape.EmptyDirt };
+  if (palette === PipeShape.EmptyDark)   return { shape: PipeShape.EmptyDark };
+  if (palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
+  if (palette === PipeShape.Empty)       return { shape: PipeShape.Empty };
+  const shape = palette as PipeShape;
+  const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
+  if (needsConn) {
+    const connDirs: Direction[] = [];
+    if (params.connections.N) connDirs.push(Direction.North);
+    if (params.connections.E) connDirs.push(Direction.East);
+    if (params.connections.S) connDirs.push(Direction.South);
+    if (params.connections.W) connDirs.push(Direction.West);
+    const def: TileDef = { shape };
+    if (shape === PipeShape.Sink && params.completion > 0) def.completion = params.completion;
+    if (connDirs.length < 4) def.connections = connDirs;
+    return def;
+  }
+  if (shape === PipeShape.Tree || shape === PipeShape.Granite || shape === PipeShape.Sea) {
+    return { shape };
+  }
+  return { shape, rotation: params.rotation };
+}
 
 // ─── Editor snapshot for undo/redo ───────────────────────────────────────────
 
