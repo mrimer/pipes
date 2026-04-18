@@ -226,13 +226,6 @@ export class CampaignManager {
 
   /** Show the chapter map screen for the given chapter index (0-based). */
   showChapterMap(chapterIdx: number, hideCampaignMap = true, animateFromMainScreen = false): void {
-    if (animateFromMainScreen) {
-      this._playMainScreenTransition(() => {
-        this.showChapterMap(chapterIdx, hideCampaignMap, false);
-        return this._chapterMapScreen?.screenEl ?? null;
-      });
-      return;
-    }
     const campaign = this._activeCampaign;
     if (!campaign) return;
     const chapter = campaign.chapters[chapterIdx];
@@ -312,6 +305,15 @@ export class CampaignManager {
         getActiveCampaign: () => this._activeCampaign,
         getCompletedChapters: () => this._activeCampaignCompletedChapters,
       });
+    }
+
+    if (animateFromMainScreen) {
+      const chapterMapEl = this._chapterMapScreen.screenEl;
+      this._playMainScreenTransition(() => {
+        this.showChapterMap(chapterIdx, hideCampaignMap, false);
+        return chapterMapEl;
+      });
+      return;
     }
 
     this._chapterMapScreen.show(campaign, chapterIdx);
@@ -444,7 +446,7 @@ export class CampaignManager {
   }
 
   private _playMainScreenTransition(showDestination: () => HTMLElement | null): void {
-    if (this._callbacks.levelSelectEl.style.display === 'none') {
+    if (getComputedStyle(this._callbacks.levelSelectEl).display === 'none') {
       showDestination();
       return;
     }
