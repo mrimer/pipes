@@ -367,6 +367,7 @@ export class Game implements InputCallbacks {
           },
         );
       },
+      levelSelectEl: this.levelSelectEl,
       levelHeaderEl: this.levelHeaderEl,
       levelListEl: this.levelListEl,
       winModalEl: this.winModalEl,

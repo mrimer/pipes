@@ -1326,7 +1326,8 @@ export class CampaignEditor {
     const name = prompt('Chapter name:');
     if (!name?.trim()) return;
     this._service.addChapter(campaign, name.trim());
-    this._showCampaignDetail();
+    this._activeChapterIdx = campaign.chapters.length - 1;
+    this._showChapterDetail();
   }
 
   private _addLevel(campaign: CampaignDef, chapterIdx: number): void {

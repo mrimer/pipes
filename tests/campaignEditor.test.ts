@@ -845,6 +845,26 @@ describe('CampaignEditor – import version comparison', () => {
     expect(saved.lastUpdated).not.toBe(old);
   });
 
+  it('opens the new chapter in chapter editor after adding a chapter', () => {
+    const campaign: CampaignDef = { id: 'cmp_new_chapter_open', name: 'C', author: '', chapters: [] };
+    const editor = makeEditor([campaign]);
+    const state = editor as unknown as {
+      _service: { campaigns: readonly CampaignDef[] };
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _screen: string;
+      _addChapter(c: CampaignDef): void;
+    };
+    const internalCampaign = state._service.campaigns[0];
+    state._activeCampaignId = internalCampaign.id;
+    jest.spyOn(window, 'prompt').mockReturnValueOnce('Chapter 1');
+
+    state._addChapter(internalCampaign);
+
+    expect(state._activeChapterIdx).toBe(0);
+    expect(state._screen).toBe('chapter');
+  });
+
   it('lastUpdated is updated and level is saved when playtesting', () => {
     const old = '2020-01-01T00:00:00.000Z';
     const level: LevelDef = {

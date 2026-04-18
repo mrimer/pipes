@@ -27,6 +27,7 @@ export class CampaignMapScreen {
         if (chapterIdx >= 0) callbacks.onChapterSelected(chapterIdx);
         else console.warn('CampaignMapScreen: selected chamber could not be mapped to chapter index.', levelDef.id);
       },
+      formatBackButtonText: () => '← Main Menu',
       formatChapterTitle: () => null,
       shouldShowCompletionStatus: () => false,
       isMapCompleted: () => this.isCampaignComplete(),
