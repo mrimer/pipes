@@ -27,7 +27,7 @@ import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
-import { playMapScreenEnterTransition, playMapScreenExitTransition } from './levelTransition';
+import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScreenTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 
@@ -71,6 +71,7 @@ export interface CampaignCallbacks {
   ): void;
 
   // ── DOM elements that CampaignManager reads/writes ──────────────────────
+  readonly levelSelectEl: HTMLElement;
   readonly levelHeaderEl: HTMLElement;
   readonly levelListEl: HTMLElement;
   readonly winModalEl: HTMLElement;
@@ -224,7 +225,14 @@ export class CampaignManager {
   set winFromChapterMap(v: boolean) { this._winFromChapterMap = v; }
 
   /** Show the chapter map screen for the given chapter index (0-based). */
-  showChapterMap(chapterIdx: number, hideCampaignMap = true): void {
+  showChapterMap(chapterIdx: number, hideCampaignMap = true, animateFromMainScreen = false): void {
+    if (animateFromMainScreen) {
+      this._playMainScreenTransition(() => {
+        this.showChapterMap(chapterIdx, hideCampaignMap, false);
+        return this._chapterMapScreen?.screenEl ?? null;
+      });
+      return;
+    }
     const campaign = this._activeCampaign;
     if (!campaign) return;
     const chapter = campaign.chapters[chapterIdx];
@@ -340,7 +348,14 @@ export class CampaignManager {
   }
 
   /** Show the campaign map when the active campaign defines a campaign-level grid. */
-  showCampaignMap(): void {
+  showCampaignMap(animateFromMainScreen = false): void {
+    if (animateFromMainScreen) {
+      this._playMainScreenTransition(() => {
+        this.showCampaignMap(false);
+        return this._campaignMapScreen?.screenEl ?? null;
+      });
+      return;
+    }
     const campaign = this._activeCampaign;
     if (!campaign?.grid) return;
     this._ensureCampaignMapScreen();
@@ -411,6 +426,7 @@ export class CampaignManager {
 
     const campaignEl = campaignMapScreen.screenEl;
     const chapterEl = chapterMapScreen.screenEl;
+    chapterEl.style.visibility = 'hidden';
     campaignEl.style.overflow = 'hidden';
     chapterEl.style.overflow = 'hidden';
     playMapScreenEnterTransition(
@@ -419,10 +435,23 @@ export class CampaignManager {
       campaignEl,
       chapterEl,
       () => {
+        chapterEl.style.visibility = '';
         campaignEl.style.overflow = '';
         chapterEl.style.overflow = '';
         campaignMapScreen.hide();
       },
+    );
+  }
+
+  private _playMainScreenTransition(showDestination: () => HTMLElement | null): void {
+    if (this._callbacks.levelSelectEl.style.display === 'none') {
+      showDestination();
+      return;
+    }
+    playSwirlScreenTransition(
+      this._callbacks.levelSelectEl,
+      showDestination,
+      () => {},
     );
   }
 
@@ -726,19 +755,19 @@ export class CampaignManager {
         if (this._activeCampaign?.grid) {
           const chapter = this._activeCampaign.chapters[ci];
           if (chapter && this._activeCampaignCompletedChapters.has(chapter.id)) {
-            this.showChapterMap(ci);
+            this.showChapterMap(ci, true, true);
           } else {
-            this.showCampaignMap();
+            this.showCampaignMap(true);
           }
         } else {
-          this.showChapterMap(ci);
+          this.showChapterMap(ci, true, true);
         }
       },
       this._activeCampaignCompletedChapters,
       () => this._callbacks.showSettings(),
       this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
       this._activeCampaign?.grid !== undefined,
-      () => this.showCampaignMap(),
+      () => this.showCampaignMap(true),
     );
   }
 

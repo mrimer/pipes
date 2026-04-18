@@ -92,6 +92,8 @@ export interface ChapterMapCallbacks {
   getActiveCampaign?(): CampaignDef | null;
   /** Returns the set of completed chapter IDs. */
   getCompletedChapters?(): Set<number>;
+  /** Optional override for the back button text. */
+  formatBackButtonText?(): string;
   /**
    * Optional override for the instruction text shown below the map canvas.
    * Return null to use the default ("Click on an accessible level").
@@ -649,7 +651,8 @@ export class ChapterMapScreen {
     el.appendChild(statsEl);
 
     // Back button
-    const backBtn = createButton('← Chapter Select', UI_BG, SUCCESS_COLOR, () => {
+    const backBtnText = this._callbacks.formatBackButtonText?.() ?? '← Chapter Select';
+    const backBtn = createButton(backBtnText, UI_BG, SUCCESS_COLOR, () => {
       this._callbacks.onShowLevelSelect(); // stopAll() is called inside; play Back after
       sfxManager.play(SfxId.Back);
     });

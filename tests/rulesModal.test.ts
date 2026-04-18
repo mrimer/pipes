@@ -51,12 +51,12 @@ describe('createGameRulesModal', () => {
     const modal = createGameRulesModal();
     modal.style.display = 'flex';
 
-    const closeBtn = Array.from(document.body.querySelectorAll('button')).find(
+    const closeButtons = Array.from(document.body.querySelectorAll('button')).filter(
       btn => btn.textContent === 'Close',
     );
-    expect(closeBtn).not.toBeUndefined();
+    expect(closeButtons).toHaveLength(2);
 
-    closeBtn!.click();
+    closeButtons[0].click();
     expect(modal.style.display).toBe('none');
   });
 

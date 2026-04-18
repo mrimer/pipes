@@ -311,6 +311,14 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     'padding:28px 32px;max-width:560px;width:100%;' +
     'display:flex;flex-direction:column;gap:16px;margin:auto;';
 
+  const createCloseButton = (): HTMLButtonElement => createButton(
+    'Close',
+    UI_BORDER,
+    '#fff',
+    () => { overlay.style.display = 'none'; },
+    'align-self:center;padding:10px 32px;font-size:1rem;border:none;margin-top:4px;',
+  );
+
   // ── Title ──────────────────────────────────────────────────────────────────
   const title = document.createElement('h2');
   title.style.cssText = 'font-size:1.5rem;text-align:center;';
@@ -406,12 +414,9 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     table.appendChild(tr);
   }
 
-  // ── Close button ──────────────────────────────────────────────────────────
-  const closeBtn = createButton(
-    'Close', UI_BORDER, '#fff',
-    () => { overlay.style.display = 'none'; },
-    'align-self:center;padding:10px 32px;font-size:1rem;border:none;margin-top:4px;',
-  );
+  // ── Close buttons ─────────────────────────────────────────────────────────
+  const topCloseBtn = createCloseButton();
+  const bottomCloseBtn = createCloseButton();
 
   // Allow closing by clicking the backdrop
   overlay.addEventListener('click', (e) => {
@@ -419,13 +424,14 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   });
 
   box.appendChild(title);
+  box.appendChild(topCloseBtn);
   box.appendChild(summary);
   box.appendChild(playLoop);
   box.appendChild(controlsHeader);
   box.appendChild(controlsTable);
   box.appendChild(legendHeader);
   box.appendChild(table);
-  box.appendChild(closeBtn);
+  box.appendChild(bottomCloseBtn);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
