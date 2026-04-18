@@ -7,16 +7,18 @@
  *   • Inventory shows campaign chapters (not chapter levels).
  *   • Grid state is persisted to campaign.grid/rows/cols/style.
  *   • Validation uses validateCampaignMap().
+ *
+ * Extends {@link MapEditorBase} for shared grid operations, undo/redo,
+ * rotation helpers, and reachability utilities.
  */
 
-import { CampaignDef, TileDef, PipeShape, Direction, Rotation, LevelDef } from '../types';
+import { CampaignDef, TileDef, PipeShape, Direction, LevelDef } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
 import {
   EditorPalette,
   TileParams,
-  DEFAULT_PARAMS,
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
   EDITOR_PANEL_BASE_CSS,
@@ -30,19 +32,16 @@ import {
   REPEATABLE_EDITOR_TILES,
   isPipePlacementPalette,
   buildMapTileDef,
-  rotateConnectionsBy90,
   computeEditorFilledCells,
   CAMPAIGN_MAP_MAX_DIM,
 } from './types';
 import { validateCampaignMap } from './campaignMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
 import { hasShapeElsewhere } from './gridUtils';
-import { HistoryManager } from './historyManager';
 import { buildStyleSectionPanel } from './tileParamsPanel';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
-import { showTimedMessage, updateUndoRedoButtonPair } from '../uiHelpers';
 import {
   updateMapEditorCanvas,
   drawFocusedTileOverlay,
@@ -50,9 +49,9 @@ import {
 } from './canvasUtils';
 import { isTileConnectedToSource } from '../tile';
 import { buildCompletionInputWidget } from './chapterEditorUI';
-import { MapEditorGridState } from './mapEditorGridState';
 import { handleMapEditorKeyDown } from './mapEditorSectionUtils';
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
+import { MapEditorBase } from './mapEditorBase';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
 const CHAPTER_CHAMBER_PALETTE: EditorPalette = 'chamber:chapter';
@@ -79,25 +78,11 @@ export interface CampaignMapEditorCallbacks {
 
 // ─── CampaignMapEditorSection ──────────────────────────────────────────────────
 
-export class CampaignMapEditorSection {
+export class CampaignMapEditorSection extends MapEditorBase {
   private readonly _cbs: CampaignMapEditorCallbacks;
 
-  // ── Grid state (delegated to MapEditorGridState) ──────────────────────────
-  private readonly _gridState: MapEditorGridState;
-
   // ── Palette / selection state ─────────────────────────────────────────────
-  private _palette: EditorPalette = PipeShape.Source;
-  private _params: TileParams = { ...DEFAULT_PARAMS };
   private _selectedChapterIdx: number | null = null;
-
-  // ── Canvas / render state ─────────────────────────────────────────────────
-  private _canvas: HTMLCanvasElement | null = null;
-  private _ctx: CanvasRenderingContext2D | null = null;
-  private _mainLayout: HTMLDivElement = document.createElement('div');
-  private _errorEl: HTMLDivElement | null = null;
-
-  // ── Undo/redo ─────────────────────────────────────────────────────────────
-  private readonly _hist = new HistoryManager<EditorSnapshot>();
 
   // ── Style panel state ─────────────────────────────────────────────────────
   private _styleSectionExpanded = false;
@@ -132,12 +117,16 @@ export class CampaignMapEditorSection {
   private static readonly DEFAULT_ROWS = 3;
   private static readonly DEFAULT_COLS = 6;
 
+  protected get _chamberContentType(): 'chapter' { return 'chapter'; }
+  protected get _undoBtnId(): string { return 'campaign-map-undo-btn'; }
+  protected get _redoBtnId(): string { return 'campaign-map-redo-btn'; }
+
   constructor(callbacks: CampaignMapEditorCallbacks) {
-    this._cbs = callbacks;
-    this._gridState = new MapEditorGridState(
+    super(
       CampaignMapEditorSection.DEFAULT_ROWS,
       CampaignMapEditorSection.DEFAULT_COLS,
     );
+    this._cbs = callbacks;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -176,8 +165,8 @@ export class CampaignMapEditorSection {
    */
   handleCampaignEditorKeyDown(e: KeyboardEvent): void {
     handleMapEditorKeyDown(e, {
-      onUndo: () => { const c = this._cbs.getActiveCampaign(); if (c) this._undo(c); },
-      onRedo: () => { const c = this._cbs.getActiveCampaign(); if (c) this._redo(c); },
+      onUndo: () => this._doUndo(),
+      onRedo: () => this._doRedo(),
       getHoverTileAndPos: () => {
         const pos = this._hover;
         if (!pos) return null;
@@ -187,15 +176,65 @@ export class CampaignMapEditorSection {
       isConnectableForRotation: (tile) =>
         tile.shape === PipeShape.Source ||
         tile.shape === PipeShape.Sink ||
-        (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter'),
-      rotateTileAt: (pos, cw) => {
-        const c = this._cbs.getActiveCampaign(); if (c) this._rotateTileAt(pos, cw, c);
-      },
-      rotateSourceSinkAt: (pos, cw) => {
-        const c = this._cbs.getActiveCampaign(); if (c) this._rotateSourceSinkAt(pos, cw, c);
-      },
+        (tile.shape === PipeShape.Chamber && tile.chamberContent === this._chamberContentType),
+      rotateTileAt: (pos, cw) => this._rotateTileAt(pos, cw),
+      rotateSourceSinkAt: (pos, cw) => this._rotateSourceSinkAt(pos, cw),
       rotatePalette: (cw) => this._rotatePalette(cw),
     });
+  }
+
+  // ── Abstract method implementations ──────────────────────────────────────
+
+  protected _recordSnapshot(markChanged = true): void {
+    const campaign = this._cbs.getActiveCampaign();
+    this._recordSnapshotBase(campaign?.style, markChanged);
+  }
+
+  protected _saveGrid(): void {
+    const campaign = this._cbs.getActiveCampaign();
+    if (!campaign) return;
+    campaign.rows = this._gridState.rows;
+    campaign.cols = this._gridState.cols;
+    campaign.grid = structuredClone(this._gridState.grid);
+    this._cbs.touchCampaign(campaign);
+    this._cbs.saveCampaigns();
+  }
+
+  protected _renderCanvas(): void {
+    this._renderCampaignCanvas();
+  }
+
+  protected _updateCanvasDisplaySize(): void {
+    if (!this._canvas) return;
+    const rows = this._gridState.rows;
+    const cols = this._gridState.cols;
+    const newViewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
+    const newViewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
+    this._viewRows = newViewRows;
+    this._viewCols = newViewCols;
+    this._clampPan();
+    updateMapEditorCanvas(this._canvas, newViewRows, newViewCols, this._mainLayout);
+  }
+
+  protected _rebuildTileParamsPanel(): void {
+    const campaign = this._cbs.getActiveCampaign();
+    if (!campaign) return;
+    document.getElementById('campaign-map-tile-params-panel')
+      ?.replaceWith(this._buildTileParamsPanel(campaign));
+  }
+
+  protected _applySnapshot(snap: EditorSnapshot): void {
+    const campaign = this._cbs.getActiveCampaign();
+    if (!campaign) return;
+    this._applySnapshotBase(snap, (style) => {
+      campaign.style = style as typeof campaign.style;
+    });
+    document.getElementById('campaign-map-chapter-inventory')
+      ?.replaceWith(this._buildChapterInventoryPanel(campaign));
+    document.getElementById('campaign-map-grid-size-panel')
+      ?.replaceWith(this._buildGridSizePanel(campaign));
+    document.getElementById('campaign-map-style-panel')
+      ?.replaceWith(this._buildStylePanel(campaign));
   }
 
   // ── Private: initialization ────────────────────────────────────────────────
@@ -204,15 +243,7 @@ export class CampaignMapEditorSection {
     this._gridState.init(campaign.rows, campaign.cols, campaign.grid);
     this._hist.clear();
     this._selectedChapterIdx = null;
-    this._recordSnapshot(campaign, false);
-  }
-
-  private _saveGridState(campaign: CampaignDef): void {
-    campaign.rows = this._gridState.rows;
-    campaign.cols = this._gridState.cols;
-    campaign.grid = structuredClone(this._gridState.grid);
-    this._cbs.touchCampaign(campaign);
-    this._cbs.saveCampaigns();
+    this._recordSnapshot(false);
   }
 
   // ── Private: section layout ────────────────────────────────────────────────
@@ -259,15 +290,11 @@ export class CampaignMapEditorSection {
     const toolbar = document.createElement('div');
     toolbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
-    const undoBtn = this._cbs.buildBtn('↩ Undo', MUTED_BTN_BG, '#aaa', () => {
-      const c = this._cbs.getActiveCampaign(); if (c) this._undo(c);
-    }, true);
+    const undoBtn = this._cbs.buildBtn('↩ Undo', MUTED_BTN_BG, '#aaa', () => this._doUndo(), true);
     undoBtn.id = 'campaign-map-undo-btn';
     toolbar.appendChild(undoBtn);
 
-    const redoBtn = this._cbs.buildBtn('↪ Redo', MUTED_BTN_BG, '#aaa', () => {
-      const c = this._cbs.getActiveCampaign(); if (c) this._redo(c);
-    }, true);
+    const redoBtn = this._cbs.buildBtn('↪ Redo', MUTED_BTN_BG, '#aaa', () => this._doRedo(), true);
     redoBtn.id = 'campaign-map-redo-btn';
     toolbar.appendChild(redoBtn);
 
@@ -306,7 +333,7 @@ export class CampaignMapEditorSection {
       (style) => {
         if (campaign.style !== style) {
           campaign.style = style;
-          this._recordSnapshot(campaign);
+          this._recordSnapshot();
           this._renderCanvas();
         }
         document.getElementById('campaign-map-style-panel')?.replaceWith(this._buildStylePanel(campaign));
@@ -479,12 +506,12 @@ export class CampaignMapEditorSection {
       {
         getRows: () => this._gridState.rows,
         getCols: () => this._gridState.cols,
-        resize: (r, c) => this._resizeGrid(r, c, campaign),
-        slide:  (dir)  => this._slideGrid(dir, campaign),
-        rotate: (cw)   => this._rotateGrid(cw, campaign),
-        reflect: ()    => this._reflectGrid(campaign),
-        flipHorizontal: () => this._flipGridHorizontal(campaign),
-        flipVertical:   () => this._flipGridVertical(campaign),
+        resize: (r, c) => this._resizeGrid(r, c),
+        slide:  (dir)  => this._slideGrid(dir),
+        rotate: (cw)   => this._rotateGrid(cw),
+        reflect: ()    => this._reflectGrid(),
+        flipHorizontal: () => this._flipGridHorizontal(),
+        flipVertical:   () => this._flipGridVertical(),
         rebuildPanel: () => {
           document.getElementById('campaign-map-grid-size-panel')
             ?.replaceWith(this._buildGridSizePanel(campaign));
@@ -540,18 +567,6 @@ export class CampaignMapEditorSection {
     return canvas;
   }
 
-  private _updateCanvasDisplaySize(): void {
-    if (!this._canvas) return;
-    const rows = this._gridState.rows;
-    const cols = this._gridState.cols;
-    const newViewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
-    const newViewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
-    this._viewRows = newViewRows;
-    this._viewCols = newViewCols;
-    this._clampPan();
-    updateMapEditorCanvas(this._canvas, newViewRows, newViewCols, this._mainLayout);
-  }
-
   /** Clamp pan to valid bounds (edge clamping only, no source-connectivity restriction). */
   private _clampPan(): void {
     const rows = this._gridState.rows;
@@ -564,7 +579,7 @@ export class CampaignMapEditorSection {
     this._panPixelY = Math.max(0, Math.min(maxPanY, this._panPixelY));
   }
 
-  private _renderCanvas(): void {
+  private _renderCampaignCanvas(): void {
     const ctx = this._ctx;
     if (!ctx) return;
 
@@ -770,8 +785,8 @@ export class CampaignMapEditorSection {
           ?.replaceWith(this._buildPalettePanel(campaign));
         document.getElementById('campaign-map-tile-params-panel')
           ?.replaceWith(this._buildTileParamsPanel(campaign));
-        this._recordSnapshot(campaign);
-        this._saveGridState(campaign);
+        this._recordSnapshot();
+        this._saveGrid();
         document.getElementById('campaign-map-chapter-inventory')
           ?.replaceWith(this._buildChapterInventoryPanel(campaign));
         this._renderCanvas();
@@ -823,8 +838,8 @@ export class CampaignMapEditorSection {
         this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
         this._playPlacementSfx(pos);
       }
-      this._recordSnapshot(campaign);
-      this._saveGridState(campaign);
+      this._recordSnapshot();
+      this._saveGrid();
       this._renderCanvas();
     }
   }
@@ -841,8 +856,8 @@ export class CampaignMapEditorSection {
       this._suppressContextMenu = true;
       document.getElementById('campaign-map-chapter-inventory')
         ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-      this._recordSnapshot(campaign);
-      this._saveGridState(campaign);
+      this._recordSnapshot();
+      this._saveGrid();
       this._renderCanvas();
       return;
     }
@@ -850,8 +865,8 @@ export class CampaignMapEditorSection {
 
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._recordSnapshot(campaign);
-      this._saveGridState(campaign);
+      this._recordSnapshot();
+      this._saveGrid();
       this._renderCanvas();
       return;
     }
@@ -864,11 +879,11 @@ export class CampaignMapEditorSection {
       this._gridState.focusedTilePos = null;
       this._gridState.grid[startPos.row][startPos.col] = null;
       this._gridState.grid[currentPos.row][currentPos.col] = tile;
-      this._recordSnapshot(campaign);
-      this._saveGridState(campaign);
+      this._recordSnapshot();
+      this._saveGrid();
     } else {
       if (PIPE_SHAPES.has(tile.shape)) {
-        this._rotateTileAt(startPos, !e.shiftKey, campaign);
+        this._rotateTileAt(startPos, !e.shiftKey);
         return;
       }
     }
@@ -944,8 +959,8 @@ export class CampaignMapEditorSection {
     this._gridState.clearFocusIfAt(pos);
     document.getElementById('campaign-map-chapter-inventory')
       ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-    this._recordSnapshot(campaign);
-    this._saveGridState(campaign);
+    this._recordSnapshot();
+    this._saveGrid();
     this._renderCanvas();
   }
 
@@ -965,11 +980,11 @@ export class CampaignMapEditorSection {
     if (this._dragState) this._dragState = null;
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._recordSnapshot(campaign);
+      this._recordSnapshot();
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
-      this._recordSnapshot(campaign);
+      this._recordSnapshot();
     }
     this._renderCanvas();
   }
@@ -980,13 +995,13 @@ export class CampaignMapEditorSection {
     if (!pos) return;
     const tile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
     if (tile && PIPE_SHAPES.has(tile.shape)) {
-      this._rotateTileAt(pos, e.deltaY > 0, campaign);
+      this._rotateTileAt(pos, e.deltaY > 0);
     } else if (tile && (
       tile.shape === PipeShape.Source ||
       tile.shape === PipeShape.Sink ||
       (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter')
     )) {
-      this._rotateSourceSinkAt(pos, e.deltaY > 0, campaign);
+      this._rotateSourceSinkAt(pos, e.deltaY > 0);
     } else if (PIPE_SHAPES.has(this._palette as PipeShape)) {
       this._rotatePalette(e.deltaY > 0);
       sfxManager.play(e.deltaY > 0 ? SfxId.PendingCW : SfxId.PendingCCW);
@@ -998,167 +1013,6 @@ export class CampaignMapEditorSection {
       const isConnected = isTileConnectedToSource(this._gridState.grid, pos);
       sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
     }
-  }
-
-  // ── Private: rotation helpers ──────────────────────────────────────────────
-
-  private _rotateTileAt(pos: { row: number; col: number }, clockwise: boolean, campaign: CampaignDef): void {
-    const tile = this._gridState.grid[pos.row]?.[pos.col];
-    if (!tile || !PIPE_SHAPES.has(tile.shape)) return;
-    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
-    const cur = (tile.rotation ?? 0) as Rotation;
-    tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
-    if (this._palette === tile.shape) this._params.rotation = tile.rotation;
-    this._recordSnapshot(campaign);
-    this._saveGridState(campaign);
-    this._renderCanvas();
-  }
-
-  private _rotatePalette(clockwise: boolean): void {
-    if (!PIPE_SHAPES.has(this._palette as PipeShape)) return;
-    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
-    const cur = this._params.rotation ?? 0;
-    this._params.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
-    this._renderCanvas();
-  }
-
-  private _rotateSourceSinkAt(pos: { row: number; col: number }, clockwise: boolean, campaign: CampaignDef): void {
-    const tile = this._gridState.grid[pos.row]?.[pos.col];
-    if (!tile) return;
-    const isConnectable =
-      tile.shape === PipeShape.Source ||
-      tile.shape === PipeShape.Sink ||
-      (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter');
-    if (!isConnectable) return;
-    sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
-
-    const newConns = rotateConnectionsBy90(tile.connections, clockwise);
-    tile.connections = newConns;
-
-    if (this._palette === tile.shape) {
-      this._params.connections = {
-        N: newConns.includes(Direction.North),
-        E: newConns.includes(Direction.East),
-        S: newConns.includes(Direction.South),
-        W: newConns.includes(Direction.West),
-      };
-    }
-
-    this._gridState.focusedTilePos = pos;
-    document.getElementById('campaign-map-tile-params-panel')
-      ?.replaceWith(this._buildTileParamsPanel(campaign));
-
-    this._recordSnapshot(campaign);
-    this._saveGridState(campaign);
-    this._renderCanvas();
-  }
-
-  // ── Private: reachability ──────────────────────────────────────────────────
-
-  private _computeFilledCells(): Set<string> {
-    return computeEditorFilledCells(this._gridState.grid, this._gridState.rows, this._gridState.cols);
-  }
-
-  private _showSinkError(): void {
-    const el = this._errorEl;
-    if (!el) return;
-    showTimedMessage(el, 'Only one sink tile is allowed.');
-  }
-
-  // ── Private: grid operations ───────────────────────────────────────────────
-
-  private _resizeGrid(newRows: number, newCols: number, campaign: CampaignDef): void {
-    this._gridState.resize(newRows, newCols);
-    this._recordSnapshot(campaign);
-    this._updateCanvasDisplaySize();
-    this._saveGridState(campaign);
-    this._renderCanvas();
-  }
-
-  private _slideGrid(dir: 'N' | 'E' | 'S' | 'W', campaign: CampaignDef): void {
-    this._gridState.slide(dir);
-    this._recordSnapshot(campaign);
-    sfxManager.play(SfxId.BoardSlide);
-    this._renderCanvas();
-  }
-
-  private _rotateGrid(clockwise: boolean, campaign: CampaignDef): void {
-    this._gridState.rotate(clockwise);
-    this._recordSnapshot(campaign);
-    sfxManager.play(SfxId.BoardSlide);
-    this._updateCanvasDisplaySize();
-    this._renderCanvas();
-  }
-
-  private _reflectGrid(campaign: CampaignDef): void {
-    this._gridState.reflect();
-    this._recordSnapshot(campaign);
-    sfxManager.play(SfxId.BoardSlide);
-    this._updateCanvasDisplaySize();
-    this._renderCanvas();
-  }
-
-  private _flipGridHorizontal(campaign: CampaignDef): void {
-    this._gridState.flipHorizontal();
-    this._recordSnapshot(campaign);
-    sfxManager.play(SfxId.BoardSlide);
-    this._renderCanvas();
-  }
-
-  private _flipGridVertical(campaign: CampaignDef): void {
-    this._gridState.flipVertical();
-    this._recordSnapshot(campaign);
-    sfxManager.play(SfxId.BoardSlide);
-    this._renderCanvas();
-  }
-
-  // ── Private: undo/redo ─────────────────────────────────────────────────────
-
-  private _recordSnapshot(campaign: CampaignDef, markChanged = true): void {
-    const snapshot: EditorSnapshot = {
-      grid: this._gridState.grid,
-      rows: this._gridState.rows,
-      cols: this._gridState.cols,
-      inventory: [],
-      levelStyle: campaign.style,
-    };
-    this._hist.record(snapshot);
-    if (markChanged) this._updateUndoRedoButtons();
-  }
-
-  private _undo(campaign: CampaignDef): void {
-    const snap = this._hist.undo();
-    if (!snap) return;
-    sfxManager.play(SfxId.Undo);
-    this._applySnapshot(snap, campaign);
-  }
-
-  private _redo(campaign: CampaignDef): void {
-    const snap = this._hist.redo();
-    if (!snap) return;
-    sfxManager.play(SfxId.Redo);
-    this._applySnapshot(snap, campaign);
-  }
-
-  private _applySnapshot(snap: EditorSnapshot, campaign: CampaignDef): void {
-    this._gridState.grid = snap.grid as (TileDef | null)[][];
-    this._gridState.rows = snap.rows;
-    this._gridState.cols = snap.cols;
-    campaign.style = snap.levelStyle as typeof campaign.style;
-    this._updateCanvasDisplaySize();
-    this._saveGridState(campaign);
-    document.getElementById('campaign-map-chapter-inventory')
-      ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-    document.getElementById('campaign-map-grid-size-panel')
-      ?.replaceWith(this._buildGridSizePanel(campaign));
-    document.getElementById('campaign-map-style-panel')
-      ?.replaceWith(this._buildStylePanel(campaign));
-    this._updateUndoRedoButtons();
-    this._renderCanvas();
-  }
-
-  private _updateUndoRedoButtons(): void {
-    updateUndoRedoButtonPair('campaign-map-undo-btn', 'campaign-map-redo-btn', this._hist.canUndo, this._hist.canRedo);
   }
 
   // ── Private: tile params panel widgets ────────────────────────────────────
@@ -1187,8 +1041,8 @@ export class CampaignMapEditorSection {
         const conns = new Set(tile.connections ?? allDirs);
         if (conns.has(dir)) conns.delete(dir); else conns.add(dir);
         tile.connections = [...conns];
-        this._recordSnapshot(campaign);
-        this._saveGridState(campaign);
+        this._recordSnapshot();
+        this._saveGrid();
         replaceTarget.replaceWith(this._buildTileParamsPanel(campaign));
         this._renderCanvas();
       },
@@ -1211,8 +1065,8 @@ export class CampaignMapEditorSection {
       () => tile.completion ?? 0,
       (val) => {
         tile.completion = val > 0 ? val : undefined;
-        this._recordSnapshot(campaign);
-        this._saveGridState(campaign);
+        this._recordSnapshot();
+        this._saveGrid();
         replaceTarget.replaceWith(this._buildTileParamsPanel(campaign));
         this._renderCanvas();
       },
