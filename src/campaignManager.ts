@@ -257,6 +257,7 @@ export class CampaignManager {
             const campaignEl = campaignMapScreen.screenEl;
             chapterEl.style.overflow = 'hidden';
             campaignEl.style.overflow = 'hidden';
+            campaignEl.style.visibility = 'hidden';
             playMapScreenExitTransition(
               minimapRect,
               chapterSnapshot,
@@ -265,6 +266,7 @@ export class CampaignManager {
               () => {
                 chapterEl.style.overflow = '';
                 campaignEl.style.overflow = '';
+                campaignEl.style.visibility = '';
                 chapterMapScreen.hide();
               },
             );
@@ -399,7 +401,7 @@ export class CampaignManager {
       getCompletedChapters: () => this._activeCampaignCompletedChapters,
       getCompletedLevels: () => this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels,
       getActiveCampaignId: () => this._activeCampaign?.id ?? null,
-      onShowLevelSelect: () => this._callbacks.showLevelSelect(),
+      onShowLevelSelect: () => this._exitCampaignMapToMainScreen(),
       onChapterSelected: (chapterIdx) => this._showChapterMapFromCampaign(chapterIdx),
     });
   }
@@ -454,6 +456,23 @@ export class CampaignManager {
     playSwirlScreenTransition(
       this._callbacks.levelSelectEl,
       showDestination,
+      () => {},
+    );
+  }
+
+  private _exitCampaignMapToMainScreen(): void {
+    const campaignMapEl = this._campaignMapScreen?.screenEl;
+    if (!campaignMapEl || getComputedStyle(campaignMapEl).display === 'none') {
+      this._callbacks.showLevelSelect();
+      return;
+    }
+
+    playSwirlScreenTransition(
+      campaignMapEl,
+      () => {
+        this._callbacks.showLevelSelect();
+        return this._callbacks.levelSelectEl;
+      },
       () => {},
     );
   }
