@@ -694,9 +694,10 @@ export class ChapterMapScreen {
 
     canvas.width  = viewCols * TILE_SIZE;
     canvas.height = viewRows * TILE_SIZE;
+    const defaultCursor = isOversized ? 'grab' : 'pointer';
     canvas.style.cssText =
       `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
-      (isOversized ? 'cursor:grab;' : 'cursor:pointer;') +
+      `cursor:${defaultCursor};` +
       'display:block;max-width:100%;height:auto;margin:0 auto;';
 
     // ── Mouse events ──────────────────────────────────────────────────────────
@@ -723,11 +724,11 @@ export class ChapterMapScreen {
           this._panDrag.moved = true;
         }
         if (this._panDrag.moved) {
-          const rect = canvas.getBoundingClientRect();
-          const scaleX = canvas.width  / rect.width;
-          const scaleY = canvas.height / rect.height;
-          this._panPixelX = this._panDrag.startPanX - dx * scaleX;
-          this._panPixelY = this._panDrag.startPanY - dy * scaleY;
+          const cp = this._clientToCanvasPx(e.clientX, e.clientY);
+          if (cp) {
+            this._panPixelX = this._panDrag.startPanX - dx * cp.scaleX;
+            this._panPixelY = this._panDrag.startPanY - dy * cp.scaleY;
+          }
           this._clampPan(chapter, viewRows, viewCols);
           this._hover = null;
           this._render(chapter);
@@ -774,7 +775,7 @@ export class ChapterMapScreen {
     canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return;
       if (this._panDrag?.moved) {
-        canvas.style.cursor = isOversized ? 'grab' : 'pointer';
+        canvas.style.cursor = defaultCursor;
       }
       // Click handling is deferred to the 'click' event so the browser can
       // fire it; we only use mouseup to restore the cursor.
@@ -785,7 +786,7 @@ export class ChapterMapScreen {
       this._mouseClientPos = null;
       this._hover = null;
       this._hideTooltip();
-      canvas.style.cursor = isOversized ? 'grab' : 'pointer';
+      canvas.style.cursor = defaultCursor;
       this._render(chapter);
     });
 
@@ -835,11 +836,11 @@ export class ChapterMapScreen {
         this._hideTooltip();
         // Pan the map for oversized maps.
         if (isOversized) {
-          const rect = canvas.getBoundingClientRect();
-          const scaleX = canvas.width  / rect.width;
-          const scaleY = canvas.height / rect.height;
-          this._panPixelX = this._touchPanStartPanX - dx * scaleX;
-          this._panPixelY = this._touchPanStartPanY - dy * scaleY;
+          const cp = this._clientToCanvasPx(touch.clientX, touch.clientY);
+          if (cp) {
+            this._panPixelX = this._touchPanStartPanX - dx * cp.scaleX;
+            this._panPixelY = this._touchPanStartPanY - dy * cp.scaleY;
+          }
           this._clampPan(chapter, viewRows, viewCols);
           this._hover = null;
           this._render(chapter);
@@ -964,26 +965,39 @@ export class ChapterMapScreen {
    * chapter canvas.  Returns null when the point is outside the canvas bounds or
    * the canvas is not available.
    */
+  /** Convert client coords to canvas intrinsic pixels (no pan applied). */
+  private _clientToCanvasPx(
+    clientX: number, clientY: number,
+  ): { px: number; py: number; scaleX: number; scaleY: number } | null {
+    const canvas = this._canvas;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      px:     (clientX - rect.left) * scaleX,
+      py:     (clientY - rect.top)  * scaleY,
+      scaleX,
+      scaleY,
+    };
+  }
+
   private _canvasPosFromCoords(
     clientX: number,
     clientY: number,
     chapter: ChapterDef,
   ): { row: number; col: number } | null {
-    const canvas = this._canvas;
-    if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
+    const cp = this._clientToCanvasPx(clientX, clientY);
+    if (!cp) return null;
+    const { px: canvasPxX, py: canvasPxY } = cp;
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
     const viewRows = this._viewRows;
     const viewCols = this._viewCols;
     // Map client coordinates to canvas pixel coordinates, then add the pan offset
     // to get the position in the full (panned) map coordinate space.
-    const canvasPxX = (clientX - rect.left) * canvas.width  / rect.width;
-    const canvasPxY = (clientY - rect.top)  * canvas.height / rect.height;
-    const gridPxX = canvasPxX + this._panPixelX;
-    const gridPxY = canvasPxY + this._panPixelY;
-    const col = Math.floor(gridPxX / TILE_SIZE);
-    const row = Math.floor(gridPxY / TILE_SIZE);
+    const col = Math.floor((canvasPxX + this._panPixelX) / TILE_SIZE);
+    const row = Math.floor((canvasPxY + this._panPixelY) / TILE_SIZE);
     // Bounds-check against the view window (only cells currently visible can be hit).
     const viewCol = Math.floor(canvasPxX / TILE_SIZE);
     const viewRow = Math.floor(canvasPxY / TILE_SIZE);

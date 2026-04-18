@@ -680,11 +680,13 @@ export class CampaignMapEditorSection {
 
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
     if (!this._canvas) return null;
-    // computeCanvasPos maps to [0, viewRows) × [0, viewCols) – shift by pan offset
-    // to get the actual grid cell under the pointer.
+    // Map client coords to canvas intrinsic pixels, then shift by pan offset to
+    // obtain the actual grid cell under the pointer.
     const rect = this._canvas.getBoundingClientRect();
-    const canvasPxX = (e.clientX - rect.left) * this._canvas.width  / rect.width;
-    const canvasPxY = (e.clientY - rect.top)  * this._canvas.height / rect.height;
+    const scaleX = this._canvas.width  / rect.width;
+    const scaleY = this._canvas.height / rect.height;
+    const canvasPxX = (e.clientX - rect.left) * scaleX;
+    const canvasPxY = (e.clientY - rect.top)  * scaleY;
     const col = Math.floor((canvasPxX + this._panPixelX) / TILE_SIZE);
     const row = Math.floor((canvasPxY + this._panPixelY) / TILE_SIZE);
     // Ensure we clicked within the visible view area.
@@ -693,6 +695,17 @@ export class CampaignMapEditorSection {
     if (viewRow < 0 || viewRow >= this._viewRows || viewCol < 0 || viewCol >= this._viewCols) return null;
     if (row < 0 || row >= this._gridState.rows || col < 0 || col >= this._gridState.cols) return null;
     return { row, col };
+  }
+
+  /** Return the canvas-intrinsic pixel scale (intrinsic / CSS) in both axes. */
+  private _canvasScale(): { scaleX: number; scaleY: number } | null {
+    const canvas = this._canvas;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      scaleX: canvas.width  / rect.width,
+      scaleY: canvas.height / rect.height,
+    };
   }
 
   private _onMouseDown(e: MouseEvent, campaign: CampaignDef): void {
@@ -870,12 +883,12 @@ export class CampaignMapEditorSection {
       if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
         this._panDrag.moved = true;
       }
-      if (this._panDrag.moved && this._canvas) {
-        const rect = this._canvas.getBoundingClientRect();
-        const scaleX = this._canvas.width  / rect.width;
-        const scaleY = this._canvas.height / rect.height;
-        this._panPixelX = this._panDrag.startPanX - dx * scaleX;
-        this._panPixelY = this._panDrag.startPanY - dy * scaleY;
+      if (this._panDrag.moved) {
+        const scale = this._canvasScale();
+        if (scale) {
+          this._panPixelX = this._panDrag.startPanX - dx * scale.scaleX;
+          this._panPixelY = this._panDrag.startPanY - dy * scale.scaleY;
+        }
         this._clampPan();
         this._renderCanvas();
         return;
