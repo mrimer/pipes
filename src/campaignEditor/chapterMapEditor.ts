@@ -101,6 +101,11 @@ export class ChapterMapEditorSection {
     this._renderChapterCanvas();
   }
 
+  /** Sync undo/redo button enabled state with current history availability. */
+  syncUndoRedoButtons(): void {
+    this._updateChapterUndoRedoButtons();
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /**
@@ -603,4 +608,3 @@ export class ChapterMapEditorSection {
   }
 
 }
-

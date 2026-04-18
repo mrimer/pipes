@@ -316,6 +316,76 @@ export function playMapExitTransition(
   requestAnimationFrame(tick);
 }
 
+/**
+ * Play a generic map-to-map zoom-out transition using a pre-captured canvas snapshot.
+ *
+ * Zooms `fromSnapshot` from its captured CSS rect down to `targetRect` while
+ * fading `fromScreenEl` out and `toScreenEl` in.
+ */
+export function playMapScreenExitTransition(
+  targetRect: ScreenRect,
+  fromSnapshot: ChapterMapSnapshot,
+  fromScreenEl: HTMLElement,
+  toScreenEl: HTMLElement,
+  onComplete: () => void,
+): void {
+  const startRect: ScreenRect = {
+    x: fromSnapshot.cssRect.left,
+    y: fromSnapshot.cssRect.top,
+    width: fromSnapshot.cssRect.width,
+    height: fromSnapshot.cssRect.height,
+  };
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
+
+  const snapshotEl = document.createElement('canvas');
+  snapshotEl.width = fromSnapshot.canvas.width;
+  snapshotEl.height = fromSnapshot.canvas.height;
+  snapshotEl.style.cssText =
+    'position:absolute;image-rendering:auto;' +
+    `left:${startRect.x}px;top:${startRect.y}px;` +
+    `width:${startRect.width}px;height:${startRect.height}px;`;
+  const snapshotCtx = snapshotEl.getContext('2d');
+  if (snapshotCtx) snapshotCtx.drawImage(fromSnapshot.canvas, 0, 0);
+  overlay.appendChild(snapshotEl);
+  document.body.appendChild(overlay);
+
+  fromScreenEl.style.opacity = '1';
+  toScreenEl.style.opacity = '0';
+
+  const startTime = performance.now();
+
+  function tick(): void {
+    const elapsed = performance.now() - startTime;
+    const rawT = Math.min(elapsed / TRANSITION_DURATION_MS, 1);
+    const t = easeInOutQuad(rawT);
+
+    const x = lerp(startRect.x, targetRect.x, t);
+    const y = lerp(startRect.y, targetRect.y, t);
+    const w = lerp(startRect.width, targetRect.width, t);
+    const h = lerp(startRect.height, targetRect.height, t);
+    snapshotEl.style.left = `${x}px`;
+    snapshotEl.style.top = `${y}px`;
+    snapshotEl.style.width = `${w}px`;
+    snapshotEl.style.height = `${h}px`;
+
+    fromScreenEl.style.opacity = `${1 - rawT}`;
+    toScreenEl.style.opacity = `${rawT}`;
+
+    if (rawT < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      overlay.remove();
+      fromScreenEl.style.opacity = '';
+      toScreenEl.style.opacity = '';
+      onComplete();
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
 // Backward-compatible aliases.
 export const playLevelTransition = playMapTransition;
 export const playLevelExitTransition = playMapExitTransition;

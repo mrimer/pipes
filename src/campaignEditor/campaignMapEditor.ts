@@ -144,6 +144,11 @@ export class CampaignMapEditorSection {
     this._renderCanvas();
   }
 
+  /** Sync undo/redo button enabled state with current history availability. */
+  syncUndoRedoButtons(): void {
+    this._updateUndoRedoButtons();
+  }
+
   /**
    * Handle a keydown event for the campaign map editor.
    * Called from the campaign editor's global keyboard handler when on the Campaign screen.

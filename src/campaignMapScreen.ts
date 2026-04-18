@@ -75,7 +75,7 @@ export class CampaignMapScreen {
       const totalStars = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
       const challenge = chapter.levels.some((l) => l.challenge === true);
       return {
-        id: -1000 - chapterIdx,
+        id: chapter.id ?? (-1000 - chapterIdx),
         name: chapter.name,
         rows,
         cols,
