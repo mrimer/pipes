@@ -42,6 +42,10 @@ const SWIRL_SATURATION_REDUCTION = 0.7;
 const SWIRL_CONTRAST_INCREASE = 0.45;
 const SWIRL_WILL_CHANGE_PROPS =
   'transform,opacity,filter,mask-image,mask-size,-webkit-mask-image,-webkit-mask-size';
+/** z-index of the source-map fade overlay during map-to-map transitions. */
+const TRANSITION_FADE_OVERLAY_Z = 12;
+/** z-index of the zooming destination-snapshot overlay during transitions. */
+const TRANSITION_ZOOM_OVERLAY_Z = 15;
 
 /** Screen-space rectangle (CSS pixels, relative to the viewport). */
 export interface ScreenRect {
@@ -245,7 +249,7 @@ export function playMapTransition(
     // Full-screen background matching the chapter map background color.
     const fadeOverlay = document.createElement('div');
     fadeOverlay.style.cssText =
-      `position:fixed;inset:0;z-index:12;pointer-events:none;background:${CHAPTER_MAP_BG};`;
+      `position:fixed;inset:0;z-index:${TRANSITION_FADE_OVERLAY_Z};pointer-events:none;background:${CHAPTER_MAP_BG};`;
 
     // Canvas snapshot element, positioned to match the original canvas exactly.
     const snapEl = document.createElement('canvas');
@@ -265,7 +269,7 @@ export function playMapTransition(
   // ── 4. Create a fixed-position overlay to host the animating snapshot ────
 
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:${TRANSITION_ZOOM_OVERLAY_Z};pointer-events:none;`;
 
   // The snapshot element – starts at minimap size, ends at full game-canvas size.
   // CSS `image-rendering: auto` ensures the browser uses bilinear interpolation.
@@ -376,7 +380,7 @@ export function playMapExitTransition(
   // ── 2. Create a fixed-position overlay hosting the animating snapshot ─────
 
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:${TRANSITION_ZOOM_OVERLAY_Z};pointer-events:none;`;
 
   // The snapshot starts at full game-canvas size and shrinks to minimap size.
   const snapshotEl = document.createElement('canvas');
@@ -464,7 +468,7 @@ export function playMapScreenExitTransition(
   };
 
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:${TRANSITION_ZOOM_OVERLAY_Z};pointer-events:none;`;
 
   const snapshotEl = document.createElement('canvas');
   snapshotEl.width = fromSnapshot.canvas.width;
@@ -554,9 +558,9 @@ export function playMapScreenEnterTransition(
     height: toSnapshot.cssRect.height,
   };
 
-  // ── Zooming destination-snapshot overlay (z-index 15) ──────────────────────
+  // ── Zooming destination-snapshot overlay ────────────────────────────────────
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;';
+  overlay.style.cssText = `position:fixed;inset:0;z-index:${TRANSITION_ZOOM_OVERLAY_Z};pointer-events:none;`;
 
   const snapshotEl = document.createElement('canvas');
   snapshotEl.width = toSnapshot.canvas.width;
@@ -570,7 +574,7 @@ export function playMapScreenEnterTransition(
   overlay.appendChild(snapshotEl);
   document.body.appendChild(overlay);
 
-  // ── Source-map fade overlay (z-index 12, below the zooming snapshot) ───────
+  // ── Source-map fade overlay (below the zooming snapshot) ──────────────────
   //
   // When a source snapshot is provided, build a pixel-accurate fade overlay for
   // the source canvas – identical in technique to the chapterMapFadeEl in
@@ -581,7 +585,7 @@ export function playMapScreenEnterTransition(
     const { canvas: snapSrc, cssRect } = fromSnapshot;
     const fadeOverlay = document.createElement('div');
     fadeOverlay.style.cssText =
-      `position:fixed;inset:0;z-index:12;pointer-events:none;background:${CHAPTER_MAP_BG};`;
+      `position:fixed;inset:0;z-index:${TRANSITION_FADE_OVERLAY_Z};pointer-events:none;background:${CHAPTER_MAP_BG};`;
     const snapEl = document.createElement('canvas');
     snapEl.width  = snapSrc.width;
     snapEl.height = snapSrc.height;
