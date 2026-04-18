@@ -27,7 +27,7 @@ import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
-import { playMapScreenExitTransition } from './levelTransition';
+import { playMapScreenEnterTransition, playMapScreenExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 
@@ -224,12 +224,12 @@ export class CampaignManager {
   set winFromChapterMap(v: boolean) { this._winFromChapterMap = v; }
 
   /** Show the chapter map screen for the given chapter index (0-based). */
-  showChapterMap(chapterIdx: number): void {
+  showChapterMap(chapterIdx: number, hideCampaignMap = true): void {
     const campaign = this._activeCampaign;
     if (!campaign) return;
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter?.grid) return;
-    this._campaignMapScreen?.hide();
+    if (hideCampaignMap) this._campaignMapScreen?.hide();
 
     if (!this._chapterMapScreen) {
       this._chapterMapScreen = new ChapterMapScreen({
@@ -380,10 +380,50 @@ export class CampaignManager {
     if (this._campaignMapScreen) return;
     this._campaignMapScreen = new CampaignMapScreen({
       getCompletedChapters: () => this._activeCampaignCompletedChapters,
+      getCompletedLevels: () => this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels,
       getActiveCampaignId: () => this._activeCampaign?.id ?? null,
       onShowLevelSelect: () => this._callbacks.showLevelSelect(),
-      onChapterSelected: (chapterIdx) => this.showChapterMap(chapterIdx),
+      onChapterSelected: (chapterIdx) => this._showChapterMapFromCampaign(chapterIdx),
     });
+  }
+
+  private _showChapterMapFromCampaign(chapterIdx: number): void {
+    const campaignMapScreen = this._campaignMapScreen;
+    if (!campaignMapScreen) {
+      this.showChapterMap(chapterIdx);
+      return;
+    }
+
+    const minimapRect = campaignMapScreen.getMinimapScreenRect(chapterIdx);
+    const campaignSnapshot = campaignMapScreen.captureCanvasSnapshot();
+    if (!minimapRect || !campaignSnapshot) {
+      this.showChapterMap(chapterIdx);
+      return;
+    }
+
+    this.showChapterMap(chapterIdx, false);
+    const chapterMapScreen = this._chapterMapScreen;
+    const chapterSnapshot = chapterMapScreen?.captureCanvasSnapshot();
+    if (!chapterMapScreen || !chapterSnapshot) {
+      campaignMapScreen.hide();
+      return;
+    }
+
+    const campaignEl = campaignMapScreen.screenEl;
+    const chapterEl = chapterMapScreen.screenEl;
+    campaignEl.style.overflow = 'hidden';
+    chapterEl.style.overflow = 'hidden';
+    playMapScreenEnterTransition(
+      minimapRect,
+      chapterSnapshot,
+      campaignEl,
+      chapterEl,
+      () => {
+        campaignEl.style.overflow = '';
+        chapterEl.style.overflow = '';
+        campaignMapScreen.hide();
+      },
+    );
   }
 
   /**

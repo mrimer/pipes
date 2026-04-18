@@ -73,6 +73,14 @@ export interface ChapterMapCallbacks {
   onShowLevelSelect(): void;
   /** Called when the player clicks an accessible level chamber. */
   onLevelSelected(levelDef: LevelDef): void;
+  /** Optional override for the chapter title text in the screen header. Return null to hide it. */
+  formatChapterTitle?(campaign: CampaignDef, chapterIdx: number, chapter: ChapterDef): string | null;
+  /** Optional override for the top stats-line text. Return undefined to use the default chapter stats. */
+  formatStatsText?(chapter: ChapterDef, displayProgress: Set<number>): string | undefined;
+  /** Optional predicate controlling whether the bottom completion status line is shown. */
+  shouldShowCompletionStatus?(chapter: ChapterDef, displayProgress: Set<number>): boolean;
+  /** Optional completion predicate override used by completion-dependent effects (e.g., flow drops). */
+  isMapCompleted?(chapter: ChapterDef, displayProgress: Set<number>): boolean;
   /** Returns the active campaign def, or null. */
   getActiveCampaign?(): CampaignDef | null;
   /** Returns the set of completed chapter IDs. */
@@ -547,10 +555,15 @@ export class ChapterMapScreen {
     campaignName.style.cssText = 'font-size:0.9rem;color:#aaa;';
     campaignName.textContent = campaign.name;
     header.appendChild(campaignName);
-    const chapterTitle = document.createElement('h2');
-    chapterTitle.textContent = `Chapter ${chapterIdx + 1}: ${chapter.name}`;
-    chapterTitle.style.cssText = `margin:4px 0;font-size:1.4rem;color:${FOCUS_COLOR};`;
-    header.appendChild(chapterTitle);
+    const chapterTitleText =
+      this._callbacks.formatChapterTitle?.(campaign, chapterIdx, chapter) ??
+      `Chapter ${chapterIdx + 1}: ${chapter.name}`;
+    if (chapterTitleText !== null) {
+      const chapterTitle = document.createElement('h2');
+      chapterTitle.textContent = chapterTitleText;
+      chapterTitle.style.cssText = `margin:4px 0;font-size:1.4rem;color:${FOCUS_COLOR};`;
+      header.appendChild(chapterTitle);
+    }
     el.appendChild(header);
 
     // Stats row
@@ -908,6 +921,11 @@ export class ChapterMapScreen {
    */
   private _updateStats(chapter: ChapterDef, displayProgress: Set<number>): void {
     if (!this._statsEl) return;
+    const customStats = this._callbacks.formatStatsText?.(chapter, displayProgress);
+    if (customStats !== undefined) {
+      this._statsEl.textContent = customStats;
+      return;
+    }
 
     const completedChapters = this._callbacks.getCompletedChapters?.();
     const campaignId = this._callbacks.getActiveCampaignId();
@@ -942,6 +960,10 @@ export class ChapterMapScreen {
    */
   private _updateStatus(chapter: ChapterDef, displayProgress: Set<number>, filledKeys: Set<string>): void {
     if (!this._statusEl) return;
+    if (this._callbacks.shouldShowCompletionStatus?.(chapter, displayProgress) === false) {
+      this._statusEl.innerHTML = '';
+      return;
+    }
 
     const grid = chapter.grid!;
     const rows = chapter.rows ?? 3;
@@ -1137,6 +1159,9 @@ export class ChapterMapScreen {
 
   /** Returns true if the chapter's completion flag is set. */
   private _isChapterCompleted(chapter: ChapterDef): boolean {
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const callbackValue = this._callbacks.isMapCompleted?.(chapter, displayProgress);
+    if (callbackValue !== undefined) return callbackValue;
     const completedChapters = this._callbacks.getCompletedChapters?.();
     return chapter.id !== undefined && completedChapters?.has(chapter.id) === true;
   }
