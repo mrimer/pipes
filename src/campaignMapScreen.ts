@@ -55,6 +55,8 @@ export class CampaignMapScreen {
           const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
           const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
           const allLevelsCompleted = allLevels.every((l) => completedLevels.has(l.id));
+          // Mirrors chapter-map mastery semantics: when no stars exist in the campaign,
+          // full level completion alone is enough for "Mastered!".
           const isMastered = allLevelsCompleted && (starsTotal === 0 || starsCollected >= starsTotal);
           parts.push(isMastered ? '🏆 Mastered!' : '✅ Complete');
         }

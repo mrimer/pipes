@@ -555,9 +555,11 @@ export class ChapterMapScreen {
     campaignName.style.cssText = 'font-size:0.9rem;color:#aaa;';
     campaignName.textContent = campaign.name;
     header.appendChild(campaignName);
+    const customChapterTitle = this._callbacks.formatChapterTitle?.(campaign, chapterIdx, chapter);
     const chapterTitleText =
-      this._callbacks.formatChapterTitle?.(campaign, chapterIdx, chapter) ??
-      `Chapter ${chapterIdx + 1}: ${chapter.name}`;
+      customChapterTitle === undefined
+        ? `Chapter ${chapterIdx + 1}: ${chapter.name}`
+        : customChapterTitle;
     if (chapterTitleText !== null) {
       const chapterTitle = document.createElement('h2');
       chapterTitle.textContent = chapterTitleText;
