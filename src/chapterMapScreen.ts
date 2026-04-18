@@ -7,7 +7,7 @@
  * ChapterMapCallbacks interface to the abstract methods.
  */
 
-import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape } from './types';
+import { ChapterDef, CampaignDef, LevelDef, TileDef } from './types';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { MapScreenBase } from './mapScreenBase';
 
