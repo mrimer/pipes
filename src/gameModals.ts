@@ -1,8 +1,6 @@
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
-import { CommandAction, COMMAND_LABELS, commandKeyManager } from './commandKeyManager';
-
-const PURE_MODIFIER_KEYS = new Set(['shift', 'control', 'ctrl', 'alt', 'meta', 'os']);
+import { CommandAction, COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
 /**
  * Factory functions for building the game's modal overlay elements.
  *
@@ -325,6 +323,37 @@ export function buildSettingsModal(
   const commandActions: CommandAction[] = ['rotateCW', 'rotateCCW', 'restartLevel', 'undo', 'redo'];
   const rowMap = new Map<CommandAction, { valueEl: HTMLElement; buttonEl: HTMLButtonElement }>();
   let capturing: CommandAction | null = null;
+  let captureListenerAttached = false;
+
+  const onDocKeyDown = (e: KeyboardEvent) => {
+    if (capturing === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      capturing = null;
+      renderCommandRows();
+      return;
+    }
+    if (isPureModifierKey(e.key)) return;
+    const result = commandKeyManager.assignFromEvent(capturing, e);
+    if (!result.ok) {
+      window.alert(result.error ?? 'Could not assign that key.');
+      return;
+    }
+    capturing = null;
+    renderCommandRows();
+  };
+
+  function syncCaptureListener(): void {
+    const shouldAttach = capturing !== null;
+    if (shouldAttach && !captureListenerAttached) {
+      document.addEventListener('keydown', onDocKeyDown);
+      captureListenerAttached = true;
+    } else if (!shouldAttach && captureListenerAttached) {
+      document.removeEventListener('keydown', onDocKeyDown);
+      captureListenerAttached = false;
+    }
+  }
 
   function renderCommandRows(): void {
     for (const action of commandActions) {
@@ -335,6 +364,7 @@ export function buildSettingsModal(
         : commandKeyManager.getBindingDisplay(action);
       row.buttonEl.textContent = capturing === action ? '✖️' : '⌨️';
     }
+    syncCaptureListener();
   }
 
   for (const action of commandActions) {
@@ -385,25 +415,6 @@ export function buildSettingsModal(
   commandsSection.appendChild(resetCommandsBtn);
   box.appendChild(commandsSection);
 
-  const onDocKeyDown = (e: KeyboardEvent) => {
-    if (capturing === null) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.key === 'Escape') {
-      capturing = null;
-      renderCommandRows();
-      return;
-    }
-    if (PURE_MODIFIER_KEYS.has(e.key.toLowerCase())) return;
-    const result = commandKeyManager.assignFromEvent(capturing, e);
-    if (!result.ok) {
-      window.alert(result.error ?? 'Could not assign that key.');
-      return;
-    }
-    capturing = null;
-    renderCommandRows();
-  };
-  document.addEventListener('keydown', onDocKeyDown);
   renderCommandRows();
 
   // ── Confirm button ───────────────────────────────────────────────────────
