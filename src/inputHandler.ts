@@ -657,6 +657,14 @@ export class InputHandler {
       e.preventDefault();
       if (this._cb.getGameState() === GameState.Playing) this._cb.performRedo();
     }
+    if (e.key === 'Backspace' && this._cb.getScreen() === GameScreen.Play) {
+      e.preventDefault();
+      if (this._cb.getGameState() === GameState.Playing ||
+          this._cb.getGameState() === GameState.GameOver ||
+          this._cb.getGameState() === GameState.Won) {
+        this._cb.performUndo();
+      }
+    }
   }
 
   private _handleDocKeyUp(e: KeyboardEvent): void {
