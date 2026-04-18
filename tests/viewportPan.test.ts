@@ -174,6 +174,64 @@ describe('viewport clamp (pure logic)', () => {
   });
 });
 
+// ─── Connected-bbox clamp logic (pure logic test) ─────────────────────────────
+
+/**
+ * Mirrors the connected-bbox clamp math from MapScreenBase._clampPan, including
+ * the fix for the case where bboxMax ≤ 0 (the far-side constraint is impossible).
+ */
+function clampPanBBox(
+  panY: number,
+  maxPanY: number,
+  bboxMinY: number,
+  bboxMaxY: number,
+): number {
+  if (bboxMaxY > 0) {
+    return clampPanAxisWithFallback(panY, bboxMinY, bboxMaxY);
+  }
+  // bboxMaxY ≤ 0: connected tiles always fit in the viewport; enforce only bboxMinY.
+  return Math.min(maxPanY, Math.max(bboxMinY, panY));
+}
+
+describe('connected-bbox clamp (pure logic)', () => {
+  const TS = 64; // tile size
+
+  it('enforces bboxMinY when bboxMaxY < 0 and pan is below bboxMinY', () => {
+    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 → bboxMinY=2*TS, bboxMaxY=-TS
+    const maxPanY = 3 * TS;
+    const bboxMinY = 2 * TS;
+    const bboxMaxY = -TS;
+    // pan=0 should be forced up to bboxMinY
+    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
+    expect(clampPanBBox(TS, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
+  });
+
+  it('enforces bboxMinY when bboxMaxY = 0 and pan is below bboxMinY', () => {
+    // boundary case: bboxMaxY exactly 0
+    const maxPanY = 3 * TS;
+    const bboxMinY = 2 * TS;
+    const bboxMaxY = 0;
+    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
+  });
+
+  it('does not exceed maxPanY when bboxMinY > maxPanY', () => {
+    // Connected tiles near the bottom of a short grid
+    const maxPanY = 2 * TS;
+    const bboxMinY = 5 * TS;   // impossible: bboxMinY > maxPanY
+    const bboxMaxY = -TS;
+    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(maxPanY);
+  });
+
+  it('normal case (bboxMin ≤ bboxMax > 0): clamps to [bboxMin, bboxMax]', () => {
+    const maxPanY = 11 * TS;
+    const bboxMinY = 4 * TS;
+    const bboxMaxY = 8 * TS;
+    expect(clampPanBBox(0, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMinY);
+    expect(clampPanBBox(6 * TS, maxPanY, bboxMinY, bboxMaxY)).toBe(6 * TS);
+    expect(clampPanBBox(99 * TS, maxPanY, bboxMinY, bboxMaxY)).toBe(bboxMaxY);
+  });
+});
+
 // ─── Initial snap logic (pure logic test) ─────────────────────────────────────
 
 /**

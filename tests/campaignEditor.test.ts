@@ -3777,7 +3777,7 @@ describe('CampaignEditor – campaign map editor pan-drag precedence', () => {
     document.body.innerHTML = '';
   });
 
-  it('prioritizes panning over tile-drag when dragging on an oversized campaign map', () => {
+  it('Shift+left-drag pans an oversized campaign map without starting tile-drag', () => {
     const bigRows = 20;
     const bigCols = 20;
     const grid = Array.from({ length: bigRows }, () => Array.from({ length: bigCols }, () => null as TileDef | null));
@@ -3823,9 +3823,10 @@ describe('CampaignEditor – campaign map editor pan-drag precedence', () => {
       configurable: true,
     });
 
-    canvas!.dispatchEvent(new MouseEvent('mousedown', { button: 0, clientX: 10, clientY: 10, bubbles: true }));
-    expect(state._campaignMapEditor._dragState).toBeTruthy();
-    canvas!.dispatchEvent(new MouseEvent('mousemove', { buttons: 1, clientX: -80, clientY: 10, bubbles: true }));
+    // Shift+left-down: pan candidate starts immediately, no tile-drag state.
+    canvas!.dispatchEvent(new MouseEvent('mousedown', { button: 0, shiftKey: true, clientX: 10, clientY: 10, bubbles: true }));
+    expect(state._campaignMapEditor._dragState).toBeNull();
+    canvas!.dispatchEvent(new MouseEvent('mousemove', { buttons: 1, shiftKey: true, clientX: -80, clientY: 10, bubbles: true }));
 
     expect(state._campaignMapEditor._dragState).toBeNull();
     expect(state._campaignMapEditor._panPixelX).toBeGreaterThan(0);
