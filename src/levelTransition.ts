@@ -135,7 +135,7 @@ function applySwirlFrame(el: HTMLElement, rawT: number, reverse: boolean): void 
   const maskScaleX = 100 + SWIRL_MASK_SCALE_X_RANGE * collapse;
   const maskScaleY = 100 + SWIRL_MASK_SCALE_Y_RANGE * collapse;
   const swirlMask = `repeating-conic-gradient(from ${maskRotationDeg}deg at 50% 50%,` +
-    ` rgba(0,0,0,1) 0deg ${sliceFillDeg}deg, rgba(0,0,0,0) ${sliceFillDeg}deg ${sliceFillDeg + sliceGapDeg}deg)`;
+    ` rgba(0,0,0,1) 0deg ${sliceFillDeg}deg, rgba(0,0,0,1) ${sliceFillDeg}deg ${sliceFillDeg + sliceGapDeg}deg)`;
 
   el.style.transformOrigin = '50% 50%';
   el.style.transform =
@@ -478,7 +478,9 @@ export function playMapScreenExitTransition(
   overlay.appendChild(snapshotEl);
   document.body.appendChild(overlay);
 
+  const fromVisibilityBefore = fromScreenEl.style.visibility;
   fromScreenEl.style.opacity = '1';
+  fromScreenEl.style.visibility = 'hidden';
   toScreenEl.style.opacity = '0';
 
   const startTime = performance.now();
@@ -505,6 +507,7 @@ export function playMapScreenExitTransition(
     } else {
       overlay.remove();
       fromScreenEl.style.opacity = '';
+      fromScreenEl.style.visibility = fromVisibilityBefore;
       toScreenEl.style.opacity = '';
       onComplete();
     }
