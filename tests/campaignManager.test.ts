@@ -78,6 +78,14 @@ function makeCampaign(withMap: boolean): CampaignDef {
   };
 }
 
+function makeCampaignEditorMock(): CampaignEditor {
+  return {
+    getAllCampaigns: () => [],
+    showAndRestore: () => {},
+    hide: () => {},
+  } as unknown as CampaignEditor;
+}
+
 describe('CampaignManager chapter-complete modal navigation button', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -86,7 +94,7 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
 
   it('shows "Campaign Map" and routes there when the campaign has a map', () => {
     const callbacks = makeCallbacks();
-    const manager = new CampaignManager(callbacks, {} as CampaignEditor);
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
     const managerAny = manager as unknown as {
       _activeCampaign: CampaignDef | null;
       _activeCampaignProgress: Set<number>;
@@ -110,7 +118,7 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
   it('keeps "Main Menu" routing when the campaign has no map', () => {
     const showLevelSelect = jest.fn();
     const callbacks = makeCallbacks({ showLevelSelect });
-    const manager = new CampaignManager(callbacks, {} as CampaignEditor);
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
     const managerAny = manager as unknown as {
       _activeCampaign: CampaignDef | null;
       _activeCampaignProgress: Set<number>;
