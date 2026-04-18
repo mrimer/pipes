@@ -382,13 +382,20 @@ export function renderLevelList(
       'color:' + (showMastered || continueActive ? UI_BG : '#888') + ';' +
       'cursor:' + (masteredCanOpenCampaignMap || (!showMastered && continueActive) ? 'pointer' : 'default') + ';' +
       'width:100%;';
+    const withChapterSelectSfx = (cb: () => void) => () => {
+      sfxManager.play(SfxId.ChapterSelect);
+      cb();
+    };
+    const openCampaignMap = onCampaignMapClick
+      ? withChapterSelectSfx(onCampaignMapClick)
+      : undefined;
     if (masteredCanOpenCampaignMap) {
-      continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignMapClick(); });
+      continueBtn.addEventListener('click', openCampaignMap!);
     } else if (!showMastered) {
-      if (campaignHasMap && onCampaignMapClick) {
-        continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onCampaignMapClick(); });
+      if (campaignHasMap && openCampaignMap) {
+        continueBtn.addEventListener('click', openCampaignMap);
       } else if ((campaignHasMap || continueChapterIdx !== null) && onChapterMap) {
-        continueBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onChapterMap(continueChapterIdx ?? 0); });
+        continueBtn.addEventListener('click', withChapterSelectSfx(() => onChapterMap(continueChapterIdx ?? 0)));
       } else if (continueId !== null) {
         continueBtn.addEventListener('click', () => startLevel(continueId));
       }
