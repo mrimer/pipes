@@ -418,6 +418,7 @@ export class CampaignManager {
       return;
     }
 
+    campaignMapScreen.stopAnimLoop();
     this.showChapterMap(chapterIdx, false);
     const chapterMapScreen = this._chapterMapScreen;
     const chapterSnapshot = chapterMapScreen?.captureCanvasSnapshot();
