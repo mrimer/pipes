@@ -69,6 +69,7 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
     if (cc === 'pump') valid.add('pressure');
     if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
     if (cc === 'level') valid.add('levelIdx');
+    if (cc === 'chapter') valid.add('chapterIdx');
   } else if (shape === PipeShape.Cement) {
     valid.add('dryingTime');
   } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {

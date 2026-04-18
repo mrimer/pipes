@@ -88,6 +88,8 @@ export interface ChapterMapCallbacks {
   shouldShowCompletionStatus?(chapter: ChapterDef, displayProgress: Set<number>): boolean;
   /** Optional completion predicate override used by completion-dependent effects (e.g., flow drops). */
   isMapCompleted?(chapter: ChapterDef, displayProgress: Set<number>): boolean;
+  /** Optional mastery predicate override used by mastery visual effects (e.g., edge flowers, gold border). */
+  isMastered?(chapter: ChapterDef, displayProgress: Set<number>): boolean;
   /** Returns the active campaign def, or null. */
   getActiveCampaign?(): CampaignDef | null;
   /** Returns the set of completed chapter IDs. */
@@ -1493,6 +1495,8 @@ export class ChapterMapScreen {
 
   /** Returns true when all levels are completed and all stars have been collected in the chapter. */
   private _isChapterMastered(chapter: ChapterDef, displayProgress: Set<number>): boolean {
+    const callbackValue = this._callbacks.isMastered?.(chapter, displayProgress);
+    if (callbackValue !== undefined) return callbackValue;
     const campaignId = this._callbacks.getActiveCampaignId();
     const chapterLevelStars = loadLevelStars(campaignId ?? undefined);
     const chLevels = chapter.levels;

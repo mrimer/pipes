@@ -1036,15 +1036,20 @@ export class CampaignManager {
     };
 
     const allChaptersMastered = campaign.chapters.every((ch) => this._isCampaignChapterMastered(ch));
-    if (allChaptersMastered && !this._campaignMasteredShown) {
-      this._showCampaignMasterySequence();
-    }
 
-    if (this._campaignMapScreen) {
-      this._campaignMapScreen.playWinAnimation(showModal);
+    const playWinThenModal = () => {
+      if (this._campaignMapScreen) {
+        this._campaignMapScreen.playWinAnimation(showModal);
+      } else {
+        sfxManager.play(SfxId.WinChapter);
+        showModal();
+      }
+    };
+
+    if (allChaptersMastered && !this._campaignMasteredShown) {
+      this._showCampaignMasterySequence(playWinThenModal);
     } else {
-      sfxManager.play(SfxId.WinChapter);
-      showModal();
+      playWinThenModal();
     }
   }
 
@@ -1108,10 +1113,11 @@ export class CampaignManager {
    * Show the full-campaign mastery sequence: play the master-chapter sfx, spawn
    * confetti, and display a golden "Campaign Mastered!" modal with a "Kudos!"
    * button.  Records the sequence as shown so it is never repeated.
+   * Calls {@link onComplete} after the modal is dismissed.
    */
-  private _showCampaignMasterySequence(): void {
+  private _showCampaignMasterySequence(onComplete: () => void = () => {}): void {
     const campaign = this._activeCampaign;
-    if (!campaign) return;
+    if (!campaign) { onComplete(); return; }
 
     this._campaignMasteredShown = true;
     markCampaignMasteredShown(campaign.id);
@@ -1121,6 +1127,7 @@ export class CampaignManager {
 
     const modal = buildCampaignMasteredModal(campaign.name, () => {
       modal.remove();
+      onComplete();
     });
   }
 
