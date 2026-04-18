@@ -31,6 +31,18 @@ export class CampaignMapScreen {
       formatChapterTitle: () => null,
       shouldShowCompletionStatus: () => false,
       isMapCompleted: () => this.isCampaignComplete(),
+      isMastered: () => {
+        const campaign = this._campaign;
+        if (!campaign) return false;
+        const completedLevels = callbacks.getCompletedLevels();
+        const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
+        const allLevelsCompleted = allLevels.every((l) => completedLevels.has(l.id));
+        if (!allLevelsCompleted) return false;
+        const levelStars = loadLevelStars(callbacks.getActiveCampaignId() ?? undefined);
+        const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
+        const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+        return starsTotal === 0 || starsCollected >= starsTotal;
+      },
       formatInstructionText: () => 'Click on an accessible chapter',
       formatStatsText: () => {
         const campaign = this._campaign;

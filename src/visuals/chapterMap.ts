@@ -596,7 +596,19 @@ function _renderChapterMapPass2NonPipeTiles(
           ctx.save();
           ctx.translate(jitterCell!.dx, jitterCell!.dy);
         }
-        drawLevelChamberTile(ctx, x, y, levelDef, levelIdx + 1, connections, isCompleted, stars, totalStars, isFilled, waterScored || undefined);
+        const chamberInfo: MapChamberInfo = {
+          label: String(levelIdx + 1),
+          minimap: levelDef ? { grid: levelDef.grid, rows: levelDef.rows, cols: levelDef.cols } : undefined,
+          stats: {
+            water: waterScored || undefined,
+            stars: totalStars > 0 ? `${stars}/${totalStars}` : undefined,
+            challenge: levelDef?.challenge,
+          },
+          isCompleted,
+          isAccessible: isFilled,
+          bgVariant: levelDef?.challenge ? 'challenge' : totalStars > 0 && stars >= totalStars ? 'gold' : 'default',
+        };
+        drawMapChamberTile(ctx, x, y, TILE_SIZE / 2, chamberInfo, connections, undefined, isFilled);
         if (isJittered) ctx.restore();
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);
