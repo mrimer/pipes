@@ -11,16 +11,14 @@
 
 import { CampaignDef, TileDef, PipeShape, Direction, Rotation, LevelStyle, LevelDef } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
-import { TILE_SIZE, setTileSize, computeTileSize, BASE_TILE_SIZE } from '../renderer';
+import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
-import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 import {
   EditorPalette,
   TileParams,
   DEFAULT_PARAMS,
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
-  MAX_EDITOR_CANVAS_PX,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
   PALETTE_ITEM_SELECTED_BORDER,
@@ -40,6 +38,8 @@ import {
   flipPositionHorizontal,
   flipPositionVertical,
   buildMapTileDef,
+  rotateConnectionsBy90,
+  computeEditorFilledCells,
 } from './types';
 import { validateCampaignMap } from './campaignMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -49,9 +49,10 @@ import { buildStyleSectionPanel } from './tileParamsPanel';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
-import { showTimedMessage } from '../uiHelpers';
-import { canvasPos as computeCanvasPos } from './canvasUtils';
+import { showTimedMessage, updateUndoRedoButtonPair } from '../uiHelpers';
+import { canvasPos as computeCanvasPos, updateMapEditorCanvas } from './canvasUtils';
 import { isTileConnectedToSource } from '../tile';
+import { buildCompletionInputWidget } from './chapterEditorUI';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
 const CHAPTER_CHAMBER_PALETTE: EditorPalette = 'chamber:chapter';
@@ -545,57 +546,7 @@ export class CampaignMapEditorSection {
 
   private _updateCanvasDisplaySize(): void {
     if (!this._canvas) return;
-    const rows = this._editRows;
-    const cols = this._editCols;
-    const BORDER = EDITOR_CANVAS_BORDER;
-    const GAP = 12;
-
-    const mainLayout = this._mainLayout;
-    let newTileSize = computeTileSize(rows, cols);
-    let scale = 1;
-
-    if (mainLayout && mainLayout.clientWidth > 0) {
-      let siblingW = 0;
-      let siblingCount = 0;
-      for (const child of mainLayout.children) {
-        if (!child.contains(this._canvas)) {
-          siblingW += (child as HTMLElement).offsetWidth;
-          siblingCount++;
-        }
-      }
-      const availW = mainLayout.clientWidth - siblingW - siblingCount * GAP - 2 * BORDER;
-
-      let availH = Infinity;
-      let absTop = 0;
-      let el: HTMLElement | null = this._canvas;
-      while (el) {
-        absTop += el.offsetTop;
-        el = el.offsetParent as HTMLElement | null;
-      }
-      if (absTop > 0) {
-        const BOTTOM_MARGIN = 16;
-        availH = window.innerHeight + window.scrollY - absTop - 2 * BORDER - BOTTOM_MARGIN;
-      }
-
-      if (availW > 0 && availH > 0) {
-        const MAX_TILE_SIZE = 128;
-        const fit = Math.floor(Math.min(availW / cols, availH / rows));
-        newTileSize = Math.max(BASE_TILE_SIZE, Math.min(MAX_TILE_SIZE, fit));
-        const intrinsicW = cols * newTileSize;
-        const intrinsicH = rows * newTileSize;
-        scale = Math.min(1, availW / intrinsicW, availH / intrinsicH);
-      }
-    } else {
-      const intrinsicW = cols * newTileSize;
-      const intrinsicH = rows * newTileSize;
-      scale = Math.min(1, MAX_EDITOR_CANVAS_PX / intrinsicW, MAX_EDITOR_CANVAS_PX / intrinsicH);
-    }
-
-    setTileSize(newTileSize);
-    this._canvas.width  = cols * TILE_SIZE;
-    this._canvas.height = rows * TILE_SIZE;
-    this._canvas.style.width  = Math.round(cols * TILE_SIZE * scale) + 'px';
-    this._canvas.style.height = Math.round(rows * TILE_SIZE * scale) + 'px';
+    updateMapEditorCanvas(this._canvas, this._editRows, this._editCols, this._mainLayout);
   }
 
   private _renderCanvas(): void {
@@ -1006,36 +957,15 @@ export class CampaignMapEditorSection {
     if (!isConnectable) return;
     sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
 
-    const allDirs: Direction[] = [Direction.North, Direction.East, Direction.South, Direction.West];
-    const currentConns = new Set(tile.connections ?? allDirs);
-    const newConns = new Set<Direction>();
-    for (const dir of currentConns) {
-      let d = dir;
-      if (clockwise) {
-        switch (d) {
-          case Direction.North: d = Direction.East;  break;
-          case Direction.East:  d = Direction.South; break;
-          case Direction.South: d = Direction.West;  break;
-          case Direction.West:  d = Direction.North; break;
-        }
-      } else {
-        switch (d) {
-          case Direction.North: d = Direction.West;  break;
-          case Direction.West:  d = Direction.South; break;
-          case Direction.South: d = Direction.East;  break;
-          case Direction.East:  d = Direction.North; break;
-        }
-      }
-      newConns.add(d);
-    }
-    tile.connections = [...newConns];
+    const newConns = rotateConnectionsBy90(tile.connections, clockwise);
+    tile.connections = newConns;
 
     if (this._palette === tile.shape) {
       this._params.connections = {
-        N: newConns.has(Direction.North),
-        E: newConns.has(Direction.East),
-        S: newConns.has(Direction.South),
-        W: newConns.has(Direction.West),
+        N: newConns.includes(Direction.North),
+        E: newConns.includes(Direction.East),
+        S: newConns.includes(Direction.South),
+        W: newConns.includes(Direction.West),
       };
     }
 
@@ -1051,12 +981,7 @@ export class CampaignMapEditorSection {
   // ── Private: reachability ──────────────────────────────────────────────────
 
   private _computeFilledCells(): Set<string> {
-    const sourcePos = findMapTile(this._editGrid, this._editRows, this._editCols, PipeShape.Source);
-    if (!sourcePos) return new Set();
-    return computeMapReachable(
-      this._editGrid, this._editRows, this._editCols, sourcePos,
-      (def) => editorTileConns(def),
-    );
+    return computeEditorFilledCells(this._editGrid, this._editRows, this._editCols);
   }
 
   private _clearFocusIfAt(pos: { row: number; col: number }): void {
@@ -1190,10 +1115,7 @@ export class CampaignMapEditorSection {
   }
 
   private _updateUndoRedoButtons(): void {
-    const undoBtn = document.getElementById('campaign-map-undo-btn') as HTMLButtonElement | null;
-    const redoBtn = document.getElementById('campaign-map-redo-btn') as HTMLButtonElement | null;
-    if (undoBtn) { undoBtn.disabled = !this._hist.canUndo; undoBtn.style.opacity = undoBtn.disabled ? '0.4' : '1'; }
-    if (redoBtn) { redoBtn.disabled = !this._hist.canRedo; redoBtn.style.opacity = redoBtn.disabled ? '0.4' : '1'; }
+    updateUndoRedoButtonPair('campaign-map-undo-btn', 'campaign-map-redo-btn', this._hist.canUndo, this._hist.canRedo);
   }
 
   // ── Private: tile params panel widgets ────────────────────────────────────
@@ -1231,7 +1153,7 @@ export class CampaignMapEditorSection {
   }
 
   private _buildSinkCompletionWidget(replaceTarget: HTMLElement, campaign: CampaignDef): HTMLElement {
-    return this._buildCompletionInput(
+    return buildCompletionInputWidget(
       () => this._params.completion,
       (val) => {
         this._params.completion = val;
@@ -1242,7 +1164,7 @@ export class CampaignMapEditorSection {
   }
 
   private _buildFocusedSinkCompletionWidget(replaceTarget: HTMLElement, tile: TileDef, campaign: CampaignDef): HTMLElement {
-    return this._buildCompletionInput(
+    return buildCompletionInputWidget(
       () => tile.completion ?? 0,
       (val) => {
         tile.completion = val > 0 ? val : undefined;
@@ -1252,25 +1174,5 @@ export class CampaignMapEditorSection {
         this._renderCanvas();
       },
     );
-  }
-
-  private _buildCompletionInput(getValue: () => number, setValue: (v: number) => void): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px;';
-    const lbl = document.createElement('div');
-    lbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-    lbl.textContent = 'Completion';
-    wrap.appendChild(lbl);
-    const inp = document.createElement('input');
-    inp.type = 'number'; inp.min = '0'; inp.step = '1'; inp.value = String(getValue());
-    inp.style.cssText =
-      `padding:4px;width:60px;background:${EDITOR_INPUT_BG};color:#eee;border:1px solid #4a90d9;border-radius:${RADIUS_SM};`;
-    inp.addEventListener('change', () => {
-      const v = Math.max(0, Math.round(parseFloat(inp.value) || 0));
-      inp.value = String(v);
-      setValue(v);
-    });
-    wrap.appendChild(inp);
-    return wrap;
   }
 }

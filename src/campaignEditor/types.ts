@@ -7,6 +7,7 @@ import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMB
 import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR } from '../colors';
 import { UI_BG, UI_BORDER } from '../uiConstants';
+import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 
 // ─── Valid field sets for data validation ─────────────────────────────────────
 
@@ -544,6 +545,27 @@ export function rotateDirectionBy90(dir: Direction, clockwise: boolean): Directi
 }
 
 /**
+ * Rotate a Source/Sink/Chamber tile's connection set 90° clockwise or
+ * counter-clockwise.  Returns the new connections as a `Direction[]`.
+ * When `connections` is `undefined`, all four directions are assumed.
+ *
+ * Pure function – contains no class or module state.
+ * Used by both the chapter map editor and the campaign map editor.
+ */
+export function rotateConnectionsBy90(
+  connections: Direction[] | undefined,
+  clockwise: boolean,
+): Direction[] {
+  const allDirs: Direction[] = [Direction.North, Direction.East, Direction.South, Direction.West];
+  const current = new Set(connections ?? allDirs);
+  const rotated = new Set<Direction>();
+  for (const dir of current) {
+    rotated.add(rotateDirectionBy90(dir, clockwise));
+  }
+  return [...rotated];
+}
+
+/**
  * Return a shallow-copy of `tile` with its orientation (rotation/connections)
  * rotated 90° CW or CCW to match a board rotation.
  */
@@ -853,4 +875,22 @@ export function flipPositionVertical(
   oldRows: number,
 ): { row: number; col: number } {
   return { row: oldRows - 1 - pos.row, col: pos.col };
+}
+
+/**
+ * Compute which grid cells are water-reachable from the Source tile for
+ * visual feedback while editing a chapter-map or campaign-map grid.
+ * All chambers and Source/Sink are treated as open (ideal path).
+ *
+ * Pure function – contains no class or module state.
+ * Used by both the chapter map editor and the campaign map editor.
+ */
+export function computeEditorFilledCells(
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+): Set<string> {
+  const sourcePos = findMapTile(grid, rows, cols, PipeShape.Source);
+  if (!sourcePos) return new Set();
+  return computeMapReachable(grid, rows, cols, sourcePos, (def) => editorTileConns(def));
 }

@@ -35,6 +35,23 @@ export function showTimedMessage(
   return setTimeout(() => { element.style.display = 'none'; }, durationMs);
 }
 
+/**
+ * Update the disabled state and visual opacity of a matched undo/redo button
+ * pair.  Both buttons are looked up by their DOM id; missing buttons are
+ * silently ignored so callers do not need to guard for the read-only case.
+ */
+export function updateUndoRedoButtonPair(
+  undoBtnId: string,
+  redoBtnId: string,
+  canUndo: boolean,
+  canRedo: boolean,
+): void {
+  const undoBtn = document.getElementById(undoBtnId) as HTMLButtonElement | null;
+  const redoBtn = document.getElementById(redoBtnId) as HTMLButtonElement | null;
+  if (undoBtn) { undoBtn.disabled = !canUndo;  undoBtn.style.opacity = undoBtn.disabled ? '0.4' : '1'; }
+  if (redoBtn) { redoBtn.disabled = !canRedo;  redoBtn.style.opacity = redoBtn.disabled ? '0.4' : '1'; }
+}
+
 export function createButton(
   label: string,
   bg: string,

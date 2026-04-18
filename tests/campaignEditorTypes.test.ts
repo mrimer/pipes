@@ -591,3 +591,77 @@ describe('buildMapTileDef', () => {
     expect((def as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
   });
 });
+
+// ─── rotateConnectionsBy90 ────────────────────────────────────────────────────
+
+import { rotateConnectionsBy90, computeEditorFilledCells } from '../src/campaignEditor/types';
+import { TileDef } from '../src/types';
+
+describe('rotateConnectionsBy90', () => {
+  it('rotates [East] clockwise to [South]', () => {
+    const result = rotateConnectionsBy90([Direction.East], true);
+    expect(result).toEqual([Direction.South]);
+  });
+
+  it('rotates [North, East] clockwise to [East, South]', () => {
+    const result = new Set(rotateConnectionsBy90([Direction.North, Direction.East], true));
+    expect(result).toEqual(new Set([Direction.East, Direction.South]));
+  });
+
+  it('rotates [East] counter-clockwise to [North]', () => {
+    const result = rotateConnectionsBy90([Direction.East], false);
+    expect(result).toEqual([Direction.North]);
+  });
+
+  it('treats undefined connections as all four directions (rotates in place)', () => {
+    const cw = rotateConnectionsBy90(undefined, true);
+    expect(new Set(cw)).toEqual(new Set([Direction.North, Direction.East, Direction.South, Direction.West]));
+  });
+
+  it('two CW rotations equal 180° (E → W)', () => {
+    const step1 = rotateConnectionsBy90([Direction.East], true);
+    const step2 = rotateConnectionsBy90(step1, true);
+    expect(step2).toEqual([Direction.West]);
+  });
+
+  it('four CW rotations return to origin', () => {
+    const dirs = [Direction.North, Direction.East];
+    let result = [...dirs];
+    for (let i = 0; i < 4; i++) result = rotateConnectionsBy90(result, true);
+    expect(new Set(result)).toEqual(new Set(dirs));
+  });
+});
+
+// ─── computeEditorFilledCells ─────────────────────────────────────────────────
+
+describe('computeEditorFilledCells', () => {
+  it('returns empty set when no source exists', () => {
+    const grid: (TileDef | null)[][] = [[null, null], [null, null]];
+    expect(computeEditorFilledCells(grid, 2, 2).size).toBe(0);
+  });
+
+  it('returns only the source cell when isolated (no pipe connections)', () => {
+    const grid: (TileDef | null)[][] = [
+      [{ shape: PipeShape.Source, connections: [] }, null],
+      [null, null],
+    ];
+    const filled = computeEditorFilledCells(grid, 2, 2);
+    // Source with no connections reaches itself only
+    expect(filled.has('0,0')).toBe(true);
+    expect(filled.size).toBe(1);
+  });
+
+  it('propagates through a connected straight pipe to reach sink', () => {
+    // Source(E) — Straight(0°=N/S rotated 90°=E/W) — Sink(W)
+    const straight: TileDef = { shape: PipeShape.Straight, rotation: 90 };
+    const grid: (TileDef | null)[][] = [[
+      { shape: PipeShape.Source, connections: [Direction.East] },
+      straight,
+      { shape: PipeShape.Sink, connections: [Direction.West] },
+    ]];
+    const filled = computeEditorFilledCells(grid, 1, 3);
+    expect(filled.has('0,0')).toBe(true);
+    expect(filled.has('0,1')).toBe(true);
+    expect(filled.has('0,2')).toBe(true);
+  });
+});

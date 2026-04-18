@@ -5,16 +5,14 @@
 
 import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, Rotation, LevelStyle } from '../types';
 import { PIPE_SHAPES, isEmptyFloor } from '../board';
-import { TILE_SIZE, setTileSize, computeTileSize, BASE_TILE_SIZE } from '../renderer';
+import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
-import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 import {
   EditorPalette,
   TileParams,
   DEFAULT_PARAMS,
   EditorSnapshot,
   EDITOR_CANVAS_BORDER,
-  MAX_EDITOR_CANVAS_PX,
   rotateGridBy90,
   rotatePositionBy90,
   reflectGridAboutDiagonal,
@@ -24,6 +22,8 @@ import {
   flipPositionHorizontal,
   flipPositionVertical,
   buildMapTileDef,
+  rotateConnectionsBy90,
+  computeEditorFilledCells,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
@@ -32,7 +32,8 @@ import { sfxManager, SfxId } from '../sfxManager';
 import { resizeGrid, slideGrid, hasShapeElsewhere } from './gridUtils';
 import { HistoryManager } from './historyManager';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
-import { showTimedMessage } from '../uiHelpers';
+import { showTimedMessage, updateUndoRedoButtonPair } from '../uiHelpers';
+import { updateMapEditorCanvas } from './canvasUtils';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -432,65 +433,12 @@ export class ChapterMapEditorSection {
   /** Update the chapter canvas display size and intrinsic tile size to fill the available space. */
   private _updateChapterCanvasDisplaySize(): void {
     if (!this._chapterCanvas) return;
-    const rows = this._chapterEditRows;
-    const cols = this._chapterEditCols;
-    const BORDER = EDITOR_CANVAS_BORDER;
-    const GAP = 12; // flex gap between columns in the main layout
-
-    const mainLayout = this._chapterEditorMainLayout;
-    let newTileSize = computeTileSize(rows, cols); // window-based fallback
-    let scale = 1;
-
-    if (mainLayout && mainLayout.clientWidth > 0) {
-      // Compute available width in the mid column by subtracting sibling widths and gaps.
-      let siblingW = 0;
-      let siblingCount = 0;
-      for (const child of mainLayout.children) {
-        if (!child.contains(this._chapterCanvas)) {
-          siblingW += (child as HTMLElement).offsetWidth;
-          siblingCount++;
-        }
-      }
-      const availW = mainLayout.clientWidth - siblingW - siblingCount * GAP - 2 * BORDER;
-
-      // Compute available height based on the canvas's position in the viewport.
-      let availH = Infinity;
-      let absTop = 0;
-      let el: HTMLElement | null = this._chapterCanvas;
-      while (el) {
-        absTop += el.offsetTop;
-        el = el.offsetParent as HTMLElement | null;
-      }
-      if (absTop > 0) {
-        const BOTTOM_MARGIN = 16;
-        availH = window.innerHeight + window.scrollY - absTop - 2 * BORDER - BOTTOM_MARGIN;
-      }
-
-      if (availW > 0 && availH > 0) {
-        // Choose the largest whole-pixel tile size that fits, capped at MAX_TILE_SIZE and
-        // floored at BASE_TILE_SIZE.  This fills the available space without
-        // exceeding the parent box dimensions.
-        const MAX_TILE_SIZE = 128;
-        const fit = Math.floor(Math.min(availW / cols, availH / rows));
-        newTileSize = Math.max(BASE_TILE_SIZE, Math.min(MAX_TILE_SIZE, fit));
-        // Scale down only if the container is narrower than BASE_TILE_SIZE per tile.
-        const intrinsicW = cols * newTileSize;
-        const intrinsicH = rows * newTileSize;
-        scale = Math.min(1, availW / intrinsicW, availH / intrinsicH);
-      }
-    } else {
-      // Layout not yet in the DOM – fall back to a CSS scale-down relative to
-      // the maximum editor canvas size.
-      const intrinsicW = cols * newTileSize;
-      const intrinsicH = rows * newTileSize;
-      scale = Math.min(1, MAX_EDITOR_CANVAS_PX / intrinsicW, MAX_EDITOR_CANVAS_PX / intrinsicH);
-    }
-
-    setTileSize(newTileSize);
-    this._chapterCanvas.width  = cols * TILE_SIZE;
-    this._chapterCanvas.height = rows * TILE_SIZE;
-    this._chapterCanvas.style.width  = Math.round(cols * TILE_SIZE * scale) + 'px';
-    this._chapterCanvas.style.height = Math.round(rows * TILE_SIZE * scale) + 'px';
+    updateMapEditorCanvas(
+      this._chapterCanvas,
+      this._chapterEditRows,
+      this._chapterEditCols,
+      this._chapterEditorMainLayout,
+    );
   }
 
   /** Render the chapter map editor canvas. */
@@ -588,21 +536,9 @@ export class ChapterMapEditorSection {
 
   /**
    * Compute which cells are water-reachable from the source in the editor grid.
-   * For rendering purposes, all chambers and source/sink are treated as open
-   * (water flows through unconditionally, simulating an ideal path).
    */
   private _computeChapterEditorFilledCells(): Set<string> {
-    const sourcePos = findMapTile(
-      this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols, PipeShape.Source);
-    if (!sourcePos) return new Set();
-
-    return computeMapReachable(
-      this._chapterEditGrid,
-      this._chapterEditRows,
-      this._chapterEditCols,
-      sourcePos,
-      (def) => editorTileConns(def),
-    );
+    return computeEditorFilledCells(this._chapterEditGrid, this._chapterEditRows, this._chapterEditCols);
   }
 
   /** Clear the focus tile if it matches the given position. */
@@ -668,41 +604,16 @@ export class ChapterMapEditorSection {
     if (!isConnectable) return;
     sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
 
-    const allDirs: Direction[] = [Direction.North, Direction.East, Direction.South, Direction.West];
-    const currentConns = new Set(tile.connections ?? allDirs);
-
-    // Rotate each connection direction CW or CCW
-    const newConns = new Set<Direction>();
-    for (const dir of currentConns) {
-      let d = dir;
-      if (clockwise) {
-        // CW: N→E→S→W→N
-        switch (d) {
-          case Direction.North: d = Direction.East;  break;
-          case Direction.East:  d = Direction.South; break;
-          case Direction.South: d = Direction.West;  break;
-          case Direction.West:  d = Direction.North; break;
-        }
-      } else {
-        // CCW: N→W→S→E→N
-        switch (d) {
-          case Direction.North: d = Direction.West;  break;
-          case Direction.West:  d = Direction.South; break;
-          case Direction.South: d = Direction.East;  break;
-          case Direction.East:  d = Direction.North; break;
-        }
-      }
-      newConns.add(d);
-    }
-    tile.connections = [...newConns];
+    const newConns = rotateConnectionsBy90(tile.connections, clockwise);
+    tile.connections = newConns;
 
     // Sync palette params when the palette matches the tile shape
     if (this._chapterPalette === tile.shape) {
       this._chapterParams.connections = {
-        N: newConns.has(Direction.North),
-        E: newConns.has(Direction.East),
-        S: newConns.has(Direction.South),
-        W: newConns.has(Direction.West),
+        N: newConns.includes(Direction.North),
+        E: newConns.includes(Direction.East),
+        S: newConns.includes(Direction.South),
+        W: newConns.includes(Direction.West),
       };
     }
 
@@ -821,16 +732,7 @@ export class ChapterMapEditorSection {
   }
 
   private _updateChapterUndoRedoButtons(): void {
-    const undoBtn = document.getElementById('chapter-undo-btn') as HTMLButtonElement | null;
-    const redoBtn = document.getElementById('chapter-redo-btn') as HTMLButtonElement | null;
-    if (undoBtn) {
-      undoBtn.disabled = !this._chapterHist.canUndo;
-      undoBtn.style.opacity = undoBtn.disabled ? '0.4' : '1';
-    }
-    if (redoBtn) {
-      redoBtn.disabled = !this._chapterHist.canRedo;
-      redoBtn.style.opacity = redoBtn.disabled ? '0.4' : '1';
-    }
+    updateUndoRedoButtonPair('chapter-undo-btn', 'chapter-redo-btn', this._chapterHist.canUndo, this._chapterHist.canRedo);
   }
 
   /** Resize the chapter grid. */
