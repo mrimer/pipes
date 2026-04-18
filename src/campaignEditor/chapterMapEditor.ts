@@ -23,6 +23,7 @@ import {
   flipGridVertical,
   flipPositionHorizontal,
   flipPositionVertical,
+  buildMapTileDef,
 } from './types';
 import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
 import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
@@ -115,7 +116,7 @@ export class ChapterMapEditorSection {
       const cols = ChapterMapEditorSection.CHAPTER_DEFAULT_COLS;
       const grid: (TileDef | null)[][] = Array.from({ length: rows }, () => Array(cols).fill(null) as null[]);
       // Source at [1, 0] with connection to the right
-      grid[1][0] = { shape: PipeShape.Source, capacity: 10, connections: [Direction.East] };
+      grid[1][0] = { shape: PipeShape.Source, connections: [Direction.East] };
       // Sink at [1, 5] with connection to the left
       grid[1][cols - 1] = { shape: PipeShape.Sink, connections: [Direction.West] };
       this._chapterEditRows = rows;
@@ -567,32 +568,7 @@ export class ChapterMapEditorSection {
 
   /** Build a TileDef from the current chapter palette selection and params. */
   private _buildChapterTileDef(): TileDef {
-    if (this._chapterPalette === 'erase') return { shape: PipeShape.Empty };
-    if (this._chapterPalette === PipeShape.EmptyDirt) return { shape: PipeShape.EmptyDirt };
-    if (this._chapterPalette === PipeShape.EmptyDark) return { shape: PipeShape.EmptyDark };
-    if (this._chapterPalette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
-    if (this._chapterPalette === PipeShape.Empty) return { shape: PipeShape.Empty };
-    const p = this._chapterParams;
-    const shape = this._chapterPalette as PipeShape;
-    const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
-    if (needsConn) {
-      const connDirs: Direction[] = [];
-      if (p.connections.N) connDirs.push(Direction.North);
-      if (p.connections.E) connDirs.push(Direction.East);
-      if (p.connections.S) connDirs.push(Direction.South);
-      if (p.connections.W) connDirs.push(Direction.West);
-      const def: TileDef = { shape };
-      // Sink can have an optional completion threshold; Source no longer uses capacity on chapter maps
-      if (shape === PipeShape.Sink && p.completion > 0) def.completion = p.completion;
-      if (connDirs.length < 4) def.connections = connDirs;
-      return def;
-    }
-    // Tree, Granite, Sea, and other shapes with no special params
-    if (shape === PipeShape.Tree || shape === PipeShape.Granite || shape === PipeShape.Sea) {
-      return { shape };
-    }
-    // Pipe shapes
-    return { shape, rotation: p.rotation };
+    return buildMapTileDef(this._chapterPalette, this._chapterParams);
   }
 
   private _chapterHasSourceElsewhere(exceptPos?: { row: number; col: number }): boolean {
@@ -747,8 +723,23 @@ export class ChapterMapEditorSection {
   handleChapterEditorKeyDown(e: KeyboardEvent): void {
     const tag = (e.target as HTMLElement | null)?.tagName ?? '';
     const isInputFocused = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-    if (e.ctrlKey || e.altKey || isInputFocused) return;
+    if (e.altKey || isInputFocused) return;
     const key = e.key.toLowerCase();
+    if (e.ctrlKey) {
+      if (key === 'z') {
+        e.preventDefault();
+        const campaign = this._callbacks.getActiveCampaign();
+        const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
+        if (campaign && chapter) this._chapterUndo(campaign, chapter);
+      }
+      if (key === 'y') {
+        e.preventDefault();
+        const campaign = this._callbacks.getActiveCampaign();
+        const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
+        if (campaign && chapter) this._chapterRedo(campaign, chapter);
+      }
+      return;
+    }
     if (key === 'q' || key === 'w') {
       e.preventDefault();
       const clockwise = key === 'w';

@@ -782,7 +782,7 @@ describe('CampaignService – scanData', () => {
     expect(issues.get('Level')?.has('style') ?? false).toBe(false);
   });
 
-  it('does not flag map Source.capacity or map pipe rotation as unrecognized', () => {
+  it('does not flag campaign map Source.capacity or map pipe rotation as unrecognized', () => {
     const campaign = campaignWithChapter();
     campaign.rows = 1;
     campaign.cols = 2;
@@ -790,6 +790,15 @@ describe('CampaignService – scanData', () => {
       { shape: PipeShape.Source, capacity: 10 },
       { shape: PipeShape.Cross, rotation: 90 },
     ]];
+
+    const svc = new CampaignService([campaign]);
+    const issues = svc.scanData(campaign, true);
+    expect(issues.get('CampaignMapTile')?.has('capacity') ?? false).toBe(false);
+    expect(issues.get('CampaignMapTile')?.has('rotation') ?? false).toBe(false);
+  });
+
+  it('flags and strips chapter map Source.capacity (unused field)', () => {
+    const campaign = campaignWithChapter();
     campaign.chapters[0].rows = 1;
     campaign.chapters[0].cols = 2;
     campaign.chapters[0].grid = [[
@@ -798,10 +807,15 @@ describe('CampaignService – scanData', () => {
     ]];
 
     const svc = new CampaignService([campaign]);
+
+    // dry-run: capacity should be detected as an unrecognized field
     const issues = svc.scanData(campaign, true);
-    expect(issues.get('CampaignMapTile')?.has('capacity') ?? false).toBe(false);
-    expect(issues.get('CampaignMapTile')?.has('rotation') ?? false).toBe(false);
-    expect(issues.get('ChapterMapTile')?.has('capacity') ?? false).toBe(false);
+    expect(issues.get('ChapterMapTile')?.has('capacity') ?? false).toBe(true);
+    // rotation is still valid (compat with saved editor output)
     expect(issues.get('ChapterMapTile')?.has('rotation') ?? false).toBe(false);
+
+    // non-dry-run: capacity should be stripped from the tile
+    svc.scanData(campaign, false);
+    expect((campaign.chapters[0].grid![0][0] as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
   });
 });
