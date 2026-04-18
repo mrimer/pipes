@@ -5,6 +5,7 @@
 import { CampaignManager, CampaignCallbacks } from '../src/campaignManager';
 import { CampaignEditor } from '../src/campaignEditor';
 import { CampaignDef, PipeShape } from '../src/types';
+import * as levelTransition from '../src/levelTransition';
 
 jest.mock('../src/visuals/confetti', () => ({
   spawnConfetti: (onComplete?: () => void) => { if (onComplete) onComplete(); },
@@ -137,5 +138,51 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
     button!.click();
     expect(showLevelSelect).toHaveBeenCalledTimes(1);
     expect(showCampaignMapSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('CampaignManager campaign-map exit transition', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    jest.restoreAllMocks();
+  });
+
+  it('falls back to showLevelSelect when campaign map screen is unavailable', () => {
+    const showLevelSelect = jest.fn();
+    const callbacks = makeCallbacks({ showLevelSelect });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const swirlSpy = jest.spyOn(levelTransition, 'playSwirlScreenTransition');
+
+    (manager as unknown as { _exitCampaignMapToMainScreen(): void })._exitCampaignMapToMainScreen();
+
+    expect(showLevelSelect).toHaveBeenCalledTimes(1);
+    expect(swirlSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses swirl transition when exiting from a visible campaign map screen', () => {
+    const showLevelSelect = jest.fn(() => {
+      // Mimic main-screen show behavior.
+      callbacks.levelSelectEl.style.display = 'flex';
+    });
+    const callbacks = makeCallbacks({ showLevelSelect });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const swirlSpy = jest.spyOn(levelTransition, 'playSwirlScreenTransition')
+      .mockImplementation((fromScreenEl, showDestination, onComplete) => {
+        expect(fromScreenEl).toBe((manager as unknown as { _campaignMapScreen?: { screenEl: HTMLElement } })._campaignMapScreen?.screenEl);
+        const toEl = showDestination();
+        expect(toEl).toBe(callbacks.levelSelectEl);
+        onComplete();
+      });
+
+    manager.activate(campaign);
+    manager.showCampaignMap();
+    showLevelSelect.mockClear();
+
+    (manager as unknown as { _exitCampaignMapToMainScreen(): void })._exitCampaignMapToMainScreen();
+
+    expect(swirlSpy).toHaveBeenCalledTimes(1);
+    expect(showLevelSelect).toHaveBeenCalledTimes(1);
   });
 });
