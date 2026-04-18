@@ -245,28 +245,28 @@ export class CampaignManager {
             this._ensureCampaignMapScreen();
             this.reshowCampaignMap();
             const campaignMapScreen = this._campaignMapScreen;
-            const minimapRect = chapterIdx >= 0
-              ? (campaignMapScreen?.getMinimapScreenRect(chapterIdx) ?? null)
+            const minimapRect = chapterIdx >= 0 && campaignMapScreen
+              ? campaignMapScreen.getMinimapScreenRect(chapterIdx)
               : null;
-            if (campaignMapScreen && chapterSnapshot && minimapRect) {
-              const chapterEl = chapterMapScreen.screenEl;
-              const campaignEl = campaignMapScreen.screenEl;
-              chapterEl.style.overflow = 'hidden';
-              campaignEl.style.overflow = 'hidden';
-              playMapScreenExitTransition(
-                minimapRect,
-                chapterSnapshot,
-                chapterEl,
-                campaignEl,
-                () => {
-                  chapterEl.style.overflow = '';
-                  campaignEl.style.overflow = '';
-                  chapterMapScreen.hide();
-                },
-              );
-            } else {
+            if (!campaignMapScreen || !chapterSnapshot || !minimapRect) {
               chapterMapScreen.hide();
+              return;
             }
+            const chapterEl = chapterMapScreen.screenEl;
+            const campaignEl = campaignMapScreen.screenEl;
+            chapterEl.style.overflow = 'hidden';
+            campaignEl.style.overflow = 'hidden';
+            playMapScreenExitTransition(
+              minimapRect,
+              chapterSnapshot,
+              chapterEl,
+              campaignEl,
+              () => {
+                chapterEl.style.overflow = '';
+                campaignEl.style.overflow = '';
+                chapterMapScreen.hide();
+              },
+            );
           } else {
             this._callbacks.showLevelSelect();
           }
