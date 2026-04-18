@@ -36,6 +36,13 @@ export const MAP_VIEW_MAX_COLS = 12;
 /** Maximum number of tile rows displayed in the map view window. */
 export const MAP_VIEW_MAX_ROWS = 9;
 
+export function clampPanAxisWithFallback(current: number, preferredMin: number, preferredMax: number): number {
+  if (preferredMin <= preferredMax) {
+    return Math.max(preferredMin, Math.min(preferredMax, current));
+  }
+  return Math.max(preferredMax, Math.min(preferredMin, current));
+}
+
 // ─── Layout overhead constants ────────────────────────────────────────────────
 // Estimated heights of UI elements that appear above/below the chapter map
 // canvas, used to compute the vertical overhead passed to computeTileSize so
@@ -1188,15 +1195,8 @@ export abstract class MapScreenBase {
     const bboxMinY = Math.max(0, (rMin - 1) * TILE_SIZE);
     const bboxMaxY = Math.min(maxPanY, (rMax + 2 - viewRows) * TILE_SIZE);
 
-    this._panPixelX = this._clampPanAxis(this._panPixelX, bboxMinX, bboxMaxX);
-    this._panPixelY = this._clampPanAxis(this._panPixelY, bboxMinY, bboxMaxY);
-  }
-
-  private _clampPanAxis(current: number, preferredMin: number, preferredMax: number): number {
-    if (preferredMin <= preferredMax) {
-      return Math.max(preferredMin, Math.min(preferredMax, current));
-    }
-    return Math.max(preferredMax, Math.min(preferredMin, current));
+    this._panPixelX = clampPanAxisWithFallback(this._panPixelX, bboxMinX, bboxMaxX);
+    this._panPixelY = clampPanAxisWithFallback(this._panPixelY, bboxMinY, bboxMaxY);
   }
 
   /**
