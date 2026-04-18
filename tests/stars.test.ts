@@ -519,6 +519,48 @@ describe('renderLevelList – campaign totals denominator gating', () => {
   });
 });
 
+describe('renderLevelList – mastered campaign continue button', () => {
+  let container: HTMLElement;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  it('keeps the "🏆 Mastered!" button clickable and routes it to Campaign Map', () => {
+    const chapters = [{ id: 1, name: 'Ch1', levels: [makeLevel(1, 1)] }];
+    const completed = new Set<number>([1]);
+    const levelStars: Record<number, number> = { 1: 1 };
+    const onCampaignMapClick = jest.fn();
+
+    renderLevelList(
+      container,
+      completed,
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      () => {},
+      { name: 'Mastered Campaign', author: 'Tester', completionPct: 100 },
+      chapters,
+      levelStars,
+      {},
+      () => {},
+      new Set<number>(),
+      undefined,
+      undefined,
+      true,
+      onCampaignMapClick,
+    );
+
+    const masteredBtn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((btn) => btn.textContent === '🏆 Mastered!');
+    expect(masteredBtn).not.toBeUndefined();
+    masteredBtn!.click();
+    expect(onCampaignMapClick).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ─── renderLevelList – no-campaign message and Select a Level header ──────────
 
 describe('renderLevelList – no-campaign / campaign header', () => {

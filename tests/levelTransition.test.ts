@@ -56,6 +56,7 @@ describe('playSwirlScreenTransition', () => {
 
     const blocker = document.body.querySelector<HTMLElement>('[data-transition-blocker="true"]');
     expect(blocker).not.toBeNull();
+    expect(blocker?.style.background).toBe('transparent');
 
     flushAllRaf();
 

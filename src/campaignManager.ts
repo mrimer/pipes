@@ -1199,9 +1199,17 @@ export class CampaignManager {
     remainBtn.addEventListener('click', () => { modal.remove(); });
 
     const menuBtn = document.createElement('button');
-    menuBtn.textContent = 'Main Menu';
+    const hasCampaignMap = !!campaign.grid;
+    menuBtn.textContent = hasCampaignMap ? 'Campaign Map' : 'Main Menu';
     menuBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#aaa;`;
-    menuBtn.addEventListener('click', () => { modal.remove(); this._callbacks.showLevelSelect(); });
+    menuBtn.addEventListener('click', () => {
+      modal.remove();
+      if (hasCampaignMap) {
+        this.showCampaignMap();
+      } else {
+        this._callbacks.showLevelSelect();
+      }
+    });
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;margin-top:16px;gap:8px;';

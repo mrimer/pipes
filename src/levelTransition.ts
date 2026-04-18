@@ -594,7 +594,7 @@ export function playSwirlScreenTransition(
 ): void {
   const blocker = document.createElement('div');
   blocker.dataset.transitionBlocker = 'true';
-  blocker.style.cssText = 'position:fixed;inset:0;z-index:400;background:#000;pointer-events:auto;';
+  blocker.style.cssText = 'position:fixed;inset:0;z-index:400;background:transparent;pointer-events:auto;';
   document.body.appendChild(blocker);
 
   const fromSnapshot = captureTransitionStyles(fromScreenEl);
