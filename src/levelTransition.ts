@@ -21,6 +21,27 @@ const GAME_CANVAS_BORDER_COLOR = '#4a90d9';
 const TRANSITION_DURATION_MS = 1000;
 /** Duration of each swirl phase in milliseconds. */
 const SWIRL_PHASE_DURATION_MS = 500;
+/** Fallback frame delay (ms) when requestAnimationFrame callbacks are unavailable. */
+const SWIRL_FRAME_FALLBACK_MS = 16;
+const SWIRL_ROTATION_FORWARD_DEG = 1080;
+const SWIRL_ROTATION_REVERSE_DEG = 960;
+const SWIRL_MAX_SKEW_DEG = 30;
+const SWIRL_STRETCH_X_FACTOR = 0.7;
+const SWIRL_STRETCH_Y_FACTOR = 0.45;
+const SWIRL_TRANSLATE_Y_PX = -18;
+const SWIRL_MASK_GAP_BASE_DEG = 8;
+const SWIRL_MASK_GAP_RANGE_DEG = 32;
+const SWIRL_MASK_FILL_MIN_DEG = 5;
+const SWIRL_MASK_FILL_BASE_DEG = 28;
+const SWIRL_MASK_FILL_RANGE_DEG = 14;
+const SWIRL_MASK_ROTATION_DEG = 1260;
+const SWIRL_MASK_SCALE_X_RANGE = 260;
+const SWIRL_MASK_SCALE_Y_RANGE = 80;
+const SWIRL_BLUR_MAX_PX = 1.4;
+const SWIRL_SATURATION_REDUCTION = 0.7;
+const SWIRL_CONTRAST_INCREASE = 0.45;
+const SWIRL_WILL_CHANGE_PROPS =
+  'transform,opacity,filter,mask-image,mask-size,-webkit-mask-image,-webkit-mask-size';
 
 /** Screen-space rectangle (CSS pixels, relative to the viewport). */
 export interface ScreenRect {
@@ -99,18 +120,20 @@ function applySwirlFrame(el: HTMLElement, rawT: number, reverse: boolean): void 
   const t = easeInOutQuad(rawT);
   const collapse = reverse ? 1 - t : t;
   const scale = Math.max(0.002, 1 - 0.985 * collapse);
-  const rotateDeg = reverse ? 960 * collapse : 1080 * collapse;
-  const skewDeg = 30 * collapse;
-  const stretchX = 1 + 0.7 * collapse;
-  const stretchY = 1 - 0.45 * collapse;
-  const translateY = -18 * collapse;
+  const rotateDeg = reverse
+    ? SWIRL_ROTATION_REVERSE_DEG * collapse
+    : SWIRL_ROTATION_FORWARD_DEG * collapse;
+  const skewDeg = SWIRL_MAX_SKEW_DEG * collapse;
+  const stretchX = 1 + SWIRL_STRETCH_X_FACTOR * collapse;
+  const stretchY = 1 - SWIRL_STRETCH_Y_FACTOR * collapse;
+  const translateY = SWIRL_TRANSLATE_Y_PX * collapse;
   const opacity = reverse ? t : 1 - t;
 
-  const sliceGapDeg = 8 + 32 * collapse;
-  const sliceFillDeg = Math.max(5, 28 - 14 * collapse);
-  const maskRotationDeg = 1260 * collapse;
-  const maskScaleX = 100 + 260 * collapse;
-  const maskScaleY = 100 + 80 * collapse;
+  const sliceGapDeg = SWIRL_MASK_GAP_BASE_DEG + SWIRL_MASK_GAP_RANGE_DEG * collapse;
+  const sliceFillDeg = Math.max(SWIRL_MASK_FILL_MIN_DEG, SWIRL_MASK_FILL_BASE_DEG - SWIRL_MASK_FILL_RANGE_DEG * collapse);
+  const maskRotationDeg = SWIRL_MASK_ROTATION_DEG * collapse;
+  const maskScaleX = 100 + SWIRL_MASK_SCALE_X_RANGE * collapse;
+  const maskScaleY = 100 + SWIRL_MASK_SCALE_Y_RANGE * collapse;
   const swirlMask = `repeating-conic-gradient(from ${maskRotationDeg}deg at 50% 50%,` +
     ` rgba(0,0,0,1) 0deg ${sliceFillDeg}deg, rgba(0,0,0,0) ${sliceFillDeg}deg ${sliceFillDeg + sliceGapDeg}deg)`;
 
@@ -119,7 +142,10 @@ function applySwirlFrame(el: HTMLElement, rawT: number, reverse: boolean): void 
     `translate3d(0, ${translateY}px, 0) rotate(${rotateDeg}deg) ` +
     `skew(${skewDeg}deg, ${-skewDeg * 0.5}deg) scale(${scale * stretchX}, ${scale * stretchY})`;
   el.style.opacity = `${opacity}`;
-  el.style.filter = `blur(${1.4 * collapse}px) saturate(${1 - 0.7 * collapse}) contrast(${1 + 0.45 * collapse})`;
+  el.style.filter =
+    `blur(${SWIRL_BLUR_MAX_PX * collapse}px) ` +
+    `saturate(${1 - SWIRL_SATURATION_REDUCTION * collapse}) ` +
+    `contrast(${1 + SWIRL_CONTRAST_INCREASE * collapse})`;
   el.style.maskImage = swirlMask;
   el.style.webkitMaskImage = swirlMask;
   el.style.maskSize = `${maskScaleX}% ${maskScaleY}%`;
@@ -134,16 +160,17 @@ function runSwirlPhase(
   const startTime = performance.now();
   const scheduleFrame = (cb: () => void): void => {
     let fired = false;
+    const timeoutId = setTimeout(() => {
+      if (fired) return;
+      fired = true;
+      cb();
+    }, SWIRL_FRAME_FALLBACK_MS);
     requestAnimationFrame(() => {
       if (fired) return;
       fired = true;
+      clearTimeout(timeoutId);
       cb();
     });
-    setTimeout(() => {
-      if (fired) return;
-      fired = true;
-      cb();
-    }, 16);
   };
   const tick = (): void => {
     const elapsed = performance.now() - startTime;
@@ -571,7 +598,7 @@ export function playSwirlScreenTransition(
   document.body.appendChild(blocker);
 
   const fromSnapshot = captureTransitionStyles(fromScreenEl);
-  fromScreenEl.style.willChange = 'transform,opacity,filter,mask-image,mask-size,-webkit-mask-image,-webkit-mask-size';
+  fromScreenEl.style.willChange = SWIRL_WILL_CHANGE_PROPS;
 
   runSwirlPhase(fromScreenEl, false, () => {
     restoreTransitionStyles(fromScreenEl, fromSnapshot);
@@ -585,7 +612,7 @@ export function playSwirlScreenTransition(
 
     const toSnapshot = captureTransitionStyles(toScreenEl);
     toScreenEl.style.visibility = 'hidden';
-    toScreenEl.style.willChange = 'transform,opacity,filter,mask-image,mask-size,-webkit-mask-image,-webkit-mask-size';
+    toScreenEl.style.willChange = SWIRL_WILL_CHANGE_PROPS;
     applySwirlFrame(toScreenEl, 0, true);
 
     requestAnimationFrame(() => {
