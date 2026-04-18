@@ -119,6 +119,10 @@ export class CampaignMapScreen {
     return this._inner.captureCanvasSnapshot();
   }
 
+  stopAnimLoop(): void {
+    this._inner.stopAnimLoop();
+  }
+
   getMinimapScreenRect(chapterIdx: number): { x: number; y: number; width: number; height: number } | null {
     const levelDef = this._pseudoLevels[chapterIdx];
     if (!levelDef) return null;

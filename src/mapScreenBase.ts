@@ -553,6 +553,14 @@ export abstract class MapScreenBase {
     }
   }
 
+  /** Stop the animation loop without hiding the screen element. */
+  stopAnimLoop(): void {
+    if (this._animFrameId !== null) {
+      cancelAnimationFrame(this._animFrameId);
+      this._animFrameId = null;
+    }
+  }
+
   /**
    * Rebuild the screen content without changing visibility.
    * Used when returning to the chapter map after winning a level (the screen
