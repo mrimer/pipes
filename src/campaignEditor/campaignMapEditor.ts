@@ -604,6 +604,25 @@ export class CampaignMapEditorSection extends MapEditorBase {
     };
   }
 
+  private _advancePanDrag(
+    drag: { startClientX: number; startClientY: number; startPanX: number; startPanY: number; moved: boolean },
+    e: MouseEvent,
+  ): boolean {
+    const dx = e.clientX - drag.startClientX;
+    const dy = e.clientY - drag.startClientY;
+    if (!drag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      drag.moved = true;
+    }
+    if (!drag.moved) return false;
+    const scale = this._canvasScale();
+    if (scale) {
+      this._panPixelX = drag.startPanX - dx * scale.scaleX;
+      this._panPixelY = drag.startPanY - dy * scale.scaleY;
+    }
+    this._clampPan();
+    return true;
+  }
+
   private _renderCampaignCanvas(): void {
     const ctx = this._ctx;
     if (!ctx) return;
@@ -928,42 +947,16 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
   private _onMouseMove(e: MouseEvent): void {
     // Handle pan drag (middle-mouse).
-    if (this._panDrag) {
-      const dx = e.clientX - this._panDrag.startClientX;
-      const dy = e.clientY - this._panDrag.startClientY;
-      if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-        this._panDrag.moved = true;
-      }
-      if (this._panDrag.moved) {
-        const scale = this._canvasScale();
-        if (scale) {
-          this._panPixelX = this._panDrag.startPanX - dx * scale.scaleX;
-          this._panPixelY = this._panDrag.startPanY - dy * scale.scaleY;
-        }
-        this._clampPan();
-        this._renderCanvas();
-        return;
-      }
+    if (this._panDrag && this._advancePanDrag(this._panDrag, e)) {
+      this._renderCanvas();
+      return;
     }
 
-    if (this._leftPanCandidate && this._dragState) {
-      const dx = e.clientX - this._leftPanCandidate.startClientX;
-      const dy = e.clientY - this._leftPanCandidate.startClientY;
-      if (!this._leftPanCandidate.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-        this._leftPanCandidate.moved = true;
-      }
-      if (this._leftPanCandidate.moved) {
-        const scale = this._canvasScale();
-        if (scale) {
-          this._panPixelX = this._leftPanCandidate.startPanX - dx * scale.scaleX;
-          this._panPixelY = this._leftPanCandidate.startPanY - dy * scale.scaleY;
-        }
-        this._clampPan();
-        this._dragState = null;
-        this._hover = null;
-        this._renderCanvas();
-        return;
-      }
+    if (this._leftPanCandidate && this._dragState && this._advancePanDrag(this._leftPanCandidate, e)) {
+      this._dragState = null;
+      this._hover = null;
+      this._renderCanvas();
+      return;
     }
 
     const pos = this._canvasPos(e);

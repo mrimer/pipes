@@ -36,6 +36,14 @@ export const MAP_VIEW_MAX_COLS = 12;
 /** Maximum number of tile rows displayed in the map view window. */
 export const MAP_VIEW_MAX_ROWS = 9;
 
+/**
+ * Clamp one pan axis to a preferred range, including the "inverted range"
+ * case where preferredMin > preferredMax (e.g. viewport larger than the
+ * one-tile connected-bounds margin).
+ *
+ * In that inverted case we clamp to the overlap interval [preferredMax, preferredMin]
+ * so panning still stays constrained instead of becoming unbounded.
+ */
 export function clampPanAxisWithFallback(current: number, preferredMin: number, preferredMax: number): number {
   if (preferredMin <= preferredMax) {
     return Math.max(preferredMin, Math.min(preferredMax, current));
