@@ -32,6 +32,7 @@ import {
   buildMapTileDef,
   rotateConnectionsBy90,
   computeEditorFilledCells,
+  CAMPAIGN_MAP_MAX_DIM,
 } from './types';
 import { validateCampaignMap } from './campaignMapValidator';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -43,7 +44,6 @@ import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
 import { showTimedMessage, updateUndoRedoButtonPair } from '../uiHelpers';
 import {
-  canvasPos as computeCanvasPos,
   updateMapEditorCanvas,
   drawFocusedTileOverlay,
   buildCanvasWithErrorDiv,
@@ -52,6 +52,7 @@ import { isTileConnectedToSource } from '../tile';
 import { buildCompletionInputWidget } from './chapterEditorUI';
 import { MapEditorGridState } from './mapEditorGridState';
 import { handleMapEditorKeyDown } from './mapEditorSectionUtils';
+import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
 const CHAPTER_CHAMBER_PALETTE: EditorPalette = 'chamber:chapter';
@@ -109,6 +110,24 @@ export class CampaignMapEditorSection {
   private _suppressContextMenu = false;
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
 
+  // ── Viewport / pan state (for oversized maps > MAP_VIEW_MAX_COLS × MAP_VIEW_MAX_ROWS) ──
+  /** Horizontal pixel scroll offset in canvas-pixels. */
+  private _panPixelX = 0;
+  /** Vertical pixel scroll offset in canvas-pixels. */
+  private _panPixelY = 0;
+  /** Number of tile rows in the current view window (≤ MAP_VIEW_MAX_ROWS). */
+  private _viewRows = MAP_VIEW_MAX_ROWS;
+  /** Number of tile cols in the current view window (≤ MAP_VIEW_MAX_COLS). */
+  private _viewCols = MAP_VIEW_MAX_COLS;
+  /** Active pan drag state (middle-mouse-button or space+drag, etc.). */
+  private _panDrag: {
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    moved: boolean;
+  } | null = null;
+
   /** Default campaign grid dimensions (same as chapter map defaults). */
   private static readonly DEFAULT_ROWS = 3;
   private static readonly DEFAULT_COLS = 6;
@@ -126,6 +145,8 @@ export class CampaignMapEditorSection {
   /** Initialize grid state from the given campaign (or create defaults). */
   init(campaign: CampaignDef): void {
     this._detachInput();
+    this._panPixelX = 0;
+    this._panPixelY = 0;
     this._initGridState(campaign);
   }
 
@@ -476,6 +497,7 @@ export class CampaignMapEditorSection {
         inputWidth: '52px',
         inputRowStyle: 'gap:4px;font-size:0.8rem;',
         minWidth: '210px',
+        maxDim: CAMPAIGN_MAP_MAX_DIM,
       },
     );
   }
@@ -484,9 +506,17 @@ export class CampaignMapEditorSection {
 
   private _buildCanvas(campaign: CampaignDef, readOnly: boolean): HTMLElement {
     const canvas = document.createElement('canvas');
-    setTileSize(computeTileSize(this._gridState.rows, this._gridState.cols));
-    canvas.width  = this._gridState.cols * TILE_SIZE;
-    canvas.height = this._gridState.rows * TILE_SIZE;
+    const rows = this._gridState.rows;
+    const cols = this._gridState.cols;
+    const viewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
+    const viewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
+    this._viewRows = viewRows;
+    this._viewCols = viewCols;
+    // Clamp pan to valid bounds for new dimensions.
+    this._clampPan();
+    setTileSize(computeTileSize(viewRows, viewCols));
+    canvas.width  = viewCols * TILE_SIZE;
+    canvas.height = viewRows * TILE_SIZE;
     canvas.style.cssText =
       `border:${EDITOR_CANVAS_BORDER}px solid #4a90d9;border-radius:${RADIUS_SM};` +
       'cursor:' + (readOnly ? 'default' : 'crosshair') + ';display:block;';
@@ -512,7 +542,26 @@ export class CampaignMapEditorSection {
 
   private _updateCanvasDisplaySize(): void {
     if (!this._canvas) return;
-    updateMapEditorCanvas(this._canvas, this._gridState.rows, this._gridState.cols, this._mainLayout);
+    const rows = this._gridState.rows;
+    const cols = this._gridState.cols;
+    const newViewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
+    const newViewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
+    this._viewRows = newViewRows;
+    this._viewCols = newViewCols;
+    this._clampPan();
+    updateMapEditorCanvas(this._canvas, newViewRows, newViewCols, this._mainLayout);
+  }
+
+  /** Clamp pan to valid bounds (edge clamping only, no source-connectivity restriction). */
+  private _clampPan(): void {
+    const rows = this._gridState.rows;
+    const cols = this._gridState.cols;
+    const viewRows = this._viewRows;
+    const viewCols = this._viewCols;
+    const maxPanX = Math.max(0, (cols - viewCols) * TILE_SIZE);
+    const maxPanY = Math.max(0, (rows - viewRows) * TILE_SIZE);
+    this._panPixelX = Math.max(0, Math.min(maxPanX, this._panPixelX));
+    this._panPixelY = Math.max(0, Math.min(maxPanY, this._panPixelY));
   }
 
   private _renderCanvas(): void {
@@ -568,6 +617,13 @@ export class CampaignMapEditorSection {
       inventory: [],
     }));
 
+    // Apply pan transform so the view window scrolls over the full grid.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
+    ctx.clip();
+    ctx.translate(-this._panPixelX, -this._panPixelY);
+
     renderEditorCanvas(
       ctx,
       this._gridState.grid,
@@ -584,6 +640,8 @@ export class CampaignMapEditorSection {
     );
 
     drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);
+
+    ctx.restore();
   }
 
   // ── Private: tile building ─────────────────────────────────────────────────
@@ -622,10 +680,34 @@ export class CampaignMapEditorSection {
 
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
     if (!this._canvas) return null;
-    return computeCanvasPos(e, this._canvas, this._gridState.rows, this._gridState.cols);
+    // computeCanvasPos maps to [0, viewRows) × [0, viewCols) – shift by pan offset
+    // to get the actual grid cell under the pointer.
+    const rect = this._canvas.getBoundingClientRect();
+    const canvasPxX = (e.clientX - rect.left) * this._canvas.width  / rect.width;
+    const canvasPxY = (e.clientY - rect.top)  * this._canvas.height / rect.height;
+    const col = Math.floor((canvasPxX + this._panPixelX) / TILE_SIZE);
+    const row = Math.floor((canvasPxY + this._panPixelY) / TILE_SIZE);
+    // Ensure we clicked within the visible view area.
+    const viewCol = Math.floor(canvasPxX / TILE_SIZE);
+    const viewRow = Math.floor(canvasPxY / TILE_SIZE);
+    if (viewRow < 0 || viewRow >= this._viewRows || viewCol < 0 || viewCol >= this._viewCols) return null;
+    if (row < 0 || row >= this._gridState.rows || col < 0 || col >= this._gridState.cols) return null;
+    return { row, col };
   }
 
   private _onMouseDown(e: MouseEvent, campaign: CampaignDef): void {
+    // Middle-mouse button starts pan drag.
+    if (e.button === 1) {
+      e.preventDefault();
+      this._panDrag = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPanX: this._panPixelX,
+        startPanY: this._panPixelY,
+        moved: false,
+      };
+      return;
+    }
     if (e.button === 2) {
       const pos = this._canvasPos(e);
       if (!pos) return;
@@ -735,6 +817,11 @@ export class CampaignMapEditorSection {
   }
 
   private _onMouseUp(e: MouseEvent, campaign: CampaignDef): void {
+    // Release pan drag on any button up.
+    if (this._panDrag) {
+      this._panDrag = null;
+      return;
+    }
     if (e.button === 2) {
       if (!this._rightEraseDragActive) return;
       this._rightEraseDragActive = false;
@@ -776,6 +863,25 @@ export class CampaignMapEditorSection {
   }
 
   private _onMouseMove(e: MouseEvent): void {
+    // Handle pan drag (middle-mouse).
+    if (this._panDrag) {
+      const dx = e.clientX - this._panDrag.startClientX;
+      const dy = e.clientY - this._panDrag.startClientY;
+      if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        this._panDrag.moved = true;
+      }
+      if (this._panDrag.moved && this._canvas) {
+        const rect = this._canvas.getBoundingClientRect();
+        const scaleX = this._canvas.width  / rect.width;
+        const scaleY = this._canvas.height / rect.height;
+        this._panPixelX = this._panDrag.startPanX - dx * scaleX;
+        this._panPixelY = this._panDrag.startPanY - dy * scaleY;
+        this._clampPan();
+        this._renderCanvas();
+        return;
+      }
+    }
+
     const pos = this._canvasPos(e);
     this._hover = pos;
 
@@ -842,6 +948,7 @@ export class CampaignMapEditorSection {
 
   private _onMouseLeave(campaign: CampaignDef): void {
     this._hover = null;
+    this._panDrag = null;
     if (this._dragState) this._dragState = null;
     if (this._paintDragActive) {
       this._paintDragActive = false;

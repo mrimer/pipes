@@ -32,6 +32,13 @@ const CHAPTER_MAP_CANVAS_BORDER_COLOR = '#4a90d9';
 /** CSS border-radius (px) on the chapter map canvas element. */
 const CHAPTER_MAP_CANVAS_BORDER_RADIUS = 6;
 
+// ─── Viewport size limits ─────────────────────────────────────────────────────
+
+/** Maximum number of tile columns displayed in the map view window. */
+export const MAP_VIEW_MAX_COLS = 12;
+/** Maximum number of tile rows displayed in the map view window. */
+export const MAP_VIEW_MAX_ROWS = 9;
+
 // ─── Layout overhead constants ────────────────────────────────────────────────
 // Estimated heights of UI elements that appear above/below the chapter map
 // canvas, used to compute the vertical overhead passed to computeTileSize so
@@ -85,6 +92,11 @@ export interface ChapterMapCallbacks {
   getActiveCampaign?(): CampaignDef | null;
   /** Returns the set of completed chapter IDs. */
   getCompletedChapters?(): Set<number>;
+  /**
+   * Optional override for the instruction text shown below the map canvas.
+   * Return null to use the default ("Click on an accessible level").
+   */
+  formatInstructionText?(): string | null;
 }
 
 // ─── ChapterMapScreen ─────────────────────────────────────────────────────────
@@ -159,6 +171,43 @@ export class ChapterMapScreen {
   private _touchMoved = false;
   /** Timer ID for long-press tooltip on touch devices. */
   private _touchLongPressTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // ─── Viewport / pan state ────────────────────────────────────────────────
+  /**
+   * Horizontal pixel scroll offset: how many canvas-pixels the map has been
+   * panned to the right (tile (0,0) is drawn at x = -_panPixelX).
+   */
+  private _panPixelX = 0;
+  /**
+   * Vertical pixel scroll offset: how many canvas-pixels the map has been
+   * panned downward (tile (0,0) is drawn at y = -_panPixelY).
+   */
+  private _panPixelY = 0;
+  /** Whether the initial snap position has been computed for the current map key. */
+  private _panInitialized = false;
+  /**
+   * Unique key identifying the current display (`${campaign.id}-${chapterIdx}`).
+   * Pan is reset whenever this key changes.
+   */
+  private _currentDisplayKey = '';
+  /** Number of tile rows visible in the current view window (≤ MAP_VIEW_MAX_ROWS). */
+  private _viewRows = MAP_VIEW_MAX_ROWS;
+  /** Number of tile cols visible in the current view window (≤ MAP_VIEW_MAX_COLS). */
+  private _viewCols = MAP_VIEW_MAX_COLS;
+
+  // ─── Pan drag state ──────────────────────────────────────────────────────
+  /** Active mouse-drag-to-pan state, null when no pan drag is in progress. */
+  private _panDrag: {
+    startClientX: number;
+    startClientY: number;
+    startPanX: number;
+    startPanY: number;
+    /** True once the pointer has moved beyond the drag threshold. */
+    moved: boolean;
+  } | null = null;
+  /** Start pan values for the current touch pan gesture. */
+  private _touchPanStartPanX = 0;
+  private _touchPanStartPanY = 0;
 
   // ─── Animation state ──────────────────────────────────────────────────────
   private _animFrameId: number | null = null;
@@ -323,8 +372,20 @@ export class ChapterMapScreen {
     }
     if (cellRow < 0) return null;
 
+    // Apply the pan offset so the minimap rect reflects the tile's current
+    // on-canvas position within the view window.
+    const canvasX = cellCol * TILE_SIZE - this._panPixelX;
+    const canvasY = cellRow * TILE_SIZE - this._panPixelY;
+
+    // If the cell is entirely outside the visible view window, return null so
+    // the transition falls back gracefully (no off-screen animation target).
+    if (
+      canvasX + TILE_SIZE <= 0 || canvasX >= this._viewCols * TILE_SIZE ||
+      canvasY + TILE_SIZE <= 0 || canvasY >= this._viewRows * TILE_SIZE
+    ) return null;
+
     const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(
-      cellCol * TILE_SIZE, cellRow * TILE_SIZE, levelDef
+      canvasX, canvasY, levelDef
     );
 
     // Convert canvas-space → screen-space using the canvas bounding rect.
@@ -468,6 +529,18 @@ export class ChapterMapScreen {
 
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
+
+    // Determine whether this is a new display (different map) or a repopulate
+    // of the same map (e.g. returning from a level).  Pan is only reset when
+    // the map actually changes so that returning from a chapter preserves the
+    // campaign-map scroll position.
+    const newKey = `${campaign.id}-${chapterIdx}`;
+    const isNewDisplay = newKey !== this._currentDisplayKey;
+    this._currentDisplayKey = newKey;
+    if (isNewDisplay) {
+      this._panInitialized = false;
+    }
+
     // Regenerate decorations and floor types when showing a new chapter
     if (this._chapter !== chapter) {
       // Compute floor types first so decoration generation selects the correct
@@ -592,16 +665,77 @@ export class ChapterMapScreen {
 
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    setTileSize(computeTileSize(rows, cols, CHAPTER_MAP_GRID_OVERHEAD));
-    canvas.width  = cols * TILE_SIZE;
-    canvas.height = rows * TILE_SIZE;
+
+    // Use a view-window capped at MAP_VIEW_MAX_COLS × MAP_VIEW_MAX_ROWS.
+    // When the map fits within that cap, view == full grid (unchanged behaviour).
+    const viewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
+    const viewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
+    const isOversized = rows > MAP_VIEW_MAX_ROWS || cols > MAP_VIEW_MAX_COLS;
+
+    // Scale tile size to fit the view window on screen.
+    const oldTileSize = TILE_SIZE;
+    setTileSize(computeTileSize(viewRows, viewCols, CHAPTER_MAP_GRID_OVERHEAD));
+    this._viewRows = viewRows;
+    this._viewCols = viewCols;
+
+    // Compute or preserve pan position.
+    if (!this._panInitialized) {
+      this._computeInitialSnap(chapter, viewRows, viewCols);
+      this._panInitialized = true;
+    } else {
+      // On resize (repopulate with same map), rescale the pan pixel offset so
+      // tile positions stay consistent with the new tile size.
+      if (oldTileSize !== TILE_SIZE && oldTileSize > 0) {
+        this._panPixelX = this._panPixelX * TILE_SIZE / oldTileSize;
+        this._panPixelY = this._panPixelY * TILE_SIZE / oldTileSize;
+      }
+      this._clampPan(chapter, viewRows, viewCols);
+    }
+
+    canvas.width  = viewCols * TILE_SIZE;
+    canvas.height = viewRows * TILE_SIZE;
     canvas.style.cssText =
-      `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};cursor:pointer;` +
+      `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
+      (isOversized ? 'cursor:grab;' : 'cursor:pointer;') +
       'display:block;max-width:100%;height:auto;margin:0 auto;';
 
-    // Mouse events for hover and click
+    // ── Mouse events ──────────────────────────────────────────────────────────
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      this._panDrag = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPanX: this._panPixelX,
+        startPanY: this._panPixelY,
+        moved: false,
+      };
+    });
+
     canvas.addEventListener('mousemove', (e) => {
       this._mouseClientPos = { x: e.clientX, y: e.clientY };
+
+      // Handle pan drag.
+      if (this._panDrag) {
+        const dx = e.clientX - this._panDrag.startClientX;
+        const dy = e.clientY - this._panDrag.startClientY;
+        if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+          this._panDrag.moved = true;
+        }
+        if (this._panDrag.moved) {
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width  / rect.width;
+          const scaleY = canvas.height / rect.height;
+          this._panPixelX = this._panDrag.startPanX - dx * scaleX;
+          this._panPixelY = this._panDrag.startPanY - dy * scaleY;
+          this._clampPan(chapter, viewRows, viewCols);
+          this._hover = null;
+          this._render(chapter);
+          canvas.style.cursor = 'grabbing';
+          return;
+        }
+      }
+
       this._onMouseMove(e, chapter);
       // Update native title for non-Ctrl hover and custom tooltip for Ctrl+hover
       const pos = this._canvasPos(e, chapter);
@@ -636,15 +770,36 @@ export class ChapterMapScreen {
         this._showTooltip(e.clientX, e.clientY);
       }
     });
+
+    canvas.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      if (this._panDrag?.moved) {
+        canvas.style.cursor = isOversized ? 'grab' : 'pointer';
+      }
+      // Click handling is deferred to the 'click' event so the browser can
+      // fire it; we only use mouseup to restore the cursor.
+    });
+
     canvas.addEventListener('mouseleave', () => {
+      this._panDrag = null;
       this._mouseClientPos = null;
       this._hover = null;
       this._hideTooltip();
+      canvas.style.cursor = isOversized ? 'grab' : 'pointer';
       this._render(chapter);
     });
-    canvas.addEventListener('click', (e) => this._onClick(e, campaign, chapter));
 
-    // Touch events for mobile/tablet devices.
+    canvas.addEventListener('click', (e) => {
+      if (this._panDrag?.moved) {
+        // A click fired after a drag – suppress it.
+        this._panDrag = null;
+        return;
+      }
+      this._panDrag = null;
+      this._onClick(e, campaign, chapter);
+    });
+
+    // ── Touch events for mobile/tablet devices ────────────────────────────────
     canvas.style.touchAction = 'none'; // prevent scroll/zoom on the canvas
     canvas.addEventListener('touchstart', (e) => {
       if (e.touches.length !== 1) return;
@@ -652,6 +807,8 @@ export class ChapterMapScreen {
       const touch = e.touches[0];
       this._touchStartX = touch.clientX;
       this._touchStartY = touch.clientY;
+      this._touchPanStartPanX = this._panPixelX;
+      this._touchPanStartPanY = this._panPixelY;
       this._touchMoved = false;
       // Start long-press timer to show tooltip (500 ms).
       if (this._touchLongPressTimer !== null) clearTimeout(this._touchLongPressTimer);
@@ -676,6 +833,17 @@ export class ChapterMapScreen {
           this._touchLongPressTimer = null;
         }
         this._hideTooltip();
+        // Pan the map for oversized maps.
+        if (isOversized) {
+          const rect = canvas.getBoundingClientRect();
+          const scaleX = canvas.width  / rect.width;
+          const scaleY = canvas.height / rect.height;
+          this._panPixelX = this._touchPanStartPanX - dx * scaleX;
+          this._panPixelY = this._touchPanStartPanY - dy * scaleY;
+          this._clampPan(chapter, viewRows, viewCols);
+          this._hover = null;
+          this._render(chapter);
+        }
       }
     }, { passive: false });
 
@@ -685,7 +853,7 @@ export class ChapterMapScreen {
         clearTimeout(this._touchLongPressTimer);
         this._touchLongPressTimer = null;
       }
-      if (this._touchMoved) return; // was a scroll/swipe, not a tap
+      if (this._touchMoved) return; // was a scroll/swipe/pan, not a tap
       const changedTouch = e.changedTouches[0];
       if (!changedTouch) return;
       // Synthesize a click at the touch coordinates.
@@ -714,7 +882,10 @@ export class ChapterMapScreen {
     // Instruction text
     const instruction = document.createElement('p');
     instruction.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:0;';
-    instruction.textContent = 'Click on an accessible level';
+    const baseInstruction = this._callbacks.formatInstructionText?.() ?? 'Click on an accessible level';
+    instruction.textContent = isOversized
+      ? `${baseInstruction}. Drag with the mouse to pan around the map.`
+      : baseInstruction;
     el.appendChild(instruction);
 
     // Status text (shown when the sink is filled / chapter complete)
@@ -803,8 +974,20 @@ export class ChapterMapScreen {
     const rect = canvas.getBoundingClientRect();
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    const col = Math.floor((clientX - rect.left) * cols / rect.width);
-    const row = Math.floor((clientY - rect.top)  * rows / rect.height);
+    const viewRows = this._viewRows;
+    const viewCols = this._viewCols;
+    // Map client coordinates to canvas pixel coordinates, then add the pan offset
+    // to get the position in the full (panned) map coordinate space.
+    const canvasPxX = (clientX - rect.left) * canvas.width  / rect.width;
+    const canvasPxY = (clientY - rect.top)  * canvas.height / rect.height;
+    const gridPxX = canvasPxX + this._panPixelX;
+    const gridPxY = canvasPxY + this._panPixelY;
+    const col = Math.floor(gridPxX / TILE_SIZE);
+    const row = Math.floor(gridPxY / TILE_SIZE);
+    // Bounds-check against the view window (only cells currently visible can be hit).
+    const viewCol = Math.floor(canvasPxX / TILE_SIZE);
+    const viewRow = Math.floor(canvasPxY / TILE_SIZE);
+    if (viewRow < 0 || viewRow >= viewRows || viewCol < 0 || viewCol >= viewCols) return null;
     if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
     return { row, col };
   }
@@ -890,6 +1073,15 @@ export class ChapterMapScreen {
       jitterCell = { row: anim.row, col: anim.col, dx, dy: 0 };
     }
 
+    // Apply pan transform so the view window scrolls over the full grid.
+    // The canvas is sized to the view window (viewCols × viewRows tiles), and
+    // the transform shifts the draw origin so that the panned region is visible.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
+    ctx.clip();
+    ctx.translate(-this._panPixelX, -this._panPixelY);
+
     renderChapterMapCanvas(
       ctx,
       grid,
@@ -905,6 +1097,8 @@ export class ChapterMapScreen {
       this._floorTypes,
       chapter.style,
     );
+
+    ctx.restore();
 
     return { filledKeys, displayProgress };
   }
@@ -1003,6 +1197,103 @@ export class ChapterMapScreen {
   }
 
   /**
+   * Clamp `_panPixelX` and `_panPixelY` to valid bounds:
+   *  1. Edge bounds: the map may not be panned past its edges (no empty space).
+   *  2. Connected-bbox bounds: panning may not go more than one tile beyond the
+   *     bounding rectangle of tiles reachable from the source.
+   */
+  private _clampPan(chapter: ChapterDef, viewRows: number, viewCols: number): void {
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const maxPanX = Math.max(0, (cols - viewCols) * TILE_SIZE);
+    const maxPanY = Math.max(0, (rows - viewRows) * TILE_SIZE);
+
+    // 1. Hard edge clamping – never show empty space beyond the map edge.
+    this._panPixelX = Math.max(0, Math.min(maxPanX, this._panPixelX));
+    this._panPixelY = Math.max(0, Math.min(maxPanY, this._panPixelY));
+
+    // 2. Connected-bbox clamping – restrict panning to within one tile of the
+    //    bounding rectangle of source-connected (reachable) tiles.
+    if (!chapter.grid) return;
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+    if (filledKeys.size === 0) return;
+
+    let rMin = rows, rMax = -1, cMin = cols, cMax = -1;
+    for (const key of filledKeys) {
+      const comma = key.indexOf(',');
+      const r = Number(key.slice(0, comma));
+      const c = Number(key.slice(comma + 1));
+      if (r < rMin) rMin = r;
+      if (r > rMax) rMax = r;
+      if (c < cMin) cMin = c;
+      if (c > cMax) cMax = c;
+    }
+
+    // Allowed pan range: left edge ≥ (cMin-1)*TILE_SIZE; right edge ≤ (cMax+2)*TILE_SIZE.
+    const bboxMinX = Math.max(0, (cMin - 1) * TILE_SIZE);
+    const bboxMaxX = Math.min(maxPanX, (cMax + 2 - viewCols) * TILE_SIZE);
+    const bboxMinY = Math.max(0, (rMin - 1) * TILE_SIZE);
+    const bboxMaxY = Math.min(maxPanY, (rMax + 2 - viewRows) * TILE_SIZE);
+
+    if (bboxMinX <= bboxMaxX) {
+      this._panPixelX = Math.max(bboxMinX, Math.min(bboxMaxX, this._panPixelX));
+    }
+    if (bboxMinY <= bboxMaxY) {
+      this._panPixelY = Math.max(bboxMinY, Math.min(bboxMaxY, this._panPixelY));
+    }
+  }
+
+  /**
+   * Set the initial pan position so that the latest unlocked chamber is
+   * centered in the view window, clamped to valid bounds.
+   */
+  private _computeInitialSnap(chapter: ChapterDef, viewRows: number, viewCols: number): void {
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const grid = chapter.grid;
+
+    // For maps that fit entirely within the view, no panning is needed.
+    if (!grid || (rows <= viewRows && cols <= viewCols)) {
+      this._panPixelX = 0;
+      this._panPixelY = 0;
+      return;
+    }
+
+    const displayProgress = this._callbacks.getDisplayProgress();
+    const filledKeys = this._computeFilledCells(chapter, displayProgress);
+
+    // Find the highest-numbered accessible chamber tile to snap to.
+    let targetRow = -1, targetCol = -1, highestNum = -1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!filledKeys.has(`${r},${c}`)) continue;
+        const def = grid[r]?.[c];
+        if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+          const num = def.levelIdx + 1;
+          if (num > highestNum) {
+            highestNum = num;
+            targetRow = r;
+            targetCol = c;
+          }
+        }
+      }
+    }
+
+    if (targetRow < 0) {
+      // No accessible chamber; center the source tile if available.
+      const sourcePos = findMapTile(grid, rows, cols, PipeShape.Source);
+      if (sourcePos) { targetRow = sourcePos.row; targetCol = sourcePos.col; }
+      else { this._panPixelX = 0; this._panPixelY = 0; return; }
+    }
+
+    // Center the target tile in the view window.
+    this._panPixelX = (targetCol + 0.5) * TILE_SIZE - (viewCols * TILE_SIZE) / 2;
+    this._panPixelY = (targetRow + 0.5) * TILE_SIZE - (viewRows * TILE_SIZE) / 2;
+    this._clampPan(chapter, viewRows, viewCols);
+  }
+
+  /**
    * Compute which grid cells are water-reachable from the source.
    * Water flows through pipes and into level chambers; beyond a level chamber,
    * water only continues when the level is completed.
@@ -1071,6 +1362,8 @@ export class ChapterMapScreen {
     const grid = chapter.grid;
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
+    const viewRows = this._viewRows;
+    const viewCols = this._viewCols;
 
     // Re-render the base canvas each frame to clear previous particle frames
     const renderResult = this._renderCanvas(chapter);
@@ -1078,6 +1371,14 @@ export class ChapterMapScreen {
     const { filledKeys, displayProgress } = renderResult;
 
     const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
+
+    // All particle/animation effects that use grid-space coordinates are rendered
+    // under the same pan transform that was applied in _renderCanvas.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, viewCols * TILE_SIZE, viewRows * TILE_SIZE);
+    ctx.clip();
+    ctx.translate(-this._panPixelX, -this._panPixelY);
 
     // Connector landing-strip lights – rendered before particles so they appear below droplets
     renderChapterMapConnectorLights(ctx, positions, now);
@@ -1129,11 +1430,14 @@ export class ChapterMapScreen {
       renderWinTileGlows(ctx, this._winGlows, now);
     }
 
-    // Edge flowers – shown only when the chapter is mastered
+    ctx.restore(); // Remove pan transform – canvas-coordinate effects follow
+
+    // Edge flowers – shown only when the chapter is mastered.
+    // These are positioned in canvas (view-window) coordinates, not grid coords.
     const isMastered = this._isChapterMastered(chapter, displayProgress);
     if (isMastered) {
       if (now - this._lastFlowerSpawn >= ChapterMapScreen.FLOWER_SPAWN_INTERVAL_MS) {
-        this._spawnEdgeFlower(now, rows, cols);
+        this._spawnEdgeFlower(now, viewRows, viewCols);
         this._lastFlowerSpawn = now;
       }
       // Shared sway angle: ~25° amplitude, ~6 s period, synchronised across all flowers
@@ -1183,10 +1487,10 @@ export class ChapterMapScreen {
    * Spawn one edge flower on the next alternating side (left/right).
    * Flowers are placed at a random vertical position with a small horizontal jitter.
    */
-  private _spawnEdgeFlower(now: number, rows: number, cols: number): void {
+  private _spawnEdgeFlower(now: number, viewRows: number, viewCols: number): void {
     const CELL = TILE_SIZE;
-    const totalH = rows * CELL;
-    const totalW = cols * CELL;
+    const totalH = viewRows * CELL;
+    const totalW = viewCols * CELL;
     // Alternate left/right to ensure both sides fill evenly
     const isLeft = (this._nextFlowerSide & 1) === 0;
     this._nextFlowerSide++;

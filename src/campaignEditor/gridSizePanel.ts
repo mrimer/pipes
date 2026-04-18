@@ -53,6 +53,11 @@ export interface GridSizePanelOptions {
   requireOneAxisAbove1?: boolean;
   /** CSS `min-width` of the outer panel div. */
   minWidth?: string;
+  /**
+   * Override the maximum allowed grid dimension for this panel.
+   * Defaults to `GRID_MAX_DIM` when omitted.
+   */
+  maxDim?: number;
 }
 
 // ─── Public function ──────────────────────────────────────────────────────────
@@ -73,6 +78,7 @@ export function buildGridSizePanel(
   options: GridSizePanelOptions,
 ): HTMLElement {
   const { panelId, title, inputWidth, inputRowStyle, requireOneAxisAbove1, minWidth } = options;
+  const maxDim = options.maxDim ?? GRID_MAX_DIM;
 
   const panel = document.createElement('div');
   panel.id = panelId;
@@ -93,14 +99,14 @@ export function buildGridSizePanel(
   const rowsInp = document.createElement('input');
   rowsInp.type = 'number';
   rowsInp.min = String(GRID_MIN_DIM);
-  rowsInp.max = String(GRID_MAX_DIM);
+  rowsInp.max = String(maxDim);
   rowsInp.value = String(callbacks.getRows());
   rowsInp.style.cssText = inpStyle;
 
   const colsInp = document.createElement('input');
   colsInp.type = 'number';
   colsInp.min = String(GRID_MIN_DIM);
-  colsInp.max = String(GRID_MAX_DIM);
+  colsInp.max = String(maxDim);
   colsInp.value = String(callbacks.getCols());
   colsInp.style.cssText = inpStyle;
 
@@ -124,20 +130,20 @@ export function buildGridSizePanel(
     const rVal = parseInt(rowsInp.value);
     const cVal = parseInt(colsInp.value);
     let outOfRange = false;
-    if (isNaN(rVal) || rVal < GRID_MIN_DIM || rVal > GRID_MAX_DIM) {
+    if (isNaN(rVal) || rVal < GRID_MIN_DIM || rVal > maxDim) {
       rowsInp.value = String(
-        Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(rVal) ? callbacks.getRows() : rVal)),
+        Math.max(GRID_MIN_DIM, Math.min(maxDim, isNaN(rVal) ? callbacks.getRows() : rVal)),
       );
       outOfRange = true;
     }
-    if (isNaN(cVal) || cVal < GRID_MIN_DIM || cVal > GRID_MAX_DIM) {
+    if (isNaN(cVal) || cVal < GRID_MIN_DIM || cVal > maxDim) {
       colsInp.value = String(
-        Math.max(GRID_MIN_DIM, Math.min(GRID_MAX_DIM, isNaN(cVal) ? callbacks.getCols() : cVal)),
+        Math.max(GRID_MIN_DIM, Math.min(maxDim, isNaN(cVal) ? callbacks.getCols() : cVal)),
       );
       outOfRange = true;
     }
     if (outOfRange) {
-      showErr(`Value out of range (${GRID_MIN_DIM}–${GRID_MAX_DIM})`);
+      showErr(`Value out of range (${GRID_MIN_DIM}–${maxDim})`);
       return;
     }
     if (requireOneAxisAbove1 && rVal <= 1 && cVal <= 1) {

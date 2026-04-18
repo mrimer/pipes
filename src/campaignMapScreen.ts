@@ -30,6 +30,7 @@ export class CampaignMapScreen {
       formatChapterTitle: () => null,
       shouldShowCompletionStatus: () => false,
       isMapCompleted: () => this.isCampaignComplete(),
+      formatInstructionText: () => 'Click on an accessible chapter',
       formatStatsText: () => {
         const campaign = this._campaign;
         if (!campaign) return '';
