@@ -416,6 +416,13 @@ export class CampaignEditor {
     }
 
     this._el.appendChild(content);
+
+    // Resize campaign map canvas after layout is in the DOM so the grid can
+    // fill the available space between the side panels.
+    requestAnimationFrame(() => {
+      this._campaignMapEditor.updateCanvasDisplaySize();
+      this._campaignMapEditor.renderCanvas();
+    });
   }
 
   private _buildCampaignRow(campaign: CampaignDef): HTMLElement {
