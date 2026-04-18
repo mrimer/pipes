@@ -601,7 +601,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     return this._gridState.rows > this._viewRows || this._gridState.cols > this._viewCols;
   }
 
-  /** Start a Shift+left-drag pan candidate.  Only called when Shift is held and the map is oversized. */
+  /** Start a pan candidate for Shift+left-drag panning.  Caller must verify that Shift is held and the map is oversized before calling. */
   private _beginShiftPanCandidate(e: MouseEvent): void {
     this._leftPanCandidate = {
       startClientX: e.clientX,
