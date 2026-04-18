@@ -322,8 +322,10 @@ export const MAX_EDITOR_CANVAS_PX = 512;
 export const EDITOR_CANVAS_BORDER = 3;
 /** Minimum allowed grid dimension (rows or cols). */
 export const GRID_MIN_DIM = 1;
-/** Maximum allowed grid dimension (rows or cols). */
+/** Maximum allowed grid dimension (rows or cols) for level/chapter-map editors. */
 export const GRID_MAX_DIM = 20;
+/** Maximum allowed grid dimension for the campaign map editor (supports larger maps with viewport panning). */
+export const CAMPAIGN_MAP_MAX_DIM = 50;
 /** Border color for the currently selected palette item button. */
 export const PALETTE_ITEM_SELECTED_BORDER = '#f0c040';
 /** Border color for an unselected palette item button. */
