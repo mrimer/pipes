@@ -10,7 +10,7 @@
  */
 
 import { CampaignDef, LevelDef, TileDef, PipeShape } from '../types';
-import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, loadCampaignEditorMapBoxCollapsed } from '../persistence';
+import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, loadCampaignEditorMapBoxCollapsed, loadChapterEditorMapBoxCollapsed } from '../persistence';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignMapEditorSection, CampaignMapEditorCallbacks } from './campaignMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
@@ -677,6 +677,7 @@ export class CampaignEditor {
 
     // Initialize chapter grid state
     this._chapterMapEditor.init(chapter);
+    this._chapterMapEditor.setMapBoxCollapsed(loadChapterEditorMapBoxCollapsed());
 
     const toolbar = this._buildToolbar(
       `${isOfficial ? '📋' : '✏️'} Chapter ${this._activeChapterIdx + 1}: ${chapter.name}`,
