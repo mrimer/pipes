@@ -1112,7 +1112,6 @@ export abstract class MapScreenBase {
       jitterCell,
       this._floorTypes,
       chapter.style,
-      this._isChapterMode(),
     );
 
     ctx.restore();
@@ -1635,14 +1634,5 @@ export abstract class MapScreenBase {
    */
   protected _augmentLevelStars(levelStars: Record<number, number>): Record<number, number> {
     return levelStars;
-  }
-
-  /**
-   * Returns true when the map is operating in "chapter mode" (i.e. each chamber
-   * represents a chapter rather than an individual level).  When true, chamber
-   * label numbers are always rendered in white.  Default: false.
-   */
-  protected _isChapterMode(): boolean {
-    return false;
   }
 }

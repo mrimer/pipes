@@ -50,11 +50,6 @@ export interface ChapterMapCallbacks {
    * may include additional synthetic entries (e.g. chapter-aggregated totals).
    */
   augmentLevelStars?(levelStars: Record<number, number>): Record<number, number>;
-  /**
-   * When true, the map is operating in "chapter mode": each chamber represents
-   * a chapter rather than an individual level, so chamber labels are always white.
-   */
-  isChapterMode?(): boolean;
 }
 
 /**
@@ -113,10 +108,6 @@ export class ChapterMapScreen extends MapScreenBase {
 
   protected _augmentLevelStars(levelStars: Record<number, number>): Record<number, number> {
     return this._callbacks.augmentLevelStars?.(levelStars) ?? levelStars;
-  }
-
-  protected _isChapterMode(): boolean {
-    return this._callbacks.isChapterMode?.() ?? false;
   }
 
   protected _formatStatsText(chapter: ChapterDef, displayProgress: Set<number>): string | undefined {
