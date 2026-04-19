@@ -48,18 +48,24 @@ export const TREE_LEAF_COLOR         = '#3a8c24';
 export const TREE_LEAF_ALT_COLOR     = '#56b03a';
 /** Trunk color for Tree tiles (warm brown). */
 export const TREE_TRUNK_COLOR        = '#6b3a2a';
-/** Border/line color for Tree tiles — Dirt style (dark brown). */
-export const TREE_DIRT_COLOR         = '#3d2008';
-/** Leaf canopy fill color for Tree tiles — Dirt style (medium dark brown). */
-export const TREE_DIRT_LEAF_COLOR    = '#5a2e0c';
-/** Secondary leaf cluster color for Tree tiles — Dirt style (slightly lighter brown). */
-export const TREE_DIRT_LEAF_ALT_COLOR = '#7a3f14';
+/** Border/line color for Tree tiles — Fall style (dark brown). */
+export const TREE_FALL_COLOR         = '#3d2008';
+/** Leaf canopy fill color for Tree tiles — Fall style (medium dark brown). */
+export const TREE_FALL_LEAF_COLOR    = '#5a2e0c';
+/** Secondary leaf cluster color for Tree tiles — Fall style (slightly lighter brown). */
+export const TREE_FALL_LEAF_ALT_COLOR = '#7a3f14';
 /** Border/line color for Tree tiles — Dark style (dark blue-green). */
 export const TREE_DARK_COLOR         = '#0a2a28';
 /** Leaf canopy fill color for Tree tiles — Dark style (medium dark blue-green). */
 export const TREE_DARK_LEAF_COLOR    = '#0f3d38';
 /** Secondary leaf cluster color for Tree tiles — Dark style (slightly lighter blue-green). */
 export const TREE_DARK_LEAF_ALT_COLOR = '#165448';
+/** Border/line color for Tree tiles — Spring style (dark rose). */
+export const TREE_SPRING_COLOR         = '#c84080';
+/** Leaf canopy fill color for Tree tiles — Spring style (pale pink, cherry blossom). */
+export const TREE_SPRING_LEAF_COLOR    = '#f5b8d0';
+/** Secondary leaf cluster color for Tree tiles — Spring style (bright pink). */
+export const TREE_SPRING_LEAF_ALT_COLOR = '#ff90c0';
 /** Border/line color for Tree tiles — Winter style (medium blue-gray, snow-laden). */
 export const TREE_WINTER_COLOR         = '#8090a8';
 /** Leaf canopy fill color for Tree tiles — Winter style (light off-white, snow-covered). */
@@ -205,12 +211,12 @@ export function darken(hex: string, amount: number): string {
   );
 }
 
-/** Base color for the Dirt empty-floor gingham pattern (medium brown). */
-export const EMPTY_DIRT_COLOR       = '#7b5230';
-/** Light shade for Dirt gingham (top-left of 2×2 cell). */
-export const EMPTY_DIRT_COLOR_LIGHT = lighten(EMPTY_DIRT_COLOR, 0.15);
-/** Dark shade for Dirt gingham (bottom-right of 2×2 cell). */
-export const EMPTY_DIRT_COLOR_DARK  = darken(EMPTY_DIRT_COLOR, 0.20);
+/** Base color for the Fall empty-floor gingham pattern (medium brown). */
+export const EMPTY_FALL_COLOR       = '#7b5230';
+/** Light shade for Fall gingham (top-left of 2×2 cell). */
+export const EMPTY_FALL_COLOR_LIGHT = lighten(EMPTY_FALL_COLOR, 0.15);
+/** Dark shade for Fall gingham (bottom-right of 2×2 cell). */
+export const EMPTY_FALL_COLOR_DARK  = darken(EMPTY_FALL_COLOR, 0.20);
 /** Base color for the Dark empty-floor gingham pattern (matches BG_COLOR). */
 export const EMPTY_DARK_COLOR       = '#1a1a2e';
 /** Light shade for Dark gingham (top-left of 2×2 cell). */
@@ -225,7 +231,15 @@ export const EMPTY_WINTER_COLOR_LIGHT = lighten(EMPTY_WINTER_COLOR, 0.25);
 export const EMPTY_WINTER_COLOR_DARK  = darken(EMPTY_WINTER_COLOR, 0.12);
 /** Minimap fill color for sea tiles — Winter style (pale blue, lightened). */
 export const SEA_FILL_COLOR_WINTER  = lighten(SEA_FILL_COLOR, 0.35);
-/** Minimap fill color for sea tiles — Dirt style (slightly darker blue). */
-export const SEA_FILL_COLOR_DIRT    = darken(SEA_FILL_COLOR, 0.15);
+/** Minimap fill color for sea tiles — Fall style (slightly darker blue). */
+export const SEA_FILL_COLOR_FALL    = darken(SEA_FILL_COLOR, 0.15);
 /** Minimap fill color for sea tiles — Dark style (dark blue-purple). */
 export const SEA_FILL_COLOR_DARK    = '#1c1a3e';
+/** Base color for the Spring empty-floor gingham pattern (medium chartreuse-green). */
+export const EMPTY_SPRING_COLOR       = '#9dc46a';
+/** Light shade for Spring gingham (top-left of 2×2 cell) — pale chartreuse. */
+export const EMPTY_SPRING_COLOR_LIGHT = lighten(EMPTY_SPRING_COLOR, 0.30);
+/** Dark shade for Spring gingham (bottom-right of 2×2 cell) — light green. */
+export const EMPTY_SPRING_COLOR_DARK  = darken(EMPTY_SPRING_COLOR, 0.20);
+/** Minimap fill color for sea tiles — Spring style (bright spring blue). */
+export const SEA_FILL_COLOR_SPRING  = lighten(SEA_FILL_COLOR, 0.20);

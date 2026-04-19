@@ -28,6 +28,16 @@ const FLOWER_PETAL_COLORS = [
 /** Flower center dot color. */
 const FLOWER_CENTER_COLOR = 'rgba(120,104,56,0.82)';
 
+/** Spring flower petal colors: bright, fully-opaque, vivid. */
+const SPRING_FLOWER_PETAL_COLORS = [
+  'rgb(232,74,126)',   // hot pink
+  'rgb(240,144,106)',  // coral
+  'rgb(144,96,200)',   // bright lavender
+] as const;
+
+/** Spring flower center dot color (bright yellow). */
+const SPRING_FLOWER_CENTER_COLOR = 'rgb(240,192,64)';
+
 /** Grass blade color. */
 const GRASS_COLOR = 'rgba(72,115,58,0.90)';
 
@@ -109,8 +119,10 @@ function _drawPebbles(ctx: CanvasRenderingContext2D, variant: number): void {
 }
 
 /** Draw a small top-down flower centered at the current canvas origin. */
-function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
-  const petalColor = FLOWER_PETAL_COLORS[variant % FLOWER_PETAL_COLORS.length];
+function _drawFlower(ctx: CanvasRenderingContext2D, variant: number, bright = false): void {
+  const petalColors = bright ? SPRING_FLOWER_PETAL_COLORS : FLOWER_PETAL_COLORS;
+  const centerColor = bright ? SPRING_FLOWER_CENTER_COLOR : FLOWER_CENTER_COLOR;
+  const petalColor = petalColors[variant % petalColors.length];
   const petals = 5;
   const petalDist = _s(4.5);
   const petalR = _s(2.8);
@@ -123,7 +135,7 @@ function _drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
   }
   ctx.beginPath();
   ctx.arc(0, 0, _s(2.2), 0, Math.PI * 2);
-  ctx.fillStyle = FLOWER_CENTER_COLOR;
+  ctx.fillStyle = centerColor;
   ctx.fill();
 }
 
@@ -318,7 +330,7 @@ export function drawAmbientDecoration(
   }
   switch (dec.type) {
     case 'pebbles':   _drawPebbles(ctx, dec.variant);  break;
-    case 'flower':    _drawFlower(ctx, dec.variant);   break;
+    case 'flower':    _drawFlower(ctx, dec.variant, dec.bright);   break;
     case 'grass':     _drawGrass(ctx, dec.variant);    break;
     case 'mushroom':  _drawMushroom(ctx, dec.variant); break;
     case 'crystal':   _drawCrystal(ctx, dec.variant, dec.count);  break;

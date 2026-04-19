@@ -15,12 +15,14 @@ export enum Direction {
 export enum PipeShape {
   /** Empty tile: no pipe placed; players may fill these with inventory pieces */
   Empty = 'EMPTY',
-  /** Empty - Dirt tile: aesthetically brown empty floor; functionally identical to Empty */
+  /** Empty - Fall tile: aesthetically warm-brown autumn empty floor; functionally identical to Empty */
   EmptyDirt = 'EMPTY_DIRT',
   /** Empty - Dark tile: aesthetically dark empty floor; functionally identical to Empty */
   EmptyDark = 'EMPTY_DARK',
   /** Empty - Winter tile: aesthetically off-white snowy empty floor; functionally identical to Empty */
   EmptyWinter = 'EMPTY_WINTER',
+  /** Empty - Spring tile: aesthetically pale chartreuse/green spring floor; functionally identical to Empty */
+  EmptySpring = 'EMPTY_SPRING',
   /** Straight pipe: North–South */
   Straight = 'STRAIGHT',
   /** Elbow pipe: North–East */
@@ -231,20 +233,22 @@ export interface TileDef {
  * Visual style for a level or chapter map, controlling the default empty floor
  * tile type (and associated tree colors).
  * - 'Grass'  → green (default)
- * - 'Dirt'   → warm brown
+ * - 'Fall'   → warm autumn brown (formerly 'Dirt')
  * - 'Dark'   → dark blue-green
  * - 'Winter' → off-white snowy
+ * - 'Spring' → pale chartreuse/green spring
  */
-export type LevelStyle = 'Grass' | 'Dirt' | 'Dark' | 'Winter';
+export type LevelStyle = 'Grass' | 'Fall' | 'Dark' | 'Winter' | 'Spring';
 
 /** Valid LevelStyle values for runtime validation. */
-export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Dirt', 'Dark', 'Winter']);
+export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Fall', 'Dark', 'Winter', 'Spring']);
 
 /** Map a LevelStyle to its corresponding empty-floor PipeShape. */
 export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
-  if (style === 'Dirt') return PipeShape.EmptyDirt;
+  if (style === 'Fall') return PipeShape.EmptyDirt;
   if (style === 'Dark') return PipeShape.EmptyDark;
   if (style === 'Winter') return PipeShape.EmptyWinter;
+  if (style === 'Spring') return PipeShape.EmptySpring;
   return PipeShape.Empty;
 }
 
@@ -255,9 +259,10 @@ export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
  * type is the generic empty shape.
  */
 export function floorShapeToStyle(shape: PipeShape): LevelStyle | undefined {
-  if (shape === PipeShape.EmptyDirt) return 'Dirt';
+  if (shape === PipeShape.EmptyDirt) return 'Fall';
   if (shape === PipeShape.EmptyDark) return 'Dark';
   if (shape === PipeShape.EmptyWinter) return 'Winter';
+  if (shape === PipeShape.EmptySpring) return 'Spring';
   return undefined;
 }
 
@@ -324,6 +329,8 @@ export interface AmbientDecoration {
   scale?: number;
   /** Number of items to draw. Currently used by crystals (1 or 2 shards); other types always draw their default quantity. */
   count?: number;
+  /** When true, render the decoration in a brighter, fully-opaque style (used for Spring flowers). */
+  bright?: boolean;
 }
 
 /** A chapter groups a set of levels under a shared name. */

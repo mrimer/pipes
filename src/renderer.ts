@@ -14,9 +14,10 @@ import { LINE_WIDTH, TILE_SIZE, _s, BASE_TILE_SIZE } from './renderer/rendererSt
 import {
   BG_COLOR, TILE_BG,
   EMPTY_COLOR, EMPTY_COLOR_LIGHT, EMPTY_COLOR_DARK,
-  EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR_DARK,
+  EMPTY_FALL_COLOR, EMPTY_FALL_COLOR_LIGHT, EMPTY_FALL_COLOR_DARK,
   EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR_DARK,
   EMPTY_WINTER_COLOR, EMPTY_WINTER_COLOR_LIGHT, EMPTY_WINTER_COLOR_DARK,
+  EMPTY_SPRING_COLOR, EMPTY_SPRING_COLOR_LIGHT, EMPTY_SPRING_COLOR_DARK,
   GOLD_SPACE_BASE_COLOR, GOLD_SPACE_SHIMMER_COLOR, GOLD_SPACE_BORDER_COLOR,
   PIPE_COLOR, WATER_COLOR,
   SOURCE_COLOR, SOURCE_WATER_COLOR,
@@ -28,9 +29,10 @@ import {
   CHAMBER_COLOR, CHAMBER_WATER_COLOR,
   GRANITE_COLOR, GRANITE_FILL_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR,
-  TREE_DIRT_COLOR, TREE_DIRT_LEAF_COLOR, TREE_DIRT_LEAF_ALT_COLOR,
+  TREE_FALL_COLOR, TREE_FALL_LEAF_COLOR, TREE_FALL_LEAF_ALT_COLOR,
   TREE_DARK_COLOR, TREE_DARK_LEAF_COLOR, TREE_DARK_LEAF_ALT_COLOR,
   TREE_WINTER_COLOR, TREE_WINTER_LEAF_COLOR, TREE_WINTER_LEAF_ALT_COLOR,
+  TREE_SPRING_COLOR, TREE_SPRING_LEAF_COLOR, TREE_SPRING_LEAF_ALT_COLOR,
   CEMENT_COLOR, CEMENT_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
@@ -48,7 +50,7 @@ import {
   ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
   SEA_COLOR, SEA_BORDER_COLOR,
-  SEA_FILL_COLOR, SEA_FILL_COLOR_WINTER, SEA_FILL_COLOR_DIRT, SEA_FILL_COLOR_DARK,
+  SEA_FILL_COLOR, SEA_FILL_COLOR_WINTER, SEA_FILL_COLOR_FALL, SEA_FILL_COLOR_DARK, SEA_FILL_COLOR_SPRING,
 } from './colors';
 
 /** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
@@ -488,9 +490,10 @@ export function computeGraniteNeighbors(board: Board, row: number, col: number):
 
 /** Return [light, mid, dark] gingham colors for the given empty floor type. */
 export function ginghamColorsForFloor(floorType: PipeShape): [string, string, string] {
-  if (floorType === PipeShape.EmptyDirt) return [EMPTY_DIRT_COLOR_LIGHT, EMPTY_DIRT_COLOR, EMPTY_DIRT_COLOR_DARK];
+  if (floorType === PipeShape.EmptyDirt) return [EMPTY_FALL_COLOR_LIGHT, EMPTY_FALL_COLOR, EMPTY_FALL_COLOR_DARK];
   if (floorType === PipeShape.EmptyDark) return [EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_DARK];
   if (floorType === PipeShape.EmptyWinter) return [EMPTY_WINTER_COLOR_LIGHT, EMPTY_WINTER_COLOR, EMPTY_WINTER_COLOR_DARK];
+  if (floorType === PipeShape.EmptySpring) return [EMPTY_SPRING_COLOR_LIGHT, EMPTY_SPRING_COLOR, EMPTY_SPRING_COLOR_DARK];
   return [EMPTY_COLOR_LIGHT, EMPTY_COLOR, EMPTY_COLOR_DARK];
 }
 
@@ -575,44 +578,38 @@ export function drawGranite(
   // Each exposed edge is drawn as a line at the inset level (±bw / ±bh),
   // extended to the tile boundary when the perpendicular edges are adjacent to
   // granite so that the border visually closes the filled shape.
-  //
-  // Each endpoint that reaches the tile boundary is extended by OVERLAP px
-  // past it so that adjacent tiles' border strokes overlap rather than merely
-  // meeting, eliminating the ~21% background bleed that would otherwise appear
-  // at a sub-pixel (fractional-pan) tile boundary.
   ctx.strokeStyle = GRANITE_COLOR;
   ctx.lineWidth = _s(3);
   ctx.beginPath();
 
   // Top border (y = -bh): skip when north is granite
   if (!n.north) {
-    ctx.moveTo(n.west ? -(outerHalf + OVERLAP) : -bw, -bh);
-    ctx.lineTo(n.east ?  (outerHalf + OVERLAP) :  bw, -bh);
+    ctx.moveTo(n.west ? -outerHalf : -bw, -bh);
+    ctx.lineTo(n.east ?  outerHalf :  bw, -bh);
   }
   // Bottom border (y = +bh): skip when south is granite
   if (!n.south) {
-    ctx.moveTo(n.west ? -(outerHalf + OVERLAP) : -bw, bh);
-    ctx.lineTo(n.east ?  (outerHalf + OVERLAP) :  bw, bh);
+    ctx.moveTo(n.west ? -outerHalf : -bw, bh);
+    ctx.lineTo(n.east ?  outerHalf :  bw, bh);
   }
   // Left border (x = -bw): skip when west is granite
   if (!n.west) {
-    ctx.moveTo(-bw, n.north ? -(outerHalf + OVERLAP) : -bh);
-    ctx.lineTo(-bw, n.south ?  (outerHalf + OVERLAP) :  bh);
+    ctx.moveTo(-bw, n.north ? -outerHalf : -bh);
+    ctx.lineTo(-bw, n.south ?  outerHalf :  bh);
   }
   // Right border (x = +bw): skip when east is granite
   if (!n.east) {
-    ctx.moveTo(bw, n.north ? -(outerHalf + OVERLAP) : -bh);
-    ctx.lineTo(bw, n.south ?  (outerHalf + OVERLAP) :  bh);
+    ctx.moveTo(bw, n.north ? -outerHalf : -bh);
+    ctx.lineTo(bw, n.south ?  outerHalf :  bh);
   }
 
   // L-shaped inset borders at corners where two edges are granite but the
   // diagonal is not.  These trace the inner boundary of the unfilled corner
   // gap and connect cleanly to the adjacent tiles' inset border lines.
-  // Tile-boundary endpoints are extended by OVERLAP for the same overlap fix.
-  if (n.north && n.west && !n.nw) { ctx.moveTo(-(outerHalf + OVERLAP), -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -(outerHalf + OVERLAP)); }
-  if (n.north && n.east && !n.ne) { ctx.moveTo( (outerHalf + OVERLAP), -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -(outerHalf + OVERLAP)); }
-  if (n.south && n.west && !n.sw) { ctx.moveTo(-(outerHalf + OVERLAP),  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  (outerHalf + OVERLAP)); }
-  if (n.south && n.east && !n.se) { ctx.moveTo( (outerHalf + OVERLAP),  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  (outerHalf + OVERLAP)); }
+  if (n.north && n.west && !n.nw) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
+  if (n.north && n.east && !n.ne) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
+  if (n.south && n.west && !n.sw) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
+  if (n.south && n.east && !n.se) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
 
   ctx.stroke();
 
@@ -628,9 +625,10 @@ export function drawGranite(
 /** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
 export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
   const treeColors: Record<string, [string, string, string]> = {
-    Dirt:   [TREE_DIRT_LEAF_COLOR,    TREE_DIRT_LEAF_ALT_COLOR,    TREE_DIRT_COLOR],
+    Fall:   [TREE_FALL_LEAF_COLOR,    TREE_FALL_LEAF_ALT_COLOR,    TREE_FALL_COLOR],
     Dark:   [TREE_DARK_LEAF_COLOR,    TREE_DARK_LEAF_ALT_COLOR,    TREE_DARK_COLOR],
     Winter: [TREE_WINTER_LEAF_COLOR,  TREE_WINTER_LEAF_ALT_COLOR,  TREE_WINTER_COLOR],
+    Spring: [TREE_SPRING_LEAF_COLOR,  TREE_SPRING_LEAF_ALT_COLOR,  TREE_SPRING_COLOR],
   };
   const [leafColor, leafAltColor, outlineColor] = (style && treeColors[style]) ?? [TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_COLOR];
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
@@ -691,8 +689,9 @@ export interface SeaNeighbors {
 /** Returns the style-dependent fill color for Sea (water) tiles. */
 export function seaFillColor(style?: LevelStyle): string {
   if (style === 'Winter') return SEA_FILL_COLOR_WINTER;
-  if (style === 'Dirt')   return SEA_FILL_COLOR_DIRT;
+  if (style === 'Fall')   return SEA_FILL_COLOR_FALL;
   if (style === 'Dark')   return SEA_FILL_COLOR_DARK;
+  if (style === 'Spring') return SEA_FILL_COLOR_SPRING;
   return SEA_FILL_COLOR;
 }
 
@@ -1382,21 +1381,14 @@ export function drawPipeBody(
   fillColor: string,
 ): void {
   const lw2 = LINE_WIDTH / 2;
-  // 1-pixel overlap margin: the clip and fill are extended this many pixels
-  // past the tile boundary on butt-end directions.  This makes adjacent
-  // connected pipes' fills overlap rather than merely abut, eliminating the
-  // ~21% background bleed that appears at a sub-pixel (fractional-pan) tile
-  // boundary under canvas anti-aliasing.
-  const PIPE_OVERLAP = 1;
-  // Clip to the tile boundary (+PIPE_OVERLAP) on each butt-end direction so
-  // the black stroke outline never bleeds into adjacent tiles beyond the
-  // overlap margin.  Non-butt (nub) directions are left unconstrained so
-  // rounded caps can extend freely into empty space.
+  // Clip to the tile boundary on each butt-end direction so the black stroke
+  // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
+  // left unconstrained so rounded caps can extend freely into empty space.
   const LARGE = half + LINE_WIDTH;
-  const clipL = localButtEndDirs?.has(Direction.West)  ? -(half + PIPE_OVERLAP) : -LARGE;
-  const clipR = localButtEndDirs?.has(Direction.East)  ?  (half + PIPE_OVERLAP) :  LARGE;
-  const clipT = localButtEndDirs?.has(Direction.North) ? -(half + PIPE_OVERLAP) : -LARGE;
-  const clipB = localButtEndDirs?.has(Direction.South) ?  (half + PIPE_OVERLAP) :  LARGE;
+  const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
+  const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
+  const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
+  const clipB = localButtEndDirs?.has(Direction.South) ?  half :  LARGE;
   ctx.save();
   ctx.beginPath();
   ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
@@ -1413,14 +1405,6 @@ export function drawPipeBody(
   ctx.stroke();
   ctx.fillStyle = fillColor;
   ctx.fill();
-  // Extend the fill by PIPE_OVERLAP pixels into the adjacent tile at each
-  // butt-end direction.  Together with the adjacent tile's own pipe fill, this
-  // ensures the shared boundary pixel is fully covered even when the tile
-  // centre lands at a fractional canvas coordinate due to a pan offset.
-  if (localButtEndDirs?.has(Direction.North)) ctx.fillRect(-lw2, -(half + PIPE_OVERLAP), LINE_WIDTH, PIPE_OVERLAP);
-  if (localButtEndDirs?.has(Direction.South)) ctx.fillRect(-lw2,  half,                  LINE_WIDTH, PIPE_OVERLAP);
-  if (localButtEndDirs?.has(Direction.West))  ctx.fillRect(-(half + PIPE_OVERLAP), -lw2, PIPE_OVERLAP, LINE_WIDTH);
-  if (localButtEndDirs?.has(Direction.East))  ctx.fillRect( half,                  -lw2, PIPE_OVERLAP, LINE_WIDTH);
   ctx.restore();
 }
 
