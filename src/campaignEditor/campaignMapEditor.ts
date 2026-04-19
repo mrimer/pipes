@@ -150,7 +150,10 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._initGridState(campaign);
   }
 
-  /** Set the collapsed state of the Map box (e.g. restored from localStorage). */
+  /**
+   * Set the collapsed state of the Map box (e.g. restored from localStorage).
+   * Must be called before {@link buildSection} so the initial UI reflects the state.
+   */
   setMapBoxCollapsed(collapsed: boolean): void {
     this._mapBoxCollapsed = collapsed;
   }

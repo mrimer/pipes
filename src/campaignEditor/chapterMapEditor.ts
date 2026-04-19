@@ -74,6 +74,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
   init(chapter: ChapterDef): void {
     this._input?.detach();
     this._input = null;
+    this._mapBoxCollapsed = false;
     this._initChapterGridState(chapter);
   }
 
