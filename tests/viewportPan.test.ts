@@ -178,8 +178,8 @@ describe('viewport clamp (pure logic)', () => {
 
 /**
  * Mirrors the connected-bbox clamp math from MapScreenBase._clampPan after the
- * upward-drag fix: when the strict far-side formula is negative, fall back to
- * (rMax+1)*TILE_SIZE so upward drag cannot push all connected tiles off the top.
+ * bboxMax fix: when the strict far-side formula is negative, fall back to
+ * (rMax+1-viewRows)*TILE_SIZE so drag cannot push all connected tiles off screen.
  */
 function clampPanBBox(
   panY: number,
@@ -192,34 +192,38 @@ function clampPanBBox(
   const bboxMinY = Math.max(0, (rMin - 1) * tileSize);
   const strictBboxMaxY = (rMax + 2 - viewRows) * tileSize;
   const bboxMaxY = Math.min(maxPanY,
-    strictBboxMaxY >= 0 ? strictBboxMaxY : (rMax + 1) * tileSize);
+    strictBboxMaxY >= 0 ? strictBboxMaxY : (rMax + 1 - viewRows) * tileSize);
   return clampPanAxisWithFallback(panY, bboxMinY, bboxMaxY);
 }
 
 describe('connected-bbox clamp (pure logic)', () => {
   const TS = 64; // tile size
 
-  it('enforces bboxMinY when strict bboxMaxY < 0 and pan is below bboxMinY', () => {
-    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 → bboxMinY=2*TS
-    // strictBboxMaxY = (6+2-9)*TS = -TS → fallback bboxMaxY = min(3*TS, 7*TS) = 3*TS
+  it('allows pan in [0, bboxMinY] when strict bboxMaxY < 0 (connected region fits in viewport)', () => {
+    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 → bboxMinY=2*TS.
+    // strictBboxMaxY = (6+2-9)*TS = -TS < 0 → fallback bboxMaxY = min(3*TS, (6+1-9)*TS) = -2*TS.
+    // Inverted range [bboxMaxY=-2*TS, bboxMinY=2*TS]: effective pan ∈ [0, 2*TS].
     const maxPanY = 3 * TS;
-    // pan=0 should be forced up to bboxMinY=2*TS
-    expect(clampPanBBox(0, maxPanY, 3, 6, 9, TS)).toBe(2 * TS);
-    expect(clampPanBBox(TS, maxPanY, 3, 6, 9, TS)).toBe(2 * TS);
+    // Small pan values are no longer pushed up to bboxMinY.
+    expect(clampPanBBox(0,    maxPanY, 3, 6, 9, TS)).toBe(0);
+    expect(clampPanBBox(TS,   maxPanY, 3, 6, 9, TS)).toBe(TS);
+    // Pan beyond bboxMinY is capped at bboxMinY (the inverted upper bound).
+    expect(clampPanBBox(3 * TS, maxPanY, 3, 6, 9, TS)).toBe(2 * TS);
   });
 
-  it('caps upward drag at (rMax+1)*TILE_SIZE when strict bboxMaxY is negative', () => {
+  it('prevents connected tiles at the map top from being scrolled off-screen', () => {
     // 22-row map, viewRows=9, connected only at rows 0-2 (rMin=0, rMax=2).
     // maxPanY = (22-9)*TS = 13*TS.
-    // strictBboxMaxY = (2+2-9)*TS = -5*TS → fallback bboxMaxY = min(13*TS, 3*TS) = 3*TS.
+    // strictBboxMaxY = (2+2-9)*TS = -5*TS → fallback bboxMaxY = min(13*TS, (2+1-9)*TS) = -6*TS.
     // bboxMinY = max(0, -TS) = 0.
-    // Upward drag (pan increasing) must stop at 3*TS, not 13*TS.
+    // Inverted range [bboxMaxY=-6*TS, bboxMinY=0]: all pan values clamp to 0,
+    // keeping connected rows 0-2 visible in the top of the viewport.
     const maxPanY = 13 * TS;
-    expect(clampPanBBox(13 * TS, maxPanY, 0, 2, 9, TS)).toBe(3 * TS);
-    expect(clampPanBBox(4 * TS,  maxPanY, 0, 2, 9, TS)).toBe(3 * TS);
-    expect(clampPanBBox(3 * TS,  maxPanY, 0, 2, 9, TS)).toBe(3 * TS);
-    expect(clampPanBBox(2 * TS,  maxPanY, 0, 2, 9, TS)).toBe(2 * TS);
-    expect(clampPanBBox(0,        maxPanY, 0, 2, 9, TS)).toBe(0);
+    expect(clampPanBBox(13 * TS, maxPanY, 0, 2, 9, TS)).toBe(0);
+    expect(clampPanBBox(4 * TS,  maxPanY, 0, 2, 9, TS)).toBe(0);
+    expect(clampPanBBox(3 * TS,  maxPanY, 0, 2, 9, TS)).toBe(0);
+    expect(clampPanBBox(TS,      maxPanY, 0, 2, 9, TS)).toBe(0);
+    expect(clampPanBBox(0,       maxPanY, 0, 2, 9, TS)).toBe(0);
   });
 
   it('does not exceed maxPanY when bboxMinY > maxPanY', () => {
