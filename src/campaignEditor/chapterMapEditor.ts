@@ -192,6 +192,13 @@ export class ChapterMapEditorSection extends MapEditorBase {
     sectionTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     sectionHeader.appendChild(sectionTitle);
 
+    // Validation warning icon – stays in the header so it is visible even when the box is collapsed.
+    const validationWarningIcon = document.createElement('span');
+    validationWarningIcon.title = 'Chapter map has validation errors – click Validate for details';
+    validationWarningIcon.style.cssText = 'display:none;font-size:1rem;cursor:default;';
+    validationWarningIcon.textContent = '⚠️';
+    sectionHeader.appendChild(validationWarningIcon);
+
     // Collapsible body containing all map editor content
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
@@ -256,13 +263,39 @@ export class ChapterMapEditorSection extends MapEditorBase {
     redoBtn.id = 'chapter-redo-btn';
     midToolbar.appendChild(redoBtn);
 
-    midToolbar.appendChild(this._callbacks.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
+    // Helper: update the validate button and warning icon to reflect a validation result.
+    const applyValidationState = (ok: boolean) => {
+      if (ok) {
+        validateBtn.textContent = '✔ Validate';
+        validateBtn.style.color = '#7ed321';
+        validateBtn.style.borderColor = '#7ed321';
+        validateBtn.style.background = UI_BG;
+        validationWarningIcon.style.display = 'none';
+      } else {
+        validateBtn.textContent = '✗ Validate';
+        validateBtn.style.color = '#ff8c00';
+        validateBtn.style.borderColor = '#ff8c00';
+        validateBtn.style.background = UI_BG;
+        validationWarningIcon.style.display = '';
+      }
+    };
+
+    const validateBtn = this._callbacks.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
       const result = validateChapterMap(
         this._gridState.grid, this._gridState.rows, this._gridState.cols, chapter,
       );
       const icon = result.ok ? '✅' : '❌';
       alert(`${icon} Chapter Map Validation\n\n${result.messages.join('\n')}`);
-    }));
+      applyValidationState(result.ok);
+    });
+    midToolbar.appendChild(validateBtn);
+
+    // Auto-validate on screen activation.
+    const initResult = validateChapterMap(
+      this._gridState.grid, this._gridState.rows, this._gridState.cols, chapter,
+    );
+    applyValidationState(initResult.ok);
+
     midCol.appendChild(midToolbar);
 
     midCol.appendChild(this._buildChapterMapCanvas(campaign, chapter, false));
