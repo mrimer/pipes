@@ -281,6 +281,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
     title.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     header.appendChild(title);
 
+    // Validation warning icon – stays in the header so it is visible even when the box is collapsed.
+    const validationWarningIcon = document.createElement('span');
+    validationWarningIcon.title = 'Campaign map has validation errors – click Validate for details';
+    validationWarningIcon.style.cssText = 'display:none;font-size:1rem;cursor:default;';
+    validationWarningIcon.textContent = '⚠️';
+    header.appendChild(validationWarningIcon);
+
     // Collapsible body containing all map editor content
     const body = document.createElement('div');
     body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
@@ -342,13 +349,37 @@ export class CampaignMapEditorSection extends MapEditorBase {
     redoBtn.id = 'campaign-map-redo-btn';
     toolbar.appendChild(redoBtn);
 
-    toolbar.appendChild(this._cbs.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
+    // Helper: update the validate button and warning icon to reflect a validation result.
+    const applyValidationState = (ok: boolean) => {
+      if (ok) {
+        validateBtn.textContent = '✔ Validate';
+        validateBtn.style.color = '#7ed321';
+        validateBtn.style.borderColor = '#7ed321';
+        validateBtn.style.background = UI_BG;
+        validationWarningIcon.style.display = 'none';
+      } else {
+        validateBtn.textContent = '✗ Validate';
+        validateBtn.style.color = '#ff8c00';
+        validateBtn.style.borderColor = '#ff8c00';
+        validateBtn.style.background = UI_BG;
+        validationWarningIcon.style.display = '';
+      }
+    };
+
+    const validateBtn = this._cbs.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
       const c = this._cbs.getActiveCampaign();
       if (!c) return;
       const result = validateCampaignMap(this._gridState.grid, this._gridState.rows, this._gridState.cols, c);
       const icon = result.ok ? '✅' : '❌';
       alert(`${icon} Campaign Map Validation\n\n${result.messages.join('\n')}`);
-    }));
+      applyValidationState(result.ok);
+    });
+    toolbar.appendChild(validateBtn);
+
+    // Auto-validate on screen activation.
+    const initResult = validateCampaignMap(this._gridState.grid, this._gridState.rows, this._gridState.cols, campaign);
+    applyValidationState(initResult.ok);
+
     midCol.appendChild(toolbar);
     midCol.appendChild(this._buildCanvas(campaign, false));
     layout.appendChild(midCol);

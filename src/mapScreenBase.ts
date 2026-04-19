@@ -164,6 +164,13 @@ export abstract class MapScreenBase {
   /** Whether the initial snap position has been computed for the current map key. */
   private _panInitialized = false;
   /**
+   * The tile size (px) that was used the last time this screen instance rendered.
+   * Tracked per-instance so that the pan rescaling on repopulate uses the correct
+   * "old" tile size even when the global TILE_SIZE was changed by another screen
+   * (e.g. the chapter map) while this screen was hidden.
+   */
+  private _lastTileSize = 0;
+  /**
    * Cached bounding box (in tile coordinates) of the connected-tile region,
    * used by `_clampPan`. Computed once in `_populate` and reused each frame
    * during drag events. Null when no grid is loaded or no tiles are reachable.
@@ -675,8 +682,13 @@ export abstract class MapScreenBase {
     const isOversized = rows > MAP_VIEW_MAX_ROWS || cols > MAP_VIEW_MAX_COLS;
 
     // Scale tile size to fit the view window on screen.
-    const oldTileSize = TILE_SIZE;
+    // Use the tile size this instance last used (not the global) as the reference
+    // for rescaling the pan offset on repopulate.  The global TILE_SIZE may have
+    // been mutated by another screen (e.g. the chapter map) while this screen was
+    // hidden, which would produce an incorrect rescale factor if used directly.
+    const oldTileSize = this._lastTileSize > 0 ? this._lastTileSize : TILE_SIZE;
     setTileSize(computeTileSize(viewRows, viewCols, CHAPTER_MAP_GRID_OVERHEAD));
+    this._lastTileSize = TILE_SIZE;
     this._viewRows = viewRows;
     this._viewCols = viewCols;
 
