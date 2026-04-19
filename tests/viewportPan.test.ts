@@ -199,9 +199,10 @@ function clampPanBBox(
 describe('connected-bbox clamp (pure logic)', () => {
   const TS = 64; // tile size
 
-  it('allows pan in [0, bboxMinY] when strict bboxMaxY < 0 (connected region fits in viewport)', () => {
-    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 → bboxMinY=2*TS.
-    // strictBboxMaxY = (6+2-9)*TS = -TS < 0 → fallback bboxMaxY = min(3*TS, (6+1-9)*TS) = -2*TS.
+  it('allows pan in [0, bboxMinY] when strict bboxMaxY < 0 (connected region fits within viewport height)', () => {
+    // rows=12, viewRows=9 → maxPanY=3*TS; connected rows 3-6 (4 tiles) fits within
+    // the 9-row viewport, so strictBboxMaxY = (6+2-9)*TS = -TS < 0.
+    // Fixed fallback bboxMaxY = min(3*TS, (6+1-9)*TS) = -2*TS.
     // Inverted range [bboxMaxY=-2*TS, bboxMinY=2*TS]: effective pan ∈ [0, 2*TS].
     const maxPanY = 3 * TS;
     // Small pan values are no longer pushed up to bboxMinY.
