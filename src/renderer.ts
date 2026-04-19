@@ -490,7 +490,7 @@ export function computeGraniteNeighbors(board: Board, row: number, col: number):
 
 /** Return [light, mid, dark] gingham colors for the given empty floor type. */
 export function ginghamColorsForFloor(floorType: PipeShape): [string, string, string] {
-  if (floorType === PipeShape.EmptyDirt) return [EMPTY_FALL_COLOR_LIGHT, EMPTY_FALL_COLOR, EMPTY_FALL_COLOR_DARK];
+  if (floorType === PipeShape.EmptyFall) return [EMPTY_FALL_COLOR_LIGHT, EMPTY_FALL_COLOR, EMPTY_FALL_COLOR_DARK];
   if (floorType === PipeShape.EmptyDark) return [EMPTY_DARK_COLOR_LIGHT, EMPTY_DARK_COLOR, EMPTY_DARK_COLOR_DARK];
   if (floorType === PipeShape.EmptyWinter) return [EMPTY_WINTER_COLOR_LIGHT, EMPTY_WINTER_COLOR, EMPTY_WINTER_COLOR_DARK];
   if (floorType === PipeShape.EmptySpring) return [EMPTY_SPRING_COLOR_LIGHT, EMPTY_SPRING_COLOR, EMPTY_SPRING_COLOR_DARK];

@@ -16,7 +16,7 @@ export enum PipeShape {
   /** Empty tile: no pipe placed; players may fill these with inventory pieces */
   Empty = 'EMPTY',
   /** Empty - Fall tile: aesthetically warm-brown autumn empty floor; functionally identical to Empty */
-  EmptyDirt = 'EMPTY_DIRT',
+  EmptyFall = 'EMPTY_FALL',
   /** Empty - Dark tile: aesthetically dark empty floor; functionally identical to Empty */
   EmptyDark = 'EMPTY_DARK',
   /** Empty - Winter tile: aesthetically off-white snowy empty floor; functionally identical to Empty */
@@ -245,7 +245,7 @@ export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Fall', '
 
 /** Map a LevelStyle to its corresponding empty-floor PipeShape. */
 export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
-  if (style === 'Fall') return PipeShape.EmptyDirt;
+  if (style === 'Fall') return PipeShape.EmptyFall;
   if (style === 'Dark') return PipeShape.EmptyDark;
   if (style === 'Winter') return PipeShape.EmptyWinter;
   if (style === 'Spring') return PipeShape.EmptySpring;
@@ -259,7 +259,7 @@ export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
  * type is the generic empty shape.
  */
 export function floorShapeToStyle(shape: PipeShape): LevelStyle | undefined {
-  if (shape === PipeShape.EmptyDirt) return 'Fall';
+  if (shape === PipeShape.EmptyFall) return 'Fall';
   if (shape === PipeShape.EmptyDark) return 'Dark';
   if (shape === PipeShape.EmptyWinter) return 'Winter';
   if (shape === PipeShape.EmptySpring) return 'Spring';

@@ -132,9 +132,10 @@ const LEAKY_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
 
 const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
   { palette: PipeShape.Empty,        label: '🟩 Empty - Grass' },
-  { palette: PipeShape.EmptyDirt,    label: '🟫 Empty - Dirt' },
+  { palette: PipeShape.EmptyFall,    label: '🍂 Empty - Fall' },
   { palette: PipeShape.EmptyDark,    label: '⬛ Empty - Dark' },
   { palette: PipeShape.EmptyWinter,  label: '⬜ Empty - Winter' },
+  { palette: PipeShape.EmptySpring,  label: '🌸 Empty - Spring' },
   { palette: PipeShape.Granite,   label: '▪ Granite' },
   { palette: PipeShape.Tree,      label: '🌿 Tree' },
   { palette: PipeShape.Sea,       label: '🌊 Sea' },
@@ -148,9 +149,10 @@ const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
 /** Label/emoji for each LevelStyle option. */
 export const STYLE_OPTION_LABELS: Array<{ value: LevelStyle; label: string }> = [
   { value: 'Grass',  label: '🟩 Grass' },
-  { value: 'Dirt',   label: '🟫 Dirt' },
+  { value: 'Fall',   label: '🍂 Fall' },
   { value: 'Dark',   label: '⬛ Dark' },
   { value: 'Winter', label: '⬜ Winter' },
+  { value: 'Spring', label: '🌸 Spring' },
 ];
 
 /**
