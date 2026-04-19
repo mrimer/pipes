@@ -135,7 +135,7 @@ export function isEmptyFloor(shape: PipeShape): boolean {
 }
 
 /**
- * Compute the display floor type (Empty / EmptyDirt / EmptyDark) for every cell
+ * Compute the display floor type (Empty / EmptyFall / EmptyDark / EmptyWinter / EmptySpring) for every cell
  * in a grid, using a two-pass algorithm:
  *
  * 1. Cells for which `getCellFloorType` returns a non-null value are resolved
@@ -304,7 +304,7 @@ const DECORATION_DENSITY = 0.30;
  * Return the decoration types appropriate for the given empty floor type.
  *
  * - **Grass** (Empty):     flowers, grass tufts, mushrooms — organic surface.
- * - **Fall** (EmptyDirt):  grass tufts, crystals, pebbles — no flowers/mushrooms.
+ * - **Fall** (EmptyFall):  grass tufts, crystals, pebbles — no flowers/mushrooms.
  * - **Dark** (EmptyDark):  pebbles only — stone-like surface.
  * - **Winter** (EmptyWinter): pebbles and crystals — icy, snow-covered surface.
  * - **Spring** (EmptySpring): flowers and grass only — bright spring surface.
@@ -445,7 +445,7 @@ export class Board {
 
   /**
    * Pre-computed "background floor type" for every cell, used for rendering.
-   * Empty cells: their own PipeShape (Empty / EmptyDirt / EmptyDark).
+   * Empty cells: their own PipeShape (Empty / EmptyFall / EmptyDark / EmptyWinter / EmptySpring).
    * Source, Sink, Tree: majority of adjacent empty-floor tiles' shapes.
    * Granite: BFS flood-fill from edges touching empty tiles.
    * Other tiles: PipeShape.Empty fallback.
@@ -603,13 +603,13 @@ export class Board {
     this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
   }
 
-  /** Pre-compute the floor type (Empty/EmptyDirt/EmptyDark/EmptyWinter/EmptySpring) for every cell. */
+  /** Pre-compute the floor type (Empty/EmptyFall/EmptyDark/EmptyWinter/EmptySpring) for every cell. */
   private _computeFloorTypes(): ReadonlyMap<string, PipeShape> {
     return computeFloorTypesFromGrid(this.rows, this.cols, (r, c) => {
       const key = posKey(r, c);
       // Gold spaces, one-way tiles, and cement tiles are stored as PipeShape.Empty
       // at runtime, but their floor type should be inferred from their region
-      // (Empty / EmptyDirt / EmptyDark) via BFS propagation from neighbours.
+      // (Empty / EmptyFall / EmptyDark / EmptyWinter / EmptySpring) via BFS propagation from neighbours.
       // Fixed pipe tile types (Source, Sink, Straight, etc.) also return null
       // here so that BFS propagates the correct floor type to them.
       if (this.goldSpaces.has(key) || this.oneWayData.has(key) || this.cementData.has(key)) {

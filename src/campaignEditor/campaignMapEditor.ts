@@ -415,10 +415,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     panel.appendChild(titleEl);
 
     const CAMPAIGN_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-      { palette: PipeShape.Empty,       label: '🟩 Empty - Grass' },
-      { palette: PipeShape.EmptyFall,   label: '🟫 Empty - Dirt' },
-      { palette: PipeShape.EmptyDark,   label: '⬛ Empty - Dark' },
-      { palette: PipeShape.EmptyWinter, label: '⬜ Empty - Winter' },
+      { palette: PipeShape.Empty,        label: '🟩 Empty - Grass' },
+      { palette: PipeShape.EmptyFall,    label: '🍂 Empty - Fall' },
+      { palette: PipeShape.EmptyDark,    label: '⬛ Empty - Dark' },
+      { palette: PipeShape.EmptyWinter,  label: '⬜ Empty - Winter' },
+      { palette: PipeShape.EmptySpring,  label: '🌸 Empty - Spring' },
       { palette: PipeShape.Source,      label: '💧 Source' },
       { palette: PipeShape.Sink,        label: '🏁 Sink' },
       { palette: CHAPTER_CHAMBER_PALETTE, label: '📂 Chapter' },

@@ -349,6 +349,8 @@ describe('REPEATABLE_EDITOR_TILES', () => {
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.Empty)).toBe(true);
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyFall)).toBe(true);
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyDark)).toBe(true);
+    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyWinter)).toBe(true);
+    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptySpring)).toBe(true);
   });
 
   it('does NOT include Source or Sink (placed singly, not by drag)', () => {
@@ -529,7 +531,7 @@ describe('buildMapTileDef', () => {
     expect(buildMapTileDef('erase', { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.Empty });
   });
 
-  it('EmptyDirt palette returns EmptyDirt tile', () => {
+  it('EmptyFall palette returns EmptyFall tile', () => {
     expect(buildMapTileDef(PipeShape.EmptyFall, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyFall });
   });
 
@@ -539,6 +541,10 @@ describe('buildMapTileDef', () => {
 
   it('EmptyWinter palette returns EmptyWinter tile', () => {
     expect(buildMapTileDef(PipeShape.EmptyWinter, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyWinter });
+  });
+
+  it('EmptySpring palette returns EmptySpring tile', () => {
+    expect(buildMapTileDef(PipeShape.EmptySpring, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptySpring });
   });
 
   it('Empty palette returns Empty tile', () => {
