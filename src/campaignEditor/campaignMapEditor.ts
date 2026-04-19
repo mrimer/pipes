@@ -682,6 +682,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       cols: ch.cols ?? 0,
       grid: ch.grid ?? [],
       inventory: [],
+      style: ch.style,
     }));
 
     // Apply pan transform so the view window scrolls over the full grid.
