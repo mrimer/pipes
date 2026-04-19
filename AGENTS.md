@@ -1,5 +1,7 @@
 Minimize duplicating code when adding or updating operations with similar logic to support ease of maintainability across the codebase. Instead, refactor duplicate logic, consolidating it into unified helper functions or modules.
 
+Avoid hardcoding magic numbers and string literals unless there's a compelling reason to do so.
+
 Fix pre-existing linter issues.
 
 Use American spelling.
