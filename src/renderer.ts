@@ -533,30 +533,32 @@ export function drawGranite(
   neighbors?: GraniteNeighbors,
 ): void {
   const n = neighbors ?? { north: false, south: false, east: false, west: false, nw: false, ne: false, sw: false, se: false };
-  // Round to integer pixels so all fillRect calls share exact coordinates and
-  // no sub-pixel anti-aliasing gaps appear between the core rectangle and the
-  // adjacent edge/corner strips.
+  // Round inner boundary to integer pixels so fillRect calls share exact
+  // coordinates.  Ceiling of half is used as the outer boundary: for even
+  // tile sizes outerHalf === half (integer), for odd tile sizes (where
+  // half = TILE_SIZE/2 is fractional) it rounds up by ½px so the strips
+  // extend just past the tile boundary.  This guarantees that adjacent tiles'
+  // strips overlap rather than merely abut, eliminating sub-pixel seams under
+  // any CSS zoom level.  All resulting size expressions are then pure integers.
   const bw = Math.round(half * 0.7);
   const bh = Math.round(half * 0.7);
+  const outerHalf = Math.ceil(half);
 
   ctx.fillStyle = GRANITE_FILL_COLOR;
 
   // ── Fill ─────────────────────────────────────────────────────────────────
   // Core inset rectangle (always drawn)
   ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-  // Edge extension strips toward adjacent granite tiles.
-  // Math.ceil on the strip/corner sizes ensures they overlap the core rectangle
-  // by up to 1 pixel, eliminating sub-pixel seams caused by CSS non-uniform
-  // scaling mapping canvas coordinates to fractional device pixels.
-  if (n.north) ctx.fillRect(-bw, -half, bw * 2, Math.ceil(half - bh));
-  if (n.south) ctx.fillRect(-bw, bh,   bw * 2, Math.ceil(half - bh));
-  if (n.west)  ctx.fillRect(-half, -bh, Math.ceil(half - bw), bh * 2);
-  if (n.east)  ctx.fillRect(bw,   -bh, Math.ceil(half - bw), bh * 2);
+  // Edge extension strips toward adjacent granite tiles
+  if (n.north) ctx.fillRect(-bw, -outerHalf, bw * 2,          outerHalf - bh);
+  if (n.south) ctx.fillRect(-bw, bh,         bw * 2,          outerHalf - bh);
+  if (n.west)  ctx.fillRect(-outerHalf, -bh, outerHalf - bw,  bh * 2);
+  if (n.east)  ctx.fillRect(bw,         -bh, outerHalf - bw,  bh * 2);
   // Corner fills: only when both edge neighbors AND the diagonal are granite
-  if (n.north && n.west && n.nw) ctx.fillRect(-half, -half, Math.ceil(half - bw), Math.ceil(half - bh));
-  if (n.north && n.east && n.ne) ctx.fillRect(bw,   -half, Math.ceil(half - bw), Math.ceil(half - bh));
-  if (n.south && n.west && n.sw) ctx.fillRect(-half, bh,   Math.ceil(half - bw), Math.ceil(half - bh));
-  if (n.south && n.east && n.se) ctx.fillRect(bw,   bh,   Math.ceil(half - bw), Math.ceil(half - bh));
+  if (n.north && n.west && n.nw) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw, outerHalf - bh);
+  if (n.north && n.east && n.ne) ctx.fillRect(bw,         -outerHalf, outerHalf - bw, outerHalf - bh);
+  if (n.south && n.west && n.sw) ctx.fillRect(-outerHalf, bh,         outerHalf - bw, outerHalf - bh);
+  if (n.south && n.east && n.se) ctx.fillRect(bw,         bh,         outerHalf - bw, outerHalf - bh);
 
   // ── Border ───────────────────────────────────────────────────────────────
   // Draw border only on edges that are NOT adjacent to granite.
@@ -569,32 +571,32 @@ export function drawGranite(
 
   // Top border (y = -bh): skip when north is granite
   if (!n.north) {
-    ctx.moveTo(n.west ? -half : -bw, -bh);
-    ctx.lineTo(n.east ? half  :  bw, -bh);
+    ctx.moveTo(n.west ? -outerHalf : -bw, -bh);
+    ctx.lineTo(n.east ?  outerHalf :  bw, -bh);
   }
   // Bottom border (y = +bh): skip when south is granite
   if (!n.south) {
-    ctx.moveTo(n.west ? -half : -bw, bh);
-    ctx.lineTo(n.east ? half  :  bw, bh);
+    ctx.moveTo(n.west ? -outerHalf : -bw, bh);
+    ctx.lineTo(n.east ?  outerHalf :  bw, bh);
   }
   // Left border (x = -bw): skip when west is granite
   if (!n.west) {
-    ctx.moveTo(-bw, n.north ? -half : -bh);
-    ctx.lineTo(-bw, n.south ? half  :  bh);
+    ctx.moveTo(-bw, n.north ? -outerHalf : -bh);
+    ctx.lineTo(-bw, n.south ?  outerHalf :  bh);
   }
   // Right border (x = +bw): skip when east is granite
   if (!n.east) {
-    ctx.moveTo(bw, n.north ? -half : -bh);
-    ctx.lineTo(bw, n.south ? half  :  bh);
+    ctx.moveTo(bw, n.north ? -outerHalf : -bh);
+    ctx.lineTo(bw, n.south ?  outerHalf :  bh);
   }
 
   // L-shaped inset borders at corners where two edges are granite but the
   // diagonal is not.  These trace the inner boundary of the unfilled corner
   // gap and connect cleanly to the adjacent tiles' inset border lines.
-  if (n.north && n.west && !n.nw) { ctx.moveTo(-half, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -half); }
-  if (n.north && n.east && !n.ne) { ctx.moveTo(half,  -bh); ctx.lineTo(bw,  -bh); ctx.lineTo(bw,  -half); }
-  if (n.south && n.west && !n.sw) { ctx.moveTo(-half,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  half); }
-  if (n.south && n.east && !n.se) { ctx.moveTo(half,   bh); ctx.lineTo(bw,   bh); ctx.lineTo(bw,   half); }
+  if (n.north && n.west && !n.nw) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
+  if (n.north && n.east && !n.ne) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
+  if (n.south && n.west && !n.sw) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
+  if (n.south && n.east && !n.se) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
 
   ctx.stroke();
 
