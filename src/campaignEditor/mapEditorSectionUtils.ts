@@ -9,6 +9,7 @@
 import { TileDef } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { commandKeyManager } from '../commandKeyManager';
+import { UI_BG } from '../uiConstants';
 
 // ─── Keyboard handler ──────────────────────────────────────────────────────────
 
@@ -84,4 +85,35 @@ export function handleMapEditorKeyDown(
     }
   }
   cbs.rotatePalette(clockwise);
+}
+
+// ─── Validation UI helper ──────────────────────────────────────────────────────
+
+/**
+ * Update a Validate button and its associated warning icon to reflect a
+ * map validation result.  Shared between the campaign map editor and the
+ * chapter map editor.
+ *
+ * @param validateBtn        The Validate `<button>` element to update.
+ * @param warningIcon        The `⚠️` icon element shown in the header.
+ * @param ok                 Whether the validation passed.
+ */
+export function applyMapValidationState(
+  validateBtn: HTMLButtonElement,
+  warningIcon: HTMLElement,
+  ok: boolean,
+): void {
+  if (ok) {
+    validateBtn.textContent = '✔ Validate';
+    validateBtn.style.color = '#7ed321';
+    validateBtn.style.borderColor = '#7ed321';
+    validateBtn.style.background = UI_BG;
+    warningIcon.style.display = 'none';
+  } else {
+    validateBtn.textContent = '✗ Validate';
+    validateBtn.style.color = '#ff8c00';
+    validateBtn.style.borderColor = '#ff8c00';
+    validateBtn.style.background = UI_BG;
+    warningIcon.style.display = '';
+  }
 }
