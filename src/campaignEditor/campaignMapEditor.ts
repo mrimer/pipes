@@ -49,7 +49,7 @@ import {
 } from './canvasUtils';
 import { isTileConnectedToSource } from '../tile';
 import { buildCompletionInputWidget } from './chapterEditorUI';
-import { handleMapEditorKeyDown } from './mapEditorSectionUtils';
+import { handleMapEditorKeyDown, applyMapValidationState } from './mapEditorSectionUtils';
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
 import { MapEditorBase } from './mapEditorBase';
 
@@ -350,21 +350,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
     toolbar.appendChild(redoBtn);
 
     // Helper: update the validate button and warning icon to reflect a validation result.
-    const applyValidationState = (ok: boolean) => {
-      if (ok) {
-        validateBtn.textContent = '✔ Validate';
-        validateBtn.style.color = '#7ed321';
-        validateBtn.style.borderColor = '#7ed321';
-        validateBtn.style.background = UI_BG;
-        validationWarningIcon.style.display = 'none';
-      } else {
-        validateBtn.textContent = '✗ Validate';
-        validateBtn.style.color = '#ff8c00';
-        validateBtn.style.borderColor = '#ff8c00';
-        validateBtn.style.background = UI_BG;
-        validationWarningIcon.style.display = '';
-      }
-    };
+    const applyValidationState = (ok: boolean) =>
+      applyMapValidationState(validateBtn, validationWarningIcon, ok);
 
     const validateBtn = this._cbs.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
       const c = this._cbs.getActiveCampaign();

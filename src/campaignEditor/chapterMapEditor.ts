@@ -25,7 +25,7 @@ import {
   drawFocusedTileOverlay,
   buildCanvasWithErrorDiv,
 } from './canvasUtils';
-import { handleMapEditorKeyDown } from './mapEditorSectionUtils';
+import { handleMapEditorKeyDown, applyMapValidationState } from './mapEditorSectionUtils';
 import { MapEditorBase } from './mapEditorBase';
 import { saveChapterEditorMapBoxCollapsed } from '../persistence';
 
@@ -264,21 +264,8 @@ export class ChapterMapEditorSection extends MapEditorBase {
     midToolbar.appendChild(redoBtn);
 
     // Helper: update the validate button and warning icon to reflect a validation result.
-    const applyValidationState = (ok: boolean) => {
-      if (ok) {
-        validateBtn.textContent = '✔ Validate';
-        validateBtn.style.color = '#7ed321';
-        validateBtn.style.borderColor = '#7ed321';
-        validateBtn.style.background = UI_BG;
-        validationWarningIcon.style.display = 'none';
-      } else {
-        validateBtn.textContent = '✗ Validate';
-        validateBtn.style.color = '#ff8c00';
-        validateBtn.style.borderColor = '#ff8c00';
-        validateBtn.style.background = UI_BG;
-        validationWarningIcon.style.display = '';
-      }
-    };
+    const applyValidationState = (ok: boolean) =>
+      applyMapValidationState(validateBtn, validationWarningIcon, ok);
 
     const validateBtn = this._callbacks.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
       const result = validateChapterMap(
