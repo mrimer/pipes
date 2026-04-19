@@ -416,7 +416,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     const CAMPAIGN_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
       { palette: PipeShape.Empty,       label: '🟩 Empty - Grass' },
-      { palette: PipeShape.EmptyDirt,   label: '🟫 Empty - Dirt' },
+      { palette: PipeShape.EmptyFall,   label: '🟫 Empty - Dirt' },
       { palette: PipeShape.EmptyDark,   label: '⬛ Empty - Dark' },
       { palette: PipeShape.EmptyWinter, label: '⬜ Empty - Winter' },
       { palette: PipeShape.Source,      label: '💧 Source' },

@@ -4,7 +4,7 @@ import { bfs } from './bfs';
 /** Base connections for each pipe shape (at 0° rotation). */
 const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.Empty]:     [],
-  [PipeShape.EmptyDirt]: [],
+  [PipeShape.EmptyFall]: [],
   [PipeShape.EmptyDark]: [],
   [PipeShape.EmptyWinter]: [],
   [PipeShape.Straight]:  [Direction.North, Direction.South],

@@ -347,7 +347,7 @@ describe('REPEATABLE_EDITOR_TILES', () => {
 
   it('includes all empty floor types for drag-paint', () => {
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.Empty)).toBe(true);
-    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyDirt)).toBe(true);
+    expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyFall)).toBe(true);
     expect(REPEATABLE_EDITOR_TILES.has(PipeShape.EmptyDark)).toBe(true);
   });
 
@@ -530,7 +530,7 @@ describe('buildMapTileDef', () => {
   });
 
   it('EmptyDirt palette returns EmptyDirt tile', () => {
-    expect(buildMapTileDef(PipeShape.EmptyDirt, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyDirt });
+    expect(buildMapTileDef(PipeShape.EmptyFall, { ...DEFAULT_PARAMS })).toEqual({ shape: PipeShape.EmptyFall });
   });
 
   it('EmptyDark palette returns EmptyDark tile', () => {

@@ -16,6 +16,7 @@ import {
   EMPTY_FALL_COLOR_DARK,
   EMPTY_DARK_COLOR_DARK,
   EMPTY_WINTER_COLOR_DARK,
+  EMPTY_SPRING_COLOR_DARK,
   PIPE_COLOR,
   FIXED_PIPE_COLOR,
   SOURCE_COLOR,
@@ -40,16 +41,18 @@ import {
   SANDSTONE_COLOR,
   STAR_COLOR,
   TREE_COLOR,
-  TREE_DIRT_COLOR,
+  TREE_FALL_COLOR,
   TREE_DARK_COLOR,
   TREE_WINTER_COLOR,
+  TREE_SPRING_COLOR,
   ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
   SEA_FILL_COLOR,
   SEA_FILL_COLOR_WINTER,
-  SEA_FILL_COLOR_DIRT,
+  SEA_FILL_COLOR_FALL,
   SEA_FILL_COLOR_DARK,
+  SEA_FILL_COLOR_SPRING,
 } from '../colors';
 
 
@@ -78,25 +81,28 @@ export function minimapDimensions(rows: number, cols: number): { width: number; 
 
 /** Returns the style-dependent color for default empty floor tiles. */
 function emptyColor(style: LevelStyle | undefined): string {
-  if (style === 'Dirt') return EMPTY_DIRT_COLOR_DARK;
+  if (style === 'Fall') return EMPTY_FALL_COLOR_DARK;
   if (style === 'Dark') return EMPTY_DARK_COLOR_DARK;
   if (style === 'Winter') return EMPTY_WINTER_COLOR_DARK;
+  if (style === 'Spring') return EMPTY_SPRING_COLOR_DARK;
   return EMPTY_COLOR_DARK;
 }
 
 /** Returns the darker tree color for the given level style. */
 function treeColor(style: LevelStyle | undefined): string {
-  if (style === 'Dirt') return TREE_DIRT_COLOR;
+  if (style === 'Fall') return TREE_FALL_COLOR;
   if (style === 'Dark') return TREE_DARK_COLOR;
   if (style === 'Winter') return TREE_WINTER_COLOR;
+  if (style === 'Spring') return TREE_SPRING_COLOR;
   return TREE_COLOR;
 }
 
 /** Returns the style-dependent fill color for Sea (water) tiles. */
 function seaColor(style: LevelStyle | undefined): string {
   if (style === 'Winter') return SEA_FILL_COLOR_WINTER;
-  if (style === 'Dirt') return SEA_FILL_COLOR_DIRT;
+  if (style === 'Fall') return SEA_FILL_COLOR_FALL;
   if (style === 'Dark') return SEA_FILL_COLOR_DARK;
+  if (style === 'Spring') return SEA_FILL_COLOR_SPRING;
   return SEA_FILL_COLOR;
 }
 
@@ -130,9 +136,10 @@ function chamberOutlineColor(tile: TileDef): string {
  */
 function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string {
   if (!tile) return emptyColor(style);
-  if (tile.shape === PipeShape.EmptyDirt) return EMPTY_DIRT_COLOR_DARK;
+  if (tile.shape === PipeShape.EmptyFall) return EMPTY_FALL_COLOR_DARK;
   if (tile.shape === PipeShape.EmptyDark) return EMPTY_DARK_COLOR_DARK;
   if (tile.shape === PipeShape.EmptyWinter) return EMPTY_WINTER_COLOR_DARK;
+  if (tile.shape === PipeShape.EmptySpring) return EMPTY_SPRING_COLOR_DARK;
   if (tile.shape === PipeShape.Empty) return emptyColor(style);
   switch (tile.shape) {
     case PipeShape.Straight:

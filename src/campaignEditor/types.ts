@@ -222,9 +222,10 @@ export const DEFAULT_PARAMS: TileParams = {
  */
 export function buildMapTileDef(palette: EditorPalette, params: TileParams): TileDef {
   if (palette === 'erase') return { shape: PipeShape.Empty };
-  if (palette === PipeShape.EmptyDirt)   return { shape: PipeShape.EmptyDirt };
+  if (palette === PipeShape.EmptyFall)   return { shape: PipeShape.EmptyFall };
   if (palette === PipeShape.EmptyDark)   return { shape: PipeShape.EmptyDark };
   if (palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
+  if (palette === PipeShape.EmptySpring) return { shape: PipeShape.EmptySpring };
   if (palette === PipeShape.Empty)       return { shape: PipeShape.Empty };
   const shape = palette as PipeShape;
   const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
@@ -276,9 +277,10 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.Tree]:          '#2d6e1a',
   [PipeShape.Sea]:           '#2a7fbf',
   [PipeShape.Empty]:         '#1a2840',
-  [PipeShape.EmptyDirt]:     '#7b5230',
+  [PipeShape.EmptyFall]:     '#7b5230',
   [PipeShape.EmptyDark]:     '#1a1a2e',
   [PipeShape.EmptyWinter]:   '#d8e4ec',
+  [PipeShape.EmptySpring]:   '#9dc46a',
   [PipeShape.Cement]:        '#8090a0',
   [PipeShape.GoldSpace]:     '#b8860b',
   [PipeShape.GoldStraight]:  '#f39c12',
@@ -357,7 +359,7 @@ export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
   PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
-  PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark, PipeShape.EmptyWinter,
+  PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
   PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
 ]);

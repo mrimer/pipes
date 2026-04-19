@@ -122,7 +122,7 @@ export function isObstacleTile(shape: PipeShape): boolean {
 
 /** All empty-floor shapes that a player may fill with a pipe from inventory. */
 export const EMPTY_FLOOR_SHAPES: readonly PipeShape[] = [
-  PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
+  PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
 ];
 
 /**
@@ -131,7 +131,7 @@ export const EMPTY_FLOOR_SHAPES: readonly PipeShape[] = [
  * future empty floor types require no additional code changes.
  */
 export function isEmptyFloor(shape: PipeShape): boolean {
-  return shape === PipeShape.Empty || shape === PipeShape.EmptyDirt || shape === PipeShape.EmptyDark || shape === PipeShape.EmptyWinter || shape === PipeShape.EmptySpring;
+  return shape === PipeShape.Empty || shape === PipeShape.EmptyFall || shape === PipeShape.EmptyDark || shape === PipeShape.EmptyWinter || shape === PipeShape.EmptySpring;
 }
 
 /**
@@ -164,7 +164,7 @@ export function computeFloorTypesFromGrid(
 
   // Majority vote over cardinal neighbours already resolved in `map`.
   const majorityFromNeighbors = (r: number, c: number): PipeShape => {
-    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
+    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyFall, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
       const nr = r + dr, nc = c + dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
@@ -315,7 +315,7 @@ const DECORATION_DENSITY = 0.30;
  */
 export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
   switch (floorType) {
-    case PipeShape.EmptyDirt:   return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower'];
+    case PipeShape.EmptyFall:   return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower'];
     case PipeShape.EmptyDark:   return ['mushroom', 'crystal', 'pebbles'];
     case PipeShape.EmptyWinter: return ['pebbles', 'crystal'];
     case PipeShape.EmptySpring: return ['flower', 'grass'];
@@ -560,7 +560,7 @@ export class Board {
         const def = level.grid[r]?.[c] ?? null;
         if (def === null) {
           this.grid[r][c] = new Tile(defaultFloor, 0);
-        } else if (def.shape === PipeShape.EmptyDirt || def.shape === PipeShape.EmptyDark || def.shape === PipeShape.EmptyWinter || def.shape === PipeShape.EmptySpring) {
+        } else if (def.shape === PipeShape.EmptyFall || def.shape === PipeShape.EmptyDark || def.shape === PipeShape.EmptyWinter || def.shape === PipeShape.EmptySpring) {
           // Fall, Dark, Winter, and Spring empty floor tiles are stored with their shape for rendering
           this.grid[r][c] = new Tile(def.shape, 0);
         } else if (def.shape === PipeShape.GoldSpace) {
