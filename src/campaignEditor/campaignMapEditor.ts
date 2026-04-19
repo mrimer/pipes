@@ -41,6 +41,7 @@ import { buildStyleSectionPanel } from './tileParamsPanel';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
+import { saveCampaignEditorMapBoxCollapsed } from '../persistence';
 import {
   updateMapEditorCanvas,
   drawFocusedTileOverlay,
@@ -85,6 +86,9 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
   // ── Style panel state ─────────────────────────────────────────────────────
   private _styleSectionExpanded = false;
+
+  // ── Map box collapsed state ────────────────────────────────────────────────
+  private _mapBoxCollapsed = false;
 
   // ── Mouse gesture state ───────────────────────────────────────────────────
   private _hover: { row: number; col: number } | null = null;
@@ -144,6 +148,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._panPixelX = 0;
     this._panPixelY = 0;
     this._initGridState(campaign);
+  }
+
+  /** Set the collapsed state of the Map box (e.g. restored from localStorage). */
+  setMapBoxCollapsed(collapsed: boolean): void {
+    this._mapBoxCollapsed = collapsed;
   }
 
   /** Build and return the full campaign map editor section element. */
@@ -268,14 +277,39 @@ export class CampaignMapEditorSection extends MapEditorBase {
     title.textContent = '🗺️ Campaign Map';
     title.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     header.appendChild(title);
+
+    // Collapsible body containing all map editor content
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+    if (this._mapBoxCollapsed) body.style.display = 'none';
+
+    const toggleBtn = this._cbs.buildBtn(
+      this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse',
+      MUTED_BTN_BG, '#aaa',
+      () => {
+        this._mapBoxCollapsed = !this._mapBoxCollapsed;
+        saveCampaignEditorMapBoxCollapsed(this._mapBoxCollapsed);
+        toggleBtn.textContent = this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse';
+        body.style.display = this._mapBoxCollapsed ? 'none' : '';
+        if (!this._mapBoxCollapsed) {
+          requestAnimationFrame(() => {
+            this._updateCanvasDisplaySize();
+            this._renderCanvas();
+          });
+        }
+      },
+      true,
+    );
+    header.appendChild(toggleBtn);
     section.appendChild(header);
 
     if (isOfficial) {
       const msg = document.createElement('p');
       msg.style.cssText = 'color:#888;font-size:0.85rem;';
       msg.textContent = 'Campaign map is read-only for official campaigns.';
-      section.appendChild(msg);
-      section.appendChild(this._buildCanvas(campaign, true));
+      body.appendChild(msg);
+      body.appendChild(this._buildCanvas(campaign, true));
+      section.appendChild(body);
       return section;
     }
 
@@ -322,7 +356,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
     rightCol.appendChild(this._buildGridSizePanel(campaign));
     layout.appendChild(rightCol);
 
-    section.appendChild(layout);
+    body.appendChild(layout);
+    section.appendChild(body);
     return section;
   }
 

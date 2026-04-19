@@ -531,3 +531,25 @@ export function clearCommandKeyAssignments(): void {
     // ignore storage errors
   }
 }
+
+// ─── Campaign editor map box state ───────────────────────────────────────────
+
+const CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY = 'pipes_campaign_editor_map_box_collapsed';
+
+/** Load the persisted collapsed state of the campaign Map box in the campaign editor. */
+export function loadCampaignEditorMapBoxCollapsed(): boolean {
+  try {
+    return localStorage.getItem(CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY) === '1';
+  } catch { return false; }
+}
+
+/** Persist the collapsed state of the campaign Map box in the campaign editor. */
+export function saveCampaignEditorMapBoxCollapsed(collapsed: boolean): void {
+  try {
+    if (collapsed) {
+      localStorage.setItem(CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY, '1');
+    } else {
+      localStorage.removeItem(CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY);
+    }
+  } catch { /* ignore */ }
+}

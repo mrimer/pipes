@@ -50,6 +50,9 @@ export class ChapterMapEditorSection extends MapEditorBase {
   private _chapterSelectedLevelIdx: number | null = null;
   private _chapterEditorMainLayout: HTMLDivElement = document.createElement('div');
 
+  // ── Map box collapsed state ────────────────────────────────────────────────
+  private _mapBoxCollapsed = false;
+
   /** Default chapter grid dimensions. */
   private static readonly CHAPTER_DEFAULT_ROWS = 3;
   private static readonly CHAPTER_DEFAULT_COLS = 6;
@@ -168,6 +171,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
    */
   private _buildChapterMapSection(campaign: CampaignDef, chapter: ChapterDef, isOfficial: boolean): HTMLElement {
     const section = document.createElement('div');
+    section.id = 'chapter-map-editor-section';
     section.style.cssText =
       `background:${EDITOR_INPUT_BG};border:1px solid #4a90d9;border-radius:8px;padding:16px;` +
       'display:flex;flex-direction:column;gap:12px;';
@@ -178,16 +182,40 @@ export class ChapterMapEditorSection extends MapEditorBase {
     sectionTitle.textContent = '🗺️ Chapter Map';
     sectionTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     sectionHeader.appendChild(sectionTitle);
+
+    // Collapsible body containing all map editor content
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+    if (this._mapBoxCollapsed) body.style.display = 'none';
+
+    const toggleBtn = this._callbacks.buildBtn(
+      this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse',
+      MUTED_BTN_BG, '#aaa',
+      () => {
+        this._mapBoxCollapsed = !this._mapBoxCollapsed;
+        toggleBtn.textContent = this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse';
+        body.style.display = this._mapBoxCollapsed ? 'none' : '';
+        if (!this._mapBoxCollapsed) {
+          requestAnimationFrame(() => {
+            this._updateChapterCanvasDisplaySize();
+            this._renderChapterCanvas();
+          });
+        }
+      },
+      true,
+    );
+    sectionHeader.appendChild(toggleBtn);
     section.appendChild(sectionHeader);
 
     if (isOfficial) {
       const readonlyMsg = document.createElement('p');
       readonlyMsg.style.cssText = 'color:#888;font-size:0.85rem;';
       readonlyMsg.textContent = 'Chapter map is read-only for official campaigns.';
-      section.appendChild(readonlyMsg);
+      body.appendChild(readonlyMsg);
       // Still render the canvas in read-only mode
       const canvas = this._buildChapterMapCanvas(campaign, chapter, true);
-      section.appendChild(canvas);
+      body.appendChild(canvas);
+      section.appendChild(body);
       return section;
     }
 
@@ -236,7 +264,8 @@ export class ChapterMapEditorSection extends MapEditorBase {
     rightCol.appendChild(this._ui.buildGridSizePanel(chapter, campaign));
     layout.appendChild(rightCol);
 
-    section.appendChild(layout);
+    body.appendChild(layout);
+    section.appendChild(body);
     return section;
   }
 
