@@ -575,38 +575,44 @@ export function drawGranite(
   // Each exposed edge is drawn as a line at the inset level (±bw / ±bh),
   // extended to the tile boundary when the perpendicular edges are adjacent to
   // granite so that the border visually closes the filled shape.
+  //
+  // Each endpoint that reaches the tile boundary is extended by OVERLAP px
+  // past it so that adjacent tiles' border strokes overlap rather than merely
+  // meeting, eliminating the ~21% background bleed that would otherwise appear
+  // at a sub-pixel (fractional-pan) tile boundary.
   ctx.strokeStyle = GRANITE_COLOR;
   ctx.lineWidth = _s(3);
   ctx.beginPath();
 
   // Top border (y = -bh): skip when north is granite
   if (!n.north) {
-    ctx.moveTo(n.west ? -outerHalf : -bw, -bh);
-    ctx.lineTo(n.east ?  outerHalf :  bw, -bh);
+    ctx.moveTo(n.west ? -(outerHalf + OVERLAP) : -bw, -bh);
+    ctx.lineTo(n.east ?  (outerHalf + OVERLAP) :  bw, -bh);
   }
   // Bottom border (y = +bh): skip when south is granite
   if (!n.south) {
-    ctx.moveTo(n.west ? -outerHalf : -bw, bh);
-    ctx.lineTo(n.east ?  outerHalf :  bw, bh);
+    ctx.moveTo(n.west ? -(outerHalf + OVERLAP) : -bw, bh);
+    ctx.lineTo(n.east ?  (outerHalf + OVERLAP) :  bw, bh);
   }
   // Left border (x = -bw): skip when west is granite
   if (!n.west) {
-    ctx.moveTo(-bw, n.north ? -outerHalf : -bh);
-    ctx.lineTo(-bw, n.south ?  outerHalf :  bh);
+    ctx.moveTo(-bw, n.north ? -(outerHalf + OVERLAP) : -bh);
+    ctx.lineTo(-bw, n.south ?  (outerHalf + OVERLAP) :  bh);
   }
   // Right border (x = +bw): skip when east is granite
   if (!n.east) {
-    ctx.moveTo(bw, n.north ? -outerHalf : -bh);
-    ctx.lineTo(bw, n.south ?  outerHalf :  bh);
+    ctx.moveTo(bw, n.north ? -(outerHalf + OVERLAP) : -bh);
+    ctx.lineTo(bw, n.south ?  (outerHalf + OVERLAP) :  bh);
   }
 
   // L-shaped inset borders at corners where two edges are granite but the
   // diagonal is not.  These trace the inner boundary of the unfilled corner
   // gap and connect cleanly to the adjacent tiles' inset border lines.
-  if (n.north && n.west && !n.nw) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
-  if (n.north && n.east && !n.ne) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
-  if (n.south && n.west && !n.sw) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
-  if (n.south && n.east && !n.se) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
+  // Tile-boundary endpoints are extended by OVERLAP for the same overlap fix.
+  if (n.north && n.west && !n.nw) { ctx.moveTo(-(outerHalf + OVERLAP), -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -(outerHalf + OVERLAP)); }
+  if (n.north && n.east && !n.ne) { ctx.moveTo( (outerHalf + OVERLAP), -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -(outerHalf + OVERLAP)); }
+  if (n.south && n.west && !n.sw) { ctx.moveTo(-(outerHalf + OVERLAP),  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  (outerHalf + OVERLAP)); }
+  if (n.south && n.east && !n.se) { ctx.moveTo( (outerHalf + OVERLAP),  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  (outerHalf + OVERLAP)); }
 
   ctx.stroke();
 
@@ -1376,14 +1382,21 @@ export function drawPipeBody(
   fillColor: string,
 ): void {
   const lw2 = LINE_WIDTH / 2;
-  // Clip to the tile boundary on each butt-end direction so the black stroke
-  // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
-  // left unconstrained so rounded caps can extend freely into empty space.
+  // 1-pixel overlap margin: the clip and fill are extended this many pixels
+  // past the tile boundary on butt-end directions.  This makes adjacent
+  // connected pipes' fills overlap rather than merely abut, eliminating the
+  // ~21% background bleed that appears at a sub-pixel (fractional-pan) tile
+  // boundary under canvas anti-aliasing.
+  const PIPE_OVERLAP = 1;
+  // Clip to the tile boundary (+PIPE_OVERLAP) on each butt-end direction so
+  // the black stroke outline never bleeds into adjacent tiles beyond the
+  // overlap margin.  Non-butt (nub) directions are left unconstrained so
+  // rounded caps can extend freely into empty space.
   const LARGE = half + LINE_WIDTH;
-  const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
-  const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
-  const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
-  const clipB = localButtEndDirs?.has(Direction.South) ?  half :  LARGE;
+  const clipL = localButtEndDirs?.has(Direction.West)  ? -(half + PIPE_OVERLAP) : -LARGE;
+  const clipR = localButtEndDirs?.has(Direction.East)  ?  (half + PIPE_OVERLAP) :  LARGE;
+  const clipT = localButtEndDirs?.has(Direction.North) ? -(half + PIPE_OVERLAP) : -LARGE;
+  const clipB = localButtEndDirs?.has(Direction.South) ?  (half + PIPE_OVERLAP) :  LARGE;
   ctx.save();
   ctx.beginPath();
   ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
@@ -1400,6 +1413,14 @@ export function drawPipeBody(
   ctx.stroke();
   ctx.fillStyle = fillColor;
   ctx.fill();
+  // Extend the fill by PIPE_OVERLAP pixels into the adjacent tile at each
+  // butt-end direction.  Together with the adjacent tile's own pipe fill, this
+  // ensures the shared boundary pixel is fully covered even when the tile
+  // centre lands at a fractional canvas coordinate due to a pan offset.
+  if (localButtEndDirs?.has(Direction.North)) ctx.fillRect(-lw2, -(half + PIPE_OVERLAP), LINE_WIDTH, PIPE_OVERLAP);
+  if (localButtEndDirs?.has(Direction.South)) ctx.fillRect(-lw2,  half,                  LINE_WIDTH, PIPE_OVERLAP);
+  if (localButtEndDirs?.has(Direction.West))  ctx.fillRect(-(half + PIPE_OVERLAP), -lw2, PIPE_OVERLAP, LINE_WIDTH);
+  if (localButtEndDirs?.has(Direction.East))  ctx.fillRect( half,                  -lw2, PIPE_OVERLAP, LINE_WIDTH);
   ctx.restore();
 }
 
