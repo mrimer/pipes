@@ -544,16 +544,19 @@ export function drawGranite(
   // ── Fill ─────────────────────────────────────────────────────────────────
   // Core inset rectangle (always drawn)
   ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-  // Edge extension strips toward adjacent granite tiles
-  if (n.north) ctx.fillRect(-bw, -half, bw * 2, half - bh);
-  if (n.south) ctx.fillRect(-bw, bh,   bw * 2, half - bh);
-  if (n.west)  ctx.fillRect(-half, -bh, half - bw, bh * 2);
-  if (n.east)  ctx.fillRect(bw,   -bh, half - bw, bh * 2);
+  // Edge extension strips toward adjacent granite tiles.
+  // Math.ceil on the strip/corner sizes ensures they overlap the core rectangle
+  // by up to 1 pixel, eliminating sub-pixel seams caused by CSS non-uniform
+  // scaling mapping canvas coordinates to fractional device pixels.
+  if (n.north) ctx.fillRect(-bw, -half, bw * 2, Math.ceil(half - bh));
+  if (n.south) ctx.fillRect(-bw, bh,   bw * 2, Math.ceil(half - bh));
+  if (n.west)  ctx.fillRect(-half, -bh, Math.ceil(half - bw), bh * 2);
+  if (n.east)  ctx.fillRect(bw,   -bh, Math.ceil(half - bw), bh * 2);
   // Corner fills: only when both edge neighbors AND the diagonal are granite
-  if (n.north && n.west && n.nw) ctx.fillRect(-half, -half, half - bw, half - bh);
-  if (n.north && n.east && n.ne) ctx.fillRect(bw,   -half, half - bw, half - bh);
-  if (n.south && n.west && n.sw) ctx.fillRect(-half, bh,   half - bw, half - bh);
-  if (n.south && n.east && n.se) ctx.fillRect(bw,   bh,   half - bw, half - bh);
+  if (n.north && n.west && n.nw) ctx.fillRect(-half, -half, Math.ceil(half - bw), Math.ceil(half - bh));
+  if (n.north && n.east && n.ne) ctx.fillRect(bw,   -half, Math.ceil(half - bw), Math.ceil(half - bh));
+  if (n.south && n.west && n.sw) ctx.fillRect(-half, bh,   Math.ceil(half - bw), Math.ceil(half - bh));
+  if (n.south && n.east && n.se) ctx.fillRect(bw,   bh,   Math.ceil(half - bw), Math.ceil(half - bh));
 
   // ── Border ───────────────────────────────────────────────────────────────
   // Draw border only on edges that are NOT adjacent to granite.
