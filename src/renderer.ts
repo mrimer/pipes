@@ -4,7 +4,7 @@
 
 import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
 import { Tile, oppositeDirection } from './tile';
-import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS, LevelStyle } from './types';
+import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS, LevelStyle, floorShapeToStyle } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState } from './renderer/chamberRenderers';
 import { drawAmbientDecoration } from './renderer/ambientDecoration';
@@ -2054,11 +2054,21 @@ function _renderPass2NonPipeTiles(
 
       // Gingham overlay on non-empty, non-pipe tiles: 100% alpha (i.e. opacity)
       // pattern drawn over the tile background color.
+      // Also compute the per-tile inferred floor type for style-dependent rendering
+      // (e.g. Tree tile colors should match the local floor style, not the overall board style).
+      let tileFloorType: PipeShape | undefined;
       if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber
           || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
-        const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
-        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, floorType, 1.0); //alpha
+        tileFloorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
+        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, tileFloorType, 1.0); //alpha
       }
+
+      // Derive the per-tile level style from the inferred floor type for tiles that
+      // render style-dependent visuals (e.g. Tree leaf colors).  Falls back to the
+      // overall board style when the inferred floor type is the default (Empty/Grass).
+      const tileStyle = tileFloorType !== undefined
+        ? (floorShapeToStyle(tileFloorType) ?? board.style)
+        : board.style;
 
       // For the sink tile, build an overlay callback that renders the vortex effect
       // after the outer circle but before the connector arms.  The callback must
@@ -2076,7 +2086,7 @@ function _renderPass2NonPipeTiles(
         };
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, board.style);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, tileStyle);
     }
   }
 }
