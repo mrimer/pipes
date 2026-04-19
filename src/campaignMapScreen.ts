@@ -80,6 +80,23 @@ export class CampaignMapScreen {
         }
         return parts.join('  ');
       },
+      isChapterMode: () => true,
+      augmentLevelStars: (baseStars) => {
+        const campaign = this._campaign;
+        if (!campaign) return baseStars;
+        const result = { ...baseStars };
+        for (let i = 0; i < campaign.chapters.length; i++) {
+          const chapter = campaign.chapters[i];
+          const pseudoLevel = this._pseudoLevels[i];
+          if (!pseudoLevel) continue;
+          // Aggregate stars across all levels in this chapter and key by the pseudo-level ID.
+          result[pseudoLevel.id] = chapter.levels.reduce(
+            (sum, l) => sum + Math.min(baseStars[l.id] ?? 0, l.starCount ?? 0),
+            0,
+          );
+        }
+        return result;
+      },
     };
     this._inner = new ChapterMapScreen(chapterCallbacks);
     this.screenEl = this._inner.screenEl;
@@ -145,6 +162,7 @@ export class CampaignMapScreen {
         inventory: [],
         starCount: totalStars,
         challenge,
+        style: chapter.style,
       };
     });
 
