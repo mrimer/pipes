@@ -4,7 +4,7 @@
  * explicit data parameters and write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle, styleToFloorShape } from '../types';
+import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle, styleToFloorShape, floorShapeToStyle } from '../types';
 import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, seaFillColor, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, computeFloorTypesFromGrid } from '../board';
@@ -151,6 +151,7 @@ export function drawLevelChamberTile(
   totalStars = 0,
   isFilled = false,
   waterScored?: number,
+  floorType: PipeShape = PipeShape.Empty,
 ): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
@@ -172,7 +173,7 @@ export function drawLevelChamberTile(
   // Gingham overlay: derive row/col from pixel position
   const tileR = Math.round(y / CELL);
   const tileC = Math.round(x / CELL);
-  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC, PipeShape.Empty, 1);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, tileR, tileC, floorType, 1);
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -337,6 +338,7 @@ export function drawMapChamberTile(
   connections: Set<Direction>,
   _buttEndDirs?: ReadonlySet<Direction>,
   filled = false,
+  floorType: PipeShape = PipeShape.Empty,
 ): void {
   const minimap = chamberInfo.minimap;
   const pseudoLevel: LevelDef | undefined = minimap ? {
@@ -366,24 +368,20 @@ export function drawMapChamberTile(
     totalStars,
     filled && chamberInfo.isAccessible,
     waterScored,
+    floorType,
   );
 }
 
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
 /**
- * Pre-compute the "display floor type" for every cell in a chapter map grid.
- * null / EmptyDirt / EmptyDark cells: their own shape (null → PipeShape.Empty).
- * Source, Sink, Tree: majority of adjacent empty floor type.
- * Granite: BFS flood-fill from edges touching empty cells.
- * Other: PipeShape.Empty fallback.
- */
-/**
  * Pre-compute the display floor type (Empty / EmptyDirt / EmptyDark) for every
  * cell in a chapter map grid.  Delegates to the shared {@link computeFloorTypesFromGrid}
  * algorithm: empty-floor cells are resolved immediately from their own shape (null cells
  * default to the style's floor shape), and all other tile types (source, sink, tree, chamber,
  * granite, pipe tiles, etc.) are resolved via BFS propagation from neighbouring resolved cells.
+ * Any cells that remain unresolved after BFS (e.g. a block of non-floor tiles with no
+ * empty-floor neighbours) receive the style's default floor shape.
  */
 export function computeChapterFloorTypes(
   grid: (TileDef | null)[][],
@@ -396,7 +394,7 @@ export function computeChapterFloorTypes(
     const def = grid[r]?.[c] ?? null;
     if (def === null) return defaultFloor;
     return isEmptyFloor(def.shape) ? def.shape : null;
-  });
+  }, defaultFloor);
 }
 
 /**
@@ -469,7 +467,7 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
-  drawTree(ctx, CELL / 2, style);
+  drawTree(ctx, CELL / 2, floorShapeToStyle(floorType) ?? style);
   ctx.restore();
 }
 
@@ -608,7 +606,7 @@ function _renderChapterMapPass2NonPipeTiles(
           isAccessible: isFilled,
           bgVariant: levelDef?.challenge ? 'challenge' : totalStars > 0 && stars >= totalStars ? 'gold' : 'default',
         };
-        drawMapChamberTile(ctx, x, y, TILE_SIZE / 2, chamberInfo, connections, undefined, isFilled);
+        drawMapChamberTile(ctx, x, y, TILE_SIZE / 2, chamberInfo, connections, undefined, isFilled, floorType);
         if (isJittered) ctx.restore();
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);

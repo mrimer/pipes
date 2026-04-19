@@ -248,6 +248,19 @@ export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
   return PipeShape.Empty;
 }
 
+/**
+ * Map an empty-floor PipeShape back to its corresponding LevelStyle.
+ * Returns `undefined` for {@link PipeShape.Empty} (the default Grass style)
+ * so callers can fall back to a board-level default when the inferred floor
+ * type is the generic empty shape.
+ */
+export function floorShapeToStyle(shape: PipeShape): LevelStyle | undefined {
+  if (shape === PipeShape.EmptyDirt) return 'Dirt';
+  if (shape === PipeShape.EmptyDark) return 'Dark';
+  if (shape === PipeShape.EmptyWinter) return 'Winter';
+  return undefined;
+}
+
 /** Complete definition of a game level. */
 export interface LevelDef {
   id: number;
