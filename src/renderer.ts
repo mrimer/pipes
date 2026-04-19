@@ -546,11 +546,12 @@ export function drawGranite(
   if (n.south) ctx.fillRect(-bw, bh,   bw * 2, half - bh);
   if (n.west)  ctx.fillRect(-half, -bh, half - bw, bh * 2);
   if (n.east)  ctx.fillRect(bw,   -bh, half - bw, bh * 2);
-  // Corner fills: only when both edge neighbors AND the diagonal are granite
-  if (n.north && n.west && n.nw) ctx.fillRect(-half, -half, half - bw, half - bh);
-  if (n.north && n.east && n.ne) ctx.fillRect(bw,   -half, half - bw, half - bh);
-  if (n.south && n.west && n.sw) ctx.fillRect(-half, bh,   half - bw, half - bh);
-  if (n.south && n.east && n.se) ctx.fillRect(bw,   bh,   half - bw, half - bh);
+  // Corner fills: whenever both adjacent edge neighbors are granite, fill the
+  // corner gap regardless of the diagonal neighbor so no background shows through.
+  if (n.north && n.west) ctx.fillRect(-half, -half, half - bw, half - bh);
+  if (n.north && n.east) ctx.fillRect(bw,   -half, half - bw, half - bh);
+  if (n.south && n.west) ctx.fillRect(-half, bh,   half - bw, half - bh);
+  if (n.south && n.east) ctx.fillRect(bw,   bh,   half - bw, half - bh);
 
   // ── Border ───────────────────────────────────────────────────────────────
   // Draw border only on edges that are NOT adjacent to granite.
@@ -581,14 +582,6 @@ export function drawGranite(
     ctx.moveTo(bw, n.north ? -half : -bh);
     ctx.lineTo(bw, n.south ? half  :  bh);
   }
-
-  // L-shaped inset borders at corners where two edges are granite but the
-  // diagonal is not.  These trace the inner boundary of the unfilled corner
-  // gap and connect cleanly to the adjacent tiles' inset border lines.
-  if (n.north && n.west && !n.nw) { ctx.moveTo(-half, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -half); }
-  if (n.north && n.east && !n.ne) { ctx.moveTo(half,  -bh); ctx.lineTo(bw,  -bh); ctx.lineTo(bw,  -half); }
-  if (n.south && n.west && !n.sw) { ctx.moveTo(-half,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  half); }
-  if (n.south && n.east && !n.se) { ctx.moveTo(half,   bh); ctx.lineTo(bw,   bh); ctx.lineTo(bw,   half); }
 
   ctx.stroke();
 

@@ -1060,7 +1060,8 @@ export abstract class MapScreenBase {
     const cols = chapter.cols ?? 6;
 
     const displayProgress = this._getDisplayProgress();
-    const levelStars = loadLevelStars(this._getActiveCampaignId() ?? undefined);
+    const rawLevelStars = loadLevelStars(this._getActiveCampaignId() ?? undefined);
+    const levelStars = this._augmentLevelStars(rawLevelStars);
     const levelWater = loadLevelWater(this._getActiveCampaignId() ?? undefined);
 
     const filledKeys = this._computeFilledCells();
@@ -1111,6 +1112,7 @@ export abstract class MapScreenBase {
       jitterCell,
       this._floorTypes,
       chapter.style,
+      this._isChapterMode(),
     );
 
     ctx.restore();
@@ -1625,4 +1627,22 @@ export abstract class MapScreenBase {
    *  - string → show the provided text
    */
   protected abstract _formatChapterTitle(campaign: CampaignDef, chapterIdx: number, chapter: ChapterDef): string | null | undefined;
+
+  /**
+   * Optionally augments the per-level star map before rendering.
+   * Subclasses may override to inject synthetic star counts (e.g. per-chapter
+   * aggregated totals on the campaign map).  The default returns the map unchanged.
+   */
+  protected _augmentLevelStars(levelStars: Record<number, number>): Record<number, number> {
+    return levelStars;
+  }
+
+  /**
+   * Returns true when the map is operating in "chapter mode" (i.e. each chamber
+   * represents a chapter rather than an individual level).  When true, chamber
+   * label numbers are always rendered in white.  Default: false.
+   */
+  protected _isChapterMode(): boolean {
+    return false;
+  }
 }
