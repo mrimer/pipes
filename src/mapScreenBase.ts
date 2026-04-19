@@ -164,6 +164,12 @@ export abstract class MapScreenBase {
   /** Whether the initial snap position has been computed for the current map key. */
   private _panInitialized = false;
   /**
+   * Cached bounding box (in tile coordinates) of the connected-tile region,
+   * used by `_clampPan`. Computed once in `_populate` and reused each frame
+   * during drag events. Null when no grid is loaded or no tiles are reachable.
+   */
+  private _connectedTileBbox: { rMin: number; rMax: number; cMin: number; cMax: number } | null = null;
+  /**
    * Unique key identifying the current display (`${campaign.id}-${chapterIdx}`).
    * Pan is reset whenever this key changes.
    */
@@ -607,6 +613,12 @@ export abstract class MapScreenBase {
   }
 
   private _populate(campaign: CampaignDef, chapterIdx: number, chapter: ChapterDef): void {
+    // Refresh the connected-tile bounding box cache. This is done once per
+    // activation (and on repopulate after returning from a level) so that
+    // _clampPan can use the pre-computed values on every drag event without
+    // recomputing the full reachability set each frame.
+    this._connectedTileBbox = this._getConnectedTileBbox();
+
     const el = this.screenEl;
     el.innerHTML = '';
 
@@ -1170,6 +1182,36 @@ export abstract class MapScreenBase {
   }
 
   /**
+   * Compute the bounding box (in tile coordinates) of all source-connected
+   * (reachable) tiles in the current chapter grid.  Returns null when there is
+   * no grid or no reachable tiles.
+   *
+   * The result is cached in `_connectedTileBbox` by `_populate` so that
+   * `_clampPan` can read it on every drag frame without repeating the
+   * full BFS traversal.
+   */
+  private _getConnectedTileBbox(): { rMin: number; rMax: number; cMin: number; cMax: number } | null {
+    const chapter = this._chapter;
+    if (!chapter?.grid) return null;
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const filledKeys = this._computeFilledCells();
+    if (filledKeys.size === 0) return null;
+
+    let rMin = rows, rMax = -1, cMin = cols, cMax = -1;
+    for (const key of filledKeys) {
+      const comma = key.indexOf(',');
+      const r = Number(key.slice(0, comma));
+      const c = Number(key.slice(comma + 1));
+      if (r < rMin) rMin = r;
+      if (r > rMax) rMax = r;
+      if (c < cMin) cMin = c;
+      if (c > cMax) cMax = c;
+    }
+    return { rMin, rMax, cMin, cMax };
+  }
+
+  /**
    * Clamp `_panPixelX` and `_panPixelY` to valid bounds:
    *  1. Edge bounds: the map may not be panned past its edges (no empty space).
    *  2. Connected-bbox bounds: panning may not go more than one tile beyond the
@@ -1188,36 +1230,28 @@ export abstract class MapScreenBase {
     // 2. Connected-bbox clamping – restrict panning to within one tile of the
     //    bounding rectangle of source-connected (reachable) tiles.
     if (!chapter.grid) return;
-    const filledKeys = this._computeFilledCells();
-    if (filledKeys.size === 0) return;
-
-    let rMin = rows, rMax = -1, cMin = cols, cMax = -1;
-    for (const key of filledKeys) {
-      const comma = key.indexOf(',');
-      const r = Number(key.slice(0, comma));
-      const c = Number(key.slice(comma + 1));
-      if (r < rMin) rMin = r;
-      if (r > rMax) rMax = r;
-      if (c < cMin) cMin = c;
-      if (c > cMax) cMax = c;
-    }
+    const bbox = this._connectedTileBbox;
+    if (!bbox) return;
+    const { rMin, rMax, cMin, cMax } = bbox;
 
     // Allowed pan range: left edge ≥ (cMin-1)*TILE_SIZE; right edge ≤ (cMax+2)*TILE_SIZE.
     const bboxMinX = Math.max(0, (cMin - 1) * TILE_SIZE);
     const bboxMinY = Math.max(0, (rMin - 1) * TILE_SIZE);
 
     // The strict far-side formula keeps the bbox bottom/right row/col within the
-    // viewport.  When it goes negative (connected tiles are near the top/left of a
-    // large map and viewRows/viewCols is larger than the connected region + 2), the
-    // viewport-bottom/right constraint can never be satisfied, so we fall back to the
-    // looser viewport-top/left constraint: pan ≤ (rMax+1)*TILE_SIZE (or cMax+1 for X).
-    // This prevents upward/rightward drag from pushing all connected tiles off-screen.
+    // viewport.  When it goes negative (the viewport is wider/taller than the
+    // connected region + 2 tiles), fall back to a formula that still ensures the
+    // last connected column/row remains visible: pan ≤ (cMax+1-viewCols)*TILE_SIZE
+    // (or rMax+1-viewRows for Y).  This value is also negative when the connected
+    // region fits entirely within the viewport, which causes clampPanAxisWithFallback
+    // to use the inverted-range path and cap pan at bboxMin, preventing the
+    // connected tiles from being scrolled completely off-screen.
     const strictBboxMaxX = (cMax + 2 - viewCols) * TILE_SIZE;
     const strictBboxMaxY = (rMax + 2 - viewRows) * TILE_SIZE;
     const bboxMaxX = Math.min(maxPanX,
-      strictBboxMaxX >= 0 ? strictBboxMaxX : (cMax + 1) * TILE_SIZE);
+      strictBboxMaxX >= 0 ? strictBboxMaxX : (cMax + 1 - viewCols) * TILE_SIZE);
     const bboxMaxY = Math.min(maxPanY,
-      strictBboxMaxY >= 0 ? strictBboxMaxY : (rMax + 1) * TILE_SIZE);
+      strictBboxMaxY >= 0 ? strictBboxMaxY : (rMax + 1 - viewRows) * TILE_SIZE);
 
     // Use the shared helper which handles both the normal case (bboxMin ≤ bboxMax)
     // and the inverted case (bboxMin > bboxMax, e.g. connected region is small
