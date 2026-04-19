@@ -617,7 +617,7 @@ export abstract class MapScreenBase {
     // activation (and on repopulate after returning from a level) so that
     // _clampPan can use the pre-computed values on every drag event without
     // recomputing the full reachability set each frame.
-    this._connectedTileBbox = this._getConnectedTileBbox();
+    this._connectedTileBbox = this._getConnectedTileBbox(chapter);
 
     const el = this.screenEl;
     el.innerHTML = '';
@@ -1183,16 +1183,15 @@ export abstract class MapScreenBase {
 
   /**
    * Compute the bounding box (in tile coordinates) of all source-connected
-   * (reachable) tiles in the current chapter grid.  Returns null when there is
+   * (reachable) tiles in the given chapter grid.  Returns null when there is
    * no grid or no reachable tiles.
    *
    * The result is cached in `_connectedTileBbox` by `_populate` so that
    * `_clampPan` can read it on every drag frame without repeating the
    * full BFS traversal.
    */
-  private _getConnectedTileBbox(): { rMin: number; rMax: number; cMin: number; cMax: number } | null {
-    const chapter = this._chapter;
-    if (!chapter?.grid) return null;
+  private _getConnectedTileBbox(chapter: ChapterDef): { rMin: number; rMax: number; cMin: number; cMax: number } | null {
+    if (!chapter.grid) return null;
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
     const filledKeys = this._computeFilledCells();
