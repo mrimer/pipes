@@ -2054,21 +2054,19 @@ function _renderPass2NonPipeTiles(
 
       // Gingham overlay on non-empty, non-pipe tiles: 100% alpha (i.e. opacity)
       // pattern drawn over the tile background color.
-      // Also compute the per-tile inferred floor type for style-dependent rendering
+      // Also compute the per-tile inferred floor shape for style-dependent rendering
       // (e.g. Tree tile colors should match the local floor style, not the overall board style).
-      let tileFloorType: PipeShape | undefined;
+      let inferredFloorShape: PipeShape | undefined;
       if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber
           || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
-        tileFloorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
-        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, tileFloorType, 1.0); //alpha
+        inferredFloorShape = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
+        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, inferredFloorShape, 1.0); //alpha
       }
 
-      // Derive the per-tile level style from the inferred floor type for tiles that
+      // Derive the per-tile level style from the inferred floor shape for tiles that
       // render style-dependent visuals (e.g. Tree leaf colors).  Falls back to the
-      // overall board style when the inferred floor type is the default (Empty/Grass).
-      const tileStyle = tileFloorType !== undefined
-        ? (floorShapeToStyle(tileFloorType) ?? board.style)
-        : board.style;
+      // overall board style when the inferred floor shape is the default (Empty/Grass).
+      const tileStyle = (inferredFloorShape !== undefined ? floorShapeToStyle(inferredFloorShape) : undefined) ?? board.style;
 
       // For the sink tile, build an overlay callback that renders the vortex effect
       // after the outer circle but before the connector arms.  The callback must
