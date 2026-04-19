@@ -122,16 +122,16 @@ export function isObstacleTile(shape: PipeShape): boolean {
 
 /** All empty-floor shapes that a player may fill with a pipe from inventory. */
 export const EMPTY_FLOOR_SHAPES: readonly PipeShape[] = [
-  PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark, PipeShape.EmptyWinter,
+  PipeShape.Empty, PipeShape.EmptyDirt, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
 ];
 
 /**
- * Returns true when shape is any empty floor type (Grass, Dirt, Dark, or Winter).
+ * Returns true when shape is any empty floor type (Grass, Fall, Dark, Winter, or Spring).
  * Use this instead of `=== PipeShape.Empty` for all game-rule checks so that
  * future empty floor types require no additional code changes.
  */
 export function isEmptyFloor(shape: PipeShape): boolean {
-  return shape === PipeShape.Empty || shape === PipeShape.EmptyDirt || shape === PipeShape.EmptyDark || shape === PipeShape.EmptyWinter;
+  return shape === PipeShape.Empty || shape === PipeShape.EmptyDirt || shape === PipeShape.EmptyDark || shape === PipeShape.EmptyWinter || shape === PipeShape.EmptySpring;
 }
 
 /**
@@ -164,7 +164,7 @@ export function computeFloorTypesFromGrid(
 
   // Majority vote over cardinal neighbours already resolved in `map`.
   const majorityFromNeighbors = (r: number, c: number): PipeShape => {
-    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0]]);
+    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyDirt, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
       const nr = r + dr, nc = c + dc;
       if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
@@ -304,9 +304,10 @@ const DECORATION_DENSITY = 0.30;
  * Return the decoration types appropriate for the given empty floor type.
  *
  * - **Grass** (Empty):     flowers, grass tufts, mushrooms — organic surface.
- * - **Dirt** (EmptyDirt):  grass tufts, crystals, pebbles — no flowers/mushrooms.
+ * - **Fall** (EmptyDirt):  grass tufts, crystals, pebbles — no flowers/mushrooms.
  * - **Dark** (EmptyDark):  pebbles only — stone-like surface.
  * - **Winter** (EmptyWinter): pebbles and crystals — icy, snow-covered surface.
+ * - **Spring** (EmptySpring): flowers and grass only — bright spring surface.
  *
  * This is the single authoritative source for floor-type ↔ decoration mapping,
  * used by {@link generateAmbientDecorations} so the logic is not duplicated
@@ -317,6 +318,7 @@ export function decorationTypesForFloor(floorType: PipeShape): AmbientDecoration
     case PipeShape.EmptyDirt:   return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower'];
     case PipeShape.EmptyDark:   return ['mushroom', 'crystal', 'pebbles'];
     case PipeShape.EmptyWinter: return ['pebbles', 'crystal'];
+    case PipeShape.EmptySpring: return ['flower', 'grass'];
     default:                  return ['flower', 'grass', 'mushroom'];  // Empty / grass
   }
 }
@@ -357,6 +359,8 @@ export function generateAmbientDecorations(
                   : undefined;
       // Crystals randomly show either one or two shards.
       const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
+      // Spring flowers are rendered brighter and fully opaque.
+      const bright = (floorType === PipeShape.EmptySpring && type === 'flower') ? true : undefined;
       // Pebbles and crystals: distribute rotations using the golden angle so that
       // each instance of the same type has a visually distinct orientation.
       // A random base angle is chosen so board instances show different orientations.
@@ -384,6 +388,7 @@ export function generateAmbientDecorations(
         variant: Math.floor(Math.random() * 3),
         scale,
         count,
+        bright,
       });
     }
   }
@@ -555,8 +560,8 @@ export class Board {
         const def = level.grid[r]?.[c] ?? null;
         if (def === null) {
           this.grid[r][c] = new Tile(defaultFloor, 0);
-        } else if (def.shape === PipeShape.EmptyDirt || def.shape === PipeShape.EmptyDark || def.shape === PipeShape.EmptyWinter) {
-          // Dirt, Dark, and Winter empty floor tiles are stored with their shape for rendering
+        } else if (def.shape === PipeShape.EmptyDirt || def.shape === PipeShape.EmptyDark || def.shape === PipeShape.EmptyWinter || def.shape === PipeShape.EmptySpring) {
+          // Fall, Dark, Winter, and Spring empty floor tiles are stored with their shape for rendering
           this.grid[r][c] = new Tile(def.shape, 0);
         } else if (def.shape === PipeShape.GoldSpace) {
           // Gold spaces are tracked separately; the cell behaves like Empty
@@ -598,7 +603,7 @@ export class Board {
     this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
   }
 
-  /** Pre-compute the floor type (Empty/EmptyDirt/EmptyDark/EmptyWinter) for every cell. */
+  /** Pre-compute the floor type (Empty/EmptyDirt/EmptyDark/EmptyWinter/EmptySpring) for every cell. */
   private _computeFloorTypes(): ReadonlyMap<string, PipeShape> {
     return computeFloorTypesFromGrid(this.rows, this.cols, (r, c) => {
       const key = posKey(r, c);
