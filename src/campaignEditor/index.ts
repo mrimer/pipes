@@ -10,7 +10,7 @@
  */
 
 import { CampaignDef, LevelDef, TileDef, PipeShape } from '../types';
-import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId } from '../persistence';
+import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, loadCampaignEditorMapBoxCollapsed } from '../persistence';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignMapEditorSection, CampaignMapEditorCallbacks } from './campaignMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
@@ -510,6 +510,7 @@ export class CampaignEditor {
 
     // Initialize campaign map editor grid state before building the section
     this._campaignMapEditor.init(campaign);
+    this._campaignMapEditor.setMapBoxCollapsed(loadCampaignEditorMapBoxCollapsed());
 
     const toolbar = this._buildToolbar(
       isOfficial ? `📋 ${campaign.name} (read-only)` : `✏️ Edit Campaign: ${campaign.name}`,
@@ -634,6 +635,7 @@ export class CampaignEditor {
         cols: chapter.cols,
         grid: chapter.grid,
         inventory: [],
+        style: chapter.style,
       };
       const minimap = renderMinimap(pseudoLevel);
       minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;border:2px solid white;';
