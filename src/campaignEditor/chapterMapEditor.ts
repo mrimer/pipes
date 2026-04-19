@@ -27,6 +27,7 @@ import {
 } from './canvasUtils';
 import { handleMapEditorKeyDown } from './mapEditorSectionUtils';
 import { MapEditorBase } from './mapEditorBase';
+import { saveChapterEditorMapBoxCollapsed } from '../persistence';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -74,8 +75,15 @@ export class ChapterMapEditorSection extends MapEditorBase {
   init(chapter: ChapterDef): void {
     this._input?.detach();
     this._input = null;
-    this._mapBoxCollapsed = false;
     this._initChapterGridState(chapter);
+  }
+
+  /**
+   * Set the collapsed state of the Map box (e.g. restored from localStorage).
+   * Must be called before {@link buildSection} so the initial UI reflects the state.
+   */
+  setMapBoxCollapsed(collapsed: boolean): void {
+    this._mapBoxCollapsed = collapsed;
   }
 
   /** Build and return the full chapter map editor section element. */
@@ -194,6 +202,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
       MUTED_BTN_BG, '#aaa',
       () => {
         this._mapBoxCollapsed = !this._mapBoxCollapsed;
+        saveChapterEditorMapBoxCollapsed(this._mapBoxCollapsed);
         toggleBtn.textContent = this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse';
         body.style.display = this._mapBoxCollapsed ? 'none' : '';
         if (!this._mapBoxCollapsed) {

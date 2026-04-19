@@ -540,25 +540,35 @@ export function drawGranite(
   // extend just past the tile boundary.  This guarantees that adjacent tiles'
   // strips overlap rather than merely abut, eliminating sub-pixel seams under
   // any CSS zoom level.  All resulting size expressions are then pure integers.
+  //
+  // Each edge strip is extended 1px INTO the core rectangle so that the
+  // shared boundary pixel is fully covered by the strip, preventing a
+  // sub-pixel seam that appears when the tile center (cx/cy) lands on a
+  // half-integer canvas coordinate (i.e. when TILE_SIZE is odd).
   const bw = Math.round(half * 0.7);
   const bh = Math.round(half * 0.7);
   const outerHalf = Math.ceil(half);
+  // 1-pixel overlap margin: strips extend this many pixels into the core.
+  const OVERLAP = 1;
 
   ctx.fillStyle = GRANITE_FILL_COLOR;
 
   // ── Fill ─────────────────────────────────────────────────────────────────
   // Core inset rectangle (always drawn)
   ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-  // Edge extension strips toward adjacent granite tiles
-  if (n.north) ctx.fillRect(-bw, -outerHalf, bw * 2,          outerHalf - bh);
-  if (n.south) ctx.fillRect(-bw, bh,         bw * 2,          outerHalf - bh);
-  if (n.west)  ctx.fillRect(-outerHalf, -bh, outerHalf - bw,  bh * 2);
-  if (n.east)  ctx.fillRect(bw,         -bh, outerHalf - bw,  bh * 2);
-  // Corner fills: only when both edge neighbors AND the diagonal are granite
-  if (n.north && n.west && n.nw) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw, outerHalf - bh);
-  if (n.north && n.east && n.ne) ctx.fillRect(bw,         -outerHalf, outerHalf - bw, outerHalf - bh);
-  if (n.south && n.west && n.sw) ctx.fillRect(-outerHalf, bh,         outerHalf - bw, outerHalf - bh);
-  if (n.south && n.east && n.se) ctx.fillRect(bw,         bh,         outerHalf - bw, outerHalf - bh);
+  // Edge extension strips toward adjacent granite tiles.
+  // Each strip overlaps the core by OVERLAP px to eliminate sub-pixel seams.
+  if (n.north) ctx.fillRect(-bw, -outerHalf,      bw * 2,          outerHalf - bh + OVERLAP);
+  if (n.south) ctx.fillRect(-bw, bh - OVERLAP,    bw * 2,          outerHalf - bh + OVERLAP);
+  if (n.west)  ctx.fillRect(-outerHalf, -bh,       outerHalf - bw + OVERLAP,  bh * 2);
+  if (n.east)  ctx.fillRect(bw - OVERLAP, -bh,     outerHalf - bw + OVERLAP,  bh * 2);
+  // Corner fills: only when both edge neighbors AND the diagonal are granite.
+  // Extended by OVERLAP in both dimensions to cover the boundary pixel shared
+  // with the adjacent strips.
+  if (n.north && n.west && n.nw) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (n.north && n.east && n.ne) ctx.fillRect(bw - OVERLAP, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (n.south && n.west && n.sw) ctx.fillRect(-outerHalf, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (n.south && n.east && n.se) ctx.fillRect(bw - OVERLAP, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
 
   // ── Border ───────────────────────────────────────────────────────────────
   // Draw border only on edges that are NOT adjacent to granite.

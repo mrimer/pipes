@@ -532,9 +532,10 @@ export function clearCommandKeyAssignments(): void {
   }
 }
 
-// ─── Campaign editor map box state ───────────────────────────────────────────
+// ─── Campaign / chapter editor map box state ─────────────────────────────────
 
 const CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY = 'pipes_campaign_editor_map_box_collapsed';
+const CHAPTER_EDITOR_MAP_BOX_COLLAPSED_KEY  = 'pipes_chapter_editor_map_box_collapsed';
 
 /** Load the persisted collapsed state of the campaign Map box in the campaign editor. */
 export function loadCampaignEditorMapBoxCollapsed(): boolean {
@@ -550,6 +551,24 @@ export function saveCampaignEditorMapBoxCollapsed(collapsed: boolean): void {
       localStorage.setItem(CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY, '1');
     } else {
       localStorage.removeItem(CAMPAIGN_EDITOR_MAP_BOX_COLLAPSED_KEY);
+    }
+  } catch { /* ignore */ }
+}
+
+/** Load the persisted collapsed state of the chapter Map box in the campaign editor. */
+export function loadChapterEditorMapBoxCollapsed(): boolean {
+  try {
+    return localStorage.getItem(CHAPTER_EDITOR_MAP_BOX_COLLAPSED_KEY) === '1';
+  } catch { return false; }
+}
+
+/** Persist the collapsed state of the chapter Map box in the campaign editor. */
+export function saveChapterEditorMapBoxCollapsed(collapsed: boolean): void {
+  try {
+    if (collapsed) {
+      localStorage.setItem(CHAPTER_EDITOR_MAP_BOX_COLLAPSED_KEY, '1');
+    } else {
+      localStorage.removeItem(CHAPTER_EDITOR_MAP_BOX_COLLAPSED_KEY);
     }
   } catch { /* ignore */ }
 }
