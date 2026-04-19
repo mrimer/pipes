@@ -61,12 +61,36 @@ const CAMPAIGNS_STORAGE_KEY = 'pipes_campaigns';
  * Currently handles:
  *   - chamberContent 'weak_ice' → 'snow'  (renamed in the v2026-03 refactor)
  *   - level.hint → level.hints            (deprecated single-string field folded into array)
+ *   - tile shape 'EMPTY_DIRT' → 'EMPTY_FALL'  (renamed in the v2026-04 refactor)
+ *   - style 'Dirt' → 'Fall'               (renamed in the v2026-04 refactor)
  */
 export function migrateCampaign(campaign: CampaignDef): CampaignDef {
+  // Migrate campaign-level style
+  const campaignRec = campaign as unknown as Record<string, unknown>;
+  if (campaignRec['style'] === 'Dirt') campaignRec['style'] = 'Fall';
+
   for (const chapter of campaign.chapters) {
+    // Migrate chapter-level style
+    const chapterRec = chapter as unknown as Record<string, unknown>;
+    if (chapterRec['style'] === 'Dirt') chapterRec['style'] = 'Fall';
+
+    // Migrate chapter map grid tile shapes
+    if (chapter.grid) {
+      for (const row of chapter.grid) {
+        for (const tile of row) {
+          if (tile && (tile as unknown as Record<string, unknown>)['shape'] === 'EMPTY_DIRT') {
+            (tile as unknown as Record<string, unknown>)['shape'] = 'EMPTY_FALL';
+          }
+        }
+      }
+    }
+
     for (const level of chapter.levels) {
-      // Migrate deprecated single-string `hint` to the `hints` array.
+      // Migrate level-level style
       const levelRec = level as unknown as Record<string, unknown>;
+      if (levelRec['style'] === 'Dirt') levelRec['style'] = 'Fall';
+
+      // Migrate deprecated single-string `hint` to the `hints` array.
       if (typeof levelRec['hint'] === 'string') {
         const hintStr = levelRec['hint'] as string;
         if (!level.hints?.length && hintStr.trim()) {
@@ -80,10 +104,25 @@ export function migrateCampaign(campaign: CampaignDef): CampaignDef {
           if (tile && (tile.chamberContent as unknown as string) === 'weak_ice') {
             (tile.chamberContent as unknown as string) = 'snow';
           }
+          if (tile && (tile as unknown as Record<string, unknown>)['shape'] === 'EMPTY_DIRT') {
+            (tile as unknown as Record<string, unknown>)['shape'] = 'EMPTY_FALL';
+          }
         }
       }
     }
   }
+
+  // Migrate campaign map grid tile shapes
+  if (campaign.grid) {
+    for (const row of campaign.grid) {
+      for (const tile of row) {
+        if (tile && (tile as unknown as Record<string, unknown>)['shape'] === 'EMPTY_DIRT') {
+          (tile as unknown as Record<string, unknown>)['shape'] = 'EMPTY_FALL';
+        }
+      }
+    }
+  }
+
   return campaign;
 }
 

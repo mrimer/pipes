@@ -29,7 +29,7 @@ import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
  * end cap.  An arm gets a butt end when the adjacent cell is a non-empty,
  * non-open-floor tile AND the neighbor has a connection pointing back (so the
  * arms visually join flush at the tile boundary).  Arms pointing into empty
- * cells, EmptyDirt, EmptyDark, or pipe tiles without a reciprocal arm keep
+ * cells, EmptyFall, EmptyDark, EmptyWinter, EmptySpring, or pipe tiles without a reciprocal arm keep
  * their round nubs.
  */
 export function computeChapterButtEndDirs(
@@ -376,7 +376,7 @@ export function drawMapChamberTile(
 // ─── Chapter map canvas renderer ──────────────────────────────────────────────
 
 /**
- * Pre-compute the display floor type (Empty / EmptyDirt / EmptyDark) for every
+ * Pre-compute the display floor type (Empty / EmptyFall / EmptyDark / EmptyWinter / EmptySpring) for every
  * cell in a chapter map grid.  Delegates to the shared {@link computeFloorTypesFromGrid}
  * algorithm: empty-floor cells are resolved immediately from their own shape (null cells
  * default to the style's floor shape), and all other tile types (source, sink, tree, chamber,
@@ -550,7 +550,7 @@ function _renderChapterMapPass1Backgrounds(
       const ginghamColor = paritySum === 0 ? colorLight : paritySum === 2 ? colorDark : colorMid;
       ctx.fillStyle = ginghamColor;
       ctx.fillRect(x, y, CELL, CELL);
-      // Ambient decoration on all empty-floor cells (null = default grass, EmptyDirt, EmptyDark)
+      // Ambient decoration on all empty-floor cells (null = default grass, EmptyFall, EmptyDark, EmptyWinter, EmptySpring)
       const dec = decorations?.get(`${r},${c}`);
       if (dec) drawAmbientDecoration(ctx, dec);
     }

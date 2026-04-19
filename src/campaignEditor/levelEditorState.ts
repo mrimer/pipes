@@ -334,6 +334,7 @@ export class LevelEditorState {
     if (palette === PipeShape.EmptyFall) return { shape: PipeShape.EmptyFall };
     if (palette === PipeShape.EmptyDark) return { shape: PipeShape.EmptyDark };
     if (palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
+    if (palette === PipeShape.EmptySpring) return { shape: PipeShape.EmptySpring };
     if (palette === PipeShape.Empty) return { shape: PipeShape.Empty };
 
     const isChm = isChamberPalette(palette);
@@ -399,7 +400,7 @@ export class LevelEditorState {
   /** Populate palette and params from an existing TileDef. */
   selectTileFromDef(def: TileDef, pos?: { row: number; col: number }): void {
     if (isEmptyFloor(def.shape)) {
-      this.palette = def.shape; // PipeShape.Empty, EmptyDirt, or EmptyDark
+      this.palette = def.shape; // PipeShape.Empty, EmptyFall, EmptyDark, EmptyWinter, or EmptySpring
     } else if (def.shape === PipeShape.Chamber) {
       const cc = def.chamberContent ?? 'tank';
       this.palette = `chamber:${cc}` as ChamberPalette;
@@ -452,7 +453,7 @@ export class LevelEditorState {
     const p = this.palette;
     const nonRotatable = new Set<EditorPalette>([
       'erase', PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
-      PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter,
+      PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
     ]);
     if (nonRotatable.has(p)) return;
 
@@ -504,10 +505,10 @@ export class LevelEditorState {
    * Compute the TileDef to restore when erasing a tile at (row, col).
    * Uses majority-adjacent algorithm: the most common empty floor type among
    * cardinal neighbors wins; tie-break by EMPTY_FLOOR_SHAPES order.
-   * Returns null for grass (PipeShape.Empty), or a TileDef for Dirt/Dark/Winter.
+   * Returns null for grass (PipeShape.Empty), or a TileDef for Fall/Dark/Winter/Spring.
    */
   eraseFloorTileDefAt(row: number, col: number): TileDef | null {
-    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyFall, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0]]);
+    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyFall, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
       const nr = row + dr, nc = col + dc;
       if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue;

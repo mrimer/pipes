@@ -6,7 +6,7 @@
  * (prompt/confirm dialogs) and tells CampaignService what to do.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction } from '../types';
+import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, LEVEL_STYLES } from '../types';
 import {
   loadImportedCampaigns,
   saveImportedCampaigns,
@@ -419,6 +419,8 @@ export class CampaignService {
   /**
    * Scan a campaign for unrecognized field names, optionally removing them
    * in place (clean-up pass when `dryRun` is false).
+   * Also corrects any legacy 'Dirt' style values to 'Fall' and 'EMPTY_DIRT'
+   * tile shape values to 'EMPTY_FALL'.
    *
    * @param campaign  The campaign to scan (mutated when `dryRun` is false).
    * @param dryRun    When true, only tallies issues without modifying data.
@@ -449,48 +451,66 @@ export class CampaignService {
       }
     };
 
+    /** Check and fix a style field on a record. */
+    const checkStyle = (obj: Record<string, unknown>, recordType: string): void => {
+      const style = obj['style'];
+      if (style === undefined) return;
+      if (style === 'Dirt') {
+        tally(recordType, 'style:Dirt→Fall');
+        if (!dryRun) obj['style'] = 'Fall';
+      } else if (typeof style === 'string' && !LEVEL_STYLES.has(style as never)) {
+        tally(recordType, `style:${style}`);
+        if (!dryRun) delete obj['style'];
+      }
+    };
+
+    /** Check and fix tile shape fields that contain legacy values. */
+    const checkTileShape = (tile: Record<string, unknown>, recordType: string): void => {
+      if (tile['shape'] === 'EMPTY_DIRT') {
+        tally(recordType, 'shape:EMPTY_DIRT→EMPTY_FALL');
+        if (!dryRun) tile['shape'] = 'EMPTY_FALL';
+      }
+    };
+
     checkKeys(campaign as unknown as Record<string, unknown>, VALID_CAMPAIGN_KEYS, 'Campaign');
+    checkStyle(campaign as unknown as Record<string, unknown>, 'Campaign');
 
     if (campaign.grid) {
       for (const row of campaign.grid) {
         for (const tile of row) {
           if (!tile) continue;
-          checkKeys(
-            tile as unknown as Record<string, unknown>,
-            getValidCampaignMapTileDefKeys(tile),
-            'CampaignMapTile',
-          );
+          const tileRec = tile as unknown as Record<string, unknown>;
+          checkKeys(tileRec, getValidCampaignMapTileDefKeys(tile), 'CampaignMapTile');
+          checkTileShape(tileRec, 'CampaignMapTile');
         }
       }
     }
 
     for (const chapter of campaign.chapters) {
       checkKeys(chapter as unknown as Record<string, unknown>, VALID_CHAPTER_KEYS, 'Chapter');
+      checkStyle(chapter as unknown as Record<string, unknown>, 'Chapter');
 
       if (chapter.grid) {
         for (const row of chapter.grid) {
           for (const tile of row) {
             if (!tile) continue;
-            checkKeys(
-              tile as unknown as Record<string, unknown>,
-              getValidChapterMapTileDefKeys(tile),
-              'ChapterMapTile',
-            );
+            const tileRec = tile as unknown as Record<string, unknown>;
+            checkKeys(tileRec, getValidChapterMapTileDefKeys(tile), 'ChapterMapTile');
+            checkTileShape(tileRec, 'ChapterMapTile');
           }
         }
       }
 
       for (const level of chapter.levels) {
         checkKeys(level as unknown as Record<string, unknown>, VALID_LEVEL_KEYS, 'Level');
+        checkStyle(level as unknown as Record<string, unknown>, 'Level');
 
         for (const row of level.grid) {
           for (const tile of row) {
             if (!tile) continue;
-            checkKeys(
-              tile as unknown as Record<string, unknown>,
-              getValidTileDefKeys(tile),
-              'Tile',
-            );
+            const tileRec = tile as unknown as Record<string, unknown>;
+            checkKeys(tileRec, getValidTileDefKeys(tile), 'Tile');
+            checkTileShape(tileRec, 'Tile');
           }
         }
 
