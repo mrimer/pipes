@@ -70,8 +70,6 @@ export interface MapChamberInfo {
   isCompleted: boolean;
   isAccessible: boolean;
   bgVariant: 'default' | 'gold' | 'challenge';
-  /** When true, the label number is always rendered in white (never gold even when allStars). */
-  alwaysWhiteLabel?: boolean;
 }
 
 function _drawLockIcon(
@@ -154,7 +152,6 @@ export function drawLevelChamberTile(
   isFilled = false,
   waterScored?: number,
   floorType: PipeShape = PipeShape.Empty,
-  alwaysWhiteLabel = false,
 ): void {
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
@@ -205,7 +202,7 @@ export function drawLevelChamberTile(
 
   // Level number, optional star icon, optional water score, and optional skull icon in the label row.
   const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
-  const labelColor = (!alwaysWhiteLabel && allStars) ? FOCUS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
+  const labelColor = allStars ? FOCUS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
 
   // Star display: empty star takes priority; only show filled star when empty star is not shown.
   const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
@@ -373,7 +370,6 @@ export function drawMapChamberTile(
     filled && chamberInfo.isAccessible,
     waterScored,
     floorType,
-    chamberInfo.alwaysWhiteLabel,
   );
 }
 
@@ -574,7 +570,6 @@ function _renderChapterMapPass2NonPipeTiles(
   jitterCell?: { row: number; col: number; dx: number; dy: number },
   floorTypes?: ReadonlyMap<string, PipeShape>,
   style?: LevelStyle,
-  chapterMode = false,
 ): void {
   const CELL = TILE_SIZE;
   for (let r = 0; r < rows; r++) {
@@ -611,7 +606,6 @@ function _renderChapterMapPass2NonPipeTiles(
           isCompleted,
           isAccessible: isFilled,
           bgVariant: levelDef?.challenge ? 'challenge' : totalStars > 0 && stars >= totalStars ? 'gold' : 'default',
-          alwaysWhiteLabel: chapterMode,
         };
         drawMapChamberTile(ctx, x, y, TILE_SIZE / 2, chamberInfo, connections, undefined, isFilled, floorType);
         if (isJittered) ctx.restore();
@@ -700,7 +694,6 @@ function _renderChapterMapPass3PipeTiles(
  * @param hoverPos             Currently hovered grid cell (for highlighting).
  * @param accessibleLevelIdxs  Set of level indices that are accessible (water reaches them).
  * @param decorations          Optional ambient decorations for empty cells.
- * @param chapterMode          When true, chamber labels are always white (used on the campaign map).
  */
 export function renderChapterMapCanvas(
   ctx: CanvasRenderingContext2D,
@@ -716,7 +709,6 @@ export function renderChapterMapCanvas(
   jitterCell?: { row: number; col: number; dx: number; dy: number },
   floorTypes?: ReadonlyMap<string, PipeShape>,
   style?: LevelStyle,
-  chapterMode = false,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
@@ -727,7 +719,7 @@ export function renderChapterMapCanvas(
   _renderChapterMapGridLines(ctx, rows, cols);
   _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations, floorTypes);
   _renderChapterMapPass2NonPipeTiles(
-    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes, style, chapterMode,
+    ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes, style,
   );
   _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys, floorTypes);
 

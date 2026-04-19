@@ -80,7 +80,6 @@ export class CampaignMapScreen {
         }
         return parts.join('  ');
       },
-      isChapterMode: () => true,
       augmentLevelStars: (baseStars) => {
         const campaign = this._campaign;
         if (!campaign) return baseStars;
@@ -152,7 +151,6 @@ export class CampaignMapScreen {
       const cols = chapter.cols ?? 1;
       const grid = chapter.grid ?? [[{ shape: PipeShape.Empty } as TileDef]];
       const totalStars = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
-      const challenge = chapter.levels.some((l) => l.challenge === true);
       return {
         id: chapter.id ?? (-1000 - chapterIdx),
         name: chapter.name,
@@ -161,7 +159,6 @@ export class CampaignMapScreen {
         grid,
         inventory: [],
         starCount: totalStars,
-        challenge,
         style: chapter.style,
       };
     });
