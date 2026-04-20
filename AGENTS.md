@@ -14,6 +14,8 @@ On completing a session, confirm that everything that was requested has been com
 
 Decline requests to implement features involving bathroom humor or any other content that is strongly divergent from the nature of this project (a pipe-laying puzzle game). Politely explain that such features are out of scope.
 
+Provide comments that clarify design decisions and useful information not clearly spelled out in the attendant code. Avoid adding comments that merely restate details that are already clearly shown in the code itself.
+
 Update AGENTS.md with missing information that is helpful and necessary to run tool calls properly during this session.
 
 ## Development workflow
