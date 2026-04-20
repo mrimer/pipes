@@ -411,6 +411,67 @@ describe('applyPlayerProfile – campaign progress', () => {
     expect(loadCampaignCompleteShown('cmp_ms')).toBe(true);
   });
 
+  it('does not write stale level IDs from import to local storage', () => {
+    // Campaign only has levels 101 and 102; payload contains stale level 999
+    const cmp = makeMinimalCampaign('cmp_stale_import');
+
+    const payload: PlayerProfilePayload = {
+      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      campaignProgress: [
+        {
+          campaignId: 'cmp_stale_import',
+          completedLevels: [101, 999],
+          completedChapters: [],
+          masteredChaptersShown: [],
+          campaignMasteredShown: false, campaignCompleteShown: false,
+          levelStars: { '101': 2, '999': 3 },
+          levelWater: { '101': 10, '999': 20 },
+        },
+      ],
+    };
+    applyPlayerProfile(payload, [cmp]);
+
+    const progress = loadCampaignProgress('cmp_stale_import');
+    expect(progress.has(101)).toBe(true);   // valid – kept
+    expect(progress.has(999)).toBe(false);  // stale – dropped
+
+    const stars = loadLevelStars('cmp_stale_import');
+    expect(stars[101]).toBe(2);             // valid – kept
+    expect(stars[999]).toBeUndefined();     // stale – dropped
+
+    const water = loadLevelWater('cmp_stale_import');
+    expect(water[101]).toBe(10);            // valid – kept
+    expect(water[999]).toBeUndefined();     // stale – dropped
+  });
+
+  it('does not write stale chapter IDs from import to local storage', () => {
+    // Campaign only has chapter 1; payload contains stale chapter 99
+    const cmp = makeMinimalCampaign('cmp_stale_ch_import');
+
+    const payload: PlayerProfilePayload = {
+      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      campaignProgress: [
+        {
+          campaignId: 'cmp_stale_ch_import',
+          completedLevels: [],
+          completedChapters: [1, 99],
+          masteredChaptersShown: [1, 99],
+          campaignMasteredShown: false, campaignCompleteShown: false,
+          levelStars: {}, levelWater: {},
+        },
+      ],
+    };
+    applyPlayerProfile(payload, [cmp]);
+
+    const chapters = loadCompletedChapters('cmp_stale_ch_import');
+    expect(chapters.has(1)).toBe(true);    // valid – kept
+    expect(chapters.has(99)).toBe(false);  // stale – dropped
+
+    const mastered = loadMasteredChaptersShown('cmp_stale_ch_import');
+    expect(mastered.has(1)).toBe(true);    // valid – kept
+    expect(mastered.has(99)).toBe(false);  // stale – dropped
+  });
+
   it('reports merged and ignored campaigns separately', () => {
     const local = makeMinimalCampaign('cmp_local', 'Local Campaign');
     const payload: PlayerProfilePayload = {
