@@ -11,13 +11,49 @@ export interface CampaignMapCallbacks {
   onChapterSelected(chapterIdx: number): void;
 }
 
+/**
+ * Augments a base water map by summing each chapter's level water scores and
+ * storing the result under the corresponding pseudo-level ID.
+ * Existing entries for actual level IDs are preserved unchanged.
+ */
+export function augmentChapterLevelWater(
+  chapters: readonly ChapterDef[],
+  pseudoLevelIds: readonly number[],
+  baseWater: Readonly<Record<number, number>>,
+): Record<number, number> {
+  const result: Record<number, number> = { ...baseWater };
+  for (let i = 0; i < chapters.length; i++) {
+    const chapter = chapters[i];
+    const pseudoLevelId = pseudoLevelIds[i];
+    if (pseudoLevelId === undefined) continue;
+    result[pseudoLevelId] = chapter.levels.reduce(
+      (sum, l) => sum + (baseWater[l.id] ?? 0),
+      0,
+    );
+  }
+  return result;
+}
+
+/**
+ * Returns true when a chapter contains at least one challenge level that has
+ * not yet been completed.
+ */
+export function chapterHasUncompletedChallenge(
+  chapter: ChapterDef,
+  completedLevels: ReadonlySet<number>,
+): boolean {
+  return chapter.levels.some((l) => l.challenge && !completedLevels.has(l.id));
+}
+
 export class CampaignMapScreen {
   readonly screenEl: HTMLElement;
   private readonly _inner: ChapterMapScreen;
+  private readonly _callbacks: CampaignMapCallbacks;
   private _pseudoLevels: LevelDef[] = [];
   private _campaign: CampaignDef | null = null;
 
   constructor(callbacks: CampaignMapCallbacks) {
+    this._callbacks = callbacks;
     const chapterCallbacks: ChapterMapCallbacks = {
       getDisplayProgress: () => callbacks.getCompletedChapters(),
       getActiveCampaignId: () => callbacks.getActiveCampaignId(),
@@ -96,6 +132,15 @@ export class CampaignMapScreen {
         }
         return result;
       },
+      augmentLevelWater: (baseWater) => {
+        const campaign = this._campaign;
+        if (!campaign) return baseWater;
+        return augmentChapterLevelWater(
+          campaign.chapters,
+          this._pseudoLevels.map((l) => l.id),
+          baseWater,
+        );
+      },
     };
     this._inner = new ChapterMapScreen(chapterCallbacks);
     this.screenEl = this._inner.screenEl;
@@ -146,11 +191,13 @@ export class CampaignMapScreen {
   }
 
   private _buildPseudoChapter(campaign: CampaignDef): ChapterDef {
+    const completedLevels = this._callbacks.getCompletedLevels();
     const levels: LevelDef[] = campaign.chapters.map((chapter, chapterIdx) => {
       const rows = chapter.rows ?? 1;
       const cols = chapter.cols ?? 1;
       const grid = chapter.grid ?? [[{ shape: PipeShape.Empty } as TileDef]];
       const totalStars = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
+      const hasUncompletedChallenge = chapterHasUncompletedChallenge(chapter, completedLevels);
       return {
         id: chapter.id ?? (-1000 - chapterIdx),
         name: chapter.name,
@@ -160,6 +207,7 @@ export class CampaignMapScreen {
         inventory: [],
         starCount: totalStars,
         style: chapter.style,
+        challenge: hasUncompletedChallenge || undefined,
       };
     });
 

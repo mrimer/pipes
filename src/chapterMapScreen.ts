@@ -50,6 +50,12 @@ export interface ChapterMapCallbacks {
    * may include additional synthetic entries (e.g. chapter-aggregated totals).
    */
   augmentLevelStars?(levelStars: Record<number, number>): Record<number, number>;
+  /**
+   * Optional hook to augment the per-level water map before rendering.
+   * Called with the raw water scores loaded from persistence; return a new map
+   * that may include additional synthetic entries (e.g. chapter-aggregated totals).
+   */
+  augmentLevelWater?(levelWater: Record<number, number>): Record<number, number>;
 }
 
 /**
@@ -108,6 +114,10 @@ export class ChapterMapScreen extends MapScreenBase {
 
   protected _augmentLevelStars(levelStars: Record<number, number>): Record<number, number> {
     return this._callbacks.augmentLevelStars?.(levelStars) ?? levelStars;
+  }
+
+  protected _augmentLevelWater(levelWater: Record<number, number>): Record<number, number> {
+    return this._callbacks.augmentLevelWater?.(levelWater) ?? levelWater;
   }
 
   protected _formatStatsText(chapter: ChapterDef, displayProgress: Set<number>): string | undefined {
