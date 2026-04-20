@@ -751,6 +751,18 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
   // Six outer bumps evenly spaced to create the bumpy outline
   const bumpR = r * 0.42;
   const bumpOff = r * 0.64;
+
+  // Outline circles drawn first so the bump fills paint on top, leaving only the
+  // outer perimeter arc of each circle visible as an outline.
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = _s(2);
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.fillStyle = leafAltColor;
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2;
@@ -768,16 +780,6 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
     ctx.beginPath();
     ctx.arc(Math.cos(angle) * innerOff, Math.sin(angle) * innerOff, innerR, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  // Outline follows the outer six-leaf shape
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(2);
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
-    ctx.stroke();
   }
 }
 
@@ -820,6 +822,18 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
   // Five outer lobes evenly spaced to create the outer five-leaf shape
   const bumpR = r * 0.44;
   const bumpOff = r * 0.62;
+
+  // Outline circles drawn first so the lobe fills paint on top, leaving only the
+  // outer perimeter arc of each circle visible as an outline.
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = _s(2);
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.fillStyle = leafAltColor;
   for (let i = 0; i < 5; i++) {
     const angle = (i / 5) * Math.PI * 2;
@@ -837,16 +851,6 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
     ctx.beginPath();
     ctx.arc(Math.cos(angle) * innerOff, Math.sin(angle) * innerOff, innerR, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  // Outline follows the outer five-leaf shape
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(2);
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
-    ctx.stroke();
   }
 }
 
@@ -888,6 +892,18 @@ export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: L
 
   const outerLobeR = r * 0.35;
   const outerLobeOff = r * 0.65;
+
+  // Outline circles drawn first so the lobe fills paint on top, leaving only the
+  // outer perimeter arc of each circle visible as an outline.
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = _s(2);
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * outerLobeOff, Math.sin(angle) * outerLobeOff, outerLobeR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.fillStyle = leafAltColor;
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
@@ -912,16 +928,6 @@ export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.20, 0, Math.PI * 2);
   ctx.fill();
-
-  // Outline follows the outer eight-leaf shape
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(2);
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * outerLobeOff, Math.sin(angle) * outerLobeOff, outerLobeR, 0, Math.PI * 2);
-    ctx.stroke();
-  }
 }
 
 // ── Sea tile rendering helpers ────────────────────────────────────────────────
