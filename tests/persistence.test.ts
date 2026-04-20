@@ -5,7 +5,6 @@
 /**
  * Tests for persistence helpers in persistence.ts that are not yet covered
  * by stars.test.ts or water.test.ts:
- *   – loadCompletedLevels / markLevelCompleted / clearCompletedLevels / markAllLevelsCompleted
  *   – computeCampaignCompletionPct
  *   – loadCompletedChapters / markChapterCompleted / clearCompletedChapters
  *   – migrateCampaign
@@ -14,10 +13,6 @@
  */
 
 import {
-  loadCompletedLevels,
-  markLevelCompleted,
-  clearCompletedLevels,
-  markAllLevelsCompleted,
   computeCampaignCompletionPct,
   loadCompletedChapters,
   markChapterCompleted,
@@ -41,97 +36,6 @@ import { CampaignDef } from '../src/types';
 
 beforeEach(() => {
   localStorage.clear();
-});
-
-// ─── loadCompletedLevels / markLevelCompleted / clearCompletedLevels ──────────
-
-describe('loadCompletedLevels', () => {
-  it('returns empty Set when nothing is stored', () => {
-    const result = loadCompletedLevels();
-    expect(result.size).toBe(0);
-    expect(result).toBeInstanceOf(Set);
-  });
-
-  it('returns empty Set when localStorage contains invalid JSON', () => {
-    localStorage.setItem('pipes_completed', 'not-valid-json');
-    expect(loadCompletedLevels().size).toBe(0);
-  });
-});
-
-describe('markLevelCompleted', () => {
-  it('adds the level ID to the in-memory set and persists it', () => {
-    const completed = new Set<number>();
-    markLevelCompleted(completed, 5);
-    expect(completed.has(5)).toBe(true);
-    // Reloading should reflect the persisted value
-    const loaded = loadCompletedLevels();
-    expect(loaded.has(5)).toBe(true);
-  });
-
-  it('marking multiple levels accumulates them', () => {
-    const completed = new Set<number>();
-    markLevelCompleted(completed, 1);
-    markLevelCompleted(completed, 2);
-    markLevelCompleted(completed, 3);
-    expect(completed.size).toBe(3);
-    const loaded = loadCompletedLevels();
-    expect(loaded.has(1)).toBe(true);
-    expect(loaded.has(2)).toBe(true);
-    expect(loaded.has(3)).toBe(true);
-  });
-
-  it('marking the same level twice is idempotent', () => {
-    const completed = new Set<number>();
-    markLevelCompleted(completed, 7);
-    markLevelCompleted(completed, 7);
-    expect(completed.size).toBe(1);
-  });
-});
-
-describe('clearCompletedLevels', () => {
-  it('empties the set and removes the stored value', () => {
-    const completed = new Set<number>([1, 2, 3]);
-    localStorage.setItem('pipes_completed', JSON.stringify([1, 2, 3]));
-    clearCompletedLevels(completed);
-    expect(completed.size).toBe(0);
-    expect(loadCompletedLevels().size).toBe(0);
-  });
-});
-
-// ─── markAllLevelsCompleted ───────────────────────────────────────────────────
-
-describe('markAllLevelsCompleted', () => {
-  it('marks every provided level ID as completed', () => {
-    const completed = new Set<number>();
-    markAllLevelsCompleted(completed, [10, 20, 30]);
-    expect(completed.has(10)).toBe(true);
-    expect(completed.has(20)).toBe(true);
-    expect(completed.has(30)).toBe(true);
-    expect(completed.size).toBe(3);
-  });
-
-  it('persists all level IDs to localStorage', () => {
-    const completed = new Set<number>();
-    markAllLevelsCompleted(completed, [1, 2, 3]);
-    const loaded = loadCompletedLevels();
-    expect(loaded.has(1)).toBe(true);
-    expect(loaded.has(2)).toBe(true);
-    expect(loaded.has(3)).toBe(true);
-  });
-
-  it('handles an empty list gracefully', () => {
-    const completed = new Set<number>();
-    markAllLevelsCompleted(completed, []);
-    expect(completed.size).toBe(0);
-  });
-
-  it('merges with existing completed levels', () => {
-    const completed = new Set<number>([5]);
-    markAllLevelsCompleted(completed, [10, 20]);
-    expect(completed.has(5)).toBe(true);
-    expect(completed.has(10)).toBe(true);
-    expect(completed.has(20)).toBe(true);
-  });
 });
 
 // ─── computeCampaignCompletionPct ─────────────────────────────────────────────

@@ -41,7 +41,6 @@ function makeCallbacks(overrides: Partial<CampaignCallbacks> = {}): CampaignCall
     winNextBtnEl,
     exitBtnEl,
     gameoverMenuBtnEl,
-    completedLevels: new Set<number>(),
     showResetConfirmModal: () => {},
     showRules: () => {},
     showSettings: () => {},

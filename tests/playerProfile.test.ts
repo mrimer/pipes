@@ -24,7 +24,6 @@ import {
   loadSfxVolume,
   loadTouchUiEnabled,
   loadCommandKeyAssignments,
-  loadCompletedLevels,
   loadLevelStars,
   loadLevelWater,
   loadCampaignProgress,
@@ -36,7 +35,6 @@ import {
   saveSfxVolume,
   saveTouchUiEnabled,
   saveCommandKeyAssignments,
-  markLevelCompleted,
   markCampaignLevelCompleted,
   saveLevelStar,
   saveLevelWater,
@@ -108,24 +106,6 @@ describe('buildPlayerProfilePayload', () => {
     expect(payload.sfxVolume).toBe(42);
     expect(payload.touchUiEnabled).toBe(true);
     expect(payload.commandKeys).toEqual({ moveLeft: 'a' });
-  });
-
-  it('captures official completed levels', () => {
-    const set = new Set<number>();
-    markLevelCompleted(set, 5);
-    markLevelCompleted(set, 10);
-
-    const payload = buildPlayerProfilePayload([]);
-    expect(payload.officialProgress.completedLevels).toEqual(expect.arrayContaining([5, 10]));
-  });
-
-  it('captures official stars and water', () => {
-    saveLevelStar(1, 3);
-    saveLevelWater(2, 50);
-
-    const payload = buildPlayerProfilePayload([]);
-    expect(payload.officialProgress.levelStars['1']).toBe(3);
-    expect(payload.officialProgress.levelWater['2']).toBe(50);
   });
 
   it('captures per-campaign progress', () => {
@@ -201,7 +181,6 @@ describe('parsePlayerFile', () => {
       sfxVolume: 80,
       touchUiEnabled: null,
       commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [],
     };
     const { computeChecksum: cs } = require('../src/playerProfile');
@@ -266,98 +245,41 @@ describe('applyPlayerProfile – settings', () => {
       sfxVolume: 60,
       touchUiEnabled: false,
       commandKeys: { moveLeft: 'a' },
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [],
       ...overrides,
     };
   }
 
   it('restores player name', () => {
-    applyPlayerProfile(makePayload({ playerName: 'Carol' }), [], new Set());
+    applyPlayerProfile(makePayload({ playerName: 'Carol' }), []);
     expect(loadPlayerName()).toBe('Carol');
   });
 
   it('restores sfx volume', () => {
-    applyPlayerProfile(makePayload({ sfxVolume: 55 }), [], new Set());
+    applyPlayerProfile(makePayload({ sfxVolume: 55 }), []);
     expect(loadSfxVolume()).toBe(55);
   });
 
   it('restores touch UI enabled', () => {
-    applyPlayerProfile(makePayload({ touchUiEnabled: true }), [], new Set());
+    applyPlayerProfile(makePayload({ touchUiEnabled: true }), []);
     expect(loadTouchUiEnabled()).toBe(true);
   });
 
   it('does not overwrite touch UI when null', () => {
     saveTouchUiEnabled(true);
-    applyPlayerProfile(makePayload({ touchUiEnabled: null }), [], new Set());
+    applyPlayerProfile(makePayload({ touchUiEnabled: null }), []);
     expect(loadTouchUiEnabled()).toBe(true);
   });
 
   it('restores command keys', () => {
-    applyPlayerProfile(makePayload({ commandKeys: { shoot: 'q' } }), [], new Set());
+    applyPlayerProfile(makePayload({ commandKeys: { shoot: 'q' } }), []);
     expect(loadCommandKeyAssignments()).toEqual({ shoot: 'q' });
   });
 
   it('does not overwrite command keys when null', () => {
     saveCommandKeyAssignments({ shoot: 'x' });
-    applyPlayerProfile(makePayload({ commandKeys: null }), [], new Set());
+    applyPlayerProfile(makePayload({ commandKeys: null }), []);
     expect(loadCommandKeyAssignments()).toEqual({ shoot: 'x' });
-  });
-});
-
-describe('applyPlayerProfile – official progress', () => {
-  beforeEach(clearStorage);
-
-  it('unions completed levels (does not clear existing)', () => {
-    const set = new Set<number>();
-    markLevelCompleted(set, 1);
-
-    const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [2, 3], levelStars: {}, levelWater: {} },
-      campaignProgress: [],
-    };
-    applyPlayerProfile(payload, [], set);
-    expect(set.has(1)).toBe(true);
-    expect(set.has(2)).toBe(true);
-    expect(set.has(3)).toBe(true);
-  });
-
-  it('merges official stars with max-value semantics', () => {
-    saveLevelStar(10, 2);
-
-    const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: { '10': 3, '11': 1 }, levelWater: {} },
-      campaignProgress: [],
-    };
-    applyPlayerProfile(payload, [], new Set());
-    expect(loadLevelStars()[10]).toBe(3);  // higher import value wins
-    expect(loadLevelStars()[11]).toBe(1);  // new entry added
-  });
-
-  it('does not overwrite a higher local star with a lower imported one', () => {
-    saveLevelStar(5, 3);
-
-    const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: { '5': 1 }, levelWater: {} },
-      campaignProgress: [],
-    };
-    applyPlayerProfile(payload, [], new Set());
-    expect(loadLevelStars()[5]).toBe(3);  // local higher value preserved
-  });
-
-  it('merges official water with max-value semantics', () => {
-    saveLevelWater(20, 10);
-
-    const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: { '20': 15 } },
-      campaignProgress: [],
-    };
-    applyPlayerProfile(payload, [], new Set());
-    expect(loadLevelWater()[20]).toBe(15);
   });
 });
 
@@ -367,7 +289,6 @@ describe('applyPlayerProfile – campaign progress', () => {
   it('ignores campaigns not present locally', () => {
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_ghost',
@@ -377,7 +298,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    const result = applyPlayerProfile(payload, [], new Set());
+    const result = applyPlayerProfile(payload, []);
     const ignored = result.outcomes.filter((o) => o.status === 'ignored');
     expect(ignored).toHaveLength(1);
     expect(ignored[0].campaignId).toBe('cmp_ghost');
@@ -390,7 +311,6 @@ describe('applyPlayerProfile – campaign progress', () => {
 
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_merge',
@@ -400,7 +320,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    applyPlayerProfile(payload, [cmp], new Set());
+    applyPlayerProfile(payload, [cmp]);
 
     const after = loadCampaignProgress('cmp_merge');
     expect(after.has(101)).toBe(true);  // local preserved
@@ -414,7 +334,6 @@ describe('applyPlayerProfile – campaign progress', () => {
 
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_ch',
@@ -424,7 +343,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    applyPlayerProfile(payload, [cmp], new Set());
+    applyPlayerProfile(payload, [cmp]);
 
     const after = loadCompletedChapters('cmp_ch');
     expect(after.has(1)).toBe(true);
@@ -437,7 +356,6 @@ describe('applyPlayerProfile – campaign progress', () => {
 
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_stars',
@@ -448,7 +366,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    applyPlayerProfile(payload, [cmp], new Set());
+    applyPlayerProfile(payload, [cmp]);
     expect(loadLevelStars('cmp_stars')[101]).toBe(3);  // imported > local
     expect(loadLevelStars('cmp_stars')[102]).toBe(1);  // new entry
   });
@@ -459,7 +377,6 @@ describe('applyPlayerProfile – campaign progress', () => {
 
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_nodown',
@@ -470,7 +387,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    applyPlayerProfile(payload, [cmp], new Set());
+    applyPlayerProfile(payload, [cmp]);
     expect(loadLevelStars('cmp_nodown')[101]).toBe(3);
   });
 
@@ -478,7 +395,6 @@ describe('applyPlayerProfile – campaign progress', () => {
     const cmp = makeMinimalCampaign('cmp_ms');
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_ms',
@@ -488,7 +404,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    applyPlayerProfile(payload, [cmp], new Set());
+    applyPlayerProfile(payload, [cmp]);
     const shown = loadMasteredChaptersShown('cmp_ms');
     expect(shown.has(1)).toBe(true);
     expect(loadCampaignMasteredShown('cmp_ms')).toBe(true);
@@ -499,7 +415,6 @@ describe('applyPlayerProfile – campaign progress', () => {
     const local = makeMinimalCampaign('cmp_local', 'Local Campaign');
     const payload: PlayerProfilePayload = {
       playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
-      officialProgress: { completedLevels: [], levelStars: {}, levelWater: {} },
       campaignProgress: [
         {
           campaignId: 'cmp_local',
@@ -515,7 +430,7 @@ describe('applyPlayerProfile – campaign progress', () => {
         },
       ],
     };
-    const result = applyPlayerProfile(payload, [local], new Set());
+    const result = applyPlayerProfile(payload, [local]);
     const merged  = result.outcomes.filter((o) => o.status === 'merged');
     const ignored = result.outcomes.filter((o) => o.status === 'ignored');
     expect(merged).toHaveLength(1);

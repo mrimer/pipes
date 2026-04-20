@@ -8,7 +8,6 @@
  */
 
 import {
-  loadCompletedLevels,
   loadCampaignProgress,
   loadLevelStars,
   loadLevelWater,
@@ -20,7 +19,6 @@ import {
   loadTouchUiEnabled,
   loadPlayerName,
   loadCommandKeyAssignments,
-  markLevelCompleted,
   markCampaignLevelCompleted,
   saveLevelStar,
   saveLevelWater,
@@ -86,11 +84,6 @@ export interface PlayerProfilePayload {
   sfxVolume: number;
   touchUiEnabled: boolean | null;
   commandKeys: Record<string, string> | null;
-  officialProgress: {
-    completedLevels: number[];
-    levelStars: Record<string, number>;
-    levelWater: Record<string, number>;
-  };
   campaignProgress: CampaignProgressBlock[];
 }
 
@@ -108,15 +101,11 @@ export interface PlayerProfileFile {
  * Build a {@link PlayerProfilePayload} from the current local-storage state.
  *
  * @param localCampaigns - All locally installed campaigns; used to enumerate
- *   per-campaign progress keys.  The official campaign (no campaignId) is
- *   always included separately via `officialProgress`.
+ *   per-campaign progress keys.
  */
 export function buildPlayerProfilePayload(
   localCampaigns: readonly CampaignDef[],
 ): PlayerProfilePayload {
-  const officialStars  = loadLevelStars();
-  const officialWater  = loadLevelWater();
-
   const campaignProgress: CampaignProgressBlock[] = localCampaigns.map((c) => ({
     campaignId:            c.id,
     completedLevels:       [...loadCampaignProgress(c.id)],
@@ -133,11 +122,6 @@ export function buildPlayerProfilePayload(
     sfxVolume:     loadSfxVolume(),
     touchUiEnabled: loadTouchUiEnabled(),
     commandKeys:   loadCommandKeyAssignments(),
-    officialProgress: {
-      completedLevels: [...loadCompletedLevels()],
-      levelStars:      officialStars,
-      levelWater:      officialWater,
-    },
     campaignProgress,
   };
 }
@@ -248,20 +232,16 @@ export interface ApplyProfileResult {
  * Apply a {@link PlayerProfilePayload} to local storage.
  *
  * - Player settings are overwritten with the imported values.
- * - Official-campaign level completion is unioned with the local set;
- *   stars and water use max-value semantics.
  * - For each campaign in the payload whose ID exists locally, progress
  *   is merged (union for sets/flags, max for numeric scores).
  * - Campaigns whose IDs are not found locally are silently skipped.
  *
  * @param payload         The decoded player-profile payload.
  * @param localCampaigns  All campaigns currently installed locally.
- * @param completedLevels The in-memory official completed-levels set to update.
  */
 export function applyPlayerProfile(
   payload:         PlayerProfilePayload,
   localCampaigns:  readonly CampaignDef[],
-  completedLevels: Set<number>,
 ): ApplyProfileResult {
 
   // ── Settings ───────────────────────────────────────────────────────────────
@@ -272,29 +252,6 @@ export function applyPlayerProfile(
   }
   if (payload.commandKeys) {
     saveCommandKeyAssignments(payload.commandKeys);
-  }
-
-  // ── Official progress ──────────────────────────────────────────────────────
-  const inc = payload.officialProgress;
-
-  // Union: mark any newly-completed official levels
-  for (const levelId of inc.completedLevels) {
-    markLevelCompleted(completedLevels, levelId);
-  }
-
-  // Max-value merge for official stars (saveLevelStar unconditionally overwrites,
-  // so we compare manually before calling it)
-  const existingOfficialStars = loadLevelStars();
-  for (const [idStr, stars] of Object.entries(inc.levelStars)) {
-    const id = Number(idStr);
-    if (stars > (existingOfficialStars[id] ?? -Infinity)) {
-      saveLevelStar(id, stars);
-    }
-  }
-
-  // Max-value merge for official water (saveLevelWater already has max semantics)
-  for (const [idStr, water] of Object.entries(inc.levelWater)) {
-    saveLevelWater(Number(idStr), water);
   }
 
   // ── Per-campaign progress ──────────────────────────────────────────────────

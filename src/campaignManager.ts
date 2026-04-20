@@ -18,7 +18,6 @@ import {
   loadLevelStars, saveLevelStar, clearLevelStars,
   loadLevelWater, saveLevelWater, clearLevelWater,
   loadCompletedChapters, markChapterCompleted, clearCompletedChapters, removeChapterCompleted,
-  markLevelCompleted, clearCompletedLevels,
   loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown, removeMasteredChapterShown,
    loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
    loadCampaignCompleteShown, markCampaignCompleteShown, clearCampaignCompleteShown,
@@ -79,9 +78,6 @@ export interface CampaignCallbacks {
   readonly winNextBtnEl: HTMLButtonElement;
   readonly exitBtnEl: HTMLButtonElement;
   readonly gameoverMenuBtnEl: HTMLButtonElement;
-
-  /** Official-campaign completion progress (used when no campaign is active). */
-  readonly completedLevels: Set<number>;
 
   /** Show the reset-progress confirmation modal with the given progress info. */
   showResetConfirmModal(info: import('./gameModals').ResetProgressInfo | null): void;
@@ -255,8 +251,7 @@ export class CampaignManager {
 
     if (!this._chapterMapScreen) {
       this._chapterMapScreen = new ChapterMapScreen({
-        getDisplayProgress: () =>
-          this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels,
+        getDisplayProgress: () => this._activeCampaignProgress,
         getActiveCampaignId: () => this._activeCampaign?.id ?? null,
         onShowLevelSelect: () => {
           if (this._activeCampaign?.grid) {
@@ -422,7 +417,7 @@ export class CampaignManager {
     if (this._campaignMapScreen) return;
     this._campaignMapScreen = new CampaignMapScreen({
       getCompletedChapters: () => this._activeCampaignCompletedChapters,
-      getCompletedLevels: () => this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels,
+      getCompletedLevels: () => this._activeCampaignProgress,
       getActiveCampaignId: () => this._activeCampaign?.id ?? null,
       onShowLevelSelect: () => this._exitCampaignMapToMainScreen(),
       onChapterSelected: (chapterIdx) => this._showChapterMapFromCampaign(chapterIdx),
@@ -706,8 +701,6 @@ export class CampaignManager {
     if (this._playtestExitCallback) return; // don't persist during playtesting
     if (this._activeCampaign) {
       markCampaignLevelCompleted(this._activeCampaign.id, levelId, this._activeCampaignProgress);
-    } else {
-      markLevelCompleted(this._callbacks.completedLevels, levelId);
     }
   }
 
@@ -753,10 +746,6 @@ export class CampaignManager {
       clearCampaignCompleteShown(this._activeCampaign.id);
       this._campaignMasteredShown = false;
       this._campaignCompleteShown = false;
-    } else {
-      clearCompletedLevels(this._callbacks.completedLevels);
-      clearLevelStars();
-      clearLevelWater();
     }
     this.renderLevelList();
   }
@@ -777,7 +766,7 @@ export class CampaignManager {
   /** Re-render the level list on the level-select screen. */
   renderLevelList(): void {
     const campaignChapters = this._activeCampaign?.chapters ?? [];
-    const displayProgress = this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels;
+    const displayProgress = this._activeCampaignProgress;
     const levelStars = loadLevelStars(this._activeCampaign?.id);
     const levelWater = loadLevelWater(this._activeCampaign?.id);
     let activeCampaignInfo: { name: string; author: string; completionPct: number } | undefined;
@@ -1189,7 +1178,7 @@ export class CampaignManager {
    * stars have been collected (using the active campaign's progress).
    */
   private _isCampaignChapterMastered(chapter: ChapterDef): boolean {
-    const progress = this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels;
+    const progress = this._activeCampaignProgress;
     const levelStars = loadLevelStars(this._activeCampaign?.id);
     const chLevels = chapter.levels;
     const allLevelsCompleted = chLevels.every(l => progress.has(l.id));
@@ -1205,7 +1194,7 @@ export class CampaignManager {
     const chapter = campaign.chapters[chapterIdx];
     const nextChapter = campaign.chapters[chapterIdx + 1] ?? null;
 
-    const progress = this._activeCampaign ? this._activeCampaignProgress : this._callbacks.completedLevels;
+    const progress = this._activeCampaignProgress;
     const levelStars = loadLevelStars(campaign.id);
     const levelWater = loadLevelWater(campaign.id);
 

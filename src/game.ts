@@ -4,7 +4,6 @@ import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, Cam
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
 import {
-  loadCompletedLevels,
   loadPlayerName,
   loadTouchUiEnabled,
   savePlayerName,
@@ -214,9 +213,6 @@ export class Game implements InputCallbacks {
   /** Manages campaign lifecycle, chapter map, modals, and campaign persistence. */
   private readonly _campaign: CampaignManager;
 
-  /** Levels that have been successfully completed (persisted in localStorage). */
-  private completedLevels: Set<number>;
-
   /** Manages all canvas-based visual effects (particles, fill/rotation animations, labels, rings). */
   private readonly _animMgr: AnimationManager;
 
@@ -279,9 +275,6 @@ export class Game implements InputCallbacks {
     this.winWaterEl = winModalEl.querySelector<HTMLElement>('#win-water');
     this.winStarsEl = winModalEl.querySelector<HTMLElement>('#win-stars');
     this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
-
-    // Load persisted completions
-    this.completedLevels = loadCompletedLevels();
 
     // Create the tooltip manager for Ctrl+hover grid coordinates
     this._tooltip = TooltipManager.create();
@@ -397,7 +390,6 @@ export class Game implements InputCallbacks {
       winNextBtnEl: this.winNextBtnEl,
       exitBtnEl: this.exitBtnEl,
       gameoverMenuBtnEl: this.gameoverMenuBtnEl,
-      completedLevels: this.completedLevels,
       showResetConfirmModal: (info) => {
         this._updateResetModalInfo(info);
         this.resetConfirmModalEl.style.display = 'flex';
@@ -1820,14 +1812,7 @@ export class Game implements InputCallbacks {
         }
 
         const localCampaigns = this.campaignEditor.getAllCampaigns();
-        const applyResult    = applyPlayerProfile(result.payload, localCampaigns, this.completedLevels);
-
-        // Reload in-memory official completed-levels from localStorage (applyPlayerProfile
-        // may have written new level IDs via markLevelCompleted which already updated the set,
-        // but ensure the set reflects exactly what is now in storage).
-        const refreshed = loadCompletedLevels();
-        this.completedLevels.clear();
-        for (const id of refreshed) this.completedLevels.add(id);
+        const applyResult    = applyPlayerProfile(result.payload, localCampaigns);
 
         // Reload active campaign's in-memory progress and re-render.
         this._campaign.reloadActiveCampaignProgress();
