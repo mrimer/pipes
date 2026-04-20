@@ -585,3 +585,74 @@ export function saveChapterEditorMapBoxCollapsed(collapsed: boolean): void {
     }
   } catch { /* ignore */ }
 }
+
+// ─── Recording storage ────────────────────────────────────────────────────────
+
+const RECORDINGS_KEY = 'pipes_recordings';
+const RECORDING_SETTINGS_KEY = 'pipes_recording_settings';
+
+/** Load all saved {@link PlaySequenceRecord} entries from localStorage. */
+export function loadAllRecordings(): import('./types').PlaySequenceRecord[] {
+  try {
+    const raw = localStorage.getItem(RECORDINGS_KEY);
+    if (raw) return JSON.parse(raw) as import('./types').PlaySequenceRecord[];
+  } catch { /* ignore parse errors */ }
+  return [];
+}
+
+/**
+ * Load only the recordings for a specific campaign + level combination.
+ * Returns a new array (does not modify the stored list).
+ */
+export function loadRecordingsForLevel(campaignId: string, levelId: number): import('./types').PlaySequenceRecord[] {
+  return loadAllRecordings().filter(
+    (r) => r.campaignId === campaignId && r.levelId === levelId,
+  );
+}
+
+/** Persist a new or updated {@link PlaySequenceRecord}. Replaces an existing entry with the same `id`. */
+export function saveRecording(record: import('./types').PlaySequenceRecord): void {
+  try {
+    const all = loadAllRecordings();
+    const idx = all.findIndex((r) => r.id === record.id);
+    if (idx >= 0) {
+      all[idx] = record;
+    } else {
+      all.push(record);
+    }
+    localStorage.setItem(RECORDINGS_KEY, JSON.stringify(all));
+  } catch { /* ignore storage errors */ }
+}
+
+/** Remove the recording with the given `id` from localStorage. No-op if not found. */
+export function deleteRecording(id: string): void {
+  try {
+    const all = loadAllRecordings().filter((r) => r.id !== id);
+    localStorage.setItem(RECORDINGS_KEY, JSON.stringify(all));
+  } catch { /* ignore storage errors */ }
+}
+
+/**
+ * Load recording settings.
+ * Defaults: `recordSuccesses = true`, `recordFailures = false`.
+ */
+export function loadRecordingSettings(): import('./types').RecordingSettings {
+  try {
+    const raw = localStorage.getItem(RECORDING_SETTINGS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<import('./types').RecordingSettings>;
+      return {
+        recordSuccesses: parsed.recordSuccesses ?? true,
+        recordFailures: parsed.recordFailures ?? false,
+      };
+    }
+  } catch { /* ignore parse errors */ }
+  return { recordSuccesses: true, recordFailures: false };
+}
+
+/** Persist recording settings. */
+export function saveRecordingSettings(settings: import('./types').RecordingSettings): void {
+  try {
+    localStorage.setItem(RECORDING_SETTINGS_KEY, JSON.stringify(settings));
+  } catch { /* ignore storage errors */ }
+}

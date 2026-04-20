@@ -244,6 +244,8 @@
     #redo-btn:disabled { opacity: 0.35; cursor: default; }
 
     #rules-btn,
+    #record-btn,
+    #playback-btn,
     #exit-btn {
       padding: 6px 18px;
       font-size: 0.9rem;
@@ -254,6 +256,8 @@
       cursor: pointer;
     }
     #rules-btn:hover,
+    #record-btn:hover,
+    #playback-btn:hover,
     #exit-btn:hover { background: #3a3a5a; color: #eee; }
 
     /* ── Modal overlay ────────────────────────────────────────────── */
@@ -362,6 +366,8 @@
     body.is-touch #redo-btn:hover:not(:disabled),
     body.is-touch #restart-btn:hover,
     body.is-touch #rules-btn:hover,
+    body.is-touch #record-btn:hover,
+    body.is-touch #playback-btn:hover,
     body.is-touch #exit-btn:hover {
       background: unset;
       color: unset;
@@ -373,6 +379,8 @@
     body.is-touch #redo-btn,
     body.is-touch #restart-btn,
     body.is-touch #rules-btn,
+    body.is-touch #record-btn,
+    body.is-touch #playback-btn,
     body.is-touch #exit-btn {
       padding: 10px 14px;
       min-height: 44px;
@@ -454,6 +462,8 @@
       <button id="redo-btn" type="button" disabled>↪ Redo</button>
       <button id="restart-btn" type="button">↺ Restart</button>
       <button id="rules-btn" type="button">📋 Rules</button>
+      <button id="record-btn" type="button" title="Record play sequence">📼</button>
+      <button id="playback-btn" type="button" title="View recordings">▶️</button>
       <button id="exit-btn" type="button">← Menu</button>
     </div>
     <div id="play-area">

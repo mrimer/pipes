@@ -9,6 +9,11 @@ import {
   savePlayerName,
   saveSfxVolume,
   saveTouchUiEnabled,
+  loadRecordingsForLevel,
+  saveRecording,
+  deleteRecording,
+  loadRecordingSettings,
+  saveRecordingSettings,
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
@@ -20,6 +25,9 @@ import {
   buildResetModal, ResetProgressInfo,
   buildExitConfirmModal, buildUnplayableModal,
   buildSettingsModal,
+  buildRecordModal,
+  buildPlaybackListModal,
+  showReplayImportSuccessModal,
   showPlayerImportResultModal,
 } from './gameModals';
 import { AnimationManager } from './animationManager';
@@ -35,8 +43,12 @@ import {
   buildPlayerFile,
   parsePlayerFile,
   applyPlayerProfile,
+  FILE_TYPE_REPLAY,
+  computeChecksum,
 } from './playerProfile';
 import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from './campaignEditor/types';
+import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
+import { PlaybackScreen, PlaybackCallbacks } from './playbackScreen';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -170,6 +182,17 @@ export class Game implements InputCallbacks {
   private gameState: GameState = GameState.Playing;
   private board: Board | null = null;
   private currentLevel: LevelDef | null = null;
+
+  /**
+   * Ordered log of encoded move strings parallel to the board history.
+   * `_moveLog[i]` is the move that produced `history[i+1]` from `history[i]`.
+   * Always trimmed to `board.historyIndex` entries (branch-after-undo support).
+   * The canonical sequence to record is `_moveLog.slice(0, board.historyIndex)`.
+   */
+  private _moveLog: string[] = [];
+
+  /** Manages the playback screen (replaying saved move sequences). */
+  private _playbackScreen!: PlaybackScreen;
 
   /** The pipe shape currently selected from the inventory, ready to be placed. */
   private selectedShape: PipeShape | null = null;
@@ -334,11 +357,18 @@ export class Game implements InputCallbacks {
       () => loadPlayerName(),
       (el) => {
         const playerNameInput = el.querySelector<HTMLInputElement>('[data-player-name-input]');
+        const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
+        const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
         saveSfxVolume(sfxManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
         savePlayerName(playerNameInput?.value ?? loadPlayerName());
+        saveRecordingSettings({
+          recordSuccesses: recordSuccessesToggle?.checked ?? true,
+          recordFailures:  recordFailuresToggle?.checked  ?? false,
+        });
         el.style.display = 'none';
       },
+      () => loadRecordingSettings(),
     );
 
     // Create the campaign editor (appends its own overlay to document.body)
@@ -434,6 +464,31 @@ export class Game implements InputCallbacks {
 
     this._showLevelSelect();
     this._loop();
+
+    // Wire the recording HUD buttons
+    const recordBtn = document.getElementById('record-btn') as HTMLButtonElement | null;
+    const playbackBtn = document.getElementById('playback-btn') as HTMLButtonElement | null;
+    if (recordBtn) {
+      recordBtn.addEventListener('click', () => this._openRecordModal());
+    }
+    if (playbackBtn) {
+      playbackBtn.addEventListener('click', () => this._openPlaybackListModal());
+    }
+
+    // Initialize the playback screen controller.
+    const playbackCbs: PlaybackCallbacks = {
+      getBoard: () => this.board,
+      getGameState: () => this.gameState,
+      getMoveLog: () => [...this._moveLog],
+      setBoard: (b) => { this.board = b; },
+      setGameState: (s) => { this.gameState = s; },
+      setScreen: (s) => { this.screen = s; },
+      refreshUI: () => this._refreshPlayUI(),
+      canvas: this.canvas,
+      hudEl: document.getElementById('hud') as HTMLElement,
+      errorFlashEl: this.errorFlashEl,
+    };
+    this._playbackScreen = new PlaybackScreen(playbackCbs);
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
@@ -487,7 +542,7 @@ export class Game implements InputCallbacks {
    * then triggers a fresh render so the board fills the updated area.
    */
   private _handleResize(): void {
-    if (this.screen !== GameScreen.Play || !this.currentLevel || !this.board) return;
+    if ((this.screen !== GameScreen.Play && this.screen !== GameScreen.Playback) || !this.currentLevel || !this.board) return;
     setTileSize(computeTileSize(
       this.currentLevel.rows,
       this.currentLevel.cols,
@@ -528,6 +583,7 @@ export class Game implements InputCallbacks {
    */
   private _enterPlayScreenState(level: LevelDef): void {
     this.board!.initHistory();
+    this._moveLog = [];  // reset move log each time a level (re)starts
     this.gameState = GameState.Playing;
     this.selectedShape = null;
     this.pendingRotation = 0;
@@ -718,10 +774,12 @@ export class Game implements InputCallbacks {
   // ─── Main render loop ──────────────────────────────────────────────────────
 
   private _loop(): void {
-    if (this.screen === GameScreen.Play) {
+    if (this.screen === GameScreen.Play || this.screen === GameScreen.Playback) {
       this._renderBoard();
       this._animMgr.tick(this.board, this.gameState);
-      this._metrics.tickGoldenInventoryTwinkle();
+      if (this.screen === GameScreen.Play) {
+        this._metrics.tickGoldenInventoryTwinkle();
+      }
     }
     requestAnimationFrame(() => this._loop());
   }
@@ -910,6 +968,11 @@ export class Game implements InputCallbacks {
     this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the map.';
     sfxManager.play(SfxId.Dry);
     this._showModalWithAnimation(this.gameoverModalEl, 'sparkle-red');
+
+    // Auto-record failure if the setting is enabled.
+    if (!this._campaign.isPlaytesting && loadRecordingSettings().recordFailures) {
+      this._maybeAutoRecord('failure', undefined, undefined);
+    }
   }
 
   /** Transition the game to the Won state and show the win modal after confetti. */
@@ -956,6 +1019,12 @@ export class Game implements InputCallbacks {
     }
     // Play win sound immediately on winning, then spawn confetti and show modal.
     sfxManager.play(SfxId.WinLevel);
+
+    // Auto-record success if the setting is enabled.
+    if (!this._campaign.isPlaytesting && loadRecordingSettings().recordSuccesses) {
+      this._maybeAutoRecord('success', waterRemaining, starsCollected);
+    }
+
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
       this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
@@ -995,6 +1064,11 @@ export class Game implements InputCallbacks {
       const changes = this.board.applyTurnDelta();
       this._playLeakSfxIfNeeded(this.board, changes);
       this._playGoldSfxIfNeeded(this.board, filledBefore);
+
+      // Record delete move before board.recordMove() increments historyIndex.
+      this._moveLog.length = this.board.historyIndex;
+      this._moveLog.push(encodeDeleteMove(pos.row, pos.col));
+
       this.board.recordMove();
       const sparkle = this._metrics.sparkleCallbacks();
       this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col);
@@ -1046,6 +1120,18 @@ export class Game implements InputCallbacks {
     this._playLeakSfxIfNeeded(this.board, changes);
     this._playGoldSfxIfNeeded(this.board, filledBefore);
     this._playAfterTileRotatedSfx(this.board, filledBefore);
+
+    // Record rotate move before board.recordMove() increments historyIndex.
+    if (rotationInfo) {
+      const tile = this.board.getTile(rotationInfo);
+      if (tile) {
+        const delta = (tile.rotation - rotationInfo.oldRotation + 360) % 360;
+        const direction = delta > 180 ? 'CCW' : 'CW';
+        this._moveLog.length = this.board.historyIndex;
+        this._moveLog.push(encodeRotateMove(rotationInfo.row, rotationInfo.col, direction));
+      }
+    }
+
     this.board.recordMove();
     let fillDelay = 0;
     if (rotationInfo) {
@@ -1406,6 +1492,14 @@ export class Game implements InputCallbacks {
       ? `${replacedRow},${replacedCol}` : null;
     const placedIsLeakyAndConnected = LEAKY_PIPE_SHAPES.has(placedShape)
       && posKey !== null && this.board.getFilledPositions().has(posKey);
+
+    // Record the move in the log before board.recordMove() increments historyIndex.
+    // Trim the log to the current history position first to handle branch-after-undo.
+    if (replacedRow !== undefined && replacedCol !== undefined) {
+      this._moveLog.length = this.board.historyIndex;
+      this._moveLog.push(encodePlaceMove(placedShape, replacedRow, replacedCol, this.pendingRotation));
+    }
+
     this.board.recordMove();
     const sparkle = this._metrics.sparkleCallbacks();
 
@@ -1748,6 +1842,230 @@ export class Game implements InputCallbacks {
   showRules(): void {
     refreshGameRulesModalCommands(this._rulesModalEl);
     this._rulesModalEl.style.display = 'flex';
+  }
+
+  // ─── Recording ────────────────────────────────────────────────────────────
+
+  /** Return the current canonical move sequence (trimmed to board history depth). */
+  getMoveLog(): string[] {
+    return this._moveLog.slice(0, this.board?.historyIndex ?? 0);
+  }
+
+  /**
+   * Open the manual "Record Play Sequence" modal.
+   * Only meaningful when a level is active.
+   */
+  private _openRecordModal(): void {
+    if (!this.board || !this.currentLevel) return;
+    const moves = this.getMoveLog();
+    const outcome: 'success' | 'failure' | 'partial' = this.gameState === GameState.Won ? 'success'
+      : this.gameState === GameState.GameOver ? 'failure'
+      : 'partial';
+    const info = {
+      outcome,
+      playerName: loadPlayerName(),
+      timestamp: Date.now(),
+      moveCount: moves.length,
+      waterScore: this.gameState === GameState.Won ? this.board.getCurrentWater() : undefined,
+      stars: this.gameState === GameState.Won ? this.board.getStarsCollected() : undefined,
+    };
+    buildRecordModal(
+      info,
+      (annotation) => {
+        if (!this.board || !this.currentLevel) return;
+        const record: import('./types').PlaySequenceRecord = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          campaignId: this._campaign.activeCampaign?.id ?? '',
+          levelId: this.currentLevel.id,
+          moves,
+          outcome,
+          autoRecorded: false,
+          timestamp: Date.now(),
+          playerName: loadPlayerName(),
+          waterScore: info.waterScore,
+          stars: info.stars,
+          annotation: annotation || undefined,
+          corrupted: false,
+        };
+        saveRecording(record);
+      },
+      () => { /* cancelled */ },
+    );
+  }
+
+  /**
+   * Open the playback list modal for the current level.
+   * Only meaningful when a level is active.
+   */
+  private _openPlaybackListModal(): void {
+    if (!this.currentLevel) return;
+    const campaignId = this._campaign.activeCampaign?.id ?? '';
+    const levelId = this.currentLevel.id;
+
+    buildPlaybackListModal({
+      getRecords: () => loadRecordingsForLevel(campaignId, levelId),
+      onReplay: (record) => {
+        if (!this.currentLevel) return;
+        this._playbackScreen.enter(record, this.currentLevel);
+      },
+      onReturn: () => { /* modal removes itself */ },
+      onDelete: (record) => {
+        deleteRecording(record.id);
+      },
+      onExport: (record) => {
+        this._exportReplay(record);
+      },
+      onImport: () => {
+        this._importReplay();
+      },
+    });
+  }
+
+  /**
+   * Auto-record the current move sequence when the settings permit it.
+   * Skips recording if an identical auto-recorded sequence already exists.
+   */
+  private _maybeAutoRecord(
+    outcome: 'success' | 'failure',
+    waterScore: number | undefined,
+    stars: number | undefined,
+  ): void {
+    if (!this.board || !this.currentLevel) return;
+    const moves = this.getMoveLog();
+    const campaignId = this._campaign.activeCampaign?.id ?? '';
+    const levelId = this.currentLevel.id;
+
+    // Dedup: skip if an identical auto-recorded sequence already exists for this level.
+    const existing = loadRecordingsForLevel(campaignId, levelId);
+    const movesJson = JSON.stringify(moves);
+    const isDuplicate = existing.some(
+      (r) => r.autoRecorded && JSON.stringify(r.moves) === movesJson,
+    );
+    if (isDuplicate) return;
+
+    const record: import('./types').PlaySequenceRecord = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      campaignId,
+      levelId,
+      moves,
+      outcome,
+      autoRecorded: true,
+      timestamp: Date.now(),
+      playerName: loadPlayerName(),
+      waterScore,
+      stars,
+      corrupted: false,
+    };
+    saveRecording(record);
+  }
+
+  /**
+   * Export a replay record as a gzip-compressed JSON file.
+   * The file contains campaign and level ids to support importing on other installs.
+   */
+  private _exportReplay(record: import('./types').PlaySequenceRecord): void {
+    const campaigns = this.campaignEditor.getAllCampaigns();
+    const campaign = campaigns.find((c) => c.id === record.campaignId);
+    const campaignName = campaign?.name ?? record.campaignId;
+
+    const payload = {
+      type: FILE_TYPE_REPLAY,
+      version: 1,
+      campaignId: record.campaignId,
+      campaignName,
+      levelId: record.levelId,
+      record,
+      checksum: computeChecksum(JSON.stringify(record)),
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const safeName = record.playerName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'player';
+    const filename = `pipes-replay-${safeName}-level${record.levelId}.pipes.json.gz`;
+
+    gzipString(json).then((compressed) => {
+      try {
+        const buf = compressed.buffer.slice(
+          compressed.byteOffset,
+          compressed.byteOffset + compressed.byteLength,
+        ) as ArrayBuffer;
+        const blob = new Blob([buf], { type: 'application/gzip' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
+      } catch (err) {
+        alert(`Export failed: ${String(err)}`);
+      }
+    }).catch((err) => {
+      alert(`Export failed (compression error): ${String(err)}`);
+    });
+  }
+
+  /**
+   * Open a file picker and import a replay file.
+   * On success shows a confirmation modal with campaign/chapter/level info.
+   */
+  private _importReplay(): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const processText = (text: string): void => {
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          alert('Import failed: invalid JSON.');
+          return;
+        }
+        if (parsed.type !== FILE_TYPE_REPLAY || typeof parsed.record !== 'object' || parsed.record === null) {
+          alert('Import failed: not a valid replay file.');
+          return;
+        }
+        const recordJson = JSON.stringify(parsed.record);
+        if (typeof parsed.checksum === 'string' && computeChecksum(recordJson) !== parsed.checksum) {
+          alert('Import failed: replay file checksum mismatch (file may be corrupted).');
+          return;
+        }
+        const record = parsed.record as import('./types').PlaySequenceRecord;
+        saveRecording(record);
+
+        // Determine chapter/level numbers for the confirmation modal.
+        const campaigns = this.campaignEditor.getAllCampaigns();
+        const campaign = campaigns.find((c) => c.id === record.campaignId);
+        const campaignName = campaign?.name ?? (parsed.campaignName as string | undefined) ?? record.campaignId;
+        let chapterNumber: number | null = null;
+        let levelNumber: number | null = null;
+        if (campaign) {
+          for (let ci = 0; ci < campaign.chapters.length; ci++) {
+            const chapter = campaign.chapters[ci];
+            const li = chapter.levels.findIndex((l) => l.id === record.levelId);
+            if (li >= 0) {
+              chapterNumber = ci + 1;
+              levelNumber = li + 1;
+              break;
+            }
+          }
+        }
+        showReplayImportSuccessModal(campaignName, chapterNumber, levelNumber);
+      };
+
+      blobToBytes(file).then((bytes) => {
+        if (isGzipBytes(bytes)) {
+          return ungzipBytes(bytes).then(processText);
+        }
+        processText(new TextDecoder().decode(bytes));
+      }).catch(() => {
+        alert('Failed to read the selected file. It may be corrupted or an unsupported format.');
+      });
+    });
+    input.click();
   }
 
   // ─── Player profile export / import ──────────────────────────────────────

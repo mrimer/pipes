@@ -41,6 +41,9 @@ export const FILE_TYPE_PLAYER   = 'pipes-player-profile' as const;
 /** Semantic type identifier for campaign files. */
 export const FILE_TYPE_CAMPAIGN = 'pipes-campaign' as const;
 
+/** Semantic type identifier for replay recording files. */
+export const FILE_TYPE_REPLAY   = 'pipes-replay' as const;
+
 /** Current player-profile file format version. */
 export const PROFILE_FORMAT_VERSION = 1;
 
