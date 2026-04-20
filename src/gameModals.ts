@@ -1,6 +1,7 @@
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 import { CommandAction, COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
+import type { CampaignImportOutcome } from './playerProfile';
 /**
  * Factory functions for building the game's modal overlay elements.
  *
@@ -558,4 +559,87 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
   exitBtn.addEventListener('click', () => onExit());
   actionsEl.appendChild(exitBtn);
   return el;
+}
+
+// ─── Player import result modal ───────────────────────────────────────────────
+
+/**
+ * Show a transient modal listing the outcome of a player-profile import.
+ *
+ * The modal is built, appended to `document.body`, made visible immediately,
+ * and auto-removes itself when the player closes it.  It does not need to be
+ * retained by the caller.
+ *
+ * @param outcomes - Per-campaign import outcomes returned by applyPlayerProfile.
+ */
+export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): void {
+  const el = createModalOverlay(0.7);
+  const box = document.createElement('div');
+  box.style.cssText =
+    `background:${UI_BG};border:3px solid #4a90d9;border-radius:${RADIUS_LG};` +
+    'padding:28px 36px;display:flex;flex-direction:column;gap:14px;' +
+    'min-width:280px;max-width:500px;max-height:80vh;overflow-y:auto;';
+
+  const title = document.createElement('h2');
+  title.style.cssText = 'margin:0;font-size:1.2rem;color:#4a90d9;';
+  title.textContent = '📥 Import Complete';
+  box.appendChild(title);
+
+  const merged  = outcomes.filter(
+    (o): o is Extract<CampaignImportOutcome, { status: 'merged' }> => o.status === 'merged',
+  );
+  const ignored = outcomes.filter(
+    (o): o is Extract<CampaignImportOutcome, { status: 'ignored' }> => o.status === 'ignored',
+  );
+
+  const addSection = (heading: string, color: string, items: string[]): void => {
+    const h = document.createElement('h3');
+    h.style.cssText = `margin:4px 0 0;font-size:0.95rem;color:${color};`;
+    h.textContent = heading;
+    box.appendChild(h);
+    if (items.length === 0) {
+      const none = document.createElement('p');
+      none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#888;';
+      none.textContent = '(none)';
+      box.appendChild(none);
+    } else {
+      const ul = document.createElement('ul');
+      ul.style.cssText = 'margin:4px 0 0 16px;padding:0;';
+      for (const item of items) {
+        const li = document.createElement('li');
+        li.style.cssText = 'font-size:0.85rem;color:#ddd;margin:2px 0;';
+        li.textContent = item;
+        ul.appendChild(li);
+      }
+      box.appendChild(ul);
+    }
+  };
+
+  addSection(
+    '✅ Campaigns merged',
+    '#7ed321',
+    merged.map((o) => o.campaignName),
+  );
+  addSection(
+    '⚠️ Campaigns not found locally (skipped)',
+    '#f0c040',
+    ignored.map((o) => o.campaignId),
+  );
+
+  const note = document.createElement('p');
+  note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';
+  note.textContent = 'Settings have been updated. Campaign progress has been merged.';
+  box.appendChild(note);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = 'Close';
+  closeBtn.style.cssText =
+    `align-self:flex-end;padding:8px 24px;font-size:0.95rem;background:${MUTED_BTN_BG};` +
+    `color:#eee;border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;margin-top:4px;`;
+  closeBtn.addEventListener('click', () => { el.remove(); });
+  box.appendChild(closeBtn);
+
+  el.appendChild(box);
+  document.body.appendChild(el);
+  el.style.display = 'flex';
 }

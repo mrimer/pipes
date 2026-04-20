@@ -45,6 +45,8 @@ function makeCallbacks(overrides: Partial<CampaignCallbacks> = {}): CampaignCall
     showResetConfirmModal: () => {},
     showRules: () => {},
     showSettings: () => {},
+    exportProgress: () => {},
+    importProgress: () => {},
     ...overrides,
   };
 }

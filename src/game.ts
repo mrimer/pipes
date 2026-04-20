@@ -21,6 +21,7 @@ import {
   buildResetModal, ResetProgressInfo,
   buildExitConfirmModal, buildUnplayableModal,
   buildSettingsModal,
+  showPlayerImportResultModal,
 } from './gameModals';
 import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
@@ -30,6 +31,13 @@ import { sfxManager, SfxId } from './sfxManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
+import {
+  buildPlayerProfilePayload,
+  buildPlayerFile,
+  parsePlayerFile,
+  applyPlayerProfile,
+} from './playerProfile';
+import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from './campaignEditor/types';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -408,6 +416,8 @@ export class Game implements InputCallbacks {
         if (playerNameInput) playerNameInput.value = loadPlayerName();
         this._settingsModalEl.style.display = 'flex';
       },
+      exportProgress: () => this._exportPlayerProfile(),
+      importProgress: () => this._importPlayerProfile(),
     };
     this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
     this._campaign.restoreFromPersistence();
@@ -1741,6 +1751,95 @@ export class Game implements InputCallbacks {
   showRules(): void {
     refreshGameRulesModalCommands(this._rulesModalEl);
     this._rulesModalEl.style.display = 'flex';
+  }
+
+  // ─── Player profile export / import ──────────────────────────────────────
+
+  /**
+   * Build a player profile from current local state, compress it with gzip,
+   * and trigger a file download named "pipes-player-<playerName>.pipes.json.gz".
+   */
+  private _exportPlayerProfile(): void {
+    const localCampaigns = this.campaignEditor.getAllCampaigns();
+    const payload  = buildPlayerProfilePayload(localCampaigns);
+    const fileObj  = buildPlayerFile(payload);
+    const json     = JSON.stringify(fileObj, null, 2);
+    const playerName = loadPlayerName().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'player';
+    const filename = `pipes-player-${playerName}.pipes.json.gz`;
+
+    gzipString(json).then((compressed) => {
+      try {
+        const buf  = compressed.buffer.slice(
+          compressed.byteOffset,
+          compressed.byteOffset + compressed.byteLength,
+        ) as ArrayBuffer;
+        const blob = new Blob([buf], { type: 'application/gzip' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      } catch (err) {
+        alert(`Export failed: ${String(err)}`);
+      }
+    }).catch((err) => {
+      alert(`Export failed (compression error): ${String(err)}`);
+    });
+  }
+
+  /**
+   * Open a file picker and import a player profile.
+   *
+   * 1. Reads and optionally decompresses the selected file.
+   * 2. Validates the file type identifier and checksum.
+   * 3. Merges settings and campaign progress into local storage.
+   * 4. Refreshes in-memory state and re-renders the level list.
+   * 5. Shows a result modal listing merged and ignored campaigns.
+   */
+  private _importPlayerProfile(): void {
+    const input  = document.createElement('input');
+    input.type   = 'file';
+    input.accept = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const processText = (text: string): void => {
+        const result = parsePlayerFile(text);
+        if (!result.ok) {
+          alert(`Import failed: ${result.error}`);
+          return;
+        }
+
+        const localCampaigns = this.campaignEditor.getAllCampaigns();
+        const applyResult    = applyPlayerProfile(result.payload, localCampaigns, this.completedLevels);
+
+        // Reload in-memory official completed-levels from localStorage (applyPlayerProfile
+        // may have written new level IDs via markLevelCompleted which already updated the set,
+        // but ensure the set reflects exactly what is now in storage).
+        const refreshed = loadCompletedLevels();
+        this.completedLevels.clear();
+        for (const id of refreshed) this.completedLevels.add(id);
+
+        // Reload active campaign's in-memory progress and re-render.
+        this._campaign.reloadActiveCampaignProgress();
+
+        showPlayerImportResultModal(applyResult.outcomes);
+      };
+
+      blobToBytes(file).then((bytes) => {
+        if (isGzipBytes(bytes)) {
+          return ungzipBytes(bytes).then(processText);
+        }
+        processText(new TextDecoder().decode(bytes));
+      }).catch(() => {
+        alert('Failed to read the selected file. It may be corrupted or an unsupported format.');
+      });
+    });
+    input.click();
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────
