@@ -635,27 +635,18 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: Le
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
   // Cast shadow – drawn before the tree canopy, offset down-right.
   // Skipped for Dark style (no strong light source in that style).
+  // A single circle matching the main canopy covers the full shadow area.
   if (style !== 'Dark') {
     const shadowOff = half * 0.18;
-    const lobeR = r * 0.48;
-    const lobeOff = r * 0.52;
     ctx.save();
     // Clip shadow to tile boundaries so it doesn't bleed outside the tile.
     ctx.beginPath();
     ctx.rect(-half, -half, half * 2, half * 2);
     ctx.clip();
     ctx.fillStyle = TREE_SHADOW_COLOR;
-    // Main canopy shadow
     ctx.beginPath();
     ctx.arc(shadowOff, shadowOff, r, 0, Math.PI * 2);
     ctx.fill();
-    // Lobe shadows matching the four cardinal-direction leaf lobes
-    for (let i = 0; i < 4; i++) {
-      const angle = (i * Math.PI) / 2;
-      ctx.beginPath();
-      ctx.arc(Math.cos(angle) * lobeOff + shadowOff, Math.sin(angle) * lobeOff + shadowOff, lobeR, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
   // Main canopy – large dark-green filled circle
