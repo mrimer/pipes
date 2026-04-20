@@ -248,10 +248,10 @@ export function buildExitConfirmModal(
 /**
  * Build and attach the Settings modal.
  *
- * The modal contains a "Sound Effects" volume slider (0–100) and a Confirm
- * button.  The slider calls `onVolumeChange` live as the user drags it; the
- * Confirm button calls `onConfirm` (which should persist the value and dismiss
- * the modal).
+ * The modal contains a "Sound Effects" volume slider (0–100), a touch-device
+ * toggle, a player-name text input, and a Confirm button. The slider calls
+ * `onVolumeChange` live as the user drags it; the Confirm button calls
+ * `onConfirm` (which should persist values and dismiss the modal).
  *
  * @param getVolume      - Returns the current volume (0–100) to initialise the slider.
  * @param onVolumeChange - Called with the new value whenever the slider moves.
@@ -265,6 +265,7 @@ export function buildSettingsModal(
   getTouchUiEnabled: () => boolean,
   isTouchUiToggleEnabled: () => boolean,
   onTouchUiChange: (enabled: boolean) => void,
+  getPlayerName: () => string,
   onConfirm: (el: HTMLElement) => void,
 ): HTMLElement {
   const el = createModalOverlay(0.5);
@@ -339,6 +340,26 @@ export function buildSettingsModal(
   touchRow.appendChild(touchToggle);
   touchSection.appendChild(touchRow);
   box.appendChild(touchSection);
+
+  // ── Player Name row ───────────────────────────────────────────────────────
+  const playerNameSection = document.createElement('div');
+  playerNameSection.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%;margin-top:4px;';
+
+  const playerNameLabel = document.createElement('label');
+  playerNameLabel.textContent = '👤 Player Name';
+  playerNameLabel.style.cssText = 'color:#eee;font-size:0.95rem;';
+
+  const playerNameInput = document.createElement('input');
+  playerNameInput.type = 'text';
+  playerNameInput.value = getPlayerName();
+  playerNameInput.maxLength = 40;
+  playerNameInput.dataset.playerNameInput = '1';
+  playerNameInput.style.cssText =
+    'width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.95rem;background:#0d1a30;color:#eee;border:1px solid #2a3a5e;border-radius:6px;';
+
+  playerNameSection.appendChild(playerNameLabel);
+  playerNameSection.appendChild(playerNameInput);
+  box.appendChild(playerNameSection);
 
   // ── Command key assignments ───────────────────────────────────────────────
   const commandsSection = document.createElement('div');

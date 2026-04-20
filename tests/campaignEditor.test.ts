@@ -6,7 +6,17 @@
  * Tests for the CampaignEditor and related persistence helpers.
  */
 
-import { loadImportedCampaigns, saveImportedCampaigns, loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress, saveActiveCampaignId, clearActiveCampaignId, migrateCampaign } from '../src/persistence';
+import {
+  loadImportedCampaigns,
+  saveImportedCampaigns,
+  loadCampaignProgress,
+  markCampaignLevelCompleted,
+  clearCampaignProgress,
+  saveActiveCampaignId,
+  clearActiveCampaignId,
+  migrateCampaign,
+  savePlayerName,
+} from '../src/persistence';
 import { CampaignEditor } from '../src/campaignEditor';
 import { CampaignDef, LevelDef, PipeShape } from '../src/types';
 import { TileParams } from '../src/campaignEditor/types';
@@ -827,6 +837,18 @@ describe('CampaignEditor – import version comparison', () => {
     expect(campaigns).toHaveLength(1);
     expect(campaigns[0].lastUpdated).toBeDefined();
     expect(new Date(campaigns[0].lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it('prefills new campaign author prompt with current player name', () => {
+    savePlayerName('Morgan');
+    const promptSpy = jest.spyOn(window, 'prompt')
+      .mockReturnValueOnce('New Campaign')
+      .mockReturnValueOnce('Morgan');
+
+    const editor = makeEditor();
+    (editor as unknown as { _createCampaign(): void })._createCampaign();
+
+    expect(promptSpy).toHaveBeenNthCalledWith(2, 'Author name:', 'Morgan');
   });
 
   it('lastUpdated is updated when a chapter is added', () => {

@@ -32,7 +32,9 @@ import {
   loadCommandKeyAssignments,
   saveCommandKeyAssignments,
   clearCommandKeyAssignments,
+  loadPlayerName,
   loadTouchUiEnabled,
+  savePlayerName,
   saveTouchUiEnabled,
 } from '../src/persistence';
 import { CampaignDef } from '../src/types';
@@ -319,6 +321,22 @@ describe('loadTouchUiEnabled / saveTouchUiEnabled', () => {
   it('saves and loads disabled touch-ui preference', () => {
     saveTouchUiEnabled(false);
     expect(loadTouchUiEnabled()).toBe(false);
+  });
+});
+
+describe('loadPlayerName / savePlayerName', () => {
+  it('returns "Player" when no player name has been saved', () => {
+    expect(loadPlayerName()).toBe('Player');
+  });
+
+  it('saves and loads a custom player name', () => {
+    savePlayerName('Casey');
+    expect(loadPlayerName()).toBe('Casey');
+  });
+
+  it('normalizes blank names to the default player name', () => {
+    savePlayerName('   ');
+    expect(loadPlayerName()).toBe('Player');
   });
 });
 

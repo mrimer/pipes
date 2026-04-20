@@ -3,7 +3,14 @@ import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
-import { loadCompletedLevels, loadTouchUiEnabled, saveSfxVolume, saveTouchUiEnabled } from './persistence';
+import {
+  loadCompletedLevels,
+  loadPlayerName,
+  loadTouchUiEnabled,
+  savePlayerName,
+  saveSfxVolume,
+  saveTouchUiEnabled,
+} from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
 import { CampaignManager, CampaignCallbacks } from './campaignManager';
@@ -318,9 +325,12 @@ export class Game implements InputCallbacks {
         setTouchUiEnabledOverride(enabled);
         document.body.classList.toggle('is-touch', enabled);
       },
+      () => loadPlayerName(),
       (el) => {
+        const playerNameInput = el.querySelector<HTMLInputElement>('[data-player-name-input]');
         saveSfxVolume(sfxManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
+        savePlayerName(playerNameInput?.value ?? loadPlayerName());
         el.style.display = 'none';
       },
     );
@@ -388,12 +398,14 @@ export class Game implements InputCallbacks {
         const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
         const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
         const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
+        const playerNameInput = this._settingsModalEl.querySelector<HTMLInputElement>('[data-player-name-input]');
         if (slider) slider.value = String(v);
         if (valueEl) valueEl.textContent = String(v);
         if (touchToggle) {
           touchToggle.checked = effectiveTouchEnabled;
           touchToggle.disabled = !hasTouchUiSupport();
         }
+        if (playerNameInput) playerNameInput.value = loadPlayerName();
         this._settingsModalEl.style.display = 'flex';
       },
     };
