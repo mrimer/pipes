@@ -10,7 +10,14 @@
  */
 
 import { CampaignDef, LevelDef, TileDef, PipeShape } from '../types';
-import { loadCampaignProgress, computeCampaignCompletionPct, loadActiveCampaignId, loadCampaignEditorMapBoxCollapsed, loadChapterEditorMapBoxCollapsed } from '../persistence';
+import {
+  loadCampaignProgress,
+  computeCampaignCompletionPct,
+  loadActiveCampaignId,
+  loadCampaignEditorMapBoxCollapsed,
+  loadChapterEditorMapBoxCollapsed,
+  loadPlayerName,
+} from '../persistence';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignMapEditorSection, CampaignMapEditorCallbacks } from './campaignMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
@@ -1320,7 +1327,7 @@ export class CampaignEditor {
   private _createCampaign(): void {
     const name = prompt('Campaign name:');
     if (!name?.trim()) return;
-    const author = prompt('Author name:') ?? '';
+    const author = prompt('Author name:', loadPlayerName()) ?? '';
     this._service.createCampaign(name.trim(), author);
     this._showCampaignList();
   }

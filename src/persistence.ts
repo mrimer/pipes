@@ -492,6 +492,8 @@ export function clearCampaignCompleteShown(campaignId: string): void {
 const SFX_VOLUME_KEY = 'pipes_sfx_volume';
 const COMMAND_KEYS_KEY = 'pipes_command_keys';
 const TOUCH_UI_ENABLED_KEY = 'pipes_touch_ui_enabled';
+const PLAYER_NAME_KEY = 'pipes_player_name';
+const DEFAULT_PLAYER_NAME = 'Player';
 
 /**
  * Load the persisted SFX volume setting.
@@ -534,6 +536,26 @@ export function loadTouchUiEnabled(): boolean | null {
 export function saveTouchUiEnabled(enabled: boolean): void {
   try {
     localStorage.setItem(TOUCH_UI_ENABLED_KEY, enabled ? '1' : '0');
+  } catch { /* ignore */ }
+}
+
+/** Load the persisted player name setting. */
+export function loadPlayerName(): string {
+  try {
+    const raw = localStorage.getItem(PLAYER_NAME_KEY);
+    if (raw !== null) {
+      const trimmed = raw.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_PLAYER_NAME;
+}
+
+/** Persist the player name setting. Blank values are normalized to the default name. */
+export function savePlayerName(name: string): void {
+  try {
+    const normalized = name.trim() || DEFAULT_PLAYER_NAME;
+    localStorage.setItem(PLAYER_NAME_KEY, normalized);
   } catch { /* ignore */ }
 }
 
