@@ -1074,7 +1074,8 @@ export abstract class MapScreenBase {
     const displayProgress = this._getDisplayProgress();
     const rawLevelStars = loadLevelStars(this._getActiveCampaignId() ?? undefined);
     const levelStars = this._augmentLevelStars(rawLevelStars);
-    const levelWater = loadLevelWater(this._getActiveCampaignId() ?? undefined);
+    const rawLevelWater = loadLevelWater(this._getActiveCampaignId() ?? undefined);
+    const levelWater = this._augmentLevelWater(rawLevelWater);
 
     const filledKeys = this._computeFilledCells();
 
@@ -1646,5 +1647,14 @@ export abstract class MapScreenBase {
    */
   protected _augmentLevelStars(levelStars: Record<number, number>): Record<number, number> {
     return levelStars;
+  }
+
+  /**
+   * Optionally augments the per-level water map before rendering.
+   * Subclasses may override to inject synthetic water totals (e.g. per-chapter
+   * aggregated totals on the campaign map).  The default returns the map unchanged.
+   */
+  protected _augmentLevelWater(levelWater: Record<number, number>): Record<number, number> {
+    return levelWater;
   }
 }
