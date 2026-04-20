@@ -141,8 +141,6 @@ const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
   { palette: PipeShape.Tree2,     label: '🌳 Tree 2' },
   { palette: PipeShape.Tree3,     label: '🌲 Tree 3' },
   { palette: PipeShape.Tree4,     label: '🌴 Tree 4' },
-  { palette: PipeShape.Poop,      label: '💩 Poop' },
-  { palette: PipeShape.Pee,       label: '🟡 Pee' },
   { palette: PipeShape.Sea,       label: '🌊 Sea' },
   { palette: PipeShape.Cement,    label: '🪧 Cement' },
   { palette: PipeShape.GoldSpace, label: '✦ Gold Space' },
@@ -386,7 +384,6 @@ export class TileParamsPanel {
     const isParamFreePipe = PIPE_SHAPES.has(p as PipeShape) && !SPIN_CEMENT_SHAPES.has(p as PipeShape);
     if (p === 'erase' || p === PipeShape.Granite
         || p === PipeShape.Tree || p === PipeShape.Tree2 || p === PipeShape.Tree3 || p === PipeShape.Tree4
-        || p === PipeShape.Poop || p === PipeShape.Pee
         || p === PipeShape.Sea || p === PipeShape.GoldSpace
         || p === PipeShape.OneWay || isParamFreePipe) {
       const none = document.createElement('div');

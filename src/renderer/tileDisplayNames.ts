@@ -113,8 +113,6 @@ export function getTileDisplayName(tile: Tile): string {
     case PipeShape.Tree2:        return 'Tree 2';
     case PipeShape.Tree3:        return 'Tree 3';
     case PipeShape.Tree4:        return 'Tree 4';
-    case PipeShape.Poop:         return 'Poop';
-    case PipeShape.Pee:          return 'Pee';
     case PipeShape.Sea:          return 'Sea';
     case PipeShape.Cement:       return 'Cement';
     case PipeShape.Chamber:

@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, LevelStyle } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree, drawTree2, drawTree3, drawTree4, drawPoop, drawPee } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree, drawTree2, drawTree3, drawTree4 } from '../renderer';
 import { Tile, rotateDirection } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
@@ -504,10 +504,6 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = '#1a2840';
   } else if (shape === PipeShape.Tree2 || shape === PipeShape.Tree3 || shape === PipeShape.Tree4) {
     bgColor = '#1a2840';
-  } else if (shape === PipeShape.Poop) {
-    bgColor = '#1a1000';
-  } else if (shape === PipeShape.Pee) {
-    bgColor = '#1a1800';
   } else if (shape === PipeShape.Sea) {
     bgColor = seaFillColor(style);
   } else {
@@ -581,8 +577,6 @@ const ITEM_SHAPE_LABEL: Readonly<Record<PipeShape, string>> = {
   [PipeShape.Tree2]:             'TRE2',
   [PipeShape.Tree3]:             'TRE3',
   [PipeShape.Tree4]:             'TRE4',
-  [PipeShape.Poop]:              'POOP',
-  [PipeShape.Pee]:               'PEE',
   [PipeShape.Sea]:               'SEA',
   [PipeShape.Cement]:            'CMT',
   [PipeShape.OneWay]:            'OWY',
@@ -670,20 +664,6 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.restore();
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'TREE4', cx, cy);
-  } else if (shape === PipeShape.Poop) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawPoop(ctx, CELL / 2, style);
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'POOP', cx, cy);
-  } else if (shape === PipeShape.Pee) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawPee(ctx, CELL / 2, style);
-    ctx.restore();
-    ctx.fillStyle = '#000';
-    strokeFillText(ctx, 'PEE', cx, cy);
   } else if (shape === PipeShape.Sea) {
     // Render sea tile using the in-game drawSea function with a "SEA" label
     ctx.save();

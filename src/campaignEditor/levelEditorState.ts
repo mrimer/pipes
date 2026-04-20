@@ -362,7 +362,7 @@ export class LevelEditorState {
       PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
       PipeShape.GoldSpace, PipeShape.Granite,
       PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
-      PipeShape.Poop, PipeShape.Pee, PipeShape.Sea,
+      PipeShape.Sea,
     ]).has(effectiveShape);
     const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
 
@@ -456,7 +456,7 @@ export class LevelEditorState {
     const nonRotatable = new Set<EditorPalette>([
       'erase', PipeShape.GoldSpace, PipeShape.Granite,
       PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
-      PipeShape.Poop, PipeShape.Pee, PipeShape.Sea,
+      PipeShape.Sea,
       PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
     ]);
     if (nonRotatable.has(p)) return;

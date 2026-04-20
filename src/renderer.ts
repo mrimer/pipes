@@ -67,16 +67,6 @@ import {
   LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR, LEAKY_RUST_COLOR,
   SEA_COLOR, SEA_BORDER_COLOR,
   SEA_FILL_COLOR, SEA_FILL_COLOR_WINTER, SEA_FILL_COLOR_FALL, SEA_FILL_COLOR_DARK, SEA_FILL_COLOR_SPRING,
-  POOP_COLOR, POOP_FILL_COLOR, POOP_HIGHLIGHT_COLOR,
-  POOP_FALL_COLOR, POOP_FALL_FILL_COLOR, POOP_FALL_HIGHLIGHT_COLOR,
-  POOP_DARK_COLOR, POOP_DARK_FILL_COLOR, POOP_DARK_HIGHLIGHT_COLOR,
-  POOP_WINTER_COLOR, POOP_WINTER_FILL_COLOR, POOP_WINTER_HIGHLIGHT_COLOR,
-  POOP_SPRING_COLOR, POOP_SPRING_FILL_COLOR, POOP_SPRING_HIGHLIGHT_COLOR,
-  PEE_COLOR, PEE_FILL_COLOR, PEE_HIGHLIGHT_COLOR,
-  PEE_FALL_COLOR, PEE_FALL_FILL_COLOR, PEE_FALL_HIGHLIGHT_COLOR,
-  PEE_DARK_COLOR, PEE_DARK_FILL_COLOR, PEE_DARK_HIGHLIGHT_COLOR,
-  PEE_WINTER_COLOR, PEE_WINTER_FILL_COLOR, PEE_WINTER_HIGHLIGHT_COLOR,
-  PEE_SPRING_COLOR, PEE_SPRING_FILL_COLOR, PEE_SPRING_HIGHLIGHT_COLOR,
 } from './colors';
 
 /** Unit-vector table for the four cardinal directions: [Direction, x-unit, y-unit]. */
@@ -931,139 +921,6 @@ export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
-}
-
-/**
- * Draw a Poop tile — a top-down view of a swirly brown pile.
- * Centered at the origin; caller translates ctx to tile center.
- */
-export function drawPoop(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const styleTable: Record<string, [string, string, string]> = {
-    Fall:   [POOP_FALL_FILL_COLOR,   POOP_FALL_HIGHLIGHT_COLOR,   POOP_FALL_COLOR],
-    Dark:   [POOP_DARK_FILL_COLOR,   POOP_DARK_HIGHLIGHT_COLOR,   POOP_DARK_COLOR],
-    Winter: [POOP_WINTER_FILL_COLOR, POOP_WINTER_HIGHLIGHT_COLOR, POOP_WINTER_COLOR],
-    Spring: [POOP_SPRING_FILL_COLOR, POOP_SPRING_HIGHLIGHT_COLOR, POOP_SPRING_COLOR],
-  };
-  const [fillColor, highlightColor, outlineColor] = _treeColorTriple(
-    styleTable, [POOP_FILL_COLOR, POOP_HIGHLIGHT_COLOR, POOP_COLOR], style,
-  );
-
-  // Shadow (skipped for Dark style)
-  if (style !== 'Dark') {
-    const shadowOff = half * 0.15;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    ctx.fillStyle = TREE_SHADOW_COLOR;
-    ctx.beginPath();
-    ctx.ellipse(shadowOff, shadowOff + half * 0.08, half * 0.60, half * 0.50, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Draw stacked tiers of the poop pile (bottom-up), each slightly smaller and higher
-  const tiers: Array<[number, number, number, number]> = [
-    // [cx, cy, rx, ry] — all in fractions of `half`
-    [0.00,  0.18, 0.58, 0.46],  // base tier (widest)
-    [0.02, -0.06, 0.44, 0.36],  // middle tier
-    [0.04, -0.26, 0.30, 0.26],  // top tier (narrowest)
-  ];
-
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(1.5);
-
-  for (const [tcx, tcy, rx, ry] of tiers) {
-    ctx.fillStyle = fillColor;
-    ctx.beginPath();
-    ctx.ellipse(tcx * half, tcy * half, rx * half, ry * half, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Swirl highlight on the top tier
-  ctx.strokeStyle = highlightColor;
-  ctx.lineWidth = _s(1.5);
-  ctx.beginPath();
-  // A small arc representing the sheen swirl
-  const swX = 0.04 * half;
-  const swY = -0.26 * half;
-  const swR = 0.13 * half;
-  ctx.arc(swX - swR * 0.3, swY - swR * 0.1, swR, -Math.PI * 0.7, Math.PI * 0.4);
-  ctx.stroke();
-
-  // Eyes (two tiny white dots near the top)
-  ctx.fillStyle = '#fff';
-  const eyeY = -0.30 * half;
-  const eyeR = _s(1.8);
-  ctx.beginPath(); ctx.arc(-0.08 * half, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc( 0.12 * half, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
-  // Pupils
-  ctx.fillStyle = outlineColor;
-  const pupilR = _s(0.9);
-  ctx.beginPath(); ctx.arc(-0.08 * half, eyeY, pupilR, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc( 0.12 * half, eyeY, pupilR, 0, Math.PI * 2); ctx.fill();
-}
-
-/**
- * Draw a Pee tile — a top-down view of a yellow puddle with a sheen.
- * Centered at the origin; caller translates ctx to tile center.
- */
-export function drawPee(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const styleTable: Record<string, [string, string, string]> = {
-    Fall:   [PEE_FALL_FILL_COLOR,   PEE_FALL_HIGHLIGHT_COLOR,   PEE_FALL_COLOR],
-    Dark:   [PEE_DARK_FILL_COLOR,   PEE_DARK_HIGHLIGHT_COLOR,   PEE_DARK_COLOR],
-    Winter: [PEE_WINTER_FILL_COLOR, PEE_WINTER_HIGHLIGHT_COLOR, PEE_WINTER_COLOR],
-    Spring: [PEE_SPRING_FILL_COLOR, PEE_SPRING_HIGHLIGHT_COLOR, PEE_SPRING_COLOR],
-  };
-  const [fillColor, highlightColor, outlineColor] = _treeColorTriple(
-    styleTable, [PEE_FILL_COLOR, PEE_HIGHLIGHT_COLOR, PEE_COLOR], style,
-  );
-
-  // Shadow (skipped for Dark style)
-  if (style !== 'Dark') {
-    const shadowOff = half * 0.12;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    ctx.fillStyle = TREE_SHADOW_COLOR;
-    ctx.beginPath();
-    ctx.ellipse(shadowOff, shadowOff, half * 0.70, half * 0.56, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Main puddle — an irregular ellipse with a slight wobble using bezier curves
-  ctx.fillStyle = fillColor;
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(1.5);
-  const pw = half * 0.68;
-  const ph = half * 0.52;
-  ctx.beginPath();
-  // Irregular puddle outline using cubic bezier approximation
-  ctx.moveTo(0, -ph);
-  ctx.bezierCurveTo( pw * 1.15, -ph * 0.55,  pw * 1.05,  ph * 0.55,  pw * 0.30,  ph * 1.05);
-  ctx.bezierCurveTo(-pw * 0.20,  ph * 1.20, -pw * 1.10,  ph * 0.60, -pw * 0.95, -ph * 0.20);
-  ctx.bezierCurveTo(-pw * 0.80, -ph * 1.00, -pw * 0.20, -ph * 1.10,  0,          -ph);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Sheen highlight — a smaller inner ellipse
-  ctx.fillStyle = highlightColor;
-  ctx.beginPath();
-  ctx.ellipse(-pw * 0.20, -ph * 0.20, pw * 0.35, ph * 0.25, -0.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Ripple ring
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(1);
-  ctx.globalAlpha = 0.35;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, pw * 0.55, ph * 0.42, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
 }
 
 // ── Sea tile rendering helpers ────────────────────────────────────────────────
@@ -1935,8 +1792,6 @@ function _resolveTileColor(
   if (shape === PipeShape.Tree2) return TREE2_COLOR;
   if (shape === PipeShape.Tree3) return TREE3_COLOR;
   if (shape === PipeShape.Tree4) return TREE4_COLOR;
-  if (shape === PipeShape.Poop) return POOP_COLOR;
-  if (shape === PipeShape.Pee) return PEE_COLOR;
   if (shape === PipeShape.Sea) return SEA_COLOR;
   if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
   if (LEAKY_PIPE_SHAPES.has(shape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
@@ -2087,16 +1942,6 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     drawTree4(ctx, half, levelStyle);
-  } else if (shape === PipeShape.Poop) {
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawPoop(ctx, half, levelStyle);
-  } else if (shape === PipeShape.Pee) {
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawPee(ctx, half, levelStyle);
   } else if (shape === PipeShape.Sea) {
     // Sea – impassable water tile with animated ripples and land border
     ctx.restore();
@@ -2510,9 +2355,7 @@ function _renderPass2NonPipeTiles(
       // (e.g. Tree tile colors should match the local floor style, not the overall board style).
       let inferredFloorShape: PipeShape | undefined;
       if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Tree2
-          || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4
-          || tile.shape === PipeShape.Poop || tile.shape === PipeShape.Pee
-          || tile.shape === PipeShape.Chamber
+          || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4 || tile.shape === PipeShape.Chamber
           || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
         inferredFloorShape = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
         drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, inferredFloorShape, 1.0); //alpha
