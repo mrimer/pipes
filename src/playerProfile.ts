@@ -95,10 +95,45 @@ export interface PlayerProfileFile {
   checksum: string;
 }
 
+// ─── ID validation helpers ────────────────────────────────────────────────────
+
+/** Returns the set of all level IDs defined across every chapter of a campaign. */
+function validLevelIds(campaign: CampaignDef): Set<number> {
+  const ids = new Set<number>();
+  for (const chapter of campaign.chapters) {
+    for (const level of chapter.levels) {
+      ids.add(level.id);
+    }
+  }
+  return ids;
+}
+
+/** Returns the set of all chapter IDs defined in a campaign. */
+function validChapterIds(campaign: CampaignDef): Set<number> {
+  return new Set(campaign.chapters.map((ch) => ch.id));
+}
+
+/** Filters an object's entries, keeping only keys (converted to numbers) present in `validIds`. */
+function filterRecordByLevelIds(
+  record: Record<string, number>,
+  validIds: Set<number>,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (validIds.has(Number(key))) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 // ─── Snapshot (build) ─────────────────────────────────────────────────────────
 
 /**
  * Build a {@link PlayerProfilePayload} from the current local-storage state.
+ *
+ * Only IDs present in the local campaign definition are included; stale or
+ * dangling references (IDs no longer in the campaign) are omitted.
  *
  * @param localCampaigns - All locally installed campaigns; used to enumerate
  *   per-campaign progress keys.
@@ -106,16 +141,20 @@ export interface PlayerProfileFile {
 export function buildPlayerProfilePayload(
   localCampaigns: readonly CampaignDef[],
 ): PlayerProfilePayload {
-  const campaignProgress: CampaignProgressBlock[] = localCampaigns.map((c) => ({
-    campaignId:            c.id,
-    completedLevels:       [...loadCampaignProgress(c.id)],
-    completedChapters:     [...loadCompletedChapters(c.id)],
-    masteredChaptersShown: [...loadMasteredChaptersShown(c.id)],
-    campaignMasteredShown: loadCampaignMasteredShown(c.id),
-    campaignCompleteShown: loadCampaignCompleteShown(c.id),
-    levelStars:            loadLevelStars(c.id),
-    levelWater:            loadLevelWater(c.id),
-  }));
+  const campaignProgress: CampaignProgressBlock[] = localCampaigns.map((c) => {
+    const levelIds   = validLevelIds(c);
+    const chapterIds = validChapterIds(c);
+    return {
+      campaignId:            c.id,
+      completedLevels:       [...loadCampaignProgress(c.id)].filter((id) => levelIds.has(id)),
+      completedChapters:     [...loadCompletedChapters(c.id)].filter((id) => chapterIds.has(id)),
+      masteredChaptersShown: [...loadMasteredChaptersShown(c.id)].filter((id) => chapterIds.has(id)),
+      campaignMasteredShown: loadCampaignMasteredShown(c.id),
+      campaignCompleteShown: loadCampaignCompleteShown(c.id),
+      levelStars:            filterRecordByLevelIds(loadLevelStars(c.id), levelIds),
+      levelWater:            filterRecordByLevelIds(loadLevelWater(c.id), levelIds),
+    };
+  });
 
   return {
     playerName:    loadPlayerName(),
@@ -265,40 +304,44 @@ export function applyPlayerProfile(
       continue;
     }
 
-    // Union: completed levels
+    const levelIds   = validLevelIds(local);
+    const chapterIds = validChapterIds(local);
+
+    // Union: completed levels (skip IDs not present in the local campaign)
     const localProgress = loadCampaignProgress(block.campaignId);
     for (const levelId of block.completedLevels) {
-      markCampaignLevelCompleted(block.campaignId, levelId, localProgress);
+      if (levelIds.has(levelId)) markCampaignLevelCompleted(block.campaignId, levelId, localProgress);
     }
 
-    // Union: completed chapters
+    // Union: completed chapters (skip IDs not present in the local campaign)
     const localChapters = loadCompletedChapters(block.campaignId);
     for (const chapterId of block.completedChapters) {
-      markChapterCompleted(block.campaignId, chapterId, localChapters);
+      if (chapterIds.has(chapterId)) markChapterCompleted(block.campaignId, chapterId, localChapters);
     }
 
-    // Union: mastered-chapters-shown
+    // Union: mastered-chapters-shown (skip IDs not present in the local campaign)
     const localMastered = loadMasteredChaptersShown(block.campaignId);
     for (const chapterId of block.masteredChaptersShown) {
-      markMasteredChapterShown(block.campaignId, chapterId, localMastered);
+      if (chapterIds.has(chapterId)) markMasteredChapterShown(block.campaignId, chapterId, localMastered);
     }
 
     // Flags: only set, never clear
     if (block.campaignMasteredShown) markCampaignMasteredShown(block.campaignId);
     if (block.campaignCompleteShown)  markCampaignCompleteShown(block.campaignId);
 
-    // Max-value merge: stars
+    // Max-value merge: stars (skip IDs not present in the local campaign)
     const existingStars = loadLevelStars(block.campaignId);
     for (const [idStr, stars] of Object.entries(block.levelStars)) {
       const id = Number(idStr);
-      if (stars > (existingStars[id] ?? -Infinity)) {
+      if (levelIds.has(id) && stars > (existingStars[id] ?? -Infinity)) {
         saveLevelStar(id, stars, block.campaignId);
       }
     }
 
-    // Max-value merge: water (saveLevelWater already uses max semantics)
+    // Max-value merge: water (skip IDs not present in the local campaign; saveLevelWater already uses max semantics)
     for (const [idStr, water] of Object.entries(block.levelWater)) {
-      saveLevelWater(Number(idStr), water, block.campaignId);
+      const id = Number(idStr);
+      if (levelIds.has(id)) saveLevelWater(id, water, block.campaignId);
     }
 
     outcomes.push({ status: 'merged', campaignName: local.name, campaignId: block.campaignId });
