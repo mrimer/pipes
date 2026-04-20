@@ -65,6 +65,13 @@ function makeMinimalCampaign(id: string, name = 'Test Campaign'): CampaignDef {
           { id: 102, name: 'Level 2', rows: 1, cols: 1, grid: [[null]], inventory: [] },
         ],
       },
+      {
+        id: 2,
+        name: 'Ch 2',
+        levels: [
+          { id: 201, name: 'Level 3', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+        ],
+      },
     ],
   };
 }

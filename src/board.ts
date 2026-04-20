@@ -305,7 +305,7 @@ const DECORATION_DENSITY = 0.30;
  * Return the decoration types appropriate for the given empty floor type.
  *
  * - **Grass** (Empty):     flowers, grass tufts, mushrooms — organic surface.
- * - **Fall** (EmptyFall):  grass tufts, crystals, pebbles — no flowers/mushrooms.
+ * - **Fall** (EmptyFall):  grass tufts, crystals, pebbles, dandelions, sunflowers, leaves — warm autumn surface.
  * - **Dark** (EmptyDark):  pebbles only — stone-like surface.
  * - **Winter** (EmptyWinter): pebbles and crystals — icy, snow-covered surface.
  * - **Spring** (EmptySpring): flowers and grass only — bright spring surface.
@@ -316,7 +316,7 @@ const DECORATION_DENSITY = 0.30;
  */
 export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
   switch (floorType) {
-    case PipeShape.EmptyFall:   return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower'];
+    case PipeShape.EmptyFall:   return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower', 'leaves'];
     case PipeShape.EmptyDark:   return ['mushroom', 'crystal', 'pebbles'];
     case PipeShape.EmptyWinter: return ['pebbles', 'crystal'];
     case PipeShape.EmptySpring: return ['flower', 'grass'];
@@ -352,14 +352,18 @@ export function generateAmbientDecorations(
       const types = decorationTypesForFloor(floorType);
       const type = types[Math.floor(Math.random() * types.length)];
       // Mushrooms scale 0.7–1.5 (up to 50 % larger); crystals scale 0.75–1.25 (±25 %);
-      // dandelions and sunflowers scale 0.65–1.35 (random factor as per design).
+      // dandelions and sunflowers scale 0.65–1.35 (random factor as per design);
+      // leaves scale 0.70–1.20 (±25 %).
       const scale = type === 'mushroom'   ? 0.7 + Math.random() * 0.8
                   : type === 'crystal'    ? 0.75 + Math.random() * 0.5
                   : type === 'dandelion'  ? 0.65 + Math.random() * 0.7
                   : type === 'sunflower'  ? 0.65 + Math.random() * 0.7
+                  : type === 'leaves'     ? 0.70 + Math.random() * 0.5
                   : undefined;
-      // Crystals randomly show either one or two shards.
-      const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2) : undefined;
+      // Crystals randomly show either one or two shards; leaves show 2–5 leaves.
+      const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2)
+                  : type === 'leaves'  ? 2 + Math.floor(Math.random() * 4)
+                  : undefined;
       // Spring flowers are rendered brighter and fully opaque.
       const bright = (floorType === PipeShape.EmptySpring && type === 'flower') ? true : undefined;
       // Pebbles and crystals: distribute rotations using the golden angle so that

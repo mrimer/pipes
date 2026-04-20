@@ -309,7 +309,7 @@ export interface LevelDef {
 }
 
 /** Possible types of ambient decorative element drawn under grid tiles. */
-export type AmbientDecorationType = 'pebbles' | 'flower' | 'grass' | 'mushroom' | 'crystal' | 'dandelion' | 'sunflower';
+export type AmbientDecorationType = 'pebbles' | 'flower' | 'grass' | 'mushroom' | 'crystal' | 'dandelion' | 'sunflower' | 'leaves';
 
 /**
  * One ambient background decoration, placed on a grid cell and rendered under
@@ -333,7 +333,7 @@ export interface AmbientDecoration {
   variant: number;
   /** Scale multiplier (1 = default size; >1 larger, <1 smaller). Only set for types that support scaling. */
   scale?: number;
-  /** Number of items to draw. Currently used by crystals (1 or 2 shards); other types always draw their default quantity. */
+  /** Number of items to draw. Used by crystals (1 or 2 shards) and leaves (2–5 leaves); other types always draw their default quantity. */
   count?: number;
   /** When true, render the decoration in a brighter, fully-opaque style (used for Spring flowers). */
   bright?: boolean;
