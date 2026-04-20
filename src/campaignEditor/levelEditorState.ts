@@ -360,7 +360,9 @@ export class LevelEditorState {
     // OneWay uses rotation to encode direction, so it is NOT in the noRotation set.
     const noRotation = new Set([
       PipeShape.Source, PipeShape.Sink, PipeShape.Chamber,
-      PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
+      PipeShape.GoldSpace, PipeShape.Granite,
+      PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
+      PipeShape.Sea,
     ]).has(effectiveShape);
     const def: TileDef = noRotation ? { shape: effectiveShape } : { shape: effectiveShape, rotation: p.rotation };
 
@@ -452,7 +454,9 @@ export class LevelEditorState {
   rotatePalette(clockwise: boolean): void {
     const p = this.palette;
     const nonRotatable = new Set<EditorPalette>([
-      'erase', PipeShape.GoldSpace, PipeShape.Granite, PipeShape.Tree, PipeShape.Sea,
+      'erase', PipeShape.GoldSpace, PipeShape.Granite,
+      PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
+      PipeShape.Sea,
       PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
     ]);
     if (nonRotatable.has(p)) return;

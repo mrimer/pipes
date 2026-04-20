@@ -17,6 +17,10 @@ const BASE_CONNECTIONS: Record<PipeShape, Direction[]> = {
   [PipeShape.Chamber]:       [Direction.North, Direction.East, Direction.South, Direction.West],
   [PipeShape.Granite]: [],
   [PipeShape.Tree]:    [],
+  [PipeShape.Tree2]:   [],
+  [PipeShape.Tree3]:   [],
+  [PipeShape.Tree4]:   [],
+
   [PipeShape.Sea]:     [],
   [PipeShape.OneWay]:    [],
   [PipeShape.Cement]:  [],

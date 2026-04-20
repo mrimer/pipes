@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, Rotation, LevelStyle } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree } from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree, drawTree2, drawTree3, drawTree4 } from '../renderer';
 import { Tile, rotateDirection } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
@@ -502,6 +502,8 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     bgColor = '#4a5568';
   } else if (shape === PipeShape.Tree) {
     bgColor = '#1a2840';
+  } else if (shape === PipeShape.Tree2 || shape === PipeShape.Tree3 || shape === PipeShape.Tree4) {
+    bgColor = '#1a2840';
   } else if (shape === PipeShape.Sea) {
     bgColor = seaFillColor(style);
   } else {
@@ -572,6 +574,9 @@ const ITEM_SHAPE_LABEL: Readonly<Record<PipeShape, string>> = {
   [PipeShape.Chamber]:           'CHM',
   [PipeShape.Granite]:           'GRN',
   [PipeShape.Tree]:              'TRE',
+  [PipeShape.Tree2]:             'TRE2',
+  [PipeShape.Tree3]:             'TRE3',
+  [PipeShape.Tree4]:             'TRE4',
   [PipeShape.Sea]:               'SEA',
   [PipeShape.Cement]:            'CMT',
   [PipeShape.OneWay]:            'OWY',
@@ -638,6 +643,27 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.restore();
     ctx.fillStyle = '#fff';
     strokeFillText(ctx, 'TREE', cx, cy);
+  } else if (shape === PipeShape.Tree2) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree2(ctx, CELL / 2, style);
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'TREE2', cx, cy);
+  } else if (shape === PipeShape.Tree3) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree3(ctx, CELL / 2, style);
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'TREE3', cx, cy);
+  } else if (shape === PipeShape.Tree4) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree4(ctx, CELL / 2, style);
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    strokeFillText(ctx, 'TREE4', cx, cy);
   } else if (shape === PipeShape.Sea) {
     // Render sea tile using the in-game drawSea function with a "SEA" label
     ctx.save();
