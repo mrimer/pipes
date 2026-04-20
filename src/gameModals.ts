@@ -563,6 +563,9 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
 
 // ─── Player import result modal ───────────────────────────────────────────────
 
+/** Backdrop opacity for the player-import result modal. */
+const IMPORT_RESULT_MODAL_OVERLAY_ALPHA = 0.7;
+
 /**
  * Show a transient modal listing the outcome of a player-profile import.
  *
@@ -573,7 +576,7 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
  * @param outcomes - Per-campaign import outcomes returned by applyPlayerProfile.
  */
 export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): void {
-  const el = createModalOverlay(0.7);
+  const el = createModalOverlay(IMPORT_RESULT_MODAL_OVERLAY_ALPHA);
   const box = document.createElement('div');
   box.style.cssText =
     `background:${UI_BG};border:3px solid #4a90d9;border-radius:${RADIUS_LG};` +
