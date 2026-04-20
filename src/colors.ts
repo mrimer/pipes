@@ -74,6 +74,105 @@ export const TREE_WINTER_LEAF_COLOR    = '#c8d8e8';
 export const TREE_WINTER_LEAF_ALT_COLOR = '#dce8f0';
 /** Semi-transparent shadow cast by Tree tiles onto the background (skipped for Dark style). */
 export const TREE_SHADOW_COLOR       = 'rgba(0,0,0,0.22)';
+
+// ─── Tree 2 colors ────────────────────────────────────────────────────────────
+
+/** Border/line color for Tree 2 tiles — Grass/Summer style (dark warm pink). */
+export const TREE2_COLOR              = '#901030';
+/** Leaf canopy fill color for Tree 2 tiles — Grass/Summer style (hot pink). */
+export const TREE2_LEAF_COLOR         = '#d84060';
+/** Secondary leaf cluster color for Tree 2 tiles — Grass/Summer style (bright pink). */
+export const TREE2_LEAF_ALT_COLOR     = '#f06080';
+/** Border/line color for Tree 2 tiles — Fall style (dark gold). */
+export const TREE2_FALL_COLOR         = '#806010';
+/** Leaf canopy fill color for Tree 2 tiles — Fall style (yellow-gold). */
+export const TREE2_FALL_LEAF_COLOR    = '#c8a020';
+/** Secondary leaf cluster color for Tree 2 tiles — Fall style (bright yellow). */
+export const TREE2_FALL_LEAF_ALT_COLOR = '#e8c040';
+/** Border/line color for Tree 2 tiles — Dark style (dark cyan). */
+export const TREE2_DARK_COLOR         = '#207870';
+/** Leaf canopy fill color for Tree 2 tiles — Dark style (pale cyan glow). */
+export const TREE2_DARK_LEAF_COLOR    = '#40c8c0';
+/** Secondary leaf cluster color for Tree 2 tiles — Dark style (bright cyan). */
+export const TREE2_DARK_LEAF_ALT_COLOR = '#60e8e0';
+/** Border/line color for Tree 2 tiles — Winter style (dark deep evergreen). */
+export const TREE2_WINTER_COLOR        = '#0a2e0a';
+/** Leaf canopy fill color for Tree 2 tiles — Winter style (dark evergreen). */
+export const TREE2_WINTER_LEAF_COLOR   = '#1a5c1a';
+/** Secondary leaf cluster color for Tree 2 tiles — Winter style (medium evergreen). */
+export const TREE2_WINTER_LEAF_ALT_COLOR = '#2e8a2e';
+/** Border/line color for Tree 2 tiles — Spring style (dark rose). */
+export const TREE2_SPRING_COLOR        = '#cc6890';
+/** Leaf canopy fill color for Tree 2 tiles — Spring style (pale pink canopy). */
+export const TREE2_SPRING_LEAF_COLOR   = '#f0c8d4';
+/** Secondary leaf cluster color for Tree 2 tiles — Spring style (green lobes). */
+export const TREE2_SPRING_LEAF_ALT_COLOR = '#70c050';
+
+// ─── Tree 3 colors ────────────────────────────────────────────────────────────
+
+/** Border/line color for Tree 3 tiles — Grass/Summer style (dark purple). */
+export const TREE3_COLOR              = '#502080';
+/** Leaf canopy fill color for Tree 3 tiles — Grass/Summer style (purple). */
+export const TREE3_LEAF_COLOR         = '#8840c0';
+/** Secondary leaf cluster color for Tree 3 tiles — Grass/Summer style (bright purple). */
+export const TREE3_LEAF_ALT_COLOR     = '#b060e0';
+/** Border/line color for Tree 3 tiles — Fall style (dark orange-brown). */
+export const TREE3_FALL_COLOR         = '#803010';
+/** Leaf canopy fill color for Tree 3 tiles — Fall style (orange-brown). */
+export const TREE3_FALL_LEAF_COLOR    = '#c05010';
+/** Secondary leaf cluster color for Tree 3 tiles — Fall style (bright orange). */
+export const TREE3_FALL_LEAF_ALT_COLOR = '#e07030';
+/** Border/line color for Tree 3 tiles — Dark style (dark violet). */
+export const TREE3_DARK_COLOR         = '#503080';
+/** Leaf canopy fill color for Tree 3 tiles — Dark style (pale lilac glow). */
+export const TREE3_DARK_LEAF_COLOR    = '#9060c8';
+/** Secondary leaf cluster color for Tree 3 tiles — Dark style (bright violet). */
+export const TREE3_DARK_LEAF_ALT_COLOR = '#b880e8';
+/** Border/line color for Tree 3 tiles — Winter style (dark deep teal). */
+export const TREE3_WINTER_COLOR        = '#0a2820';
+/** Leaf canopy fill color for Tree 3 tiles — Winter style (deep teal-green evergreen). */
+export const TREE3_WINTER_LEAF_COLOR   = '#1a4a3c';
+/** Secondary leaf cluster color for Tree 3 tiles — Winter style (medium teal). */
+export const TREE3_WINTER_LEAF_ALT_COLOR = '#2a7060';
+/** Border/line color for Tree 3 tiles — Spring style (dark purple). */
+export const TREE3_SPRING_COLOR        = '#7060a8';
+/** Leaf canopy fill color for Tree 3 tiles — Spring style (pastel purple). */
+export const TREE3_SPRING_LEAF_COLOR   = '#c8a8e8';
+/** Secondary leaf cluster color for Tree 3 tiles — Spring style (lighter pastel purple). */
+export const TREE3_SPRING_LEAF_ALT_COLOR = '#e0c8f8';
+
+// ─── Tree 4 colors ────────────────────────────────────────────────────────────
+
+/** Border/line color for Tree 4 tiles — Grass/Summer style (dark gold). */
+export const TREE4_COLOR              = '#806000';
+/** Leaf canopy fill color for Tree 4 tiles — Grass/Summer style (yellow). */
+export const TREE4_LEAF_COLOR         = '#d4b820';
+/** Secondary leaf cluster color for Tree 4 tiles — Grass/Summer style (bright yellow). */
+export const TREE4_LEAF_ALT_COLOR     = '#f0d040';
+/** Border/line color for Tree 4 tiles — Fall style (dark red). */
+export const TREE4_FALL_COLOR         = '#600808';
+/** Leaf canopy fill color for Tree 4 tiles — Fall style (red). */
+export const TREE4_FALL_LEAF_COLOR    = '#a01818';
+/** Secondary leaf cluster color for Tree 4 tiles — Fall style (bright red). */
+export const TREE4_FALL_LEAF_ALT_COLOR = '#d03030';
+/** Border/line color for Tree 4 tiles — Dark style (dark amber). */
+export const TREE4_DARK_COLOR         = '#806010';
+/** Leaf canopy fill color for Tree 4 tiles — Dark style (pale amber glow). */
+export const TREE4_DARK_LEAF_COLOR    = '#c89030';
+/** Secondary leaf cluster color for Tree 4 tiles — Dark style (bright amber). */
+export const TREE4_DARK_LEAF_ALT_COLOR = '#e8b040';
+/** Border/line color for Tree 4 tiles — Winter style (dark gray, birch-like). */
+export const TREE4_WINTER_COLOR        = '#606060';
+/** Leaf canopy fill color for Tree 4 tiles — Winter style (off-white, birch canopy). */
+export const TREE4_WINTER_LEAF_COLOR   = '#d8d8d8';
+/** Secondary leaf cluster color for Tree 4 tiles — Winter style (near-white). */
+export const TREE4_WINTER_LEAF_ALT_COLOR = '#f0f0f0';
+/** Border/line color for Tree 4 tiles — Spring style (dark magenta). */
+export const TREE4_SPRING_COLOR        = '#a82080';
+/** Leaf canopy fill color for Tree 4 tiles — Spring style (magenta). */
+export const TREE4_SPRING_LEAF_COLOR   = '#e840a8';
+/** Secondary leaf cluster color for Tree 4 tiles — Spring style (fuchsia). */
+export const TREE4_SPRING_LEAF_ALT_COLOR = '#f870d0';
 /** Border/line color for Cement tiles (medium gray). */
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */

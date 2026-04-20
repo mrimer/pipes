@@ -42,6 +42,12 @@ export enum PipeShape {
   /** Tree – an impassable obstacle; cannot be moved and water cannot flow through it.
    *  Rendered as a 2-D top-down view of a broad-leafed tree (fern / palm style). */
   Tree = 'TREE',
+  /** Tree 2 – functionally identical to Tree; rendered with a unique shape and style-specific colors. */
+  Tree2 = 'TREE2',
+  /** Tree 3 – functionally identical to Tree; rendered with a unique shape and style-specific colors. */
+  Tree3 = 'TREE3',
+  /** Tree 4 – functionally identical to Tree; rendered with a unique shape and style-specific colors. */
+  Tree4 = 'TREE4',
   /** Sea – an impassable obstacle; cannot be moved and water cannot flow through it.
    *  Rendered as a blue water tile with animated ripples and a thin land border
    *  on edges where a non-sea tile is adjacent. */

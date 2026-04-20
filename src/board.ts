@@ -117,7 +117,8 @@ export const ELBOW_PIPE_SHAPES = new Set<PipeShape>([
  * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
  */
 export function isObstacleTile(shape: PipeShape): boolean {
-  return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Sea;
+  return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Tree2
+    || shape === PipeShape.Tree3 || shape === PipeShape.Tree4 || shape === PipeShape.Sea;
 }
 
 /** All empty-floor shapes that a player may fill with a pipe from inventory. */

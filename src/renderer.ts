@@ -34,6 +34,21 @@ import {
   TREE_WINTER_COLOR, TREE_WINTER_LEAF_COLOR, TREE_WINTER_LEAF_ALT_COLOR,
   TREE_SPRING_COLOR, TREE_SPRING_LEAF_COLOR, TREE_SPRING_LEAF_ALT_COLOR,
   TREE_SHADOW_COLOR,
+  TREE2_COLOR, TREE2_LEAF_COLOR, TREE2_LEAF_ALT_COLOR,
+  TREE2_FALL_COLOR, TREE2_FALL_LEAF_COLOR, TREE2_FALL_LEAF_ALT_COLOR,
+  TREE2_DARK_COLOR, TREE2_DARK_LEAF_COLOR, TREE2_DARK_LEAF_ALT_COLOR,
+  TREE2_WINTER_COLOR, TREE2_WINTER_LEAF_COLOR, TREE2_WINTER_LEAF_ALT_COLOR,
+  TREE2_SPRING_COLOR, TREE2_SPRING_LEAF_COLOR, TREE2_SPRING_LEAF_ALT_COLOR,
+  TREE3_COLOR, TREE3_LEAF_COLOR, TREE3_LEAF_ALT_COLOR,
+  TREE3_FALL_COLOR, TREE3_FALL_LEAF_COLOR, TREE3_FALL_LEAF_ALT_COLOR,
+  TREE3_DARK_COLOR, TREE3_DARK_LEAF_COLOR, TREE3_DARK_LEAF_ALT_COLOR,
+  TREE3_WINTER_COLOR, TREE3_WINTER_LEAF_COLOR, TREE3_WINTER_LEAF_ALT_COLOR,
+  TREE3_SPRING_COLOR, TREE3_SPRING_LEAF_COLOR, TREE3_SPRING_LEAF_ALT_COLOR,
+  TREE4_COLOR, TREE4_LEAF_COLOR, TREE4_LEAF_ALT_COLOR,
+  TREE4_FALL_COLOR, TREE4_FALL_LEAF_COLOR, TREE4_FALL_LEAF_ALT_COLOR,
+  TREE4_DARK_COLOR, TREE4_DARK_LEAF_COLOR, TREE4_DARK_LEAF_ALT_COLOR,
+  TREE4_WINTER_COLOR, TREE4_WINTER_LEAF_COLOR, TREE4_WINTER_LEAF_ALT_COLOR,
+  TREE4_SPRING_COLOR, TREE4_SPRING_LEAF_COLOR, TREE4_SPRING_LEAF_ALT_COLOR,
   CEMENT_COLOR, CEMENT_FILL_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
@@ -677,6 +692,230 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: Le
   // Small brown trunk circle in the center – omitted as the trunk would not be
   // visible from a top-down aerial perspective; the canopy fully covers it.
   // Dark green outline around the whole canopy
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = _s(2);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/**
+ * Resolve color triple [leafColor, leafAltColor, outlineColor] for a tree variant
+ * given its per-style color table and the optional level style.
+ */
+function _treeColorTriple(
+  styleTable: Record<string, [string, string, string]>,
+  defaultTriple: [string, string, string],
+  style?: LevelStyle,
+): [string, string, string] {
+  return (style && styleTable[style]) ?? defaultTriple;
+}
+
+/**
+ * Draw Tree 2 – a top-down tree with a bumpy rounded outline formed by 6 outer lobes
+ * and a concentric inner ring pattern, giving it a layered canopy look.
+ */
+export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
+  const styleTable: Record<string, [string, string, string]> = {
+    Fall:   [TREE2_FALL_LEAF_COLOR,   TREE2_FALL_LEAF_ALT_COLOR,   TREE2_FALL_COLOR],
+    Dark:   [TREE2_DARK_LEAF_COLOR,   TREE2_DARK_LEAF_ALT_COLOR,   TREE2_DARK_COLOR],
+    Winter: [TREE2_WINTER_LEAF_COLOR, TREE2_WINTER_LEAF_ALT_COLOR, TREE2_WINTER_COLOR],
+    Spring: [TREE2_SPRING_LEAF_COLOR, TREE2_SPRING_LEAF_ALT_COLOR, TREE2_SPRING_COLOR],
+  };
+  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(
+    styleTable, [TREE2_LEAF_COLOR, TREE2_LEAF_ALT_COLOR, TREE2_COLOR], style,
+  );
+
+  const r = half * 0.72;
+  // Cast shadow (skipped for Dark style)
+  if (style !== 'Dark') {
+    const shadowOff = half * 0.18;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-half, -half, half * 2, half * 2);
+    ctx.clip();
+    ctx.fillStyle = TREE_SHADOW_COLOR;
+    // Slightly elliptical shadow to match the bumpy bounding shape
+    ctx.beginPath();
+    ctx.ellipse(shadowOff, shadowOff, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Main canopy – large filled circle
+  ctx.fillStyle = leafColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Six outer bumps evenly spaced to create the bumpy outline
+  const bumpR = r * 0.42;
+  const bumpOff = r * 0.64;
+  ctx.fillStyle = leafAltColor;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Inner concentric ring of smaller lobes (layered look)
+  const innerR = r * 0.30;
+  const innerOff = r * 0.32;
+  ctx.fillStyle = leafColor;
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 6 + (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * innerOff, Math.sin(angle) * innerOff, innerR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Outline circle (bounding)
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = _s(2);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/**
+ * Draw Tree 3 – an irregular cloud-like top-down tree formed by scattered overlapping
+ * lobes of varying sizes, giving an asymmetric organic canopy appearance.
+ */
+export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
+  const styleTable: Record<string, [string, string, string]> = {
+    Fall:   [TREE3_FALL_LEAF_COLOR,   TREE3_FALL_LEAF_ALT_COLOR,   TREE3_FALL_COLOR],
+    Dark:   [TREE3_DARK_LEAF_COLOR,   TREE3_DARK_LEAF_ALT_COLOR,   TREE3_DARK_COLOR],
+    Winter: [TREE3_WINTER_LEAF_COLOR, TREE3_WINTER_LEAF_ALT_COLOR, TREE3_WINTER_COLOR],
+    Spring: [TREE3_SPRING_LEAF_COLOR, TREE3_SPRING_LEAF_ALT_COLOR, TREE3_SPRING_COLOR],
+  };
+  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(
+    styleTable, [TREE3_LEAF_COLOR, TREE3_LEAF_ALT_COLOR, TREE3_COLOR], style,
+  );
+
+  // Deterministic lobe positions for the organic irregular shape
+  // Each entry: [offsetX, offsetY, radius] in units of `half`
+  const lobes: Array<[number, number, number]> = [
+    [ 0.00,  0.00, 0.62],  // center (main)
+    [ 0.42, -0.32, 0.46],  // upper-right
+    [-0.38, -0.38, 0.44],  // upper-left
+    [ 0.52,  0.28, 0.40],  // right
+    [-0.50,  0.22, 0.42],  // left
+    [ 0.10,  0.52, 0.44],  // lower-center
+    [-0.20,  0.34, 0.36],  // lower-left
+    [ 0.34,  0.10, 0.32],  // mid-right
+  ];
+
+  // Cast shadow using the rough bounding extent of the lobes (skipped for Dark)
+  if (style !== 'Dark') {
+    const shadowOff = half * 0.18;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-half, -half, half * 2, half * 2);
+    ctx.clip();
+    ctx.fillStyle = TREE_SHADOW_COLOR;
+    ctx.beginPath();
+    ctx.ellipse(shadowOff, shadowOff, half * 0.78, half * 0.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Draw base lobes (main color)
+  ctx.fillStyle = leafColor;
+  for (const [ox, oy, rFrac] of lobes) {
+    ctx.beginPath();
+    ctx.arc(ox * half, oy * half, rFrac * half, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw highlight lobes (alt color) – smaller, slightly offset inward
+  ctx.fillStyle = leafAltColor;
+  for (const [ox, oy, rFrac] of lobes) {
+    ctx.beginPath();
+    ctx.arc(ox * half * 0.8, oy * half * 0.8, rFrac * half * 0.65, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Re-draw main color lobes at reduced scale to create a layered effect
+  ctx.fillStyle = leafColor;
+  for (const [ox, oy, rFrac] of lobes) {
+    ctx.beginPath();
+    ctx.arc(ox * half * 0.55, oy * half * 0.55, rFrac * half * 0.40, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Outline using the bounding circle of the lobe cluster
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = _s(2);
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.78, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/**
+ * Draw Tree 4 – a compact, dense top-down tree formed by many small tightly-packed
+ * lobes arranged in concentric rings, giving a rosette / dense-foliage appearance.
+ */
+export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
+  const styleTable: Record<string, [string, string, string]> = {
+    Fall:   [TREE4_FALL_LEAF_COLOR,   TREE4_FALL_LEAF_ALT_COLOR,   TREE4_FALL_COLOR],
+    Dark:   [TREE4_DARK_LEAF_COLOR,   TREE4_DARK_LEAF_ALT_COLOR,   TREE4_DARK_COLOR],
+    Winter: [TREE4_WINTER_LEAF_COLOR, TREE4_WINTER_LEAF_ALT_COLOR, TREE4_WINTER_COLOR],
+    Spring: [TREE4_SPRING_LEAF_COLOR, TREE4_SPRING_LEAF_ALT_COLOR, TREE4_SPRING_COLOR],
+  };
+  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(
+    styleTable, [TREE4_LEAF_COLOR, TREE4_LEAF_ALT_COLOR, TREE4_COLOR], style,
+  );
+
+  const r = half * 0.70;
+  // Cast shadow (skipped for Dark style)
+  if (style !== 'Dark') {
+    const shadowOff = half * 0.18;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-half, -half, half * 2, half * 2);
+    ctx.clip();
+    ctx.fillStyle = TREE_SHADOW_COLOR;
+    ctx.beginPath();
+    ctx.arc(shadowOff, shadowOff, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Outer ring: 8 small lobes
+  ctx.fillStyle = leafColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  const outerLobeR = r * 0.35;
+  const outerLobeOff = r * 0.65;
+  ctx.fillStyle = leafAltColor;
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * outerLobeOff, Math.sin(angle) * outerLobeOff, outerLobeR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Middle ring: 6 slightly smaller lobes at offset phase
+  const midLobeR = r * 0.28;
+  const midLobeOff = r * 0.38;
+  ctx.fillStyle = leafColor;
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 6 + (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * midLobeOff, Math.sin(angle) * midLobeOff, midLobeR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Center dot (alt color)
+  ctx.fillStyle = leafAltColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.20, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Outline circle
   ctx.strokeStyle = outlineColor;
   ctx.lineWidth = _s(2);
   ctx.beginPath();
@@ -1550,6 +1789,9 @@ function _resolveTileColor(
   }
   if (shape === PipeShape.Granite) return GRANITE_COLOR;
   if (shape === PipeShape.Tree) return TREE_COLOR;
+  if (shape === PipeShape.Tree2) return TREE2_COLOR;
+  if (shape === PipeShape.Tree3) return TREE3_COLOR;
+  if (shape === PipeShape.Tree4) return TREE4_COLOR;
   if (shape === PipeShape.Sea) return SEA_COLOR;
   if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
   if (LEAKY_PIPE_SHAPES.has(shape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
@@ -1685,6 +1927,21 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     drawTree(ctx, half, levelStyle);
+  } else if (shape === PipeShape.Tree2) {
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree2(ctx, half, levelStyle);
+  } else if (shape === PipeShape.Tree3) {
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree3(ctx, half, levelStyle);
+  } else if (shape === PipeShape.Tree4) {
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawTree4(ctx, half, levelStyle);
   } else if (shape === PipeShape.Sea) {
     // Sea – impassable water tile with animated ripples and land border
     ctx.restore();
@@ -2097,7 +2354,8 @@ function _renderPass2NonPipeTiles(
       // Also compute the per-tile inferred floor shape for style-dependent rendering
       // (e.g. Tree tile colors should match the local floor style, not the overall board style).
       let inferredFloorShape: PipeShape | undefined;
-      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Chamber
+      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Tree2
+          || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4 || tile.shape === PipeShape.Chamber
           || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
         inferredFloorShape = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
         drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, inferredFloorShape, 1.0); //alpha
