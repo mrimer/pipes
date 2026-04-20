@@ -72,6 +72,8 @@ export const TREE_WINTER_COLOR         = '#8090a8';
 export const TREE_WINTER_LEAF_COLOR    = '#c8d8e8';
 /** Secondary leaf cluster color for Tree tiles — Winter style (slightly brighter off-white). */
 export const TREE_WINTER_LEAF_ALT_COLOR = '#dce8f0';
+/** Semi-transparent shadow cast by Tree tiles onto the background (skipped for Dark style). */
+export const TREE_SHADOW_COLOR       = 'rgba(0,0,0,0.22)';
 /** Border/line color for Cement tiles (medium gray). */
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */
