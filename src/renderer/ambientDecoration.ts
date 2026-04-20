@@ -67,8 +67,16 @@ const DANDELION_STALK_COLOR = 'rgba(72,115,58,0.92)';
 /** Dandelion puff center color (inner, opaque white). */
 const DANDELION_PUFF_CENTER = 'rgba(240,240,235,0.90)';
 
+/** Autumn leaf colors: warm fall palette cycling through red, orange, yellow, and brown tones. */
+const LEAF_COLORS = [
+  'rgba(190, 65, 35, 0.88)',   // crimson red
+  'rgba(210, 105, 25, 0.88)',  // burnt orange
+  'rgba(225, 165, 18, 0.88)',  // golden yellow
+  'rgba(165, 90, 18, 0.85)',   // warm brown
+  'rgba(175, 45, 28, 0.85)',   // dark red
+] as const;
+
 /** Sunflower petal color. */
-const SUNFLOWER_PETAL_COLOR = 'rgba(240,195,28,0.92)';
 
 /** Sunflower inner petal ring / shading color. */
 const SUNFLOWER_PETAL_INNER = 'rgba(200,140,20,0.85)';
@@ -311,6 +319,42 @@ function _drawSunflower(ctx: CanvasRenderingContext2D, variant: number): void {
 }
 
 /**
+ * Draw a cluster of autumn leaves lying on the ground (top-down view),
+ * centered at the current canvas origin.
+ * `count` leaves (2–5) are scattered at varying angles and positions;
+ * each leaf cycles through autumn colors independently.
+ */
+function _drawLeaves(ctx: CanvasRenderingContext2D, variant: number, count: number): void {
+  const leafHalfW = _s(2.8);   // leaf half-width
+  const leafHalfH = _s(5.0);   // leaf half-height (elongated)
+  for (let i = 0; i < count; i++) {
+    // Spread leaves around the center using evenly spaced angles offset by variant.
+    const spreadAngle = (i / count) * Math.PI * 2 + variant * 1.2;
+    const dist = _s(3.0 + (i % 3) * 2.2);
+    const cx = Math.cos(spreadAngle) * dist;
+    const cy = Math.sin(spreadAngle) * dist;
+    // Each leaf has its own tilt for a natural, wind-blown look.
+    const leafTilt = (i * 1.31 + variant * 0.79) * Math.PI;
+    const color = LEAF_COLORS[(i + variant) % LEAF_COLORS.length];
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(leafTilt);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, leafHalfW, leafHalfH, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Light central vein for definition
+    ctx.strokeStyle = 'rgba(255, 255, 200, 0.35)';
+    ctx.lineWidth = _s(0.7);
+    ctx.beginPath();
+    ctx.moveTo(0, -leafHalfH * 0.75);
+    ctx.lineTo(0,  leafHalfH * 0.75);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
  * The canvas context should NOT have any prior transforms applied;
  * this function handles its own save/restore cycle.
  */
@@ -336,6 +380,7 @@ export function drawAmbientDecoration(
     case 'crystal':   _drawCrystal(ctx, dec.variant, dec.count);  break;
     case 'dandelion': _drawDandelion(ctx);              break;
     case 'sunflower': _drawSunflower(ctx, dec.variant); break;
+    case 'leaves':    _drawLeaves(ctx, dec.variant, dec.count ?? 3); break;
   }
   ctx.restore();
 }
