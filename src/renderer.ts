@@ -770,17 +770,20 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
     ctx.fill();
   }
 
-  // Outline circle (bounding)
+  // Outline follows the outer six-leaf shape
   ctx.strokeStyle = outlineColor;
   ctx.lineWidth = _s(2);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 /**
- * Draw Tree 3 – an irregular cloud-like top-down tree formed by scattered overlapping
- * lobes of varying sizes, giving an asymmetric organic canopy appearance.
+ * Draw Tree 3 – a top-down tree with a bumpy rounded outline formed by 5 outer lobes
+ * and a concentric inner ring pattern, giving it a layered canopy look.
  */
 export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
   const styleTable: Record<string, [string, string, string]> = {
@@ -793,20 +796,8 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
     styleTable, [TREE3_LEAF_COLOR, TREE3_LEAF_ALT_COLOR, TREE3_COLOR], style,
   );
 
-  // Deterministic lobe positions for the organic irregular shape
-  // Each entry: [offsetX, offsetY, radius] in units of `half`
-  const lobes: Array<[number, number, number]> = [
-    [ 0.00,  0.00, 0.62],  // center (main)
-    [ 0.42, -0.32, 0.46],  // upper-right
-    [-0.38, -0.38, 0.44],  // upper-left
-    [ 0.52,  0.28, 0.40],  // right
-    [-0.50,  0.22, 0.42],  // left
-    [ 0.10,  0.52, 0.44],  // lower-center
-    [-0.20,  0.34, 0.36],  // lower-left
-    [ 0.34,  0.10, 0.32],  // mid-right
-  ];
-
-  // Cast shadow using the rough bounding extent of the lobes (skipped for Dark)
+  const r = half * 0.72;
+  // Cast shadow (skipped for Dark style)
   if (style !== 'Dark') {
     const shadowOff = half * 0.18;
     ctx.save();
@@ -815,41 +806,48 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
     ctx.clip();
     ctx.fillStyle = TREE_SHADOW_COLOR;
     ctx.beginPath();
-    ctx.ellipse(shadowOff, shadowOff, half * 0.78, half * 0.72, 0, 0, Math.PI * 2);
+    ctx.ellipse(shadowOff, shadowOff, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
-  // Draw base lobes (main color)
+  // Main canopy – large filled circle
   ctx.fillStyle = leafColor;
-  for (const [ox, oy, rFrac] of lobes) {
-    ctx.beginPath();
-    ctx.arc(ox * half, oy * half, rFrac * half, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
 
-  // Draw highlight lobes (alt color) – smaller, slightly offset inward
+  // Five outer lobes evenly spaced to create the outer five-leaf shape
+  const bumpR = r * 0.44;
+  const bumpOff = r * 0.62;
   ctx.fillStyle = leafAltColor;
-  for (const [ox, oy, rFrac] of lobes) {
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
     ctx.beginPath();
-    ctx.arc(ox * half * 0.8, oy * half * 0.8, rFrac * half * 0.65, 0, Math.PI * 2);
+    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Re-draw main color lobes at reduced scale to create a layered effect
+  // Inner concentric ring of smaller lobes (layered look)
+  const innerR = r * 0.30;
+  const innerOff = r * 0.32;
   ctx.fillStyle = leafColor;
-  for (const [ox, oy, rFrac] of lobes) {
+  for (let i = 0; i < 5; i++) {
+    const angle = Math.PI / 5 + (i / 5) * Math.PI * 2;
     ctx.beginPath();
-    ctx.arc(ox * half * 0.55, oy * half * 0.55, rFrac * half * 0.40, 0, Math.PI * 2);
+    ctx.arc(Math.cos(angle) * innerOff, Math.sin(angle) * innerOff, innerR, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Outline using the bounding circle of the lobe cluster
+  // Outline follows the outer five-leaf shape
   ctx.strokeStyle = outlineColor;
   ctx.lineWidth = _s(2);
-  ctx.beginPath();
-  ctx.arc(0, 0, half * 0.78, 0, Math.PI * 2);
-  ctx.stroke();
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 /**
@@ -915,12 +913,15 @@ export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.arc(0, 0, r * 0.20, 0, Math.PI * 2);
   ctx.fill();
 
-  // Outline circle
+  // Outline follows the outer eight-leaf shape
   ctx.strokeStyle = outlineColor;
   ctx.lineWidth = _s(2);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * outerLobeOff, Math.sin(angle) * outerLobeOff, outerLobeR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 // ── Sea tile rendering helpers ────────────────────────────────────────────────
