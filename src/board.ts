@@ -701,6 +701,14 @@ export class Board {
   }
 
   /**
+   * Read-only view of the current history index.
+   * Equals the number of moves recorded since the last `initHistory` call.
+   */
+  get historyIndex(): number {
+    return this._historyIndex;
+  }
+
+  /**
    * Returns true when the game-over undo can restore the board, i.e. when
    * either a normal undo is available or the failing move was the very first
    * move (discardLastMoveFromHistory was called and _historyIndex is back at 0).
@@ -1549,6 +1557,38 @@ export class Board {
    */
   rotateTile(pos: GridPos): MoveResult {
     return this.rotateTileBy(pos, 1);
+  }
+
+  /**
+   * Rotate the tile at the given position 90° clockwise.
+   * Alias for {@link rotateTile} used during move replay.
+   */
+  rotateTileCW(pos: GridPos): MoveResult {
+    return this.rotateTileBy(pos, 1);
+  }
+
+  /**
+   * Rotate the tile at the given position 90° counter-clockwise.
+   * Equivalent to {@link rotateTileBy} with `steps = 3`.
+   */
+  rotateTileCCW(pos: GridPos): MoveResult {
+    return this.rotateTileBy(pos, 3);
+  }
+
+  /**
+   * Place or replace a tile at `pos` as part of move replay.
+   * Behaves like {@link placeInventoryTile} when the cell is empty,
+   * or {@link replaceInventoryTile} when it already holds a pipe.
+   * Used by the replay engine where the move log dictates the exact action.
+   */
+  placeOrReplaceForReplay(row: number, col: number, shape: PipeShape, rotation: Rotation): MoveResult {
+    const pos: GridPos = { row, col };
+    const tile = this.getTile(pos);
+    if (!tile) return { success: false };
+    if (isEmptyFloor(tile.shape)) {
+      return this.placeInventoryTile(pos, shape, rotation);
+    }
+    return this.replaceInventoryTile(pos, shape, rotation);
   }
 
   /**

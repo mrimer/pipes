@@ -151,6 +151,8 @@ export enum GameScreen {
   Play = 'PLAY',
   CampaignEditor = 'CAMPAIGN_EDITOR',
   ChapterMap = 'CHAPTER_MAP',
+  /** Playback mode: replaying a saved move sequence for a level. */
+  Playback = 'PLAYBACK',
 }
 
 /** State of an active game level. */
@@ -395,4 +397,56 @@ export interface CampaignDef {
    * type and tree rendering colors. Defaults to 'Grass' when absent or invalid.
    */
   style?: LevelStyle;
+}
+
+// ─── Recording / playback types ───────────────────────────────────────────────
+
+/**
+ * A single saved record of a player's move sequence for a level.
+ *
+ * The `moves` array is the canonical sequence: each entry is an encoded action
+ * string (see `src/moveRecorder.ts`).  The game state is NOT stored; it can be
+ * reconstructed by replaying the moves from the initial level state.
+ */
+export interface PlaySequenceRecord {
+  /** Unique identifier for this record (timestamp-based). */
+  id: string;
+  /** Campaign this recording belongs to. */
+  campaignId: string;
+  /** Level ID within the campaign. */
+  levelId: number;
+  /**
+   * Ordered list of encoded action strings.
+   * Format: see `encodeMove` / `decodeMove` in `src/moveRecorder.ts`.
+   */
+  moves: string[];
+  /** Whether the level was completed, failed, or is a partial recording. */
+  outcome: 'success' | 'failure' | 'partial';
+  /** True when this recording was created automatically on win/loss. */
+  autoRecorded: boolean;
+  /** Unix timestamp (ms) of when this recording was saved. */
+  timestamp: number;
+  /** Display name of the player who made the recording. */
+  playerName: string;
+  /** Water remaining when the level was completed (success only). */
+  waterScore?: number;
+  /** Stars collected when the level was completed (success only). */
+  stars?: number;
+  /** Optional manual annotation written by the player. */
+  annotation?: string;
+  /**
+   * Set to true when an invalid move is encountered during playback.
+   * Marks the recording as potentially corrupted from that point on.
+   */
+  corrupted: boolean;
+}
+
+/**
+ * Settings that control automatic recording of play sequences.
+ */
+export interface RecordingSettings {
+  /** Automatically record a play sequence each time the player wins a level. Default: true. */
+  recordSuccesses: boolean;
+  /** Automatically record a play sequence each time the player loses a level. Default: false. */
+  recordFailures: boolean;
 }
