@@ -681,21 +681,26 @@ export class InputHandler {
     if (commandKeyManager.matches('rotateCCW', e)) {
       e.preventDefault();
       if (this._cb.getGameState() !== GameState.Playing) return;
-      if (this._cb.getSelectedShape() !== null) {
-        this._rotatePendingCCW();
-      } else if (!this._tryRotateHoverSpinner(3)) {
-        // 3 CW steps = 1 CCW step
-        this._tryAdjustHoverRotation(-1);
+      // 3 CW steps = 1 CCW step; spinner takes priority over pending piece rotation
+      if (!this._tryRotateHoverSpinner(3)) {
+        if (this._cb.getSelectedShape() !== null) {
+          this._rotatePendingCCW();
+        } else {
+          this._tryAdjustHoverRotation(-1);
+        }
       }
       return;
     }
     if (commandKeyManager.matches('rotateCW', e)) {
       e.preventDefault();
       if (this._cb.getGameState() !== GameState.Playing) return;
-      if (this._cb.getSelectedShape() !== null) {
-        this._rotatePendingCW();
-      } else if (!this._tryRotateHoverSpinner(1)) {
-        this._tryAdjustHoverRotation(1);
+      // Spinner takes priority over pending piece rotation
+      if (!this._tryRotateHoverSpinner(1)) {
+        if (this._cb.getSelectedShape() !== null) {
+          this._rotatePendingCW();
+        } else {
+          this._tryAdjustHoverRotation(1);
+        }
       }
       return;
     }
