@@ -179,6 +179,10 @@ function chapterWaterTotal(
  *   passing a non-null callback when the sequence should run.
  * @param onCampaignMapClick - Optional callback invoked when the top-level
  *   "Campaign Map" button is clicked.
+ * @param onExportProgress - Optional callback invoked when the player clicks
+ *   the "Export Progress" button.
+ * @param onImportProgress - Optional callback invoked when the player clicks
+ *   the "Import Progress" button.
  */
 export function renderLevelList(
   levelListEl: HTMLElement,
@@ -198,6 +202,8 @@ export function renderLevelList(
   onCampaignMastered?: () => void,
   campaignHasMap = false,
   onCampaignMapClick?: () => void,
+  onExportProgress?: () => void,
+  onImportProgress?: () => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -585,6 +591,26 @@ export function renderLevelList(
     'margin-top:8px;padding:10px 20px;width:100%;',
   );
   levelListEl.appendChild(rulesBtn);
+
+  // Export Progress button
+  if (onExportProgress) {
+    const exportBtn = createButton(
+      '📤 Export Progress', UI_BG, '#4a90d9',
+      () => { sfxManager.play(SfxId.ChapterSelect); onExportProgress(); },
+      'margin-top:8px;padding:10px 20px;width:100%;',
+    );
+    levelListEl.appendChild(exportBtn);
+  }
+
+  // Import Progress button
+  if (onImportProgress) {
+    const importBtn = createButton(
+      '📥 Import Progress', UI_BG, '#4a90d9',
+      () => { sfxManager.play(SfxId.ChapterSelect); onImportProgress(); },
+      'margin-top:8px;padding:10px 20px;width:100%;',
+    );
+    levelListEl.appendChild(importBtn);
+  }
 
   // Reset-progress button: hidden when no campaign is active; disabled when there is no
   // recorded progress (no completed levels and no collected stars) so it cannot be clicked.

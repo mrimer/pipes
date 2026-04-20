@@ -1013,3 +1013,70 @@ describe('renderLevelList – Continue button location text', () => {
     expect(btn?.disabled).toBe(true);
   });
 });
+
+// ─── Export / Import Progress buttons ────────────────────────────────────────
+
+describe('renderLevelList – Export/Import Progress buttons', () => {
+  let container: HTMLElement;
+  const emptySet = new Set<number>();
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  it('renders the Export Progress button when onExportProgress is provided', () => {
+    renderLevelList(
+      container, emptySet,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, undefined, {}, {}, undefined, undefined, undefined, undefined, false, undefined,
+      () => {},  // onExportProgress
+    );
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
+    const exportBtn = buttons.find((b) => b.textContent?.includes('Export Progress'));
+    expect(exportBtn).toBeDefined();
+  });
+
+  it('renders the Import Progress button when onImportProgress is provided', () => {
+    renderLevelList(
+      container, emptySet,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      undefined, undefined, {}, {}, undefined, undefined, undefined, undefined, false, undefined,
+      undefined,  // onExportProgress
+      () => {},   // onImportProgress
+    );
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
+    const importBtn = buttons.find((b) => b.textContent?.includes('Import Progress'));
+    expect(importBtn).toBeDefined();
+  });
+
+  it('does not render Export/Import buttons when callbacks are omitted', () => {
+    renderLevelList(
+      container, emptySet,
+      () => {}, () => {}, () => {}, () => {}, () => {},
+    );
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
+    const exportBtn = buttons.find((b) => b.textContent?.includes('Export Progress'));
+    const importBtn = buttons.find((b) => b.textContent?.includes('Import Progress'));
+    expect(exportBtn).toBeUndefined();
+    expect(importBtn).toBeUndefined();
+  });
+
+  it('Export Progress button appears above the Reset Progress button', () => {
+    const campaign = { name: 'Test', author: 'A', completionPct: 50 };
+    renderLevelList(
+      container, new Set([1]), // non-empty so reset button is enabled
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, [], {}, {}, undefined, undefined, undefined, undefined, false, undefined,
+      () => {},  // onExportProgress
+      () => {},  // onImportProgress
+    );
+    const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
+    const idxExport = buttons.findIndex((b) => b.textContent?.includes('Export Progress'));
+    const idxReset  = buttons.findIndex((b) => b.textContent?.includes('Reset Progress'));
+    expect(idxExport).toBeGreaterThanOrEqual(0);
+    expect(idxReset).toBeGreaterThanOrEqual(0);
+    expect(idxExport).toBeLessThan(idxReset);
+  });
+});

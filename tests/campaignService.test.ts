@@ -648,6 +648,24 @@ describe('CampaignService – exportToJson', () => {
     const json = svc.exportToJson(campaign);
     expect(json).not.toContain('unknownField');
   });
+
+  it('includes the pipes-campaign type identifier in the exported JSON', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const json = svc.exportToJson(campaign);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(parsed['type']).toBe('pipes-campaign');
+  });
+
+  it('places the type identifier before other campaign fields', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const json = svc.exportToJson(campaign);
+    const typeIdx = json.indexOf('"type"');
+    const idIdx   = json.indexOf('"id"');
+    expect(typeIdx).toBeGreaterThanOrEqual(0);
+    expect(typeIdx).toBeLessThan(idIdx);
+  });
 });
 
 // ─── parseImport ─────────────────────────────────────────────────────────────
@@ -707,6 +725,36 @@ describe('CampaignService – parseImport', () => {
     const svc = makeService();
     const result = svc.parseImport(JSON.stringify(campaign));
     expect(result.campaign.id).not.toBe('official');
+  });
+
+  // ── Type identifier enforcement ───────────────────────────────────────────
+
+  it('accepts a campaign file that has the pipes-campaign type identifier', () => {
+    const campaign = emptyCampaign('cmp_typed');
+    const json = JSON.stringify({ type: 'pipes-campaign', ...campaign });
+    const svc = makeService();
+    const result = svc.parseImport(json);
+    expect(result.campaign.id).toBe('cmp_typed');
+  });
+
+  it('accepts a campaign file with no type field (legacy format)', () => {
+    const campaign = emptyCampaign('cmp_legacy');
+    const json = JSON.stringify(campaign);  // no type field
+    const svc = makeService();
+    const result = svc.parseImport(json);
+    expect(result.campaign.id).toBe('cmp_legacy');
+  });
+
+  it('throws with a type-mismatch message when a player-profile file is imported as campaign', () => {
+    const json = JSON.stringify({ type: 'pipes-player-profile', version: 1, payload: {}, checksum: '0' });
+    const svc = makeService();
+    expect(() => svc.parseImport(json)).toThrow(/player profile/i);
+  });
+
+  it('throws with a descriptive message when an unknown type is used', () => {
+    const json = JSON.stringify({ type: 'unknown-type', id: 'x', name: 'X', author: 'A', chapters: [] });
+    const svc = makeService();
+    expect(() => svc.parseImport(json)).toThrow(/wrong file type/i);
   });
 });
 

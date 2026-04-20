@@ -25,6 +25,7 @@ import {
   getValidChapterMapTileDefKeys,
   getValidCampaignMapTileDefKeys,
 } from './types';
+import { FILE_TYPE_CAMPAIGN, FILE_TYPE_PLAYER } from '../playerProfile';
 
 // ─── ImportResult ─────────────────────────────────────────────────────────────
 
@@ -356,22 +357,46 @@ export class CampaignService {
 
   /**
    * Deep-clone a campaign, strip unrecognized fields via {@link scanData},
-   * and return the resulting JSON string.
+   * prepend the campaign file-type identifier, and return the resulting JSON string.
    */
   exportToJson(campaign: CampaignDef): string {
     const clean = structuredClone(campaign) as CampaignDef;
     this.scanData(clean, false);
-    return JSON.stringify(clean, null, 2);
+    // Add the type identifier AFTER the clean pass so it is never stripped.
+    const envelope = { type: FILE_TYPE_CAMPAIGN, ...clean };
+    return JSON.stringify(envelope, null, 2);
   }
 
   /**
    * Parse a JSON string as a campaign, validate it, detect conflicts with the
    * current library, and return an {@link ImportResult}.
    *
-   * @throws {Error} If the JSON is malformed or the campaign format is invalid.
+   * If the JSON contains a `type` field it is enforced: the file must declare
+   * {@link FILE_TYPE_CAMPAIGN}.  Files without a `type` field are accepted for
+   * backward-compatibility with exports produced before this check was added.
+   *
+   * @throws {Error} If the JSON is malformed, the type is wrong, or the
+   *   campaign format is invalid.
    */
   parseImport(json: string): ImportResult {
-    const data = migrateCampaign(JSON.parse(json) as CampaignDef);
+    const raw = JSON.parse(json) as Record<string, unknown>;
+
+    // Enforce the type identifier when it is present.
+    if ('type' in raw) {
+      if (raw['type'] !== FILE_TYPE_CAMPAIGN) {
+        const got = raw['type'] === FILE_TYPE_PLAYER
+          ? 'a player profile'
+          : `"${String(raw['type'])}"`;
+        throw new Error(
+          `Wrong file type: expected a campaign file, got ${got}. ` +
+          'Use "Import Progress" in the main menu to import player profiles.',
+        );
+      }
+      // Remove the envelope key before treating the object as a CampaignDef.
+      delete raw['type'];
+    }
+
+    const data = migrateCampaign(raw as unknown as CampaignDef);
     if (!data.id || !data.name || !Array.isArray(data.chapters)) {
       throw new Error('Invalid campaign file format.');
     }

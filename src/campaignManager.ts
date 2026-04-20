@@ -89,6 +89,10 @@ export interface CampaignCallbacks {
   showRules(): void;
   /** Show the settings modal overlay. */
   showSettings(): void;
+  /** Export all player progress and settings to a downloadable file. */
+  exportProgress(): void;
+  /** Import player progress and settings from a file. */
+  importProgress(): void;
 }
 
 // ─── Module-level helper ──────────────────────────────────────────────────────
@@ -214,6 +218,22 @@ export class CampaignManager {
     } else {
       this._autoSelectCampaign();
     }
+  }
+
+  /**
+   * Reload the active campaign's progress from localStorage and re-render
+   * the level list.  Call this after external changes to localStorage, such
+   * as after a player-profile import.
+   */
+  reloadActiveCampaignProgress(): void {
+    if (this._activeCampaign) {
+      this._activeCampaignProgress               = loadCampaignProgress(this._activeCampaign.id);
+      this._activeCampaignCompletedChapters       = loadCompletedChapters(this._activeCampaign.id);
+      this._activeCampaignMasteredChaptersShown   = loadMasteredChaptersShown(this._activeCampaign.id);
+      this._campaignMasteredShown                 = loadCampaignMasteredShown(this._activeCampaign.id);
+      this._campaignCompleteShown                 = loadCampaignCompleteShown(this._activeCampaign.id);
+    }
+    this.renderLevelList();
   }
 
   // ── Public API: chapter map ──────────────────────────────────────────────
@@ -801,6 +821,8 @@ export class CampaignManager {
       this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
       this._activeCampaign?.grid !== undefined,
       () => this.showCampaignMap(true),
+      () => this._callbacks.exportProgress(),
+      () => this._callbacks.importProgress(),
     );
   }
 
