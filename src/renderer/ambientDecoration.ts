@@ -77,6 +77,7 @@ const LEAF_COLORS = [
 ] as const;
 
 /** Sunflower petal color. */
+const SUNFLOWER_PETAL_COLOR = 'rgba(240,195,28,0.92)';
 
 /** Sunflower inner petal ring / shading color. */
 const SUNFLOWER_PETAL_INNER = 'rgba(200,140,20,0.85)';

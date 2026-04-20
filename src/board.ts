@@ -305,7 +305,7 @@ const DECORATION_DENSITY = 0.30;
  * Return the decoration types appropriate for the given empty floor type.
  *
  * - **Grass** (Empty):     flowers, grass tufts, mushrooms — organic surface.
- * - **Fall** (EmptyFall):  grass tufts, crystals, pebbles, dandelions, sunflowers, leaves — warm autumn surface.
+ * - **Fall** (EmptyFall):  grass tufts, pebbles, dandelions, sunflowers, leaves — warm autumn surface.
  * - **Dark** (EmptyDark):  pebbles only — stone-like surface.
  * - **Winter** (EmptyWinter): pebbles and crystals — icy, snow-covered surface.
  * - **Spring** (EmptySpring): flowers and grass only — bright spring surface.
@@ -316,7 +316,7 @@ const DECORATION_DENSITY = 0.30;
  */
 export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
   switch (floorType) {
-    case PipeShape.EmptyFall:   return ['grass', 'crystal', 'pebbles', 'dandelion', 'sunflower', 'leaves'];
+    case PipeShape.EmptyFall:   return ['grass', 'pebbles', 'dandelion', 'sunflower', 'leaves'];
     case PipeShape.EmptyDark:   return ['mushroom', 'crystal', 'pebbles'];
     case PipeShape.EmptyWinter: return ['pebbles', 'crystal'];
     case PipeShape.EmptySpring: return ['flower', 'grass'];
