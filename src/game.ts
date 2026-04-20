@@ -60,6 +60,11 @@ const SANDSTONE_SFX_THRESHOLD_MID = 5;
 /** Sandstone-sfx threshold: sandstone cost above this uses Sandstone3 sfx (instead of Sandstone2). */
 const SANDSTONE_SFX_THRESHOLD_HIGH = 10;
 
+/** Fallback player name used in the export filename when the stored name is empty after sanitization. */
+const EXPORT_FILENAME_FALLBACK_NAME = 'player';
+/** Delay (ms) before revoking the object URL after triggering a file download. */
+const DOWNLOAD_URL_REVOKE_DELAY_MS = 10_000;
+
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
   'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
@@ -1764,7 +1769,7 @@ export class Game implements InputCallbacks {
     const payload  = buildPlayerProfilePayload(localCampaigns);
     const fileObj  = buildPlayerFile(payload);
     const json     = JSON.stringify(fileObj, null, 2);
-    const playerName = loadPlayerName().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'player';
+    const playerName = loadPlayerName().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || EXPORT_FILENAME_FALLBACK_NAME;
     const filename = `pipes-player-${playerName}.pipes.json.gz`;
 
     gzipString(json).then((compressed) => {
@@ -1781,7 +1786,7 @@ export class Game implements InputCallbacks {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
       } catch (err) {
         alert(`Export failed: ${String(err)}`);
       }

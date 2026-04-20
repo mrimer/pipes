@@ -55,11 +55,13 @@ export const PROFILE_FORMAT_VERSION = 1;
  * Used for lightweight data-integrity verification only – not cryptographic.
  */
 export function computeChecksum(data: string): string {
-  let h = 0x811c9dc5;
+  const FNV_OFFSET_BASIS = 0x811c9dc5;  // FNV-1a offset basis (32-bit)
+  const FNV_PRIME        = 0x01000193;  // FNV-1a prime (32-bit)
+  let h = FNV_OFFSET_BASIS;
   for (let i = 0; i < data.length; i++) {
     h ^= data.charCodeAt(i);
     // Unsigned 32-bit multiply: use >>> 0 to keep it in [0, 2^32).
-    h = Math.imul(h, 0x01000193) >>> 0;
+    h = Math.imul(h, FNV_PRIME) >>> 0;
   }
   return h.toString(16).padStart(8, '0');
 }

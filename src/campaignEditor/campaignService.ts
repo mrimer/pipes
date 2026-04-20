@@ -362,7 +362,7 @@ export class CampaignService {
   exportToJson(campaign: CampaignDef): string {
     const clean = structuredClone(campaign) as CampaignDef;
     this.scanData(clean, false);
-    // Add the type identifier AFTER the clean pass so it is never stripped.
+    // Add the type identifier AFTER scanData so it is never stripped.
     const envelope = { type: FILE_TYPE_CAMPAIGN, ...clean };
     return JSON.stringify(envelope, null, 2);
   }
