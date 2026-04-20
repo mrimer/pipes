@@ -16,6 +16,11 @@ import { sfxManager, SfxId } from '../sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
 
+/** All tree tile shapes — any tree variant may overwrite any other. */
+const TREE_SHAPES = new Set<PipeShape>([
+  PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
+]);
+
 // ─── Callback interface ────────────────────────────────────────────────────────
 
 export interface EditorInputCallbacks {
@@ -155,6 +160,17 @@ export class EditorInputHandler {
 
     const existingTile = state.grid[pos.row][pos.col];
     const existingIsEmpty = existingTile === null || (existingTile !== null && isEmptyFloor(existingTile.shape));
+
+    // Tree palette on a tree cell: start a paint-drag session (tree-on-tree overwrite).
+    const paletteIsTree = TREE_SHAPES.has(state.palette as PipeShape);
+    const existingIsTree = existingTile !== null && TREE_SHAPES.has(existingTile.shape);
+    if (paletteIsTree && existingIsTree && REPEATABLE_EDITOR_TILES.has(state.palette)) {
+      this._paintDragActive = true;
+      this._paintCell(pos);
+      this._playPlacementSfx(pos);
+      this._cb.renderCanvas();
+      return;
+    }
 
     // Repeatable tile on an empty cell: start a paint-drag session.
     if (existingIsEmpty && REPEATABLE_EDITOR_TILES.has(state.palette)) {
@@ -332,8 +348,12 @@ export class EditorInputHandler {
 
     if (this._paintDragActive && pos) {
       // Paint each empty (or empty-floor-typed) cell the cursor enters during a paint-drag.
+      // Also allow a tree palette to overwrite any other tree tile.
       const cur = state.grid[pos.row][pos.col];
-      if (cur === null || (cur !== null && isEmptyFloor(cur.shape))) {
+      const curIsEmpty = cur === null || (cur !== null && isEmptyFloor(cur.shape));
+      const paletteIsTree = TREE_SHAPES.has(state.palette as PipeShape);
+      const curIsTree = cur !== null && TREE_SHAPES.has(cur.shape);
+      if (curIsEmpty || (paletteIsTree && curIsTree)) {
         this._paintCell(pos);
       }
     } else if (this._rightEraseDragActive && pos) {

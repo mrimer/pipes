@@ -51,6 +51,9 @@ export enum PipeShape {
   /** Poop – an impassable obstacle; cannot be moved and water cannot flow through it.
    *  Rendered as a 2-D top-down view of a swirly pile of poop. */
   Poop = 'POOP',
+  /** Pee – an impassable obstacle; cannot be moved and water cannot flow through it.
+   *  Rendered as a 2-D top-down view of a yellow puddle. */
+  Pee = 'PEE',
   /** Sea – an impassable obstacle; cannot be moved and water cannot flow through it.
    *  Rendered as a blue water tile with animated ripples and a thin land border
    *  on edges where a non-sea tile is adjacent. */

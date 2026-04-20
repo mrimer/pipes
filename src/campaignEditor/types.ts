@@ -241,7 +241,8 @@ export function buildMapTileDef(palette: EditorPalette, params: TileParams): Til
     return def;
   }
   if (shape === PipeShape.Tree || shape === PipeShape.Tree2 || shape === PipeShape.Tree3
-      || shape === PipeShape.Tree4 || shape === PipeShape.Granite || shape === PipeShape.Sea) {
+      || shape === PipeShape.Tree4 || shape === PipeShape.Poop || shape === PipeShape.Pee
+      || shape === PipeShape.Granite || shape === PipeShape.Sea) {
     return { shape };
   }
   return { shape, rotation: params.rotation };
@@ -279,6 +280,8 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.Tree2]:         '#901030',
   [PipeShape.Tree3]:         '#502080',
   [PipeShape.Tree4]:         '#806000',
+  [PipeShape.Poop]:          '#7b3f00',
+  [PipeShape.Pee]:           '#c8a000',
   [PipeShape.Sea]:           '#2a7fbf',
   [PipeShape.Empty]:         '#1a2840',
   [PipeShape.EmptyFall]:     '#7b5230',
@@ -362,7 +365,7 @@ export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.Straight, PipeShape.Elbow, PipeShape.Tee, PipeShape.Cross,
   PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
-  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4, PipeShape.Sea,
+  PipeShape.GoldSpace, PipeShape.OneWay, PipeShape.Cement, PipeShape.Granite, PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4, PipeShape.Poop, PipeShape.Pee, PipeShape.Sea,
   PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
   PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
   PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,

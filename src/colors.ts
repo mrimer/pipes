@@ -206,6 +206,39 @@ export const POOP_SPRING_COLOR       = '#5c3000';
 export const POOP_SPRING_FILL_COLOR  = '#8b4513';
 /** Highlight color for Poop tiles — Spring style (golden tan, spring light). */
 export const POOP_SPRING_HIGHLIGHT_COLOR = '#d2a679';
+
+// ─── Pee tile colors ──────────────────────────────────────────────────────────
+
+/** Outline color for Pee tiles — default (deep golden yellow). */
+export const PEE_COLOR               = '#8a6800';
+/** Main fill color for Pee tiles — default (bright yellow). */
+export const PEE_FILL_COLOR          = '#f0d000';
+/** Highlight/sheen color for Pee tiles — default (pale lemon). */
+export const PEE_HIGHLIGHT_COLOR     = '#fff176';
+/** Outline color for Pee tiles — Fall style (dark amber). */
+export const PEE_FALL_COLOR          = '#6b4c00';
+/** Main fill color for Pee tiles — Fall style (amber-gold). */
+export const PEE_FALL_FILL_COLOR     = '#c8900a';
+/** Highlight color for Pee tiles — Fall style (pale amber). */
+export const PEE_FALL_HIGHLIGHT_COLOR = '#f5cc6a';
+/** Outline color for Pee tiles — Dark style (dim greenish-yellow). */
+export const PEE_DARK_COLOR          = '#505000';
+/** Main fill color for Pee tiles — Dark style (murky dark yellow). */
+export const PEE_DARK_FILL_COLOR     = '#a0a000';
+/** Highlight color for Pee tiles — Dark style (pale acid yellow). */
+export const PEE_DARK_HIGHLIGHT_COLOR = '#d8d820';
+/** Outline color for Pee tiles — Winter style (muted yellow-gray). */
+export const PEE_WINTER_COLOR        = '#706040';
+/** Main fill color for Pee tiles — Winter style (pale icy yellow, frozen). */
+export const PEE_WINTER_FILL_COLOR   = '#d8d090';
+/** Highlight color for Pee tiles — Winter style (near-white icy sheen). */
+export const PEE_WINTER_HIGHLIGHT_COLOR = '#f5f0d0';
+/** Outline color for Pee tiles — Spring style (vivid golden). */
+export const PEE_SPRING_COLOR        = '#9a7800';
+/** Main fill color for Pee tiles — Spring style (bright spring yellow). */
+export const PEE_SPRING_FILL_COLOR   = '#ffe033';
+/** Highlight color for Pee tiles — Spring style (very pale yellow). */
+export const PEE_SPRING_HIGHLIGHT_COLOR = '#fffaaa';
 /** Border/line color for Cement tiles (medium gray). */
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */
