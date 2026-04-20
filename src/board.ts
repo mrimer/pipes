@@ -118,7 +118,8 @@ export const ELBOW_PIPE_SHAPES = new Set<PipeShape>([
  */
 export function isObstacleTile(shape: PipeShape): boolean {
   return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Tree2
-    || shape === PipeShape.Tree3 || shape === PipeShape.Tree4 || shape === PipeShape.Sea;
+    || shape === PipeShape.Tree3 || shape === PipeShape.Tree4 || shape === PipeShape.Poop
+    || shape === PipeShape.Sea;
 }
 
 /** All empty-floor shapes that a player may fill with a pipe from inventory. */
