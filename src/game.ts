@@ -1,6 +1,6 @@
 import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
 import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration } from './types';
+import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
 import {
@@ -25,11 +25,13 @@ import {
   buildResetModal, ResetProgressInfo,
   buildExitConfirmModal, buildUnplayableModal,
   buildSettingsModal,
-  buildRecordModal,
-  buildPlaybackListModal,
-  showReplayImportSuccessModal,
   showPlayerImportResultModal,
 } from './gameModals';
+import {
+  buildRecordModal, RecordModalInfo,
+  buildPlaybackListModal,
+  showReplayImportSuccessModal,
+} from './recordingModals';
 import { AnimationManager } from './animationManager';
 import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
@@ -185,11 +187,27 @@ export class Game implements InputCallbacks {
 
   /**
    * Ordered log of encoded move strings parallel to the board history.
-   * `_moveLog[i]` is the move that produced `history[i+1]` from `history[i]`.
-   * Always trimmed to `board.historyIndex` entries (branch-after-undo support).
-   * The canonical sequence to record is `_moveLog.slice(0, board.historyIndex)`.
+   * `_moveLog[i]` is the move that produced `history[i+1]` from `history[i]`,
+   * relative to `_moveLogGraftOffset` (i.e. index 0 = the first post-restart move).
+   * The canonical sequence to record is `getMoveLog()`.
    */
   private _moveLog: string[] = [];
+
+  /**
+   * Move log entries from before the most recent restart that was grafted onto
+   * the current history via {@link retryLevel}.  When the player undoes all the
+   * way past the restart boundary, {@link getMoveLog} returns entries from this
+   * array instead of `_moveLog`.
+   */
+  private _preRestartMoveLog: string[] = [];
+
+  /**
+   * Board `historyIndex` at the point where a restart occurred.
+   * All board states at indices < `_moveLogGraftOffset` belong to the pre-restart
+   * session; states at indices >= `_moveLogGraftOffset` belong to the current
+   * (post-restart) session.  0 means no restart has happened.
+   */
+  private _moveLogGraftOffset = 0;
 
   /** Manages the playback screen (replaying saved move sequences). */
   private _playbackScreen!: PlaybackScreen;
@@ -584,6 +602,8 @@ export class Game implements InputCallbacks {
   private _enterPlayScreenState(level: LevelDef): void {
     this.board!.initHistory();
     this._moveLog = [];  // reset move log each time a level (re)starts
+    this._preRestartMoveLog = [];
+    this._moveLogGraftOffset = 0;
     this.gameState = GameState.Playing;
     this.selectedShape = null;
     this.pendingRotation = 0;
@@ -777,9 +797,7 @@ export class Game implements InputCallbacks {
     if (this.screen === GameScreen.Play || this.screen === GameScreen.Playback) {
       this._renderBoard();
       this._animMgr.tick(this.board, this.gameState);
-      if (this.screen === GameScreen.Play) {
-        this._metrics.tickGoldenInventoryTwinkle();
-      }
+      this._metrics.tickGoldenInventoryTwinkle();
     }
     requestAnimationFrame(() => this._loop());
   }
@@ -1066,7 +1084,7 @@ export class Game implements InputCallbacks {
       this._playGoldSfxIfNeeded(this.board, filledBefore);
 
       // Record delete move before board.recordMove() increments historyIndex.
-      this._moveLog.length = this.board.historyIndex;
+      this._moveLog.length = this.board.historyIndex - this._moveLogGraftOffset;
       this._moveLog.push(encodeDeleteMove(pos.row, pos.col));
 
       this.board.recordMove();
@@ -1127,7 +1145,7 @@ export class Game implements InputCallbacks {
       if (tile) {
         const delta = (tile.rotation - rotationInfo.oldRotation + 360) % 360;
         const direction = delta > 180 ? 'CCW' : 'CW';
-        this._moveLog.length = this.board.historyIndex;
+        this._moveLog.length = this.board.historyIndex - this._moveLogGraftOffset;
         this._moveLog.push(encodeRotateMove(rotationInfo.row, rotationInfo.col, direction));
       }
     }
@@ -1496,7 +1514,7 @@ export class Game implements InputCallbacks {
     // Record the move in the log before board.recordMove() increments historyIndex.
     // Trim the log to the current history position first to handle branch-after-undo.
     if (replacedRow !== undefined && replacedCol !== undefined) {
-      this._moveLog.length = this.board.historyIndex;
+      this._moveLog.length = this.board.historyIndex - this._moveLogGraftOffset;
       this._moveLog.push(encodePlaceMove(placedShape, replacedRow, replacedCol, this.pendingRotation));
     }
 
@@ -1613,6 +1631,8 @@ export class Game implements InputCallbacks {
     sfxManager.stopAll();
     const prevBoard = this.board;
     const prevDecorations = prevBoard?.ambientDecorations;
+    // Capture the current move log before startLevel() resets _moveLog / _moveLogGraftOffset.
+    const preRestartMoveLog = this.getMoveLog();
     this.startLevel(this.currentLevel.id, prevDecorations, /* isUserRestart */ true);
     // Graft the pre-restart history onto the new board so Undo can revert to
     // the state the player was in before restarting.
@@ -1622,6 +1642,11 @@ export class Game implements InputCallbacks {
     // found) and this.board was not replaced with a new Board instance.
     if (prevBoard && this.board && this.board !== prevBoard) {
       this.board.graftPreRestartHistory(prevBoard);
+      // After grafting, board.historyIndex points to the fresh-restart state.
+      // Record the graft offset and preserve pre-restart moves so getMoveLog()
+      // returns the correct sequence when the player undoes past the restart.
+      this._moveLogGraftOffset = this.board.historyIndex;
+      this._preRestartMoveLog = preRestartMoveLog;
       this._updateUndoRedoButtons();
     }
   }
@@ -1846,9 +1871,21 @@ export class Game implements InputCallbacks {
 
   // ─── Recording ────────────────────────────────────────────────────────────
 
-  /** Return the current canonical move sequence (trimmed to board history depth). */
+  /**
+   * Return the current canonical move sequence for the active play session.
+   *
+   * When the player has undone past a restart boundary (historyIndex is within the
+   * pre-restart portion of the grafted history), the pre-restart move log is
+   * returned instead of the post-restart log, so that auto-recording at win/loss
+   * always captures a valid, replayable sequence.
+   */
   getMoveLog(): string[] {
-    return this._moveLog.slice(0, this.board?.historyIndex ?? 0);
+    const historyIndex = this.board?.historyIndex ?? 0;
+    if (this._moveLogGraftOffset > 0 && historyIndex < this._moveLogGraftOffset) {
+      // Player has undone past the restart; return the matching pre-restart sequence.
+      return this._preRestartMoveLog.slice(0, historyIndex);
+    }
+    return this._moveLog.slice(0, historyIndex - this._moveLogGraftOffset);
   }
 
   /**
@@ -1861,7 +1898,7 @@ export class Game implements InputCallbacks {
     const outcome: 'success' | 'failure' | 'partial' = this.gameState === GameState.Won ? 'success'
       : this.gameState === GameState.GameOver ? 'failure'
       : 'partial';
-    const info = {
+    const info: RecordModalInfo = {
       outcome,
       playerName: loadPlayerName(),
       timestamp: Date.now(),
@@ -1873,7 +1910,7 @@ export class Game implements InputCallbacks {
       info,
       (annotation) => {
         if (!this.board || !this.currentLevel) return;
-        const record: import('./types').PlaySequenceRecord = {
+        const record: PlaySequenceRecord = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           campaignId: this._campaign.activeCampaign?.id ?? '',
           levelId: this.currentLevel.id,
@@ -1943,7 +1980,7 @@ export class Game implements InputCallbacks {
     );
     if (isDuplicate) return;
 
-    const record: import('./types').PlaySequenceRecord = {
+    const record: PlaySequenceRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       campaignId,
       levelId,
@@ -1963,10 +2000,24 @@ export class Game implements InputCallbacks {
    * Export a replay record as a gzip-compressed JSON file.
    * The file contains campaign and level ids to support importing on other installs.
    */
-  private _exportReplay(record: import('./types').PlaySequenceRecord): void {
+  private _exportReplay(record: PlaySequenceRecord): void {
     const campaigns = this.campaignEditor.getAllCampaigns();
     const campaign = campaigns.find((c) => c.id === record.campaignId);
     const campaignName = campaign?.name ?? record.campaignId;
+
+    // Determine chapter and level numbers for a human-readable filename.
+    let chapterNumber: number | null = null;
+    let levelNumber: number | null = null;
+    if (campaign) {
+      for (let ci = 0; ci < campaign.chapters.length; ci++) {
+        const li = campaign.chapters[ci].levels.findIndex((l) => l.id === record.levelId);
+        if (li >= 0) {
+          chapterNumber = ci + 1;
+          levelNumber = li + 1;
+          break;
+        }
+      }
+    }
 
     const payload = {
       type: FILE_TYPE_REPLAY,
@@ -1979,7 +2030,10 @@ export class Game implements InputCallbacks {
     };
     const json = JSON.stringify(payload, null, 2);
     const safeName = record.playerName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'player';
-    const filename = `pipes-replay-${safeName}-level${record.levelId}.pipes.json.gz`;
+    const safeCampaign = campaignName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'campaign';
+    const chapterPart = chapterNumber !== null ? `-ch${chapterNumber}` : '';
+    const levelPart   = levelNumber   !== null ? `-level${levelNumber}` : `-levelid${record.levelId}`;
+    const filename = `replay-${safeName}-${safeCampaign}${chapterPart}${levelPart}.pipes.json.gz`;
 
     gzipString(json).then((compressed) => {
       try {
@@ -2033,7 +2087,7 @@ export class Game implements InputCallbacks {
           alert('Import failed: replay file checksum mismatch (file may be corrupted).');
           return;
         }
-        const record = parsed.record as import('./types').PlaySequenceRecord;
+        const record = parsed.record as PlaySequenceRecord;
         saveRecording(record);
 
         // Determine chapter/level numbers for the confirmation modal.
