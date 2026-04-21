@@ -27,6 +27,23 @@ import {
 } from './types';
 import { FILE_TYPE_CAMPAIGN, FILE_TYPE_PLAYER } from '../playerProfile';
 
+/**
+ * Locate a level inside a campaign and return its 1-based chapter/level numbers.
+ * Returns null when the level ID is not found.
+ */
+export function findLevelLocation(
+  campaign: CampaignDef,
+  levelId: number,
+): { chapterNumber: number; levelNumber: number } | null {
+  for (let chapterIndex = 0; chapterIndex < campaign.chapters.length; chapterIndex++) {
+    const levelIndex = campaign.chapters[chapterIndex].levels.findIndex((level) => level.id === levelId);
+    if (levelIndex >= 0) {
+      return { chapterNumber: chapterIndex + 1, levelNumber: levelIndex + 1 };
+    }
+  }
+  return null;
+}
+
 // ─── ImportResult ─────────────────────────────────────────────────────────────
 
 /**
