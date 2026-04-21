@@ -13,6 +13,7 @@ export const UI_OVERLAY_BG = 'rgba(0,0,0,0.7)';
 // Editor colors
 export const EDITOR_INPUT_BG = '#0d1a30';
 export const MUTED_BTN_BG    = '#2a2a4a';
+export const UI_INPUT_BORDER = '#2a3a5e';
 export const ERROR_COLOR     = '#e74c3c';
 export const ERROR_DARK      = '#c0392b';
 

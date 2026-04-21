@@ -3,7 +3,7 @@
 import { shapeIcon } from './renderer';
 import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
-import { RADIUS_LG, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
+import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 import { CommandAction, CommandKeyManager, commandKeyManager } from './commandKeyManager';
 import {
@@ -363,7 +363,7 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   const activeControlRows = isTouchDevice() ? TOUCH_CONTROL_ROWS : getControlRows(manager);
   for (const row of activeControlRows) {
     const tr = document.createElement('tr');
-    tr.style.cssText = 'border-bottom:1px solid #2a3a5e;';
+    tr.style.cssText = `border-bottom:1px solid ${UI_INPUT_BORDER};`;
 
     const tdInput = document.createElement('td');
     tdInput.style.cssText =
@@ -392,7 +392,7 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
 
   for (const row of LEGEND_ROWS) {
     const tr = document.createElement('tr');
-    tr.style.cssText = 'border-bottom:1px solid #2a3a5e;';
+    tr.style.cssText = `border-bottom:1px solid ${UI_INPUT_BORDER};`;
 
     const tdIcon = document.createElement('td');
     tdIcon.style.cssText =

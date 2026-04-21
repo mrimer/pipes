@@ -8,7 +8,7 @@
 
 import { CampaignDef } from '../types';
 import { CampaignService } from './campaignService';
-import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS } from '../uiConstants';
+import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, UI_INPUT_BORDER } from '../uiConstants';
 
 /** CSS for a button row aligned to the trailing edge (mirrors EDITOR_BTN_ROW_CSS). */
 const BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -50,7 +50,7 @@ export class DataValidationDialog {
     const headerRow = document.createElement('tr');
     for (const [label, align] of [['Record Type', 'left'], ['Field Name', 'left'], ['Count', 'right']] as const) {
       const th = document.createElement('th');
-      th.style.cssText = `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid #2a3a5e;`;
+      th.style.cssText = `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid ${UI_INPUT_BORDER};`;
       th.textContent = label;
       headerRow.appendChild(th);
     }

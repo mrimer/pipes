@@ -18,6 +18,7 @@ import { Board } from './board';
 import { LevelDef, GameScreen, GameState, PlaySequenceRecord, AmbientDecoration } from './types';
 import { replayMoves } from './moveRecorder';
 import { saveRecording } from './persistence';
+import { MUTED_BTN_BG } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 
 /** Default playback interval between moves (ms). */
@@ -63,7 +64,7 @@ export interface PlaybackCallbacks {
 
 /** CSS shared between all transport icon buttons. */
 const TRANSPORT_BTN_CSS =
-  'padding:6px 10px;font-size:1rem;background:#2a2a4a;color:#aaa;' +
+  `padding:6px 10px;font-size:1rem;background:${MUTED_BTN_BG};color:#aaa;` +
   'border:1px solid #555;border-radius:4px;cursor:pointer;min-height:36px;';
 
 export class PlaybackScreen {
