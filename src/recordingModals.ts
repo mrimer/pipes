@@ -8,7 +8,7 @@
  *  - showReplayImportSuccessModal – transient confirmation after import
  */
 
-import { RADIUS_LG, UI_BG } from './uiConstants';
+import { EDITOR_INPUT_BG, RADIUS_LG, UI_BG, UI_INPUT_BORDER } from './uiConstants';
 import { createModalOverlay } from './gameModals';
 import type { PlaySequenceRecord } from './types';
 
@@ -96,7 +96,7 @@ export function buildRecordModal(
   annotationInput.placeholder = 'Add a note about this recording…';
   annotationInput.style.cssText =
     'width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.9rem;' +
-    'background:#0d1a30;color:#eee;border:1px solid #2a3a5e;border-radius:6px;resize:vertical;font-family:inherit;';
+    `background:${EDITOR_INPUT_BG};color:#eee;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;resize:vertical;font-family:inherit;`;
   box.appendChild(annotationInput);
 
   // Buttons
@@ -198,7 +198,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
 
   const listContainer = document.createElement('div');
   listContainer.style.cssText =
-    'max-height:300px;overflow-y:auto;border:1px solid #2a3a5e;border-radius:6px;background:#0d1a30;';
+    `max-height:300px;overflow-y:auto;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;background:${EDITOR_INPUT_BG};`;
 
   const listEl = document.createElement('ul');
   listEl.style.cssText = 'list-style:none;margin:0;padding:0;';

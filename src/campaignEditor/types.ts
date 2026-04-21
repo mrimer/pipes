@@ -6,7 +6,7 @@
 import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction, LevelStyle } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR } from '../colors';
-import { UI_BG, UI_BORDER } from '../uiConstants';
+import { UI_BG, UI_BORDER, UI_INPUT_BORDER } from '../uiConstants';
 import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 
 // ─── Valid field sets for data validation ─────────────────────────────────────
@@ -336,7 +336,7 @@ export const CAMPAIGN_MAP_MAX_DIM = 50;
 /** Border color for the currently selected palette item button. */
 export const PALETTE_ITEM_SELECTED_BORDER = '#f0c040';
 /** Border color for an unselected palette item button. */
-export const PALETTE_ITEM_UNSELECTED_BORDER = '#2a3a5e';
+export const PALETTE_ITEM_UNSELECTED_BORDER = UI_INPUT_BORDER;
 /** Background color for the currently selected palette item button. */
 export const PALETTE_ITEM_SELECTED_BG = '#2a3a1a';
 /** Background color for an unselected palette item button. */

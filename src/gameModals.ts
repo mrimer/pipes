@@ -1,4 +1,4 @@
-import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_OVERLAY_BG } from './uiConstants';
+import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 import { CommandAction, COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
 import type { CampaignImportOutcome } from './playerProfile';
@@ -359,7 +359,7 @@ export function buildSettingsModal(
   playerNameInput.maxLength = 40;
   playerNameInput.dataset.playerNameInput = '1';
   playerNameInput.style.cssText =
-    'width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.95rem;background:#0d1a30;color:#eee;border:1px solid #2a3a5e;border-radius:6px;';
+    `width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.95rem;background:${EDITOR_INPUT_BG};color:#eee;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;`;
 
   playerNameSection.appendChild(playerNameLabel);
   playerNameSection.appendChild(playerNameInput);
@@ -434,13 +434,13 @@ export function buildSettingsModal(
 
     const valueEl = document.createElement('span');
     valueEl.style.cssText =
-      'font-size:0.85rem;color:#ddd;background:#0d1a30;border:1px solid #2a3a5e;border-radius:6px;padding:4px 8px;min-width:95px;text-align:center;';
+      `font-size:0.85rem;color:#ddd;background:${EDITOR_INPUT_BG};border:1px solid ${UI_INPUT_BORDER};border-radius:6px;padding:4px 8px;min-width:95px;text-align:center;`;
 
     const assignBtn = document.createElement('button');
     assignBtn.type = 'button';
     assignBtn.title = `Reassign ${COMMAND_LABELS[action]}`;
     assignBtn.style.cssText =
-      'padding:4px 8px;font-size:0.9rem;background:#2a2a4a;color:#ddd;border:1px solid #555;border-radius:4px;cursor:pointer;';
+      `padding:4px 8px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #555;border-radius:4px;cursor:pointer;`;
     assignBtn.addEventListener('click', () => {
       capturing = capturing === action ? null : action;
       renderCommandRows();
@@ -458,7 +458,7 @@ export function buildSettingsModal(
   resetCommandsBtn.type = 'button';
   resetCommandsBtn.textContent = 'Reset Commands';
   resetCommandsBtn.style.cssText =
-    'padding:8px 12px;font-size:0.9rem;background:#2a2a4a;color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:flex-start;';
+    `padding:8px 12px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:flex-start;`;
   resetCommandsBtn.addEventListener('click', () => {
     const confirmed = window.confirm('Reset all command key assignments to defaults?');
     if (!confirmed) return;
@@ -685,4 +685,3 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
   document.body.appendChild(el);
   el.style.display = 'flex';
 }
-
