@@ -1079,28 +1079,20 @@ export class Game implements InputCallbacks {
    * responsible for invoking {@link refreshUI} and {@link checkWinLose} afterwards.
    *
    * @param filledBefore - Filled positions snapshot taken before the rotation.
-   * @param rotationInfo - When provided, a pipe-rotation animation is spawned
-   *   for the rotated tile from `oldRotation` to the tile's current rotation.
-   *   Any subsequent fill animation is delayed until after the rotation completes.
+   * @param rotationInfo - Position and pre-rotation angle of the rotated tile.
+   *   A pipe-rotation animation is spawned from `oldRotation` to the tile's
+   *   current rotation, and subsequent fill animations are delayed until after
+   *   the rotation completes.
    */
   afterTileRotated(
     filledBefore: Set<string>,
     result: MoveResult,
-    rotationInfo?: { row: number; col: number; oldRotation: number },
+    rotationInfo: { row: number; col: number; oldRotation: number },
   ): void {
     if (!this.board) return;
-    // Play rotation sound based on the direction of rotation.
-    if (rotationInfo) {
-      const tile = this.board.getTile(rotationInfo);
-      if (tile) {
-        const delta = (tile.rotation - rotationInfo.oldRotation + 360) % 360;
-        sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
-      } else {
-        sfxManager.play(SfxId.RotateCW);
-      }
-    } else {
-      sfxManager.play(SfxId.RotateCW);
-    }
+    const tile = this.board.getTile(rotationInfo);
+    const delta = tile ? (tile.rotation - rotationInfo.oldRotation + 360) % 360 : 0;
+    sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
@@ -1108,28 +1100,20 @@ export class Game implements InputCallbacks {
     this._playGoldSfxIfNeeded(this.board, filledBefore);
     this._playAfterTileRotatedSfx(this.board, filledBefore);
 
-    // Compute the encoded move string (if we have enough info) and record the snapshot.
-    let encodedMove = '';
-    if (rotationInfo) {
-      const tile = this.board.getTile(rotationInfo);
-      if (tile) {
-        const delta = (tile.rotation - rotationInfo.oldRotation + 360) % 360;
-        encodedMove = encodeRotateMove(rotationInfo.row, rotationInfo.col, delta > 180 ? 'CCW' : 'CW');
-      }
-    }
+    // Compute the encoded move string and record the snapshot.
+    const encodedMove = tile
+      ? encodeRotateMove(rotationInfo.row, rotationInfo.col, delta > 180 ? 'CCW' : 'CW')
+      : '';
     this.board.recordMove(encodedMove);
 
     let fillDelay = 0;
-    if (rotationInfo) {
-      const tile = this.board.getTile(rotationInfo);
-      if (tile) {
-        this._animMgr.spawnRotationAnim(
-          rotationInfo.row, rotationInfo.col,
-          rotationInfo.oldRotation, tile.rotation,
-        );
-        // Fill animations begin only after the rotation animation completes.
-        fillDelay = ROTATION_ANIM_DURATION;
-      }
+    if (tile) {
+      this._animMgr.spawnRotationAnim(
+        rotationInfo.row, rotationInfo.col,
+        rotationInfo.oldRotation, tile.rotation,
+      );
+      // Fill animations begin only after the rotation animation completes.
+      fillDelay = ROTATION_ANIM_DURATION;
     }
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
@@ -1466,25 +1450,20 @@ export class Game implements InputCallbacks {
     placedShape: PipeShape,
     result: MoveResult,
     filledBefore: Set<string>,
-    replacedTile?: Tile,
-    replacedRow?: number,
-    replacedCol?: number,
+    replacedTile: Tile | undefined,
+    replacedRow: number,
+    replacedCol: number,
   ): void {
     if (!this.board) return;
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
-    const posKey = (replacedRow !== undefined && replacedCol !== undefined)
-      ? `${replacedRow},${replacedCol}` : null;
+    const posKey = `${replacedRow},${replacedCol}`;
     const placedIsLeakyAndConnected = LEAKY_PIPE_SHAPES.has(placedShape)
-      && posKey !== null && this.board.getFilledPositions().has(posKey);
+      && this.board.getFilledPositions().has(posKey);
 
     // Record the move in the log before board.recordMove() increments historyIndex.
-    if (replacedRow !== undefined && replacedCol !== undefined) {
-      this.board.recordMove(encodePlaceMove(placedShape, replacedRow, replacedCol, this.pendingRotation));
-    } else {
-      this.board.recordMove();
-    }
+    this.board.recordMove(encodePlaceMove(placedShape, replacedRow, replacedCol, this.pendingRotation));
 
     const sparkle = this._metrics.sparkleCallbacks();
 

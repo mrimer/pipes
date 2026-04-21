@@ -40,9 +40,9 @@ export interface InputCallbacks {
     shape: PipeShape,
     result: MoveResult,
     filledBefore: Set<string>,
-    replacedTile?: Tile,
-    row?: number,
-    col?: number,
+    replacedTile: Tile | undefined,
+    row: number,
+    col: number,
   ): void;
   /**
    * Called after a successful tile rotation.  Handles animations and records
@@ -52,7 +52,7 @@ export interface InputCallbacks {
   afterTileRotated(
     filledBefore: Set<string>,
     result: MoveResult,
-    rotationInfo?: { row: number; col: number; oldRotation: number },
+    rotationInfo: { row: number; col: number; oldRotation: number },
   ): void;
   /** Show an error flash and optional tile highlights for a failed board operation. */
   handleBoardError(result: MoveResult): void;
