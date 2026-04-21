@@ -33,7 +33,6 @@ const CORRUPT_FLASH_MS = 3000;
 interface SavedGameState {
   board: Board | null;
   gameState: GameState;
-  moveLog: string[];
   screen: GameScreen;
 }
 
@@ -45,13 +44,11 @@ export interface PlaybackCallbacks {
   /** Returns the current live board (used to copy decorations). */
   getBoard(): Board | null;
   /** Returns the current GameState. */
-  getGameState(): import('./types').GameState;
-  /** Returns the current move log snapshot. */
-  getMoveLog(): string[];
+  getGameState(): GameState;
   /** Switches to the given board as the active board. */
   setBoard(board: Board | null): void;
   /** Updates Game's gameState field. */
-  setGameState(state: import('./types').GameState): void;
+  setGameState(state: GameState): void;
   /** Switches Game to the given screen. */
   setScreen(screen: GameScreen): void;
   /** Refreshes the play UI (inventory bar, water display, undo/redo buttons). */
@@ -104,10 +101,11 @@ export class PlaybackScreen {
     const existingBoard = this._cb.getBoard();
 
     // Save current game state for restoration on exit.
+    // The move log is stored inside the board's snapshot history and will be
+    // automatically restored when the board is restored on exit.
     this._savedState = {
       board: existingBoard,
       gameState: this._cb.getGameState(),
-      moveLog: this._cb.getMoveLog(),
       screen: GameScreen.Play,
     };
 

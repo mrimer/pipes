@@ -185,30 +185,6 @@ export class Game implements InputCallbacks {
   private board: Board | null = null;
   private currentLevel: LevelDef | null = null;
 
-  /**
-   * Ordered log of encoded move strings parallel to the board history.
-   * `_moveLog[i]` is the move that produced `history[i+1]` from `history[i]`,
-   * relative to `_moveLogGraftOffset` (i.e. index 0 = the first post-restart move).
-   * The canonical sequence to record is `getMoveLog()`.
-   */
-  private _moveLog: string[] = [];
-
-  /**
-   * Move log entries from before the most recent restart that was grafted onto
-   * the current history via {@link retryLevel}.  When the player undoes all the
-   * way past the restart boundary, {@link getMoveLog} returns entries from this
-   * array instead of `_moveLog`.
-   */
-  private _preRestartMoveLog: string[] = [];
-
-  /**
-   * Board `historyIndex` at the point where a restart occurred.
-   * All board states at indices < `_moveLogGraftOffset` belong to the pre-restart
-   * session; states at indices >= `_moveLogGraftOffset` belong to the current
-   * (post-restart) session.  0 means no restart has happened.
-   */
-  private _moveLogGraftOffset = 0;
-
   /** Manages the playback screen (replaying saved move sequences). */
   private _playbackScreen!: PlaybackScreen;
 
@@ -497,7 +473,6 @@ export class Game implements InputCallbacks {
     const playbackCbs: PlaybackCallbacks = {
       getBoard: () => this.board,
       getGameState: () => this.gameState,
-      getMoveLog: () => [...this._moveLog],
       setBoard: (b) => { this.board = b; },
       setGameState: (s) => { this.gameState = s; },
       setScreen: (s) => { this.screen = s; },
@@ -601,9 +576,6 @@ export class Game implements InputCallbacks {
    */
   private _enterPlayScreenState(level: LevelDef): void {
     this.board!.initHistory();
-    this._moveLog = [];  // reset move log each time a level (re)starts
-    this._preRestartMoveLog = [];
-    this._moveLogGraftOffset = 0;
     this.gameState = GameState.Playing;
     this.selectedShape = null;
     this.pendingRotation = 0;
@@ -1084,10 +1056,7 @@ export class Game implements InputCallbacks {
       this._playGoldSfxIfNeeded(this.board, filledBefore);
 
       // Record delete move before board.recordMove() increments historyIndex.
-      this._moveLog.length = this.board.historyIndex - this._moveLogGraftOffset;
-      this._moveLog.push(encodeDeleteMove(pos.row, pos.col));
-
-      this.board.recordMove();
+      this.board.recordMove(encodeDeleteMove(pos.row, pos.col));
       const sparkle = this._metrics.sparkleCallbacks();
       this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col);
       this._animMgr.spawnLockedCostChangeAnimations(changes);
@@ -1139,18 +1108,17 @@ export class Game implements InputCallbacks {
     this._playGoldSfxIfNeeded(this.board, filledBefore);
     this._playAfterTileRotatedSfx(this.board, filledBefore);
 
-    // Record rotate move before board.recordMove() increments historyIndex.
+    // Compute the encoded move string (if we have enough info) and record the snapshot.
+    let encodedMove = '';
     if (rotationInfo) {
       const tile = this.board.getTile(rotationInfo);
       if (tile) {
         const delta = (tile.rotation - rotationInfo.oldRotation + 360) % 360;
-        const direction = delta > 180 ? 'CCW' : 'CW';
-        this._moveLog.length = this.board.historyIndex - this._moveLogGraftOffset;
-        this._moveLog.push(encodeRotateMove(rotationInfo.row, rotationInfo.col, direction));
+        encodedMove = encodeRotateMove(rotationInfo.row, rotationInfo.col, delta > 180 ? 'CCW' : 'CW');
       }
     }
+    this.board.recordMove(encodedMove);
 
-    this.board.recordMove();
     let fillDelay = 0;
     if (rotationInfo) {
       const tile = this.board.getTile(rotationInfo);
@@ -1512,13 +1480,12 @@ export class Game implements InputCallbacks {
       && posKey !== null && this.board.getFilledPositions().has(posKey);
 
     // Record the move in the log before board.recordMove() increments historyIndex.
-    // Trim the log to the current history position first to handle branch-after-undo.
     if (replacedRow !== undefined && replacedCol !== undefined) {
-      this._moveLog.length = this.board.historyIndex - this._moveLogGraftOffset;
-      this._moveLog.push(encodePlaceMove(placedShape, replacedRow, replacedCol, this.pendingRotation));
+      this.board.recordMove(encodePlaceMove(placedShape, replacedRow, replacedCol, this.pendingRotation));
+    } else {
+      this.board.recordMove();
     }
 
-    this.board.recordMove();
     const sparkle = this._metrics.sparkleCallbacks();
 
     // Spawn all animations.
@@ -1631,8 +1598,6 @@ export class Game implements InputCallbacks {
     sfxManager.stopAll();
     const prevBoard = this.board;
     const prevDecorations = prevBoard?.ambientDecorations;
-    // Capture the current move log before startLevel() resets _moveLog / _moveLogGraftOffset.
-    const preRestartMoveLog = this.getMoveLog();
     this.startLevel(this.currentLevel.id, prevDecorations, /* isUserRestart */ true);
     // Graft the pre-restart history onto the new board so Undo can revert to
     // the state the player was in before restarting.
@@ -1640,13 +1605,11 @@ export class Game implements InputCallbacks {
     // discardLastMoveFromHistory(), so it will not appear in the grafted history.
     // Guard against the edge case where startLevel() returned early (level not
     // found) and this.board was not replaced with a new Board instance.
+    // The new board's initial snapshot serves as the restart boundary marker
+    // (move === undefined), so getMoveLog() automatically returns only the
+    // moves from the current session when the board history is assembled.
     if (prevBoard && this.board && this.board !== prevBoard) {
       this.board.graftPreRestartHistory(prevBoard);
-      // After grafting, board.historyIndex points to the fresh-restart state.
-      // Record the graft offset and preserve pre-restart moves so getMoveLog()
-      // returns the correct sequence when the player undoes past the restart.
-      this._moveLogGraftOffset = this.board.historyIndex;
-      this._preRestartMoveLog = preRestartMoveLog;
       this._updateUndoRedoButtons();
     }
   }
@@ -1874,18 +1837,13 @@ export class Game implements InputCallbacks {
   /**
    * Return the current canonical move sequence for the active play session.
    *
-   * When the player has undone past a restart boundary (historyIndex is within the
-   * pre-restart portion of the grafted history), the pre-restart move log is
-   * returned instead of the post-restart log, so that auto-recording at win/loss
-   * always captures a valid, replayable sequence.
+   * Delegates to {@link Board.getMoveSequence}, which walks the snapshot
+   * history back to the most recent restart boundary (a snapshot with
+   * `move === undefined`).  Handles any number of restarts and undo-past-
+   * restart actions automatically without any extra state in Game.
    */
   getMoveLog(): string[] {
-    const historyIndex = this.board?.historyIndex ?? 0;
-    if (this._moveLogGraftOffset > 0 && historyIndex < this._moveLogGraftOffset) {
-      // Player has undone past the restart; return the matching pre-restart sequence.
-      return this._preRestartMoveLog.slice(0, historyIndex);
-    }
-    return this._moveLog.slice(0, historyIndex - this._moveLogGraftOffset);
+    return this.board?.getMoveSequence() ?? [];
   }
 
   /**

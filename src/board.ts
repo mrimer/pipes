@@ -274,6 +274,12 @@ type Snapshot = {
   inventory: InventoryItem[];
   turnState: TurnStateSnapshot;
   cementData: Map<string, number>;
+  /**
+   * The encoded move string that produced this snapshot from the previous one.
+   * `undefined` for the initial snapshot at the start of a level (or after a
+   * restart), which serves as the boundary marker for {@link getMoveSequence}.
+   */
+  move?: string;
 };
 
 /**
@@ -643,7 +649,18 @@ export class Board {
 
   /**
    * Record the current board state as the next move in the history.
-   * Call this AFTER each successful player action (place, rotate).
+   * Call this AFTER each successful player action (place, rotate, delete).
+   *
+   * @param move - The encoded move string that produced this state.  Stored
+   *   inside the snapshot so {@link getMoveSequence} can reconstruct the
+   *   sequence without any parallel data structure.
+   *
+   *   Defaults to `''` (empty string) rather than `undefined` so that callers
+   *   that do not need move tracking (e.g. tests and the replay engine) do not
+   *   accidentally create restart-boundary markers — `undefined` is reserved
+   *   exclusively for the initial snapshot created by {@link initHistory}.
+   *   Empty-string entries are silently omitted from the {@link getMoveSequence}
+   *   output.
    *
    * If the player is currently at a position earlier than the end of the history
    * (i.e. some moves were undone), the behavior is:
@@ -651,12 +668,14 @@ export class Board {
    *   the index without modifying the history (the redo chain is preserved).
    * - Otherwise, truncate all future states and append the new state.
    */
-  recordMove(): void {
+  recordMove(move = ''): void {
     if (this._historyIndex < this._history.length - 1) {
       // There are "future" (undone) states.
       // Compare the live board to the next entry WITHOUT allocating a new snapshot first.
       if (this._liveBoardMatchesSnapshot(this._history[this._historyIndex + 1])) {
         // Exact same result as the next history state – advance the pointer, preserve the redo chain.
+        // Update the stored move string so the redo entry reflects the latest action that produced it.
+        this._history[this._historyIndex + 1].move = move;
         this._historyIndex++;
         return;
       }
@@ -664,7 +683,7 @@ export class Board {
       this._history = this._history.slice(0, this._historyIndex + 1);
     }
 
-    this._history.push(this._captureSnapshot());
+    this._history.push(this._captureSnapshot(move));
     this._historyIndex++;
   }
 
@@ -706,6 +725,41 @@ export class Board {
    */
   get historyIndex(): number {
     return this._historyIndex;
+  }
+
+  /**
+   * Return the move sequence for the current play session as an array of
+   * encoded move strings.
+   *
+   * Walks backwards through the snapshot history from the current position
+   * until it reaches the most recent restart boundary (a snapshot whose
+   * `move` is `undefined`), then returns all the non-empty moves from that
+   * boundary to the current position in forward order.
+   *
+   * Snapshots with `move === undefined` mark the start of each play session
+   * (from `initHistory`).  Snapshots with `move === ''` (the default when
+   * `recordMove` is called without an argument, e.g. in tests or the replay
+   * engine) are silently ignored in the assembled sequence.
+   *
+   * This correctly handles any number of restarts and undo-past-restart actions:
+   * after `graftPreRestartHistory`, pre-restart snapshots are prepended to the
+   * history, and each restart boundary snapshot has `move = undefined`, so the
+   * scan naturally stops at the most recent session's origin.
+   */
+  getMoveSequence(): string[] {
+    let startIdx = 0;
+    for (let i = this._historyIndex; i >= 0; i--) {
+      if (this._history[i].move === undefined) {
+        startIdx = i + 1;
+        break;
+      }
+    }
+    const moves: string[] = [];
+    for (let i = startIdx; i <= this._historyIndex; i++) {
+      const m = this._history[i].move;
+      if (m) moves.push(m); // skip empty-string placeholders
+    }
+    return moves;
   }
 
   /**
@@ -765,13 +819,14 @@ export class Board {
 
   // ─── Snapshot helpers ──────────────────────────────────────────────────────
 
-  /** Capture a deep copy of the current grid and inventory. */
-  private _captureSnapshot(): Snapshot {
+  /** Capture a deep copy of the current grid and inventory, with an optional move string. */
+  private _captureSnapshot(move?: string): Snapshot {
     return {
       grid: this.grid.map((row) => row.map((tile) => tile.clone())),
       inventory: this.inventory.map((item) => ({ ...item })),
       turnState: this._turnState.captureSnapshot(),
       cementData: this._cement.captureSnapshot(),
+      move,
     };
   }
 
