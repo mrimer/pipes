@@ -48,7 +48,7 @@ import {
   FILE_TYPE_REPLAY,
   computeChecksum,
 } from './playerProfile';
-import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from './campaignEditor/types';
+import { downloadGzipJson, readGzipOrJsonFile } from './fileIO';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
 import { PlaybackScreen, PlaybackCallbacks } from './playbackScreen';
 
@@ -75,8 +75,6 @@ const SANDSTONE_SFX_THRESHOLD_HIGH = 10;
 
 /** Fallback player name used in the export filename when the stored name is empty after sanitization. */
 const EXPORT_FILENAME_FALLBACK_NAME = 'player';
-/** Delay (ms) before revoking the object URL after triggering a file download. */
-const DOWNLOAD_URL_REVOKE_DELAY_MS = 10_000;
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -1972,26 +1970,8 @@ export class Game implements InputCallbacks {
     const levelPart   = levelNumber   !== null ? `-level${levelNumber}` : `-levelid${record.levelId}`;
     const filename = `replay-${safeName}-${safeCampaign}${chapterPart}${levelPart}.pipes.json.gz`;
 
-    gzipString(json).then((compressed) => {
-      try {
-        const buf = compressed.buffer.slice(
-          compressed.byteOffset,
-          compressed.byteOffset + compressed.byteLength,
-        ) as ArrayBuffer;
-        const blob = new Blob([buf], { type: 'application/gzip' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
-      } catch (err) {
-        alert(`Export failed: ${String(err)}`);
-      }
-    }).catch((err) => {
-      alert(`Export failed (compression error): ${String(err)}`);
+    downloadGzipJson(json, filename).catch((err) => {
+      alert(`Export failed: ${err}`);
     });
   }
 
@@ -2047,12 +2027,7 @@ export class Game implements InputCallbacks {
         showReplayImportSuccessModal(campaignName, chapterNumber, levelNumber);
       };
 
-      blobToBytes(file).then((bytes) => {
-        if (isGzipBytes(bytes)) {
-          return ungzipBytes(bytes).then(processText);
-        }
-        processText(new TextDecoder().decode(bytes));
-      }).catch(() => {
+      readGzipOrJsonFile(file).then(processText).catch(() => {
         alert('Failed to read the selected file. It may be corrupted or an unsupported format.');
       });
     });
@@ -2073,26 +2048,8 @@ export class Game implements InputCallbacks {
     const playerName = loadPlayerName().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || EXPORT_FILENAME_FALLBACK_NAME;
     const filename = `pipes-player-${playerName}.pipes.json.gz`;
 
-    gzipString(json).then((compressed) => {
-      try {
-        const buf  = compressed.buffer.slice(
-          compressed.byteOffset,
-          compressed.byteOffset + compressed.byteLength,
-        ) as ArrayBuffer;
-        const blob = new Blob([buf], { type: 'application/gzip' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
-      } catch (err) {
-        alert(`Export failed: ${String(err)}`);
-      }
-    }).catch((err) => {
-      alert(`Export failed (compression error): ${String(err)}`);
+    downloadGzipJson(json, filename).catch((err) => {
+      alert(`Export failed: ${err}`);
     });
   }
 
@@ -2129,12 +2086,7 @@ export class Game implements InputCallbacks {
         showPlayerImportResultModal(applyResult.outcomes);
       };
 
-      blobToBytes(file).then((bytes) => {
-        if (isGzipBytes(bytes)) {
-          return ungzipBytes(bytes).then(processText);
-        }
-        processText(new TextDecoder().decode(bytes));
-      }).catch(() => {
+      readGzipOrJsonFile(file).then(processText).catch(() => {
         alert('Failed to read the selected file. It may be corrupted or an unsupported format.');
       });
     });

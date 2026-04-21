@@ -27,10 +27,6 @@ import { LevelMetadataPanel } from './levelMetadataPanel';
 import {
   EditorScreen,
   generateLevelId,
-  gzipString,
-  ungzipBytes,
-  blobToBytes,
-  isGzipBytes,
   getValidTileDefKeys,
   EDITOR_CANVAS_BORDER,
   EDITOR_PANEL_BASE_CSS,
@@ -50,6 +46,7 @@ import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_G
 import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
 import { commandKeyManager } from '../commandKeyManager';
+import { downloadGzipJson, readGzipOrJsonFile } from '../fileIO';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
@@ -1391,42 +1388,13 @@ export class CampaignEditor {
       return;
     }
 
-    log.append('⏳ Compressing with gzip …');
-
-    gzipString(json).then((compressed) => {
-      log.append(`✅ gzip complete (${compressed.byteLength} bytes)`);
-
-      try {
-        // Copy to a plain ArrayBuffer to satisfy strict BlobPart typing.
-        const buf = compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength) as ArrayBuffer;
-        const blob = new Blob([buf], { type: 'application/gzip' });
-        log.append(`✅ Blob created (${blob.size} bytes, type=${blob.type})`);
-
-        const url = URL.createObjectURL(blob);
-        log.append(`✅ Object URL: ${url}`);
-
-        const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        // Attach to document so Firefox triggers the download on programmatic click.
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        log.append(`✅ Anchor click fired (filename="${filename}")`);
-
-        // Defer revocation long enough for the browser to initiate the download.
-        // A 0 ms delay is too short for Chrome; use 10 s as a safe margin.
-        setTimeout(() => URL.revokeObjectURL(url), 10_000);
-
-        log.append('✅ Export complete – download should have started.');
-        log.done(true);
-      } catch (err) {
-        log.append(`❌ Post-compression step failed: ${String(err)}`);
-        log.done(false);
-      }
+    log.append('⏳ Compressing and downloading …');
+    const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
+    downloadGzipJson(json, filename).then(() => {
+      log.append('✅ Export complete – download should have started.');
+      log.done(true);
     }).catch((err) => {
-      log.append(`❌ gzip compression failed: ${String(err)}`);
+      log.append(`❌ Export failed: ${String(err)}`);
       log.done(false);
     });
   }
@@ -1513,12 +1481,7 @@ export class CampaignEditor {
         this._onPlayCampaign(result.campaign);
       };
 
-      blobToBytes(file).then((bytes) => {
-        if (isGzipBytes(bytes)) {
-          return ungzipBytes(bytes).then(processText);
-        }
-        processText(new TextDecoder().decode(bytes));
-      }).catch(() => {
+      readGzipOrJsonFile(file).then(processText).catch(() => {
         alert('Failed to read campaign file. The file may be corrupted or invalid.');
       });
     });
