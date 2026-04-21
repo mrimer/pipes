@@ -40,17 +40,9 @@ import { sfxManager, SfxId } from './sfxManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
-import {
-  buildPlayerProfilePayload,
-  buildPlayerFile,
-  parsePlayerFile,
-  applyPlayerProfile,
-  FILE_TYPE_REPLAY,
-  computeChecksum,
-} from './playerProfile';
-import { downloadGzipJson, readGzipOrJsonFile } from './fileIO';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
 import { PlaybackScreen, PlaybackCallbacks } from './playbackScreen';
+import { exportReplay, importReplay, exportPlayerProfile, importPlayerProfile } from './profileIO';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -72,9 +64,6 @@ const DIRT_SFX_THRESHOLD_HIGH = 10;
 const SANDSTONE_SFX_THRESHOLD_MID = 5;
 /** Sandstone-sfx threshold: sandstone cost above this uses Sandstone3 sfx (instead of Sandstone2). */
 const SANDSTONE_SFX_THRESHOLD_HIGH = 10;
-
-/** Fallback player name used in the export filename when the stored name is empty after sanitization. */
-const EXPORT_FILENAME_FALLBACK_NAME = 'player';
 
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
@@ -1936,43 +1925,7 @@ export class Game implements InputCallbacks {
    * The file contains campaign and level ids to support importing on other installs.
    */
   private _exportReplay(record: PlaySequenceRecord): void {
-    const campaigns = this.campaignEditor.getAllCampaigns();
-    const campaign = campaigns.find((c) => c.id === record.campaignId);
-    const campaignName = campaign?.name ?? record.campaignId;
-
-    // Determine chapter and level numbers for a human-readable filename.
-    let chapterNumber: number | null = null;
-    let levelNumber: number | null = null;
-    if (campaign) {
-      for (let ci = 0; ci < campaign.chapters.length; ci++) {
-        const li = campaign.chapters[ci].levels.findIndex((l) => l.id === record.levelId);
-        if (li >= 0) {
-          chapterNumber = ci + 1;
-          levelNumber = li + 1;
-          break;
-        }
-      }
-    }
-
-    const payload = {
-      type: FILE_TYPE_REPLAY,
-      version: 1,
-      campaignId: record.campaignId,
-      campaignName,
-      levelId: record.levelId,
-      record,
-      checksum: computeChecksum(JSON.stringify(record)),
-    };
-    const json = JSON.stringify(payload, null, 2);
-    const safeName = record.playerName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'player';
-    const safeCampaign = campaignName.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'campaign';
-    const chapterPart = chapterNumber !== null ? `-ch${chapterNumber}` : '';
-    const levelPart   = levelNumber   !== null ? `-level${levelNumber}` : `-levelid${record.levelId}`;
-    const filename = `replay-${safeName}-${safeCampaign}${chapterPart}${levelPart}.pipes.json.gz`;
-
-    downloadGzipJson(json, filename).catch((err) => {
-      alert(`Export failed: ${err}`);
-    });
+    void exportReplay(record, this.campaignEditor.getAllCampaigns());
   }
 
   /**
@@ -1980,58 +1933,9 @@ export class Game implements InputCallbacks {
    * On success shows a confirmation modal with campaign/chapter/level info.
    */
   private _importReplay(): void {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
-    input.addEventListener('change', () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      const processText = (text: string): void => {
-        let parsed: Record<string, unknown>;
-        try {
-          parsed = JSON.parse(text) as Record<string, unknown>;
-        } catch {
-          alert('Import failed: invalid JSON.');
-          return;
-        }
-        if (parsed.type !== FILE_TYPE_REPLAY || typeof parsed.record !== 'object' || parsed.record === null) {
-          alert('Import failed: not a valid replay file.');
-          return;
-        }
-        const recordJson = JSON.stringify(parsed.record);
-        if (typeof parsed.checksum === 'string' && computeChecksum(recordJson) !== parsed.checksum) {
-          alert('Import failed: replay file checksum mismatch (file may be corrupted).');
-          return;
-        }
-        const record = parsed.record as PlaySequenceRecord;
-        saveRecording(record);
-
-        // Determine chapter/level numbers for the confirmation modal.
-        const campaigns = this.campaignEditor.getAllCampaigns();
-        const campaign = campaigns.find((c) => c.id === record.campaignId);
-        const campaignName = campaign?.name ?? (parsed.campaignName as string | undefined) ?? record.campaignId;
-        let chapterNumber: number | null = null;
-        let levelNumber: number | null = null;
-        if (campaign) {
-          for (let ci = 0; ci < campaign.chapters.length; ci++) {
-            const chapter = campaign.chapters[ci];
-            const li = chapter.levels.findIndex((l) => l.id === record.levelId);
-            if (li >= 0) {
-              chapterNumber = ci + 1;
-              levelNumber = li + 1;
-              break;
-            }
-          }
-        }
-        showReplayImportSuccessModal(campaignName, chapterNumber, levelNumber);
-      };
-
-      readGzipOrJsonFile(file).then(processText).catch(() => {
-        alert('Failed to read the selected file. It may be corrupted or an unsupported format.');
-      });
+    importReplay(this.campaignEditor.getAllCampaigns(), (_record, campaignName, chapterNumber, levelNumber) => {
+      showReplayImportSuccessModal(campaignName, chapterNumber, levelNumber);
     });
-    input.click();
   }
 
   // ─── Player profile export / import ──────────────────────────────────────
@@ -2041,16 +1945,7 @@ export class Game implements InputCallbacks {
    * and trigger a file download named "pipes-player-<playerName>.pipes.json.gz".
    */
   private _exportPlayerProfile(): void {
-    const localCampaigns = this.campaignEditor.getAllCampaigns();
-    const payload  = buildPlayerProfilePayload(localCampaigns);
-    const fileObj  = buildPlayerFile(payload);
-    const json     = JSON.stringify(fileObj, null, 2);
-    const playerName = loadPlayerName().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || EXPORT_FILENAME_FALLBACK_NAME;
-    const filename = `pipes-player-${playerName}.pipes.json.gz`;
-
-    downloadGzipJson(json, filename).catch((err) => {
-      alert(`Export failed: ${err}`);
-    });
+    void exportPlayerProfile(this.campaignEditor.getAllCampaigns());
   }
 
   /**
@@ -2063,34 +1958,10 @@ export class Game implements InputCallbacks {
    * 5. Shows a result modal listing merged and ignored campaigns.
    */
   private _importPlayerProfile(): void {
-    const input  = document.createElement('input');
-    input.type   = 'file';
-    input.accept = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
-    input.addEventListener('change', () => {
-      const file = input.files?.[0];
-      if (!file) return;
-
-      const processText = (text: string): void => {
-        const result = parsePlayerFile(text);
-        if (!result.ok) {
-          alert(`Import failed: ${result.error}`);
-          return;
-        }
-
-        const localCampaigns = this.campaignEditor.getAllCampaigns();
-        const applyResult    = applyPlayerProfile(result.payload, localCampaigns);
-
-        // Reload active campaign's in-memory progress and re-render.
-        this._campaign.reloadActiveCampaignProgress();
-
-        showPlayerImportResultModal(applyResult.outcomes);
-      };
-
-      readGzipOrJsonFile(file).then(processText).catch(() => {
-        alert('Failed to read the selected file. It may be corrupted or an unsupported format.');
-      });
+    importPlayerProfile(this.campaignEditor.getAllCampaigns(), (outcomes) => {
+      this._campaign.reloadActiveCampaignProgress();
+      showPlayerImportResultModal(outcomes);
     });
-    input.click();
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────

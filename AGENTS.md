@@ -29,6 +29,8 @@ cd /home/runner/work/pipes/pipes
 npm install
 ```
 
+- Use absolute paths for all repository file tool calls (root: `/home/runner/work/pipes/pipes`).
+
 ### Available commands
 
 | Task | Command |
