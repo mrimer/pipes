@@ -1933,7 +1933,8 @@ export class Game implements InputCallbacks {
    * On success shows a confirmation modal with campaign/chapter/level info.
    */
   private _importReplay(): void {
-    importReplay(this.campaignEditor.getAllCampaigns(), (_record, campaignName, chapterNumber, levelNumber) => {
+    importReplay(this.campaignEditor.getAllCampaigns(), (...args) => {
+      const [, campaignName, chapterNumber, levelNumber] = args;
       showReplayImportSuccessModal(campaignName, chapterNumber, levelNumber);
     });
   }
