@@ -15,7 +15,7 @@
  */
 
 import { Board } from './board';
-import { LevelDef, GameScreen, PlaySequenceRecord, AmbientDecoration } from './types';
+import { LevelDef, GameScreen, GameState, PlaySequenceRecord, AmbientDecoration } from './types';
 import { replayMoves } from './moveRecorder';
 import { saveRecording } from './persistence';
 import { showTimedMessage } from './uiHelpers';
@@ -32,7 +32,7 @@ const CORRUPT_FLASH_MS = 3000;
 /** Saved game state captured before entering playback, restored on exit. */
 interface SavedGameState {
   board: Board | null;
-  gameState: import('./types').GameState;
+  gameState: GameState;
   moveLog: string[];
   screen: GameScreen;
 }
