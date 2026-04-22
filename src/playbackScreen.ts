@@ -60,6 +60,8 @@ export interface PlaybackCallbacks {
   hudEl: HTMLElement;
   /** Element used to show brief flash messages. */
   errorFlashEl: HTMLElement;
+  /** Element showing the campaign name / chapter / level header text. */
+  levelHeaderEl: HTMLElement;
 }
 
 /** CSS shared between all transport icon buttons. */
@@ -82,6 +84,9 @@ export class PlaybackScreen {
   private _playing = false;
   private _timer: ReturnType<typeof setTimeout> | null = null;
   private _corrupted = false;
+
+  /** Original text of the level-header line2 element, saved so it can be restored on exit. */
+  private _savedHeaderLine2Text: string | null = null;
 
   // HUD overlay elements
   private _hudOverlayEl: HTMLElement | null = null;
@@ -127,6 +132,7 @@ export class PlaybackScreen {
     // Switch to playback screen.
     this._cb.setScreen(GameScreen.Playback);
     this._buildHudOverlay();
+    this._appendReplayToHeader();
     this._cb.refreshUI();
     this._cb.canvas.focus();
   }
@@ -143,6 +149,7 @@ export class PlaybackScreen {
     }
 
     this._removeHudOverlay();
+    this._restoreHeaderLine2();
     this._cb.refreshUI();
     this._cb.canvas.focus();
 
@@ -288,6 +295,25 @@ export class PlaybackScreen {
   }
 
   // ─── HUD overlay ──────────────────────────────────────────────────────────
+
+  /** Append " (Replay)" to the level-header line2 text and save the original. */
+  private _appendReplayToHeader(): void {
+    const line2 = this._cb.levelHeaderEl.lastElementChild as HTMLElement | null;
+    if (line2) {
+      this._savedHeaderLine2Text = line2.textContent ?? '';
+      line2.textContent = `${this._savedHeaderLine2Text} (Replay)`;
+    }
+  }
+
+  /** Restore the level-header line2 text saved by {@link _appendReplayToHeader}. */
+  private _restoreHeaderLine2(): void {
+    if (this._savedHeaderLine2Text === null) return;
+    const line2 = this._cb.levelHeaderEl.lastElementChild as HTMLElement | null;
+    if (line2) {
+      line2.textContent = this._savedHeaderLine2Text;
+    }
+    this._savedHeaderLine2Text = null;
+  }
 
   /**
    * Build the playback transport control bar and inject it into the HUD.

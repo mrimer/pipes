@@ -467,6 +467,7 @@ export class Game implements InputCallbacks {
       canvas: this.canvas,
       hudEl: document.getElementById('hud') as HTMLElement,
       errorFlashEl: this.errorFlashEl,
+      levelHeaderEl: this.levelHeaderEl,
     };
     this._playbackScreen = new PlaybackScreen(playbackCbs);
   }

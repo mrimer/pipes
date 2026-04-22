@@ -662,11 +662,13 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
     '#7ed321',
     merged.map((o) => o.campaignName),
   );
-  addSection(
-    '⚠️ Campaigns not found locally (skipped)',
-    '#f0c040',
-    ignored.map((o) => o.campaignId),
-  );
+  if (ignored.length > 0) {
+    addSection(
+      '⚠️ Campaigns not found locally (skipped)',
+      '#f0c040',
+      ignored.map((o) => o.campaignName),
+    );
+  }
 
   const note = document.createElement('p');
   note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';

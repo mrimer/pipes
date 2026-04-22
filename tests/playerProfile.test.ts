@@ -299,6 +299,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_ghost',
+          campaignName: 'cmp_ghost',
           completedLevels: [101], completedChapters: [1], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: {}, levelWater: {},
@@ -321,6 +322,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_merge',
+          campaignName: 'cmp_merge',
           completedLevels: [102], completedChapters: [], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: {}, levelWater: {},
@@ -344,6 +346,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_ch',
+          campaignName: 'cmp_ch',
           completedLevels: [], completedChapters: [2], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: {}, levelWater: {},
@@ -366,6 +369,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_stars',
+          campaignName: 'cmp_stars',
           completedLevels: [], completedChapters: [], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: { '101': 3, '102': 1 },
@@ -387,6 +391,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_nodown',
+          campaignName: 'cmp_nodown',
           completedLevels: [], completedChapters: [], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: { '101': 1 },
@@ -405,6 +410,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_ms',
+          campaignName: 'cmp_ms',
           completedLevels: [], completedChapters: [], masteredChaptersShown: [1],
           campaignMasteredShown: true, campaignCompleteShown: true,
           levelStars: {}, levelWater: {},
@@ -427,6 +433,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_stale_import',
+          campaignName: 'cmp_stale_import',
           completedLevels: [101, 999],
           completedChapters: [],
           masteredChaptersShown: [],
@@ -460,6 +467,7 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_stale_ch_import',
+          campaignName: 'cmp_stale_ch_import',
           completedLevels: [],
           completedChapters: [1, 99],
           masteredChaptersShown: [1, 99],
@@ -486,12 +494,14 @@ describe('applyPlayerProfile – campaign progress', () => {
       campaignProgress: [
         {
           campaignId: 'cmp_local',
+          campaignName: 'Local Campaign',
           completedLevels: [], completedChapters: [], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: {}, levelWater: {},
         },
         {
           campaignId: 'cmp_missing',
+          campaignName: 'Missing Campaign',
           completedLevels: [], completedChapters: [], masteredChaptersShown: [],
           campaignMasteredShown: false, campaignCompleteShown: false,
           levelStars: {}, levelWater: {},
@@ -506,5 +516,6 @@ describe('applyPlayerProfile – campaign progress', () => {
     expect((merged[0] as { campaignName: string }).campaignName).toBe('Local Campaign');
     expect(ignored).toHaveLength(1);
     expect(ignored[0].campaignId).toBe('cmp_missing');
+    expect((ignored[0] as { campaignName: string }).campaignName).toBe('Missing Campaign');
   });
 });
