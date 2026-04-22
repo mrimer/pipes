@@ -72,6 +72,7 @@ export function computeChecksum(data: string): string {
 /** Progress snapshot for a single campaign. */
 export interface CampaignProgressBlock {
   campaignId: string;
+  campaignName: string;
   completedLevels: number[];
   completedChapters: number[];
   masteredChaptersShown: number[];
@@ -149,6 +150,7 @@ export function buildPlayerProfilePayload(
     const chapterIds = validChapterIds(c);
     return {
       campaignId:            c.id,
+      campaignName:          c.name,
       completedLevels:       [...loadCampaignProgress(c.id)].filter((id) => levelIds.has(id)),
       completedChapters:     [...loadCompletedChapters(c.id)].filter((id) => chapterIds.has(id)),
       masteredChaptersShown: [...loadMasteredChaptersShown(c.id)].filter((id) => chapterIds.has(id)),
@@ -263,7 +265,7 @@ export function parsePlayerFile(json: string): PlayerFileResult {
 /** Outcome of importing a single campaign's progress block. */
 export type CampaignImportOutcome =
   | { status: 'merged';  campaignName: string; campaignId: string }
-  | { status: 'ignored'; campaignId: string;   reason: 'not_found_locally' };
+  | { status: 'ignored'; campaignId: string; campaignName: string; reason: 'not_found_locally' };
 
 /** Result returned from {@link applyPlayerProfile}. */
 export interface ApplyProfileResult {
@@ -303,7 +305,7 @@ export function applyPlayerProfile(
   for (const block of payload.campaignProgress) {
     const local = localById.get(block.campaignId);
     if (!local) {
-      outcomes.push({ status: 'ignored', campaignId: block.campaignId, reason: 'not_found_locally' });
+      outcomes.push({ status: 'ignored', campaignId: block.campaignId, campaignName: block.campaignName ?? block.campaignId, reason: 'not_found_locally' });
       continue;
     }
 

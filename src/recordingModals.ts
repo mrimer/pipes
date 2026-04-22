@@ -135,6 +135,55 @@ export function buildRecordModal(
   return el;
 }
 
+/**
+ * Show a confirmation dialog before deleting a recording.
+ * Calls `onConfirm` only if the player clicks "Delete".
+ */
+function _showConfirmDeleteDialog(record: PlaySequenceRecord, onConfirm: () => void): void {
+  const el = createModalOverlay(0.7);
+
+  const box = document.createElement('div');
+  box.className = 'modal-box';
+  box.style.minWidth = '280px';
+  box.style.maxWidth = '420px';
+
+  const title = document.createElement('h2');
+  title.textContent = '🗑️ Delete Recording?';
+  box.appendChild(title);
+
+  const msg = document.createElement('p');
+  msg.style.cssText = 'font-size:0.9rem;color:#ddd;margin:0;';
+  msg.textContent = `Delete this recording by ${record.playerName}? This cannot be undone.`;
+  box.appendChild(msg);
+
+  const actionsEl = document.createElement('div');
+  actionsEl.className = 'modal-actions';
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = 'Delete';
+  confirmBtn.className = 'modal-btn secondary';
+  confirmBtn.type = 'button';
+  confirmBtn.style.cssText += 'color:#f66;border-color:#a33;';
+  confirmBtn.addEventListener('click', () => {
+    el.remove();
+    onConfirm();
+  });
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.className = 'modal-btn primary';
+  cancelBtn.type = 'button';
+  cancelBtn.addEventListener('click', () => { el.remove(); });
+
+  actionsEl.appendChild(confirmBtn);
+  actionsEl.appendChild(cancelBtn);
+  box.appendChild(actionsEl);
+
+  el.appendChild(box);
+  document.body.appendChild(el);
+  el.style.display = 'flex';
+}
+
 // ─── Playback list modal ──────────────────────────────────────────────────────
 
 /**
@@ -302,8 +351,11 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
 
   deleteBtn.addEventListener('click', () => {
     if (!selectedRecord) return;
-    callbacks.onDelete(selectedRecord);
-    renderList();
+    const rec = selectedRecord;
+    _showConfirmDeleteDialog(rec, () => {
+      callbacks.onDelete(rec);
+      renderList();
+    });
   });
 
   exportBtn.addEventListener('click', () => {
