@@ -22,6 +22,7 @@ import {
   SANDSTONE_HARD_COLOR, SANDSTONE_HARD_WATER_COLOR,
   SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
   STAR_COLOR,
+  REGULATOR_COLOR, REGULATOR_WATER_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
   GEL_COLOR, GEL_WATER_COLOR,
   SIPHON_COLOR, SIPHON_WATER_COLOR,
@@ -508,6 +509,34 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   }
 }
 
+/**
+ * Return a brief human-readable label for the stat check on a Regulator tile.
+ * Format examples: ">10💧" (water), "<5°" (temperature), "=2P" (pressure), ">3❄" (frozen).
+ * Exported so the tooltip manager and rules modal can reuse this without duplicating logic.
+ */
+export function regulatorCheckText(tile: Tile): string {
+  const op   = tile.regulatorOperator ?? '>';
+  const cost = tile.cost;
+  const stat = tile.regulatorStat ?? 'water';
+  const symbol =
+    stat === 'water'       ? '\u{1F4A7}' : // 💧
+    stat === 'temperature' ? '\u00B0'     : // °
+    stat === 'pressure'    ? 'P'          :
+    /* frozen */             '\u2744';      // ❄
+  return `${op}${cost}${symbol}`;
+}
+
+function _drawChamberRegulatorContent(ctx: CanvasRenderingContext2D, tile: Tile, isWater: boolean): void {
+  const color = isWater ? REGULATOR_WATER_COLOR : REGULATOR_COLOR;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // Choose font size based on text length so it fits within the chamber box.
+  const text = regulatorCheckText(tile);
+  ctx.font = `bold ${text.length <= 4 ? _s(14) : _s(11)}px Arial`;
+  ctx.fillText(text, 0, 0);
+}
+
 function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
   // Draw wave line near the bottom of the box to represent viscous gel content.
   const gelDecorColor = isWater ? GEL_WATER_COLOR : GEL_COLOR;
@@ -915,6 +944,8 @@ export function drawChamber(
     _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
   } else if (chamberContent === 'star') {
     _drawChamberStarContent(ctx, isWater, half);
+  } else if (chamberContent === 'regulator') {
+    _drawChamberRegulatorContent(ctx, tile, isWater);
   } else if (chamberContent === 'gel') {
     _drawChamberGelContent(ctx, bw, bh, isWater);
   } else if (chamberContent === 'siphon') {

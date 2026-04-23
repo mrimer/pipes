@@ -1,4 +1,4 @@
-import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
+import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, ERR_REGULATOR_CHECK_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
 import { Tile } from './tile';
 import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
 import { InputCallbacks, InputHandler } from './inputHandler';
@@ -1399,6 +1399,8 @@ export class Game implements InputCallbacks {
       sfxManager.play(SfxId.Locked);
     } else if (result.error.startsWith(ERR_SANDSTONE_TOO_HARD_PREFIX)) {
       sfxManager.play(SfxId.SandstoneHard);
+    } else if (result.error.startsWith(ERR_REGULATOR_CHECK_PREFIX)) {
+      sfxManager.play(SfxId.BadConnection);
     } else if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       sfxManager.play(SfxId.BadConnection);
     }

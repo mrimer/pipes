@@ -274,6 +274,13 @@ const ERR_CONTAINER_ROTATE =
 export const ERR_VALVE =
   'First connect this tile to the source by its valve';
 
+/**
+ * Prefix of the error message emitted when a Regulator tile's stat check
+ * fails at connection time.  Exported so callers can identify this specific
+ * error type without fragile full-string comparisons.
+ */
+export const ERR_REGULATOR_CHECK_PREFIX = 'Regulator check failed: ';
+
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
   grid: Tile[][];
@@ -606,7 +613,7 @@ export class Board {
           // Spinnable pipes are not fixed so the player can rotate them, but they
           // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
           const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
-          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0, firstConns);
+          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0, firstConns, def.regulatorStat ?? null, def.regulatorOperator ?? null);
           // Spin-cement tiles also track cement drying time.
           if (SPIN_CEMENT_SHAPES.has(def.shape)) {
             this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
@@ -985,6 +992,14 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
+    // Regulator checks run first (using pre-placement stats) before any other
+    // tiles in this turn can change the stats.
+    const { error: regError, positions: regPositions } = this._checkRegulators(filledBefore, filled);
+    if (regError) {
+      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
+      this._unspendInventory(shape);
+      return { success: false, error: regError, errorTilePositions: regPositions ?? undefined };
+    }
     const { error, positions } = this._validateConstraints(filled);
     if (error) {
       // Roll back placement.
@@ -1152,6 +1167,13 @@ export class Board {
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
+    // Regulator checks run first (using pre-replacement stats).
+    const { error: regError2, positions: regPositions2 } = this._checkRegulators(filledBeforeReplace, finalFilled);
+    if (regError2) {
+      this.inventory = savedInventory;
+      this.grid[pos.row][pos.col] = tile; // revert to old tile
+      return { success: false, error: regError2, errorTilePositions: regPositions2 ?? undefined };
+    }
     const { error: constraintError, positions: constraintPositions } =
       this._validateConstraints(finalFilled);
     if (constraintError) {
@@ -1446,6 +1468,66 @@ export class Board {
   }
 
   /**
+   * Check all Regulator tiles that are **newly** connected in `newFilled`
+   * (i.e. present in `newFilled` but not yet in the locked-impact map).
+   *
+   * The stat values are read from the board state that existed *before* the
+   * current move so that other tiles connecting in the same turn cannot
+   * satisfy a Regulator check they themselves cause.
+   *
+   * All failing regulators are checked in grid-scan order; the first failure
+   * is returned immediately.
+   *
+   * @param preFilled - Fill set before the current board mutation.
+   * @param newFilled - Fill set after the current board mutation.
+   */
+  private _checkRegulators(
+    preFilled: Set<string>,
+    newFilled: Set<string>,
+  ): { error: string | null; positions: GridPos[] | null } {
+    const preWater       = this.getCurrentWater();
+    const preTemperature = this.getCurrentTemperature(preFilled);
+    const prePressure    = this.getCurrentPressure(preFilled);
+    const preFrozen      = this._turnState.frozen;
+
+    for (const key of newFilled) {
+      // Only newly-connecting tiles (not yet in the locked map).
+      if (this._turnState.lockedWaterImpact.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (!tile || tile.shape !== PipeShape.Chamber || tile.chamberContent !== 'regulator') continue;
+
+      const stat = tile.regulatorStat ?? 'water';
+      const op   = tile.regulatorOperator ?? '>';
+      const threshold = tile.cost;
+
+      let statValue: number;
+      switch (stat) {
+        case 'water':       statValue = preWater;       break;
+        case 'frozen':      statValue = preFrozen;      break;
+        case 'temperature': statValue = preTemperature; break;
+        case 'pressure':    statValue = prePressure;    break;
+      }
+
+      let passes: boolean;
+      switch (op) {
+        case '<': passes = statValue <  threshold; break;
+        case '>': passes = statValue >  threshold; break;
+        case '=': passes = statValue === threshold; break;
+      }
+
+      if (!passes) {
+        const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
+        return {
+          error: `${ERR_REGULATOR_CHECK_PREFIX}${statLabel} ${op} ${threshold}`,
+          positions: [{ row: r, col: c }],
+        };
+      }
+    }
+    return { error: null, positions: null };
+  }
+
+  /**
    * Returns `true` when the tile at the given position can be reclaimed or
    * replaced by the player.  A tile passes this check when it is non-fixed,
    * non-empty, and is not a Source, Sink, Chamber, obstacle, or spinner pipe.
@@ -1720,6 +1802,14 @@ export class Board {
 
     // Validate the final state.
     const filled = this.getFilledPositions();
+    // Regulator checks run first (using pre-rotation stats).
+    const { error: regError3, positions: regPositions3 } = this._checkRegulators(filledBefore, filled);
+    if (regError3) {
+      for (let i = 0; i < 4 - normalizedSteps; i++) {
+        tile.rotate();
+      }
+      return { success: false, error: regError3, errorTilePositions: regPositions3 ?? undefined };
+    }
     const { error: constraintError, positions: constraintPositions } = this._validateConstraints(filled);
     if (constraintError) {
       // Revert by rotating the remaining steps to complete a full 360°.

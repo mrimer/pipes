@@ -16,6 +16,7 @@ import {
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
   STAR_COLOR, HOT_PLATE_COLOR,
+  REGULATOR_COLOR,
   GEL_COLOR, SIPHON_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_RUST_COLOR,
@@ -287,6 +288,11 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: chamberSwatch(HOT_PLATE_COLOR, 'HP'),
     name: 'Hot Plate',
     description: 'Consumes water based on mass and temperature. Effective cost = mass × (boiling temp° − current temp°). First drains frozen water (restoring it to liquid); remaining cost draws from regular water. Boiling temp is displayed as temp°.',
+  },
+  {
+    iconHtml: chamberSwatch(REGULATOR_COLOR, '>N\u2026'),
+    name: 'Regulator',
+    description: 'Blocks tile connection unless the specified stat check passes. The check compares the player\'s stat (Water, Frozen, Temperature, or Pressure) to a threshold value using <, >, or =. Checked before any other tiles resolve on the same turn. If the check fails, the move is rejected.',
   },
   {
     iconHtml: chamberSwatch(STAR_COLOR, '★'),

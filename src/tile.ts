@@ -1,4 +1,4 @@
-import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent, TileDef } from './types';
+import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent, TileDef, RegulatorStat, RegulatorOperator } from './types';
 import { bfs } from './bfs';
 
 /** Base connections for each pipe shape (at 0° rotation). */
@@ -151,6 +151,20 @@ export class Tile {
   shatter: number;
 
   /**
+   * Stat checked by a Chamber-regulator tile at connection time.
+   * One of: 'water', 'frozen', 'temperature', 'pressure'.
+   * Null for all non-regulator tiles.
+   */
+  regulatorStat: RegulatorStat | null;
+
+  /**
+   * Comparison operator for a Chamber-regulator tile.
+   * The check is: playerStat OP cost.  One of: '<', '>', '='.
+   * Null for all non-regulator tiles.
+   */
+  regulatorOperator: RegulatorOperator | null;
+
+  /**
    * @param shape - The pipe shape of this tile.
    * @param rotation - Initial rotation in degrees.
    * @param isFixed - If true the tile cannot be rotated by the player.
@@ -165,8 +179,10 @@ export class Tile {
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
    * @param shatter - Shatter value for Sandstone tiles. When > Hardness and Pressure >= Shatter, effective cost is 0. Defaults to 0.
    * @param firstConnections - Valve directions: BFS only counts this chamber as source-connected when it is entered from one of these directions. Null means no valve.
+   * @param regulatorStat - Stat to check for Regulator tiles at connection time. Null for all other tiles.
+   * @param regulatorOperator - Comparison operator for Regulator tiles. Null for all other tiles.
    */
-  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0, shatter = 0, firstConnections: Set<Direction> | null = null) {
+  constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0, shatter = 0, firstConnections: Set<Direction> | null = null, regulatorStat: RegulatorStat | null = null, regulatorOperator: RegulatorOperator | null = null) {
     this.shape = shape;
     this.rotation = rotation;
     this.isFixed = isFixed;
@@ -181,6 +197,8 @@ export class Tile {
     this.hardness = hardness;
     this.shatter = shatter;
     this.firstConnections = firstConnections;
+    this.regulatorStat = regulatorStat;
+    this.regulatorOperator = regulatorOperator;
   }
 
   /** Return a deep copy of this tile. */
@@ -200,6 +218,8 @@ export class Tile {
       this.hardness,
       this.shatter,
       this.firstConnections !== null ? new Set(this.firstConnections) : null,
+      this.regulatorStat,
+      this.regulatorOperator,
     );
   }
 
