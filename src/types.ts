@@ -93,7 +93,19 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level' | 'chapter' | 'gel' | 'siphon';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level' | 'chapter' | 'gel' | 'siphon' | 'regulator';
+
+/**
+ * Player stat that a Regulator chamber can test.
+ * The check is applied once at connection time; if it fails the move is rolled back.
+ */
+export type RegulatorStat = 'water' | 'frozen' | 'temperature' | 'pressure';
+
+/**
+ * Comparison operator used by a Regulator chamber.
+ * The stat is compared against the tile's `cost` threshold: stat OP cost.
+ */
+export type RegulatorOperator = '<' | '>' | '=';
 
 /**
  * Chamber content types that multiply the water total when connected.
@@ -251,6 +263,16 @@ export interface TileDef {
    * Defaults to 0 (always satisfiable once the sink is connected).
    */
   completion?: number;
+  /**
+   * Stat checked by a Chamber-regulator tile at connection time.
+   * One of: 'water', 'frozen', 'temperature', 'pressure'.
+   */
+  regulatorStat?: RegulatorStat;
+  /**
+   * Comparison operator used by a Chamber-regulator tile.
+   * The check is: playerStat OP cost.  One of: '<', '>', '='.
+   */
+  regulatorOperator?: RegulatorOperator;
 }
 
 /**

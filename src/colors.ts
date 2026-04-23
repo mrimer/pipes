@@ -227,6 +227,10 @@ export const SANDSTONE_SHATTER_WATER_COLOR = '#f0d8b0';
 export const STAR_COLOR       = '#f0c040';
 /** Star chamber tile color when water is flowing through it. */
 export const STAR_WATER_COLOR = '#ffe880';
+/** Regulator chamber tile color (medium green-gray). */
+export const REGULATOR_COLOR       = '#4a7a6a';
+/** Regulator chamber tile color when water is flowing through it (more saturated green). */
+export const REGULATOR_WATER_COLOR = '#5da87a';
 /** Gel chamber tile color (dark navy blue). */
 export const GEL_COLOR        = '#1a3a7a';
 /** Gel chamber tile color when water is flowing through it (slightly lighter dark blue). */

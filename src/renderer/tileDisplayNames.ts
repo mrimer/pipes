@@ -5,7 +5,6 @@
 
 import { Tile } from '../tile';
 import { PipeShape } from '../types';
-
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
   [PipeShape.Straight]:     'St',
@@ -139,6 +138,12 @@ export function getTileDisplayName(tile: Tile): string {
         }
         case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
         case 'star':   return 'Star';
+        case 'regulator': {
+          const stat = tile.regulatorStat ?? 'water';
+          const op   = tile.regulatorOperator ?? '>';
+          const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
+          return `Regulator: ${statLabel} ${op} ${tile.cost}`;
+        }
         case 'gel':    return 'Gel \u00D7\u00BD';
         case 'siphon': return 'Siphon \u00D72';
         default:       return 'Chamber';

@@ -7,7 +7,7 @@
  * the level editor when visual updates are needed.
  */
 
-import { PipeShape, TEMP_CHAMBER_CONTENTS, LevelStyle, Direction } from '../types';
+import { PipeShape, TEMP_CHAMBER_CONTENTS, LevelStyle, Direction, RegulatorStat, RegulatorOperator } from '../types';
 import { PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import {
   EditorPalette,
@@ -113,6 +113,7 @@ const CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> =
   { palette: 'chamber:snow',      label: '❄ Snow' },
   { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
   { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
+  { palette: 'chamber:regulator', label: '🔒 Regulator' },
   { palette: 'chamber:star',      label: '⭐ Star' },
   { palette: 'chamber:gel',       label: '½ Gel' },
   { palette: 'chamber:siphon',    label: '×2 Siphon' },
@@ -593,6 +594,17 @@ export class TileParamsPanel {
         this._cb.renderCanvas();
       }, 'number', '90px'));
     }
+    if (cc === 'regulator') {
+      parent.appendChild(this._buildRegulatorStatSelector());
+      parent.appendChild(this._buildRegulatorOperatorSelector());
+      parent.appendChild(this.labeledInput('Threshold', String(state.params.cost), (v) => {
+        const parsed = parseInt(v) || 0;
+        state.params.cost = parsed;
+        state.applyParamsToLinkedTile();
+        this._cb.updateUndoRedoButtons();
+        this._cb.renderCanvas();
+      }, 'number', '90px'));
+    }
   }
 
   /**
@@ -628,6 +640,79 @@ export class TileParamsPanel {
     itemSelWrap.appendChild(itemLbl);
     itemSelWrap.appendChild(itemSel);
     return itemSelWrap;
+  }
+
+  /**
+   * Build a `<select>` widget for the Regulator stat field.
+   * Extracted to keep {@link _buildChamberContentParams} focused.
+   */
+  private _buildRegulatorStatSelector(): HTMLElement {
+    const state = this._cb.getState();
+    const sel = document.createElement('select');
+    sel.style.cssText =
+      'padding:5px 8px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
+    const options: Array<{ value: RegulatorStat; label: string }> = [
+      { value: 'water',       label: 'Water' },
+      { value: 'frozen',      label: 'Frozen' },
+      { value: 'temperature', label: 'Temperature' },
+      { value: 'pressure',    label: 'Pressure' },
+    ];
+    for (const { value, label } of options) {
+      const o = document.createElement('option');
+      o.value = value;
+      o.textContent = label;
+      if (state.params.regulatorStat === value) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => {
+      state.params.regulatorStat = sel.value as RegulatorStat;
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    });
+    const wrap = document.createElement('div');
+    wrap.style.cssText = EDITOR_FLEX_ROW_CSS;
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
+    lbl.textContent = 'Stat:';
+    wrap.appendChild(lbl);
+    wrap.appendChild(sel);
+    return wrap;
+  }
+
+  /**
+   * Build a `<select>` widget for the Regulator operator field.
+   * Extracted to keep {@link _buildChamberContentParams} focused.
+   */
+  private _buildRegulatorOperatorSelector(): HTMLElement {
+    const state = this._cb.getState();
+    const sel = document.createElement('select');
+    sel.style.cssText =
+      'padding:5px 8px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
+      `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
+    const ops: RegulatorOperator[] = ['<', '>', '='];
+    for (const op of ops) {
+      const o = document.createElement('option');
+      o.value = op;
+      o.textContent = op;
+      if (state.params.regulatorOperator === op) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', () => {
+      state.params.regulatorOperator = sel.value as RegulatorOperator;
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    });
+    const wrap = document.createElement('div');
+    wrap.style.cssText = EDITOR_FLEX_ROW_CSS;
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
+    lbl.textContent = 'Operator:';
+    wrap.appendChild(lbl);
+    wrap.appendChild(sel);
+    return wrap;
   }
 
   /**

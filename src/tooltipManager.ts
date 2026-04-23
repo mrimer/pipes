@@ -199,7 +199,13 @@ export class TooltipManager {
     if (tile.isFixed && PIPE_SHAPES.has(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
       tooltipText += ' (fixed)';
     }
-    if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
+    if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'regulator') {
+      // Regulator: always show the check parameters regardless of connected state.
+      const stat = tile.regulatorStat ?? 'water';
+      const op   = tile.regulatorOperator ?? '>';
+      const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
+      tooltipText += `\nRegulator: ${statLabel} ${op} ${tile.cost}`;
+    } else if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
       // for ice/snow/sandstone/hot_plate show the locked-in effective cost value.

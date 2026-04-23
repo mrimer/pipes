@@ -404,6 +404,7 @@ export class LevelEditorState {
       if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; if (p.shatter !== 0) def.shatter = p.shatter; }
       if (cc === 'hot_plate') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
+      if (cc === 'regulator') { def.cost = p.cost; def.regulatorStat = p.regulatorStat; def.regulatorOperator = p.regulatorOperator; }
     }
 
     return def;
@@ -444,6 +445,8 @@ export class LevelEditorState {
     if (def.chamberContent !== undefined) this.params.chamberContent = def.chamberContent;
     if (def.itemShape !== undefined) this.params.itemShape = def.itemShape;
     if (def.itemCount !== undefined) this.params.itemCount = def.itemCount;
+    if (def.regulatorStat !== undefined) this.params.regulatorStat = def.regulatorStat;
+    if (def.regulatorOperator !== undefined) this.params.regulatorOperator = def.regulatorOperator;
     if (def.connections) {
       this.params.connections = {
         N: def.connections.includes(Direction.North),

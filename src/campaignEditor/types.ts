@@ -3,9 +3,9 @@
  * Campaign Editor. Kept separate to reduce the size of campaignEditor.ts.
  */
 
-import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction, LevelStyle } from '../types';
+import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction, LevelStyle, RegulatorStat, RegulatorOperator } from '../types';
 import { PIPE_SHAPES } from '../board';
-import { DIRT_COLOR, ICE_COLOR } from '../colors';
+import { DIRT_COLOR, ICE_COLOR, REGULATOR_COLOR } from '../colors';
 import { UI_BG, UI_BORDER, UI_INPUT_BORDER } from '../uiConstants';
 import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 
@@ -71,6 +71,7 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
     if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
     if (cc === 'level') valid.add('levelIdx');
     if (cc === 'chapter') valid.add('chapterIdx');
+    if (cc === 'regulator') { valid.add('cost'); valid.add('regulatorStat'); valid.add('regulatorOperator'); }
   } else if (shape === PipeShape.Cement) {
     valid.add('dryingTime');
   } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
@@ -198,6 +199,10 @@ export interface TileParams {
   dryingTime: number;
   /** Completion threshold for Sink tiles on chapter maps (≥ 0). */
   completion: number;
+  /** Stat checked by a Chamber-regulator tile at connection time. */
+  regulatorStat: RegulatorStat;
+  /** Comparison operator used by a Chamber-regulator tile (stat OP cost). */
+  regulatorOperator: RegulatorOperator;
 }
 
 export const DEFAULT_PARAMS: TileParams = {
@@ -215,6 +220,8 @@ export const DEFAULT_PARAMS: TileParams = {
   firstConnections: { N: false, E: false, S: false, W: false },
   dryingTime: 0,
   completion: 0,
+  regulatorStat: 'water',
+  regulatorOperator: '>',
 };
 
 // ─── Shared tile-def builder ──────────────────────────────────────────────────
@@ -319,6 +326,7 @@ export function chamberColor(content: string): string {
     case 'sandstone': return '#c2a26e';
     case 'star':      return '#f0c040';
     case 'hot_plate': return '#e44';
+    case 'regulator': return REGULATOR_COLOR;
     case 'level':    return '#2a3a5e';
     case 'chapter':  return '#5a2a5e';
     default:         return '#b2bec3';
