@@ -509,7 +509,7 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
 }
 
 function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
-  // Draw water line near the bottom of the box (half-filled visual).
+  // Draw wave line near the bottom of the box to represent viscous gel content.
   const gelDecorColor = isWater ? GEL_WATER_COLOR : GEL_COLOR;
   ctx.strokeStyle = gelDecorColor;
   ctx.lineWidth = _s(1.5);
@@ -558,7 +558,7 @@ function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: n
 }
 
 function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
-  // Draw water line near the top (like tank) with fast wave animation when connected.
+  // Draw wave line near the top of the box to represent the upward-drawing siphon effect.
   const siphonDecorColor = isWater ? SIPHON_WATER_COLOR : SIPHON_COLOR;
   ctx.strokeStyle = siphonDecorColor;
   ctx.lineWidth = _s(1.5);
