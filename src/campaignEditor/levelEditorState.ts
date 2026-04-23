@@ -378,6 +378,16 @@ export class LevelEditorState {
       def.connections = connDirs;
     }
 
+    // firstConnections: only for Chamber tiles
+    if (effectiveShape === PipeShape.Chamber) {
+      const firstDirs: Direction[] = [];
+      if (p.firstConnections.N) firstDirs.push(Direction.North);
+      if (p.firstConnections.E) firstDirs.push(Direction.East);
+      if (p.firstConnections.S) firstDirs.push(Direction.South);
+      if (p.firstConnections.W) firstDirs.push(Direction.West);
+      if (firstDirs.length > 0) def.firstConnections = firstDirs;
+    }
+
     if (effectiveShape === PipeShape.Source) {
       def.capacity = p.capacity;
       if (p.temperature !== 0) def.temperature = p.temperature;
@@ -444,6 +454,16 @@ export class LevelEditorState {
     } else {
       this.params.connections = { N: true, E: true, S: true, W: true };
     }
+    if (def.firstConnections && def.firstConnections.length > 0) {
+      this.params.firstConnections = {
+        N: def.firstConnections.includes(Direction.North),
+        E: def.firstConnections.includes(Direction.East),
+        S: def.firstConnections.includes(Direction.South),
+        W: def.firstConnections.includes(Direction.West),
+      };
+    } else {
+      this.params.firstConnections = { N: false, E: false, S: false, W: false };
+    }
   }
 
   /**
@@ -467,6 +487,14 @@ export class LevelEditorState {
         this.params.connections = { N: c.W, E: c.N, S: c.E, W: c.S };
       } else {
         this.params.connections = { N: c.E, E: c.S, S: c.W, W: c.N };
+      }
+      if (isChamberPalette(p)) {
+        const f = this.params.firstConnections;
+        if (clockwise) {
+          this.params.firstConnections = { N: f.W, E: f.N, S: f.E, W: f.S };
+        } else {
+          this.params.firstConnections = { N: f.E, E: f.S, S: f.W, W: f.N };
+        }
       }
     } else {
       const cur = this.params.rotation;

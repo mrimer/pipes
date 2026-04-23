@@ -671,3 +671,43 @@ describe('computeEditorFilledCells', () => {
     expect(filled.has('0,2')).toBe(true);
   });
 });
+
+// ─── getValidTileDefKeys – firstConnections ───────────────────────────────────
+
+describe('getValidTileDefKeys – firstConnections', () => {
+  it('Chamber tile includes firstConnections in valid keys', () => {
+    const keys = getValidTileDefKeys({ shape: PipeShape.Chamber, chamberContent: 'tank' });
+    expect(keys.has('firstConnections')).toBe(true);
+  });
+
+  it('Chamber/dirt tile also includes firstConnections', () => {
+    const keys = getValidTileDefKeys({ shape: PipeShape.Chamber, chamberContent: 'dirt' });
+    expect(keys.has('firstConnections')).toBe(true);
+  });
+
+  it('Source tile does NOT include firstConnections', () => {
+    const keys = getValidTileDefKeys({ shape: PipeShape.Source });
+    expect(keys.has('firstConnections')).toBe(false);
+  });
+
+  it('Sink tile does NOT include firstConnections', () => {
+    const keys = getValidTileDefKeys({ shape: PipeShape.Sink });
+    expect(keys.has('firstConnections')).toBe(false);
+  });
+
+  it('Straight tile does NOT include firstConnections', () => {
+    const keys = getValidTileDefKeys({ shape: PipeShape.Straight });
+    expect(keys.has('firstConnections')).toBe(false);
+  });
+
+  it('Chapter-map Chamber does NOT include firstConnections (via getValidChapterMapTileDefKeys)', () => {
+    // firstConnections is a level-editor-only feature; not supported on map grids.
+    const keys = getValidChapterMapTileDefKeys({ shape: PipeShape.Chamber, chamberContent: 'tank' });
+    expect(keys.has('firstConnections')).toBe(false);
+  });
+
+  it('Campaign-map Chamber does NOT include firstConnections (via getValidCampaignMapTileDefKeys)', () => {
+    const keys = getValidCampaignMapTileDefKeys({ shape: PipeShape.Chamber, chamberContent: 'tank' });
+    expect(keys.has('firstConnections')).toBe(false);
+  });
+});

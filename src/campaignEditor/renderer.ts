@@ -529,6 +529,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   // We construct a temporary Tile to render it
   const rot = (def.rotation ?? 0) as Rotation;
   const customConns = def.connections ? new Set(def.connections) : null;
+  const firstConns = (def.firstConnections && def.firstConnections.length > 0) ? new Set(def.firstConnections) : null;
   const tile = new Tile(
     shape,
     rot,
@@ -543,6 +544,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
     def.pressure ?? 0,
     def.hardness ?? 0,
     def.shatter ?? 0,
+    firstConns,
   );
 
   drawTileOnEditor(ctx, x, y, tile, def, isChapterMap, style, buttEndDirs);
@@ -793,6 +795,30 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape != null ? ITEM_SHAPE_LABEL[tile.itemShape] : '?'}×${tile.itemCount}`, cx, cy + _s(8));
     }
     drawConnectionLines(ctx, x, y, tile);
+    // Regulator indicator: draw a small green ring with black outline along each
+    // first-connection direction, near the tile edge, to mark regulator sides.
+    if (tile.firstConnections && tile.firstConnections.size > 0) {
+      const indicatorDist = CELL / 2 - _s(7); // distance from tile center to indicator center
+      const indicatorR = _s(5);
+      for (const dir of tile.firstConnections) {
+        let ix = cx, iy = cy;
+        if (dir === Direction.North) iy = cy - indicatorDist;
+        else if (dir === Direction.South) iy = cy + indicatorDist;
+        else if (dir === Direction.East)  ix = cx + indicatorDist;
+        else ix = cx - indicatorDist;
+        // Black outline
+        ctx.beginPath();
+        ctx.arc(ix, iy, indicatorR + _s(1.5), 0, Math.PI * 2);
+        ctx.fillStyle = 'black';
+        ctx.fill();
+        // Green ring (hollow circle)
+        ctx.beginPath();
+        ctx.arc(ix, iy, indicatorR, 0, Math.PI * 2);
+        ctx.strokeStyle = '#00cc44';
+        ctx.lineWidth = _s(2.5);
+        ctx.stroke();
+      }
+    }
   } else {
     // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants, Leaky variants)
     const isGold = [PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross].includes(shape);

@@ -7,7 +7,7 @@
  * the level editor when visual updates are needed.
  */
 
-import { PipeShape, TEMP_CHAMBER_CONTENTS, LevelStyle } from '../types';
+import { PipeShape, TEMP_CHAMBER_CONTENTS, LevelStyle, Direction } from '../types';
 import { PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
 import {
   EditorPalette,
@@ -630,10 +630,12 @@ export class TileParamsPanel {
   /**
    * Build the compass-layout connections widget for Source, Sink, and Chamber tiles.
    * Each direction button toggles the connection and rebuilds the param panel when clicked.
+   * For Chamber tiles, also wires regulator ("first") flag indicators.
    * @param replaceTarget - The outer param panel element that connection-change rebuilds replace.
    */
   private _buildConnectionsWidget(replaceTarget: HTMLElement): HTMLElement {
     const state = this._cb.getState();
+    const isChm = isChamberPalette(state.palette);
 
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = TILE_SIZE;
@@ -644,19 +646,50 @@ export class TileParamsPanel {
       drawEditorTile(previewCtx, 0, 0, state.buildTileDef());
     }
 
+    const onToggle = (dir: Direction): void => {
+      const key = dir as keyof TileParams['connections'];
+      const wasOn = state.params.connections[key];
+      state.params.connections[key] = !wasOn;
+      // Turning off a connection also clears the first-flag for that direction.
+      if (wasOn) {
+        state.params.firstConnections[key] = false;
+      }
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+      const newPanel = this.buildParamPanel();
+      newPanel.id = 'editor-param-panel';
+      replaceTarget.replaceWith(newPanel);
+    };
+
+    const getFirstActive = isChm
+      ? (dir: Direction): boolean => state.params.firstConnections[dir as keyof TileParams['firstConnections']]
+      : undefined;
+
+    const onFirstToggle = isChm
+      ? (dir: Direction): void => {
+          const key = dir as keyof TileParams['firstConnections'];
+          const turningOn = !state.params.firstConnections[key];
+          state.params.firstConnections[key] = turningOn;
+          // Enabling a regulator connection also ensures the connection itself is on.
+          if (turningOn) {
+            state.params.connections[key] = true;
+          }
+          state.applyParamsToLinkedTile();
+          this._cb.updateUndoRedoButtons();
+          this._cb.renderCanvas();
+          const newPanel = this.buildParamPanel();
+          newPanel.id = 'editor-param-panel';
+          replaceTarget.replaceWith(newPanel);
+        }
+      : undefined;
+
     return buildCompassConnectionsWidget(
       (dir) => state.params.connections[dir as keyof TileParams['connections']],
-      (dir) => {
-        const key = dir as keyof TileParams['connections'];
-        state.params.connections[key] = !state.params.connections[key];
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-        const newPanel = this.buildParamPanel();
-        newPanel.id = 'editor-param-panel';
-        replaceTarget.replaceWith(newPanel);
-      },
+      onToggle,
       previewCanvas,
+      getFirstActive,
+      onFirstToggle,
     );
   }
 }

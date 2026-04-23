@@ -1,4 +1,4 @@
-import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_REGULATOR, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
 import { Direction, LevelDef, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
@@ -5203,5 +5203,190 @@ describe('Leaky pipes', () => {
     board.applyTurnDelta(); board.recordMove();
     expect(board.leakyPermanentLoss).toBe(2); // 2 leaky pipes × 1 penalty each
     expect(board.getCurrentWater()).toBe(16); // 20 - 2 (locked) - 2 (permanent)
+  });
+});
+
+// ─── Regulator (first connection) rules ──────────────────────────────────────
+
+describe('Regulator (first connection) rules', () => {
+  /**
+   * Build a minimal 3×3 board for regulator tests:
+   *   (0,1): Source  – connections: S
+   *   (1,1): Chamber with N as regulator  – connections: N,E,S,W; firstConnections: {N}
+   *   (2,1): Sink    – connections: N
+   *
+   * All other cells are Empty. Source → Chamber is via the regulator (North), so the
+   * chamber starts as source-connected after board construction.
+   */
+  function makeRegulatorBoard(): Board {
+    const board = new Board(3, 3);
+    board.source = { row: 0, col: 1 };
+    board.sink   = { row: 2, col: 1 };
+    // Clear all cells to Empty first (avoid random tiles from _buildGrid).
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+      }
+    }
+    // Source pointing South
+    board.grid[0][1] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.South]));
+    board.sourceCapacity = 10;
+    // Chamber with North regulator (all four connections open by default – no customConnections)
+    const firstConns = new Set([Direction.North]);
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    // Sink pointing North
+    board.grid[2][1] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.North]));
+    // Inventory: Straight pipes
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    return board;
+  }
+
+  it('chamber connected via regulator (North) is reachable', () => {
+    // Layout: Source(S) – Straight(NS) – Chamber(N reg) – Straight(NS) – Sink
+    // Place a N-S Straight between Source and Chamber
+    const board = makeRegulatorBoard();
+    // Source is at (0,1) with S; Chamber at (1,1) with N as regulator.
+    // The Chamber's North face directly faces the Source's South face.
+    // In this layout Source → Chamber directly (no pipe in between).
+    const filled = board.getFilledPositions();
+    // Chamber is connected via its North (= regulator direction), so it should be filled.
+    expect(filled.has(posKey(1, 1))).toBe(true);
+  });
+
+  it('chamber NOT reachable when only entered via non-regulator side', () => {
+    // Modify the board so the source points East and chamber is only reachable from East.
+    // Source at (0,1) pointing E → (0,2); Chamber at (1,2) with N as regulator.
+    // We approach Chamber from its West side – a non-regulator direction – so it must not be filled.
+    const board = new Board(3, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 2, col: 2 };
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.sourceCapacity = 10;
+    // Chamber at (0,1): connections all-4, firstConnections = { North }
+    // Arrived from West (East direction of Source) – non-regulator → should NOT be filled
+    const firstConns = new Set([Direction.North]);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    board.grid[2][2] = new Tile(PipeShape.Sink, 0, true);
+
+    const filled = board.getFilledPositions();
+    expect(filled.has(posKey(0, 1))).toBe(false);
+  });
+
+  it('placing a pipe connecting non-regulator side of unsatisfied regulator chamber fails', () => {
+    // 3×3 board; Source at (0,0) points East, Chamber at (0,2) has N regulator.
+    // Place an E-W Straight pipe at (0,1) trying to connect to chamber's West face
+    // before the regulator (North) side is satisfied.
+    const board = new Board(3, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 2, col: 2 };
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    // Source pointing East
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.sourceCapacity = 10;
+    // Chamber at (0,2): connections all-4, firstConnections = { North }
+    const firstConns = new Set([Direction.North]);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    board.grid[2][2] = new Tile(PipeShape.Sink, 0, true);
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    // Place an E-W Straight at (0,1) – it connects Source to Chamber's West (non-regulator)
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR);
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
+    // Inventory must be restored
+    expect(board.inventory[0].count).toBe(1);
+  });
+
+  it('replacing a tile that connects non-regulator side of unsatisfied chamber fails', () => {
+    const board = new Board(3, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 2, col: 2 };
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.sourceCapacity = 10;
+    const firstConns = new Set([Direction.North]);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    board.grid[2][2] = new Tile(PipeShape.Sink, 0, true);
+    // Pre-place a N-S Straight at (0,1) (not connected to anything useful)
+    board.grid[0][1] = new Tile(PipeShape.Straight, 0); // N-S: doesn't connect Source(E) or Chamber(W)
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }, { shape: PipeShape.Elbow, count: 1 }];
+    // Now replace with an E-W Straight (rotation 90) which connects Source → Chamber West
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR);
+  });
+
+  it('rotating a spin pipe that connects non-regulator side of unsatisfied chamber fails', () => {
+    const board = new Board(3, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 2, col: 2 };
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.sourceCapacity = 10;
+    const firstConns = new Set([Direction.North]);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    board.grid[2][2] = new Tile(PipeShape.Sink, 0, true);
+    // Pre-place a N-S SpinStraight at (0,1); rotating it CW makes it E-W → bridges Source to Chamber West
+    board.grid[0][1] = new Tile(PipeShape.SpinStraight, 0, false); // N-S
+    // CW rotation → E-W → connects Source(E) to Chamber(W=non-regulator)
+    const result = board.rotateTile({ row: 0, col: 1 });
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR);
+  });
+
+  it('connecting via regulator first then non-regulator sides succeeds', () => {
+    // Source(S) → Chamber (N=regulator) → regulator satisfied.
+    // Then placing an E-W Straight at (1,0) connecting to Chamber's West (non-regulator) should succeed.
+    const board = makeRegulatorBoard();
+    // Verify the regulator is satisfied
+    expect(board.getFilledPositions().has(posKey(1, 1))).toBe(true);
+    // Now place an E-W Straight at (1,0) to connect Chamber's West face.
+    // Chamber regulator is already satisfied → should be allowed.
+    const result = board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('multiple regulators on one chamber: satisfying any one allows non-regulator connections', () => {
+    // Chamber with N and W as regulators.  Connect from North → regulator satisfied.
+    // Then connecting from East (non-regulator) should be allowed.
+    const board = new Board(3, 3);
+    board.source = { row: 0, col: 1 };
+    board.sink   = { row: 2, col: 1 };
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][1] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.South]));
+    board.sourceCapacity = 10;
+    const firstConns = new Set([Direction.North, Direction.West]); // two regulators
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    board.grid[2][1] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.North]));
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+
+    // Source(S) → Chamber(N regulator) → should be in filled (satisfied via North).
+    expect(board.getFilledPositions().has(posKey(1, 1))).toBe(true);
+
+    // Place a N-S Straight at (1,2) to connect Chamber's East – allowed since North regulator is satisfied.
+    // Note: Straight at rotation 0 is N-S, which doesn't connect Chamber East.
+    // Use E-W Straight (rotation 90) to test the connection from Chamber's East.
+    const result = board.placeInventoryTile({ row: 1, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('chamber with only non-regulator path from source: whole downstream also not filled', () => {
+    // Source → (0,1 Straight EW) → Chamber(0,2, N-regulator, all conns) → Sink(0,3)
+    // Chamber can only be reached from West (non-regulator) → chamber not filled → Sink not filled.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    for (let c = 0; c < 4; c++) board.grid[0][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.sourceCapacity = 10;
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90, true); // E-W
+    const firstConns = new Set([Direction.North]);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+
+    const filled = board.getFilledPositions();
+    expect(filled.has(posKey(0, 2))).toBe(false);
+    expect(filled.has(posKey(0, 3))).toBe(false);
   });
 });
