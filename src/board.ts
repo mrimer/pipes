@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape, GEL_SIPHON_CONTENTS } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
@@ -1315,28 +1315,9 @@ export class Board {
     if (lockedWaterImpact.size > 0) {
       let total = this.sourceCapacity;
       for (const key of filled) {
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        // Gel/Siphon: skip their locked impact (handled by multipliers below).
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent !== null && GEL_SIPHON_CONTENTS.has(tile.chamberContent)) continue;
         total += lockedWaterImpact.get(key) ?? 0;
       }
-      total -= this._turnState.leakyPermanentLoss;
-      // Apply Siphon multipliers (all connected, locked Siphon tiles double the total).
-      for (const key of filled) {
-        if (!lockedWaterImpact.has(key)) continue;
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'siphon') total *= 2;
-      }
-      // Apply Gel multipliers (all connected, locked Gel tiles halve the total).
-      for (const key of filled) {
-        if (!lockedWaterImpact.has(key)) continue;
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'gel') total = Math.floor(total / 2);
-      }
-      return total;
+      return total - this._turnState.leakyPermanentLoss;
     }
 
     // ── Dynamic fallback (test/legacy path) ─────────────────────────────────
@@ -1382,20 +1363,7 @@ export class Board {
         }
       }
     }
-    let result = this.sourceCapacity - pipeCost + tankGain - this._turnState.leakyPermanentLoss;
-    // Apply Siphon multipliers (Siphon first, then Gel per spec).
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'siphon') result *= 2;
-    }
-    // Apply Gel multipliers.
-    for (const key of filled) {
-      const [r, c] = parseKey(key);
-      const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'gel') result = Math.floor(result / 2);
-    }
-    return result;
+    return this.sourceCapacity - pipeCost + tankGain - this._turnState.leakyPermanentLoss;
   }
 
   /**
