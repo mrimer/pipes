@@ -192,7 +192,7 @@ export interface TileParams {
   itemShape: PipeShape;
   itemCount: number;
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };
-  /** Regulator ("first") connection flags for Chamber tiles. */
+  /** Valve ("first") connection flags for Chamber tiles. */
   firstConnections: { N: boolean; E: boolean; S: boolean; W: boolean };
   /** Drying Time for Cement tiles – number of adjustments allowed before hardening. */
   dryingTime: number;

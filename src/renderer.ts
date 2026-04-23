@@ -6,7 +6,7 @@ import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAP
 import { Tile, oppositeDirection } from './tile';
 import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS, LevelStyle, floorShapeToStyle } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
-import { drawChamber, sandstoneColorState, drawChamberRegulatorIcons } from './renderer/chamberRenderers';
+import { drawChamber, sandstoneColorState, drawChamberValveIcons } from './renderer/chamberRenderers';
 import { drawAmbientDecoration } from './renderer/ambientDecoration';
 export { drawAmbientDecoration };
 export { LINE_WIDTH, TILE_SIZE, _s, setTileSize, BASE_TILE_SIZE } from './renderer/rendererState';
@@ -1922,9 +1922,9 @@ export function drawTile(
     // clip and stub endpoints land precisely on the tile edge at every tile size,
     // consistent with the pipe-body path approach above.
     drawChamber(ctx, tile, color, isWater, TILE_SIZE / 2, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, effectiveButtEndDirs);
-    // Regulator icons: draw over the chamber when it has first-connection constraints.
+    // Valve icons: draw over the chamber when it has first-connection constraints.
     if (tile.firstConnections && tile.firstConnections.size > 0) {
-      drawChamberRegulatorIcons(ctx, tile.firstConnections, tile.connections, isWater, TILE_SIZE / 2);
+      drawChamberValveIcons(ctx, tile.firstConnections, tile.connections, isWater, TILE_SIZE / 2);
     }
   } else if (shape === PipeShape.Granite) {
     // Granite – solid impassable stone block; no connections

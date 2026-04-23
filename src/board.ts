@@ -268,11 +268,11 @@ const ERR_CONTAINER_ROTATE =
   'Reconfigure the path first.';
 
 /**
- * Error shown when a move would connect to a non-regulator side of a chamber
- * before its regulator side has been satisfied.
+ * Error shown when a move would connect to a non-valve side of a chamber
+ * before its valve side has been satisfied.
  */
-export const ERR_REGULATOR =
-  'First connect this tile to the source by its regulator';
+export const ERR_VALVE =
+  'First connect this tile to the source by its valve';
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
@@ -969,17 +969,17 @@ export class Board {
     if (effectiveCount <= 0) return { success: false };
 
     this._spendInventory(shape);
-    // Compute the pre-placement fill set for regulator-gate checking.
+    // Compute the pre-placement fill set for valve-gate checking.
     const filledBefore = this.getFilledPositions();
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
 
-    // Regulator gate: reject if this placement connects to a non-regulator side
-    // of an unsatisfied regulator chamber.
-    const regulatorViolation = this._checkRegulatorViolation(pos, filledBefore);
-    if (regulatorViolation) {
+    // Valve gate: reject if this placement connects to a non-valve side
+    // of an unsatisfied valve chamber.
+    const valveViolation = this._checkValveViolation(pos, filledBefore);
+    if (valveViolation) {
       this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
       this._unspendInventory(shape);
-      return regulatorViolation;
+      return valveViolation;
     }
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
@@ -1048,7 +1048,7 @@ export class Board {
     // disconnect such a container and produce a false "not available" result.)
     const newExisting = this.inventory.find((it) => it.shape === newShape);
     const baseCount = newExisting?.count ?? 0;
-    // Capture the pre-replacement fill for regulator-gate checking (old tile still in grid).
+    // Capture the pre-replacement fill for valve-gate checking (old tile still in grid).
     const filledBeforeReplace = this.getFilledPositions();
     this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
     const bonuses = this.getContainerBonuses();
@@ -1073,13 +1073,13 @@ export class Board {
     this._spendInventory(newShape);
     // grid[pos.row][pos.col] is already set to new Tile(newShape, rotation) above
 
-    // Regulator gate: reject if this replacement connects to a non-regulator side
-    // of an unsatisfied regulator chamber.
-    const regulatorViolation = this._checkRegulatorViolation(pos, filledBeforeReplace);
-    if (regulatorViolation) {
+    // Valve gate: reject if this replacement connects to a non-valve side
+    // of an unsatisfied valve chamber.
+    const valveViolation = this._checkValveViolation(pos, filledBeforeReplace);
+    if (valveViolation) {
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile;
-      return regulatorViolation;
+      return valveViolation;
     }
 
     // ── Step 3: Post-replacement state validation ──────────────────────────────
@@ -1702,20 +1702,20 @@ export class Board {
     // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return { success: true };
-    // Capture the pre-rotation fill for disconnection-highlight computation and regulator-gate check.
+    // Capture the pre-rotation fill for disconnection-highlight computation and valve-gate check.
     const filledBefore = this.getFilledPositions();
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
     }
 
-    // Regulator gate: reject if this rotation connects to a non-regulator side
-    // of an unsatisfied regulator chamber.
-    const regulatorViolation = this._checkRegulatorViolation(pos, filledBefore);
-    if (regulatorViolation) {
+    // Valve gate: reject if this rotation connects to a non-valve side
+    // of an unsatisfied valve chamber.
+    const valveViolation = this._checkValveViolation(pos, filledBefore);
+    if (valveViolation) {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
-      return regulatorViolation;
+      return valveViolation;
     }
 
     // Validate the final state.
@@ -1805,10 +1805,10 @@ export class Board {
   /**
    * Flood-fill from the source tile and return all reachable positions.
    *
-   * Regulator rule: a Chamber tile with `firstConnections` is only entered
+   * Valve rule: a Chamber tile with `firstConnections` is only entered
    * (and therefore counted as source-connected) when the BFS path arrives via
-   * one of its regulator ("first") directions.  Non-regulator arrivals are
-   * silently skipped; if a regulator arrival is found later, the chamber and
+   * one of its valve ("first") directions.  Non-valve arrivals are
+   * silently skipped; if a valve arrival is found later, the chamber and
    * everything downstream of it become reachable at that point.
    *
    * @returns Set of stringified "row,col" keys that are water-filled.
@@ -1830,7 +1830,7 @@ export class Board {
         if (reached.has(nextKey)) continue;
         const nextTile = this.grid[nextPos.row]?.[nextPos.col];
         if (!nextTile) continue;
-        // Regulator check: only enter a chamber via a first-connection direction.
+        // Valve check: only enter a chamber via a first-connection direction.
         if (nextTile.firstConnections && nextTile.firstConnections.size > 0) {
           const arrivalDir = oppositeDirection(dir);
           if (!nextTile.firstConnections.has(arrivalDir)) continue;
@@ -1853,15 +1853,15 @@ export class Board {
 
   /**
    * Check whether a tile placement or rotation at `pos` would illegally connect
-   * to a regulator chamber's non-regulator side before the chamber has been
-   * satisfied via its regulator.
+   * to a valve chamber's non-valve side before the chamber has been
+   * satisfied via its valve.
    *
    * Must be called **after** the mutation is applied to the grid, using the
    * **pre-mutation** fill set as `filledBefore`.
    *
    * @returns A failing `MoveResult` when a violation is found, otherwise `null`.
    */
-  private _checkRegulatorViolation(pos: GridPos, filledBefore: Set<string>): { success: false; error: string; errorTilePositions?: GridPos[] } | null {
+  private _checkValveViolation(pos: GridPos, filledBefore: Set<string>): { success: false; error: string; errorTilePositions?: GridPos[] } | null {
     const tile = this.getTile(pos);
     if (!tile) return null;
 
@@ -1879,12 +1879,12 @@ export class Board {
       // From the neighbor's perspective, the arrival direction is `opposite(dir)`.
       const arrivalDir = oppositeDirection(dir);
 
-      // Only block when arriving via a non-regulator side.
+      // Only block when arriving via a non-valve side.
       if (neighborTile.firstConnections.has(arrivalDir)) continue;
 
       // Block if the neighbor chamber was not already source-connected before this move.
       if (!filledBefore.has(neighborKey)) {
-        return { success: false, error: ERR_REGULATOR, errorTilePositions: [neighborPos] };
+        return { success: false, error: ERR_VALVE, errorTilePositions: [neighborPos] };
       }
     }
     return null;

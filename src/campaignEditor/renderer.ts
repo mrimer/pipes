@@ -795,8 +795,8 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape != null ? ITEM_SHAPE_LABEL[tile.itemShape] : '?'}×${tile.itemCount}`, cx, cy + _s(8));
     }
     drawConnectionLines(ctx, x, y, tile);
-    // Regulator indicator: draw a small green ring with black outline along each
-    // first-connection direction, near the tile edge, to mark regulator sides.
+    // Valve indicator: draw a small green ring with black outline along each
+    // first-connection direction, near the tile edge, to mark valve sides.
     if (tile.firstConnections && tile.firstConnections.size > 0) {
       const indicatorDist = CELL / 2 - _s(7); // distance from tile center to indicator center
       const indicatorR = _s(5);
