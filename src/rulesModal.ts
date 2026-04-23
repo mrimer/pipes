@@ -301,7 +301,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: chamberSwatch(SIPHON_COLOR, '\u00D72'),
     name: 'Siphon',
-    description: 'Doubles the current water total when connected. Applied before Gel chambers each turn.',
+    description: 'Doubles the current water total when connected. Applied before Gel chambers.',
   },
 ];
 

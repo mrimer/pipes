@@ -469,9 +469,9 @@ export class TurnStateManager {
    *  Pass 2 — hot_plate tiles, processed after cold tiles have updated frozen.
    *  Pass 3 — Gel/Siphon tiles, processed last so they see the final
    *            pre-multiplier water total.  Their locked impact is the
-   *            animation delta (gain for Siphon, loss for Gel) computed at
-   *            connection time.  `getCurrentWater()` skips their locked
-   *            impact in its sum and applies the multipliers directly.
+   *            one-time water delta (gain for Siphon, loss for Gel) applied at
+   *            connection time; it is included in the normal locked-impact sum
+   *            in `getCurrentWater()` and does not re-apply on subsequent turns.
    */
   private _lockNewTiles(
     filled: Set<string>,
@@ -549,8 +549,10 @@ export class TurnStateManager {
     }
 
     // Third pass: Gel/Siphon tiles, processed after all other tiles are locked.
-    // Compute the pre-multiplier base total so each multiplier tile's animation
-    // delta (and thus its locked impact) reflects the water it actually changed.
+    // Compute the pre-multiplier base total so each tile's locked impact equals the
+    // one-time water delta it causes on connection (gain for Siphon, loss for Gel).
+    // These impacts are included in the normal sum in `getCurrentWater()` like any
+    // other chamber — the effect is applied once at connection time, not each turn.
     if (newGelSiphonKeys.length > 0) {
       // Build base total from sourceCapacity + all currently-locked non-Gel/Siphon impacts - leaky loss.
       let runningTotal = this.getSourceCapacity() - this.leakyPermanentLoss;
