@@ -630,7 +630,7 @@ export class TileParamsPanel {
   /**
    * Build the compass-layout connections widget for Source, Sink, and Chamber tiles.
    * Each direction button toggles the connection and rebuilds the param panel when clicked.
-   * For Chamber tiles, also wires regulator ("first") flag indicators.
+   * For Chamber tiles, also wires valve ("first") flag indicators.
    * @param replaceTarget - The outer param panel element that connection-change rebuilds replace.
    */
   private _buildConnectionsWidget(replaceTarget: HTMLElement): HTMLElement {
@@ -671,7 +671,7 @@ export class TileParamsPanel {
           const key = dir as keyof TileParams['firstConnections'];
           const turningOn = !state.params.firstConnections[key];
           state.params.firstConnections[key] = turningOn;
-          // Enabling a regulator connection also ensures the connection itself is on.
+          // Enabling a valve connection also ensures the connection itself is on.
           if (turningOn) {
             state.params.connections[key] = true;
           }

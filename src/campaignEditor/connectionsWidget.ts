@@ -15,16 +15,16 @@ import { EDITOR_INPUT_BG, RADIUS_SM } from '../uiConstants';
  * placed there instead.
  *
  * When `getFirstActive` and `onFirstToggle` are supplied (level editor only),
- * each direction button also shows a small "first / regulator" indicator
+ * each direction button also shows a small "first / valve" indicator
  * rectangle.  The indicator is drawn as a thin bordered overlay:
- * - Gray hollow (inactive): the direction is not a regulator.
- * - Solid red (active): the direction is a regulator for this chamber.
+ * - Gray hollow (inactive): the direction is not a valve.
+ * - Solid red (active): the direction is a valve for this chamber.
  * Clicking the indicator calls `onFirstToggle(dir)`.
  *
  * @param getActive       Returns `true` when the given direction is currently active.
  * @param onToggle        Called with the toggled direction when a button is clicked.
  * @param centerEl        Optional element to display in the centre of the compass.
- * @param getFirstActive  Optional: returns `true` when direction is a first/regulator connection.
+ * @param getFirstActive  Optional: returns `true` when direction is a first/valve connection.
  * @param onFirstToggle   Optional: called when the first-flag indicator is clicked.
  */
 export function buildCompassConnectionsWidget(
@@ -86,7 +86,7 @@ export function buildCompassConnectionsWidget(
         `border:1.5px solid #555;border-radius:4px;` +
         `background:${firstActive ? '#cc0000' : 'transparent'};` +
         'pointer-events:all;cursor:pointer;box-sizing:border-box;';
-      indicator.title = `Toggle ${label} as regulator (first connection)`;
+      indicator.title = `Toggle ${label} as valve (first connection)`;
       indicator.addEventListener('click', (e) => {
         e.stopPropagation(); // prevent toggling the connection button
         onFirstToggle(dir);

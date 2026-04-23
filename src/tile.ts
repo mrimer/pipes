@@ -117,9 +117,9 @@ export class Tile {
    */
   customConnections: ConnectionSet | null;
   /**
-   * Regulator directions for Chamber tiles.  When non-null and non-empty, the
+   * Valve directions for Chamber tiles.  When non-null and non-empty, the
    * BFS treats this chamber as unreachable unless it is entered via one of these
-   * directions from the source side.  Null means no regulator is defined.
+   * directions from the source side.  Null means no valve is defined.
    */
   firstConnections: Set<Direction> | null;
   /**
@@ -164,7 +164,7 @@ export class Tile {
    * @param pressure - Pressure value: base pressure for Source tiles; additive bonus for Pump tiles. Defaults to 0.
    * @param hardness - Hardness value for Sandstone tiles (subtracted from Pressure to get deltaDamage). Defaults to 0.
    * @param shatter - Shatter value for Sandstone tiles. When > Hardness and Pressure >= Shatter, effective cost is 0. Defaults to 0.
-   * @param firstConnections - Regulator directions: BFS only counts this chamber as source-connected when it is entered from one of these directions. Null means no regulator.
+   * @param firstConnections - Valve directions: BFS only counts this chamber as source-connected when it is entered from one of these directions. Null means no valve.
    */
   constructor(shape: PipeShape, rotation: Rotation = 0, isFixed = false, capacity = 0, cost = 0, itemShape: PipeShape | null = null, itemCount = 1, customConnections: ConnectionSet | null = null, chamberContent: ChamberContent | null = null, temperature = 0, pressure = 0, hardness = 0, shatter = 0, firstConnections: Set<Direction> | null = null) {
     this.shape = shape;
@@ -264,7 +264,7 @@ export function isTileConnectedToSource(
       if (!nextTile) continue;
       const nextConns = getConnections(nextTile.shape, (nextTile.rotation ?? 0) as Rotation);
       if (!nextConns.has(oppositeDirection(dir))) continue;
-      // Regulator check: only enter a chamber via a first-connection direction.
+      // Valve check: only enter a chamber via a first-connection direction.
       if (nextTile.firstConnections && nextTile.firstConnections.length > 0) {
         const arrivalDir = oppositeDirection(dir);
         if (!nextTile.firstConnections.includes(arrivalDir)) continue;
