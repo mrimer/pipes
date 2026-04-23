@@ -139,6 +139,8 @@ export function getTileDisplayName(tile: Tile): string {
         }
         case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
         case 'star':   return 'Star';
+        case 'gel':    return 'Gel \u00D7\u00BD';
+        case 'siphon': return 'Siphon \u00D72';
         default:       return 'Chamber';
       }
     default: return '';

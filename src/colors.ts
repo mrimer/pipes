@@ -227,6 +227,14 @@ export const SANDSTONE_SHATTER_WATER_COLOR = '#f0d8b0';
 export const STAR_COLOR       = '#f0c040';
 /** Star chamber tile color when water is flowing through it. */
 export const STAR_WATER_COLOR = '#ffe880';
+/** Gel chamber tile color (dark navy blue). */
+export const GEL_COLOR        = '#1a3a7a';
+/** Gel chamber tile color when water is flowing through it (slightly lighter dark blue). */
+export const GEL_WATER_COLOR  = '#2a50a8';
+/** Siphon chamber tile color (bright cyan-blue). */
+export const SIPHON_COLOR       = '#40c4ff';
+/** Siphon chamber tile color when water is flowing through it (even brighter). */
+export const SIPHON_WATER_COLOR = '#80d8ff';
 /** Hot plate chamber tile color (warm orange-red). */
 export const HOT_PLATE_COLOR       = '#e44';
 /** Hot plate chamber tile color when water is flowing through it. */

@@ -1,5 +1,5 @@
 import { Tile } from './tile';
-import { GridPos, PipeShape, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS, ENV_MODIFIER_CONTENTS } from './types';
+import { GridPos, PipeShape, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS, ENV_MODIFIER_CONTENTS, GEL_SIPHON_CONTENTS } from './types';
 import { parseKey, posKey, LEAKY_PIPE_SHAPES, PIPE_SHAPES } from './board';
 import { ThermoSimulator } from './thermoSimulator';
 
@@ -152,7 +152,8 @@ export class TurnStateManager {
    *  4b. Re-evaluate hot_plate tiles — only if a cold tile that froze water left;
    *      sorted by connection turn so frozen is allocated correctly across multiple plates.
    *  5.  Lock newly-connected tiles — uses current temp/pressure at this moment;
-   *      ice/snow/sandstone are processed before hot_plate so frozen counts are current.
+   *      ice/snow/sandstone are processed before hot_plate so frozen counts are current;
+   *      Gel/Siphon are processed last so they see the final pre-multiplier total.
    *  6.  Apply leaky penalties — only for tiles locked *before* this turn.
    *
    * @returns The list of locked-cost changes for UI animation.
@@ -463,9 +464,14 @@ export class TurnStateManager {
    * Lock the water impact for each tile that is newly connected this turn.
    * Uses the current temperature and pressure at the moment this method runs.
    *
-   * Two-pass approach: ice/snow/sandstone tiles are processed before hot_plate
-   * tiles so that any water frozen this turn is visible to hot_plate tiles
-   * connected on the same turn, regardless of BFS discovery order.
+   * Three-pass approach:
+   *  Pass 1 — all newly-connected tiles except hot_plate and Gel/Siphon.
+   *  Pass 2 — hot_plate tiles, processed after cold tiles have updated frozen.
+   *  Pass 3 — Gel/Siphon tiles, processed last so they see the final
+   *            pre-multiplier water total.  Their locked impact is the
+   *            animation delta (gain for Siphon, loss for Gel) computed at
+   *            connection time.  `getCurrentWater()` skips their locked
+   *            impact in its sum and applies the multipliers directly.
    */
   private _lockNewTiles(
     filled: Set<string>,
@@ -474,8 +480,9 @@ export class TurnStateManager {
     const currentTemp = this.thermo.computeTemperature(filled, this._connectionTurn);
     const currentPressure = this.thermo.computePressure(filled, this._connectionTurn);
 
-    // First pass: all newly-connected tiles except hot_plate.
+    // First pass: all newly-connected tiles except hot_plate and Gel/Siphon.
     const newHotPlateKeys: string[] = [];
+    const newGelSiphonKeys: string[] = [];
     for (const key of filled) {
       if (this._lockedWaterImpact.has(key)) continue; // Already evaluated.
 
@@ -486,6 +493,12 @@ export class TurnStateManager {
       // Defer hot_plate tiles to the second pass.
       if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'hot_plate') {
         newHotPlateKeys.push(key);
+        continue;
+      }
+
+      // Defer Gel/Siphon tiles to the third pass.
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent !== null && GEL_SIPHON_CONTENTS.has(tile.chamberContent)) {
+        newGelSiphonKeys.push(key);
         continue;
       }
 
@@ -533,6 +546,54 @@ export class TurnStateManager {
       this.frozen -= waterGain;
       this._hotPlateWaterGain.set(key, waterGain);
       this._recordLockedTileState(key, impact, currentTemp, currentPressure);
+    }
+
+    // Third pass: Gel/Siphon tiles, processed after all other tiles are locked.
+    // Compute the pre-multiplier base total so each multiplier tile's animation
+    // delta (and thus its locked impact) reflects the water it actually changed.
+    if (newGelSiphonKeys.length > 0) {
+      // Build base total from sourceCapacity + all currently-locked non-Gel/Siphon impacts - leaky loss.
+      let runningTotal = this.getSourceCapacity() - this.leakyPermanentLoss;
+      for (const key of filled) {
+        if (!this._lockedWaterImpact.has(key)) continue;
+        const [r, c] = parseKey(key);
+        const t = this.grid[r]?.[c];
+        if (t?.shape === PipeShape.Chamber && t.chamberContent !== null && GEL_SIPHON_CONTENTS.has(t.chamberContent)) continue;
+        runningTotal += this._lockedWaterImpact.get(key)!;
+      }
+      // Apply multipliers from already-locked (previously connected) Siphons.
+      for (const key of filled) {
+        if (!this._lockedWaterImpact.has(key)) continue;
+        const [r, c] = parseKey(key);
+        const t = this.grid[r]?.[c];
+        if (t?.shape === PipeShape.Chamber && t.chamberContent === 'siphon') runningTotal *= 2;
+      }
+      // Apply multipliers from already-locked (previously connected) Gels.
+      for (const key of filled) {
+        if (!this._lockedWaterImpact.has(key)) continue;
+        const [r, c] = parseKey(key);
+        const t = this.grid[r]?.[c];
+        if (t?.shape === PipeShape.Chamber && t.chamberContent === 'gel') runningTotal = Math.floor(runningTotal / 2);
+      }
+      // Process newly-connecting Siphons first (double), then Gels (halve).
+      const newGelKeys: string[] = [];
+      for (const key of newGelSiphonKeys) {
+        const [r, c] = parseKey(key);
+        const t = this.grid[r]?.[c];
+        if (t?.chamberContent === 'siphon') {
+          // Animation delta = water gained (runningTotal, since it doubles).
+          this._recordLockedTileState(key, runningTotal, currentTemp, currentPressure);
+          runningTotal *= 2;
+        } else {
+          newGelKeys.push(key);
+        }
+      }
+      for (const key of newGelKeys) {
+        const halved = Math.floor(runningTotal / 2);
+        // Animation delta = water lost (negative, since it halves).
+        this._recordLockedTileState(key, halved - runningTotal, currentTemp, currentPressure);
+        runningTotal = halved;
+      }
     }
 
     // (changes is populated in _reEvaluateConnectedTiles and _applyLeakyPenalties;

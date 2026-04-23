@@ -93,7 +93,14 @@ export enum PipeShape {
 }
 
 /** The type of content housed inside a Chamber tile. */
-export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level' | 'chapter';
+export type ChamberContent = 'tank' | 'dirt' | 'item' | 'heater' | 'ice' | 'pump' | 'snow' | 'sandstone' | 'star' | 'hot_plate' | 'level' | 'chapter' | 'gel' | 'siphon';
+
+/**
+ * Chamber content types that multiply the water total when connected.
+ * Gel halves (floor) and Siphon doubles.  Applied after all other
+ * cost-impacting chambers resolve each turn: Siphon instances first, then Gel.
+ */
+export const GEL_SIPHON_CONTENTS: ReadonlySet<ChamberContent> = new Set(['gel', 'siphon']);
 
 /**
  * Chamber content types that apply a cold (temperature-delta) water cost.

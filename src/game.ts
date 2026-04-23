@@ -1203,6 +1203,10 @@ export class Game implements InputCallbacks {
         if (candidate === SfxId.Sizzle || hotPlateSfx === null) hotPlateSfx = candidate;
       } else if (tile.chamberContent === 'star') {
         sfxToPlay.push(SfxId.Star);
+      } else if (tile.chamberContent === 'gel') {
+        sfxToPlay.push(SfxId.Gel);
+      } else if (tile.chamberContent === 'siphon') {
+        sfxToPlay.push(SfxId.Siphon);
       } else if (tile.chamberContent === 'ice') {
         const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
         if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;

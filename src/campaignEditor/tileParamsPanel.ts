@@ -114,6 +114,8 @@ const CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> =
   { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
   { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
   { palette: 'chamber:star',      label: '⭐ Star' },
+  { palette: 'chamber:gel',       label: '½ Gel' },
+  { palette: 'chamber:siphon',    label: '×2 Siphon' },
 ];
 
 const GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -531,8 +533,9 @@ export class TileParamsPanel {
     const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
       tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
       ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
+      gel: 'Gel', siphon: 'Siphon',
     };
-    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate']) {
+    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate', 'gel', 'siphon']) {
       const o = document.createElement('option');
       o.value = opt;
       o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;

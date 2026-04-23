@@ -16,6 +16,7 @@ import {
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
   STAR_COLOR, HOT_PLATE_COLOR,
+  GEL_COLOR, SIPHON_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
@@ -291,6 +292,16 @@ const LEGEND_ROWS: LegendRow[] = [
     iconHtml: chamberSwatch(STAR_COLOR, '★'),
     name: 'Star',
     description: 'A bonus collectible. Connect it to the water path before winning to count it as a collected star for the level. Stars are tracked per-level and shown on the level select screen.',
+  },
+  {
+    iconHtml: chamberSwatch(GEL_COLOR, '\u00BD'),
+    name: 'Gel',
+    description: 'Halves the current water total (rounded down) when connected. Applied after all cost chambers resolve.',
+  },
+  {
+    iconHtml: chamberSwatch(SIPHON_COLOR, '\u00D72'),
+    name: 'Siphon',
+    description: 'Doubles the current water total when connected. Applied before Gel chambers each turn.',
   },
 ];
 

@@ -23,6 +23,8 @@ import {
   SANDSTONE_SHATTER_COLOR, SANDSTONE_SHATTER_WATER_COLOR,
   STAR_COLOR,
   HOT_PLATE_COLOR, HOT_PLATE_WATER_COLOR,
+  GEL_COLOR, GEL_WATER_COLOR,
+  SIPHON_COLOR, SIPHON_WATER_COLOR,
   CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
   lighten, darken,
 } from '../colors';
@@ -506,6 +508,104 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   }
 }
 
+function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
+  // Draw water line near the bottom of the box (half-filled visual).
+  const gelDecorColor = isWater ? GEL_WATER_COLOR : GEL_COLOR;
+  ctx.strokeStyle = gelDecorColor;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  const wy = bh - _s(7); // near bottom (opposite to tank which is near top)
+  const wLeft = -bw + _s(4);
+  const wRight = bw - _s(4);
+  const waveWidth = wRight - wLeft;
+  if (isWater) {
+    // Animated wave at half speed to suggest slow, viscous gel.
+    const WAVE_PERIOD_MS = 4000;
+    const offset = (Date.now() % WAVE_PERIOD_MS) / WAVE_PERIOD_MS * waveWidth;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(wLeft, wy - _s(5), waveWidth, _s(10));
+    ctx.clip();
+    const WAVE_COPIES = 3;
+    const startX = wLeft - offset;
+    ctx.beginPath();
+    for (let i = 0; i < WAVE_COPIES; i++) {
+      const x0 = startX + i * waveWidth;
+      const xMid = x0 + waveWidth / 2;
+      const xEnd = x0 + waveWidth;
+      const wQuart = waveWidth / 4;
+      if (i === 0) ctx.moveTo(x0, wy);
+      ctx.quadraticCurveTo(x0 + wQuart, wy - _s(3), xMid, wy);
+      ctx.quadraticCurveTo(xMid + wQuart, wy + _s(3), xEnd, wy);
+    }
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    const wMid = 0;
+    const wQuart = waveWidth / 4;
+    ctx.beginPath();
+    ctx.moveTo(wLeft, wy);
+    ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
+    ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
+    ctx.stroke();
+  }
+  // Show "1/2" label in gel color
+  ctx.fillStyle = gelDecorColor;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u00BD', 0, -_s(5)); // ½ character
+}
+
+function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
+  // Draw water line near the top (like tank) with fast wave animation when connected.
+  const siphonDecorColor = isWater ? SIPHON_WATER_COLOR : SIPHON_COLOR;
+  ctx.strokeStyle = siphonDecorColor;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  const wy = -bh + _s(7); // near top (same as tank)
+  const wLeft = -bw + _s(4);
+  const wRight = bw - _s(4);
+  const waveWidth = wRight - wLeft;
+  if (isWater) {
+    // Double-speed wave to suggest energetic suction.
+    const WAVE_PERIOD_MS = 1000;
+    const offset = (Date.now() % WAVE_PERIOD_MS) / WAVE_PERIOD_MS * waveWidth;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(wLeft, wy - _s(5), waveWidth, _s(10));
+    ctx.clip();
+    const WAVE_COPIES = 3;
+    const startX = wLeft - offset;
+    ctx.beginPath();
+    for (let i = 0; i < WAVE_COPIES; i++) {
+      const x0 = startX + i * waveWidth;
+      const xMid = x0 + waveWidth / 2;
+      const xEnd = x0 + waveWidth;
+      const wQuart = waveWidth / 4;
+      if (i === 0) ctx.moveTo(x0, wy);
+      ctx.quadraticCurveTo(x0 + wQuart, wy - _s(3), xMid, wy);
+      ctx.quadraticCurveTo(xMid + wQuart, wy + _s(3), xEnd, wy);
+    }
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    const wMid = 0;
+    const wQuart = waveWidth / 4;
+    ctx.beginPath();
+    ctx.moveTo(wLeft, wy);
+    ctx.quadraticCurveTo(wLeft + wQuart, wy - _s(3), wMid, wy);
+    ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
+    ctx.stroke();
+  }
+  // Show "x2" label in siphon color
+  ctx.fillStyle = siphonDecorColor;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u00D72', 0, _s(5)); // ×2
+}
+
 /** Draw a 5-pointed star inside the chamber inner box. */
 function _drawChamberStarContent(ctx: CanvasRenderingContext2D, isWater: boolean, half: number): void {
   const outerR = half * 0.45;
@@ -815,6 +915,10 @@ export function drawChamber(
     _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
   } else if (chamberContent === 'star') {
     _drawChamberStarContent(ctx, isWater, half);
+  } else if (chamberContent === 'gel') {
+    _drawChamberGelContent(ctx, bw, bh, isWater);
+  } else if (chamberContent === 'siphon') {
+    _drawChamberSiphonContent(ctx, bw, bh, isWater);
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
   }
