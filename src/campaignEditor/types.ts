@@ -61,6 +61,7 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
   } else if (shape === PipeShape.Chamber) {
     valid.add('chamberContent');
     valid.add('connections');
+    valid.add('firstConnections');
     const cc = tile.chamberContent;
     if (cc === 'tank') valid.add('capacity');
     if (cc !== undefined && COST_CHAMBER_CONTENTS.has(cc)) valid.add('cost');
@@ -191,6 +192,8 @@ export interface TileParams {
   itemShape: PipeShape;
   itemCount: number;
   connections: { N: boolean; E: boolean; S: boolean; W: boolean };
+  /** Regulator ("first") connection flags for Chamber tiles. */
+  firstConnections: { N: boolean; E: boolean; S: boolean; W: boolean };
   /** Drying Time for Cement tiles – number of adjustments allowed before hardening. */
   dryingTime: number;
   /** Completion threshold for Sink tiles on chapter maps (≥ 0). */
@@ -209,6 +212,7 @@ export const DEFAULT_PARAMS: TileParams = {
   itemShape: PipeShape.Straight,
   itemCount: 1,
   connections: { N: true, E: true, S: true, W: true },
+  firstConnections: { N: false, E: false, S: false, W: false },
   dryingTime: 0,
   completion: 0,
 };
@@ -585,6 +589,10 @@ export function rotateTileDefBy90(tile: TileDef, clockwise: boolean): TileDef {
     rotated.connections = rotated.connections.map(d => rotateDirectionBy90(d, clockwise));
   }
 
+  if (rotated.firstConnections) {
+    rotated.firstConnections = rotated.firstConnections.map(d => rotateDirectionBy90(d, clockwise));
+  }
+
   if (rotated.rotation !== undefined) {
     const delta = clockwise ? 90 : 270;
     rotated.rotation = ((rotated.rotation + delta) % 360) as Rotation;
@@ -640,6 +648,10 @@ export function reflectTileDefAboutDiagonal(tile: TileDef): TileDef {
 
   if (reflected.connections) {
     reflected.connections = reflected.connections.map(reflectDirectionAboutDiagonal);
+  }
+
+  if (reflected.firstConnections) {
+    reflected.firstConnections = reflected.firstConnections.map(reflectDirectionAboutDiagonal);
   }
 
   if (reflected.rotation !== undefined) {
@@ -783,6 +795,10 @@ export function flipTileDefHorizontal(tile: TileDef): TileDef {
     flipped.connections = flipped.connections.map(flipDirectionHorizontal);
   }
 
+  if (flipped.firstConnections) {
+    flipped.firstConnections = flipped.firstConnections.map(flipDirectionHorizontal);
+  }
+
   if (flipped.rotation !== undefined) {
     flipped.rotation = _flipRotationHorizontal(flipped.shape, flipped.rotation);
   }
@@ -799,6 +815,10 @@ export function flipTileDefVertical(tile: TileDef): TileDef {
 
   if (flipped.connections) {
     flipped.connections = flipped.connections.map(flipDirectionVertical);
+  }
+
+  if (flipped.firstConnections) {
+    flipped.firstConnections = flipped.firstConnections.map(flipDirectionVertical);
   }
 
   if (flipped.rotation !== undefined) {

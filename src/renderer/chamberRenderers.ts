@@ -825,3 +825,76 @@ export function drawChamber(
   drawChamberButtStubs(ctx, tile.connections, bw, bh, half, color, buttEndDirs);
   ctx.restore();
 }
+
+/**
+ * Draw regulator ("first connection") icons over a Chamber tile.
+ *
+ * - When the chamber IS source-connected via a regulator (`isRegulatorSatisfied`):
+ *   draw a green ring with black outline over each regulator direction's connection
+ *   line, near the tile edge.
+ * - When the chamber is NOT yet connected:
+ *   draw a black-and-white hollow circle over each regulator direction, and a red
+ *   "X" with black outline over each enabled non-regulator connection direction.
+ *
+ * The canvas origin must already be translated to the tile center before calling.
+ *
+ * @param ctx                   - 2D rendering context.
+ * @param firstConnections      - Set of regulator directions.
+ * @param connections           - Full connection set for the tile.
+ * @param isRegulatorSatisfied  - Whether a regulator path from source has been established.
+ * @param half                  - Half the tile size in canvas pixels (i.e. TILE_SIZE / 2 * scale).
+ */
+export function drawChamberRegulatorIcons(
+  ctx: CanvasRenderingContext2D,
+  firstConnections: ReadonlySet<Direction>,
+  connections: ReadonlySet<Direction>,
+  isRegulatorSatisfied: boolean,
+  half: number,
+): void {
+  const indicatorDist = half * 0.78; // distance from tile center to icon center
+  const iconR = _s(5);
+
+  for (const dir of connections) {
+    const isFirst = firstConnections.has(dir);
+    let ix = 0, iy = 0;
+    if (dir === Direction.North)      iy = -indicatorDist;
+    else if (dir === Direction.South) iy =  indicatorDist;
+    else if (dir === Direction.East)  ix =  indicatorDist;
+    else                              ix = -indicatorDist;
+
+    if (isFirst) {
+      // Green ring: regulator direction
+      // Black outline circle
+      ctx.beginPath();
+      ctx.arc(ix, iy, iconR + _s(1.5), 0, Math.PI * 2);
+      ctx.fillStyle = 'black';
+      ctx.fill();
+      // Inner fill
+      ctx.beginPath();
+      ctx.arc(ix, iy, iconR, 0, Math.PI * 2);
+      ctx.fillStyle = isRegulatorSatisfied ? '#00cc44' : '#888';
+      ctx.fill();
+      // Hollow ring effect
+      ctx.beginPath();
+      ctx.arc(ix, iy, iconR * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'black';
+      ctx.fill();
+    } else if (!isRegulatorSatisfied) {
+      // Red X on non-regulator connections when regulator not yet satisfied
+      const xSize = _s(4);
+      ctx.strokeStyle = 'black';
+      ctx.lineWidth = _s(3.5);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ix - xSize, iy - xSize); ctx.lineTo(ix + xSize, iy + xSize);
+      ctx.moveTo(ix + xSize, iy - xSize); ctx.lineTo(ix - xSize, iy + xSize);
+      ctx.stroke();
+      ctx.strokeStyle = '#cc0000';
+      ctx.lineWidth = _s(2);
+      ctx.beginPath();
+      ctx.moveTo(ix - xSize, iy - xSize); ctx.lineTo(ix + xSize, iy + xSize);
+      ctx.moveTo(ix + xSize, iy - xSize); ctx.lineTo(ix - xSize, iy + xSize);
+      ctx.stroke();
+    }
+  }
+}

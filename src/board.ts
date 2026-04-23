@@ -1,6 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
 import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
-import { bfs } from './bfs';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
@@ -267,6 +266,13 @@ const ERR_CONTAINER_REPLACE =
 const ERR_CONTAINER_ROTATE =
   'Cannot rotate: you have used items granted by a connected container. ' +
   'Reconfigure the path first.';
+
+/**
+ * Error shown when a move would connect to a non-regulator side of a chamber
+ * before its regulator side has been satisfied.
+ */
+export const ERR_REGULATOR =
+  'First connect this tile to the source by its regulator';
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
@@ -594,10 +600,13 @@ export class Board {
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;
           const chamberContent = def.chamberContent ?? null;
+          const firstConns = (def.firstConnections && def.firstConnections.length > 0)
+            ? new Set(def.firstConnections)
+            : null;
           // Spinnable pipes are not fixed so the player can rotate them, but they
           // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
           const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
-          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0);
+          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0, firstConns);
           // Spin-cement tiles also track cement drying time.
           if (SPIN_CEMENT_SHAPES.has(def.shape)) {
             this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
@@ -960,7 +969,18 @@ export class Board {
     if (effectiveCount <= 0) return { success: false };
 
     this._spendInventory(shape);
+    // Compute the pre-placement fill set for regulator-gate checking.
+    const filledBefore = this.getFilledPositions();
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
+
+    // Regulator gate: reject if this placement connects to a non-regulator side
+    // of an unsatisfied regulator chamber.
+    const regulatorViolation = this._checkRegulatorViolation(pos, filledBefore);
+    if (regulatorViolation) {
+      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
+      this._unspendInventory(shape);
+      return regulatorViolation;
+    }
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
@@ -1028,6 +1048,8 @@ export class Board {
     // disconnect such a container and produce a false "not available" result.)
     const newExisting = this.inventory.find((it) => it.shape === newShape);
     const baseCount = newExisting?.count ?? 0;
+    // Capture the pre-replacement fill for regulator-gate checking (old tile still in grid).
+    const filledBeforeReplace = this.getFilledPositions();
     this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
     const bonuses = this.getContainerBonuses();
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
@@ -1050,6 +1072,15 @@ export class Board {
 
     this._spendInventory(newShape);
     // grid[pos.row][pos.col] is already set to new Tile(newShape, rotation) above
+
+    // Regulator gate: reject if this replacement connects to a non-regulator side
+    // of an unsatisfied regulator chamber.
+    const regulatorViolation = this._checkRegulatorViolation(pos, filledBeforeReplace);
+    if (regulatorViolation) {
+      this.inventory = savedInventory;
+      this.grid[pos.row][pos.col] = tile;
+      return regulatorViolation;
+    }
 
     // ── Step 3: Post-replacement state validation ──────────────────────────────
     // Check that no inventory item's effective count has gone below zero as a
@@ -1128,10 +1159,10 @@ export class Board {
       this.grid[pos.row][pos.col] = tile; // revert to old tile
       // Compute only tiles that are both disconnected by the replacement AND in the
       // constraint positions set.  Falls back to positions when the intersection is empty.
-      const filledBeforeReplace = this.getFilledPositions();
+      const filledWithOldTile = this.getFilledPositions();
       const positionKeys = constraintPositions ? new Set(constraintPositions.map(p => posKey(p.row, p.col))) : null;
       const disconnected: GridPos[] = [];
-      for (const k of filledBeforeReplace) {
+      for (const k of filledWithOldTile) {
         if (!finalFilled.has(k) && positionKeys?.has(k)) {
           const [r, c] = parseKey(k);
           disconnected.push({ row: r, col: c });
@@ -1671,11 +1702,22 @@ export class Board {
     // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return { success: true };
-    // Capture the pre-rotation fill for disconnection-highlight computation.
+    // Capture the pre-rotation fill for disconnection-highlight computation and regulator-gate check.
     const filledBefore = this.getFilledPositions();
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
     }
+
+    // Regulator gate: reject if this rotation connects to a non-regulator side
+    // of an unsatisfied regulator chamber.
+    const regulatorViolation = this._checkRegulatorViolation(pos, filledBefore);
+    if (regulatorViolation) {
+      for (let i = 0; i < 4 - normalizedSteps; i++) {
+        tile.rotate();
+      }
+      return regulatorViolation;
+    }
+
     // Validate the final state.
     const filled = this.getFilledPositions();
     const { error: constraintError, positions: constraintPositions } = this._validateConstraints(filled);
@@ -1762,18 +1804,42 @@ export class Board {
 
   /**
    * Flood-fill from the source tile and return all reachable positions.
+   *
+   * Regulator rule: a Chamber tile with `firstConnections` is only entered
+   * (and therefore counted as source-connected) when the BFS path arrives via
+   * one of its regulator ("first") directions.  Non-regulator arrivals are
+   * silently skipped; if a regulator arrival is found later, the chamber and
+   * everything downstream of it become reachable at that point.
+   *
    * @returns Set of stringified "row,col" keys that are water-filled.
    */
   getFilledPositions(): Set<string> {
-    const reached = bfs(this.source, (pos) => {
-      const neighbors: GridPos[] = [];
+    const reached = new Map<string, GridPos>();
+    const sourceKey = posKey(this.source.row, this.source.col);
+    reached.set(sourceKey, this.source);
+
+    const queue: GridPos[] = [this.source];
+    let qi = 0;
+    while (qi < queue.length) {
+      const pos = queue[qi++];
       for (const dir of Object.values(Direction)) {
         if (!this.areMutuallyConnected(pos, dir)) continue;
         const delta = NEIGHBOUR_DELTA[dir];
-        neighbors.push({ row: pos.row + delta.row, col: pos.col + delta.col });
+        const nextPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
+        const nextKey = posKey(nextPos.row, nextPos.col);
+        if (reached.has(nextKey)) continue;
+        const nextTile = this.grid[nextPos.row]?.[nextPos.col];
+        if (!nextTile) continue;
+        // Regulator check: only enter a chamber via a first-connection direction.
+        if (nextTile.firstConnections && nextTile.firstConnections.size > 0) {
+          const arrivalDir = oppositeDirection(dir);
+          if (!nextTile.firstConnections.has(arrivalDir)) continue;
+        }
+        reached.set(nextKey, nextPos);
+        queue.push(nextPos);
       }
-      return neighbors;
-    });
+    }
+
     return new Set(reached.keys());
   }
 
@@ -1783,5 +1849,44 @@ export class Board {
   isSolved(): boolean {
     const filled = this.getFilledPositions();
     return filled.has(posKey(this.sink.row, this.sink.col));
+  }
+
+  /**
+   * Check whether a tile placement or rotation at `pos` would illegally connect
+   * to a regulator chamber's non-regulator side before the chamber has been
+   * satisfied via its regulator.
+   *
+   * Must be called **after** the mutation is applied to the grid, using the
+   * **pre-mutation** fill set as `filledBefore`.
+   *
+   * @returns A failing `MoveResult` when a violation is found, otherwise `null`.
+   */
+  private _checkRegulatorViolation(pos: GridPos, filledBefore: Set<string>): { success: false; error: string; errorTilePositions?: GridPos[] } | null {
+    const tile = this.getTile(pos);
+    if (!tile) return null;
+
+    for (const dir of tile.connections) {
+      const delta = NEIGHBOUR_DELTA[dir];
+      const neighborPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
+      const neighborKey = posKey(neighborPos.row, neighborPos.col);
+      const neighborTile = this.getTile(neighborPos);
+      if (!neighborTile || !neighborTile.firstConnections || neighborTile.firstConnections.size === 0) continue;
+
+      // Check mutual connection
+      if (!neighborTile.connections.has(oppositeDirection(dir))) continue;
+
+      // `dir` is the direction from `pos` toward `neighbor`.
+      // From the neighbor's perspective, the arrival direction is `opposite(dir)`.
+      const arrivalDir = oppositeDirection(dir);
+
+      // Only block when arriving via a non-regulator side.
+      if (neighborTile.firstConnections.has(arrivalDir)) continue;
+
+      // Block if the neighbor chamber was not already source-connected before this move.
+      if (!filledBefore.has(neighborKey)) {
+        return { success: false, error: ERR_REGULATOR, errorTilePositions: [neighborPos] };
+      }
+    }
+    return null;
   }
 }

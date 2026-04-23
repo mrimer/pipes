@@ -1,5 +1,6 @@
 import { Tile, getConnections, rotateDirection, oppositeDirection } from '../src/tile';
 import { Direction, PipeShape } from '../src/types';
+import { rotateTileDefBy90, reflectTileDefAboutDiagonal, flipTileDefHorizontal, flipTileDefVertical } from '../src/campaignEditor/types';
 
 describe('rotateDirection', () => {
   it('rotates North → East', () => {
@@ -219,4 +220,90 @@ describe('Tile.clone', () => {
     expect(orig.rotation).toBe(0);
     expect(copy.rotation).toBe(90);
   });
+
+  it('deep-copies firstConnections so mutations do not affect the original', () => {
+    const firstConns = new Set([Direction.North]);
+    const orig = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank', 0, 0, 0, 0, firstConns);
+    const copy = orig.clone();
+    copy.firstConnections!.add(Direction.South);
+    expect(orig.firstConnections!.has(Direction.South)).toBe(false);
+  });
+
+  it('preserves null firstConnections', () => {
+    const orig = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank');
+    const copy = orig.clone();
+    expect(copy.firstConnections).toBeNull();
+  });
 });
+
+// ─── TileDef transform helpers: firstConnections propagation ─────────────────
+
+describe('rotateTileDefBy90 – firstConnections', () => {
+  it('rotates firstConnections CW: North → East', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.North] };
+    const result = rotateTileDefBy90(tile, true);
+    expect(result.firstConnections).toEqual([Direction.East]);
+  });
+
+  it('rotates firstConnections CCW: North → West', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.North] };
+    const result = rotateTileDefBy90(tile, false);
+    expect(result.firstConnections).toEqual([Direction.West]);
+  });
+
+  it('preserves absent firstConnections', () => {
+    const tile = { shape: PipeShape.Chamber };
+    const result = rotateTileDefBy90(tile, true);
+    expect(result.firstConnections).toBeUndefined();
+  });
+
+  it('rotates multiple directions', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.North, Direction.East] };
+    const result = rotateTileDefBy90(tile, true);
+    expect(result.firstConnections).toContain(Direction.East);
+    expect(result.firstConnections).toContain(Direction.South);
+  });
+});
+
+describe('reflectTileDefAboutDiagonal – firstConnections', () => {
+  it('reflects firstConnections: North → West', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.North] };
+    const result = reflectTileDefAboutDiagonal(tile);
+    expect(result.firstConnections).toEqual([Direction.West]);
+  });
+
+  it('preserves absent firstConnections', () => {
+    const tile = { shape: PipeShape.Chamber };
+    const result = reflectTileDefAboutDiagonal(tile);
+    expect(result.firstConnections).toBeUndefined();
+  });
+});
+
+describe('flipTileDefHorizontal – firstConnections', () => {
+  it('flips firstConnections: East → West', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.East] };
+    const result = flipTileDefHorizontal(tile);
+    expect(result.firstConnections).toEqual([Direction.West]);
+  });
+
+  it('leaves North unchanged under horizontal flip', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.North] };
+    const result = flipTileDefHorizontal(tile);
+    expect(result.firstConnections).toEqual([Direction.North]);
+  });
+});
+
+describe('flipTileDefVertical – firstConnections', () => {
+  it('flips firstConnections: North → South', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.North] };
+    const result = flipTileDefVertical(tile);
+    expect(result.firstConnections).toEqual([Direction.South]);
+  });
+
+  it('leaves East unchanged under vertical flip', () => {
+    const tile = { shape: PipeShape.Chamber, firstConnections: [Direction.East] };
+    const result = flipTileDefVertical(tile);
+    expect(result.firstConnections).toEqual([Direction.East]);
+  });
+});
+

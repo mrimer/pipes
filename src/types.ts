@@ -219,6 +219,15 @@ export interface TileDef {
    */
   connections?: Direction[];
   /**
+   * Regulator ("first") connection directions for Chamber tiles.
+   * A chamber with regulators is only considered source-connected once the BFS
+   * path from the source arrives via one of these directions.  Only after the
+   * regulator constraint is satisfied can the chamber propagate water outward
+   * through all of its connections.
+   * Omit (or leave empty) for chambers with no regulator.
+   */
+  firstConnections?: Direction[];
+  /**
    * Level index (0-based, within the chapter) for Chamber tiles with chamberContent='level'.
    * References the level that this chamber represents on the chapter map.
    */
