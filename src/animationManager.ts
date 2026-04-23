@@ -861,6 +861,24 @@ export class AnimationManager {
         const starCy = r * TILE_SIZE + TILE_SIZE / 2;
         const canvasRect = this.canvas.getBoundingClientRect();
         spawnStarSparkles(canvasRect.left + starCx, canvasRect.top + starCy);
+      } else if (tile.chamberContent === 'siphon') {
+        // Siphon: shows water gained when connected (positive, like tank).
+        // On disconnect: shows water lost (negated locked delta).
+        const lockedDelta = board.getLockedWaterImpact({ row: r, col: c });
+        if (lockedDelta !== null) {
+          const val = dir === 'connect' ? lockedDelta : -lockedDelta;
+          text = val >= 0 ? `+${val}💧` : `${val}💧`;
+          color = animColor(val);
+        }
+      } else if (tile.chamberContent === 'gel') {
+        // Gel: shows water lost when connected (negative, like dirt).
+        // On disconnect: shows water returned (negated locked delta).
+        const lockedDelta = board.getLockedWaterImpact({ row: r, col: c });
+        if (lockedDelta !== null) {
+          const val = dir === 'connect' ? lockedDelta : -lockedDelta;
+          text = val !== 0 ? (val >= 0 ? `+${val}💧` : `${val}💧`) : (dir === 'connect' ? '-0💧' : '+0💧');
+          color = animColor(val);
+        }
       }
     }
 

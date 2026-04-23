@@ -448,6 +448,10 @@ export class EditorInputHandler {
       sfxManager.play(SfxId.Pump);
     } else if (palette === 'chamber:star') {
       sfxManager.play(SfxId.Star);
+    } else if (palette === 'chamber:gel') {
+      sfxManager.play(SfxId.Gel);
+    } else if (palette === 'chamber:siphon') {
+      sfxManager.play(SfxId.Siphon);
     } else if (palette === 'chamber:heater') {
       sfxManager.play(SfxId.Heater);
     } else if (palette === 'chamber:hot_plate') {

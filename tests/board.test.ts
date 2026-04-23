@@ -5390,3 +5390,261 @@ describe('Valve (first connection) rules', () => {
     expect(filled.has(posKey(0, 3))).toBe(false);
   });
 });
+
+// ─── Gel and Siphon chambers ──────────────────────────────────────────────────
+
+describe('Gel and Siphon chambers — getCurrentWater (dynamic fallback path)', () => {
+  /** Build a minimal 1×3 board: Source(0,0) → Chamber(0,1) → Sink(0,2). */
+  function makeChamberBoard(chamberContent: 'gel' | 'siphon', sourceCapacity = 10): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, sourceCapacity, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, chamberContent);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = sourceCapacity;
+    return board;
+  }
+
+  it('Gel halves the water total (floor) when connected — dynamic path', () => {
+    const board = makeChamberBoard('gel', 10);
+    // Source(10) → Gel halves → floor(10 / 2) = 5
+    expect(board.getCurrentWater()).toBe(5);
+  });
+
+  it('Siphon doubles the water total when connected — dynamic path', () => {
+    const board = makeChamberBoard('siphon', 10);
+    // Source(10) → Siphon doubles → 20
+    expect(board.getCurrentWater()).toBe(20);
+  });
+
+  it('Gel floors correctly on odd source capacity — dynamic path', () => {
+    const board = makeChamberBoard('gel', 11);
+    // floor(11 / 2) = 5
+    expect(board.getCurrentWater()).toBe(5);
+  });
+
+  it('Siphon applied before Gel when both present — dynamic path', () => {
+    // Board: Source(0,0) → Gel(0,1) → Siphon(0,2) → Sink(0,3)
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    // Siphon first: 10 × 2 = 20, then Gel: floor(20 / 2) = 10
+    expect(board.getCurrentWater()).toBe(10);
+  });
+
+  it('two Siphons double twice — dynamic path', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 5, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 5;
+    // 5 × 2 × 2 = 20
+    expect(board.getCurrentWater()).toBe(20);
+  });
+
+  it('two Gels halve twice — dynamic path', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 20, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 20;
+    // floor(20/2) = 10, then floor(10/2) = 5
+    expect(board.getCurrentWater()).toBe(5);
+  });
+});
+
+describe('Gel and Siphon chambers — getCurrentWater (incremental path via applyTurnDelta)', () => {
+  /** Build a fully-connected 1×3 board with given chamber and call initHistory(). */
+  function makeConnectedChamberBoard(chamberContent: 'gel' | 'siphon', sourceCapacity = 10): Board {
+    const board = new Board(1, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, sourceCapacity, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, chamberContent);
+    board.grid[0][2] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = sourceCapacity;
+    board.inventory = [];
+    board.initHistory();
+    return board;
+  }
+
+  it('Gel halves the water total (floor) — incremental path', () => {
+    const board = makeConnectedChamberBoard('gel', 10);
+    expect(board.getCurrentWater()).toBe(5);
+  });
+
+  it('Siphon doubles the water total — incremental path', () => {
+    const board = makeConnectedChamberBoard('siphon', 10);
+    expect(board.getCurrentWater()).toBe(20);
+  });
+
+  it('Gel floors correctly on odd source capacity — incremental path', () => {
+    const board = makeConnectedChamberBoard('gel', 11);
+    expect(board.getCurrentWater()).toBe(5);
+  });
+
+  it('Siphon applied before Gel when both present — incremental path', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [];
+    board.initHistory();
+    // Siphon first: 10 × 2 = 20, Gel: floor(20/2) = 10
+    expect(board.getCurrentWater()).toBe(10);
+  });
+
+  it('Gel + Siphon effectively cancel with even water (no rounding artifact)', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 4, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 4;
+    board.inventory = [];
+    board.initHistory();
+    // Siphon: 4 × 2 = 8; Gel: floor(8/2) = 4
+    expect(board.getCurrentWater()).toBe(4);
+  });
+
+  it('Gel animation delta (locked impact) is the water lost at connection time', () => {
+    const board = makeConnectedChamberBoard('gel', 10);
+    // Base = 10 (no other tiles affect water before gel), Gel halves to 5, so delta = -5
+    const delta = board.getLockedWaterImpact({ row: 0, col: 1 });
+    expect(delta).toBe(-5);
+  });
+
+  it('Siphon animation delta (locked impact) is the water gained at connection time', () => {
+    const board = makeConnectedChamberBoard('siphon', 10);
+    // Base = 10, Siphon doubles to 20, delta = +10
+    const delta = board.getLockedWaterImpact({ row: 0, col: 1 });
+    expect(delta).toBe(10);
+  });
+
+  it('Siphon connects incrementally — water doubles when newly connected', () => {
+    // Board: Source(0,0) → [Empty(0,1)] → Siphon(0,2) → Sink(0,3)
+    // Siphon at (0,2) is only connected after player places pipe at (0,1).
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 8, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 8;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    // Siphon not yet connected; water = 8
+    expect(board.getCurrentWater()).toBe(8);
+
+    // Connect the path by placing a pipe at (0,1)
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Now Siphon is connected: 8 (source) - 1 (pipe) = 7 base, × 2 = 14
+    expect(board.getCurrentWater()).toBe(14);
+
+    // Animation delta stored for Siphon should equal the base at connection time (7)
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(7);
+  });
+
+  it('Gel connects incrementally — water halves when newly connected', () => {
+    // Board: Source(0,0) → [Empty(0,1)] → Gel(0,2) → Sink(0,3)
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 8, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 8;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    expect(board.getCurrentWater()).toBe(8);
+
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Base = 8 - 1 = 7; Gel halves → floor(7/2) = 3
+    expect(board.getCurrentWater()).toBe(3);
+
+    // Animation delta: floor(7/2) - 7 = 3 - 7 = -4
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-4);
+  });
+
+  it('Siphon effect persists when more pipes are added later', () => {
+    // Connect Siphon on turn 1, then add a Tank on turn 2.
+    // The Siphon still doubles the total (including the tank bonus).
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][2] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 6, 0, null, 1, null, 'tank');
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    // Turn 1: Siphon connected. base = 10, × 2 = 20
+    expect(board.getCurrentWater()).toBe(20);
+
+    // Turn 2: place pipe at (0,2) to connect the Tank too
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // base (without siphon) = 10 - 1 (pipe) + 6 (tank) = 15; × 2 (siphon) = 30
+    expect(board.getCurrentWater()).toBe(30);
+  });
+
+  it('Gel and Siphon undo/redo correctly restores water', () => {
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    expect(board.getCurrentWater()).toBe(10);
+
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    // base = 10 - 1 = 9; × 2 = 18
+    expect(board.getCurrentWater()).toBe(18);
+
+    board.undoMove();
+    expect(board.getCurrentWater()).toBe(10);
+
+    board.redoMove();
+    expect(board.getCurrentWater()).toBe(18);
+  });
+});
