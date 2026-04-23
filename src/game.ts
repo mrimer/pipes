@@ -41,7 +41,7 @@ import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
-import { PlaybackScreen, PlaybackCallbacks } from './playbackScreen';
+import { PlaybackScreen, PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
 import { exportReplay, importReplay, exportPlayerProfile, importPlayerProfile } from './profileIO';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -468,6 +468,34 @@ export class Game implements InputCallbacks {
       hudEl: document.getElementById('hud') as HTMLElement,
       errorFlashEl: this.errorFlashEl,
       levelHeaderEl: this.levelHeaderEl,
+      spawnMoveAnimations: (board, info: MoveAnimationInfo) => {
+        this._animMgr.completeAnims();
+        this._animMgr.resetIdleTimer();
+        const sparkle = this._metrics.sparkleCallbacks();
+        if (info.rotationInfo) {
+          const tile = board.getTile(info.rotationInfo);
+          this._animMgr.spawnRotationAnim(
+            info.rotationInfo.row, info.rotationInfo.col,
+            info.rotationInfo.oldRotation,
+            tile?.rotation ?? info.rotationInfo.oldRotation,
+          );
+        }
+        this._animMgr.spawnConnectionAnimations(board, info.filledBefore, sparkle);
+        if (info.decodedMove.type === 'delete') {
+          this._animMgr.spawnDisconnectionAnimations(
+            board, info.filledBefore, sparkle,
+            info.reclaimedTile, info.decodedMove.row, info.decodedMove.col,
+          );
+        } else {
+          this._animMgr.spawnDisconnectionAnimations(board, info.filledBefore, sparkle);
+        }
+        const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
+        this._animMgr.spawnFillAnims(board, info.filledBefore, fillDelay);
+        this._animMgr.spawnLockedCostChangeAnimations(info.turnChanges);
+        this._animMgr.spawnCementDecrementAnimation(info.moveResult.cementDecrement);
+        this._refreshPlayUI();
+      },
+      resetMetricBaselines: () => this._metrics.resetBaselines(),
     };
     this._playbackScreen = new PlaybackScreen(playbackCbs);
   }
