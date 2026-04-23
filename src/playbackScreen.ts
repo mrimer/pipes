@@ -14,9 +14,10 @@
  *  - Restore the original game state on exit.
  */
 
-import { Board } from './board';
+import { Board, MoveResult } from './board';
 import { LevelDef, GameScreen, GameState, PlaySequenceRecord, AmbientDecoration } from './types';
-import { replayMoves } from './moveRecorder';
+import { DecodedMove, decodeMove, replayMoves } from './moveRecorder';
+import { Tile } from './tile';
 import { saveRecording } from './persistence';
 import { MUTED_BTN_BG } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
@@ -29,6 +30,25 @@ const MIN_SPEED_MS = 100;
 const MAX_SPEED_MS = 5000;
 /** How long the "invalid move" flash stays visible (ms). */
 const CORRUPT_FLASH_MS = 3000;
+
+/**
+ * Data captured around a single replay move, passed to the {@link PlaybackCallbacks.spawnMoveAnimations}
+ * callback so the Game can spawn the correct visual effects.
+ */
+export interface MoveAnimationInfo {
+  /** Filled-position set captured immediately before the move was applied. */
+  filledBefore: Set<string>;
+  /** The decoded move that was applied. */
+  decodedMove: DecodedMove;
+  /** Result returned by the board operation (carries `cementDecrement` when set). */
+  moveResult: MoveResult;
+  /** Locked-cost change deltas returned by {@link Board.applyTurnDelta}. */
+  turnChanges: Array<{ row: number; col: number; delta: number }>;
+  /** For delete moves: the tile that occupied the cell before it was reclaimed. */
+  reclaimedTile?: Tile;
+  /** For rotate moves: the cell and its rotation angle before the move. */
+  rotationInfo?: { row: number; col: number; oldRotation: number };
+}
 
 /** Saved game state captured before entering playback, restored on exit. */
 interface SavedGameState {
@@ -62,6 +82,13 @@ export interface PlaybackCallbacks {
   errorFlashEl: HTMLElement;
   /** Element showing the campaign name / chapter / level header text. */
   levelHeaderEl: HTMLElement;
+  /**
+   * Spawn canvas animations and refresh the play UI (inventory bar + stat rows)
+   * after a single forward replay step has been applied to the board.
+   */
+  spawnMoveAnimations(board: Board, info: MoveAnimationInfo): void;
+  /** Reset metric-sparkle baselines so the next stat refresh fires no spurious sparkles. */
+  resetMetricBaselines(): void;
 }
 
 /** CSS shared between all transport icon buttons. */
@@ -163,8 +190,7 @@ export class PlaybackScreen {
     if (!this._record || !this._level) return false;
     if (this._currentStep >= this._stepLimit) return false;
     if (this._corrupted) return false;
-    this._applyStep(this._currentStep + 1);
-    return true;
+    return this._applyMoveIncremental();
   }
 
   /** Step back one move. */
@@ -242,6 +268,8 @@ export class PlaybackScreen {
   /**
    * Rebuild the board from scratch to represent the state after exactly `step`
    * moves have been applied.  Updates `this.board` and injects it into Game.
+   * Resets metric baselines and refreshes the play UI (used for scrub / rewind /
+   * step-back, where jumping to an arbitrary position makes sparkles meaningless).
    *
    * If replay encounters a corrupt move at the requested step, it stops there,
    * sets the corrupted flag, updates the persisted record, and flashes a message.
@@ -257,17 +285,82 @@ export class PlaybackScreen {
     this._cb.setBoard(result.board);
 
     if (result.corrupted && !this._corrupted) {
-      this._corrupted = true;
-      this._pause();
-      this._markRecordCorrupted();
-      showTimedMessage(
-        this._cb.errorFlashEl,
-        `Playback halted at move ${result.stoppedAt + 1}: invalid move`,
-        CORRUPT_FLASH_MS,
-      );
+      this._handleCorruption(result.stoppedAt);
     }
 
+    this._cb.resetMetricBaselines();
+    this._cb.refreshUI();
     this._updateScrubAndLabel();
+  }
+
+  /**
+   * Apply the single move at `this._currentStep` directly to the existing board
+   * (incremental forward step).  Captures the pre-move filled set, applies the
+   * board operation, then notifies Game to spawn animations and refresh the UI.
+   *
+   * Returns `true` on success, `false` when the move is corrupt or the board
+   * operation fails.
+   */
+  private _applyMoveIncremental(): boolean {
+    if (!this._record || !this._level || !this.board) return false;
+
+    const step = this._currentStep;
+    const encoded = this._record.moves[step];
+    const decoded = decodeMove(encoded);
+    if (!decoded) {
+      if (!this._corrupted) this._handleCorruption(step);
+      return false;
+    }
+
+    const filledBefore = this.board.getFilledPositions();
+    let moveResult: MoveResult;
+    let reclaimedTile: Tile | undefined;
+    let rotationInfo: { row: number; col: number; oldRotation: number } | undefined;
+
+    if (decoded.type === 'place') {
+      moveResult = this.board.placeOrReplaceForReplay(decoded.row, decoded.col, decoded.shape, decoded.rotation);
+    } else if (decoded.type === 'rotate') {
+      const tile = this.board.getTile({ row: decoded.row, col: decoded.col });
+      rotationInfo = { row: decoded.row, col: decoded.col, oldRotation: tile?.rotation ?? 0 };
+      moveResult = decoded.direction === 'CW'
+        ? this.board.rotateTileCW({ row: decoded.row, col: decoded.col })
+        : this.board.rotateTileCCW({ row: decoded.row, col: decoded.col });
+    } else {
+      reclaimedTile = this.board.getTile({ row: decoded.row, col: decoded.col }) ?? undefined;
+      moveResult = this.board.reclaimTile({ row: decoded.row, col: decoded.col });
+    }
+
+    if (!moveResult.success) {
+      if (!this._corrupted) this._handleCorruption(step);
+      return false;
+    }
+
+    const turnChanges = this.board.applyTurnDelta();
+    this.board.recordMove();
+    this._currentStep = step + 1;
+
+    this._cb.spawnMoveAnimations(this.board, {
+      filledBefore,
+      decodedMove: decoded,
+      moveResult,
+      turnChanges,
+      reclaimedTile,
+      rotationInfo,
+    });
+    this._updateScrubAndLabel();
+    return true;
+  }
+
+  /** Mark the sequence as corrupted, pause playback, persist the flag, and show a flash message. */
+  private _handleCorruption(stoppedAt: number): void {
+    this._corrupted = true;
+    this._pause();
+    this._markRecordCorrupted();
+    showTimedMessage(
+      this._cb.errorFlashEl,
+      `Playback halted at move ${stoppedAt + 1}: invalid move`,
+      CORRUPT_FLASH_MS,
+    );
   }
 
   /** Persist the corrupted flag back onto the record in localStorage. */
