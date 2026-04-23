@@ -554,28 +554,13 @@ export class TurnStateManager {
     // These impacts are included in the normal sum in `getCurrentWater()` like any
     // other chamber — the effect is applied once at connection time, not each turn.
     if (newGelSiphonKeys.length > 0) {
-      // Build base total from sourceCapacity + all currently-locked non-Gel/Siphon impacts - leaky loss.
+      // Build base total from sourceCapacity + all currently-locked impacts - leaky loss.
+      // Gel/Siphon locked impacts are plain numeric deltas (one-time effect at connection),
+      // so they are included here like any other chamber.
       let runningTotal = this.getSourceCapacity() - this.leakyPermanentLoss;
       for (const key of filled) {
         if (!this._lockedWaterImpact.has(key)) continue;
-        const [r, c] = parseKey(key);
-        const t = this.grid[r]?.[c];
-        if (t?.shape === PipeShape.Chamber && t.chamberContent !== null && GEL_SIPHON_CONTENTS.has(t.chamberContent)) continue;
         runningTotal += this._lockedWaterImpact.get(key)!;
-      }
-      // Apply multipliers from already-locked (previously connected) Siphons.
-      for (const key of filled) {
-        if (!this._lockedWaterImpact.has(key)) continue;
-        const [r, c] = parseKey(key);
-        const t = this.grid[r]?.[c];
-        if (t?.shape === PipeShape.Chamber && t.chamberContent === 'siphon') runningTotal *= 2;
-      }
-      // Apply multipliers from already-locked (previously connected) Gels.
-      for (const key of filled) {
-        if (!this._lockedWaterImpact.has(key)) continue;
-        const [r, c] = parseKey(key);
-        const t = this.grid[r]?.[c];
-        if (t?.shape === PipeShape.Chamber && t.chamberContent === 'gel') runningTotal = Math.floor(runningTotal / 2);
       }
       // Process newly-connecting Siphons first (double), then Gels (halve).
       const newGelKeys: string[] = [];
