@@ -992,8 +992,8 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
-    // Regulator pre-check: newly-connecting regulators against pre-placement stats,
-    // before any tiles in this turn can change the environment.
+    // Regulator pre-check: newly-connecting regulators against stats captured
+    // before the placement, even though the tile is already on the grid.
     const { error: regError, positions: regPositions } = this._checkRegulators(
       filledBefore,
       filled,
