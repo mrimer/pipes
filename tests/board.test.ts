@@ -5645,10 +5645,12 @@ describe('Regulator chambers — stat check at connection time', () => {
     expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water < 5');
   });
 
-  it('passes when water = threshold (= operator)', () => {
-    const board = makeRegulatorBoard(6, 'water', '=', 5);
-    // Pre-placement water = 6 − 1 = 5; 5 = 5 → passes
-    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+  it('passes when temperature = threshold (= operator — stat unaffected by pipe cost)', () => {
+    // Temperature does not change when a pipe is placed, so pre-check and post-check
+    // both see the same value and can pass the = operator test.
+    // Board: Source(temp=5) → Heater(temp=0) → Straight(fixed) → [Empty] → Regulator(temp=5) → Sink
+    const board = makeTemperatureRegulatorBoard(5, 0, '=', 5);
+    const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
     expect(result.success).toBe(true);
   });
 
@@ -5671,13 +5673,14 @@ describe('Regulator chambers — stat check at connection time', () => {
     expect(board.inventory.find(i => i.shape === PipeShape.Straight)!.count).toBe(invBefore);
   });
 
-  // ── pre-move vs. post-move stats ──
+  // ── pre-move vs. post-turn stats ──
 
-  it('uses pre-placement water — a placement whose pipe cost would break the check still passes', () => {
-    // Board: Source(cap=4, E) → [Empty](0,1) → Regulator(water > 3)(0,2) → Sink(0,3)
-    // After initHistory: filled = {Source} only (gap at 0,1), getCurrentWater() = 4.
-    // Player places Straight at (0,1): pre-move water = 4 > 3 → passes.
-    // Post-move water would be 4 − 1 = 3, which would FAIL 3 > 3 — confirming we use pre-move values.
+  it('post-turn check rejects a placement whose pipe cost drops water to the threshold (pre-check passes, post-check fails)', () => {
+    // Board: Source(cap=4) → [Empty](0,1) → Regulator(water > 3)(0,2) → Sink(0,3)
+    // After initHistory: fill = {Source}, water = 4.
+    // Player places Straight at (0,1):
+    //   Pre-check:  pre-water = 4 > 3 → passes.
+    //   Post-check: connecting the pipe costs 1 → post-water = 3; 3 > 3 is false → rejected.
     const board = new Board(1, 4);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 3 };
@@ -5693,7 +5696,34 @@ describe('Regulator chambers — stat check at connection time', () => {
     board.initHistory();
 
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water > 3');
+  });
+
+  it('pre-check rejects when a heater connecting in the same turn would satisfy the threshold but pre-stats do not', () => {
+    // Board: Source(temp=0) → [Empty](0,1) → Heater(temp=10, fixed)(0,2) → Regulator(temp > 5)(0,3) → Sink(0,4)
+    // After initHistory: fill = {Source}, temperature = 0.
+    // Player places Straight at (0,1) — this would connect both the Heater and the Regulator.
+    //   Pre-check:  pre-temperature = 0 (heater not yet connected); 0 > 5 → rejected.
+    //   Post-check: would be post-temperature = 10 > 5, but the pre-check fires first.
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', 10);
+    board.grid[0][3] = new Tile(
+      PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'regulator',
+      0, 0, 0, 0, null, 'temperature', '>',
+    );
+    board.grid[0][4] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Temperature > 5');
   });
 
   // ── temperature stat ──

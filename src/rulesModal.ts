@@ -292,7 +292,7 @@ const LEGEND_ROWS: LegendRow[] = [
   {
     iconHtml: chamberSwatch(REGULATOR_COLOR, '>N\u2026'),
     name: 'Regulator',
-    description: 'Blocks tile connection unless the specified stat check passes. The check compares the player\'s stat (Water, Frozen, Temperature, or Pressure) to a threshold value using <, >, or =. Checked before any other tiles resolve on the same turn. If the check fails, the move is rejected.',
+    description: 'Blocks tile connection unless the specified stat check passes. The check compares the player\'s stat (Water, Frozen, Temperature, or Pressure) to a threshold value using <, >, or =. Checked both before and after other tiles resolve on the same turn. If either check fails, the move is rejected.',
   },
   {
     iconHtml: chamberSwatch(STAR_COLOR, '★'),

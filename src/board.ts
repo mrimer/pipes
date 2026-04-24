@@ -992,9 +992,16 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
-    // Regulator checks run first (using pre-placement stats) before any other
-    // tiles in this turn can change the stats.
-    const { error: regError, positions: regPositions } = this._checkRegulators(filledBefore, filled);
+    // Regulator pre-check: newly-connecting regulators against pre-placement stats,
+    // before any tiles in this turn can change the environment.
+    const { error: regError, positions: regPositions } = this._checkRegulators(
+      filledBefore,
+      filled,
+      this.getCurrentWater(),
+      this.getCurrentTemperature(filledBefore),
+      this.getCurrentPressure(filledBefore),
+      this._turnState.frozen,
+    );
     if (regError) {
       this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
       this._unspendInventory(shape);
@@ -1006,6 +1013,15 @@ export class Board {
       this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
       this._unspendInventory(shape);
       return { success: false, error, errorTilePositions: positions ?? undefined };
+    }
+
+    // Regulator post-turn check: re-validate newly-connecting regulators using
+    // the stats that result after all tiles in this turn have resolved.
+    const { error: postRegError, positions: postRegPositions } = this._checkRegulatorsPostTurn(filledBefore, filled);
+    if (postRegError) {
+      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
+      this._unspendInventory(shape);
+      return { success: false, error: postRegError, errorTilePositions: postRegPositions ?? undefined };
     }
 
     // Decrement cement setting time after successful placement.
@@ -1167,8 +1183,15 @@ export class Board {
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
-    // Regulator checks run first (using pre-replacement stats).
-    const { error: regError2, positions: regPositions2 } = this._checkRegulators(filledBeforeReplace, finalFilled);
+    // Regulator pre-check: newly-connecting regulators against pre-replacement stats.
+    const { error: regError2, positions: regPositions2 } = this._checkRegulators(
+      filledBeforeReplace,
+      finalFilled,
+      this.getCurrentWater(),
+      this.getCurrentTemperature(filledBeforeReplace),
+      this.getCurrentPressure(filledBeforeReplace),
+      this._turnState.frozen,
+    );
     if (regError2) {
       this.inventory = savedInventory;
       this.grid[pos.row][pos.col] = tile; // revert to old tile
@@ -1191,6 +1214,15 @@ export class Board {
         }
       }
       return { success: false, error: constraintError, errorTilePositions: disconnected.length ? disconnected : constraintPositions ?? undefined };
+    }
+
+    // Regulator post-turn check: re-validate newly-connecting regulators using
+    // the stats that result after all tiles in this turn have resolved.
+    const { error: postRegError2, positions: postRegPositions2 } = this._checkRegulatorsPostTurn(filledBeforeReplace, finalFilled);
+    if (postRegError2) {
+      this.inventory = savedInventory;
+      this.grid[pos.row][pos.col] = tile; // revert to old tile
+      return { success: false, error: postRegError2, errorTilePositions: postRegPositions2 ?? undefined };
     }
 
     // Decrement cement setting time after successful replace.
@@ -1468,31 +1500,34 @@ export class Board {
   }
 
   /**
-   * Check all Regulator tiles that are **newly** connected in `newFilled`
-   * (i.e. present in `newFilled` but not yet in the locked-impact map).
+   * Scan `newFilled` for newly-connected Regulator tiles (i.e. not present in
+   * `preFilled`) and test each one against the provided stat snapshot.
    *
-   * The stat values are read from the board state that existed *before* the
-   * current move so that other tiles connecting in the same turn cannot
-   * satisfy a Regulator check they themselves cause.
+   * Using `preFilled` as the "already connected" guard rather than the locked-
+   * impact map means the check works correctly both before *and* after
+   * {@link applyTurnDelta} has been called (after which the locked map would
+   * include the newly-connected tiles and incorrectly skip them).
    *
-   * All failing regulators are checked in grid-scan order; the first failure
+   * All failing regulators are checked in iteration order; the first failure
    * is returned immediately.
    *
-   * @param preFilled - Fill set before the current board mutation.
-   * @param newFilled - Fill set after the current board mutation.
+   * @param preFilled - Fill set before the current board mutation (tiles to skip).
+   * @param newFilled - Fill set after the current board mutation (tiles to scan).
+   * @param water - Water stat value to test against the threshold.
+   * @param temperature - Temperature stat value to test against the threshold.
+   * @param pressure - Pressure stat value to test against the threshold.
+   * @param frozen - Frozen stat value to test against the threshold.
    */
   private _checkRegulators(
     preFilled: Set<string>,
     newFilled: Set<string>,
+    water: number,
+    temperature: number,
+    pressure: number,
+    frozen: number,
   ): { error: string | null; positions: GridPos[] | null } {
-    const preWater       = this.getCurrentWater();
-    const preTemperature = this.getCurrentTemperature(preFilled);
-    const prePressure    = this.getCurrentPressure(preFilled);
-    const preFrozen      = this._turnState.frozen;
-
     for (const key of newFilled) {
-      // Only newly-connecting tiles (not yet in the locked map).
-      if (this._turnState.lockedWaterImpact.has(key)) continue;
+      if (preFilled.has(key)) continue; // skip previously-connected tiles
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
       if (!tile || tile.shape !== PipeShape.Chamber || tile.chamberContent !== 'regulator') continue;
@@ -1503,10 +1538,10 @@ export class Board {
 
       let statValue: number;
       switch (stat) {
-        case 'water':       statValue = preWater;       break;
-        case 'frozen':      statValue = preFrozen;      break;
-        case 'temperature': statValue = preTemperature; break;
-        case 'pressure':    statValue = prePressure;    break;
+        case 'water':       statValue = water;       break;
+        case 'frozen':      statValue = frozen;      break;
+        case 'temperature': statValue = temperature; break;
+        case 'pressure':    statValue = pressure;    break;
       }
 
       let passes: boolean;
@@ -1525,6 +1560,36 @@ export class Board {
       }
     }
     return { error: null, positions: null };
+  }
+
+  /**
+   * Temporarily apply the turn delta to compute post-turn stats, run the
+   * post-turn regulator check on the **newly-connected** regulators
+   * (`newFilled − preFilled`), then restore the turn state.
+   *
+   * Must be called after the board mutation has already been applied so that
+   * `applyTurnDelta()` sees the final fill path — including any newly-connected
+   * heaters, pumps, ice, gel, and siphon tiles — when locking water impacts.
+   *
+   * @param preFilled - Fill set before the board mutation (used to identify new tiles).
+   * @param newFilled - Fill set after the board mutation.
+   */
+  private _checkRegulatorsPostTurn(
+    preFilled: Set<string>,
+    newFilled: Set<string>,
+  ): { error: string | null; positions: GridPos[] | null } {
+    const savedTurnState = this._turnState.captureSnapshot();
+    this.applyTurnDelta();
+    const result = this._checkRegulators(
+      preFilled,
+      newFilled,
+      this.getCurrentWater(),
+      this.getCurrentTemperature(newFilled),
+      this.getCurrentPressure(newFilled),
+      this._turnState.frozen,
+    );
+    this._turnState.restoreSnapshot(savedTurnState);
+    return result;
   }
 
   /**
@@ -1802,8 +1867,15 @@ export class Board {
 
     // Validate the final state.
     const filled = this.getFilledPositions();
-    // Regulator checks run first (using pre-rotation stats).
-    const { error: regError3, positions: regPositions3 } = this._checkRegulators(filledBefore, filled);
+    // Regulator pre-check: newly-connecting regulators against pre-rotation stats.
+    const { error: regError3, positions: regPositions3 } = this._checkRegulators(
+      filledBefore,
+      filled,
+      this.getCurrentWater(),
+      this.getCurrentTemperature(filledBefore),
+      this.getCurrentPressure(filledBefore),
+      this._turnState.frozen,
+    );
     if (regError3) {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
@@ -1847,6 +1919,16 @@ export class Board {
           return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: itemPositions.length ? itemPositions : undefined };
         }
       }
+    }
+
+    // Regulator post-turn check: re-validate newly-connecting regulators using
+    // the stats that result after all tiles in this turn have resolved.
+    const { error: postRegError3, positions: postRegPositions3 } = this._checkRegulatorsPostTurn(filledBefore, filled);
+    if (postRegError3) {
+      for (let i = 0; i < 4 - normalizedSteps; i++) {
+        tile.rotate();
+      }
+      return { success: false, error: postRegError3, errorTilePositions: postRegPositions3 ?? undefined };
     }
 
     // Decrement cement setting time after successful rotation.
