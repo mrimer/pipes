@@ -1,4 +1,4 @@
-import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_VALVE, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_VALVE, ERR_REGULATOR_CHECK_PREFIX, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
 import { Direction, LevelDef, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
@@ -5575,5 +5575,224 @@ describe('Gel and Siphon chambers — getCurrentWater (incremental path via appl
 
     board.redoMove();
     expect(board.getCurrentWater()).toBe(18);
+  });
+});
+
+// ─── Regulator chambers ───────────────────────────────────────────────────────
+
+describe('Regulator chambers — stat check at connection time', () => {
+  /**
+   * Build a board where the regulator tile is not yet connected so that a
+   * single player placement completes the path and triggers the check:
+   *
+   *   Source(0,0, cap) → Straight(0,1, fixed) → [Empty](0,2) → Regulator(0,3) → Sink(0,4)
+   *
+   * Pre-placement water = cap − 1 (one fixed straight-pipe cost).
+   */
+  function makeRegulatorBoard(
+    cap: number,
+    stat: 'water' | 'frozen' | 'temperature' | 'pressure',
+    op: '<' | '>' | '=',
+    threshold: number,
+  ): Board {
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, cap, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90, true); // E-W, fixed — costs 1 water when connected
+    board.grid[0][2] = new Tile(PipeShape.Empty, 0, false);
+    board.grid[0][3] = new Tile(
+      PipeShape.Chamber, 0, true, 0, threshold, null, 1, null, 'regulator',
+      0, 0, 0, 0, null, stat, op,
+    );
+    board.grid[0][4] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = cap;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+    return board;
+  }
+
+  // ── water stat ──
+
+  it('passes when water > threshold (water stat, > operator)', () => {
+    const board = makeRegulatorBoard(10, 'water', '>', 5);
+    // Pre-placement water = 10 − 1 = 9; 9 > 5 → passes
+    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('fails when water <= threshold (water stat, > operator)', () => {
+    const board = makeRegulatorBoard(3, 'water', '>', 5);
+    // Pre-placement water = 3 − 1 = 2; 2 > 5 → fails
+    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water > 5');
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 3 }]);
+  });
+
+  it('passes when water < threshold (< operator)', () => {
+    const board = makeRegulatorBoard(3, 'water', '<', 5);
+    // Pre-placement water = 2; 2 < 5 → passes
+    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('fails when water >= threshold (< operator)', () => {
+    const board = makeRegulatorBoard(10, 'water', '<', 5);
+    // Pre-placement water = 9; 9 < 5 → fails
+    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water < 5');
+  });
+
+  it('passes when water = threshold (= operator)', () => {
+    const board = makeRegulatorBoard(6, 'water', '=', 5);
+    // Pre-placement water = 6 − 1 = 5; 5 = 5 → passes
+    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('fails when water != threshold (= operator)', () => {
+    const board = makeRegulatorBoard(10, 'water', '=', 5);
+    // Pre-placement water = 9; 9 ≠ 5 → fails
+    const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water = 5');
+  });
+
+  // ── rollback on failure ──
+
+  it('failed placement rolls back board state and restores inventory', () => {
+    const board = makeRegulatorBoard(3, 'water', '>', 5);
+    // 2 > 5 → fails; grid[0][2] must stay Empty and inventory count must be unchanged
+    const invBefore = board.inventory.find(i => i.shape === PipeShape.Straight)!.count;
+    board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
+    expect(board.grid[0][2].shape).toBe(PipeShape.Empty);
+    expect(board.inventory.find(i => i.shape === PipeShape.Straight)!.count).toBe(invBefore);
+  });
+
+  // ── pre-move vs. post-move stats ──
+
+  it('uses pre-placement water — a placement whose pipe cost would break the check still passes', () => {
+    // Board: Source(cap=4, E) → [Empty](0,1) → Regulator(water > 3)(0,2) → Sink(0,3)
+    // After initHistory: filled = {Source} only (gap at 0,1), getCurrentWater() = 4.
+    // Player places Straight at (0,1): pre-move water = 4 > 3 → passes.
+    // Post-move water would be 4 − 1 = 3, which would FAIL 3 > 3 — confirming we use pre-move values.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 4, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(
+      PipeShape.Chamber, 0, true, 0, 3, null, 1, null, 'regulator',
+      0, 0, 0, 0, null, 'water', '>',
+    );
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 4;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  // ── temperature stat ──
+
+  /**
+   * Build a board where a heater is already connected before the regulator,
+   * so the temperature check can be exercised:
+   *
+   *   Source(0,0, temp=sourceTemp) → Heater(0,1, temp=heaterTemp) → Straight(0,2, fixed)
+   *     → [Empty](0,3) → Regulator(0,4, temperature OP threshold) → Sink(0,5)
+   *
+   * Pre-placement temperature = sourceTemp + heaterTemp.
+   */
+  function makeTemperatureRegulatorBoard(
+    sourceTemp: number,
+    heaterTemp: number,
+    op: '<' | '>' | '=',
+    threshold: number,
+  ): Board {
+    const board = new Board(1, 6);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 5 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]), null, sourceTemp);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'heater', heaterTemp);
+    board.grid[0][2] = new Tile(PipeShape.Straight, 90, true); // E-W, fixed
+    board.grid[0][3] = new Tile(PipeShape.Empty, 0, false);
+    board.grid[0][4] = new Tile(
+      PipeShape.Chamber, 0, true, 0, threshold, null, 1, null, 'regulator',
+      0, 0, 0, 0, null, 'temperature', op,
+    );
+    board.grid[0][5] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+    return board;
+  }
+
+  it('passes when temperature > threshold (temperature stat)', () => {
+    // sourceTemp=8, heaterTemp=5 → pre-move temperature=13; 13 > 10 → passes
+    const board = makeTemperatureRegulatorBoard(8, 5, '>', 10);
+    const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('fails when temperature <= threshold (temperature stat)', () => {
+    // sourceTemp=8, heaterTemp=5 → pre-move temperature=13; 13 > 15 → fails
+    const board = makeTemperatureRegulatorBoard(8, 5, '>', 15);
+    const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Temperature > 15');
+  });
+
+  // ── pressure stat ──
+
+  /**
+   * Build a board where a pump is already connected before the regulator,
+   * so the pressure check can be exercised:
+   *
+   *   Source(0,0, pressure=sourcePressure) → Pump(0,1, pressure=pumpPressure)
+   *     → Straight(0,2, fixed) → [Empty](0,3) → Regulator(0,4, pressure OP threshold) → Sink(0,5)
+   *
+   * Pre-placement pressure = sourcePressure + pumpPressure.
+   */
+  function makePressureRegulatorBoard(
+    sourcePressure: number,
+    pumpPressure: number,
+    op: '<' | '>' | '=',
+    threshold: number,
+  ): Board {
+    const board = new Board(1, 6);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 5 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]), null, 0, sourcePressure);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'pump', 0, pumpPressure);
+    board.grid[0][2] = new Tile(PipeShape.Straight, 90, true); // E-W, fixed
+    board.grid[0][3] = new Tile(PipeShape.Empty, 0, false);
+    board.grid[0][4] = new Tile(
+      PipeShape.Chamber, 0, true, 0, threshold, null, 1, null, 'regulator',
+      0, 0, 0, 0, null, 'pressure', op,
+    );
+    board.grid[0][5] = new Tile(PipeShape.Sink, 0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 1 }];
+    board.initHistory();
+    return board;
+  }
+
+  it('passes when pressure > threshold (pressure stat)', () => {
+    // sourcePressure=2, pumpPressure=3 → pre-move pressure=5; 5 > 4 → passes
+    const board = makePressureRegulatorBoard(2, 3, '>', 4);
+    const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+  });
+
+  it('fails when pressure <= threshold (pressure stat)', () => {
+    // sourcePressure=2, pumpPressure=3 → pre-move pressure=5; 5 > 6 → fails
+    const board = makePressureRegulatorBoard(2, 3, '>', 6);
+    const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Pressure > 6');
   });
 });
