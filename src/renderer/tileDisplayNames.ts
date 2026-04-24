@@ -5,6 +5,7 @@
 
 import { Tile } from '../tile';
 import { PipeShape } from '../types';
+
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
   [PipeShape.Straight]:     'St',
