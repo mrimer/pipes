@@ -1571,6 +1571,21 @@ export class Board {
    * `applyTurnDelta()` sees the final fill path — including any newly-connected
    * heaters, pumps, ice, gel, and siphon tiles — when locking water impacts.
    *
+   * ### Why `applyTurnDelta()` is unavoidable here
+   * The regulator check compares post-turn water, temperature, pressure, and
+   * frozen values.  All four are derived from turn-state that only exists after
+   * `applyTurnDelta()` has run:
+   *  - `getCurrentWater()` reads `lockedWaterImpact`, which is populated by
+   *    `applyTurnDelta()`.
+   *  - `getCurrentTemperature()` / `getCurrentPressure()` use `connectionTurn`,
+   *    which is incremented by `applyTurnDelta()`.
+   *  - `frozen` is updated during `applyTurnDelta()`.
+   *
+   * There is therefore no cheaper way to obtain the stats needed by
+   * `_checkRegulators`.  On the rejection path the `applyTurnDelta()` work is
+   * discarded, but `restoreSnapshot` guarantees that the turn state is identical
+   * to what it was before the call, so correctness is preserved in both cases.
+   *
    * @param preFilled - Fill set before the board mutation (used to identify new tiles).
    * @param newFilled - Fill set after the board mutation.
    */
