@@ -2066,6 +2066,33 @@ function _renderPass5FixedPipeBolts(ctx: CanvasRenderingContext2D, board: Board)
   ctx.restore();
 }
 
+/**
+ * Pass 6: Draw error-highlight overlays on top of all tile content.
+ *
+ * The pulsing red rectangle is drawn last so it appears above pipes, chambers,
+ * and all other tile visuals, making it clearly visible during an invalid move.
+ */
+function _renderPass6ErrorHighlights(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  highlightedPositions: Set<string>,
+): void {
+  if (highlightedPositions.size === 0) return;
+  const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
+  ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
+  ctx.strokeStyle = ERROR_HIGHLIGHT_BORDER;
+  ctx.lineWidth = 3;
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      if (!highlightedPositions.has(posKey(r, c))) continue;
+      const x = c * TILE_SIZE;
+      const y = r * TILE_SIZE;
+      ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+      ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    }
+  }
+}
+
 /** Render the full game board onto the canvas. */
 export function renderBoard(
   ctx: CanvasRenderingContext2D,
@@ -2100,13 +2127,15 @@ export function renderBoard(
 
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
-  _renderPass1Backgrounds(ctx, board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha, highlightedPositions);
+  _renderPass1Backgrounds(ctx, board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha);
   // Win tile glow overlay: rendered above backgrounds but beneath all tile content.
   winTileOverlayFn?.(ctx);
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);
+  // Error highlights are drawn last so they appear above all tile content.
+  _renderPass6ErrorHighlights(ctx, board, highlightedPositions);
   _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater, effectiveFilled);
 }
 
@@ -2212,7 +2241,6 @@ function _renderPass1Backgrounds(
   pendingRotation: number,
   selectedIsGold: boolean,
   shimmerAlpha: number,
-  highlightedPositions: Set<string>,
 ): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
@@ -2275,15 +2303,6 @@ function _renderPass1Backgrounds(
         }
       }
 
-      // Sandstone error highlight (pulsing red overlay)
-      if (highlightedPositions.has(posKey(r, c))) {
-        const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
-        ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
-        ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        ctx.strokeStyle = ERROR_HIGHLIGHT_BORDER;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-      }
     }
   }
 }

@@ -113,10 +113,10 @@ const CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> =
   { palette: 'chamber:snow',      label: '❄ Snow' },
   { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
   { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
-  { palette: 'chamber:regulator', label: '🔒 Regulator' },
   { palette: 'chamber:star',      label: '⭐ Star' },
   { palette: 'chamber:gel',       label: '½ Gel' },
   { palette: 'chamber:siphon',    label: '×2 Siphon' },
+  { palette: 'chamber:regulator', label: '🔒 Regulator' },
 ];
 
 const GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -533,10 +533,10 @@ export class TileParamsPanel {
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
       tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
-      ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', star: 'Star', hot_plate: 'Hot Plate',
-      gel: 'Gel', siphon: 'Siphon',
+      ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', hot_plate: 'Hot Plate',
+      star: 'Star', gel: 'Gel', siphon: 'Siphon', regulator: 'Regulator',
     };
-    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'star', 'hot_plate', 'gel', 'siphon']) {
+    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'hot_plate', 'star', 'gel', 'siphon', 'regulator']) {
       const o = document.createElement('option');
       o.value = opt;
       o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
