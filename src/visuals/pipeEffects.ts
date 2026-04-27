@@ -193,6 +193,14 @@ export function computeFillOrder(
       if (bfsVisited.has(nextKey)) continue;
       bfsVisited.add(nextKey);
 
+      // Valve check: only enter a Chamber tile via one of its first-connection
+      // directions (mirrors the guard in Board.getFilledPositions).
+      const nextTile = board.grid[next.row]?.[next.col];
+      if (nextTile?.firstConnections && nextTile.firstConnections.size > 0) {
+        const arrivalDir = oppositeDirection(dir);
+        if (!nextTile.firstConnections.has(arrivalDir)) continue;
+      }
+
       const nextIsNew = !filledBefore.has(nextKey);
       // animDepth for the next tile:
       //  already-filled tile       → -1 (continues traversal without incrementing)

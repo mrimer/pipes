@@ -7,6 +7,21 @@
 import { Direction } from '../types';
 import { EDITOR_INPUT_BG, RADIUS_SM } from '../uiConstants';
 
+// Button dimensions for the compass layout.
+// W/E buttons are wider; N/S buttons are taller, giving more surface area for
+// both the connection button itself and the valve-indicator rectangles inside.
+const BTN_NS_W = 28; // N and S button width  (px)
+const BTN_NS_H = 40; // N and S button height (px)
+const BTN_WE_W = 40; // W and E button width  (px)
+const BTN_WE_H = 28; // W and E button height (px)
+const BTN_CTR  = 28; // center cell size      (px)
+
+// Valve indicator dimensions (the clickable rectangle drawn inside each button).
+const IND_NS_W = '20px'; // landscape strip width  for N/S buttons
+const IND_NS_H =  '7px'; // landscape strip height for N/S buttons
+const IND_WE_W =  '7px'; // portrait  strip width  for W/E buttons
+const IND_WE_H = '20px'; // portrait  strip height for W/E buttons
+
 /**
  * Build a compass-layout N/E/S/W toggle widget.
  *
@@ -43,8 +58,12 @@ export function buildCompassConnectionsWidget(
   connWrap.appendChild(connLbl);
 
   const connGrid = document.createElement('div');
+  // Asymmetric grid: W/E columns are wider, N/S rows are taller.
   connGrid.style.cssText =
-    'display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(3,28px);gap:2px;';
+    `display:grid;` +
+    `grid-template-columns:${BTN_WE_W}px ${BTN_CTR}px ${BTN_WE_W}px;` +
+    `grid-template-rows:${BTN_NS_H}px ${BTN_WE_H}px ${BTN_NS_H}px;` +
+    `gap:2px;`;
 
   const makeBtn = (dir: Direction): HTMLElement => {
     const label = dir === Direction.North ? 'N'
@@ -52,12 +71,15 @@ export function buildCompassConnectionsWidget(
                 : dir === Direction.South ? 'S'
                 : 'W';
     const active = getActive(dir);
+    const isNS = dir === Direction.North || dir === Direction.South;
+    const btnW = isNS ? BTN_NS_W : BTN_WE_W;
+    const btnH = isNS ? BTN_NS_H : BTN_WE_H;
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
     b.title = `Toggle ${label} connection`;
     b.style.cssText =
-      'width:28px;height:28px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;' +
+      `width:${btnW}px;height:${btnH}px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;` +
       'position:relative;' +
       'background:' + (active ? '#1a3a1a' : EDITOR_INPUT_BG) + ';' +
       'color:'      + (active ? '#7ed321' : '#555')    + ';' +
@@ -69,17 +91,15 @@ export function buildCompassConnectionsWidget(
     if (getFirstActive && onFirstToggle) {
       const firstActive = getFirstActive(dir);
       const indicator = document.createElement('span');
-      // Portrait indicator for N/S (landscape strip at top/bottom edge);
-      // Landscape indicator for W/E (portrait strip at left/right edge).
-      const isNS = dir === Direction.North || dir === Direction.South;
-      const indW = isNS ? '14px' : '5px';
-      const indH = isNS ? '5px' : '14px';
-      const top  = dir === Direction.North ? '1px'
-                 : dir === Direction.South ? 'calc(100% - 6px)'
-                 : 'calc(50% - 7px)';
-      const left = dir === Direction.West  ? '1px'
-                 : dir === Direction.East  ? 'calc(100% - 6px)'
-                 : 'calc(50% - 7px)';
+      // N/S: horizontal bar near the inward edge; W/E: vertical bar near the inward edge.
+      const indW = isNS ? IND_NS_W : IND_WE_W;
+      const indH = isNS ? IND_NS_H : IND_WE_H;
+      const top  = dir === Direction.North ? 'calc(100% - 9px)'
+                 : dir === Direction.South ? '2px'
+                 : `calc(50% - ${parseInt(IND_WE_H) / 2}px)`;
+      const left = dir === Direction.West  ? 'calc(100% - 9px)'
+                 : dir === Direction.East  ? '2px'
+                 : `calc(50% - ${parseInt(IND_NS_W) / 2}px)`;
       indicator.style.cssText =
         `position:absolute;top:${top};left:${left};` +
         `width:${indW};height:${indH};` +
