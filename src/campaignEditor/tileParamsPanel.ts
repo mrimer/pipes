@@ -534,9 +534,9 @@ export class TileParamsPanel {
     const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
       tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
       ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', hot_plate: 'Hot Plate',
-      star: 'Star', gel: 'Gel', siphon: 'Siphon', regulator: 'Regulator',
+      gel: 'Gel', siphon: 'Siphon', regulator: 'Regulator', star: 'Star',
     };
-    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'hot_plate', 'star', 'gel', 'siphon', 'regulator']) {
+    for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'hot_plate', 'gel', 'siphon', 'regulator', 'star']) {
       const o = document.createElement('option');
       o.value = opt;
       o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
