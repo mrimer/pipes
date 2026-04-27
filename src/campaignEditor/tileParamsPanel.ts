@@ -113,10 +113,10 @@ const CHAMBER_PALETTE_ITEMS: Array<{ palette: ChamberPalette; label: string }> =
   { palette: 'chamber:snow',      label: '❄ Snow' },
   { palette: 'chamber:sandstone', label: '🪨 Sandstone' },
   { palette: 'chamber:hot_plate', label: '🌡 Hot Plate' },
-  { palette: 'chamber:star',      label: '⭐ Star' },
   { palette: 'chamber:gel',       label: '½ Gel' },
   { palette: 'chamber:siphon',    label: '×2 Siphon' },
   { palette: 'chamber:regulator', label: '🔒 Regulator' },
+  { palette: 'chamber:star',      label: '⭐ Star' },
 ];
 
 const GOLD_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
