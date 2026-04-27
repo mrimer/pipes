@@ -951,6 +951,59 @@ export class Board {
   }
 
   /**
+   * Returns a failure MoveResult when a non-gold pipe is being placed on a gold space,
+   * or `null` when the constraint is satisfied.
+   */
+  private _checkGoldSpacePipe(pos: GridPos, shape: PipeShape): MoveResult | null {
+    const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
+    const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
+    if (isGoldSpace && !isGoldPipe) {
+      return { success: false, error: ERR_GOLD_SPACE };
+    }
+    return null;
+  }
+
+  /**
+   * Wraps the regulator pre-check with the standard set of current stats derived
+   * from `filledBefore`, avoiding repeated 6-argument call sites.
+   */
+  private _runRegulatorPreCheck(
+    filledBefore: Set<string>,
+    filled: Set<string>,
+  ): { error: string | null; positions: GridPos[] | null } {
+    return this._checkRegulators(
+      filledBefore,
+      filled,
+      this.getCurrentWater(),
+      this.getCurrentTemperature(filledBefore),
+      this.getCurrentPressure(filledBefore),
+      this._turnState.frozen,
+    );
+  }
+
+  /**
+   * Computes the subset of `constraintPositions` whose keys were present in
+   * `prevFilled` but are absent from `newFilled` (i.e. tiles disconnected by the
+   * move that are also flagged by the constraint validator).  Falls back to the
+   * full `constraintPositions` array when the intersection is empty.
+   */
+  private _computeDisconnectedConstraintPositions(
+    prevFilled: Set<string>,
+    newFilled: Set<string>,
+    constraintPositions: GridPos[] | null | undefined,
+  ): GridPos[] {
+    const positionKeys = constraintPositions ? new Set(constraintPositions.map(p => posKey(p.row, p.col))) : null;
+    const disconnected: GridPos[] = [];
+    for (const k of prevFilled) {
+      if (!newFilled.has(k) && positionKeys?.has(k)) {
+        const [r, c] = parseKey(k);
+        disconnected.push({ row: r, col: c });
+      }
+    }
+    return disconnected.length ? disconnected : constraintPositions ?? [];
+  }
+
+  /**
    * Place a pipe from the inventory onto an empty cell.
    * The effective inventory count (base + ItemContainer grants) must be positive.
    * Gold spaces only accept gold pipes; gold pipes may be placed on any empty cell.
@@ -960,13 +1013,8 @@ export class Board {
     const tile = this.getTile(pos);
     if (!tile || !isEmptyFloor(tile.shape)) return { success: false };
 
-    const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
-    const isGoldPipe  = GOLD_PIPE_SHAPES.has(shape);
-
-    // Gold spaces only accept gold pipes; regular pipes may not go on gold spaces
-    if (isGoldSpace && !isGoldPipe) {
-      return { success: false, error: ERR_GOLD_SPACE };
-    }
+    const goldViolation = this._checkGoldSpacePipe(pos, shape);
+    if (goldViolation) return goldViolation;
 
     const existing = this.inventory.find((it) => it.shape === shape);
     const baseCount = existing?.count ?? 0;
@@ -980,12 +1028,17 @@ export class Board {
     const filledBefore = this.getFilledPositions();
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
 
+    // Rolls back both the grid cell and the inventory spend on failure.
+    const rollback = () => {
+      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
+      this._unspendInventory(shape);
+    };
+
     // Valve gate: reject if this placement connects to a non-valve side
     // of an unsatisfied valve chamber.
     const valveViolation = this._checkValveViolation(pos, filledBefore);
     if (valveViolation) {
-      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
-      this._unspendInventory(shape);
+      rollback();
       return valveViolation;
     }
 
@@ -994,24 +1047,14 @@ export class Board {
     const filled = this.getFilledPositions();
     // Regulator pre-check: newly-connecting regulators against stats captured
     // before the placement, even though the tile is already on the grid.
-    const { error: regError, positions: regPositions } = this._checkRegulators(
-      filledBefore,
-      filled,
-      this.getCurrentWater(),
-      this.getCurrentTemperature(filledBefore),
-      this.getCurrentPressure(filledBefore),
-      this._turnState.frozen,
-    );
+    const { error: regError, positions: regPositions } = this._runRegulatorPreCheck(filledBefore, filled);
     if (regError) {
-      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
-      this._unspendInventory(shape);
+      rollback();
       return { success: false, error: regError, errorTilePositions: regPositions ?? undefined };
     }
     const { error, positions } = this._validateConstraints(filled);
     if (error) {
-      // Roll back placement.
-      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
-      this._unspendInventory(shape);
+      rollback();
       return { success: false, error, errorTilePositions: positions ?? undefined };
     }
 
@@ -1019,8 +1062,7 @@ export class Board {
     // the stats that result after all tiles in this turn have resolved.
     const { error: postRegError, positions: postRegPositions } = this._checkRegulatorsPostTurn(filledBefore, filled);
     if (postRegError) {
-      this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
-      this._unspendInventory(shape);
+      rollback();
       return { success: false, error: postRegError, errorTilePositions: postRegPositions ?? undefined };
     }
 
@@ -1059,15 +1101,18 @@ export class Board {
     }
 
     // Gold-space / gold-pipe constraint for the incoming shape
-    const isGoldSpace = this.goldSpaces.has(posKey(pos.row, pos.col));
-    const isGoldPipe  = GOLD_PIPE_SHAPES.has(newShape);
-    if (isGoldSpace && !isGoldPipe) {
-      return { success: false, error: ERR_GOLD_SPACE };
-    }
+    const goldViolation = this._checkGoldSpacePipe(pos, newShape);
+    if (goldViolation) return goldViolation;
 
     // Save inventory snapshot so we can roll back cleanly on failure
     const savedInventory = this.inventory.map((item) => ({ ...item }));
     const oldShape = tile.shape;
+
+    // Rolls back both the inventory snapshot and the grid cell on failure.
+    const rollback = () => {
+      this.inventory = savedInventory;
+      this.grid[pos.row][pos.col] = tile;
+    };
 
     // ── Step 1: Reclaim old tile into inventory (no constraint check yet) ──────
     this._reclaimInventory(oldShape);
@@ -1108,8 +1153,7 @@ export class Board {
     // of an unsatisfied valve chamber.
     const valveViolation = this._checkValveViolation(pos, filledBeforeReplace);
     if (valveViolation) {
-      this.inventory = savedInventory;
-      this.grid[pos.row][pos.col] = tile;
+      rollback();
       return valveViolation;
     }
 
@@ -1165,9 +1209,7 @@ export class Board {
         if (!positiveContainerDisconnected) {
           continue; // drop is from newly-connected negative containers only
         }
-        this.inventory = savedInventory;
-        this.grid[pos.row][pos.col] = tile;
-        // Highlight the disconnected item chambers that are causing the constraint.
+        rollback();
         const disconnectedPositions = [...(originalFilled ?? new Set<string>())].flatMap((key) => {
           if (finalFilled.has(key)) return [];
           const [r, c] = parseKey(key);
@@ -1184,44 +1226,26 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     // Regulator pre-check: newly-connecting regulators against pre-replacement stats.
-    const { error: regError2, positions: regPositions2 } = this._checkRegulators(
-      filledBeforeReplace,
-      finalFilled,
-      this.getCurrentWater(),
-      this.getCurrentTemperature(filledBeforeReplace),
-      this.getCurrentPressure(filledBeforeReplace),
-      this._turnState.frozen,
-    );
+    const { error: regError2, positions: regPositions2 } = this._runRegulatorPreCheck(filledBeforeReplace, finalFilled);
     if (regError2) {
-      this.inventory = savedInventory;
-      this.grid[pos.row][pos.col] = tile; // revert to old tile
+      rollback();
       return { success: false, error: regError2, errorTilePositions: regPositions2 ?? undefined };
     }
     const { error: constraintError, positions: constraintPositions } =
       this._validateConstraints(finalFilled);
     if (constraintError) {
-      this.inventory = savedInventory;
-      this.grid[pos.row][pos.col] = tile; // revert to old tile
+      rollback();
       // Compute only tiles that are both disconnected by the replacement AND in the
       // constraint positions set.  Falls back to positions when the intersection is empty.
       const filledWithOldTile = this.getFilledPositions();
-      const positionKeys = constraintPositions ? new Set(constraintPositions.map(p => posKey(p.row, p.col))) : null;
-      const disconnected: GridPos[] = [];
-      for (const k of filledWithOldTile) {
-        if (!finalFilled.has(k) && positionKeys?.has(k)) {
-          const [r, c] = parseKey(k);
-          disconnected.push({ row: r, col: c });
-        }
-      }
-      return { success: false, error: constraintError, errorTilePositions: disconnected.length ? disconnected : constraintPositions ?? undefined };
+      return { success: false, error: constraintError, errorTilePositions: this._computeDisconnectedConstraintPositions(filledWithOldTile, finalFilled, constraintPositions) };
     }
 
     // Regulator post-turn check: re-validate newly-connecting regulators using
     // the stats that result after all tiles in this turn have resolved.
     const { error: postRegError2, positions: postRegPositions2 } = this._checkRegulatorsPostTurn(filledBeforeReplace, finalFilled);
     if (postRegError2) {
-      this.inventory = savedInventory;
-      this.grid[pos.row][pos.col] = tile; // revert to old tile
+      rollback();
       return { success: false, error: postRegError2, errorTilePositions: postRegPositions2 ?? undefined };
     }
 
@@ -1883,14 +1907,7 @@ export class Board {
     // Validate the final state.
     const filled = this.getFilledPositions();
     // Regulator pre-check: newly-connecting regulators against pre-rotation stats.
-    const { error: regError3, positions: regPositions3 } = this._checkRegulators(
-      filledBefore,
-      filled,
-      this.getCurrentWater(),
-      this.getCurrentTemperature(filledBefore),
-      this.getCurrentPressure(filledBefore),
-      this._turnState.frozen,
-    );
+    const { error: regError3, positions: regPositions3 } = this._runRegulatorPreCheck(filledBefore, filled);
     if (regError3) {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
@@ -1906,15 +1923,7 @@ export class Board {
       // Highlight only tiles that are both disconnected by the rotation AND
       // in the constraint-violating positions set.  Falls back to positions
       // when the intersection is empty.
-      const positionKeys = constraintPositions ? new Set(constraintPositions.map(p => posKey(p.row, p.col))) : null;
-      const disconnected: GridPos[] = [];
-      for (const k of filledBefore) {
-        if (!filled.has(k) && positionKeys?.has(k)) {
-          const [r, c] = parseKey(k);
-          disconnected.push({ row: r, col: c });
-        }
-      }
-      return { success: false, error: constraintError, errorTilePositions: disconnected.length ? disconnected : constraintPositions ?? undefined };
+      return { success: false, error: constraintError, errorTilePositions: this._computeDisconnectedConstraintPositions(filledBefore, filled, constraintPositions) };
     }
 
     // Validate container-grant constraints: rotation may disconnect a container from
