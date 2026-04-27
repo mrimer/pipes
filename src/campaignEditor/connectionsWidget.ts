@@ -21,6 +21,10 @@ const IND_NS_W = '20px'; // landscape strip width  for N/S buttons
 const IND_NS_H =  '7px'; // landscape strip height for N/S buttons
 const IND_WE_W =  '7px'; // portrait  strip width  for W/E buttons
 const IND_WE_H = '20px'; // portrait  strip height for W/E buttons
+// Gap from the inward button edge to the near edge of the indicator strip (px).
+const IND_EDGE_OFFSET = 2;
+// indicator height (7) + IND_EDGE_OFFSET (2) = the CSS 'calc(100% - 9px)' used on the far edge.
+const IND_FAR_OFFSET = parseInt(IND_NS_H) + IND_EDGE_OFFSET; // 9
 
 /**
  * Build a compass-layout N/E/S/W toggle widget.
@@ -94,11 +98,11 @@ export function buildCompassConnectionsWidget(
       // N/S: horizontal bar near the inward edge; W/E: vertical bar near the inward edge.
       const indW = isNS ? IND_NS_W : IND_WE_W;
       const indH = isNS ? IND_NS_H : IND_WE_H;
-      const top  = dir === Direction.North ? 'calc(100% - 9px)'
-                 : dir === Direction.South ? '2px'
+      const top  = dir === Direction.North ? `calc(100% - ${IND_FAR_OFFSET}px)`
+                 : dir === Direction.South ? `${IND_EDGE_OFFSET}px`
                  : `calc(50% - ${parseInt(IND_WE_H) / 2}px)`;
-      const left = dir === Direction.West  ? 'calc(100% - 9px)'
-                 : dir === Direction.East  ? '2px'
+      const left = dir === Direction.West  ? `calc(100% - ${IND_FAR_OFFSET}px)`
+                 : dir === Direction.East  ? `${IND_EDGE_OFFSET}px`
                  : `calc(50% - ${parseInt(IND_NS_W) / 2}px)`;
       indicator.style.cssText =
         `position:absolute;top:${top};left:${left};` +
