@@ -13,7 +13,7 @@ import { computeMapReachable, findMapTile, editorTileConns } from '../mapUtils';
 
 /** Valid keys for a CampaignDef record. */
 export const VALID_CAMPAIGN_KEYS: ReadonlySet<string> = new Set([
-  'id', 'name', 'author', 'chapters', 'official', 'lastUpdated', 'rows', 'cols', 'grid', 'style',
+  'id', 'name', 'author', 'authorGuid', 'anyoneEdit', 'chapters', 'official', 'lastUpdated', 'rows', 'cols', 'grid', 'style',
 ]);
 
 /** Valid keys for a ChapterDef record. */

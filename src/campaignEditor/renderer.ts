@@ -254,7 +254,7 @@ export function renderEditorCanvas(
         ctx.stroke();
       } else {
         ctx.globalAlpha = overlay.alpha;
-        drawEditorTile(ctx, x, y, overlay.def, filledKeys !== undefined);
+        drawEditorTile(ctx, x, y, overlay.def, filledKeys !== undefined, style);
         ctx.globalAlpha = Math.min(1, overlay.alpha + 0.3);
         ctx.strokeStyle = '#f0c040';
         ctx.lineWidth = 2;
@@ -775,6 +775,15 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(2));
       const shatterActive = tile.shatter > tile.hardness;
       strokeFillText(ctx, shatterActive ? `H:${tile.hardness} S:${tile.shatter}` : `H:${tile.hardness}`, cx, cy + _s(13));
+    } else if (cc === 'regulator') {
+      // Show regulator stat, operator, and threshold value
+      const stat = def?.regulatorStat ?? 'water';
+      const op   = def?.regulatorOperator ?? '>';
+      ctx.font = `bold ${_s(11)}px Arial`;
+      strokeFillText(ctx, 'REGULATOR', cx, cy - _s(10));
+      ctx.font = `${_s(10)}px Arial`;
+      strokeFillText(ctx, stat, cx, cy + _s(1));
+      strokeFillText(ctx, `${op} ${tile.cost}`, cx, cy + _s(12));
     } else {
       let displayLabel: string;
       if (isNegHeater) displayLabel = 'COOLER';

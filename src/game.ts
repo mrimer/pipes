@@ -380,7 +380,9 @@ export class Game implements InputCallbacks {
       // Update settings that depend on the newly active slot.
       sfxManager.setVolume(loadSfxVolume());
       saveActiveSlotIndex(slotIndex);
-      this._campaign.reloadActiveCampaignProgress();
+      // Restore the active campaign from the new slot's persisted state, then
+      // show the level-select screen.
+      this._campaign.restoreFromPersistence();
       this._showLevelSelect();
     };
     this._profileScreen.onReturnToMenu = () => {

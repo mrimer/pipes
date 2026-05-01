@@ -142,7 +142,7 @@ export class CampaignService {
   // ── Campaign CRUD ────────────────────────────────────────────────────────────
 
   /** Create a new campaign, persist it, and return it. */
-  createCampaign(name: string, author: string): CampaignDef {
+  createCampaign(name: string, author: string, authorGuid?: string): CampaignDef {
     const defaults = this._buildDefaultCampaignMap();
     const campaign: CampaignDef = {
       id: generateCampaignId(),
@@ -154,6 +154,7 @@ export class CampaignService {
       grid: defaults.grid,
       lastUpdated: new Date().toISOString(),
     };
+    if (authorGuid) campaign.authorGuid = authorGuid;
     this._campaigns.push(campaign);
     this.save();
     return campaign;
@@ -167,16 +168,19 @@ export class CampaignService {
 
   /**
    * Update a top-level campaign field, touch the timestamp, and persist.
-   * Passing `false` for the `'official'` field removes the flag entirely.
+   * Passing `false` for the `'official'` or `'anyoneEdit'` field removes the
+   * flag entirely.
    */
   updateCampaignField(
     campaign: CampaignDef,
-    field: 'name' | 'author' | 'official',
-    value: string | boolean,
+    field: 'name' | 'author' | 'official' | 'authorGuid' | 'anyoneEdit',
+    value: string | boolean | undefined,
   ): void {
     if (field === 'name') campaign.name = value as string;
     else if (field === 'author') campaign.author = value as string;
     else if (field === 'official') campaign.official = (value as boolean) ? true : undefined;
+    else if (field === 'authorGuid') campaign.authorGuid = value as string | undefined;
+    else if (field === 'anyoneEdit') campaign.anyoneEdit = (value as boolean) ? true : undefined;
     this.touch(campaign);
     this.save();
   }

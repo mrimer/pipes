@@ -839,16 +839,20 @@ describe('CampaignEditor – import version comparison', () => {
     expect(new Date(campaigns[0].lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
   });
 
-  it('prefills new campaign author prompt with current player name', () => {
+  it('uses current player name as author when creating a new campaign (no author prompt)', () => {
     savePlayerName('Morgan');
     const promptSpy = jest.spyOn(window, 'prompt')
-      .mockReturnValueOnce('New Campaign')
-      .mockReturnValueOnce('Morgan');
+      .mockReturnValueOnce('New Campaign');
 
     const editor = makeEditor();
     (editor as unknown as { _createCampaign(): void })._createCampaign();
 
-    expect(promptSpy).toHaveBeenNthCalledWith(2, 'Author name:', 'Morgan');
+    // Only one prompt (campaign name) — no author prompt any more
+    expect(promptSpy).toHaveBeenCalledTimes(1);
+    expect(promptSpy).toHaveBeenCalledWith('Campaign name:');
+
+    const campaigns = loadImportedCampaigns();
+    expect(campaigns.some((c) => c.name === 'New Campaign' && c.author === 'Morgan')).toBe(true);
   });
 
   it('lastUpdated is updated when a chapter is added', () => {
