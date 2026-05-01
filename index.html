@@ -304,6 +304,7 @@
     .modal-btn.secondary { background: #2a2a4a; color: #aaa; border: 1px solid #555; }
 
     /* Brighten all non-disabled buttons on hover. */
+    button:not(:disabled) { transition: filter 0.15s; }
     button:hover:not(:disabled) { filter: brightness(1.35); }
 
     .modal-actions { display: flex; gap: 12px; justify-content: center; }
