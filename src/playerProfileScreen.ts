@@ -18,6 +18,7 @@ import {
   saveSlotMeta,
   deleteSlotMeta,
   loadAllSlotMetas,
+  loadSlotMeta,
   saveActiveSlotIndex,
   clearActiveSlotIndex,
   generateGuid,
@@ -451,11 +452,16 @@ export class PlayerProfileScreen {
     const prevActive = getActiveSlotIndex();
     setActiveSlotIndex(slotIndex);
 
-    importPlayerProfile(this._campaigns, (outcomes, targetSlotIndex, isNewSlot) => {
+    // For occupied slots (Import Merge), require the file's GUID to match this
+    // slot's GUID so we don't accidentally merge a different player's data.
+    const existingMeta = loadSlotMeta(slotIndex);
+    const requiredSlotGuid = existingMeta?.guid;
+
+    importPlayerProfile(this._campaigns, (outcomes, targetSlotIndex, isNewSlot, importedPlayerName) => {
       setActiveSlotIndex(prevActive);
       void targetSlotIndex; // Slot meta was already updated by importPlayerProfile.
-      showPlayerImportResultModal(outcomes, isNewSlot);
+      showPlayerImportResultModal(outcomes, isNewSlot, importedPlayerName);
       this._render();
-    });
+    }, requiredSlotGuid);
   }
 }
