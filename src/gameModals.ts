@@ -910,8 +910,8 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   const note = document.createElement('p');
   note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';
   note.textContent = isNewSlot
-    ? 'Settings have been updated. Campaign progress has been imported.'
-    : 'Settings have been updated. Campaign progress has been merged.';
+    ? 'Settings loaded. Campaign progress has been imported.'
+    : 'Settings updated. Campaign progress has been merged.';
   box.appendChild(note);
 
   const closeBtn = document.createElement('button');
