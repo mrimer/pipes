@@ -128,7 +128,7 @@ export async function exportPlayerProfile(
   const fileObj = buildPlayerFile(payload);
   const json = JSON.stringify(fileObj, null, 2);
   const playerName = sanitizeFilenamePart(loadPlayerName(), EXPORT_FILENAME_FALLBACK_PLAYER);
-  const filename = `pipes-player-${playerName}.pipes.json.gz`;
+  const filename = `player-${playerName}.pipes.json.gz`;
 
   try {
     await downloadGzipJson(json, filename);
@@ -167,7 +167,7 @@ export async function exportPlayerProfileWithRecordings(
   const fileObj = buildPlayerFile(payload);
   const json = JSON.stringify(fileObj, null, 2);
   const safePlayerName = sanitizeFilenamePart(playerName, EXPORT_FILENAME_FALLBACK_PLAYER);
-  const filename = `pipes-player-${safePlayerName}-with-recordings.pipes.json.gz`;
+  const filename = `player-${safePlayerName}-with-recordings.pipes.json.gz`;
 
   try {
     await downloadGzipJson(json, filename);
