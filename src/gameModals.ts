@@ -846,7 +846,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   if (merged.length > 0) {
     const mergedHeader = document.createElement('h3');
     mergedHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#7ed321;';
-    mergedHeader.textContent = isNewSlot ? '✅ Campaign progress imported' : '✅ Campaigns merged';
+    mergedHeader.textContent = isNewSlot ? '✅ Campaign progress imported' : '✅ Campaign progress merged';
     box.appendChild(mergedHeader);
 
     const ul = document.createElement('ul');
