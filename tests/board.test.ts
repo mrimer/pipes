@@ -1,7 +1,8 @@
 import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_VALVE, ERR_REGULATOR_CHECK_PREFIX, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
-import { Direction, LevelDef, PipeShape } from '../src/types';
+import { Direction, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
+import { makeLevelDef } from './testHelpers';
 
 /** Build a minimal 2×1 board and manually set the tiles for deterministic testing. */
 function makeTwoTileBoard(): Board {
@@ -107,19 +108,16 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
   });
 
   it('_initFromLevel populates oneWayData from level def', () => {
-    // Use LevelDef-compatible structure cast via 'as any' since the test only
-    // exercises initialization of oneWayData and grid cell placement.
     // The Source connections field is left out (defaults to all-4) to keep the fixture minimal.
-    const level: Pick<LevelDef, 'rows' | 'cols' | 'inventory' | 'grid'> = {
+    const level = makeLevelDef({
       rows: 2,
       cols: 2,
-      inventory: [],
       grid: [
         [{ shape: PipeShape.Source, capacity: 5 }, { shape: PipeShape.OneWay, rotation: 90 }],
         [null, { shape: PipeShape.Sink }],
       ],
-    };
-    const board = new Board(2, 2, level as LevelDef);
+    });
+    const board = new Board(2, 2, level);
     // OneWay at (0,1) with rotation 90 → Direction.East
     expect(board.oneWayData.size).toBe(1);
     expect(board.getOneWayDirection({ row: 0, col: 1 })).toBe(Direction.East);

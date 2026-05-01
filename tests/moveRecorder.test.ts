@@ -3,8 +3,9 @@
  */
 
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove, decodeMove, replayMoves } from '../src/moveRecorder';
-import { PipeShape, Direction, LevelDef } from '../src/types';
+import { PipeShape, Direction } from '../src/types';
 import { Board } from '../src/board';
+import { makeLevelDef } from './testHelpers';
 
 // ─── Encode / decode round-trips ─────────────────────────────────────────────
 
@@ -85,27 +86,23 @@ describe('decodeMove – invalid inputs', () => {
 
 // ─── replayMoves ─────────────────────────────────────────────────────────────
 
-/** Build a minimal solvable level: 1×3, source–(slot)–sink. */
-function makeSimpleLevel(): LevelDef {
-  return {
-    id: 9001,
-    name: 'Test Level',
-    rows: 1,
-    cols: 3,
-    grid: [
-      [
-        { shape: PipeShape.Source, capacity: 10, connections: [Direction.East] },
-        null,
-        { shape: PipeShape.Sink, connections: [Direction.West] },
-      ],
+/** Minimal solvable level: 1×3, source–(slot)–sink. */
+const SIMPLE_LEVEL = makeLevelDef({
+  id: 9001,
+  cols: 3,
+  grid: [
+    [
+      { shape: PipeShape.Source, capacity: 10, connections: [Direction.East] },
+      null,
+      { shape: PipeShape.Sink, connections: [Direction.West] },
     ],
-    inventory: [{ shape: PipeShape.Straight, count: 2 }],
-  };
-}
+  ],
+  inventory: [{ shape: PipeShape.Straight, count: 2 }],
+});
 
 describe('replayMoves', () => {
   it('returns an empty initial board when given no moves', () => {
-    const level = makeSimpleLevel();
+    const level = SIMPLE_LEVEL;
     const { board, stoppedAt, corrupted } = replayMoves(level, []);
     expect(corrupted).toBe(false);
     expect(stoppedAt).toBe(0);
@@ -113,7 +110,7 @@ describe('replayMoves', () => {
   });
 
   it('correctly replays a place move', () => {
-    const level = makeSimpleLevel();
+    const level = SIMPLE_LEVEL;
     const moves = [encodePlaceMove(PipeShape.Straight, 0, 1, 90)];
     const { board, stoppedAt, corrupted } = replayMoves(level, moves);
     expect(corrupted).toBe(false);
@@ -122,7 +119,7 @@ describe('replayMoves', () => {
   });
 
   it('correctly replays a delete (reclaim) move', () => {
-    const level = makeSimpleLevel();
+    const level = SIMPLE_LEVEL;
     const moves = [
       encodePlaceMove(PipeShape.Straight, 0, 1, 90),
       encodeDeleteMove(0, 1),
@@ -134,7 +131,7 @@ describe('replayMoves', () => {
   });
 
   it('stops and sets corrupted on a malformed move string', () => {
-    const level = makeSimpleLevel();
+    const level = SIMPLE_LEVEL;
     const moves = ['NOT_A_VALID_MOVE'];
     const { stoppedAt, corrupted } = replayMoves(level, moves);
     expect(corrupted).toBe(true);
@@ -142,7 +139,7 @@ describe('replayMoves', () => {
   });
 
   it('stops and sets corrupted when a move fails on the board', () => {
-    const level = makeSimpleLevel();
+    const level = SIMPLE_LEVEL;
     // Delete move on an empty cell: will fail because there is no tile to reclaim.
     const moves = [encodeDeleteMove(0, 1)];
     const { stoppedAt, corrupted } = replayMoves(level, moves);
@@ -151,7 +148,7 @@ describe('replayMoves', () => {
   });
 
   it('applies only valid moves before the corrupt one', () => {
-    const level = makeSimpleLevel();
+    const level = SIMPLE_LEVEL;
     const moves = [
       encodePlaceMove(PipeShape.Straight, 0, 1, 90), // valid
       encodeDeleteMove(0, 0), // row 0 col 0 is the Source – not reclaimable

@@ -6,6 +6,7 @@ import { CampaignManager, CampaignCallbacks } from '../src/campaignManager';
 import { CampaignEditor } from '../src/campaignEditor';
 import { CampaignDef, PipeShape } from '../src/types';
 import * as levelTransition from '../src/levelTransition';
+import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
 jest.mock('../src/visuals/confetti', () => ({
   spawnConfetti: (onComplete?: () => void) => { if (onComplete) onComplete(); },
@@ -53,33 +54,23 @@ function makeCallbacks(overrides: Partial<CampaignCallbacks> = {}): CampaignCall
 }
 
 function makeCampaign(withMap: boolean): CampaignDef {
-  return {
+  return makeCampaignDef({
     id: withMap ? 'cmp-map' : 'cmp-no-map',
     name: 'Campaign',
-    author: 'Tester',
     rows: withMap ? 1 : undefined,
     cols: withMap ? 1 : undefined,
     grid: withMap ? [[{ shape: PipeShape.Source }]] : undefined,
     chapters: [
-      {
+      makeChapterDef({
         id: 1,
         name: 'Chapter 1',
         rows: 1,
         cols: 1,
         grid: [[{ shape: PipeShape.Source }]],
-        levels: [
-          {
-            id: 1,
-            name: 'Level 1',
-            rows: 1,
-            cols: 1,
-            grid: [[{ shape: PipeShape.Source }]],
-            inventory: [],
-          },
-        ],
-      },
+        levels: [makeLevelDef({ id: 1, name: 'Level 1', rows: 1, cols: 1, grid: [[{ shape: PipeShape.Source }]] })],
+      }),
     ],
-  };
+  });
 }
 
 function makeCampaignEditorMock(): CampaignEditor {

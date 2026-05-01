@@ -9,6 +9,7 @@
 import { saveImportedCampaigns, loadImportedCampaigns } from '../src/persistence';
 import { CampaignService, ImportResult } from '../src/campaignEditor';
 import { CampaignDef, LevelDef, PipeShape, TileDef } from '../src/types';
+import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -21,31 +22,22 @@ function makeService(campaigns: CampaignDef[] = []): CampaignService {
 }
 
 function emptyCampaign(id = 'cmp_test', name = 'Test Campaign'): CampaignDef {
-  return { id, name, author: 'Tester', chapters: [] };
+  return makeCampaignDef({ id, name, chapters: [] });
 }
 
 function campaignWithChapter(): CampaignDef {
-  return {
+  return makeCampaignDef({
     id: 'cmp_ch',
     name: 'Campaign',
     author: 'A',
     chapters: [
-      {
+      makeChapterDef({
         id: 1,
         name: 'Chapter 1',
-        levels: [
-          {
-            id: 101,
-            name: 'Level 1',
-            rows: 2,
-            cols: 2,
-            grid: [[null, null], [null, null]],
-            inventory: [],
-          },
-        ],
-      },
+        levels: [makeLevelDef({ id: 101, name: 'Level 1', rows: 2, cols: 2, grid: [[null, null], [null, null]] })],
+      }),
     ],
-  };
+  });
 }
 
 beforeEach(() => {

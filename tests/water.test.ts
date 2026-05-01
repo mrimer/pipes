@@ -6,7 +6,7 @@
 
 import { loadLevelWater, saveLevelWater, clearLevelWater, clearLevelWaterRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
-import { LevelDef, PipeShape, Direction } from '../src/types';
+import { makeLevelDef } from './testHelpers';
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 
@@ -106,24 +106,6 @@ describe('clearLevelWaterRecord', () => {
 
 // ─── Level-select water display ───────────────────────────────────────────────
 
-/** Minimal level for testing. */
-function makeLevel(id: number, challenge?: boolean): LevelDef {
-  return {
-    id,
-    name: `Level ${id}`,
-    rows: 1,
-    cols: 2,
-    grid: [
-      [
-        { shape: PipeShape.Source, connections: [Direction.East], capacity: 10 },
-        { shape: PipeShape.Sink,   connections: [Direction.West] },
-      ],
-    ],
-    inventory: [],
-    challenge,
-  };
-}
-
 function makeLevelListEl(): HTMLElement {
   const el = document.createElement('div');
   document.body.appendChild(el);
@@ -138,7 +120,7 @@ describe('renderLevelList water display', () => {
   });
 
   it('shows 💧 N in chapter header when completed levels have water', () => {
-    const level = makeLevel(1);
+    const level = makeLevelDef({ id: 1 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const levelWater: Record<number, number> = { 1: 4 };
 
@@ -153,7 +135,7 @@ describe('renderLevelList water display', () => {
   });
 
   it('does not show 💧 in chapter header when no water is recorded for completed levels', () => {
-    const level = makeLevel(1);
+    const level = makeLevelDef({ id: 1 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
 
     renderLevelList(
@@ -167,7 +149,7 @@ describe('renderLevelList water display', () => {
   });
 
   it('sums water across multiple completed levels in a chapter', () => {
-    const levels = [makeLevel(1), makeLevel(2)];
+    const levels = [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 })];
     const chapters = [{ id: 1, name: 'Ch1', levels }];
     const levelWater: Record<number, number> = { 1: 3, 2: 5 };
 
@@ -182,7 +164,7 @@ describe('renderLevelList water display', () => {
   });
 
   it('shows 💧 in campaign header when any levels are completed with water', () => {
-    const level = makeLevel(1);
+    const level = makeLevelDef({ id: 1 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const levelWater: Record<number, number> = { 1: 5 };
     const activeCampaign = { name: 'My Campaign', author: 'Tester', completionPct: 50 };
@@ -199,8 +181,8 @@ describe('renderLevelList water display', () => {
   });
 
   it('shows 💀 challenge count in campaign header', () => {
-    const normalLevel = makeLevel(1);
-    const challengeLevel = makeLevel(2, true);
+    const normalLevel = makeLevelDef({ id: 1 });
+    const challengeLevel = makeLevelDef({ id: 2, challenge: true });
     const chapters = [{ id: 1, name: 'Ch1', levels: [normalLevel, challengeLevel] }];
     const activeCampaign = { name: 'My Campaign', author: 'Tester', completionPct: 50 };
 
