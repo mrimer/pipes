@@ -7,7 +7,6 @@ import {
   loadPlayerName,
   loadSfxVolume,
   loadTouchUiEnabled,
-  savePlayerName,
   saveSfxVolume,
   saveTouchUiEnabled,
   loadRecordingsForLevel,
@@ -44,7 +43,7 @@ import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecor
 import { PlaybackScreen, PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
 import { exportReplay, importReplay } from './profileIO';
 import { getActiveSlotIndex } from './activeProfile';
-import { loadSlotMeta, saveSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
+import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -341,23 +340,11 @@ export class Game implements InputCallbacks {
         setTouchUiEnabledOverride(enabled);
         document.body.classList.toggle('is-touch', enabled);
       },
-      () => loadPlayerName(),
       (el) => {
-        const playerNameInput = el.querySelector<HTMLInputElement>('[data-player-name-input]');
         const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
         const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
         saveSfxVolume(sfxManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
-        const newName = playerNameInput?.value ?? loadPlayerName();
-        savePlayerName(newName);
-        // Keep the profile-slot metadata name in sync with the settings name.
-        const slotIdx = getActiveSlotIndex();
-        if (slotIdx !== null) {
-          const meta = loadSlotMeta(slotIdx);
-          if (meta) {
-            saveSlotMeta(slotIdx, { ...meta, name: newName.trim() || meta.name });
-          }
-        }
         saveRecordingSettings({
           recordSuccesses: recordSuccessesToggle?.checked ?? true,
           recordFailures:  recordFailuresToggle?.checked  ?? false,
@@ -444,14 +431,12 @@ export class Game implements InputCallbacks {
         const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
         const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
         const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
-        const playerNameInput = this._settingsModalEl.querySelector<HTMLInputElement>('[data-player-name-input]');
         if (slider) slider.value = String(v);
         if (valueEl) valueEl.textContent = String(v);
         if (touchToggle) {
           touchToggle.checked = effectiveTouchEnabled;
           touchToggle.disabled = !hasTouchUiSupport();
         }
-        if (playerNameInput) playerNameInput.value = loadPlayerName();
         this._settingsModalEl.style.display = 'flex';
       },
       showPlayerProfile: () => this._showPlayerProfileScreen(),

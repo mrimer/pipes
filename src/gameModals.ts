@@ -251,9 +251,9 @@ export function buildExitConfirmModal(
  * Build and attach the Settings modal.
  *
  * The modal contains a "Sound Effects" volume slider (0–100), a touch-device
- * toggle, a player-name text input, and a Confirm button. The slider calls
- * `onVolumeChange` live as the user drags it; the Confirm button calls
- * `onConfirm` (which should persist values and dismiss the modal).
+ * toggle, and a Confirm button. The slider calls `onVolumeChange` live as the
+ * user drags it; the Confirm button calls `onConfirm` (which should persist
+ * values and dismiss the modal).
  *
  * @param getVolume      - Returns the current volume (0–100) to initialise the slider.
  * @param onVolumeChange - Called with the new value whenever the slider moves.
@@ -268,7 +268,6 @@ export function buildSettingsModal(
   getTouchUiEnabled: () => boolean,
   isTouchUiToggleEnabled: () => boolean,
   onTouchUiChange: (enabled: boolean) => void,
-  getPlayerName: () => string,
   onConfirm: (el: HTMLElement) => void,
   getRecordingSettings?: () => import('./types').RecordingSettings,
 ): HTMLElement {
@@ -344,26 +343,6 @@ export function buildSettingsModal(
   touchRow.appendChild(touchToggle);
   touchSection.appendChild(touchRow);
   box.appendChild(touchSection);
-
-  // ── Player Name row ───────────────────────────────────────────────────────
-  const playerNameSection = document.createElement('div');
-  playerNameSection.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%;margin-top:4px;';
-
-  const playerNameLabel = document.createElement('label');
-  playerNameLabel.textContent = '👤 Player Name';
-  playerNameLabel.style.cssText = 'color:#eee;font-size:0.95rem;';
-
-  const playerNameInput = document.createElement('input');
-  playerNameInput.type = 'text';
-  playerNameInput.value = getPlayerName();
-  playerNameInput.maxLength = 40;
-  playerNameInput.dataset.playerNameInput = '1';
-  playerNameInput.style.cssText =
-    `width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.95rem;background:${EDITOR_INPUT_BG};color:#eee;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;`;
-
-  playerNameSection.appendChild(playerNameLabel);
-  playerNameSection.appendChild(playerNameInput);
-  box.appendChild(playerNameSection);
 
   // ── Command key assignments ───────────────────────────────────────────────
   const commandsSection = document.createElement('div');
@@ -603,6 +582,90 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
 // ─── New Player modal ──────────────────────────────────────────────────────────
 
 /**
+ * Show a modal that lets the player rename an existing profile.
+ *
+ * Displays a pre-populated text input with OK and Cancel buttons.
+ * Calls `onOK` with the trimmed name (falling back to `currentName`) when
+ * confirmed, or `onCancel` when dismissed.
+ *
+ * @param currentName - The name to pre-fill in the input field.
+ * @param onOK        - Called with the new name when the player clicks OK.
+ * @param onCancel    - Called when the player cancels.
+ */
+export function buildEditPlayerNameModal(
+  currentName: string,
+  onOK: (name: string) => void,
+  onCancel: () => void,
+): void {
+  const el = createModalOverlay(0.7);
+
+  const box = document.createElement('div');
+  box.style.cssText =
+    `background:${UI_BG};border:2px solid #4a90d9;border-radius:${RADIUS_LG};` +
+    'padding:28px 36px;display:flex;flex-direction:column;gap:16px;' +
+    'min-width:280px;max-width:380px;';
+
+  const title = document.createElement('h2');
+  title.style.cssText = 'margin:0;font-size:1.2rem;color:#74b9ff;';
+  title.textContent = '✏️ Edit Player Name';
+  box.appendChild(title);
+
+  const label = document.createElement('label');
+  label.textContent = 'Player name:';
+  label.style.cssText = 'color:#eee;font-size:0.95rem;';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.maxLength = 40;
+  input.style.cssText =
+    `width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.95rem;background:${EDITOR_INPUT_BG};` +
+    `color:#eee;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;`;
+
+  label.appendChild(document.createElement('br'));
+  label.appendChild(input);
+  box.appendChild(label);
+
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.type = 'button';
+  cancelBtn.style.cssText =
+    `padding:8px 20px;font-size:0.95rem;background:${MUTED_BTN_BG};color:#aaa;` +
+    `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
+
+  const okBtn = document.createElement('button');
+  okBtn.textContent = 'OK';
+  okBtn.type = 'button';
+  okBtn.style.cssText =
+    `padding:8px 20px;font-size:0.95rem;background:#1a4a9a;color:#fff;` +
+    `border:1px solid #4a90d9;border-radius:${RADIUS_MD};cursor:pointer;`;
+
+  const dismiss = (): void => { el.remove(); };
+
+  cancelBtn.addEventListener('click', () => { dismiss(); onCancel(); });
+  okBtn.addEventListener('click', () => {
+    const name = input.value.trim() || currentName;
+    dismiss();
+    onOK(name);
+  });
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter') { okBtn.click(); }
+    if (e.key === 'Escape') { cancelBtn.click(); }
+  });
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(okBtn);
+  box.appendChild(actions);
+  el.appendChild(box);
+  document.body.appendChild(el);
+  el.style.display = 'flex';
+  setTimeout(() => input.focus(), 0);
+}
+
+/**
  * Build and show a modal prompting the user to enter a name for a new profile.
  *
  * The modal is self-managed: it appends itself to `document.body`, shows
@@ -751,9 +814,16 @@ const IMPORT_RESULT_MODAL_OVERLAY_ALPHA = 0.7;
  * and auto-removes itself when the player closes it.  It does not need to be
  * retained by the caller.
  *
- * @param outcomes - Per-campaign import outcomes returned by applyPlayerProfile.
+ * @param outcomes   - Per-campaign import outcomes returned by applyPlayerProfile.
+ * @param isNewSlot  - True when the import target was an empty slot (fresh import,
+ *                     not a merge into an existing profile).  Controls the language
+ *                     used in the modal: "imported" vs "merged".
  */
-export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): void {
+export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], isNewSlot: boolean): void {
+  // Format "N noun[s]" with an optional verb suffix appended when !isNewSlot.
+  const statLine = (n: number, singular: string, plural: string, verb: string): string =>
+    `${n} ${n === 1 ? singular : plural}${isNewSlot ? '' : ` ${verb}`}`;
+
   const el = createModalOverlay(IMPORT_RESULT_MODAL_OVERLAY_ALPHA);
   const box = document.createElement('div');
   box.style.cssText =
@@ -776,7 +846,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
   if (merged.length > 0) {
     const mergedHeader = document.createElement('h3');
     mergedHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#7ed321;';
-    mergedHeader.textContent = '✅ Campaigns merged';
+    mergedHeader.textContent = isNewSlot ? '✅ Campaign progress imported' : '✅ Campaigns merged';
     box.appendChild(mergedHeader);
 
     const ul = document.createElement('ul');
@@ -790,11 +860,13 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
 
       const stats: string[] = [];
       if (o.newLevelsCompleted > 0)
-        stats.push(`${o.newLevelsCompleted} level${o.newLevelsCompleted !== 1 ? 's' : ''} completed`);
+        stats.push(statLine(o.newLevelsCompleted, 'level', 'levels', 'completed'));
       if (o.newChaptersCompleted > 0)
-        stats.push(`${o.newChaptersCompleted} chapter${o.newChaptersCompleted !== 1 ? 's' : ''} completed`);
+        stats.push(statLine(o.newChaptersCompleted, 'chapter', 'chapters', 'completed'));
       if (o.newStars > 0)
-        stats.push(`${o.newStars} ⭐ added`);
+        stats.push(statLine(o.newStars, '⭐', '⭐', 'added'));
+      if (o.newWater > 0)
+        stats.push(statLine(o.newWater, '💧', '💧', 'added'));
       if (o.newRecordings > 0)
         stats.push(`${o.newRecordings} recording${o.newRecordings !== 1 ? 's' : ''} imported`);
 
@@ -806,7 +878,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
       } else {
         const detail = document.createElement('span');
         detail.style.cssText = 'color:#888;';
-        detail.textContent = ' — already up to date';
+        detail.textContent = isNewSlot ? ' — no campaign progress' : ' — already up to date';
         li.appendChild(detail);
       }
       ul.appendChild(li);
@@ -815,7 +887,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
   } else {
     const none = document.createElement('p');
     none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#888;';
-    none.textContent = 'No campaign progress was merged.';
+    none.textContent = isNewSlot ? 'No campaign progress found in this file.' : 'No campaign progress was merged.';
     box.appendChild(none);
   }
 
@@ -837,7 +909,9 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
 
   const note = document.createElement('p');
   note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';
-  note.textContent = 'Settings have been updated. Campaign progress has been merged.';
+  note.textContent = isNewSlot
+    ? 'Settings have been updated. Campaign progress has been imported.'
+    : 'Settings have been updated. Campaign progress has been merged.';
   box.appendChild(note);
 
   const closeBtn = document.createElement('button');
