@@ -28,7 +28,7 @@ import { savePlayerName, loadSfxVolume, loadTouchUiEnabled } from './persistence
 import { sfxManager } from './sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from './deviceUtils';
 import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profileIO';
-import { buildNewPlayerModal, buildConfirmModal } from './gameModals';
+import { buildNewPlayerModal, buildConfirmModal, showPlayerImportResultModal } from './gameModals';
 import { attachHoverWaveAnimation } from './visuals/chapterWaves';
 import type { CampaignDef } from './types';
 
@@ -434,9 +434,7 @@ export class PlayerProfileScreen {
     importPlayerProfile(this._campaigns, (outcomes, targetSlotIndex) => {
       setActiveSlotIndex(prevActive);
       void targetSlotIndex; // Slot meta was already updated by importPlayerProfile.
-      // The per-campaign import outcomes are shown inside importPlayerProfile via
-      // showPlayerImportResultModal; there is nothing more to do with them here.
-      void outcomes;
+      showPlayerImportResultModal(outcomes);
       this._render();
     });
   }

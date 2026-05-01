@@ -18,6 +18,8 @@ import {
   loadChapterEditorMapBoxCollapsed,
   loadPlayerName,
 } from '../persistence';
+import { getActiveSlotIndex } from '../activeProfile';
+import { loadSlotMeta, loadAllSlotMetas } from '../playerProfileSlots';
 import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { CampaignMapEditorSection, CampaignMapEditorCallbacks } from './campaignMapEditor';
 import { CampaignService, ImportResult } from './campaignService';
@@ -369,6 +371,22 @@ export class CampaignEditor {
     this._service.touch(campaign);
   }
 
+  /**
+   * Return true when the active player profile has permission to edit the
+   * given campaign.  A campaign is editable when:
+   * - It has no `authorGuid` (created before this feature or by a legacy import), OR
+   * - Its `authorGuid` matches the active player profile's GUID, OR
+   * - Its `anyoneEdit` flag is set.
+   */
+  private _canActivePlayerEdit(campaign: CampaignDef): boolean {
+    if (!campaign.authorGuid) return true;
+    if (campaign.anyoneEdit) return true;
+    const activeSlot = getActiveSlotIndex();
+    if (activeSlot === null) return false;
+    const meta = loadSlotMeta(activeSlot);
+    return meta?.guid === campaign.authorGuid;
+  }
+
   private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
     return this._paramsPanel.labeledInput(labelText, value, onInput, type, inputWidth);
   }
@@ -434,6 +452,7 @@ export class CampaignEditor {
     const isOfficial = campaign.official === true;
     const activeCampaignId = loadActiveCampaignId();
     const isActive = activeCampaignId === campaign.id;
+    const canEdit = !isOfficial && this._canActivePlayerEdit(campaign);
     const { row, info, btns } = this._buildItemRow('#4a90d9', '14px 18px');
 
     const name = document.createElement('div');
@@ -471,11 +490,19 @@ export class CampaignEditor {
     }
 
     if (!isOfficial) {
-      btns.appendChild(this._btn('✏️ Edit', UI_BG, '#f0c040', () => {
+      const editBtn = this._btn('✏️ Edit', UI_BG, canEdit ? '#f0c040' : '#666', () => {
+        if (!canEdit) return;
         sfxManager.play(SfxId.ChapterSelect);
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
-      }));
+      });
+      if (!canEdit) {
+        editBtn.disabled = true;
+        editBtn.title = 'You are not the author of this campaign';
+        editBtn.style.opacity = '0.5';
+        editBtn.style.cursor = 'not-allowed';
+      }
+      btns.appendChild(editBtn);
     } else {
       btns.appendChild(this._btn('👁 View', UI_BG, '#aaa', () => {
         this._activeCampaignId = campaign.id;
@@ -483,9 +510,17 @@ export class CampaignEditor {
       }));
     }
 
-    btns.appendChild(this._btn('📤 Export', UI_BG, '#4a90d9', () => {
+    const exportBtn = this._btn('📤 Export', UI_BG, canEdit ? '#4a90d9' : '#444', () => {
+      if (!canEdit) return;
       this._exportCampaign(campaign);
-    }));
+    });
+    if (!isOfficial && !canEdit) {
+      exportBtn.disabled = true;
+      exportBtn.title = 'You are not the author of this campaign';
+      exportBtn.style.opacity = '0.5';
+      exportBtn.style.cursor = 'not-allowed';
+    }
+    btns.appendChild(exportBtn);
 
     if (!isOfficial) {
       btns.appendChild(this._btn('🗑 Delete', UI_BG, ERROR_COLOR, () => {
@@ -522,8 +557,17 @@ export class CampaignEditor {
     );
     if (!isOfficial) {
       toolbar.appendChild(this._btn('📤 Export', UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
-      toolbar.appendChild(this._btn('🔍 Dev – Validate data', UI_BG, '#f0c040',
-        () => this._dataValidator.show(this._el, campaign)));
+      toolbar.appendChild(this._btn('🔍 Dev – Validate data', UI_BG, '#f0c040', () => {
+        // If no authorGuid is set, try to match by author name across all profiles.
+        if (!campaign.authorGuid) {
+          const allMetas = loadAllSlotMetas();
+          const match = allMetas.find((m) => m !== null && m.name === campaign.author);
+          if (match) {
+            this._service.updateCampaignField(campaign, 'authorGuid', match.guid);
+          }
+        }
+        this._dataValidator.show(this._el, campaign);
+      }));
     }
     this._el.appendChild(toolbar);
 
@@ -532,33 +576,58 @@ export class CampaignEditor {
       'width:100%;max-width:1200px;padding:20px;box-sizing:border-box;display:flex;' +
       'flex-direction:column;gap:16px;';
 
-    // ── Dev – Official Campaign toggle (user campaigns only) ──────────────────
+    // ── Dev – Official Campaign toggle and "anyone edit" checkbox (user campaigns only) ──
     if (isUserCampaign) {
       const toggleWrap = document.createElement('div');
       toggleWrap.style.cssText =
         `background:${UI_BG};border:1px solid ${UI_GOLD};border-radius:8px;padding:12px 16px;` +
-        'display:flex;align-items:center;gap:10px;';
-      const toggleCb = document.createElement('input');
-      toggleCb.type = 'checkbox';
-      toggleCb.id = 'official-toggle';
-      toggleCb.checked = isOfficial;
-      toggleCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
-      const toggleLbl = document.createElement('label');
-      toggleLbl.htmlFor = 'official-toggle';
-      toggleLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
-      toggleLbl.textContent = 'Dev – Official Campaign';
-      toggleCb.addEventListener('change', () => {
-        this._service.updateCampaignField(campaign, 'official', toggleCb.checked);
+        'display:flex;align-items:center;gap:20px;flex-wrap:wrap;';
+
+      // Official toggle
+      const officialCb = document.createElement('input');
+      officialCb.type = 'checkbox';
+      officialCb.id = 'official-toggle';
+      officialCb.checked = isOfficial;
+      officialCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+      const officialLbl = document.createElement('label');
+      officialLbl.htmlFor = 'official-toggle';
+      officialLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
+      officialLbl.textContent = 'Dev – Official Campaign';
+      officialCb.addEventListener('change', () => {
+        this._service.updateCampaignField(campaign, 'official', officialCb.checked);
         // Re-render to update read-only state
         this._showCampaignDetail();
       });
-      toggleWrap.appendChild(toggleCb);
-      toggleWrap.appendChild(toggleLbl);
+      const officialGroup = document.createElement('div');
+      officialGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      officialGroup.appendChild(officialCb);
+      officialGroup.appendChild(officialLbl);
+      toggleWrap.appendChild(officialGroup);
+
+      // "Anyone edit" checkbox
+      const anyoneEditCb = document.createElement('input');
+      anyoneEditCb.type = 'checkbox';
+      anyoneEditCb.id = 'anyone-edit-toggle';
+      anyoneEditCb.checked = campaign.anyoneEdit === true;
+      anyoneEditCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+      const anyoneEditLbl = document.createElement('label');
+      anyoneEditLbl.htmlFor = 'anyone-edit-toggle';
+      anyoneEditLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
+      anyoneEditLbl.textContent = 'Anyone can edit';
+      anyoneEditCb.addEventListener('change', () => {
+        this._service.updateCampaignField(campaign, 'anyoneEdit', anyoneEditCb.checked);
+      });
+      const anyoneEditGroup = document.createElement('div');
+      anyoneEditGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      anyoneEditGroup.appendChild(anyoneEditCb);
+      anyoneEditGroup.appendChild(anyoneEditLbl);
+      toggleWrap.appendChild(anyoneEditGroup);
+
       content.appendChild(toggleWrap);
     }
 
     if (!isOfficial) {
-      // Name and author fields
+      // Name field (editable) and author (static display – author is set automatically from the active player profile)
       const fields = document.createElement('div');
       fields.style.cssText =
         `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
@@ -567,9 +636,20 @@ export class CampaignEditor {
       fields.appendChild(this._labeledInput('Name', campaign.name, (v) => {
         this._service.updateCampaignField(campaign, 'name', v);
       }));
-      fields.appendChild(this._labeledInput('Author', campaign.author, (v) => {
-        this._service.updateCampaignField(campaign, 'author', v);
-      }));
+
+      // Author: static text (set from the active player profile at creation time)
+      const authorRow = document.createElement('div');
+      authorRow.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.9rem;';
+      const authorLbl = document.createElement('span');
+      authorLbl.style.cssText = 'color:#aaa;min-width:80px;';
+      authorLbl.textContent = 'Author';
+      const authorVal = document.createElement('span');
+      authorVal.style.cssText = 'color:#eee;';
+      authorVal.textContent = campaign.author || '(none)';
+      authorRow.appendChild(authorLbl);
+      authorRow.appendChild(authorVal);
+      fields.appendChild(authorRow);
+
       content.appendChild(fields);
     }
 
@@ -1324,8 +1404,10 @@ export class CampaignEditor {
   private _createCampaign(): void {
     const name = prompt('Campaign name:');
     if (!name?.trim()) return;
-    const author = prompt('Author name:', loadPlayerName()) ?? '';
-    this._service.createCampaign(name.trim(), author);
+    const author = loadPlayerName();
+    const activeSlot = getActiveSlotIndex();
+    const authorGuid = activeSlot !== null ? loadSlotMeta(activeSlot)?.guid : undefined;
+    this._service.createCampaign(name.trim(), author, authorGuid);
     this._showCampaignList();
   }
 

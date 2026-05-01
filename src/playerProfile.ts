@@ -19,6 +19,9 @@ import {
   loadTouchUiEnabled,
   loadPlayerName,
   loadCommandKeyAssignments,
+  loadActiveCampaignId,
+  saveActiveCampaignId,
+  clearActiveCampaignId,
   markCampaignLevelCompleted,
   saveLevelStar,
   saveLevelWater,
@@ -47,7 +50,7 @@ export const FILE_TYPE_CAMPAIGN = 'pipes-campaign' as const;
 export const FILE_TYPE_REPLAY   = 'pipes-replay' as const;
 
 /** Current player-profile file format version. */
-export const PROFILE_FORMAT_VERSION = 2;
+export const PROFILE_FORMAT_VERSION = 3;
 
 // ─── Checksum ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +97,12 @@ export interface PlayerProfilePayload {
   sfxVolume: number;
   touchUiEnabled: boolean | null;
   commandKeys: Record<string, string> | null;
+  /**
+   * ID of the active campaign at export time. Added in v3.
+   * On import, the active campaign is set to this value when the campaign
+   * exists locally; otherwise cleared to null.
+   */
+  activeCampaignId?: string | null;
   campaignProgress: CampaignProgressBlock[];
   /**
    * Playback recordings belonging to this profile.
@@ -183,12 +192,13 @@ export function buildPlayerProfilePayload(
   });
 
   const payload: PlayerProfilePayload = {
-    guid:           guid ?? _generateFallbackGuid(),
-    lastPlayedAt:   lastPlayedAt ?? null,
-    playerName:     loadPlayerName(),
-    sfxVolume:      loadSfxVolume(),
-    touchUiEnabled: loadTouchUiEnabled(),
-    commandKeys:    loadCommandKeyAssignments(),
+    guid:             guid ?? _generateFallbackGuid(),
+    lastPlayedAt:     lastPlayedAt ?? null,
+    playerName:       loadPlayerName(),
+    sfxVolume:        loadSfxVolume(),
+    touchUiEnabled:   loadTouchUiEnabled(),
+    commandKeys:      loadCommandKeyAssignments(),
+    activeCampaignId: loadActiveCampaignId(),
     campaignProgress,
   };
   if (recordings !== undefined) {
@@ -317,7 +327,19 @@ export function parsePlayerFile(json: string): PlayerFileResult {
 
 /** Outcome of importing a single campaign's progress block. */
 export type CampaignImportOutcome =
-  | { status: 'merged';  campaignName: string; campaignId: string }
+  | {
+      status: 'merged';
+      campaignName: string;
+      campaignId: string;
+      /** Number of levels newly marked as completed (previously incomplete). */
+      newLevelsCompleted: number;
+      /** Number of chapters newly marked as completed (previously incomplete). */
+      newChaptersCompleted: number;
+      /** Total additional stars gained across all levels (sum of deltas). */
+      newStars: number;
+      /** Number of recordings imported that were not already present locally. */
+      newRecordings: number;
+    }
   | { status: 'ignored'; campaignId: string; campaignName: string; reason: 'not_found_locally' };
 
 /** Result returned from {@link applyPlayerProfile}. */
@@ -357,6 +379,9 @@ export function applyPlayerProfile(
   const localById  = new Map(localCampaigns.map((c) => [c.id, c]));
   const outcomes: CampaignImportOutcome[] = [];
 
+  // Pre-load existing recording IDs so we can count new ones per campaign.
+  const existingRecordingIds = new Set(loadAllRecordings().map((r) => r.id));
+
   for (const block of payload.campaignProgress) {
     const local = localById.get(block.campaignId);
     if (!local) {
@@ -367,14 +392,19 @@ export function applyPlayerProfile(
     const levelIds   = validLevelIds(local);
     const chapterIds = validChapterIds(local);
 
+    // Snapshot pre-merge state to compute deltas.
+    const preMergeProgress = loadCampaignProgress(block.campaignId);
+    const preMergeChapters = loadCompletedChapters(block.campaignId);
+    const preMergeStars    = loadLevelStars(block.campaignId);
+
     // Union: completed levels (skip IDs not present in the local campaign)
-    const localProgress = loadCampaignProgress(block.campaignId);
+    const localProgress = preMergeProgress;
     for (const levelId of block.completedLevels) {
       if (levelIds.has(levelId)) markCampaignLevelCompleted(block.campaignId, levelId, localProgress);
     }
 
     // Union: completed chapters (skip IDs not present in the local campaign)
-    const localChapters = loadCompletedChapters(block.campaignId);
+    const localChapters = preMergeChapters;
     for (const chapterId of block.completedChapters) {
       if (chapterIds.has(chapterId)) markChapterCompleted(block.campaignId, chapterId, localChapters);
     }
@@ -390,7 +420,7 @@ export function applyPlayerProfile(
     if (block.campaignCompleteShown)  markCampaignCompleteShown(block.campaignId);
 
     // Max-value merge: stars (skip IDs not present in the local campaign)
-    const existingStars = loadLevelStars(block.campaignId);
+    const existingStars = preMergeStars;
     for (const [idStr, stars] of Object.entries(block.levelStars)) {
       const id = Number(idStr);
       if (levelIds.has(id) && stars > (existingStars[id] ?? -Infinity)) {
@@ -404,17 +434,57 @@ export function applyPlayerProfile(
       if (levelIds.has(id)) saveLevelWater(id, water, block.campaignId);
     }
 
-    outcomes.push({ status: 'merged', campaignName: local.name, campaignId: block.campaignId });
+    // Compute deltas for this campaign.
+    const newLevelsCompleted   = [...block.completedLevels].filter((id) => levelIds.has(id) && !preMergeProgress.has(id)).length;
+    const newChaptersCompleted = [...block.completedChapters].filter((id) => chapterIds.has(id) && !preMergeChapters.has(id)).length;
+    let newStars = 0;
+    for (const [idStr, stars] of Object.entries(block.levelStars)) {
+      const id = Number(idStr);
+      if (levelIds.has(id)) {
+        const delta = stars - (preMergeStars[id] ?? 0);
+        if (delta > 0) newStars += delta;
+      }
+    }
+
+    outcomes.push({
+      status: 'merged',
+      campaignName: local.name,
+      campaignId: block.campaignId,
+      newLevelsCompleted,
+      newChaptersCompleted,
+      newStars,
+      newRecordings: 0, // filled in below after recordings are processed
+    });
   }
 
   // ── Recordings (present only in "Export + Recordings" files) ──────────────
+  // Count new recordings per campaign so the per-campaign outcome can reflect them.
+  const newRecordingsPerCampaign = new Map<string, number>();
   if (payload.recordings && payload.recordings.length > 0) {
-    const existingIds = new Set(loadAllRecordings().map((r) => r.id));
     for (const record of payload.recordings) {
-      if (!existingIds.has(record.id)) {
+      if (!existingRecordingIds.has(record.id)) {
         saveRecording(record);
-        existingIds.add(record.id); // guard against duplicates within the imported list itself
+        existingRecordingIds.add(record.id); // guard against duplicates within the imported list itself
+        if (record.campaignId) {
+          newRecordingsPerCampaign.set(record.campaignId, (newRecordingsPerCampaign.get(record.campaignId) ?? 0) + 1);
+        }
       }
+    }
+  }
+
+  // Patch newRecordings counts into the merged outcomes.
+  for (const outcome of outcomes) {
+    if (outcome.status === 'merged') {
+      outcome.newRecordings = newRecordingsPerCampaign.get(outcome.campaignId) ?? 0;
+    }
+  }
+
+  // ── Active campaign ────────────────────────────────────────────────────────
+  if ('activeCampaignId' in payload && payload.activeCampaignId) {
+    if (localById.has(payload.activeCampaignId)) {
+      saveActiveCampaignId(payload.activeCampaignId);
+    } else {
+      clearActiveCampaignId();
     }
   }
 

@@ -759,7 +759,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
   box.style.cssText =
     `background:${UI_BG};border:3px solid #4a90d9;border-radius:${RADIUS_LG};` +
     'padding:28px 36px;display:flex;flex-direction:column;gap:14px;' +
-    'min-width:280px;max-width:500px;max-height:80vh;overflow-y:auto;';
+    'min-width:280px;max-width:540px;max-height:80vh;overflow-y:auto;';
 
   const title = document.createElement('h2');
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#4a90d9;';
@@ -773,40 +773,66 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[]): 
     (o): o is Extract<CampaignImportOutcome, { status: 'ignored' }> => o.status === 'ignored',
   );
 
-  const addSection = (heading: string, color: string, items: string[]): void => {
-    const h = document.createElement('h3');
-    h.style.cssText = `margin:4px 0 0;font-size:0.95rem;color:${color};`;
-    h.textContent = heading;
-    box.appendChild(h);
-    if (items.length === 0) {
-      const none = document.createElement('p');
-      none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#888;';
-      none.textContent = '(none)';
-      box.appendChild(none);
-    } else {
-      const ul = document.createElement('ul');
-      ul.style.cssText = 'margin:4px 0 0 16px;padding:0;';
-      for (const item of items) {
-        const li = document.createElement('li');
-        li.style.cssText = 'font-size:0.85rem;color:#ddd;margin:2px 0;';
-        li.textContent = item;
-        ul.appendChild(li);
-      }
-      box.appendChild(ul);
-    }
-  };
+  if (merged.length > 0) {
+    const mergedHeader = document.createElement('h3');
+    mergedHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#7ed321;';
+    mergedHeader.textContent = '✅ Campaigns merged';
+    box.appendChild(mergedHeader);
 
-  addSection(
-    '✅ Campaigns merged',
-    '#7ed321',
-    merged.map((o) => o.campaignName),
-  );
+    const ul = document.createElement('ul');
+    ul.style.cssText = 'margin:4px 0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px;';
+    for (const o of merged) {
+      const li = document.createElement('li');
+      li.style.cssText = 'font-size:0.85rem;color:#ddd;';
+      const namePart = document.createElement('strong');
+      namePart.textContent = o.campaignName;
+      li.appendChild(namePart);
+
+      const stats: string[] = [];
+      if (o.newLevelsCompleted > 0)
+        stats.push(`${o.newLevelsCompleted} level${o.newLevelsCompleted !== 1 ? 's' : ''} completed`);
+      if (o.newChaptersCompleted > 0)
+        stats.push(`${o.newChaptersCompleted} chapter${o.newChaptersCompleted !== 1 ? 's' : ''} completed`);
+      if (o.newStars > 0)
+        stats.push(`${o.newStars} ⭐ added`);
+      if (o.newRecordings > 0)
+        stats.push(`${o.newRecordings} recording${o.newRecordings !== 1 ? 's' : ''} imported`);
+
+      if (stats.length > 0) {
+        const detail = document.createElement('span');
+        detail.style.cssText = 'color:#aaa;';
+        detail.textContent = ' — ' + stats.join(', ');
+        li.appendChild(detail);
+      } else {
+        const detail = document.createElement('span');
+        detail.style.cssText = 'color:#888;';
+        detail.textContent = ' — already up to date';
+        li.appendChild(detail);
+      }
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+  } else {
+    const none = document.createElement('p');
+    none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#888;';
+    none.textContent = 'No campaign progress was merged.';
+    box.appendChild(none);
+  }
+
   if (ignored.length > 0) {
-    addSection(
-      '⚠️ Campaigns not found locally (skipped)',
-      '#f0c040',
-      ignored.map((o) => o.campaignName),
-    );
+    const ignoredHeader = document.createElement('h3');
+    ignoredHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#f0c040;';
+    ignoredHeader.textContent = '⚠️ Campaigns not found locally (skipped)';
+    box.appendChild(ignoredHeader);
+    const ul = document.createElement('ul');
+    ul.style.cssText = 'margin:4px 0 0 16px;padding:0;';
+    for (const o of ignored) {
+      const li = document.createElement('li');
+      li.style.cssText = 'font-size:0.85rem;color:#ddd;margin:2px 0;';
+      li.textContent = o.campaignName;
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
   }
 
   const note = document.createElement('p');

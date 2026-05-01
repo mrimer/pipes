@@ -418,6 +418,18 @@ export interface CampaignDef {
    */
   official?: boolean;
   /**
+   * UUID v4 of the player profile that created this campaign.
+   * When set, only the profile with a matching GUID (or any profile when
+   * `anyoneEdit` is true) may edit or export this campaign.
+   * Absent for campaigns created before this field was introduced.
+   */
+  authorGuid?: string;
+  /**
+   * When true, any player profile may edit and export this campaign,
+   * regardless of whether their GUID matches `authorGuid`.
+   */
+  anyoneEdit?: boolean;
+  /**
    * ISO 8601 timestamp of when this campaign was last modified.
    * Used for versioning during import to detect newer/older/same versions.
    */
