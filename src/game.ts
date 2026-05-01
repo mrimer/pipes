@@ -5,6 +5,7 @@ import { InputCallbacks, InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
 import {
   loadPlayerName,
+  loadSfxVolume,
   loadTouchUiEnabled,
   savePlayerName,
   saveSfxVolume,
@@ -43,6 +44,9 @@ import { showTimedMessage } from './uiHelpers';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
 import { PlaybackScreen, PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
 import { exportReplay, importReplay, exportPlayerProfile, importPlayerProfile } from './profileIO';
+import { getActiveSlotIndex } from './activeProfile';
+import { loadSlotMeta, saveSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
+import { PlayerProfileScreen } from './playerProfileScreen';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -243,6 +247,9 @@ export class Game implements InputCallbacks {
   /** Modal overlay for the game settings (SFX volume, etc.). */
   private readonly _settingsModalEl: HTMLElement;
 
+  /** Player profile selection screen overlay. */
+  private readonly _profileScreen: PlayerProfileScreen;
+
   constructor(
     canvas: HTMLCanvasElement,
     levelSelectEl: HTMLElement,
@@ -342,7 +349,16 @@ export class Game implements InputCallbacks {
         const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
         saveSfxVolume(sfxManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
-        savePlayerName(playerNameInput?.value ?? loadPlayerName());
+        const newName = playerNameInput?.value ?? loadPlayerName();
+        savePlayerName(newName);
+        // Keep the profile-slot metadata name in sync with the settings name.
+        const slotIdx = getActiveSlotIndex();
+        if (slotIdx !== null) {
+          const meta = loadSlotMeta(slotIdx);
+          if (meta) {
+            saveSlotMeta(slotIdx, { ...meta, name: newName.trim() || meta.name });
+          }
+        }
         saveRecordingSettings({
           recordSuccesses: recordSuccessesToggle?.checked ?? true,
           recordFailures:  recordFailuresToggle?.checked  ?? false,
@@ -358,6 +374,16 @@ export class Game implements InputCallbacks {
       (level) => this._campaign.playtestLevel(level), // onPlaytest: start the level in play mode
       (campaign) => this._campaign.activate(campaign), // onPlayCampaign: activate campaign for play
     );
+
+    // Create the player-profile selection screen (appends itself to document.body).
+    this._profileScreen = new PlayerProfileScreen();
+    this._profileScreen.onProfileSelected = (slotIndex) => {
+      // Update settings that depend on the newly active slot.
+      sfxManager.setVolume(loadSfxVolume());
+      saveActiveSlotIndex(slotIndex);
+      this._campaign.reloadActiveCampaignProgress();
+      this._showLevelSelect();
+    };
 
     // Create the campaign manager and restore persisted campaign state
     const campaignCallbacks: CampaignCallbacks = {
@@ -426,6 +452,11 @@ export class Game implements InputCallbacks {
       },
       exportProgress: () => this._exportPlayerProfile(),
       importProgress: () => this._importPlayerProfile(),
+      showPlayerProfile: () => this._showPlayerProfileScreen(),
+      getPlayerName: () => {
+        const idx = getActiveSlotIndex();
+        return idx !== null ? (loadSlotMeta(idx)?.name ?? null) : null;
+      },
     };
     this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
     this._campaign.restoreFromPersistence();
@@ -443,7 +474,13 @@ export class Game implements InputCallbacks {
       }, 100);
     });
 
-    this._showLevelSelect();
+    // Show the level-select screen or, if no profile slot is active, show the
+    // profile screen so the player can choose or create a profile first.
+    if (getActiveSlotIndex() !== null) {
+      this._showLevelSelect();
+    } else {
+      this._showPlayerProfileScreen();
+    }
     this._loop();
 
     // Wire the recording HUD buttons
@@ -1994,10 +2031,18 @@ export class Game implements InputCallbacks {
    * 5. Shows a result modal listing merged and ignored campaigns.
    */
   private _importPlayerProfile(): void {
-    importPlayerProfile(this.campaignEditor.getAllCampaigns(), (outcomes) => {
-      this._campaign.reloadActiveCampaignProgress();
+    importPlayerProfile(this.campaignEditor.getAllCampaigns(), (outcomes, targetSlotIndex) => {
+      if (targetSlotIndex === getActiveSlotIndex()) {
+        this._campaign.reloadActiveCampaignProgress();
+      }
       showPlayerImportResultModal(outcomes);
     });
+  }
+
+  /** Show the player-profile selection screen (hides the level-select screen). */
+  private _showPlayerProfileScreen(): void {
+    this.levelSelectEl.style.display = 'none';
+    this._profileScreen.show(this.campaignEditor.getAllCampaigns());
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────

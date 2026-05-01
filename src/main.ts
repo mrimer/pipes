@@ -3,7 +3,19 @@ import { sfxManager, SfxId } from './sfxManager';
 import { loadSfxVolume, loadTouchUiEnabled } from './persistence';
 import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
 import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
+import { migrateIfNeeded, loadActiveSlotIndex } from './playerProfileSlots';
+import { setActiveSlotIndex } from './activeProfile';
 
+// ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
+migrateIfNeeded();
+
+// ─── Step 2: activate the persisted slot (if any) ────────────────────────────
+const savedActiveSlot = loadActiveSlotIndex();
+if (savedActiveSlot !== null) {
+  setActiveSlotIndex(savedActiveSlot);
+}
+
+// ─── Step 3: apply player settings from the active slot ──────────────────────
 sfxManager.setVolume(loadSfxVolume());
 sfxManager.preload();
 
