@@ -617,6 +617,23 @@ export function loadRecordingsForLevel(campaignId: string, levelId: number): Pla
   );
 }
 
+/**
+ * Load all recordings that belong to a specific player profile.
+ *
+ * Matching strategy (in priority order):
+ * 1. If the recording has a `playerGuid`, match on that field.
+ * 2. Otherwise fall back to matching on `playerName`.
+ *
+ * @param guid  UUID v4 of the target player profile.
+ * @param name  Display name of the target player (fallback for older recordings
+ *              that pre-date the `playerGuid` field).
+ */
+export function loadRecordingsForProfile(guid: string, name: string): PlaySequenceRecord[] {
+  return loadAllRecordings().filter(
+    (r) => r.playerGuid ? r.playerGuid === guid : r.playerName === name,
+  );
+}
+
 /** Persist a new or updated {@link PlaySequenceRecord}. Replaces an existing entry with the same `id`. */
 export function saveRecording(record: PlaySequenceRecord): void {
   try {

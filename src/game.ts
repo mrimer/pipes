@@ -384,6 +384,9 @@ export class Game implements InputCallbacks {
       this._campaign.reloadActiveCampaignProgress();
       this._showLevelSelect();
     };
+    this._profileScreen.onReturnToMenu = () => {
+      this._showLevelSelect();
+    };
 
     // Create the campaign manager and restore persisted campaign state
     const campaignCallbacks: CampaignCallbacks = {
@@ -1906,6 +1909,7 @@ export class Game implements InputCallbacks {
       info,
       (annotation) => {
         if (!this.board || !this.currentLevel) return;
+        const activeSlot = getActiveSlotIndex();
         const record: PlaySequenceRecord = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           campaignId: this._campaign.activeCampaign?.id ?? '',
@@ -1915,6 +1919,7 @@ export class Game implements InputCallbacks {
           autoRecorded: false,
           timestamp: Date.now(),
           playerName: loadPlayerName(),
+          playerGuid: activeSlot !== null ? loadSlotMeta(activeSlot)?.guid : undefined,
           waterScore: info.waterScore,
           stars: info.stars,
           annotation: annotation || undefined,
@@ -1976,6 +1981,7 @@ export class Game implements InputCallbacks {
     );
     if (isDuplicate) return;
 
+    const autoActiveSlot = getActiveSlotIndex();
     const record: PlaySequenceRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       campaignId,
@@ -1985,6 +1991,7 @@ export class Game implements InputCallbacks {
       autoRecorded: true,
       timestamp: Date.now(),
       playerName: loadPlayerName(),
+      playerGuid: autoActiveSlot !== null ? loadSlotMeta(autoActiveSlot)?.guid : undefined,
       waterScore,
       stars,
       corrupted: false,

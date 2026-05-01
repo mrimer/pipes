@@ -30,8 +30,10 @@ import {
   saveTouchUiEnabled,
   savePlayerName,
   saveCommandKeyAssignments,
+  loadAllRecordings,
+  saveRecording,
 } from './persistence';
-import { CampaignDef } from './types';
+import { CampaignDef, PlaySequenceRecord } from './types';
 
 // ─── File type constants ──────────────────────────────────────────────────────
 
@@ -93,6 +95,12 @@ export interface PlayerProfilePayload {
   touchUiEnabled: boolean | null;
   commandKeys: Record<string, string> | null;
   campaignProgress: CampaignProgressBlock[];
+  /**
+   * Playback recordings belonging to this profile.
+   * Present only in files exported via "Export + Recordings"; absent in
+   * standard profile exports.  Optional so that v1/v2 files parse correctly.
+   */
+  recordings?: PlaySequenceRecord[];
 }
 
 /** The complete serialized player-profile file. */
@@ -148,11 +156,15 @@ function filterRecordByLevelIds(
  * @param guid - UUID v4 for this profile.  Callers should pass the GUID from
  *   the active slot's metadata.  A fresh GUID is generated when omitted.
  * @param lastPlayedAt - ISO 8601 timestamp or null.
+ * @param recordings - Optional recordings to embed in the payload (used by
+ *   "Export + Recordings").  When omitted the `recordings` field is absent
+ *   from the returned payload.
  */
 export function buildPlayerProfilePayload(
   localCampaigns: readonly CampaignDef[],
   guid?: string,
   lastPlayedAt?: string | null,
+  recordings?: PlaySequenceRecord[],
 ): PlayerProfilePayload {
   const campaignProgress: CampaignProgressBlock[] = localCampaigns.map((c) => {
     const levelIds   = validLevelIds(c);
@@ -170,15 +182,19 @@ export function buildPlayerProfilePayload(
     };
   });
 
-  return {
-    guid:          guid ?? _generateFallbackGuid(),
-    lastPlayedAt:  lastPlayedAt ?? null,
-    playerName:    loadPlayerName(),
-    sfxVolume:     loadSfxVolume(),
+  const payload: PlayerProfilePayload = {
+    guid:           guid ?? _generateFallbackGuid(),
+    lastPlayedAt:   lastPlayedAt ?? null,
+    playerName:     loadPlayerName(),
+    sfxVolume:      loadSfxVolume(),
     touchUiEnabled: loadTouchUiEnabled(),
-    commandKeys:   loadCommandKeyAssignments(),
+    commandKeys:    loadCommandKeyAssignments(),
     campaignProgress,
   };
+  if (recordings !== undefined) {
+    payload.recordings = recordings;
+  }
+  return payload;
 }
 
 /** Minimal UUID v4 fallback (used when no GUID is supplied to buildPlayerProfilePayload). */
@@ -316,6 +332,8 @@ export interface ApplyProfileResult {
  * - For each campaign in the payload whose ID exists locally, progress
  *   is merged (union for sets/flags, max for numeric scores).
  * - Campaigns whose IDs are not found locally are silently skipped.
+ * - When the payload includes `recordings`, each record is merged into the
+ *   local store; records whose `id` already exists locally are skipped.
  *
  * @param payload         The decoded player-profile payload.
  * @param localCampaigns  All campaigns currently installed locally.
@@ -387,6 +405,17 @@ export function applyPlayerProfile(
     }
 
     outcomes.push({ status: 'merged', campaignName: local.name, campaignId: block.campaignId });
+  }
+
+  // ── Recordings (present only in "Export + Recordings" files) ──────────────
+  if (payload.recordings && payload.recordings.length > 0) {
+    const existingIds = new Set(loadAllRecordings().map((r) => r.id));
+    for (const record of payload.recordings) {
+      if (!existingIds.has(record.id)) {
+        saveRecording(record);
+        existingIds.add(record.id); // guard against duplicates within the imported list itself
+      }
+    }
   }
 
   return { outcomes };

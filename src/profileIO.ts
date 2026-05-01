@@ -8,7 +8,7 @@ import {
   applyPlayerProfile,
   type CampaignImportOutcome,
 } from './playerProfile';
-import { saveRecording, loadPlayerName } from './persistence';
+import { saveRecording, loadPlayerName, loadRecordingsForProfile } from './persistence';
 import { downloadGzipJson, readGzipOrJsonFile } from './fileIO';
 import { findLevelLocation } from './campaignEditor/campaignService';
 import { getActiveSlotIndex, withSlot } from './activeProfile';
@@ -129,6 +129,40 @@ export async function exportPlayerProfile(
   const json = JSON.stringify(fileObj, null, 2);
   const playerName = sanitizeFilenamePart(loadPlayerName(), EXPORT_FILENAME_FALLBACK_PLAYER);
   const filename = `pipes-player-${playerName}.pipes.json.gz`;
+
+  try {
+    await downloadGzipJson(json, filename);
+  } catch (err) {
+    alert(`Export failed: ${err}`);
+  }
+}
+
+/**
+ * Export a player profile together with all recordings that belong to it.
+ *
+ * Recordings are matched to the profile using the GUID-first, name-fallback
+ * strategy: a recording belongs to this profile when its `playerGuid` equals
+ * the profile GUID, or — for older recordings that pre-date the `playerGuid`
+ * field — when its `playerName` equals the profile's player name.
+ *
+ * The resulting file is identical to a standard profile export except that
+ * `payload.recordings` is populated.  On import, {@link importPlayerProfile}
+ * will merge those recordings into the local store, skipping any whose `id`
+ * already exists.
+ */
+export async function exportPlayerProfileWithRecordings(
+  campaigns: CampaignDef[],
+): Promise<void> {
+  const slotIdx = getActiveSlotIndex();
+  const meta = slotIdx !== null ? loadSlotMeta(slotIdx) : null;
+  const playerName = loadPlayerName();
+  const guid = meta?.guid ?? '';
+  const recordings = loadRecordingsForProfile(guid, playerName);
+  const payload = buildPlayerProfilePayload(campaigns, meta?.guid, meta?.lastPlayedAt ?? null, recordings);
+  const fileObj = buildPlayerFile(payload);
+  const json = JSON.stringify(fileObj, null, 2);
+  const safePlayerName = sanitizeFilenamePart(playerName, EXPORT_FILENAME_FALLBACK_PLAYER);
+  const filename = `pipes-player-${safePlayerName}-with-recordings.pipes.json.gz`;
 
   try {
     await downloadGzipJson(json, filename);

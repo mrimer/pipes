@@ -466,6 +466,13 @@ export interface PlaySequenceRecord {
   timestamp: number;
   /** Display name of the player who made the recording. */
   playerName: string;
+  /**
+   * UUID v4 of the player profile that created this recording.
+   * Present on recordings created after the multi-profile feature was added;
+   * absent on older recordings.  When matching a recording to a profile, check
+   * this field first and fall back to `playerName` when it is absent.
+   */
+  playerGuid?: string;
   /** Water remaining when the level was completed (success only). */
   waterScore?: number;
   /** Stars collected when the level was completed (success only). */
