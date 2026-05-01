@@ -15,7 +15,6 @@ import {
   PROFILE_SLOT_COUNT,
   ProfileSlotMeta,
   ProfileSlotStats,
-  loadSlotMeta,
   saveSlotMeta,
   deleteSlotMeta,
   loadAllSlotMetas,
@@ -373,12 +372,10 @@ export class PlayerProfileScreen {
 
     importPlayerProfile(this._campaigns, (outcomes, targetSlotIndex) => {
       setActiveSlotIndex(prevActive);
-      // Update slot metadata name from the imported profile.
-      const updatedMeta = loadSlotMeta(targetSlotIndex);
-      if (!updatedMeta) {
-        // Slot was newly created inside importPlayerProfile; meta was already saved there.
-      }
-      void outcomes; // Outcomes are handled by the import function itself.
+      void targetSlotIndex; // Slot meta was already updated by importPlayerProfile.
+      // The per-campaign import outcomes are shown inside importPlayerProfile via
+      // showPlayerImportResultModal; there is nothing more to do with them here.
+      void outcomes;
       this._render();
     });
   }

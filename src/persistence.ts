@@ -639,7 +639,8 @@ export function deleteRecording(id: string): void {
   } catch { /* ignore storage errors */ }
 }
 
-/** Load recording settings.
+/**
+ * Load recording settings.
  * Defaults: `recordSuccesses = true`, `recordFailures = false`.
  */
 export function loadRecordingSettings(): RecordingSettings {
