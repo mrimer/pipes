@@ -337,6 +337,8 @@ export type CampaignImportOutcome =
       newChaptersCompleted: number;
       /** Total additional stars gained across all levels (sum of deltas). */
       newStars: number;
+      /** Total additional water gained across all levels (sum of deltas). */
+      newWater: number;
       /** Number of recordings imported that were not already present locally. */
       newRecordings: number;
     }
@@ -405,6 +407,7 @@ export function applyPlayerProfile(
     const preMergeProgress = loadCampaignProgress(block.campaignId);
     const preMergeChapters = loadCompletedChapters(block.campaignId);
     const preMergeStars    = loadLevelStars(block.campaignId);
+    const preMergeWater    = loadLevelWater(block.campaignId);
 
     // Union: completed levels (skip IDs not present in the local campaign)
     const localProgress = preMergeProgress;
@@ -454,6 +457,14 @@ export function applyPlayerProfile(
         if (delta > 0) newStars += delta;
       }
     }
+    let newWater = 0;
+    for (const [idStr, water] of Object.entries(block.levelWater)) {
+      const id = Number(idStr);
+      if (levelIds.has(id)) {
+        const delta = water - (preMergeWater[id] ?? 0);
+        if (delta > 0) newWater += delta;
+      }
+    }
 
     outcomes.push({
       status: 'merged',
@@ -462,6 +473,7 @@ export function applyPlayerProfile(
       newLevelsCompleted,
       newChaptersCompleted,
       newStars,
+      newWater,
       newRecordings: newRecordingsPerCampaign.get(block.campaignId) ?? 0,
     });
   }

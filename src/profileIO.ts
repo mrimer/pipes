@@ -186,11 +186,12 @@ export async function exportPlayerProfileWithRecordings(
  * - If no empty slot is available, show an error.
  *
  * @param campaigns  All locally installed campaigns.
- * @param onSuccess  Called with the merge outcomes and target slot index.
+ * @param onSuccess  Called with the merge outcomes, target slot index, and
+ *                   whether the target slot was empty before the import.
  */
 export function importPlayerProfile(
   campaigns: CampaignDef[],
-  onSuccess: (outcomes: CampaignImportOutcome[], targetSlotIndex: number) => void,
+  onSuccess: (outcomes: CampaignImportOutcome[], targetSlotIndex: number, isNewSlot: boolean) => void,
 ): void {
   const processText = (text: string): void => {
     const result = parsePlayerFile(text);
@@ -223,11 +224,14 @@ export function importPlayerProfile(
 
     const finalTarget = targetSlot;
 
+    // Detect whether the target slot was empty before the import.
+    const existingMeta = loadSlotMeta(finalTarget);
+    const isNewSlot = !existingMeta;
+
     // Perform the merge inside the target slot's namespace.
     const applyResult = withSlot(finalTarget, () => applyPlayerProfile(result.payload, campaigns));
 
     // Update slot metadata: if this is a new slot, create metadata from the file.
-    const existingMeta = loadSlotMeta(finalTarget);
     if (!existingMeta) {
       saveSlotMeta(finalTarget, {
         // parsePlayerFile always ensures payload.guid is a string (generating a fallback for v1
@@ -241,7 +245,7 @@ export function importPlayerProfile(
       saveSlotMeta(finalTarget, { ...existingMeta, name: result.payload.playerName });
     }
 
-    onSuccess(applyResult.outcomes, finalTarget);
+    onSuccess(applyResult.outcomes, finalTarget, isNewSlot);
   };
 
   openImportFilePicker(processText);

@@ -28,7 +28,7 @@ import { savePlayerName, loadSfxVolume, loadTouchUiEnabled } from './persistence
 import { sfxManager } from './sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from './deviceUtils';
 import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profileIO';
-import { buildNewPlayerModal, buildConfirmModal, showPlayerImportResultModal } from './gameModals';
+import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from './gameModals';
 import { attachHoverWaveAnimation } from './visuals/chapterWaves';
 import type { CampaignDef } from './types';
 
@@ -228,7 +228,27 @@ export class PlayerProfileScreen {
     nameEl.textContent = meta.name;
     nameEl.style.cssText =
       `font-size:1.15rem;font-weight:bold;color:${isActive ? '#ffffff' : '#ddeeff'};text-align:center;`;
-    card.appendChild(nameEl);
+
+    const pencilBtn = document.createElement('button');
+    pencilBtn.type = 'button';
+    pencilBtn.textContent = '✏️';
+    pencilBtn.title = 'Edit player name';
+    pencilBtn.style.cssText =
+      'background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0 0 0 4px;line-height:1;vertical-align:middle;opacity:0.7;';
+    pencilBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      buildEditPlayerNameModal(meta.name, (newName) => {
+        withSlot(slotIndex, () => savePlayerName(newName));
+        saveSlotMeta(slotIndex, { ...meta, name: newName });
+        this._render();
+      }, () => { /* cancelled */ });
+    });
+
+    const nameRow = document.createElement('div');
+    nameRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:4px;';
+    nameRow.appendChild(nameEl);
+    nameRow.appendChild(pencilBtn);
+    card.appendChild(nameRow);
 
     // Last played
     const lastPlayedEl = document.createElement('div');
@@ -431,10 +451,10 @@ export class PlayerProfileScreen {
     const prevActive = getActiveSlotIndex();
     setActiveSlotIndex(slotIndex);
 
-    importPlayerProfile(this._campaigns, (outcomes, targetSlotIndex) => {
+    importPlayerProfile(this._campaigns, (outcomes, targetSlotIndex, isNewSlot) => {
       setActiveSlotIndex(prevActive);
       void targetSlotIndex; // Slot meta was already updated by importPlayerProfile.
-      showPlayerImportResultModal(outcomes);
+      showPlayerImportResultModal(outcomes, isNewSlot);
       this._render();
     });
   }
