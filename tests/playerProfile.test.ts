@@ -47,7 +47,7 @@ import {
   loadAllRecordings,
 } from '../src/persistence';
 import { CampaignDef, PlaySequenceRecord } from '../src/types';
-import { makeRecord } from './testHelpers';
+import { makeCampaignDef, makeChapterDef, makeLevelDef, makeRecord } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,28 +56,27 @@ function clearStorage(): void {
 }
 
 function makeMinimalCampaign(id: string, name = 'Test Campaign'): CampaignDef {
-  return {
+  return makeCampaignDef({
     id,
     name,
-    author: 'Tester',
     chapters: [
-      {
+      makeChapterDef({
         id: 1,
         name: 'Ch 1',
         levels: [
-          { id: 101, name: 'Level 1', rows: 1, cols: 1, grid: [[null]], inventory: [] },
-          { id: 102, name: 'Level 2', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          makeLevelDef({ id: 101, name: 'Level 1', rows: 1, cols: 1, grid: [[null]] }),
+          makeLevelDef({ id: 102, name: 'Level 2', rows: 1, cols: 1, grid: [[null]] }),
         ],
-      },
-      {
+      }),
+      makeChapterDef({
         id: 2,
         name: 'Ch 2',
         levels: [
-          { id: 201, name: 'Level 3', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          makeLevelDef({ id: 201, name: 'Level 3', rows: 1, cols: 1, grid: [[null]] }),
         ],
-      },
+      }),
     ],
-  };
+  });
 }
 
 // ─── computeChecksum ─────────────────────────────────────────────────────────

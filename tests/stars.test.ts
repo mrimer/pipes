@@ -6,7 +6,8 @@
 
 import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
-import { LevelDef, TileDef, PipeShape, Direction } from '../src/types';
+import { TileDef } from '../src/types';
+import { makeLevelDef } from './testHelpers';
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 
@@ -104,25 +105,6 @@ describe('clearLevelStarRecord', () => {
 
 // ─── Level-select star display ────────────────────────────────────────────────
 
-/** Minimal level for testing. */
-function makeLevel(id: number, starCount?: number, challenge?: boolean): LevelDef {
-  return {
-    id,
-    name: `Level ${id}`,
-    rows: 1,
-    cols: 2,
-    grid: [
-      [
-        { shape: PipeShape.Source, connections: [Direction.East], capacity: 5 },
-        { shape: PipeShape.Sink,   connections: [Direction.West] },
-      ],
-    ],
-    inventory: [],
-    starCount,
-    challenge,
-  };
-}
-
 function makeLevelListEl(): HTMLElement {
   const el = document.createElement('div');
   document.body.appendChild(el);
@@ -137,7 +119,7 @@ describe('renderLevelList star display', () => {
   });
 
   it('shows ⭐ X/Y in chapter header when all levels are complete and chapter has stars', () => {
-    const level = makeLevel(1, 3);
+    const level = makeLevelDef({ id: 1, starCount: 3 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const levelStars: Record<number, number> = { 1: 2 };
 
@@ -153,7 +135,7 @@ describe('renderLevelList star display', () => {
   });
 
   it('does not show chapter star tally when chapter is not yet fully complete', () => {
-    const levels = [makeLevel(1, 2), makeLevel(2, 1)];
+    const levels = [makeLevelDef({ id: 1, starCount: 2 }), makeLevelDef({ id: 2, starCount: 1 })];
     const chapters = [{ id: 1, name: 'Ch1', levels }];
     // Only level 1 completed
     const levelStars: Record<number, number> = { 1: 2 };
@@ -170,7 +152,7 @@ describe('renderLevelList star display', () => {
   });
 
   it('shows campaign star tally when campaign is 100% complete and has stars', () => {
-    const level = makeLevel(1, 2);
+    const level = makeLevelDef({ id: 1, starCount: 2 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const levelStars: Record<number, number> = { 1: 1 };
     const activeCampaign = { name: 'My Campaign', author: 'Tester', completionPct: 100 };
@@ -187,7 +169,7 @@ describe('renderLevelList star display', () => {
   });
 
   it('does not show campaign star tally when campaign is not complete', () => {
-    const level = makeLevel(1, 2);
+    const level = makeLevelDef({ id: 1, starCount: 2 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const activeCampaign = { name: 'My Campaign', author: 'Tester', completionPct: 50 };
 
@@ -219,9 +201,9 @@ describe('renderLevelList – challenge levels', () => {
     // Completing L1 + L2 + L4💀 satisfies the quota even though L3 is skipped.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2), makeLevel(3), makeLevel(4, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 }), makeLevelDef({ id: 3 }), makeLevelDef({ id: 4, challenge: true })],
     };
-    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(5)] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevelDef({ id: 5 })] };
     const chapters = [ch1, ch2];
 
     // L1, L2, and L4💀 completed; L3 not done.
@@ -243,9 +225,9 @@ describe('renderLevelList – challenge levels', () => {
     // Completing only 2 levels (1 regular + 1 challenge) is not enough.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2), makeLevel(3), makeLevel(4, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 }), makeLevelDef({ id: 3 }), makeLevelDef({ id: 4, challenge: true })],
     };
-    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(5)] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevelDef({ id: 5 })] };
     const chapters = [ch1, ch2];
 
     // Only L1 and L4💀 completed (2 total < 3 required).
@@ -266,9 +248,9 @@ describe('renderLevelList – challenge levels', () => {
     // Completing only the regular level should unlock chapter 2 (quota=1, completed=1).
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2, challenge: true })],
     };
-    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevelDef({ id: 3 })] };
     const chapters = [ch1, ch2];
 
     // Only the non-challenge level (1) is completed; challenge level (2) is not.
@@ -288,9 +270,9 @@ describe('renderLevelList – challenge levels', () => {
   it('keeps next chapter locked when a non-challenge level in the previous chapter is incomplete', () => {
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 })],
     };
-    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevelDef({ id: 3 })] };
     const chapters = [ch1, ch2];
 
     // Only level 1 is completed; level 2 (also non-challenge) is not (1 < 2 required).
@@ -310,7 +292,7 @@ describe('renderLevelList – challenge levels', () => {
     // 1 regular level (id=1) + 2 challenge levels (id=2, id=3). All completed.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2, undefined, true), makeLevel(3, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2, challenge: true }), makeLevelDef({ id: 3, challenge: true })],
     };
     const chapters = [ch1];
     const completed = new Set<number>([1, 2, 3]);
@@ -329,7 +311,7 @@ describe('renderLevelList – challenge levels', () => {
   it('shows 💀 0/N when chapter is complete but no challenge levels completed', () => {
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2, challenge: true })],
     };
     const chapters = [ch1];
     // Only the regular level is completed → chapter is "done" (all non-challenge done)
@@ -349,7 +331,7 @@ describe('renderLevelList – challenge levels', () => {
   it('does not show 💀 in chapter header when chapter has no challenge levels', () => {
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 })],
     };
     const chapters = [ch1];
     const completed = new Set<number>([1, 2]);
@@ -368,7 +350,7 @@ describe('renderLevelList – challenge levels', () => {
     // Chapter has 2 regular levels + 1 challenge level; only 1 regular done.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2), makeLevel(3, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 }), makeLevelDef({ id: 3, challenge: true })],
     };
     const chapters = [ch1];
     const completed = new Set<number>([1, 3]);  // L2 (regular) still incomplete
@@ -387,7 +369,7 @@ describe('renderLevelList – challenge levels', () => {
   it('calls onChapterMap with the chapter index when a chapter with a grid is clicked', () => {
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1)],
+      levels: [makeLevelDef({ id: 1 })],
       grid: [[null]] as (TileDef | null)[][],
       rows: 1,
       cols: 1,
@@ -407,7 +389,7 @@ describe('renderLevelList – challenge levels', () => {
   });
 
   it('shows an error message when a chapter without a grid is clicked', () => {
-    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1)] };
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevelDef({ id: 1 })] };
     const chapters = [ch1];
 
     renderLevelList(
@@ -438,7 +420,7 @@ describe('renderLevelList – campaign totals denominator gating', () => {
     // Campaign: 2 regular levels + 1 challenge level; only L1 done.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1, 2), makeLevel(2, 1), makeLevel(3, undefined, true)],
+      levels: [makeLevelDef({ id: 1, starCount: 2 }), makeLevelDef({ id: 2, starCount: 1 }), makeLevelDef({ id: 3, challenge: true })],
     };
     const chapters = [ch1];
     const levelStars: Record<number, number> = { 1: 1 };
@@ -460,7 +442,7 @@ describe('renderLevelList – campaign totals denominator gating', () => {
     // Campaign: 2 regular levels + 1 challenge level; L1 and L2 both done (all non-challenge).
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1, 2), makeLevel(2, 1), makeLevel(3, undefined, true)],
+      levels: [makeLevelDef({ id: 1, starCount: 2 }), makeLevelDef({ id: 2, starCount: 1 }), makeLevelDef({ id: 3, challenge: true })],
     };
     const chapters = [ch1];
     const levelStars: Record<number, number> = { 1: 1, 2: 1 };
@@ -481,7 +463,7 @@ describe('renderLevelList – campaign totals denominator gating', () => {
     // Campaign: 2 regular levels + 2 challenge levels; only L1 done, L3 (challenge) done.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2), makeLevel(3, undefined, true), makeLevel(4, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 }), makeLevelDef({ id: 3, challenge: true }), makeLevelDef({ id: 4, challenge: true })],
     };
     const chapters = [ch1];
     const activeCampaign = { name: 'Partial', author: 'T', completionPct: 25 };
@@ -502,7 +484,7 @@ describe('renderLevelList – campaign totals denominator gating', () => {
     // Campaign: 2 regular + 2 challenge; L1 & L2 done (all non-challenge), L3 (challenge) done.
     const ch1 = {
       id: 1, name: 'Ch1',
-      levels: [makeLevel(1), makeLevel(2), makeLevel(3, undefined, true), makeLevel(4, undefined, true)],
+      levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 }), makeLevelDef({ id: 3, challenge: true }), makeLevelDef({ id: 4, challenge: true })],
     };
     const chapters = [ch1];
     const activeCampaign = { name: 'Done', author: 'T', completionPct: 75 };
@@ -528,7 +510,7 @@ describe('renderLevelList – mastered campaign continue button', () => {
   });
 
   it('keeps the "🏆 Mastered!" button clickable and routes it to Campaign Map', () => {
-    const chapters = [{ id: 1, name: 'Ch1', levels: [makeLevel(1, 1)] }];
+    const chapters = [{ id: 1, name: 'Ch1', levels: [makeLevelDef({ id: 1, starCount: 1 })] }];
     const completed = new Set<number>([1]);
     const levelStars: Record<number, number> = { 1: 1 };
     const onCampaignMapClick = jest.fn();
@@ -731,7 +713,7 @@ describe('renderLevelList – chapter box color coding', () => {
   }
 
   it('shows gold border when all levels and all stars are completed', () => {
-    const level = makeLevel(1, 2);
+    const level = makeLevelDef({ id: 1, starCount: 2 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
     const levelStars: Record<number, number> = { 1: 2 };
@@ -748,7 +730,7 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   it('shows gold border when all levels are completed and chapter has no stars', () => {
-    const level = makeLevel(1);  // no starCount
+    const level = makeLevelDef({ id: 1 });  // no starCount
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
 
@@ -764,7 +746,7 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   it('shows indigo border when all levels are completed but not all stars collected', () => {
-    const level = makeLevel(1, 3);
+    const level = makeLevelDef({ id: 1, starCount: 3 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
     const levelStars: Record<number, number> = { 1: 1 };  // only 1 of 3 stars
@@ -781,7 +763,7 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   it('shows blue border when chapter is unlocked but not yet completed', () => {
-    const levels = [makeLevel(1), makeLevel(2)];
+    const levels = [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 })];
     const chapters = [{ id: 1, name: 'Ch1', levels }];
     const completed = new Set<number>([1]);  // only 1 of 2 levels done
 
@@ -797,8 +779,8 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   it('shows gray border when chapter is locked', () => {
-    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1), makeLevel(2)] };
-    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(3)] };
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 })] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevelDef({ id: 3 })] };
     const chapters = [ch1, ch2];
     const completed = new Set<number>();  // nothing done → ch2 is locked
 
@@ -815,7 +797,7 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   it('shows gold header background when chapter is gold', () => {
-    const level = makeLevel(1, 2);
+    const level = makeLevelDef({ id: 1, starCount: 2 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
     const levelStars: Record<number, number> = { 1: 2 };
@@ -832,7 +814,7 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   it('shows indigo header background when chapter is completed but stars remain', () => {
-    const level = makeLevel(1, 3);
+    const level = makeLevelDef({ id: 1, starCount: 3 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
     const levelStars: Record<number, number> = { 1: 1 };
@@ -867,8 +849,8 @@ describe('renderLevelList – campaign summary box color', () => {
   }
 
   it('shows gold border on campaign summary when all levels, stars, and challenges are completed', () => {
-    const regular = makeLevel(1, 2);
-    const challenge = makeLevel(2, undefined, true);
+    const regular = makeLevelDef({ id: 1, starCount: 2 });
+    const challenge = makeLevelDef({ id: 2, challenge: true });
     const chapters = [{ id: 1, name: 'Ch1', levels: [regular, challenge] }];
     const completed = new Set<number>([1, 2]);
     const levelStars: Record<number, number> = { 1: 2 };
@@ -884,8 +866,8 @@ describe('renderLevelList – campaign summary box color', () => {
   });
 
   it('shows white border on campaign summary when not all levels are completed', () => {
-    const level1 = makeLevel(1);
-    const level2 = makeLevel(2);
+    const level1 = makeLevelDef({ id: 1 });
+    const level2 = makeLevelDef({ id: 2 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level1, level2] }];
     const completed = new Set<number>([1]); // level2 not done
 
@@ -900,7 +882,7 @@ describe('renderLevelList – campaign summary box color', () => {
   });
 
   it('shows white border on campaign summary when not all stars are collected', () => {
-    const level = makeLevel(1, 3);
+    const level = makeLevelDef({ id: 1, starCount: 3 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
     const levelStars: Record<number, number> = { 1: 2 }; // missing 1 star
@@ -916,8 +898,8 @@ describe('renderLevelList – campaign summary box color', () => {
   });
 
   it('shows white border on campaign summary when not all challenge levels are completed', () => {
-    const regular = makeLevel(1);
-    const challenge = makeLevel(2, undefined, true);
+    const regular = makeLevelDef({ id: 1 });
+    const challenge = makeLevelDef({ id: 2, challenge: true });
     const chapters = [{ id: 1, name: 'Ch1', levels: [regular, challenge] }];
     const completed = new Set<number>([1]); // challenge not done
 
@@ -932,7 +914,7 @@ describe('renderLevelList – campaign summary box color', () => {
   });
 
   it('shows gold border when all levels are completed and campaign has no stars or challenges', () => {
-    const level = makeLevel(1); // no stars, no challenges
+    const level = makeLevelDef({ id: 1 }); // no stars, no challenges
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];
     const completed = new Set<number>([1]);
 
@@ -964,7 +946,7 @@ describe('renderLevelList – Continue button location text', () => {
   }
 
   it('appends chapter-level location to Continue button when there is a level to continue', () => {
-    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1), makeLevel(2)] };
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevelDef({ id: 1 }), makeLevelDef({ id: 2 })] };
     const chapters = [ch1];
     const completed = new Set<number>([1]); // level 2 is next
 
@@ -981,8 +963,8 @@ describe('renderLevelList – Continue button location text', () => {
   });
 
   it('appends correct chapter-level location across multiple chapters', () => {
-    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevel(1)] };
-    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevel(2), makeLevel(3)] };
+    const ch1 = { id: 1, name: 'Ch1', levels: [makeLevelDef({ id: 1 })] };
+    const ch2 = { id: 2, name: 'Ch2', levels: [makeLevelDef({ id: 2 }), makeLevelDef({ id: 3 })] };
     const chapters = [ch1, ch2];
     const completed = new Set<number>([1, 2]); // level 3 (ch2, pos2) is next
 
@@ -998,7 +980,7 @@ describe('renderLevelList – Continue button location text', () => {
   });
 
   it('shows Continue without location when all levels are complete', () => {
-    const chapters = [{ id: 1, name: 'Ch1', levels: [makeLevel(1)] }];
+    const chapters = [{ id: 1, name: 'Ch1', levels: [makeLevelDef({ id: 1 })] }];
     const completed = new Set<number>([1]);
 
     renderLevelList(

@@ -33,6 +33,7 @@ import {
   saveTouchUiEnabled,
 } from '../src/persistence';
 import { CampaignDef } from '../src/types';
+import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
 beforeEach(() => {
   localStorage.clear();
@@ -41,26 +42,21 @@ beforeEach(() => {
 // ─── computeCampaignCompletionPct ─────────────────────────────────────────────
 
 function makeCampaign(levelIds: number[][]): CampaignDef {
-  return {
+  return makeCampaignDef({
     id: 'test_cmp',
     name: 'Test',
     author: 'tester',
-    chapters: levelIds.map((ids, i) => ({
-      id: i + 1,
-      name: `Chapter ${i + 1}`,
-      levels: ids.map((id) => ({
-        id,
-        name: `Level ${id}`,
+    chapters: levelIds.map((ids, i) =>
+      makeChapterDef({
+        id: i + 1,
+        name: `Chapter ${i + 1}`,
+        levels: ids.map((id) => makeLevelDef({ id, name: `Level ${id}`, rows: 1, cols: 1, grid: [[null]] })),
         rows: 1,
         cols: 1,
         grid: [[null]],
-        inventory: [],
-      })),
-      rows: 1,
-      cols: 1,
-      grid: [[null]],
-    })),
-  };
+      }),
+    ),
+  });
 }
 
 describe('computeCampaignCompletionPct', () => {
