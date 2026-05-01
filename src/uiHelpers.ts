@@ -65,6 +65,8 @@ export function createButton(
   b.style.cssText =
     `padding:8px 16px;font-size:0.9rem;background:${bg};color:${color};` +
     `border:1px solid ${color};border-radius:${RADIUS_MD};cursor:pointer;${extraStyle ?? ''}`;
+  b.addEventListener('mouseenter', () => { b.style.filter = 'brightness(1.35)'; });
+  b.addEventListener('mouseleave', () => { b.style.filter = ''; });
   b.addEventListener('click', onClick);
   return b;
 }

@@ -26,7 +26,6 @@ import {
   buildResetModal, ResetProgressInfo,
   buildExitConfirmModal, buildUnplayableModal,
   buildSettingsModal,
-  showPlayerImportResultModal,
 } from './gameModals';
 import {
   buildRecordModal, RecordModalInfo,
@@ -43,7 +42,7 @@ import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT 
 import { showTimedMessage } from './uiHelpers';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
 import { PlaybackScreen, PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
-import { exportReplay, importReplay, exportPlayerProfile, importPlayerProfile } from './profileIO';
+import { exportReplay, importReplay } from './profileIO';
 import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
@@ -453,8 +452,6 @@ export class Game implements InputCallbacks {
         if (playerNameInput) playerNameInput.value = loadPlayerName();
         this._settingsModalEl.style.display = 'flex';
       },
-      exportProgress: () => this._exportPlayerProfile(),
-      importProgress: () => this._importPlayerProfile(),
       showPlayerProfile: () => this._showPlayerProfileScreen(),
       getPlayerName: () => {
         const idx = getActiveSlotIndex();
@@ -2015,34 +2012,6 @@ export class Game implements InputCallbacks {
     importReplay(this.campaignEditor.getAllCampaigns(), (...args) => {
       const [, campaignName, chapterNumber, levelNumber] = args;
       showReplayImportSuccessModal(campaignName, chapterNumber, levelNumber);
-    });
-  }
-
-  // ─── Player profile export / import ──────────────────────────────────────
-
-  /**
-   * Build a player profile from current local state, compress it with gzip,
-   * and trigger a file download named "pipes-player-<playerName>.pipes.json.gz".
-   */
-  private _exportPlayerProfile(): void {
-    void exportPlayerProfile(this.campaignEditor.getAllCampaigns());
-  }
-
-  /**
-   * Open a file picker and import a player profile.
-   *
-   * 1. Reads and optionally decompresses the selected file.
-   * 2. Validates the file type identifier and checksum.
-   * 3. Merges settings and campaign progress into local storage.
-   * 4. Refreshes in-memory state and re-renders the level list.
-   * 5. Shows a result modal listing merged and ignored campaigns.
-   */
-  private _importPlayerProfile(): void {
-    importPlayerProfile(this.campaignEditor.getAllCampaigns(), (outcomes, targetSlotIndex) => {
-      if (targetSlotIndex === getActiveSlotIndex()) {
-        this._campaign.reloadActiveCampaignProgress();
-      }
-      showPlayerImportResultModal(outcomes);
     });
   }
 
