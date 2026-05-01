@@ -89,6 +89,36 @@ export function _heightToRgb(h: number, isGold: boolean): [number, number, numbe
 }
 
 /**
+ * Create and mount a wave canvas inside `el`.
+ *
+ * Sets `el` to `position:relative; z-index:0` to form a stacking context, then
+ * appends a canvas that fills the element behind its children (`z-index:-1`).
+ *
+ * @param el              Parent element.
+ * @param initialOpacity  CSS opacity value for the canvas at rest.
+ * @param withTransition  Whether to add a 120 ms opacity fade-in/out.
+ * @returns               The newly created canvas element.
+ */
+function _setupWaveCanvas(
+  el: HTMLElement,
+  initialOpacity: string,
+  withTransition: boolean,
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText =
+    'position:absolute;inset:0;width:100%;height:100%;' +
+    `pointer-events:none;border-radius:inherit;z-index:-1;opacity:${initialOpacity};` +
+    (withTransition ? 'transition:opacity 120ms ease-out;' : '');
+  // position:relative + z-index:0 creates a stacking context so the canvas
+  // (z-index:-1) paints behind the element's inline children while remaining
+  // visible above the element's own background.
+  el.style.position = 'relative';
+  el.style.zIndex = '0';
+  el.appendChild(canvas);
+  return canvas;
+}
+
+/**
  * Mutable holder for the low-resolution offscreen canvas reused across frames.
  * Passed by reference so {@link _renderWaveFrame} can (re-)create it when the
  * element size changes.
@@ -101,8 +131,7 @@ interface OffscreenState {
 /**
  * Render one wave animation frame onto `canvas`.
  *
- * This is the shared pixel-computation kernel used by both
- * {@link attachChapterWaveAnimation} and {@link attachInventoryWaveAnimation}.
+ * This is the shared pixel-computation kernel used by {@link _createWaveLoop}.
  *
  * @param ts     `requestAnimationFrame` timestamp in milliseconds.
  * @param canvas The display canvas to draw into.
@@ -198,6 +227,46 @@ function _renderWaveFrame(
   return 'ok';
 }
 
+/** Controls returned by {@link _createWaveLoop}. */
+interface WaveLoopHandle {
+  /** Start the rAF loop (no-op if already running). */
+  start(): void;
+  /** Cancel the rAF loop (no-op if already stopped). */
+  stop(): void;
+}
+
+/**
+ * Build the wave data and return a managed animation-loop handle.
+ *
+ * Owns `waves`, `off`, and the `_frame` closure internally; callers receive
+ * only `start()`/`stop()` controls.  Calling `start()` while the loop is
+ * already running is safe (no double-scheduling).
+ *
+ * @param canvas  Display canvas (must already be in the document).
+ * @param el      Sizing element (`offsetWidth`/`offsetHeight` read each frame).
+ * @param isGold  Color palette: `true` → gold, `false` → blue.
+ */
+function _createWaveLoop(
+  canvas: HTMLCanvasElement,
+  el: HTMLElement,
+  isGold: boolean,
+): WaveLoopHandle {
+  const waves = _buildWaves();
+  const off: OffscreenState = { el: null, ctx: null };
+  let animId: number | null = null;
+
+  function _frame(ts: number): void {
+    const result = _renderWaveFrame(ts, canvas, el, waves, isGold, off);
+    if (result === 'stop') { animId = null; return; }
+    animId = requestAnimationFrame(_frame);
+  }
+
+  return {
+    start() { if (animId === null) animId = requestAnimationFrame(_frame); },
+    stop()  { if (animId !== null) { cancelAnimationFrame(animId); animId = null; } },
+  };
+}
+
 /**
  * Attach a water-wave background animation to a chapter header element.
  *
@@ -224,31 +293,9 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   const idleAlpha = 0.5;
   const hoverAlpha = 0.7;
 
-  // ── Canvas setup ────────────────────────────────────────────────────────────
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText =
-    'position:absolute;inset:0;width:100%;height:100%;' +
-    `pointer-events:none;border-radius:inherit;z-index:-1;opacity:${idleAlpha};` +
-    'transition:opacity 120ms ease-out;';
-
-  // position:relative + z-index:0 creates a stacking context so that the
-  // canvas's z-index:-1 places it behind the header's inline content (tier 7
-  // of the stacking context painting order) while staying visible above the
-  // parent element's background.
-  headerEl.style.position = 'relative';
-  headerEl.style.zIndex = '0';
+  const canvas = _setupWaveCanvas(headerEl, String(idleAlpha), true);
   // Remove the static background so the canvas provides it instead.
   headerEl.style.background = 'transparent';
-
-  // Append as the LAST child so existing children (e.g. the title <span>)
-  // retain their :first-child relationship and are unaffected by the canvas.
-  headerEl.appendChild(canvas);
-
-  const waves = _buildWaves();
-  let animId: number | null = null;
-
-  // Low-resolution offscreen canvas reused across frames when the size is stable.
-  const off: OffscreenState = { el: null, ctx: null };
 
   // ── Static background helper ────────────────────────────────────────────────
   /** Paint the idle background color onto the canvas (used before and after animation). */
@@ -269,27 +316,17 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
   // Paint the static background after the first layout pass.
   requestAnimationFrame(_drawStatic);
 
-  // ── Animation frame ─────────────────────────────────────────────────────────
-  function _frame(ts: number): void {
-    const result = _renderWaveFrame(ts, canvas, headerEl, waves, isGold, off);
-    if (result === 'stop') { animId = null; return; }
-    animId = requestAnimationFrame(_frame);
-  }
+  const loop = _createWaveLoop(canvas, headerEl, isGold);
 
   // ── Hover handlers ──────────────────────────────────────────────────────────
   hoverEl.addEventListener('mouseenter', () => {
     canvas.style.opacity = String(hoverAlpha);
-    if (animId === null) {
-      animId = requestAnimationFrame(_frame);
-    }
+    loop.start();
   });
 
   hoverEl.addEventListener('mouseleave', () => {
     canvas.style.opacity = String(idleAlpha);
-    if (animId !== null) {
-      cancelAnimationFrame(animId);
-      animId = null;
-    }
+    loop.stop();
     // Restore the static background so the header looks the same as before hover.
     _drawStatic();
   });
@@ -311,29 +348,10 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
  * @param el  The element that receives the animated canvas as a child.
  */
 export function attachInventoryWaveAnimation(el: HTMLElement): void {
-  // ── Canvas setup ────────────────────────────────────────────────────────────
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText =
-    'position:absolute;inset:0;width:100%;height:100%;' +
-    'pointer-events:none;border-radius:inherit;z-index:-1;opacity:0.4;';
-
-  el.style.position = 'relative';
-  el.style.zIndex = '0';
-
-  el.appendChild(canvas);
-
-  const waves = _buildWaves();
-  const off: OffscreenState = { el: null, ctx: null };
-
-  // ── Animation frame ─────────────────────────────────────────────────────────
-  function _frame(ts: number): void {
-    const result = _renderWaveFrame(ts, canvas, el, waves, false, off);
-    if (result === 'stop') { return; }
-    requestAnimationFrame(_frame);
-  }
-
+  const canvas = _setupWaveCanvas(el, '0.4', false);
+  const loop = _createWaveLoop(canvas, el, false);
   // Start the animation immediately.
-  requestAnimationFrame(_frame);
+  loop.start();
 }
 
 /**
@@ -351,45 +369,17 @@ export function attachInventoryWaveAnimation(el: HTMLElement): void {
  * @param alpha  Opacity of the wave overlay while hovered (0–1).
  */
 export function attachHoverWaveAnimation(el: HTMLElement, alpha: number): void {
-  // ── Canvas setup ────────────────────────────────────────────────────────────
-  const canvas = document.createElement('canvas');
-  canvas.style.cssText =
-    'position:absolute;inset:0;width:100%;height:100%;' +
-    'pointer-events:none;border-radius:inherit;z-index:-1;opacity:0;' +
-    'transition:opacity 120ms ease-out;';
-
-  // position:relative + z-index:0 creates a stacking context so the canvas
-  // (z-index:-1) paints behind the element's inline children while remaining
-  // visible above the element's own background.
-  el.style.position = 'relative';
-  el.style.zIndex = '0';
-
-  el.appendChild(canvas);
-
-  const waves = _buildWaves();
-  const off: OffscreenState = { el: null, ctx: null };
-  let animId: number | null = null;
-
-  // ── Animation frame ─────────────────────────────────────────────────────────
-  function _frame(ts: number): void {
-    const result = _renderWaveFrame(ts, canvas, el, waves, false, off);
-    if (result === 'stop') { animId = null; return; }
-    animId = requestAnimationFrame(_frame);
-  }
+  const canvas = _setupWaveCanvas(el, '0', true);
+  const loop = _createWaveLoop(canvas, el, false);
 
   // ── Hover handlers ──────────────────────────────────────────────────────────
   el.addEventListener('mouseenter', () => {
     canvas.style.opacity = String(alpha);
-    if (animId === null) {
-      animId = requestAnimationFrame(_frame);
-    }
+    loop.start();
   });
 
   el.addEventListener('mouseleave', () => {
     canvas.style.opacity = '0';
-    if (animId !== null) {
-      cancelAnimationFrame(animId);
-      animId = null;
-    }
+    loop.stop();
   });
 }
