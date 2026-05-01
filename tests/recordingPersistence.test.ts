@@ -9,6 +9,7 @@
 import {
   loadAllRecordings,
   loadRecordingsForLevel,
+  loadRecordingsForProfile,
   saveRecording,
   deleteRecording,
   loadRecordingSettings,
@@ -180,5 +181,54 @@ describe('auto-recording dedup logic', () => {
   it('skips when an identical empty sequence was already auto-recorded', () => {
     const existing = [makeRecord({ autoRecorded: true, moves: [] })];
     expect(simulateMaybeAutoRecord(existing, [])).toBe(false);
+  });
+});
+
+// ─── loadRecordingsForProfile ─────────────────────────────────────────────────
+
+describe('loadRecordingsForProfile', () => {
+  const GUID_A = 'aaaa-aaaa';
+  const GUID_B = 'bbbb-bbbb';
+
+  it('matches on playerGuid when present', () => {
+    saveRecording(makeRecord({ id: 'r1', playerGuid: GUID_A, playerName: 'Alice' }));
+    saveRecording(makeRecord({ id: 'r2', playerGuid: GUID_B, playerName: 'Bob' }));
+
+    const result = loadRecordingsForProfile(GUID_A, 'Alice');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('r1');
+  });
+
+  it('falls back to playerName when playerGuid is absent', () => {
+    // Old recording without a guid.
+    saveRecording(makeRecord({ id: 'r-old', playerName: 'Alice' }));
+    saveRecording(makeRecord({ id: 'r-new', playerGuid: GUID_B, playerName: 'Bob' }));
+
+    const result = loadRecordingsForProfile(GUID_A, 'Alice');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('r-old');
+  });
+
+  it('does not match on name when playerGuid is present but different', () => {
+    // Same name but different guid → belongs to a different profile.
+    saveRecording(makeRecord({ id: 'r-other', playerGuid: GUID_B, playerName: 'Alice' }));
+
+    const result = loadRecordingsForProfile(GUID_A, 'Alice');
+    expect(result).toHaveLength(0);
+  });
+
+  it('returns empty array when no recordings match', () => {
+    saveRecording(makeRecord({ id: 'r1', playerGuid: GUID_B, playerName: 'Bob' }));
+    expect(loadRecordingsForProfile(GUID_A, 'Alice')).toHaveLength(0);
+  });
+
+  it('returns all matching recordings across campaigns and levels', () => {
+    saveRecording(makeRecord({ id: 'r1', playerGuid: GUID_A, playerName: 'Alice', campaignId: 'c1', levelId: 1 }));
+    saveRecording(makeRecord({ id: 'r2', playerGuid: GUID_A, playerName: 'Alice', campaignId: 'c2', levelId: 5 }));
+    saveRecording(makeRecord({ id: 'r3', playerGuid: GUID_B, playerName: 'Bob' }));
+
+    const result = loadRecordingsForProfile(GUID_A, 'Alice');
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.id).sort()).toEqual(['r1', 'r2']);
   });
 });

@@ -5,7 +5,8 @@
  * - computeChecksum
  * - buildPlayerProfilePayload / buildPlayerFile
  * - parsePlayerFile (type enforcement, checksum validation)
- * - applyPlayerProfile (settings restore, progress merge, max-value semantics)
+ * - applyPlayerProfile (settings restore, progress merge, max-value semantics,
+ *   recording merge)
  */
 
 import {
@@ -42,8 +43,10 @@ import {
   markMasteredChapterShown,
   markCampaignMasteredShown,
   markCampaignCompleteShown,
+  saveRecording,
+  loadAllRecordings,
 } from '../src/persistence';
-import { CampaignDef } from '../src/types';
+import { CampaignDef, PlaySequenceRecord } from '../src/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +76,21 @@ function makeMinimalCampaign(id: string, name = 'Test Campaign'): CampaignDef {
         ],
       },
     ],
+  };
+}
+
+function makeRecord(overrides: Partial<PlaySequenceRecord> = {}): PlaySequenceRecord {
+  return {
+    id: `rec-${Math.random().toString(36).slice(2, 9)}`,
+    campaignId: 'test_campaign',
+    levelId: 1,
+    moves: ['P:Straight:0:1:90'],
+    outcome: 'success',
+    autoRecorded: false,
+    timestamp: Date.now(),
+    playerName: 'Alice',
+    corrupted: false,
+    ...overrides,
   };
 }
 
@@ -521,5 +539,91 @@ describe('applyPlayerProfile – campaign progress', () => {
     expect(ignored).toHaveLength(1);
     expect(ignored[0].campaignId).toBe('cmp_missing');
     expect((ignored[0] as { campaignName: string }).campaignName).toBe('Missing Campaign');
+  });
+});
+
+// ─── buildPlayerProfilePayload – recordings param ────────────────────────────
+
+describe('buildPlayerProfilePayload recordings parameter', () => {
+  beforeEach(clearStorage);
+
+  it('omits the recordings field when not provided', () => {
+    const payload = buildPlayerProfilePayload([]);
+    expect(payload.recordings).toBeUndefined();
+  });
+
+  it('includes the provided recordings in the payload', () => {
+    const recs = [makeRecord({ id: 'r1' }), makeRecord({ id: 'r2' })];
+    const payload = buildPlayerProfilePayload([], undefined, null, recs);
+    expect(payload.recordings).toHaveLength(2);
+    expect(payload.recordings!.map((r) => r.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('includes an empty recordings array when an empty array is passed', () => {
+    const payload = buildPlayerProfilePayload([], undefined, null, []);
+    expect(Array.isArray(payload.recordings)).toBe(true);
+    expect(payload.recordings).toHaveLength(0);
+  });
+});
+
+// ─── applyPlayerProfile – recording merge ────────────────────────────────────
+
+describe('applyPlayerProfile recording merge', () => {
+  beforeEach(clearStorage);
+
+  function makeBasePayload(overrides: Partial<PlayerProfilePayload> = {}): PlayerProfilePayload {
+    return {
+      guid: 'test-guid',
+      lastPlayedAt: null,
+      playerName: 'Alice',
+      sfxVolume: 50,
+      touchUiEnabled: null,
+      commandKeys: null,
+      campaignProgress: [],
+      ...overrides,
+    };
+  }
+
+  it('saves new recordings when payload.recordings is present', () => {
+    const recs = [makeRecord({ id: 'import-1' }), makeRecord({ id: 'import-2' })];
+    applyPlayerProfile(makeBasePayload({ recordings: recs }), []);
+    const stored = loadAllRecordings();
+    expect(stored.map((r) => r.id).sort()).toEqual(['import-1', 'import-2']);
+  });
+
+  it('skips recordings whose id already exists locally', () => {
+    const existing = makeRecord({ id: 'existing-1', playerName: 'Alice' });
+    saveRecording(existing);
+
+    const imported = [
+      { ...existing, playerName: 'Renamed' }, // same id → must be skipped
+      makeRecord({ id: 'new-1' }),
+    ];
+    applyPlayerProfile(makeBasePayload({ recordings: imported }), []);
+
+    const stored = loadAllRecordings();
+    expect(stored).toHaveLength(2);
+    // The existing record must not have been overwritten.
+    const kept = stored.find((r) => r.id === 'existing-1')!;
+    expect(kept.playerName).toBe('Alice');
+    // The new record must have been added.
+    expect(stored.some((r) => r.id === 'new-1')).toBe(true);
+  });
+
+  it('handles duplicate ids within the imported list itself', () => {
+    const rec = makeRecord({ id: 'dup-1' });
+    applyPlayerProfile(makeBasePayload({ recordings: [rec, rec] }), []);
+    expect(loadAllRecordings()).toHaveLength(1);
+  });
+
+  it('does nothing when payload.recordings is absent', () => {
+    saveRecording(makeRecord({ id: 'pre-existing' }));
+    applyPlayerProfile(makeBasePayload(), []);
+    expect(loadAllRecordings()).toHaveLength(1);
+  });
+
+  it('does nothing when payload.recordings is empty', () => {
+    applyPlayerProfile(makeBasePayload({ recordings: [] }), []);
+    expect(loadAllRecordings()).toHaveLength(0);
   });
 });

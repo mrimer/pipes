@@ -27,8 +27,9 @@ import { setActiveSlotIndex, getActiveSlotIndex, withSlot } from './activeProfil
 import { savePlayerName, loadSfxVolume, loadTouchUiEnabled } from './persistence';
 import { sfxManager } from './sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from './deviceUtils';
-import { importPlayerProfile, exportPlayerProfile } from './profileIO';
+import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profileIO';
 import { buildNewPlayerModal, buildConfirmModal } from './gameModals';
+import { attachHoverWaveAnimation } from './visuals/chapterWaves';
 import type { CampaignDef } from './types';
 
 // ─── Styling constants ────────────────────────────────────────────────────────
@@ -46,6 +47,9 @@ const BTN_MUTED_BG       = '#1e2a3a';
 const BTN_MUTED_BORDER   = '#3a4a5a';
 const TEXT_MUTED         = '#8899aa';
 const TEXT_ACCENT        = '#74b9ff';
+
+/** Alpha for the hover wave overlay on occupied profile cards. */
+const CARD_HOVER_WAVE_ALPHA = 0.25;
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
@@ -87,6 +91,8 @@ function formatDate(iso: string | null | undefined): string {
  *   2. `hide()` – hides the overlay.
  *   3. On "Select": calls `onProfileSelected(slotIndex)` so the caller can
  *      activate the slot and navigate to the main menu.
+ *   4. On active-card click or Escape (when a profile is active): calls
+ *      `onReturnToMenu()` so the caller can show the main menu directly.
  */
 export class PlayerProfileScreen {
   private readonly _el: HTMLDivElement;
@@ -94,12 +100,22 @@ export class PlayerProfileScreen {
 
   private _campaigns: CampaignDef[] = [];
 
+  /** Bound Escape-key handler (stored so it can be removed on hide). */
+  private readonly _onKeyDown: (e: KeyboardEvent) => void;
+
   /**
    * Called when the player selects a profile slot.  The caller is responsible
    * for activating the slot (calling `setActiveSlotIndex`) and navigating to
    * the main menu.
    */
   onProfileSelected: (slotIndex: number) => void = () => { /* no-op */ };
+
+  /**
+   * Called when the player dismisses the screen by clicking the active profile
+   * card or pressing Escape while a profile is active.  The caller should
+   * navigate back to the main menu without changing the active slot.
+   */
+  onReturnToMenu: () => void = () => { /* no-op */ };
 
   constructor() {
     // Outer overlay
@@ -122,6 +138,14 @@ export class PlayerProfileScreen {
     this._el.appendChild(this._cardsEl);
 
     document.body.appendChild(this._el);
+
+    // Escape key returns to the main menu when a profile is active.
+    this._onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && getActiveSlotIndex() !== null) {
+        this.hide();
+        this.onReturnToMenu();
+      }
+    };
   }
 
   /** Show the screen and re-render all slot cards. */
@@ -129,11 +153,13 @@ export class PlayerProfileScreen {
     this._campaigns = campaigns;
     this._render();
     this._el.style.display = 'flex';
+    document.addEventListener('keydown', this._onKeyDown);
   }
 
   /** Hide the screen. */
   hide(): void {
     this._el.style.display = 'none';
+    document.removeEventListener('keydown', this._onKeyDown);
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
@@ -178,6 +204,21 @@ export class PlayerProfileScreen {
   private _buildOccupiedCard(slotIndex: number, meta: ProfileSlotMeta, isActive: boolean): HTMLDivElement {
     const card = this._card(slotIndex, isActive);
 
+    // Clicking the active card returns to the main menu.
+    if (isActive) {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', (e) => {
+        // Only act on clicks that land directly on the card (not on a button inside it).
+        if (e.target === card || (e.target instanceof HTMLElement && !e.target.closest('button'))) {
+          this.hide();
+          this.onReturnToMenu();
+        }
+      });
+    }
+
+    // Hover wave animation on all occupied cards.
+    attachHoverWaveAnimation(card, CARD_HOVER_WAVE_ALPHA);
+
     // Name row
     const nameEl = document.createElement('div');
     nameEl.textContent = meta.name;
@@ -207,7 +248,7 @@ export class PlayerProfileScreen {
       card.appendChild(badge);
     }
 
-    // Action buttons
+    // ── Primary action buttons ─────────────────────────────────────────────
     const actions = this._actionsRow();
 
     if (!isActive) {
@@ -220,11 +261,21 @@ export class PlayerProfileScreen {
       this._exportSlot(slotIndex);
     }));
 
-    actions.appendChild(btn('📥 Import', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
+    actions.appendChild(btn('📤 Export + Recordings', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
+      this._exportSlotWithRecordings(slotIndex);
+    }));
+
+    actions.appendChild(btn('📥 Import Merge', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
       this._importIntoSlot(slotIndex);
     }));
 
-    actions.appendChild(btn('🗑 Delete', BTN_DANGER_BG, BTN_DANGER_BORDER, () => {
+    card.appendChild(actions);
+
+    // ── Delete row – separated by vertical buffer ─────────────────────────
+    const deleteRow = this._actionsRow();
+    deleteRow.style.marginTop = '8px';
+
+    deleteRow.appendChild(btn('🗑 Delete', BTN_DANGER_BG, BTN_DANGER_BORDER, () => {
       buildConfirmModal(
         `Delete profile "${meta.name}"? All progress for this profile will be lost.`,
         () => { this._deleteSlot(slotIndex); },
@@ -232,7 +283,7 @@ export class PlayerProfileScreen {
       );
     }));
 
-    card.appendChild(actions);
+    card.appendChild(deleteRow);
     return card;
   }
 
@@ -360,6 +411,12 @@ export class PlayerProfileScreen {
   private _exportSlot(slotIndex: number): void {
     withSlot(slotIndex, () => {
       void exportPlayerProfile(this._campaigns);
+    });
+  }
+
+  private _exportSlotWithRecordings(slotIndex: number): void {
+    withSlot(slotIndex, () => {
+      void exportPlayerProfileWithRecordings(this._campaigns);
     });
   }
 

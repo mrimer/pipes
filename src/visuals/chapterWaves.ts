@@ -335,3 +335,61 @@ export function attachInventoryWaveAnimation(el: HTMLElement): void {
   // Start the animation immediately.
   requestAnimationFrame(_frame);
 }
+
+/**
+ * Attach a hover-triggered water-wave background animation to an element.
+ *
+ * The animation is invisible at rest and fades in at `alpha` opacity when the
+ * user mouses over the element.  The loop is paused on `mouseleave` to avoid
+ * consuming CPU when the element is not being interacted with.
+ *
+ * Unlike {@link attachChapterWaveAnimation}, the element's own CSS background
+ * is preserved: the canvas is simply overlaid behind the element's children,
+ * letting the wave blend with the existing background colour.
+ *
+ * @param el     The element that receives the animated canvas as a child.
+ * @param alpha  Opacity of the wave overlay while hovered (0–1).
+ */
+export function attachHoverWaveAnimation(el: HTMLElement, alpha: number): void {
+  // ── Canvas setup ────────────────────────────────────────────────────────────
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText =
+    'position:absolute;inset:0;width:100%;height:100%;' +
+    'pointer-events:none;border-radius:inherit;z-index:-1;opacity:0;' +
+    'transition:opacity 120ms ease-out;';
+
+  // position:relative + z-index:0 creates a stacking context so the canvas
+  // (z-index:-1) paints behind the element's inline children while remaining
+  // visible above the element's own background.
+  el.style.position = 'relative';
+  el.style.zIndex = '0';
+
+  el.appendChild(canvas);
+
+  const waves = _buildWaves();
+  const off: OffscreenState = { el: null, ctx: null };
+  let animId: number | null = null;
+
+  // ── Animation frame ─────────────────────────────────────────────────────────
+  function _frame(ts: number): void {
+    const result = _renderWaveFrame(ts, canvas, el, waves, false, off);
+    if (result === 'stop') { animId = null; return; }
+    animId = requestAnimationFrame(_frame);
+  }
+
+  // ── Hover handlers ──────────────────────────────────────────────────────────
+  el.addEventListener('mouseenter', () => {
+    canvas.style.opacity = String(alpha);
+    if (animId === null) {
+      animId = requestAnimationFrame(_frame);
+    }
+  });
+
+  el.addEventListener('mouseleave', () => {
+    canvas.style.opacity = '0';
+    if (animId !== null) {
+      cancelAnimationFrame(animId);
+      animId = null;
+    }
+  });
+}
