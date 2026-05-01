@@ -186,12 +186,18 @@ export async function exportPlayerProfileWithRecordings(
  * - If no empty slot is available, show an error.
  *
  * @param campaigns  All locally installed campaigns.
- * @param onSuccess  Called with the merge outcomes, target slot index, and
- *                   whether the target slot was empty before the import.
+ * @param onSuccess  Called with the merge outcomes, target slot index,
+ *                   whether the target slot was empty before the import,
+ *                   and the player name from the imported file.
+ * @param requiredSlotGuid  When provided, the import is only permitted if the
+ *                          file's GUID matches this value.  Used by the
+ *                          "Import Merge" action on occupied slots to prevent
+ *                          accidentally merging a different player's data.
  */
 export function importPlayerProfile(
   campaigns: CampaignDef[],
-  onSuccess: (outcomes: CampaignImportOutcome[], targetSlotIndex: number, isNewSlot: boolean) => void,
+  onSuccess: (outcomes: CampaignImportOutcome[], targetSlotIndex: number, isNewSlot: boolean, importedPlayerName: string) => void,
+  requiredSlotGuid?: string,
 ): void {
   const processText = (text: string): void => {
     const result = parsePlayerFile(text);
@@ -201,6 +207,16 @@ export function importPlayerProfile(
     }
 
     const importedGuid = result.payload.guid;
+
+    // When merging into a specific occupied slot, verify the file belongs to that profile.
+    if (requiredSlotGuid !== undefined && importedGuid !== requiredSlotGuid) {
+      alert(
+        `Import Merge aborted: the profile in the file ("${result.payload.playerName}") ` +
+        `doesn't match the selected profile. No changes were made.`,
+      );
+      return;
+    }
+
     const allMetas = loadAllSlotMetas();
 
     // Find a slot whose GUID matches the imported file.
@@ -245,7 +261,7 @@ export function importPlayerProfile(
       saveSlotMeta(finalTarget, { ...existingMeta, name: result.payload.playerName });
     }
 
-    onSuccess(applyResult.outcomes, finalTarget, isNewSlot);
+    onSuccess(applyResult.outcomes, finalTarget, isNewSlot, result.payload.playerName);
   };
 
   openImportFilePicker(processText);

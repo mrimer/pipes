@@ -814,12 +814,14 @@ const IMPORT_RESULT_MODAL_OVERLAY_ALPHA = 0.7;
  * and auto-removes itself when the player closes it.  It does not need to be
  * retained by the caller.
  *
- * @param outcomes   - Per-campaign import outcomes returned by applyPlayerProfile.
- * @param isNewSlot  - True when the import target was an empty slot (fresh import,
- *                     not a merge into an existing profile).  Controls the language
- *                     used in the modal: "imported" vs "merged".
+ * @param outcomes            - Per-campaign import outcomes returned by applyPlayerProfile.
+ * @param isNewSlot           - True when the import target was an empty slot (fresh import,
+ *                              not a merge into an existing profile).  Controls the language
+ *                              used in the modal: "imported" vs "merged".
+ * @param importedPlayerName  - Name of the player from the imported file.  When provided
+ *                              and `isNewSlot` is true, the name is displayed in the modal.
  */
-export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], isNewSlot: boolean): void {
+export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], isNewSlot: boolean, importedPlayerName?: string): void {
   // Format "N noun[s]" with an optional verb suffix appended when !isNewSlot.
   const statLine = (n: number, singular: string, plural: string, verb: string): string =>
     `${n} ${n === 1 ? singular : plural}${isNewSlot ? '' : ` ${verb}`}`;
@@ -835,6 +837,13 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#4a90d9;';
   title.textContent = '📥 Import Complete';
   box.appendChild(title);
+
+  if (isNewSlot && importedPlayerName) {
+    const nameEl = document.createElement('p');
+    nameEl.style.cssText = 'margin:2px 0;font-size:0.9rem;color:#eee;';
+    nameEl.textContent = `Player: ${importedPlayerName}`;
+    box.appendChild(nameEl);
+  }
 
   const merged  = outcomes.filter(
     (o): o is Extract<CampaignImportOutcome, { status: 'merged' }> => o.status === 'merged',

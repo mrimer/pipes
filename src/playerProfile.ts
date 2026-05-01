@@ -409,14 +409,16 @@ export function applyPlayerProfile(
     const preMergeStars    = loadLevelStars(block.campaignId);
     const preMergeWater    = loadLevelWater(block.campaignId);
 
-    // Union: completed levels (skip IDs not present in the local campaign)
-    const localProgress = preMergeProgress;
+    // Union: completed levels (skip IDs not present in the local campaign).
+    // Use a copy so preMergeProgress remains an unmodified snapshot for delta computation.
+    const localProgress = new Set(preMergeProgress);
     for (const levelId of block.completedLevels) {
       if (levelIds.has(levelId)) markCampaignLevelCompleted(block.campaignId, levelId, localProgress);
     }
 
-    // Union: completed chapters (skip IDs not present in the local campaign)
-    const localChapters = preMergeChapters;
+    // Union: completed chapters (skip IDs not present in the local campaign).
+    // Use a copy so preMergeChapters remains an unmodified snapshot for delta computation.
+    const localChapters = new Set(preMergeChapters);
     for (const chapterId of block.completedChapters) {
       if (chapterIds.has(chapterId)) markChapterCompleted(block.campaignId, chapterId, localChapters);
     }

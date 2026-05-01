@@ -612,3 +612,82 @@ describe('applyPlayerProfile recording merge', () => {
     expect(loadAllRecordings()).toHaveLength(0);
   });
 });
+
+// ─── applyPlayerProfile – import outcome deltas ──────────────────────────────
+
+describe('applyPlayerProfile – import outcome deltas', () => {
+  beforeEach(clearStorage);
+
+  it('reports correct newLevelsCompleted and newChaptersCompleted when importing into an empty slot', () => {
+    const cmp = makeMinimalCampaign('cmp_delta');
+
+    const payload: PlayerProfilePayload = {
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Alice', sfxVolume: 100,
+      touchUiEnabled: null, commandKeys: null,
+      campaignProgress: [
+        {
+          campaignId: 'cmp_delta',
+          campaignName: 'Delta Campaign',
+          completedLevels: [101, 102],
+          completedChapters: [1],
+          masteredChaptersShown: [],
+          campaignMasteredShown: false, campaignCompleteShown: false,
+          levelStars: { '101': 2 },
+          levelWater: { '101': 50 },
+        },
+      ],
+    };
+
+    const result = applyPlayerProfile(payload, [cmp]);
+    const merged = result.outcomes.find((o) => o.status === 'merged' && o.campaignId === 'cmp_delta');
+    expect(merged).toBeDefined();
+    expect(merged!.status).toBe('merged');
+    if (merged!.status !== 'merged') return;
+
+    // All levels and chapters were new (empty slot), so deltas should equal totals.
+    expect(merged!.newLevelsCompleted).toBe(2);
+    expect(merged!.newChaptersCompleted).toBe(1);
+    expect(merged!.newStars).toBe(2);
+    expect(merged!.newWater).toBe(50);
+  });
+
+  it('reports zero deltas when progress already matches local state', () => {
+    const cmp = makeMinimalCampaign('cmp_nodelay');
+
+    // Pre-populate local state with the same data that will be imported.
+    const localProg = new Set<number>();
+    markCampaignLevelCompleted('cmp_nodelay', 101, localProg);
+    const localCh = new Set<number>();
+    markChapterCompleted('cmp_nodelay', 1, localCh);
+    saveLevelStar(101, 3, 'cmp_nodelay');
+    saveLevelWater(101, 60, 'cmp_nodelay');
+
+    const payload: PlayerProfilePayload = {
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Bob', sfxVolume: 100,
+      touchUiEnabled: null, commandKeys: null,
+      campaignProgress: [
+        {
+          campaignId: 'cmp_nodelay',
+          campaignName: 'No-delta Campaign',
+          completedLevels: [101],
+          completedChapters: [1],
+          masteredChaptersShown: [],
+          campaignMasteredShown: false, campaignCompleteShown: false,
+          levelStars: { '101': 3 },
+          levelWater: { '101': 60 },
+        },
+      ],
+    };
+
+    const result = applyPlayerProfile(payload, [cmp]);
+    const merged = result.outcomes.find((o) => o.status === 'merged' && o.campaignId === 'cmp_nodelay');
+    expect(merged).toBeDefined();
+    if (merged!.status !== 'merged') return;
+
+    // Nothing new was added — all deltas must be zero.
+    expect(merged!.newLevelsCompleted).toBe(0);
+    expect(merged!.newChaptersCompleted).toBe(0);
+    expect(merged!.newStars).toBe(0);
+    expect(merged!.newWater).toBe(0);
+  });
+});
