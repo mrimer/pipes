@@ -47,6 +47,7 @@ import {
   loadAllRecordings,
 } from '../src/persistence';
 import { CampaignDef, PlaySequenceRecord } from '../src/types';
+import { makeRecord } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,21 +77,6 @@ function makeMinimalCampaign(id: string, name = 'Test Campaign'): CampaignDef {
         ],
       },
     ],
-  };
-}
-
-function makeRecord(overrides: Partial<PlaySequenceRecord> = {}): PlaySequenceRecord {
-  return {
-    id: `rec-${Math.random().toString(36).slice(2, 9)}`,
-    campaignId: 'test_campaign',
-    levelId: 1,
-    moves: ['P:Straight:0:1:90'],
-    outcome: 'success',
-    autoRecorded: false,
-    timestamp: Date.now(),
-    playerName: 'Alice',
-    corrupted: false,
-    ...overrides,
   };
 }
 

@@ -207,6 +207,10 @@ export class PlayerProfileScreen {
     // Clicking the active card returns to the main menu.
     if (isActive) {
       card.style.cursor = 'pointer';
+      // Note: this listener is attached to the card element itself.  _render()
+      // always calls `_cardsEl.innerHTML = ''` before rebuilding, which removes
+      // the card from the DOM and lets it be garbage-collected along with its
+      // listeners — no detachment step is necessary.
       card.addEventListener('click', (e) => {
         // Only act on clicks that land directly on the card (not on a button inside it).
         if (e.target === card || (e.target instanceof HTMLElement && !e.target.closest('button'))) {

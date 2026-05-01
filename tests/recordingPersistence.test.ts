@@ -16,23 +16,9 @@ import {
   saveRecordingSettings,
 } from '../src/persistence';
 import { PlaySequenceRecord, RecordingSettings } from '../src/types';
+import { makeRecord } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function makeRecord(overrides: Partial<PlaySequenceRecord> = {}): PlaySequenceRecord {
-  return {
-    id: `test-${Math.random().toString(36).slice(2, 9)}`,
-    campaignId: 'test_campaign',
-    levelId: 1,
-    moves: ['P:Straight:0:1:90'],
-    outcome: 'success',
-    autoRecorded: false,
-    timestamp: Date.now(),
-    playerName: 'Tester',
-    corrupted: false,
-    ...overrides,
-  };
-}
 
 beforeEach(() => {
   localStorage.clear();
