@@ -299,11 +299,12 @@
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      transition: opacity 0.15s;
     }
-    .modal-btn:hover { opacity: 0.85; }
     .modal-btn.primary   { background: #4a90d9; color: #fff; }
     .modal-btn.secondary { background: #2a2a4a; color: #aaa; border: 1px solid #555; }
+
+    /* Brighten all non-disabled buttons on hover. */
+    button:hover:not(:disabled) { filter: brightness(1.35); }
 
     .modal-actions { display: flex; gap: 12px; justify-content: center; }
 
@@ -359,6 +360,7 @@
 
     /* Suppress persistent :hover highlights on touch devices (a tap would
        leave an element stuck in the hover state). */
+    body.is-touch button:hover { filter: unset; }
     body.is-touch .level-btn:hover:not(:disabled),
     body.is-touch .inv-item:hover:not(.depleted):not(.negative):not(.selected),
     body.is-touch .inv-item.gold:hover:not(.depleted):not(.negative):not(.selected),
