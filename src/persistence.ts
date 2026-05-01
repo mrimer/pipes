@@ -1,6 +1,13 @@
 /** Helpers for persisting long-term player progress in localStorage. */
 
 import { CampaignDef, PlaySequenceRecord, RecordingSettings } from './types';
+import { getActiveSlotPrefix } from './activeProfile';
+
+/**
+ * Convenience shorthand: returns the active-slot prefix string.
+ * Avoids repeating `getActiveSlotPrefix()` inline in every key function.
+ */
+const p = (): string => getActiveSlotPrefix();
 
 // ─── Campaign persistence ────────────────────────────────────────────────────
 
@@ -104,7 +111,7 @@ export function saveImportedCampaigns(campaigns: CampaignDef[]): void {
 // ─── Per-campaign progress ────────────────────────────────────────────────────
 
 function campaignProgressKey(campaignId: string): string {
-  return `pipes_campaign_progress_${campaignId}`;
+  return `pipes_${p()}campaign_progress_${campaignId}`;
 }
 
 /** Load the set of completed level IDs for a specific campaign. */
@@ -157,12 +164,12 @@ export function computeCampaignCompletionPct(campaign: import('./types').Campaig
 
 // ─── Active campaign ──────────────────────────────────────────────────────────
 
-const ACTIVE_CAMPAIGN_KEY = 'pipes_active_campaign';
+const ACTIVE_CAMPAIGN_KEY = () => `pipes_${p()}active_campaign`;
 
 /** Load the ID of the campaign currently activated for play, or null for the official campaign. */
 export function loadActiveCampaignId(): string | null {
   try {
-    return localStorage.getItem(ACTIVE_CAMPAIGN_KEY);
+    return localStorage.getItem(ACTIVE_CAMPAIGN_KEY());
   } catch {
     return null;
   }
@@ -171,7 +178,7 @@ export function loadActiveCampaignId(): string | null {
 /** Persist the ID of the campaign to activate for play. */
 export function saveActiveCampaignId(campaignId: string): void {
   try {
-    localStorage.setItem(ACTIVE_CAMPAIGN_KEY, campaignId);
+    localStorage.setItem(ACTIVE_CAMPAIGN_KEY(), campaignId);
   } catch {
     // ignore storage errors
   }
@@ -180,7 +187,7 @@ export function saveActiveCampaignId(campaignId: string): void {
 /** Clear the active campaign (reverts to playing the official campaign). */
 export function clearActiveCampaignId(): void {
   try {
-    localStorage.removeItem(ACTIVE_CAMPAIGN_KEY);
+    localStorage.removeItem(ACTIVE_CAMPAIGN_KEY());
   } catch {
     // ignore storage errors
   }
@@ -246,7 +253,7 @@ function _makeLevelRecordStore(
 // ─── Star progress ────────────────────────────────────────────────────────────
 
 const _starsStore = _makeLevelRecordStore(
-  (campaignId?) => campaignId ? `pipes_campaign_stars_${campaignId}` : 'pipes_level_stars',
+  (campaignId?) => campaignId ? `pipes_${p()}campaign_stars_${campaignId}` : `pipes_${p()}level_stars`,
 );
 
 /** Load the map of level IDs → stars collected from localStorage. */
@@ -272,7 +279,7 @@ export function clearLevelStarRecord(levelId: number, campaignId?: string): void
 // ─── Water-remaining progress ──────────────────────────────────────────────────
 
 const _waterStore = _makeLevelRecordStore(
-  (campaignId?) => campaignId ? `pipes_campaign_water_${campaignId}` : 'pipes_level_water',
+  (campaignId?) => campaignId ? `pipes_${p()}campaign_water_${campaignId}` : `pipes_${p()}level_water`,
   (newVal, existing) => newVal > existing,
 );
 
@@ -302,7 +309,7 @@ export function clearLevelWaterRecord(levelId: number, campaignId?: string): voi
 // ─── Chapter completion tracking ─────────────────────────────────────────────
 
 function campaignChaptersKey(campaignId: string): string {
-  return `pipes_campaign_chapters_${campaignId}`;
+  return `pipes_${p()}campaign_chapters_${campaignId}`;
 }
 
 /** Load the set of completed chapter IDs (using chapter.id) for a campaign. */
@@ -342,7 +349,7 @@ export function removeChapterCompleted(campaignId: string, chapterId: number, co
 // ─── Chapter mastery sequence tracking ───────────────────────────────────────
 
 function campaignMasteredShownKey(campaignId: string): string {
-  return `pipes_campaign_mastered_shown_${campaignId}`;
+  return `pipes_${p()}campaign_mastered_shown_${campaignId}`;
 }
 
 /**
@@ -385,7 +392,7 @@ export function removeMasteredChapterShown(campaignId: string, chapterId: number
 // ─── Campaign mastery shown flag ──────────────────────────────────────────────
 
 function campaignMasteredCampaignKey(campaignId: string): string {
-  return `pipes_campaign_mastered_campaign_${campaignId}`;
+  return `pipes_${p()}campaign_mastered_campaign_${campaignId}`;
 }
 
 /**
@@ -415,7 +422,7 @@ export function clearCampaignMasteredShown(campaignId: string): void {
 // ─── Campaign complete shown flag ─────────────────────────────────────────────
 
 function campaignCompleteShownKey(campaignId: string): string {
-  return `pipes_campaign_complete_shown_${campaignId}`;
+  return `pipes_${p()}campaign_complete_shown_${campaignId}`;
 }
 
 /** Returns true if the full-campaign complete modal has already been shown. */
@@ -441,10 +448,10 @@ export function clearCampaignCompleteShown(campaignId: string): void {
 
 // ─── Settings persistence ─────────────────────────────────────────────────────
 
-const SFX_VOLUME_KEY = 'pipes_sfx_volume';
-const COMMAND_KEYS_KEY = 'pipes_command_keys';
-const TOUCH_UI_ENABLED_KEY = 'pipes_touch_ui_enabled';
-const PLAYER_NAME_KEY = 'pipes_player_name';
+const SFX_VOLUME_KEY      = (): string => `pipes_${p()}sfx_volume`;
+const COMMAND_KEYS_KEY     = (): string => `pipes_${p()}command_keys`;
+const TOUCH_UI_ENABLED_KEY = (): string => `pipes_${p()}touch_ui_enabled`;
+const PLAYER_NAME_KEY      = (): string => `pipes_${p()}player_name`;
 const DEFAULT_PLAYER_NAME = 'Player';
 
 /**
@@ -453,7 +460,7 @@ const DEFAULT_PLAYER_NAME = 'Player';
  */
 export function loadSfxVolume(): number {
   try {
-    const raw = localStorage.getItem(SFX_VOLUME_KEY);
+    const raw = localStorage.getItem(SFX_VOLUME_KEY());
     if (raw !== null) {
       const v = Number(raw);
       if (!isNaN(v) && v >= 0 && v <= 100) return Math.round(v);
@@ -465,7 +472,7 @@ export function loadSfxVolume(): number {
 /** Persist the SFX volume setting. @param volume - Integer in [0, 100]. */
 export function saveSfxVolume(volume: number): void {
   try {
-    localStorage.setItem(SFX_VOLUME_KEY, String(Math.round(Math.max(0, Math.min(100, volume)))));
+    localStorage.setItem(SFX_VOLUME_KEY(), String(Math.round(Math.max(0, Math.min(100, volume)))));
   } catch { /* ignore */ }
 }
 
@@ -477,7 +484,7 @@ export function saveSfxVolume(volume: number): void {
  */
 export function loadTouchUiEnabled(): boolean | null {
   try {
-    const raw = localStorage.getItem(TOUCH_UI_ENABLED_KEY);
+    const raw = localStorage.getItem(TOUCH_UI_ENABLED_KEY());
     if (raw === '1') return true;
     if (raw === '0') return false;
   } catch { /* ignore */ }
@@ -487,14 +494,14 @@ export function loadTouchUiEnabled(): boolean | null {
 /** Persist the Touch UI setting. */
 export function saveTouchUiEnabled(enabled: boolean): void {
   try {
-    localStorage.setItem(TOUCH_UI_ENABLED_KEY, enabled ? '1' : '0');
+    localStorage.setItem(TOUCH_UI_ENABLED_KEY(), enabled ? '1' : '0');
   } catch { /* ignore */ }
 }
 
 /** Load the persisted player name setting. */
 export function loadPlayerName(): string {
   try {
-    const raw = localStorage.getItem(PLAYER_NAME_KEY);
+    const raw = localStorage.getItem(PLAYER_NAME_KEY());
     if (raw !== null) {
       const trimmed = raw.trim();
       if (trimmed.length > 0) return trimmed;
@@ -507,14 +514,14 @@ export function loadPlayerName(): string {
 export function savePlayerName(name: string): void {
   try {
     const normalized = name.trim() || DEFAULT_PLAYER_NAME;
-    localStorage.setItem(PLAYER_NAME_KEY, normalized);
+    localStorage.setItem(PLAYER_NAME_KEY(), normalized);
   } catch { /* ignore */ }
 }
 
 /** Load persisted command key assignments (action -> binding string), or null when unset/invalid. */
 export function loadCommandKeyAssignments(): Record<string, string> | null {
   try {
-    const raw = localStorage.getItem(COMMAND_KEYS_KEY);
+    const raw = localStorage.getItem(COMMAND_KEYS_KEY());
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const out: Record<string, string> = {};
@@ -530,7 +537,7 @@ export function loadCommandKeyAssignments(): Record<string, string> | null {
 /** Persist command key assignments (action -> binding string). */
 export function saveCommandKeyAssignments(bindings: Record<string, string>): void {
   try {
-    localStorage.setItem(COMMAND_KEYS_KEY, JSON.stringify(bindings));
+    localStorage.setItem(COMMAND_KEYS_KEY(), JSON.stringify(bindings));
   } catch {
     // ignore storage errors
   }
@@ -539,7 +546,7 @@ export function saveCommandKeyAssignments(bindings: Record<string, string>): voi
 /** Clear persisted custom command key assignments. */
 export function clearCommandKeyAssignments(): void {
   try {
-    localStorage.removeItem(COMMAND_KEYS_KEY);
+    localStorage.removeItem(COMMAND_KEYS_KEY());
   } catch {
     // ignore storage errors
   }
@@ -589,7 +596,7 @@ export function saveChapterEditorMapBoxCollapsed(collapsed: boolean): void {
 // ─── Recording storage ────────────────────────────────────────────────────────
 
 const RECORDINGS_KEY = 'pipes_recordings';
-const RECORDING_SETTINGS_KEY = 'pipes_recording_settings';
+const RECORDING_SETTINGS_KEY = (): string => `pipes_${p()}recording_settings`;
 
 /** Load all saved {@link PlaySequenceRecord} entries from localStorage. */
 export function loadAllRecordings(): PlaySequenceRecord[] {
@@ -632,13 +639,12 @@ export function deleteRecording(id: string): void {
   } catch { /* ignore storage errors */ }
 }
 
-/**
- * Load recording settings.
+/** Load recording settings.
  * Defaults: `recordSuccesses = true`, `recordFailures = false`.
  */
 export function loadRecordingSettings(): RecordingSettings {
   try {
-    const raw = localStorage.getItem(RECORDING_SETTINGS_KEY);
+    const raw = localStorage.getItem(RECORDING_SETTINGS_KEY());
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<RecordingSettings>;
       return {
@@ -653,6 +659,6 @@ export function loadRecordingSettings(): RecordingSettings {
 /** Persist recording settings. */
 export function saveRecordingSettings(settings: RecordingSettings): void {
   try {
-    localStorage.setItem(RECORDING_SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.setItem(RECORDING_SETTINGS_KEY(), JSON.stringify(settings));
   } catch { /* ignore storage errors */ }
 }

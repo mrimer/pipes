@@ -89,6 +89,10 @@ export interface CampaignCallbacks {
   exportProgress(): void;
   /** Import player progress and settings from a file. */
   importProgress(): void;
+  /** Open the player-profile selection screen. */
+  showPlayerProfile(): void;
+  /** Return the display name of the currently active player, or null. */
+  getPlayerName(): string | null;
 }
 
 // ─── Module-level helper ──────────────────────────────────────────────────────
@@ -812,6 +816,8 @@ export class CampaignManager {
       () => this.showCampaignMap(true),
       () => this._callbacks.exportProgress(),
       () => this._callbacks.importProgress(),
+      () => this._callbacks.showPlayerProfile(),
+      this._callbacks.getPlayerName() ?? undefined,
     );
   }
 

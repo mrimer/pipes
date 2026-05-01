@@ -46,6 +46,8 @@ function makeCallbacks(overrides: Partial<CampaignCallbacks> = {}): CampaignCall
     showSettings: () => {},
     exportProgress: () => {},
     importProgress: () => {},
+    showPlayerProfile: () => {},
+    getPlayerName: () => null,
     ...overrides,
   };
 }

@@ -600,7 +600,146 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
   return el;
 }
 
-// ─── Player import result modal ───────────────────────────────────────────────
+// ─── New Player modal ──────────────────────────────────────────────────────────
+
+/**
+ * Build and show a modal prompting the user to enter a name for a new profile.
+ *
+ * The modal is self-managed: it appends itself to `document.body`, shows
+ * immediately, and removes itself when dismissed.
+ *
+ * @param defaultName - Pre-filled value for the name input.
+ * @param onOK        - Called with the trimmed name when the user confirms.
+ * @param onCancel    - Called when the user cancels.
+ */
+export function buildNewPlayerModal(
+  defaultName: string,
+  onOK: (name: string) => void,
+  onCancel: () => void,
+): void {
+  const el = createModalOverlay(0.7);
+
+  const box = document.createElement('div');
+  box.style.cssText =
+    `background:${UI_BG};border:2px solid #4a90d9;border-radius:${RADIUS_LG};` +
+    'padding:28px 36px;display:flex;flex-direction:column;gap:16px;' +
+    'min-width:280px;max-width:380px;';
+
+  const title = document.createElement('h2');
+  title.style.cssText = 'margin:0;font-size:1.2rem;color:#74b9ff;';
+  title.textContent = '👤 New Player';
+  box.appendChild(title);
+
+  const label = document.createElement('label');
+  label.textContent = 'Player name:';
+  label.style.cssText = 'color:#eee;font-size:0.95rem;';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = defaultName;
+  input.maxLength = 40;
+  input.style.cssText =
+    `width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.95rem;background:${EDITOR_INPUT_BG};` +
+    `color:#eee;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;`;
+
+  label.appendChild(document.createElement('br'));
+  label.appendChild(input);
+  box.appendChild(label);
+
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.type = 'button';
+  cancelBtn.style.cssText =
+    `padding:8px 20px;font-size:0.95rem;background:${MUTED_BTN_BG};color:#aaa;` +
+    `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
+
+  const okBtn = document.createElement('button');
+  okBtn.textContent = 'Create';
+  okBtn.type = 'button';
+  okBtn.style.cssText =
+    `padding:8px 20px;font-size:0.95rem;background:#1a4a9a;color:#fff;` +
+    `border:1px solid #4a90d9;border-radius:${RADIUS_MD};cursor:pointer;`;
+
+  const dismiss = (): void => { el.remove(); };
+
+  cancelBtn.addEventListener('click', () => { dismiss(); onCancel(); });
+  okBtn.addEventListener('click', () => {
+    const name = input.value.trim() || defaultName;
+    dismiss();
+    onOK(name);
+  });
+  input.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Enter') { okBtn.click(); }
+    if (e.key === 'Escape') { cancelBtn.click(); }
+  });
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(okBtn);
+  box.appendChild(actions);
+  el.appendChild(box);
+  document.body.appendChild(el);
+  el.style.display = 'flex';
+  // Focus the input after the overlay is visible.
+  setTimeout(() => input.focus(), 0);
+}
+
+/**
+ * Show a simple confirmation modal (OK / Cancel) and call the appropriate
+ * callback on dismissal.
+ *
+ * @param message   - Text shown in the modal body.
+ * @param onConfirm - Called when the user clicks "Confirm".
+ * @param onCancel  - Called when the user cancels.
+ */
+export function buildConfirmModal(
+  message: string,
+  onConfirm: () => void,
+  onCancel: () => void,
+): void {
+  const el = createModalOverlay(0.7);
+  const box = document.createElement('div');
+  box.style.cssText =
+    `background:${UI_BG};border:2px solid ${ERROR_COLOR};border-radius:${RADIUS_LG};` +
+    'padding:24px 32px;display:flex;flex-direction:column;gap:16px;' +
+    'min-width:260px;max-width:360px;';
+
+  const msg = document.createElement('p');
+  msg.style.cssText = 'margin:0;color:#eee;font-size:0.95rem;';
+  msg.textContent = message;
+  box.appendChild(msg);
+
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.type = 'button';
+  cancelBtn.style.cssText =
+    `padding:8px 18px;font-size:0.95rem;background:${MUTED_BTN_BG};color:#aaa;` +
+    `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.textContent = 'Confirm';
+  confirmBtn.type = 'button';
+  confirmBtn.style.cssText =
+    `padding:8px 18px;font-size:0.95rem;background:${ERROR_COLOR};color:#fff;` +
+    `border:none;border-radius:${RADIUS_MD};cursor:pointer;`;
+
+  const dismiss = (): void => { el.remove(); };
+  cancelBtn.addEventListener('click',  () => { dismiss(); onCancel(); });
+  confirmBtn.addEventListener('click', () => { dismiss(); onConfirm(); });
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(confirmBtn);
+  box.appendChild(actions);
+  el.appendChild(box);
+  document.body.appendChild(el);
+  el.style.display = 'flex';
+}
+
 
 /** Backdrop opacity for the player-import result modal. */
 const IMPORT_RESULT_MODAL_OVERLAY_ALPHA = 0.7;

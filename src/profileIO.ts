@@ -11,6 +11,8 @@ import {
 import { saveRecording, loadPlayerName } from './persistence';
 import { downloadGzipJson, readGzipOrJsonFile } from './fileIO';
 import { findLevelLocation } from './campaignEditor/campaignService';
+import { getActiveSlotIndex, withSlot } from './activeProfile';
+import { loadSlotMeta, loadAllSlotMetas, saveSlotMeta, findEmptySlotIndex, generateGuid, PROFILE_SLOT_COUNT } from './playerProfileSlots';
 
 const FILE_INPUT_ACCEPT = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
 const FILENAME_SAFE_CHARACTERS_REGEX = /[^\w\s-]/g;
@@ -118,7 +120,11 @@ export function importReplay(
 export async function exportPlayerProfile(
   campaigns: CampaignDef[],
 ): Promise<void> {
-  const payload = buildPlayerProfilePayload(campaigns);
+  // Include this slot's GUID and last-played date in the export so the file
+  // can be matched back to the same slot on import.
+  const slotIdx = getActiveSlotIndex();
+  const meta = slotIdx !== null ? loadSlotMeta(slotIdx) : null;
+  const payload = buildPlayerProfilePayload(campaigns, meta?.guid, meta?.lastPlayedAt ?? null);
   const fileObj = buildPlayerFile(payload);
   const json = JSON.stringify(fileObj, null, 2);
   const playerName = sanitizeFilenamePart(loadPlayerName(), EXPORT_FILENAME_FALLBACK_PLAYER);
@@ -131,9 +137,21 @@ export async function exportPlayerProfile(
   }
 }
 
+/**
+ * Import a player profile from a file.
+ *
+ * GUID-matching rules:
+ * - If the file's GUID matches the active slot's GUID → merge into the active slot.
+ * - If the file's GUID matches any other occupied slot → merge into that slot.
+ * - Otherwise, import into an empty slot (creating a new profile).
+ * - If no empty slot is available, show an error.
+ *
+ * @param campaigns  All locally installed campaigns.
+ * @param onSuccess  Called with the merge outcomes and target slot index.
+ */
 export function importPlayerProfile(
   campaigns: CampaignDef[],
-  onSuccess: (outcomes: CampaignImportOutcome[]) => void,
+  onSuccess: (outcomes: CampaignImportOutcome[], targetSlotIndex: number) => void,
 ): void {
   const processText = (text: string): void => {
     const result = parsePlayerFile(text);
@@ -142,8 +160,47 @@ export function importPlayerProfile(
       return;
     }
 
-    const applyResult = applyPlayerProfile(result.payload, campaigns);
-    onSuccess(applyResult.outcomes);
+    const importedGuid = result.payload.guid;
+    const allMetas = loadAllSlotMetas();
+
+    // Find a slot whose GUID matches the imported file.
+    let targetSlot: number | null = null;
+    for (let i = 0; i < PROFILE_SLOT_COUNT; i++) {
+      if (allMetas[i]?.guid === importedGuid) {
+        targetSlot = i;
+        break;
+      }
+    }
+
+    // If no GUID match, look for an empty slot.
+    if (targetSlot === null) {
+      targetSlot = findEmptySlotIndex();
+    }
+
+    if (targetSlot === null) {
+      alert('Import failed: no empty profile slots available. Delete a profile first.');
+      return;
+    }
+
+    const finalTarget = targetSlot;
+
+    // Perform the merge inside the target slot's namespace.
+    const applyResult = withSlot(finalTarget, () => applyPlayerProfile(result.payload, campaigns));
+
+    // Update slot metadata: if this is a new slot, create metadata from the file.
+    const existingMeta = loadSlotMeta(finalTarget);
+    if (!existingMeta) {
+      saveSlotMeta(finalTarget, {
+        guid:         importedGuid ?? generateGuid(),
+        name:         result.payload.playerName,
+        lastPlayedAt: result.payload.lastPlayedAt ?? null,
+      });
+    } else {
+      // Update the name in case it changed.
+      saveSlotMeta(finalTarget, { ...existingMeta, name: result.payload.playerName });
+    }
+
+    onSuccess(applyResult.outcomes, finalTarget);
   };
 
   openImportFilePicker(processText);

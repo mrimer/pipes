@@ -204,6 +204,8 @@ export function renderLevelList(
   onCampaignMapClick?: () => void,
   onExportProgress?: () => void,
   onImportProgress?: () => void,
+  onPlayerProfileClick?: () => void,
+  playerName?: string,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -225,7 +227,8 @@ export function renderLevelList(
     h2.style.textAlign = 'center';
 
     if (onSettingsClick) {
-      // Row containing the gear/settings button (left) and the "Select a Level" heading.
+      // Row containing the gear/settings button (left), "Select a Level" heading,
+      // and an optional player-profile button (right).
       const selectRow = document.createElement('div');
       selectRow.style.cssText =
         'display:flex;align-items:center;justify-content:center;gap:10px;width:100%;position:relative;';
@@ -240,7 +243,28 @@ export function renderLevelList(
       gearBtn.addEventListener('click', () => onSettingsClick());
       selectRow.appendChild(gearBtn);
       selectRow.appendChild(h2);
+
+      if (onPlayerProfileClick) {
+        const profileBtn = document.createElement('button');
+        profileBtn.type = 'button';
+        profileBtn.title = playerName ? `Player: ${playerName}` : 'Switch Player';
+        profileBtn.textContent = '👤';
+        profileBtn.style.cssText =
+          'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
+          'position:absolute;right:0;';
+        profileBtn.addEventListener('click', () => onPlayerProfileClick());
+        selectRow.appendChild(profileBtn);
+      }
+
       levelListEl.appendChild(selectRow);
+
+      // Welcome line shown below the heading row when a named player is active.
+      if (playerName) {
+        const welcomeEl = document.createElement('div');
+        welcomeEl.style.cssText = 'font-size:0.8rem;color:#aabbcc;text-align:center;margin-top:-6px;';
+        welcomeEl.textContent = `Welcome, ${playerName}`;
+        levelListEl.appendChild(welcomeEl);
+      }
     } else {
       levelListEl.appendChild(h2);
     }

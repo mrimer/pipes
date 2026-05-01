@@ -45,7 +45,7 @@ export const FILE_TYPE_CAMPAIGN = 'pipes-campaign' as const;
 export const FILE_TYPE_REPLAY   = 'pipes-replay' as const;
 
 /** Current player-profile file format version. */
-export const PROFILE_FORMAT_VERSION = 1;
+export const PROFILE_FORMAT_VERSION = 2;
 
 // ─── Checksum ─────────────────────────────────────────────────────────────────
 
@@ -84,6 +84,10 @@ export interface CampaignProgressBlock {
 
 /** The data section inside a player-profile file. */
 export interface PlayerProfilePayload {
+  /** UUID v4 uniquely identifying this player profile across devices. Added in v2. */
+  guid: string;
+  /** ISO 8601 timestamp of the last play session, or null. Added in v2. */
+  lastPlayedAt: string | null;
   playerName: string;
   sfxVolume: number;
   touchUiEnabled: boolean | null;
@@ -141,9 +145,14 @@ function filterRecordByLevelIds(
  *
  * @param localCampaigns - All locally installed campaigns; used to enumerate
  *   per-campaign progress keys.
+ * @param guid - UUID v4 for this profile.  Callers should pass the GUID from
+ *   the active slot's metadata.  A fresh GUID is generated when omitted.
+ * @param lastPlayedAt - ISO 8601 timestamp or null.
  */
 export function buildPlayerProfilePayload(
   localCampaigns: readonly CampaignDef[],
+  guid?: string,
+  lastPlayedAt?: string | null,
 ): PlayerProfilePayload {
   const campaignProgress: CampaignProgressBlock[] = localCampaigns.map((c) => {
     const levelIds   = validLevelIds(c);
@@ -162,12 +171,26 @@ export function buildPlayerProfilePayload(
   });
 
   return {
+    guid:          guid ?? _generateFallbackGuid(),
+    lastPlayedAt:  lastPlayedAt ?? null,
     playerName:    loadPlayerName(),
     sfxVolume:     loadSfxVolume(),
     touchUiEnabled: loadTouchUiEnabled(),
     commandKeys:   loadCommandKeyAssignments(),
     campaignProgress,
   };
+}
+
+/** Minimal UUID v4 fallback (used when no GUID is supplied to buildPlayerProfilePayload). */
+function _generateFallbackGuid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 /**
@@ -206,6 +229,10 @@ export type PlayerFileResult = PlayerFileSuccess | PlayerFileError;
 
 /**
  * Parse and validate a player-profile JSON string.
+ *
+ * Accepts both v1 (no `guid`/`lastPlayedAt`) and v2 files:
+ * - v1 files receive a freshly generated GUID and `lastPlayedAt: null` so
+ *   callers can treat all payloads uniformly.
  *
  * Validation steps:
  * 1. Valid JSON
@@ -257,7 +284,17 @@ export function parsePlayerFile(json: string): PlayerFileResult {
     };
   }
 
-  return { ok: true, payload: payload as PlayerProfilePayload };
+  const rawPayload = payload as Record<string, unknown>;
+
+  // Forward-compatibility: v1 files lack `guid` and `lastPlayedAt`.
+  if (!rawPayload['guid'] || typeof rawPayload['guid'] !== 'string') {
+    rawPayload['guid'] = _generateFallbackGuid();
+  }
+  if (!('lastPlayedAt' in rawPayload)) {
+    rawPayload['lastPlayedAt'] = null;
+  }
+
+  return { ok: true, payload: rawPayload as unknown as PlayerProfilePayload };
 }
 
 // ─── Apply / merge ────────────────────────────────────────────────────────────

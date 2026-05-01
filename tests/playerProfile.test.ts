@@ -184,6 +184,8 @@ describe('buildPlayerFile', () => {
 describe('parsePlayerFile', () => {
   function makeValidJson(overrides: Record<string, unknown> = {}): string {
     const payload: PlayerProfilePayload = {
+      guid: 'test-guid-bob',
+      lastPlayedAt: null,
       playerName: 'Bob',
       sfxVolume: 80,
       touchUiEnabled: null,
@@ -248,6 +250,8 @@ describe('applyPlayerProfile – settings', () => {
 
   function makePayload(overrides: Partial<PlayerProfilePayload> = {}): PlayerProfilePayload {
     return {
+      guid: 'test-guid',
+      lastPlayedAt: null,
       playerName: 'Carol',
       sfxVolume: 60,
       touchUiEnabled: false,
@@ -295,7 +299,7 @@ describe('applyPlayerProfile – campaign progress', () => {
 
   it('ignores campaigns not present locally', () => {
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_ghost',
@@ -318,7 +322,7 @@ describe('applyPlayerProfile – campaign progress', () => {
     markCampaignLevelCompleted('cmp_merge', 101, localProg);
 
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_merge',
@@ -342,7 +346,7 @@ describe('applyPlayerProfile – campaign progress', () => {
     markChapterCompleted('cmp_ch', 1, localCh);
 
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_ch',
@@ -365,7 +369,7 @@ describe('applyPlayerProfile – campaign progress', () => {
     saveLevelStar(101, 2, 'cmp_stars');
 
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_stars',
@@ -387,7 +391,7 @@ describe('applyPlayerProfile – campaign progress', () => {
     saveLevelStar(101, 3, 'cmp_nodown');
 
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_nodown',
@@ -406,7 +410,7 @@ describe('applyPlayerProfile – campaign progress', () => {
   it('merges mastered-shown flag (only sets, never clears)', () => {
     const cmp = makeMinimalCampaign('cmp_ms');
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_ms',
@@ -429,7 +433,7 @@ describe('applyPlayerProfile – campaign progress', () => {
     const cmp = makeMinimalCampaign('cmp_stale_import');
 
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_stale_import',
@@ -463,7 +467,7 @@ describe('applyPlayerProfile – campaign progress', () => {
     const cmp = makeMinimalCampaign('cmp_stale_ch_import');
 
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_stale_ch_import',
@@ -490,7 +494,7 @@ describe('applyPlayerProfile – campaign progress', () => {
   it('reports merged and ignored campaigns separately', () => {
     const local = makeMinimalCampaign('cmp_local', 'Local Campaign');
     const payload: PlayerProfilePayload = {
-      playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
+      guid: 'test-guid', lastPlayedAt: null, playerName: 'Test', sfxVolume: 100, touchUiEnabled: null, commandKeys: null,
       campaignProgress: [
         {
           campaignId: 'cmp_local',
