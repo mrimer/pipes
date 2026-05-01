@@ -379,8 +379,17 @@ export function applyPlayerProfile(
   const localById  = new Map(localCampaigns.map((c) => [c.id, c]));
   const outcomes: CampaignImportOutcome[] = [];
 
-  // Pre-load existing recording IDs so we can count new ones per campaign.
+  // Pre-compute new recording counts per campaign before processing progress,
+  // so the counts can be included directly when each outcome is created.
   const existingRecordingIds = new Set(loadAllRecordings().map((r) => r.id));
+  const newRecordingsPerCampaign = new Map<string, number>();
+  if (payload.recordings) {
+    for (const record of payload.recordings) {
+      if (!existingRecordingIds.has(record.id) && record.campaignId) {
+        newRecordingsPerCampaign.set(record.campaignId, (newRecordingsPerCampaign.get(record.campaignId) ?? 0) + 1);
+      }
+    }
+  }
 
   for (const block of payload.campaignProgress) {
     const local = localById.get(block.campaignId);
@@ -435,8 +444,8 @@ export function applyPlayerProfile(
     }
 
     // Compute deltas for this campaign.
-    const newLevelsCompleted   = [...block.completedLevels].filter((id) => levelIds.has(id) && !preMergeProgress.has(id)).length;
-    const newChaptersCompleted = [...block.completedChapters].filter((id) => chapterIds.has(id) && !preMergeChapters.has(id)).length;
+    const newLevelsCompleted   = block.completedLevels.filter((id) => levelIds.has(id) && !preMergeProgress.has(id)).length;
+    const newChaptersCompleted = block.completedChapters.filter((id) => chapterIds.has(id) && !preMergeChapters.has(id)).length;
     let newStars = 0;
     for (const [idStr, stars] of Object.entries(block.levelStars)) {
       const id = Number(idStr);
@@ -453,29 +462,17 @@ export function applyPlayerProfile(
       newLevelsCompleted,
       newChaptersCompleted,
       newStars,
-      newRecordings: 0, // filled in below after recordings are processed
+      newRecordings: newRecordingsPerCampaign.get(block.campaignId) ?? 0,
     });
   }
 
   // ── Recordings (present only in "Export + Recordings" files) ──────────────
-  // Count new recordings per campaign so the per-campaign outcome can reflect them.
-  const newRecordingsPerCampaign = new Map<string, number>();
   if (payload.recordings && payload.recordings.length > 0) {
     for (const record of payload.recordings) {
       if (!existingRecordingIds.has(record.id)) {
         saveRecording(record);
         existingRecordingIds.add(record.id); // guard against duplicates within the imported list itself
-        if (record.campaignId) {
-          newRecordingsPerCampaign.set(record.campaignId, (newRecordingsPerCampaign.get(record.campaignId) ?? 0) + 1);
-        }
       }
-    }
-  }
-
-  // Patch newRecordings counts into the merged outcomes.
-  for (const outcome of outcomes) {
-    if (outcome.status === 'merged') {
-      outcome.newRecordings = newRecordingsPerCampaign.get(outcome.campaignId) ?? 0;
     }
   }
 
