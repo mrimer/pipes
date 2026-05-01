@@ -191,6 +191,8 @@ export function importPlayerProfile(
     const existingMeta = loadSlotMeta(finalTarget);
     if (!existingMeta) {
       saveSlotMeta(finalTarget, {
+        // parsePlayerFile always ensures payload.guid is a string (generating a fallback for v1
+        // files), so importedGuid is never null here.  The fallback is a safety net.
         guid:         importedGuid ?? generateGuid(),
         name:         result.payload.playerName,
         lastPlayedAt: result.payload.lastPlayedAt ?? null,
