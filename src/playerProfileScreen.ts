@@ -67,6 +67,8 @@ function btn(
     `padding:7px 14px;font-size:0.82rem;background:${bgColor};color:#eee;` +
     `border:1px solid ${borderColor};border-radius:6px;cursor:pointer;` +
     `font-family:inherit;${extraCss}`;
+  b.addEventListener('mouseenter', () => { b.style.filter = 'brightness(1.35)'; });
+  b.addEventListener('mouseleave', () => { b.style.filter = ''; });
   b.addEventListener('click', onClick);
   return b;
 }

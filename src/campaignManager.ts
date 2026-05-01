@@ -85,10 +85,6 @@ export interface CampaignCallbacks {
   showRules(): void;
   /** Show the settings modal overlay. */
   showSettings(): void;
-  /** Export all player progress and settings to a downloadable file. */
-  exportProgress(): void;
-  /** Import player progress and settings from a file. */
-  importProgress(): void;
   /** Open the player-profile selection screen. */
   showPlayerProfile(): void;
   /** Return the display name of the currently active player, or null. */
@@ -814,8 +810,6 @@ export class CampaignManager {
       this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
       this._activeCampaign?.grid !== undefined,
       () => this.showCampaignMap(true),
-      () => this._callbacks.exportProgress(),
-      () => this._callbacks.importProgress(),
       () => this._callbacks.showPlayerProfile(),
       this._callbacks.getPlayerName() ?? undefined,
     );

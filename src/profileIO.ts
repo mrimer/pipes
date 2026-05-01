@@ -158,7 +158,12 @@ export async function exportPlayerProfileWithRecordings(
   const playerName = loadPlayerName();
   const guid = meta?.guid ?? '';
   const recordings = loadRecordingsForProfile(guid, playerName);
-  const payload = buildPlayerProfilePayload(campaigns, meta?.guid, meta?.lastPlayedAt ?? null, recordings);
+  // Inject the player's GUID into any recording that was created before the
+  // playerGuid field existed, so the export can be matched back to this profile.
+  const recordingsWithGuid = guid
+    ? recordings.map((r) => r.playerGuid ? r : { ...r, playerGuid: guid })
+    : recordings;
+  const payload = buildPlayerProfilePayload(campaigns, meta?.guid, meta?.lastPlayedAt ?? null, recordingsWithGuid);
   const fileObj = buildPlayerFile(payload);
   const json = JSON.stringify(fileObj, null, 2);
   const safePlayerName = sanitizeFilenamePart(playerName, EXPORT_FILENAME_FALLBACK_PLAYER);
