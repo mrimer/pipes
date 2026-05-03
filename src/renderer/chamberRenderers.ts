@@ -473,9 +473,9 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
     ctx.restore();
   }
   if (lockedCost !== null) {
-    // Connected: locked effective cost takes precedence regardless of hardness
+    // Connected: locked effective cost is centered in the full chamber rectangle.
     ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(-lockedCost), 0, textCenterY);
+    ctx.fillText(String(-lockedCost), 0, 0);
   } else if (isHard) {
     // Unconnected and pressure <= hardness: show hardness/H and "temperature x cost"
     ctx.font = `bold ${_s(14)}px Arial`;
