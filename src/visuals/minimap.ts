@@ -45,6 +45,21 @@ import {
   TREE_DARK_COLOR,
   TREE_WINTER_COLOR,
   TREE_SPRING_COLOR,
+  TREE2_COLOR,
+  TREE2_FALL_COLOR,
+  TREE2_DARK_COLOR,
+  TREE2_WINTER_COLOR,
+  TREE2_SPRING_COLOR,
+  TREE3_COLOR,
+  TREE3_FALL_COLOR,
+  TREE3_DARK_COLOR,
+  TREE3_WINTER_COLOR,
+  TREE3_SPRING_COLOR,
+  TREE4_COLOR,
+  TREE4_FALL_COLOR,
+  TREE4_DARK_COLOR,
+  TREE4_WINTER_COLOR,
+  TREE4_SPRING_COLOR,
   ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
@@ -95,6 +110,43 @@ function treeColor(style: LevelStyle | undefined): string {
   if (style === 'Winter') return TREE_WINTER_COLOR;
   if (style === 'Spring') return TREE_SPRING_COLOR;
   return TREE_COLOR;
+}
+
+/** Returns the style-dependent main color for Tree 2. */
+function tree2Color(style: LevelStyle | undefined): string {
+  if (style === 'Fall') return TREE2_FALL_COLOR;
+  if (style === 'Dark') return TREE2_DARK_COLOR;
+  if (style === 'Winter') return TREE2_WINTER_COLOR;
+  if (style === 'Spring') return TREE2_SPRING_COLOR;
+  return TREE2_COLOR;
+}
+
+/** Returns the style-dependent main color for Tree 3. */
+function tree3Color(style: LevelStyle | undefined): string {
+  if (style === 'Fall') return TREE3_FALL_COLOR;
+  if (style === 'Dark') return TREE3_DARK_COLOR;
+  if (style === 'Winter') return TREE3_WINTER_COLOR;
+  if (style === 'Spring') return TREE3_SPRING_COLOR;
+  return TREE3_COLOR;
+}
+
+/** Returns the style-dependent main color for Tree 4. */
+function tree4Color(style: LevelStyle | undefined): string {
+  if (style === 'Fall') return TREE4_FALL_COLOR;
+  if (style === 'Dark') return TREE4_DARK_COLOR;
+  if (style === 'Winter') return TREE4_WINTER_COLOR;
+  if (style === 'Spring') return TREE4_SPRING_COLOR;
+  return TREE4_COLOR;
+}
+
+/**
+ * Returns the style-dependent main color for a Tree 2/3/4 tile.
+ * Dispatches to the appropriate per-variant color function.
+ */
+function treeVariantColor(shape: PipeShape, style: LevelStyle | undefined): string {
+  if (shape === PipeShape.Tree3) return tree3Color(style);
+  if (shape === PipeShape.Tree4) return tree4Color(style);
+  return tree2Color(style);
 }
 
 /** Returns the style-dependent fill color for Sea (water) tiles. */
@@ -181,6 +233,12 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
       return GRANITE_COLOR;
     case PipeShape.Tree:
       return treeColor(style);
+    case PipeShape.Tree2:
+      return tree2Color(style);
+    case PipeShape.Tree3:
+      return tree3Color(style);
+    case PipeShape.Tree4:
+      return tree4Color(style);
     case PipeShape.Sea:
       return seaColor(style);
     case PipeShape.Cement:
@@ -335,9 +393,8 @@ function drawTree(
   x: number,
   y: number,
   px: number,
-  style: LevelStyle | undefined,
+  color: string,
 ): void {
-  const color = treeColor(style);
   const cx = x + px / 2;
   const cy = y + px / 2;
   const radius = Math.max(0.5, (px - 1) / 2);
@@ -408,7 +465,11 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
         // Fill the cell with the empty background color first, then draw a circle on top.
         ctx.fillStyle = emptyColor(style);
         ctx.fillRect(tx, ty, px, px);
-        drawTree(ctx, tx, ty, px, style);
+        drawTree(ctx, tx, ty, px, treeColor(style));
+      } else if (tile && (tile.shape === PipeShape.Tree2 || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4)) {
+        ctx.fillStyle = emptyColor(style);
+        ctx.fillRect(tx, ty, px, px);
+        drawTree(ctx, tx, ty, px, treeVariantColor(tile.shape, style));
       } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.Chamber) {
         drawContainer(ctx, tx, ty, px, chamberOutlineColor(tile));
       } else {
