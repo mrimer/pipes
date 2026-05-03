@@ -186,15 +186,17 @@ export function buildNewChapterModal(
 /**
  * Build and attach the challenge-level warning modal.
  *
- * The modal auto-advances to the level after a display period followed by a
- * fade-out; no "Play Level" button is needed.  An optional "Skip Level" button
- * is shown when the player may bypass the challenge.
+ * When `canSkip` is false the modal auto-advances (no buttons); when true an
+ * optional "Skip Level" button is shown and clicking outside the dialog box
+ * plays the level instead.
  *
+ * @param onPlay - Called when the player proceeds to play the challenge level.
  * @param onSkip - Called when the player chooses to skip the challenge.
  * @returns The overlay and the two elements that are toggled when the modal is
  *          shown in "can skip" vs "directly selected" mode.
  */
 export function buildChallengeModal(
+  onPlay: () => void,
   onSkip: () => void,
 ): { el: HTMLElement; msgEl: HTMLElement; skipBtnEl: HTMLButtonElement } {
   const { el, box, actionsEl } = buildModalShell('☠️ Challenge Level ☠️');
@@ -208,6 +210,8 @@ export function buildChallengeModal(
   skipBtnEl.type = 'button';
   skipBtnEl.addEventListener('click', () => onSkip());
   actionsEl.appendChild(skipBtnEl);
+  // Clicking the dimmed backdrop (outside the dialog box) plays the level.
+  el.addEventListener('click', (e) => { if (e.target === el) onPlay(); });
   return { el, msgEl, skipBtnEl };
 }
 

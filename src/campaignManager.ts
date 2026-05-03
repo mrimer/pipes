@@ -162,6 +162,7 @@ export class CampaignManager {
 
     // Build the challenge-level warning modal
     const challengeModal = buildChallengeModal(
+      () => this.playChallengeLevel(),
       () => this.skipChallengeLevel(),
     );
     this._challengeModalEl = challengeModal.el;
@@ -964,16 +965,20 @@ export class CampaignManager {
     this._challengeModalEl.style.display = 'flex';
     sfxManager.play(SfxId.Challenge);
     this._callbacks.triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
-    // After 2 s, begin a 1 s opacity fade-out; after 3 s total, auto-advance.
-    this._challengeFadeTimerId = setTimeout(() => {
-      this._challengeFadeTimerId = null;
-      this._challengeModalEl.style.transition = 'opacity 1s ease-out';
-      this._challengeModalEl.style.opacity = '0';
-      this._challengeCloseTimerId = setTimeout(() => {
-        this._challengeCloseTimerId = null;
-        this.playChallengeLevel();
-      }, 1000);
-    }, 2000);
+    // When the level was directly selected (canSkip=false) there is no Skip
+    // button, so auto-advance after 2 s display + 1 s fade.  When canSkip is
+    // true the player decides by clicking Skip or the backdrop.
+    if (!canSkip) {
+      this._challengeFadeTimerId = setTimeout(() => {
+        this._challengeFadeTimerId = null;
+        this._challengeModalEl.style.transition = 'opacity 1s ease-out';
+        this._challengeModalEl.style.opacity = '0';
+        this._challengeCloseTimerId = setTimeout(() => {
+          this._challengeCloseTimerId = null;
+          this.playChallengeLevel();
+        }, 1000);
+      }, 2000);
+    }
   }
 
   /** Cancel any pending challenge auto-dismiss timers and reset opacity styles. */
