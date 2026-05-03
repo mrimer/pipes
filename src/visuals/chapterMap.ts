@@ -5,7 +5,7 @@
  */
 
 import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle, styleToFloorShape, floorShapeToStyle } from '../types';
-import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawSea, SeaNeighbors, seaFillColor, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
+import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawTree2, drawTree3, drawTree4, drawSea, SeaNeighbors, seaFillColor, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, computeFloorTypesFromGrid } from '../board';
 import { oppositeDirection } from '../tile';
@@ -472,6 +472,42 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.restore();
 }
 
+/** Draw Tree 2 tile like in-game. */
+function _drawChapterMapTree2(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
+  ctx.fillRect(x, y, CELL, CELL);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
+  ctx.save();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawTree2(ctx, CELL / 2, floorShapeToStyle(floorType) ?? style);
+  ctx.restore();
+}
+
+/** Draw Tree 3 tile like in-game. */
+function _drawChapterMapTree3(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
+  ctx.fillRect(x, y, CELL, CELL);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
+  ctx.save();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawTree3(ctx, CELL / 2, floorShapeToStyle(floorType) ?? style);
+  ctx.restore();
+}
+
+/** Draw Tree 4 tile like in-game. */
+function _drawChapterMapTree4(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
+  ctx.fillRect(x, y, CELL, CELL);
+  drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
+  ctx.save();
+  ctx.translate(x + CELL / 2, y + CELL / 2);
+  drawTree4(ctx, CELL / 2, floorShapeToStyle(floorType) ?? style);
+  ctx.restore();
+}
+
 /** Draw Sea tile like in-game with neighbor-aware borders. */
 function _drawChapterMapSea(
   ctx: CanvasRenderingContext2D,
@@ -627,6 +663,12 @@ function _renderChapterMapPass2NonPipeTiles(
         _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c, floorType);
       } else if (def.shape === PipeShape.Tree) {
         _drawChapterMapTree(ctx, x, y, r, c, floorType, style);
+      } else if (def.shape === PipeShape.Tree2) {
+        _drawChapterMapTree2(ctx, x, y, r, c, floorType, style);
+      } else if (def.shape === PipeShape.Tree3) {
+        _drawChapterMapTree3(ctx, x, y, r, c, floorType, style);
+      } else if (def.shape === PipeShape.Tree4) {
+        _drawChapterMapTree4(ctx, x, y, r, c, floorType, style);
       } else if (def.shape === PipeShape.Sea) {
         _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c, style);
       }

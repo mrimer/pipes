@@ -124,7 +124,22 @@ export function computePulseLayers(board: Board): IdlePulseLayer[] {
       // entryDir = direction FROM which the pulse enters the next tile.
       const entryDir = oppositeDirection(dir);
       const tile = board.getTile(next);
-      const connections = tile ? new Set(tile.connections) : new Set<Direction>();
+      const rawConnections = tile ? new Set(tile.connections) : new Set<Direction>();
+
+      // Respect the one-way floor constraint at this tile.  If the cell sits on a
+      // one-way floor, water cannot exit in the direction opposite the arrow; remove
+      // that direction from the connections so the phase-2 glow doesn't animate
+      // outward against the arrow.  entryDir is always kept so that phase-1 can
+      // still draw the inward arm (entering via entryDir is what the BFS confirmed
+      // is valid, and the one-way only restricts exit, not this entry itself).
+      const nextOwDir = board.getOneWayDirection(next);
+      const blockedExit = nextOwDir !== null ? oppositeDirection(nextOwDir) : null;
+      const connections = new Set<Direction>();
+      for (const c of rawConnections) {
+        if (c === blockedExit && c !== entryDir) continue;
+        connections.add(c);
+      }
+
       const isGold = tile !== null && GOLD_PIPE_SHAPES.has(tile.shape);
 
       result.push({ row: next.row, col: next.col, entryDir, depth: nextDepth, connections, isGold });
