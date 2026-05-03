@@ -137,6 +137,9 @@ export class CampaignManager {
   private readonly _challengeModalEl: HTMLElement;
   private readonly _challengeMsgEl: HTMLElement;
   private readonly _challengeSkipBtnEl: HTMLButtonElement;
+  /** Timer IDs for the challenge modal's auto-dismiss sequence (fade + close). */
+  private _challengeFadeTimerId: ReturnType<typeof setTimeout> | null = null;
+  private _challengeCloseTimerId: ReturnType<typeof setTimeout> | null = null;
 
   // ── Chapter context for current level ─────────────────────────────────────
 
@@ -159,7 +162,6 @@ export class CampaignManager {
 
     // Build the challenge-level warning modal
     const challengeModal = buildChallengeModal(
-      () => this.playChallengeLevel(),
       () => this.skipChallengeLevel(),
     );
     this._challengeModalEl = challengeModal.el;
@@ -622,10 +624,12 @@ export class CampaignManager {
   }
 
   /**
-   * Called when the player chooses to play the challenge level.
+   * Called when the player chooses to play the challenge level (or by the
+   * auto-dismiss timer after the modal fades out).
    * Dismisses the challenge modal and starts the pending level.
    */
   playChallengeLevel(): void {
+    this._cancelChallengeAutoPlay();
     this._callbacks.closeModal(this._challengeModalEl);
     if (this._pendingLevelId === null) return;
     const id = this._pendingLevelId;
@@ -635,9 +639,11 @@ export class CampaignManager {
 
   /**
    * Called when the player chooses to skip the challenge level.
-   * Dismisses the challenge modal and advances to the next level after the challenge.
+   * Cancels the auto-dismiss timer, dismisses the challenge modal and advances
+   * to the next level after the challenge.
    */
   skipChallengeLevel(): void {
+    this._cancelChallengeAutoPlay();
     this._callbacks.closeModal(this._challengeModalEl);
     if (this._pendingLevelId === null) { this._callbacks.exitToMenu(); return; }
 
@@ -848,6 +854,7 @@ export class CampaignManager {
     this.hideChapterMap();
     this.hideCampaignMap();
     this._newChapterModalEl.style.display = 'none';
+    this._cancelChallengeAutoPlay();
     this._challengeModalEl.style.display = 'none';
     clearModalSparkle(this._newChapterModalEl);
     clearModalSparkle(this._challengeModalEl);
@@ -861,6 +868,7 @@ export class CampaignManager {
    */
   hideCampaignModals(): void {
     this._newChapterModalEl.style.display = 'none';
+    this._cancelChallengeAutoPlay();
     this._challengeModalEl.style.display = 'none';
   }
 
@@ -947,11 +955,39 @@ export class CampaignManager {
   }
 
   private _showChallengeLevelModal(canSkip: boolean): void {
+    this._cancelChallengeAutoPlay();
     this._challengeMsgEl.style.display    = canSkip ? '' : 'none';
     this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
+    // Reset opacity and transition from any previous auto-dismiss sequence.
+    this._challengeModalEl.style.opacity = '1';
+    this._challengeModalEl.style.transition = '';
     this._challengeModalEl.style.display = 'flex';
     sfxManager.play(SfxId.Challenge);
     this._callbacks.triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
+    // After 2 s, begin a 1 s opacity fade-out; after 3 s total, auto-advance.
+    this._challengeFadeTimerId = setTimeout(() => {
+      this._challengeFadeTimerId = null;
+      this._challengeModalEl.style.transition = 'opacity 1s ease-out';
+      this._challengeModalEl.style.opacity = '0';
+      this._challengeCloseTimerId = setTimeout(() => {
+        this._challengeCloseTimerId = null;
+        this.playChallengeLevel();
+      }, 1000);
+    }, 2000);
+  }
+
+  /** Cancel any pending challenge auto-dismiss timers and reset opacity styles. */
+  private _cancelChallengeAutoPlay(): void {
+    if (this._challengeFadeTimerId !== null) {
+      clearTimeout(this._challengeFadeTimerId);
+      this._challengeFadeTimerId = null;
+    }
+    if (this._challengeCloseTimerId !== null) {
+      clearTimeout(this._challengeCloseTimerId);
+      this._challengeCloseTimerId = null;
+    }
+    this._challengeModalEl.style.opacity = '';
+    this._challengeModalEl.style.transition = '';
   }
 
   /**
