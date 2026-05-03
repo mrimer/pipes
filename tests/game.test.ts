@@ -341,6 +341,7 @@ type GameTestHooks = {
     _newChapterModalElInternal: HTMLElement;
     _challengeModalElInternal: HTMLElement;
     _challengeMsgElInternal: HTMLElement;
+    _challengePlayBtnElInternal: HTMLButtonElement;
     _challengeSkipBtnElInternal: HTMLButtonElement;
     _pendingLevelIdInternal: number | null;
     _playtestExitCallbackInternal: (() => void) | null;
@@ -2355,6 +2356,7 @@ describe('Game – challenge-level modal', () => {
     game.requestLevel(9002);
 
     const hooks = gameHooks(game);
+    expect(hooks._campaign._challengePlayBtnElInternal.style.display).toBe('none');
     expect(hooks._campaign._challengeSkipBtnElInternal.style.display).toBe('none');
     expect(hooks._campaign._challengeMsgElInternal.style.display).toBe('none');
   });
@@ -2368,6 +2370,7 @@ describe('Game – challenge-level modal', () => {
     game.nextLevel();
 
     const hooks = gameHooks(game);
+    expect(hooks._campaign._challengePlayBtnElInternal.style.display).not.toBe('none');
     expect(hooks._campaign._challengeSkipBtnElInternal.style.display).not.toBe('none');
     expect(hooks._campaign._challengeMsgElInternal.style.display).not.toBe('none');
   });

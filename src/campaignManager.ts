@@ -136,6 +136,7 @@ export class CampaignManager {
   private readonly _newChapterNameEl: HTMLElement;
   private readonly _challengeModalEl: HTMLElement;
   private readonly _challengeMsgEl: HTMLElement;
+  private readonly _challengePlayBtnEl: HTMLButtonElement;
   private readonly _challengeSkipBtnEl: HTMLButtonElement;
   /** Timer IDs for the challenge modal's auto-dismiss sequence (fade + close). */
   private _challengeFadeTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -167,6 +168,7 @@ export class CampaignManager {
     );
     this._challengeModalEl = challengeModal.el;
     this._challengeMsgEl = challengeModal.msgEl;
+    this._challengePlayBtnEl = challengeModal.playBtnEl;
     this._challengeSkipBtnEl = challengeModal.skipBtnEl;
   }
 
@@ -895,6 +897,8 @@ export class CampaignManager {
   /** @internal */
   get _challengeMsgElInternal(): HTMLElement { return this._challengeMsgEl; }
   /** @internal */
+  get _challengePlayBtnElInternal(): HTMLButtonElement { return this._challengePlayBtnEl; }
+  /** @internal */
   get _challengeSkipBtnElInternal(): HTMLButtonElement { return this._challengeSkipBtnEl; }
   /** @internal */
   get _pendingLevelIdInternal(): number | null { return this._pendingLevelId; }
@@ -957,7 +961,11 @@ export class CampaignManager {
 
   private _showChallengeLevelModal(canSkip: boolean): void {
     this._cancelChallengeAutoPlay();
-    this._challengeMsgEl.style.display    = canSkip ? '' : 'none';
+    // canSkip=true (sequential): show the message and both action buttons so the
+    // player must click to proceed.  canSkip=false (directly selected): hide
+    // them all and let the auto-fade sequence advance to the level.
+    this._challengeMsgEl.style.display     = canSkip ? '' : 'none';
+    this._challengePlayBtnEl.style.display = canSkip ? '' : 'none';
     this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
     // Reset opacity and transition from any previous auto-dismiss sequence.
     this._challengeModalEl.style.opacity = '1';
@@ -965,9 +973,7 @@ export class CampaignManager {
     this._challengeModalEl.style.display = 'flex';
     sfxManager.play(SfxId.Challenge);
     this._callbacks.triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
-    // When the level was directly selected (canSkip=false) there is no Skip
-    // button, so auto-advance after 2 s display + 1 s fade.  When canSkip is
-    // true the player decides by clicking Skip or the backdrop.
+    // When directly selected (canSkip=false) auto-advance after 2 s display + 1 s fade.
     if (!canSkip) {
       this._challengeFadeTimerId = setTimeout(() => {
         this._challengeFadeTimerId = null;
