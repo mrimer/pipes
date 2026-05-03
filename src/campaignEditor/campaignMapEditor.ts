@@ -423,7 +423,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       { palette: PipeShape.Source,      label: '💧 Source' },
       { palette: PipeShape.Sink,        label: '🏁 Sink' },
       { palette: CHAPTER_CHAMBER_PALETTE, label: '📂 Chapter' },
-      { palette: PipeShape.Tree,        label: '🌳 Tree' },
+      { palette: PipeShape.Tree,        label: '🌿 Tree' },
       { palette: PipeShape.Tree2,       label: '🌳 Tree 2' },
       { palette: PipeShape.Tree3,       label: '🌲 Tree 3' },
       { palette: PipeShape.Tree4,       label: '🌴 Tree 4' },
