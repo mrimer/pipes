@@ -2128,9 +2128,10 @@ export function renderBoard(
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
   _renderPass1Backgrounds(ctx, board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha);
-  // Win tile glow overlay: rendered above backgrounds but beneath all tile content.
-  winTileOverlayFn?.(ctx);
   _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn);
+  // Win tile glow overlay: rendered above Source/Sink/Chamber content but beneath
+  // pipe strokes, so it is visible on all connected tile types.
+  winTileOverlayFn?.(ctx);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);

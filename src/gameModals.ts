@@ -186,33 +186,38 @@ export function buildNewChapterModal(
 /**
  * Build and attach the challenge-level warning modal.
  *
- * When `canSkip` is false the modal auto-advances (no buttons); when true an
- * optional "Skip Level" button is shown and clicking outside the dialog box
- * plays the level instead.
+ * Two mutually-exclusive modes controlled by the caller via element visibility:
+ * - `canSkip=false` (directly selected): all buttons/message are hidden and the
+ *   modal auto-fades away after a short delay.
+ * - `canSkip=true`  (sequential flow):   "Play Level" and "Skip Level" buttons
+ *   plus the skip message are shown; the player must click one to dismiss.
  *
  * @param onPlay - Called when the player proceeds to play the challenge level.
  * @param onSkip - Called when the player chooses to skip the challenge.
- * @returns The overlay and the two elements that are toggled when the modal is
- *          shown in "can skip" vs "directly selected" mode.
+ * @returns The overlay and the three interactive elements toggled by the caller.
  */
 export function buildChallengeModal(
   onPlay: () => void,
   onSkip: () => void,
-): { el: HTMLElement; msgEl: HTMLElement; skipBtnEl: HTMLButtonElement } {
+): { el: HTMLElement; msgEl: HTMLElement; playBtnEl: HTMLButtonElement; skipBtnEl: HTMLButtonElement } {
   const { el, box, actionsEl } = buildModalShell('☠️ Challenge Level ☠️');
   const msgEl = document.createElement('p');
   msgEl.style.cssText = 'font-size:0.95rem;color:#aaa;';
   msgEl.textContent = 'This is an optional challenge level. You may skip it without affecting your progress.';
   box.insertBefore(msgEl, actionsEl);
+  const playBtnEl = document.createElement('button');
+  playBtnEl.textContent = 'Play Level';
+  playBtnEl.className = 'modal-btn';
+  playBtnEl.type = 'button';
+  playBtnEl.addEventListener('click', () => onPlay());
+  actionsEl.appendChild(playBtnEl);
   const skipBtnEl = document.createElement('button');
   skipBtnEl.textContent = 'Skip Level';
   skipBtnEl.className = 'modal-btn secondary';
   skipBtnEl.type = 'button';
   skipBtnEl.addEventListener('click', () => onSkip());
   actionsEl.appendChild(skipBtnEl);
-  // Clicking the dimmed backdrop (outside the dialog box) plays the level.
-  el.addEventListener('click', (e) => { if (e.target === el) onPlay(); });
-  return { el, msgEl, skipBtnEl };
+  return { el, msgEl, playBtnEl, skipBtnEl };
 }
 
 /**
