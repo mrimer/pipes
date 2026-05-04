@@ -1286,8 +1286,8 @@ function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction>
  * @param half        Half the tile size in pixels.
  * @param color       Stroke color for this arm.
  * @param buttEnd     When true, the tile-edge end is rendered flat by clipping
- *                    at the tile boundary.  The centre end always uses a natural
- *                    round linecap — no explicit centre cap circle is needed.
+ *                    at the tile boundary.  The center end always uses a natural
+ *                    round linecap — no explicit center cap circle is needed.
  */
 function _drawPipeArmInRotatedFrame(
   ctx: CanvasRenderingContext2D,
@@ -1320,8 +1320,8 @@ function _drawPipeArmInRotatedFrame(
   }
 
   // For a butt end at the tile edge, clip to the tile half-boundary in the arm's
-  // direction so the natural round linecap is trimmed flat there.  The centre end
-  // is left unconstrained so its round cap lands naturally — no explicit centre
+  // direction so the natural round linecap is trimmed flat there.  The center end
+  // is left unconstrained so its round cap lands naturally — no explicit center
   // cap circle is required.
   if (buttEnd) {
     // LARGE is a value safely outside the tile in any direction.
