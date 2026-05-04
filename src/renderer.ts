@@ -1285,6 +1285,9 @@ function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction>
  * @param tileRotation The tile's rotation in degrees (0 / 90 / 180 / 270).
  * @param half        Half the tile size in pixels.
  * @param color       Stroke color for this arm.
+ * @param buttEnd     When true, the tile-edge end is rendered flat by clipping
+ *                    at the tile boundary.  The centre end always uses a natural
+ *                    round linecap — no explicit centre cap circle is needed.
  */
 function _drawPipeArmInRotatedFrame(
   ctx: CanvasRenderingContext2D,
@@ -1292,6 +1295,7 @@ function _drawPipeArmInRotatedFrame(
   tileRotation: number,
   half: number,
   color: string,
+  buttEnd = false,
 ): void {
   // Convert the absolute direction to the local coordinate-system direction by
   // rotating it CCW by (tileRotation / 90) steps.  The canvas coordinate frame
@@ -1315,11 +1319,30 @@ function _drawPipeArmInRotatedFrame(
     default:              ex = -half; ey =    0; break; // West
   }
 
+  // For a butt end at the tile edge, clip to the tile half-boundary in the arm's
+  // direction so the natural round linecap is trimmed flat there.  The centre end
+  // is left unconstrained so its round cap lands naturally — no explicit centre
+  // cap circle is required.
+  if (buttEnd) {
+    // LARGE is a value safely outside the tile in any direction.
+    const LARGE = half * 2;
+    ctx.save();
+    ctx.beginPath();
+    if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + half, LARGE * 2);
+    else if (ex < 0) ctx.rect(-half,  -LARGE, LARGE + half, LARGE * 2);
+    else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2,    LARGE + half);
+    else             ctx.rect(-LARGE, -half,  LARGE * 2,    LARGE + half);
+    ctx.clip();
+  }
+
   ctx.strokeStyle = color;
+  ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(ex, ey);
   ctx.stroke();
+
+  if (buttEnd) ctx.restore();
 }
 
 /**
@@ -1868,30 +1891,22 @@ export function drawTile(
     const sortedArms = [...tile.connections].sort(
       (a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0),
     );
-    // Step 1: all arm black outlines
+    // Step 1: all arm black outlines.  Each arm uses lineCap='round' at the
+    // centre end (natural semicircle cap) and a clip-based flat end at the tile
+    // edge when buttEnd is true.  The natural round caps from all arms together
+    // cover the centre junction — no explicit centre cap circle is needed.
     ctx.lineWidth = LINE_WIDTH + _s(3);
-    ctx.strokeStyle = 'black';
     for (const armDir of tile.connections) {
-      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black');
+      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black',
+        effectiveButtEndDirs?.has(armDir) ?? false);
     }
-    // Step 2: black center cap covers the junction seam between arm outlines
-    ctx.fillStyle = 'black';
-    ctx.beginPath();
-    ctx.arc(0, 0, (LINE_WIDTH + _s(3)) / 2, 0, Math.PI * 2);
-    ctx.fill();
-    // Step 3: all arm color fills (blocked arm first; dominant water color last)
+    // Step 2: all arm color fills (blocked arm first; dominant water color last).
     ctx.lineWidth = LINE_WIDTH;
     for (const armDir of sortedArms) {
       const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
-      ctx.lineCap = effectiveButtEndDirs?.has(armDir) ? 'butt' : 'round';
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor);
+      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor,
+        effectiveButtEndDirs?.has(armDir) ?? false);
     }
-    // Step 4: pipe-color center cap fills the junction interior
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
-    ctx.fill();
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
     }
