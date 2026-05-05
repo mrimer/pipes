@@ -1894,7 +1894,7 @@ export function drawTile(
     // Step 1: all arm black outlines.  Each arm uses lineCap='round' at the
     // centre end (natural semicircle cap) and a clip-based flat end at the tile
     // edge when buttEnd is true.  The natural round caps from all arms together
-    // cover the centre junction — no explicit centre cap circle is needed.
+    // cover the centre junction without visible seaming.
     ctx.lineWidth = LINE_WIDTH + _s(3);
     for (const armDir of tile.connections) {
       _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black',
