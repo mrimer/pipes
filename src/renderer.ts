@@ -1671,7 +1671,10 @@ export function drawPipeBody(
   // Clip to the tile boundary on each butt-end direction so the black stroke
   // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
   // left unconstrained so rounded caps can extend freely into empty space.
-  const LARGE = half + LINE_WIDTH;
+  // When a shadow (e.g. the ghost-placement glow) is active, expand the free
+  // edges by the blur radius so the glow is not clipped.
+  const shadowClipExpansion = ctx.shadowBlur;
+  const LARGE = half + LINE_WIDTH + shadowClipExpansion;
   const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
   const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
   const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
