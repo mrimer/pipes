@@ -10,7 +10,7 @@ import {
   WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   SOURCE_CONNECTOR_LIT, SOURCE_WATER_CONNECTOR_LIT,
   SINK_CONNECTOR_LIT, SINK_WATER_CONNECTOR_LIT,
-  GOLD_PIPE_WATER_COLOR, FIXED_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR,
+  GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR,
   GOLD_BUBBLE_COLOR,
 } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, drawConnectorGlow, connectorLitIndex } from './renderer';
@@ -312,7 +312,7 @@ export class AnimationManager {
       if (tile) {
         if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
         else if (LEAKY_PIPE_SHAPES.has(tile.shape)) waterColor = LEAKY_PIPE_WATER_COLOR;
-        else if (SPIN_PIPE_SHAPES.has(tile.shape) || tile.isFixed) waterColor = FIXED_PIPE_WATER_COLOR;
+        else if (SPIN_PIPE_SHAPES.has(tile.shape) || tile.isFixed) waterColor = WATER_COLOR;
       }
       this._fillAnims.push({
         row, col, entryDir, blockedDir, isSink, waterColor,
