@@ -25,7 +25,7 @@ import {
   SNOW_COLOR,
   CHAMBER_COLOR,
   CHAMBER_FILL_COLOR,
-  GRANITE_COLOR,
+  GRANITE_FILL_COLOR,
   CEMENT_FILL_COLOR,
   GOLD_SPACE_BASE_COLOR,
   GOLD_PIPE_COLOR,
@@ -219,7 +219,7 @@ function tileColor(tile: TileDef | null, r: number, c: number, floorType: PipeSh
         default:          return CHAMBER_COLOR;
       }
     case PipeShape.Granite:
-      return GRANITE_COLOR;
+      return GRANITE_FILL_COLOR;
     case PipeShape.Sea:
       return seaColor(floorType);
     case PipeShape.Cement:
