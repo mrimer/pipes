@@ -145,8 +145,8 @@ function treeVariantColor(shape: PipeShape, style: LevelStyle | undefined): stri
 /** Returns the fill color for Sea (water) tiles, derived from the cell's floor type. */
 function seaColor(floorType: PipeShape): string {
   if (floorType === PipeShape.EmptyWinter) return SEA_FILL_COLOR_WINTER;
-  if (floorType === PipeShape.EmptyFall)   return SEA_FILL_COLOR_FALL;
-  if (floorType === PipeShape.EmptyDark)   return SEA_FILL_COLOR_DARK;
+  if (floorType === PipeShape.EmptyFall) return SEA_FILL_COLOR_FALL;
+  if (floorType === PipeShape.EmptyDark) return SEA_FILL_COLOR_DARK;
   if (floorType === PipeShape.EmptySpring) return SEA_FILL_COLOR_SPRING;
   return SEA_FILL_COLOR;
 }
