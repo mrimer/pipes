@@ -7,16 +7,12 @@
  * has been scaled, so it remains crisp at any display size.
  */
 
-import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef } from '../types';
+import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef, styleToFloorShape } from '../types';
 import { getConnections } from '../tile';
-import { GOLD_PIPE_SHAPES } from '../board';
+import { GOLD_PIPE_SHAPES, isEmptyFloor, computeFloorTypesFromGrid, posKey } from '../board';
+import { ginghamColorsForFloor } from '../renderer';
 import {
   EMPTY_COLOR,
-  EMPTY_COLOR_DARK,
-  EMPTY_FALL_COLOR_DARK,
-  EMPTY_DARK_COLOR_DARK,
-  EMPTY_WINTER_COLOR_DARK,
-  EMPTY_SPRING_COLOR_DARK,
   PIPE_COLOR,
   FIXED_PIPE_COLOR,
   SOURCE_COLOR,
@@ -60,7 +56,6 @@ import {
   TREE4_DARK_COLOR,
   TREE4_WINTER_COLOR,
   TREE4_SPRING_COLOR,
-  ONE_WAY_BG_COLOR,
   LEAKY_PIPE_COLOR,
   ONE_WAY_ARROW_COLOR,
   SEA_FILL_COLOR,
@@ -94,13 +89,11 @@ export function minimapDimensions(rows: number, cols: number): { width: number; 
   };
 }
 
-/** Returns the style-dependent color for default empty floor tiles. */
-function emptyColor(style: LevelStyle | undefined): string {
-  if (style === 'Fall') return EMPTY_FALL_COLOR_DARK;
-  if (style === 'Dark') return EMPTY_DARK_COLOR_DARK;
-  if (style === 'Winter') return EMPTY_WINTER_COLOR_DARK;
-  if (style === 'Spring') return EMPTY_SPRING_COLOR_DARK;
-  return EMPTY_COLOR_DARK;
+/** Returns the parity-based gingham shade for a tile at grid position (r, c). */
+function ginghamShadeForCell(r: number, c: number, floorType: PipeShape): string {
+  const [colorLight, colorMid, colorDark] = ginghamColorsForFloor(floorType);
+  const paritySum = (r % 2) + (c % 2);
+  return paritySum === 0 ? colorLight : paritySum === 2 ? colorDark : colorMid;
 }
 
 /** Returns the darker tree color for the given level style. */
@@ -149,12 +142,12 @@ function treeVariantColor(shape: PipeShape, style: LevelStyle | undefined): stri
   return tree2Color(style);
 }
 
-/** Returns the style-dependent fill color for Sea (water) tiles. */
-function seaColor(style: LevelStyle | undefined): string {
-  if (style === 'Winter') return SEA_FILL_COLOR_WINTER;
-  if (style === 'Fall') return SEA_FILL_COLOR_FALL;
-  if (style === 'Dark') return SEA_FILL_COLOR_DARK;
-  if (style === 'Spring') return SEA_FILL_COLOR_SPRING;
+/** Returns the fill color for Sea (water) tiles, derived from the cell's floor type. */
+function seaColor(floorType: PipeShape): string {
+  if (floorType === PipeShape.EmptyWinter) return SEA_FILL_COLOR_WINTER;
+  if (floorType === PipeShape.EmptyFall)   return SEA_FILL_COLOR_FALL;
+  if (floorType === PipeShape.EmptyDark)   return SEA_FILL_COLOR_DARK;
+  if (floorType === PipeShape.EmptySpring) return SEA_FILL_COLOR_SPRING;
   return SEA_FILL_COLOR;
 }
 
@@ -186,13 +179,9 @@ function chamberOutlineColor(tile: TileDef): string {
 /** Returns the fill color to use for a grid tile on the minimap.
  * Used for drawing a uniform pixel when tile size < MIN_PX_FOR_LINES.
  */
-function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string {
-  if (!tile) return emptyColor(style);
-  if (tile.shape === PipeShape.EmptyFall) return EMPTY_FALL_COLOR_DARK;
-  if (tile.shape === PipeShape.EmptyDark) return EMPTY_DARK_COLOR_DARK;
-  if (tile.shape === PipeShape.EmptyWinter) return EMPTY_WINTER_COLOR_DARK;
-  if (tile.shape === PipeShape.EmptySpring) return EMPTY_SPRING_COLOR_DARK;
-  if (tile.shape === PipeShape.Empty) return emptyColor(style);
+function tileColor(tile: TileDef | null, r: number, c: number, floorType: PipeShape): string {
+  if (!tile) return ginghamShadeForCell(r, c, floorType);
+  if (isEmptyFloor(tile.shape)) return ginghamShadeForCell(r, c, floorType);
   switch (tile.shape) {
     case PipeShape.Straight:
     case PipeShape.Elbow:
@@ -231,20 +220,12 @@ function tileColor(tile: TileDef | null, style: LevelStyle | undefined): string 
       }
     case PipeShape.Granite:
       return GRANITE_COLOR;
-    case PipeShape.Tree:
-      return treeColor(style);
-    case PipeShape.Tree2:
-      return tree2Color(style);
-    case PipeShape.Tree3:
-      return tree3Color(style);
-    case PipeShape.Tree4:
-      return tree4Color(style);
     case PipeShape.Sea:
-      return seaColor(style);
+      return seaColor(floorType);
     case PipeShape.Cement:
       return CEMENT_FILL_COLOR;
     case PipeShape.OneWay:
-      return ONE_WAY_BG_COLOR;
+      return ginghamShadeForCell(r, c, floorType);
     case PipeShape.GoldSpace:
       return GOLD_SPACE_BASE_COLOR;
     case PipeShape.GoldStraight:
@@ -280,11 +261,12 @@ function drawOneWayChevron(
   y: number,
   px: number,
   rotation: Rotation,
+  ginghamBg: string,
 ): void {
   const dirs = [Direction.North, Direction.East, Direction.South, Direction.West] as const;
   const dir = dirs[rotation / 90] ?? Direction.North;
 
-  ctx.fillStyle = ONE_WAY_BG_COLOR;
+  ctx.fillStyle = ginghamBg;
   ctx.fillRect(x, y, px, px);
 
   const margin = Math.max(1, Math.round(px * 0.15));
@@ -450,6 +432,19 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
   }
 
   const style = level.style;
+  const defaultFloor = styleToFloorShape(style);
+
+  // Pre-compute the BFS-inferred floor type for every cell so that gingham
+  // colors (and the sea-tile palette) match what the main game renderer shows.
+  const floorTypes = computeFloorTypesFromGrid(
+    level.rows, level.cols,
+    (r, c) => {
+      const cell = level.grid[r]?.[c] ?? null;
+      if (cell === null) return defaultFloor;        // null cell = default empty floor
+      return isEmptyFloor(cell.shape) ? cell.shape : null; // non-empty cells: BFS infers
+    },
+    defaultFloor,
+  );
 
   // Draw each tile as a colored rectangle; pipe tiles get connection-line art when large enough.
   for (let r = 0; r < level.rows; r++) {
@@ -457,24 +452,25 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
       const tile = (level.grid[r]?.[c]) ?? null;
       const tx = c * px;
       const ty = r * px;
+      const floorType = floorTypes.get(posKey(r, c)) ?? defaultFloor;
       if (tile && px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape)) {
         drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0) as Rotation);
       } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay) {
-        drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0) as Rotation);
+        drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0) as Rotation, ginghamShadeForCell(r, c, floorType));
       } else if (tile && tile.shape === PipeShape.Tree) {
-        // Fill the cell with the empty background color first, then draw a circle on top.
-        ctx.fillStyle = emptyColor(style);
+        // Fill the cell with the gingham background color first, then draw a circle on top.
+        ctx.fillStyle = ginghamShadeForCell(r, c, floorType);
         ctx.fillRect(tx, ty, px, px);
         drawTree(ctx, tx, ty, px, treeColor(style));
       } else if (tile && (tile.shape === PipeShape.Tree2 || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4)) {
-        ctx.fillStyle = emptyColor(style);
+        ctx.fillStyle = ginghamShadeForCell(r, c, floorType);
         ctx.fillRect(tx, ty, px, px);
         drawTree(ctx, tx, ty, px, treeVariantColor(tile.shape, style));
       } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.Chamber) {
         drawContainer(ctx, tx, ty, px, chamberOutlineColor(tile));
       } else {
         // Draw the tile as a uniform pixel.
-        ctx.fillStyle = tileColor(tile, style);
+        ctx.fillStyle = tileColor(tile, r, c, floorType);
         ctx.fillRect(tx, ty, px, px);
       }
     }
