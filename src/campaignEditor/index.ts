@@ -722,7 +722,11 @@ export class CampaignEditor {
         style: chapter.style,
       };
       const minimap = renderMinimap(pseudoLevel);
-      minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;border:2px solid white;';
+      minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;cursor:pointer;border:2px solid white;';
+      minimap.addEventListener('click', () => {
+        this._activeChapterIdx = chapterIdx;
+        this._showChapterDetail();
+      });
       info.appendChild(minimap);
     }
 
