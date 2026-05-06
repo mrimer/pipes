@@ -844,45 +844,21 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.rotate((tile.rotation * Math.PI) / 180);
     const h = CELL / 2;
     if (buttEndDirs !== undefined) {
-      // Per-arm drawing: draw each arm individually from center to edge.  All
-      // arms use lineCap='round' so their natural semicircular caps merge
-      // seamlessly at the center junction — no explicit cap circle is needed.
-      // For butt ends (arms that abut a reciprocal neighbor), the round cap at
-      // the tile edge is trimmed flat by clipping to the tile half-boundary in
-      // that direction; the center cap is left unconstrained.
-      // The canvas is already rotated by tile.rotation, so each absolute
-      // direction is un-rotated CCW to the local canvas frame.
-      ctx.lineCap = 'round';
-      const LARGE = h * 2;
+      // The canvas is already rotated by tile.rotation; un-rotate absolute
+      // directions CCW to the local canvas frame before delegating to the helper.
       const rotSteps = ((tile.rotation / 90) % 4 + 4) % 4;
       const ccwSteps = (4 - rotSteps) % 4;
-      for (const absDir of tile.connections) {
-        const isButtEnd = buttEndDirs.has(absDir);
-        let localDir = absDir;
-        for (let i = 0; i < ccwSteps; i++) localDir = rotateDirection(localDir);
-        let ex = 0;
-        let ey = 0;
-        if      (localDir === Direction.North) { ex =  0; ey = -h; }
-        else if (localDir === Direction.East)  { ex =  h; ey =  0; }
-        else if (localDir === Direction.South) { ex =  0; ey =  h; }
-        else                                   { ex = -h; ey =  0; }
-        if (isButtEnd) {
-          // Clip to the tile half-boundary in the arm's direction so the round
-          // linecap at the tile edge is trimmed flat there.
-          ctx.save();
-          ctx.beginPath();
-          if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + h, LARGE * 2);
-          else if (ex < 0) ctx.rect(-h,     -LARGE, LARGE + h, LARGE * 2);
-          else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2, LARGE + h);
-          else             ctx.rect(-LARGE, -h,     LARGE * 2, LARGE + h);
-          ctx.clip();
-        }
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(ex, ey);
-        ctx.stroke();
-        if (isButtEnd) ctx.restore();
-      }
+      const toLocal = (dir: Direction): Direction => {
+        let ld = dir;
+        for (let i = 0; i < ccwSteps; i++) ld = rotateDirection(ld);
+        return ld;
+      };
+      _drawButtEndPipeArms(
+        ctx,
+        new Set([...tile.connections].map(toLocal)),
+        new Set([...buttEndDirs].map(toLocal)),
+        h,
+      );
     } else {
       ctx.lineCap = 'round';
       if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight || shape === PipeShape.SpinStraightCement) {
@@ -966,6 +942,54 @@ function drawConnectionLines(ctx: CanvasRenderingContext2D, x: number, y: number
 }
 
 /**
+ * Draw per-arm pipe strokes in a canvas context already translated to the
+ * tile centre.  All arms use lineCap='round' so their natural semicircular
+ * caps merge seamlessly at the centre junction — no explicit cap circle is
+ * needed.  Arms listed in localButtEndDirs are clipped to the tile
+ * half-boundary so the round cap at the tile edge is trimmed flat there
+ * while the centre cap is left unconstrained.
+ *
+ * @param ctx              2D context (origin = tile centre, no rotation applied).
+ * @param localConnections Arm directions in the local (already-unrotated) canvas frame.
+ * @param localButtEndDirs Subset of localConnections that abut a reciprocal neighbour.
+ * @param h                Half the tile size in canvas pixels (= tile-centre offset).
+ */
+function _drawButtEndPipeArms(
+  ctx: CanvasRenderingContext2D,
+  localConnections: ReadonlySet<Direction>,
+  localButtEndDirs: ReadonlySet<Direction> | undefined,
+  h: number,
+): void {
+  const LARGE = h * 2;
+  ctx.lineCap = 'round';
+  for (const dir of localConnections) {
+    const isButtEnd = localButtEndDirs?.has(dir) ?? false;
+    let ex = 0;
+    let ey = 0;
+    if      (dir === Direction.North) { ex =  0; ey = -h; }
+    else if (dir === Direction.East)  { ex =  h; ey =  0; }
+    else if (dir === Direction.South) { ex =  0; ey =  h; }
+    else                              { ex = -h; ey =  0; }
+    if (isButtEnd) {
+      // Clip to the tile half-boundary so the round cap at the tile edge is
+      // trimmed flat there; the centre cap is left unconstrained.
+      ctx.save();
+      ctx.beginPath();
+      if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + h, LARGE * 2);
+      else if (ex < 0) ctx.rect(-h,     -LARGE, LARGE + h, LARGE * 2);
+      else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2, LARGE + h);
+      else             ctx.rect(-LARGE, -h,     LARGE * 2, LARGE + h);
+      ctx.clip();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    if (isButtEnd) ctx.restore();
+  }
+}
+
+/**
  * Draw a pipe tile on the chapter map editor canvas using per-arm strokes
  * with optional butt-end caps for arms connecting to adjacent non-empty tiles.
  * Uses global (absolute) arm directions so the canvas does not need to be
@@ -1001,23 +1025,12 @@ function _drawChapterEditorPipeTile(
                  : isLeaky ? (isFilled ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
                  : (isFilled ? WATER_COLOR : PIPE_COLOR);
 
-  // Draw each arm center-to-edge with per-arm linecap (butt or round)
+  // Draw arms: chapter map pipes use absolute directions (no tile rotation), so
+  // local canvas frame = absolute frame; pass connections directly to the helper.
   ctx.strokeStyle = pipeColor;
   ctx.lineWidth = LINE_WIDTH;
-  for (const dir of connections) {
-    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    if (dir === Direction.North) ctx.lineTo(cx, y);
-    else if (dir === Direction.South) ctx.lineTo(cx, y + CELL);
-    else if (dir === Direction.East)  ctx.lineTo(x + CELL, cy);
-    else if (dir === Direction.West)  ctx.lineTo(x, cy);
-    ctx.stroke();
-  }
-
-  // Center junction dot fills the seam between arms
-  ctx.fillStyle = pipeColor;
-  ctx.beginPath();
-  ctx.arc(cx, cy, _s(5), 0, Math.PI * 2);
-  ctx.fill();
+  ctx.save();
+  ctx.translate(cx, cy);
+  _drawButtEndPipeArms(ctx, connections, buttEndDirs, CELL / 2);
+  ctx.restore();
 }
