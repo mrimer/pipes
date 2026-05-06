@@ -49,7 +49,7 @@ import {
 } from './canvasUtils';
 import { isTileConnectedToSource } from '../tile';
 import { buildCompletionInputWidget } from './chapterEditorUI';
-import { handleMapEditorKeyDown, applyMapValidationState } from './mapEditorSectionUtils';
+import { handleMapEditorKeyDown, applyMapValidationState, buildPaletteSubSection } from './mapEditorSectionUtils';
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
 import { MapEditorBase } from './mapEditorBase';
 
@@ -86,6 +86,10 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
   // ── Style panel state ─────────────────────────────────────────────────────
   private _styleSectionExpanded = false;
+
+  // ── Palette sub-section expand state ──────────────────────────────────────
+  private _floorSectionExpanded = false;
+  private _pipesSectionExpanded = false;
 
   // ── Map box collapsed state ────────────────────────────────────────────────
   private _mapBoxCollapsed = false;
@@ -414,34 +418,39 @@ export class CampaignMapEditorSection extends MapEditorBase {
     titleEl.textContent = 'TILE PALETTE';
     panel.appendChild(titleEl);
 
-    const CAMPAIGN_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-      { palette: PipeShape.Empty,        label: '🟩 Empty - Summer' },
-      { palette: PipeShape.EmptyFall,    label: '🍂 Empty - Fall' },
-      { palette: PipeShape.EmptyDark,    label: '⬛ Empty - Dark' },
-      { palette: PipeShape.EmptyWinter,  label: '⬜ Empty - Winter' },
-      { palette: PipeShape.EmptySpring,  label: '🌸 Empty - Spring' },
-      { palette: PipeShape.Source,      label: '💧 Source' },
-      { palette: PipeShape.Sink,        label: '🏁 Sink' },
-      { palette: CHAPTER_CHAMBER_PALETTE, label: '📂 Chapter' },
+    const FLOOR_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+      { palette: PipeShape.Empty,       label: '🟩 Empty - Summer' },
+      { palette: PipeShape.EmptyFall,   label: '🍂 Empty - Fall' },
+      { palette: PipeShape.EmptyDark,   label: '⬛ Empty - Dark' },
+      { palette: PipeShape.EmptyWinter, label: '⬜ Empty - Winter' },
+      { palette: PipeShape.EmptySpring, label: '🌸 Empty - Spring' },
+      { palette: PipeShape.Sea,         label: '🌊 Sea' },
+      { palette: PipeShape.Granite,     label: '🪨 Granite' },
       { palette: PipeShape.Tree,        label: '🌿 Tree' },
       { palette: PipeShape.Tree2,       label: '🌳 Tree 2' },
       { palette: PipeShape.Tree3,       label: '🌲 Tree 3' },
       { palette: PipeShape.Tree4,       label: '🌴 Tree 4' },
-      { palette: PipeShape.Sea,         label: '🌊 Sea' },
-      { palette: PipeShape.Granite,     label: '🪨 Granite' },
-      { palette: PipeShape.Straight,    label: '━ Straight' },
-      { palette: PipeShape.Elbow,       label: '┗ Elbow' },
-      { palette: PipeShape.Tee,         label: '┣ Tee' },
-      { palette: PipeShape.Cross,       label: '╋ Cross' },
     ];
 
-    for (const item of CAMPAIGN_PALETTE_ITEMS) {
+    const PIPES_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+      { palette: PipeShape.Straight, label: '━ Straight' },
+      { palette: PipeShape.Elbow,    label: '┗ Elbow' },
+      { palette: PipeShape.Tee,      label: '┣ Tee' },
+      { palette: PipeShape.Cross,    label: '╋ Cross' },
+    ];
+
+    // Auto-expand section containing the currently selected palette item.
+    if (FLOOR_ITEMS.some(i => i.palette === this._palette)) this._floorSectionExpanded = true;
+    if (PIPES_ITEMS.some(i => i.palette === this._palette)) this._pipesSectionExpanded = true;
+
+    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = item.label;
       const isSelected = this._palette === item.palette;
       btn.style.cssText =
         `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
+        (indent ? 'margin-left:12px;' : '') +
         'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
         'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
@@ -457,8 +466,33 @@ export class CampaignMapEditorSection extends MapEditorBase {
           ?.replaceWith(this._buildChapterInventoryPanel(campaign));
         this._renderCanvas();
       });
-      panel.appendChild(btn);
+      return btn;
+    };
+
+    // Source and Sink at the top
+    for (const item of [
+      { palette: PipeShape.Source as EditorPalette, label: '💧 Source' },
+      { palette: PipeShape.Sink   as EditorPalette, label: '🏁 Sink' },
+    ]) {
+      panel.appendChild(makeItemBtn(item));
     }
+
+    // Chapter chamber item
+    panel.appendChild(makeItemBtn({ palette: CHAPTER_CHAMBER_PALETTE, label: '📂 Chapter' }));
+
+    // Collapsible Floor sub-menu
+    buildPaletteSubSection(
+      panel, 'Floor', this._floorSectionExpanded,
+      () => { this._floorSectionExpanded = !this._floorSectionExpanded; panel.replaceWith(this._buildPalettePanel(campaign)); },
+      '#888', '#1a1a1a', '#ccc', FLOOR_ITEMS, makeItemBtn,
+    );
+
+    // Collapsible Pipes sub-menu
+    buildPaletteSubSection(
+      panel, 'Pipes', this._pipesSectionExpanded,
+      () => { this._pipesSectionExpanded = !this._pipesSectionExpanded; panel.replaceWith(this._buildPalettePanel(campaign)); },
+      '#4a90d9', '#0a1520', '#4a90d9', PIPES_ITEMS, makeItemBtn,
+    );
 
     return panel;
   }

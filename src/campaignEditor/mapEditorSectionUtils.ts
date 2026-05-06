@@ -7,9 +7,10 @@
  */
 
 import { TileDef } from '../types';
+import { EditorPalette } from './types';
 import { PIPE_SHAPES } from '../board';
 import { commandKeyManager } from '../commandKeyManager';
-import { UI_BG } from '../uiConstants';
+import { RADIUS_SM, UI_BG } from '../uiConstants';
 
 // ─── Keyboard handler ──────────────────────────────────────────────────────────
 
@@ -115,5 +116,51 @@ export function applyMapValidationState(
     validateBtn.style.borderColor = '#ff8c00';
     validateBtn.style.background = UI_BG;
     warningIcon.style.display = '';
+  }
+}
+
+// ─── Palette sub-section helper ────────────────────────────────────────────────
+
+/**
+ * Append a collapsible sub-section header and (when expanded) its item buttons
+ * to the given palette panel.
+ *
+ * @param parent       The palette panel element to append into.
+ * @param label        The section header label (e.g. "Floor").
+ * @param expanded     Whether the section is currently expanded.
+ * @param onToggle     Called when the user clicks the toggle; should flip the
+ *                     expanded flag then rebuild the palette.
+ * @param borderColor  CSS color for the toggle button border.
+ * @param bgColor      CSS background color for the toggle button.
+ * @param textColor    CSS text color for the toggle button.
+ * @param items        Palette items to show when expanded.
+ * @param makeItemBtn  Factory that creates a styled button for a single item.
+ *                     The second argument signals that the button should be
+ *                     indented beneath the section header.
+ */
+export function buildPaletteSubSection(
+  parent: HTMLElement,
+  label: string,
+  expanded: boolean,
+  onToggle: () => void,
+  borderColor: string,
+  bgColor: string,
+  textColor: string,
+  items: { palette: EditorPalette; label: string }[],
+  makeItemBtn: (item: { palette: EditorPalette; label: string }, indent?: boolean) => HTMLButtonElement,
+): void {
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.textContent = (expanded ? '▾' : '▸') + ' ' + label;
+  toggle.style.cssText =
+    `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
+    `border:1px solid ${borderColor};background:${bgColor};color:${textColor};font-weight:bold;margin-top:2px;`;
+  toggle.addEventListener('click', onToggle);
+  parent.appendChild(toggle);
+
+  if (expanded) {
+    for (const item of items) {
+      parent.appendChild(makeItemBtn(item, true));
+    }
   }
 }

@@ -21,6 +21,7 @@ import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
+import { buildPaletteSubSection } from './mapEditorSectionUtils';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -96,6 +97,8 @@ export interface ChapterEditorUICallbacks {
 
 export class ChapterEditorUI {
   styleSectionExpanded = false;
+  floorSectionExpanded = false;
+  pipesSectionExpanded = false;
 
   constructor(private readonly _cb: ChapterEditorUICallbacks) {}
 
@@ -140,34 +143,41 @@ export class ChapterEditorUI {
     title.textContent = 'TILE PALETTE';
     panel.appendChild(title);
 
-    const CHAPTER_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
-      { palette: PipeShape.Empty,        label: '🟩 Empty - Summer' },
-      { palette: PipeShape.EmptyFall,    label: '🍂 Empty - Fall' },
-      { palette: PipeShape.EmptyDark,    label: '⬛ Empty - Dark' },
-      { palette: PipeShape.EmptyWinter,  label: '⬜ Empty - Winter' },
-      { palette: PipeShape.EmptySpring,  label: '🌸 Empty - Spring' },
-      { palette: PipeShape.Source,       label: '💧 Source' },
-      { palette: PipeShape.Sink,         label: '🏁 Sink' },
-      { palette: LEVEL_CHAMBER_PALETTE,  label: '🚪 Level' },
-      { palette: PipeShape.Tree,         label: '🌿 Tree' },
-      { palette: PipeShape.Tree2,        label: '🌳 Tree 2' },
-      { palette: PipeShape.Tree3,        label: '🌲 Tree 3' },
-      { palette: PipeShape.Tree4,        label: '🌴 Tree 4' },
-      { palette: PipeShape.Sea,          label: '🌊 Sea' },
-      { palette: PipeShape.Granite,      label: '🪨 Granite' },
-      { palette: PipeShape.Straight,     label: '━ Straight' },
-      { palette: PipeShape.Elbow,        label: '┗ Elbow' },
-      { palette: PipeShape.Tee,          label: '┣ Tee' },
-      { palette: PipeShape.Cross,        label: '╋ Cross' },
+    const FLOOR_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+      { palette: PipeShape.Empty,       label: '🟩 Empty - Summer' },
+      { palette: PipeShape.EmptyFall,   label: '🍂 Empty - Fall' },
+      { palette: PipeShape.EmptyDark,   label: '⬛ Empty - Dark' },
+      { palette: PipeShape.EmptyWinter, label: '⬜ Empty - Winter' },
+      { palette: PipeShape.EmptySpring, label: '🌸 Empty - Spring' },
+      { palette: PipeShape.Sea,         label: '🌊 Sea' },
+      { palette: PipeShape.Granite,     label: '🪨 Granite' },
+      { palette: PipeShape.Tree,        label: '🌿 Tree' },
+      { palette: PipeShape.Tree2,       label: '🌳 Tree 2' },
+      { palette: PipeShape.Tree3,       label: '🌲 Tree 3' },
+      { palette: PipeShape.Tree4,       label: '🌴 Tree 4' },
     ];
 
-    for (const item of CHAPTER_PALETTE_ITEMS) {
+    const PIPES_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
+      { palette: PipeShape.Straight, label: '━ Straight' },
+      { palette: PipeShape.Elbow,    label: '┗ Elbow' },
+      { palette: PipeShape.Tee,      label: '┣ Tee' },
+      { palette: PipeShape.Cross,    label: '╋ Cross' },
+    ];
+
+    const currentPalette = this._cb.getChapterPalette();
+
+    // Auto-expand section containing the currently selected palette item.
+    if (FLOOR_ITEMS.some(i => i.palette === currentPalette)) this.floorSectionExpanded = true;
+    if (PIPES_ITEMS.some(i => i.palette === currentPalette)) this.pipesSectionExpanded = true;
+
+    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = item.label;
-      const isSelected = this._cb.getChapterPalette() === item.palette;
+      const isSelected = currentPalette === item.palette;
       btn.style.cssText =
         `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
+        (indent ? 'margin-left:12px;' : '') +
         'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
         'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
         'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
@@ -182,8 +192,33 @@ export class ChapterEditorUI {
         this.rebuildLevelInventory(chapter, campaign);
         this._cb.renderCanvas();
       });
-      panel.appendChild(btn);
+      return btn;
+    };
+
+    // Source and Sink at the top
+    for (const item of [
+      { palette: PipeShape.Source as EditorPalette, label: '💧 Source' },
+      { palette: PipeShape.Sink   as EditorPalette, label: '🏁 Sink' },
+    ]) {
+      panel.appendChild(makeItemBtn(item));
     }
+
+    // Level chamber item
+    panel.appendChild(makeItemBtn({ palette: LEVEL_CHAMBER_PALETTE, label: '🚪 Level' }));
+
+    // Collapsible Floor sub-menu
+    buildPaletteSubSection(
+      panel, 'Floor', this.floorSectionExpanded,
+      () => { this.floorSectionExpanded = !this.floorSectionExpanded; panel.replaceWith(this.buildPalettePanel(chapter, campaign)); },
+      '#888', '#1a1a1a', '#ccc', FLOOR_ITEMS, makeItemBtn,
+    );
+
+    // Collapsible Pipes sub-menu
+    buildPaletteSubSection(
+      panel, 'Pipes', this.pipesSectionExpanded,
+      () => { this.pipesSectionExpanded = !this.pipesSectionExpanded; panel.replaceWith(this.buildPalettePanel(chapter, campaign)); },
+      '#4a90d9', '#0a1520', '#4a90d9', PIPES_ITEMS, makeItemBtn,
+    );
 
     return panel;
   }
