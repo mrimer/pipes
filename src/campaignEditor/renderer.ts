@@ -844,29 +844,45 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
     ctx.rotate((tile.rotation * Math.PI) / 180);
     const h = CELL / 2;
     if (buttEndDirs !== undefined) {
-      // Per-arm drawing: draw each arm individually from center to edge so each
-      // can have its own lineCap (butt for reciprocal connections, round for open ends).
-      // The canvas is already rotated by tile.rotation, so we convert each absolute
-      // direction back to a local canvas direction by un-rotating CCW.
+      // Per-arm drawing: draw each arm individually from center to edge.  All
+      // arms use lineCap='round' so their natural semicircular caps merge
+      // seamlessly at the center junction — no explicit cap circle is needed.
+      // For butt ends (arms that abut a reciprocal neighbor), the round cap at
+      // the tile edge is trimmed flat by clipping to the tile half-boundary in
+      // that direction; the center cap is left unconstrained.
+      // The canvas is already rotated by tile.rotation, so each absolute
+      // direction is un-rotated CCW to the local canvas frame.
+      ctx.lineCap = 'round';
+      const LARGE = h * 2;
       const rotSteps = ((tile.rotation / 90) % 4 + 4) % 4;
       const ccwSteps = (4 - rotSteps) % 4;
       for (const absDir of tile.connections) {
-        ctx.lineCap = buttEndDirs.has(absDir) ? 'butt' : 'round';
+        const isButtEnd = buttEndDirs.has(absDir);
         let localDir = absDir;
         for (let i = 0; i < ccwSteps; i++) localDir = rotateDirection(localDir);
+        let ex = 0;
+        let ey = 0;
+        if      (localDir === Direction.North) { ex =  0; ey = -h; }
+        else if (localDir === Direction.East)  { ex =  h; ey =  0; }
+        else if (localDir === Direction.South) { ex =  0; ey =  h; }
+        else                                   { ex = -h; ey =  0; }
+        if (isButtEnd) {
+          // Clip to the tile half-boundary in the arm's direction so the round
+          // linecap at the tile edge is trimmed flat there.
+          ctx.save();
+          ctx.beginPath();
+          if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + h, LARGE * 2);
+          else if (ex < 0) ctx.rect(-h,     -LARGE, LARGE + h, LARGE * 2);
+          else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2, LARGE + h);
+          else             ctx.rect(-LARGE, -h,     LARGE * 2, LARGE + h);
+          ctx.clip();
+        }
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        if (localDir === Direction.North)      ctx.lineTo(0, -h);
-        else if (localDir === Direction.East)  ctx.lineTo(h, 0);
-        else if (localDir === Direction.South) ctx.lineTo(0, h);
-        else                                   ctx.lineTo(-h, 0);
+        ctx.lineTo(ex, ey);
         ctx.stroke();
+        if (isButtEnd) ctx.restore();
       }
-      // Center junction dot fills the seam between arms
-      ctx.fillStyle = ctx.strokeStyle as string;
-      ctx.beginPath();
-      ctx.arc(0, 0, _s(5), 0, Math.PI * 2);
-      ctx.fill();
     } else {
       ctx.lineCap = 'round';
       if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight || shape === PipeShape.SpinStraightCement) {
