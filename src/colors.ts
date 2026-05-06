@@ -177,6 +177,8 @@ export const TREE4_SPRING_LEAF_ALT_COLOR = '#f870d0';
 export const CEMENT_COLOR            = '#8090a0';
 /** Background fill color for Cement tiles (light blue-gray). */
 export const CEMENT_FILL_COLOR       = '#c0c8d4';
+/** Background fill color for fully hardened Cement tiles — noticeably darker to signal immobility. */
+export const CEMENT_FILL_HARDENED_COLOR = '#9aa0aa';
 export const GOLD_PIPE_COLOR         = '#ffd700';
 export const GOLD_PIPE_WATER_COLOR   = '#ffec6e';
 /** Bubble particle color for connected golden pipes (pale yellow-white). */
