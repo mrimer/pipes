@@ -49,7 +49,7 @@ import {
   TREE4_DARK_COLOR, TREE4_DARK_LEAF_COLOR, TREE4_DARK_LEAF_ALT_COLOR,
   TREE4_WINTER_COLOR, TREE4_WINTER_LEAF_COLOR, TREE4_WINTER_LEAF_ALT_COLOR,
   TREE4_SPRING_COLOR, TREE4_SPRING_LEAF_COLOR, TREE4_SPRING_LEAF_ALT_COLOR,
-  CEMENT_COLOR, CEMENT_FILL_COLOR,
+  CEMENT_COLOR, CEMENT_FILL_COLOR, CEMENT_FILL_HARDENED_COLOR,
   GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR,
   LABEL_COLOR,
   REMOVABLE_BG_COLOR,
@@ -1117,11 +1117,13 @@ export function computeSeaNeighbors(isSea: (dr: number, dc: number) => boolean):
 /**
  * Draw the cement background for a grid cell.
  * Call once during renderBoard pass 1, using full tile-space coordinates (x, y top-left).
+ * When `isHardened` is true the fill is rendered darker to signal that the cement
+ * has set and pipes on this cell can no longer be adjusted.
  */
-function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+function _drawCementBackground(ctx: CanvasRenderingContext2D, x: number, y: number, isHardened: boolean): void {
   const ts = TILE_SIZE;
-  // Light-gray fill
-  ctx.fillStyle = CEMENT_FILL_COLOR;
+  // Fill color is darker for hardened cells to signal immobility
+  ctx.fillStyle = isHardened ? CEMENT_FILL_HARDENED_COLOR : CEMENT_FILL_COLOR;
   ctx.fillRect(x + 1, y + 1, ts - 2, ts - 2);
   // Slightly darker border
   ctx.strokeStyle = CEMENT_COLOR;
@@ -2283,7 +2285,8 @@ function _renderPass1Backgrounds(
         drawOneWayArrow(ctx, x, y, oneWayDir!);
       } else if (isCementCell) {
         // Cement cell: always show cement background regardless of tile on top
-        _drawCementBackground(ctx, x, y);
+        const dryingTime = board.cementData.get(posKey(r, c)) as number;
+        _drawCementBackground(ctx, x, y, dryingTime === 0);
       } else if (isEmptyFloor(tile.shape)) {
         if (isGoldCell) {
           // Shimmering gold background
