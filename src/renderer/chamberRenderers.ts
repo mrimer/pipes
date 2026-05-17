@@ -537,7 +537,7 @@ function _drawChamberRegulatorContent(ctx: CanvasRenderingContext2D, tile: Tile,
   ctx.fillText(text, 0, 0);
 }
 
-function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
+function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean, lockedCost: number | null): void {
   // Draw wave line near the bottom of the box to represent viscous gel content.
   const gelDecorColor = isWater ? GEL_WATER_COLOR : GEL_COLOR;
   ctx.strokeStyle = gelDecorColor;
@@ -578,17 +578,22 @@ function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: n
     ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
     ctx.stroke();
   }
-  // Show "1/2" label centered in the chamber box, with a white outline for
-  // legibility on the dark background.
   ctx.font = `bold ${_s(14)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = _s(3);
-  ctx.lineJoin = 'round';
-  ctx.strokeText('\u00BD', 0, 0); // ½ character
-  ctx.fillStyle = gelDecorColor;
-  ctx.fillText('\u00BD', 0, 0); // ½ character
+  if (isWater && lockedCost !== null) {
+    // Connected: show the actual water lost as a negative value, like other cost containers.
+    ctx.fillStyle = gelDecorColor;
+    ctx.fillText(String(-lockedCost), 0, 0);
+  } else {
+    // Unconnected: show the "½" formula label with a white outline for legibility.
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = _s(3);
+    ctx.lineJoin = 'round';
+    ctx.strokeText('\u00BD', 0, 0); // ½ character
+    ctx.fillStyle = gelDecorColor;
+    ctx.fillText('\u00BD', 0, 0); // ½ character
+  }
 }
 
 function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
@@ -952,7 +957,7 @@ export function drawChamber(
   } else if (chamberContent === 'regulator') {
     _drawChamberRegulatorContent(ctx, tile, isWater);
   } else if (chamberContent === 'gel') {
-    _drawChamberGelContent(ctx, bw, bh, isWater);
+    _drawChamberGelContent(ctx, bw, bh, isWater, lockedCost);
   } else if (chamberContent === 'siphon') {
     _drawChamberSiphonContent(ctx, bw, bh, isWater);
   } else if (chamberContent === 'hot_plate') {

@@ -95,6 +95,8 @@ export class TooltipManager {
         const loss = Math.max(0, lockedGain - lockedImpact);
         return tooltipText + `\n${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
       }
+    } else if (content === 'gel') {
+      return tooltipText + `\ncost: ${lockedCost}`;
     }
     return tooltipText;
   }
@@ -205,16 +207,17 @@ export class TooltipManager {
       const op   = tile.regulatorOperator ?? '>';
       const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
       tooltipText += `\nRegulator: ${statLabel} ${op} ${tile.cost}`;
-    } else if (tile.shape === PipeShape.Chamber && tile.cost > 0) {
+    } else if (tile.shape === PipeShape.Chamber && (tile.cost > 0 || tile.chamberContent === 'gel')) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
-      // for ice/snow/sandstone/hot_plate show the locked-in effective cost value.
+      // for ice/snow/sandstone/hot_plate/gel show the locked-in effective cost value.
       const lockedImpact = board.getLockedWaterImpact({ row, col });
       const isConnected = lockedImpact !== null;
       const pos = { row, col };
       if (isConnected) {
         tooltipText = this._tooltipForConnectedChamber(tooltipText, tile, pos, lockedImpact, board);
-      } else {
+      } else if (tile.cost > 0) {
+        // Gel has no fixed cost to predict before connection, so skip unconnected cost display.
         tooltipText = this._tooltipForUnconnectedChamber(tooltipText, tile, board);
       }
     }
