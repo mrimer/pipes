@@ -2227,10 +2227,7 @@ export function renderContainerFillAnims(
     let lockedCost: number | null = null;
     let lockedGain: number | null = null;
     if (tile.shape === PipeShape.Chamber) {
-      if (tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
-        const impact = board.getLockedWaterImpact({ row, col });
-        if (impact !== null) lockedCost = Math.abs(impact);
-      } else if (tile.chamberContent === 'gel') {
+      if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
         const impact = board.getLockedWaterImpact({ row, col });
         if (impact !== null) lockedCost = Math.abs(impact);
       } else if (tile.chamberContent === 'hot_plate') {
@@ -2365,12 +2362,7 @@ function _renderPass2NonPipeTiles(
       let lockedCost: number | null = null;
       let lockedGain: number | null = null;
       if (isWater && tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent !== null && COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
-          const impact = board.getLockedWaterImpact({ row: r, col: c });
-          if (impact !== null) {
-            lockedCost = Math.abs(impact);
-          }
-        } else if (tile.chamberContent === 'gel') {
+        if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
           const impact = board.getLockedWaterImpact({ row: r, col: c });
           if (impact !== null) lockedCost = Math.abs(impact);
         } else if (tile.chamberContent === 'hot_plate') {
