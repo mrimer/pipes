@@ -596,7 +596,7 @@ function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: n
   }
 }
 
-function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean): void {
+function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh: number, isWater: boolean, lockedGain: number | null): void {
   // Draw wave line near the top of the box to represent the upward-drawing siphon effect.
   const siphonDecorColor = isWater ? SIPHON_WATER_COLOR : SIPHON_COLOR;
   ctx.strokeStyle = siphonDecorColor;
@@ -637,12 +637,18 @@ function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh
     ctx.quadraticCurveTo(wMid + wQuart, wy + _s(3), wRight, wy);
     ctx.stroke();
   }
-  // Show "x2" label centered in the chamber box, in siphon color
-  ctx.fillStyle = siphonDecorColor;
   ctx.font = `bold ${_s(14)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('\u00D72', 0, 0); // ×2
+  if (isWater && lockedGain !== null) {
+    // Connected: show the actual water gained as a positive value, like other gain containers.
+    ctx.fillStyle = siphonDecorColor;
+    ctx.fillText(`+${lockedGain}`, 0, 0);
+  } else {
+    // Unconnected: show the "×2" formula label.
+    ctx.fillStyle = siphonDecorColor;
+    ctx.fillText('\u00D72', 0, 0); // ×2
+  }
 }
 
 /** Draw a 5-pointed star inside the chamber inner box. */
@@ -959,7 +965,7 @@ export function drawChamber(
   } else if (chamberContent === 'gel') {
     _drawChamberGelContent(ctx, bw, bh, isWater, lockedCost);
   } else if (chamberContent === 'siphon') {
-    _drawChamberSiphonContent(ctx, bw, bh, isWater);
+    _drawChamberSiphonContent(ctx, bw, bh, isWater, lockedGain);
   } else if (chamberContent === 'hot_plate') {
     _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
   }

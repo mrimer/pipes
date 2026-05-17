@@ -2230,6 +2230,9 @@ export function renderContainerFillAnims(
       if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
         const impact = board.getLockedWaterImpact({ row, col });
         if (impact !== null) lockedCost = Math.abs(impact);
+      } else if (tile.chamberContent === 'siphon') {
+        const impact = board.getLockedWaterImpact({ row, col });
+        if (impact !== null) lockedGain = impact;
       } else if (tile.chamberContent === 'hot_plate') {
         const impact = board.getLockedWaterImpact({ row, col });
         const gain = board.getLockedHotPlateGain({ row, col });
@@ -2365,6 +2368,9 @@ function _renderPass2NonPipeTiles(
         if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
           const impact = board.getLockedWaterImpact({ row: r, col: c });
           if (impact !== null) lockedCost = Math.abs(impact);
+        } else if (tile.chamberContent === 'siphon') {
+          const impact = board.getLockedWaterImpact({ row: r, col: c });
+          if (impact !== null) lockedGain = impact;
         } else if (tile.chamberContent === 'hot_plate') {
           const impact = board.getLockedWaterImpact({ row: r, col: c });
           const gain = board.getLockedHotPlateGain({ row: r, col: c });
