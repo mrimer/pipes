@@ -280,8 +280,8 @@ export class CloudShadowField {
   }
 
   private _getCampaignAreaCloudCount(): number {
-    const areaTiles = (this._width / this._tileSize) * (this._height / this._tileSize);
-    return Math.max(1, Math.round(areaTiles / CAMPAIGN_TILES_PER_CLOUD));
+    const totalTileCount = (this._width / this._tileSize) * (this._height / this._tileSize);
+    return Math.max(1, Math.round(totalTileCount / CAMPAIGN_TILES_PER_CLOUD));
   }
 
   private _spawnCloud(options: CloudSpawnOptions = {}): boolean {

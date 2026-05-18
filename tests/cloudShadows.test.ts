@@ -11,7 +11,7 @@ interface CloudShadowFieldInternals {
   _spawnCloud: (options?: Record<string, unknown>) => boolean;
 }
 
-function makeDeterministicRandom(seed = 12345): () => number {
+function createSeededRandomGenerator(seed = 12345): () => number {
   let state = seed;
   return () => {
     state = (state * 48271) % 0x7fffffff;
@@ -57,7 +57,7 @@ describe('CloudShadowField', () => {
   });
 
   it('pre-seeds campaign maps at one cloud per ten tiles', () => {
-    jest.spyOn(Math, 'random').mockImplementation(makeDeterministicRandom(17));
+    jest.spyOn(Math, 'random').mockImplementation(createSeededRandomGenerator(17));
     const field = new CloudShadowField();
 
     field.resetForScreen(20, 10, 1, 'campaign');
@@ -66,7 +66,7 @@ describe('CloudShadowField', () => {
   });
 
   it('spawns new clouds from one of the two incoming edges', () => {
-    jest.spyOn(Math, 'random').mockImplementation(makeDeterministicRandom(91));
+    jest.spyOn(Math, 'random').mockImplementation(createSeededRandomGenerator(91));
     const field = new CloudShadowField();
     field.resetForScreen(120, 80, 1, 'chapter');
 
