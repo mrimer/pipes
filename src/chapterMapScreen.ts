@@ -10,6 +10,7 @@
 import { ChapterDef, CampaignDef, LevelDef, TileDef } from './types';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { MapScreenBase } from './mapScreenBase';
+import { CloudShadowPreset } from './visuals/cloudShadows';
 
 export { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from './mapScreenBase';
 
@@ -56,6 +57,8 @@ export interface ChapterMapCallbacks {
    * that may include additional synthetic entries (e.g. chapter-aggregated totals).
    */
   augmentLevelWater?(levelWater: Record<number, number>): Record<number, number>;
+  /** Cloud-shadow scale preset for this map screen variant. Defaults to 'chapter'. */
+  cloudShadowPreset?: CloudShadowPreset;
 }
 
 /**
@@ -72,7 +75,7 @@ export class ChapterMapScreen extends MapScreenBase {
   private readonly _callbacks: ChapterMapCallbacks;
 
   constructor(callbacks: ChapterMapCallbacks) {
-    super();
+    super(callbacks.cloudShadowPreset ?? 'chapter');
     this._callbacks = callbacks;
   }
 

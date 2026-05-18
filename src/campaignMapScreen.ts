@@ -141,6 +141,7 @@ export class CampaignMapScreen {
           baseWater,
         );
       },
+      cloudShadowPreset: 'campaign',
     };
     this._inner = new ChapterMapScreen(chapterCallbacks);
     this.screenEl = this._inner.screenEl;

@@ -125,7 +125,8 @@ src/
 │   ├── tileAnimation.ts         # General tile animation driver
 │   ├── chapterMap.ts            # Chapter map node visual helpers
 │   ├── chapterWaves.ts          # Animated waves on chapter map
-│   └── minimap.ts               # Minimap overlay renderer
+│   ├── minimap.ts               # Minimap overlay renderer
+│   └── cloudShadows.ts          # Procedural cloud-shadow overlay field for level/map screens
 │
 └── campaignEditor/
     ├── index.ts                 # Editor orchestrator — wires all editor sub-modules
@@ -200,6 +201,7 @@ src/
 | Player profile schema | `playerProfile.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |
 | Win confetti | `visuals/confetti.ts` |
+| Cloud shadow overlay | `visuals/cloudShadows.ts` |
 | Campaign CRUD | `campaignEditor/campaignService.ts` |
 | Editor undo/redo | `campaignEditor/historyManager.ts` + `mapEditorBase.ts` |
 | Validation error messages | `campaignEditor/validationMessages.ts` |
