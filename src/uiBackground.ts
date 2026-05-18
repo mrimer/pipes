@@ -15,6 +15,8 @@ const PIPE_STROKE_OUTER_PX = 30;
 const PIPE_STROKE_INNER_PX = 14;
 /** Center joint radius (px) for pipe hubs. */
 const PIPE_JOINT_RADIUS_PX = 16;
+/** Radius ratio for the inner joint highlight circle to keep the hub ring visible. */
+const INNER_JOINT_RADIUS_RATIO = 0.56;
 /** One-half tile size (px). */
 const HALF_TILE_PX = PIPE_TILE_SIZE_PX / 2;
 
@@ -38,7 +40,7 @@ const PIPE_MASK_GRID: ReadonlyArray<ReadonlyArray<number>> = [
   [DIR_NORTH | DIR_EAST, DIR_EAST | DIR_SOUTH | DIR_WEST, DIR_SOUTH | DIR_WEST],
 ];
 
-const PIPE_PATTERN_DATA_URL = `url("data:image/svg+xml,${encodeURIComponent(buildPipePatternSvg())}")`;
+let cachedPipePatternDataUrl: string | null = null;
 
 export interface ScrollingPipeBackgroundOptions {
   /** Solid fallback/background color below the pattern. */
@@ -87,10 +89,16 @@ function buildPipePatternSvg(): string {
     ...joints,
     '</g>',
     `<g fill="#4b7fb5">`,
-    ...joints.map((joint) => joint.replace(`r="${PIPE_JOINT_RADIUS_PX}"`, `r="${PIPE_JOINT_RADIUS_PX * 0.56}"`)),
+    ...joints.map((joint) => joint.replace(`r="${PIPE_JOINT_RADIUS_PX}"`, `r="${PIPE_JOINT_RADIUS_PX * INNER_JOINT_RADIUS_RATIO}"`)),
     '</g>',
     '</svg>',
   ].join('');
+}
+
+function getPipePatternDataUrl(): string {
+  if (cachedPipePatternDataUrl !== null) return cachedPipePatternDataUrl;
+  cachedPipePatternDataUrl = `url("data:image/svg+xml,${encodeURIComponent(buildPipePatternSvg())}")`;
+  return cachedPipePatternDataUrl;
 }
 
 function ensurePipeBackgroundKeyframes(): void {
@@ -111,9 +119,10 @@ export function applyScrollingPipeBackground(
   ensurePipeBackgroundKeyframes();
   const overlayAlpha = options.overlayAlpha ?? DEFAULT_OVERLAY_ALPHA;
   const durationSec = options.animationDurationSec ?? DEFAULT_ANIMATION_DURATION_SEC;
+  const patternDataUrl = getPipePatternDataUrl();
   target.style.backgroundColor = options.baseColor ?? DEFAULT_BASE_COLOR;
   target.style.backgroundImage =
-    `linear-gradient(rgba(${OVERLAY_RGB},${overlayAlpha}),rgba(${OVERLAY_RGB},${overlayAlpha})),${PIPE_PATTERN_DATA_URL}`;
+    `linear-gradient(rgba(${OVERLAY_RGB},${overlayAlpha}),rgba(${OVERLAY_RGB},${overlayAlpha})),${patternDataUrl}`;
   target.style.backgroundRepeat = 'repeat,repeat';
   target.style.backgroundSize = `auto,${PIPE_PATTERN_SIZE_PX}px ${PIPE_PATTERN_SIZE_PX}px`;
   target.style.animation = `${PIPE_SCROLL_KEYFRAMES_NAME} ${durationSec}s linear infinite`;
