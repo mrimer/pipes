@@ -62,6 +62,7 @@ const GRADIENT_INNER_RADIUS_SCALE = 0.15;
 const GRADIENT_CENTER_OPACITY_SCALE = 0.95;
 const GRADIENT_MID_STOP = 0.65;
 const GRADIENT_MID_OPACITY_SCALE = 0.45;
+const SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER = 2;
 const INITIAL_CLOUD_COUNTS: Record<CloudShadowPreset, number> = {
   level: 2,
   chapter: 6,
@@ -259,9 +260,14 @@ export class CloudShadowField {
 
       const lane = randRange(laneStart, laneEnd);
       const entryDistance = this._distanceMin - radius - this._config.entryMarginTiles * this._tileSize;
-      const defaultDistanceMin = entryDistance - (this._config.minSpawnDistanceTiles * this._tileSize + radius * 2);
+      const defaultDistanceMin = entryDistance - (
+        this._config.minSpawnDistanceTiles * this._tileSize
+        + radius * SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER
+      );
       const requestedDistanceMin = options.distanceMin ?? defaultDistanceMin;
       const requestedDistanceMax = options.distanceMax ?? entryDistance;
+      // Normalize caller-provided ranges (or computed defaults) so accidental
+      // min/max inversion still yields a valid random sampling interval.
       const distanceMin = Math.min(requestedDistanceMin, requestedDistanceMax);
       const distanceMax = Math.max(requestedDistanceMin, requestedDistanceMax);
       const distance = randRange(distanceMin, distanceMax);
