@@ -10,6 +10,7 @@ import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../src/chapterMapScreen';
 import { GRID_MAX_DIM, CAMPAIGN_MAP_MAX_DIM, GRID_MIN_DIM } from '../src/campaignEditor/types';
 import { buildGridSizePanel, GridSizePanelCallbacks } from '../src/campaignEditor/gridSizePanel';
 import { clampPanAxisWithFallback } from '../src/mapScreenBase';
+import { computeViewBounds } from '../src/mapUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -381,20 +382,6 @@ describe('pan-aware hit test (pure logic)', () => {
 });
 
 // ─── Viewport bounds computation ──────────────────────────────────────────────
-
-function computeViewBounds(
-  panX: number, panY: number,
-  viewCols: number, viewRows: number,
-  gridCols: number, gridRows: number,
-  tileSize = 64,
-): { rMin: number; rMax: number; cMin: number; cMax: number } {
-  return {
-    rMin: Math.max(0, Math.floor(panY / tileSize)),
-    rMax: Math.min(gridRows - 1, Math.ceil((panY + viewRows * tileSize) / tileSize)),
-    cMin: Math.max(0, Math.floor(panX / tileSize)),
-    cMax: Math.min(gridCols - 1, Math.ceil((panX + viewCols * tileSize) / tileSize)),
-  };
-}
 
 describe('computeViewBounds', () => {
   const TS = 64;

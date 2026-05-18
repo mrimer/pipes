@@ -7,6 +7,14 @@ import { Tile } from './tile';
 import { PIPE_SHAPES } from './board';
 import { bfs } from './bfs';
 
+/** Visible tile range for viewport-culled rendering. All loops use [rMin..rMax] inclusive. */
+export interface ViewBounds {
+  rMin: number;
+  rMax: number;
+  cMin: number;
+  cMax: number;
+}
+
 /** Grid-delta for each cardinal direction. */
 export const CHAPTER_MAP_DELTAS: Record<Direction, { dr: number; dc: number }> = {
   [Direction.North]: { dr: -1, dc:  0 },
@@ -22,6 +30,24 @@ export const CHAPTER_MAP_OPPOSITE: Record<Direction, Direction> = {
   [Direction.South]: Direction.North,
   [Direction.West]:  Direction.East,
 };
+
+/** Compute viewport-aligned inclusive tile bounds from pan offsets and view size. */
+export function computeViewBounds(
+  panX: number,
+  panY: number,
+  viewCols: number,
+  viewRows: number,
+  gridCols: number,
+  gridRows: number,
+  tileSize: number,
+): ViewBounds {
+  return {
+    rMin: Math.max(0, Math.floor(panY / tileSize)),
+    rMax: Math.min(gridRows - 1, Math.ceil((panY + viewRows * tileSize) / tileSize)),
+    cMin: Math.max(0, Math.floor(panX / tileSize)),
+    cMax: Math.min(gridCols - 1, Math.ceil((panX + viewCols * tileSize) / tileSize)),
+  };
+}
 
 /** Find the first tile with the given shape in the grid. */
 export function findMapTile(
