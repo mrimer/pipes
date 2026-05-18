@@ -13,9 +13,10 @@ import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeMapReachable, tileDefConnections, findMapTile } from './mapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
-import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR, CHAPTER_MAP_BG } from './colors';
+import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
+import { applyScrollingPipeBackground } from './uiBackground';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 import { createButton } from './uiHelpers';
@@ -613,9 +614,10 @@ export abstract class MapScreenBase {
     const el = document.createElement('div');
     el.id = 'chapter-map-screen';
     el.style.cssText =
-      `display:none;position:fixed;inset:0;background:${CHAPTER_MAP_BG};flex-direction:column;` +
+      'display:none;position:fixed;inset:0;flex-direction:column;' +
       'align-items:center;justify-content:flex-start;overflow:auto;z-index:10;' +
       'padding:20px;box-sizing:border-box;gap:16px;';
+    applyScrollingPipeBackground(el);
     return el;
   }
 
