@@ -1132,6 +1132,10 @@ export abstract class MapScreenBase {
     ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
+    const rMin = Math.max(0, Math.floor(this._panPixelY / TILE_SIZE));
+    const rMax = Math.min(rows - 1, Math.ceil((this._panPixelY + this._viewRows * TILE_SIZE) / TILE_SIZE));
+    const cMin = Math.max(0, Math.floor(this._panPixelX / TILE_SIZE));
+    const cMax = Math.min(cols - 1, Math.ceil((this._panPixelX + this._viewCols * TILE_SIZE) / TILE_SIZE));
 
     renderChapterMapCanvas(
       ctx,
@@ -1147,6 +1151,7 @@ export abstract class MapScreenBase {
       jitterCell,
       this._floorTypes,
       chapter.style,
+      { rMin, rMax, cMin, cMax },
     );
 
     this._cloudShadows.updateAndRender(ctx, now);
