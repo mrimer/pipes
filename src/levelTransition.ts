@@ -222,7 +222,9 @@ export function playMapTransition(
   }
 
   // Copy the live level canvas so any pre-initialized visual overlays (such as
-  // cloud shadows) are already present at transition start.
+  // cloud shadows) are already present at transition start. The caller renders a
+  // fresh frame immediately before this transition begins, so the copied image is
+  // a stable "just-entered level" frame rather than an arbitrary transient state.
   offCtx.drawImage(gameCanvas, 0, 0, snapshotW, snapshotH);
 
   // ── 2. Compute the target rect (where the game canvas content area is) ──
