@@ -379,3 +379,60 @@ describe('pan-aware hit test (pure logic)', () => {
     expect(result).toEqual({ row: 3, col: 0 });
   });
 });
+
+// ─── Viewport bounds computation ──────────────────────────────────────────────
+
+function computeViewBounds(
+  panX: number, panY: number,
+  viewCols: number, viewRows: number,
+  gridCols: number, gridRows: number,
+  tileSize = 64,
+): { rMin: number; rMax: number; cMin: number; cMax: number } {
+  return {
+    rMin: Math.max(0, Math.floor(panY / tileSize)),
+    rMax: Math.min(gridRows - 1, Math.ceil((panY + viewRows * tileSize) / tileSize)),
+    cMin: Math.max(0, Math.floor(panX / tileSize)),
+    cMax: Math.min(gridCols - 1, Math.ceil((panX + viewCols * tileSize) / tileSize)),
+  };
+}
+
+describe('computeViewBounds', () => {
+  const TS = 64;
+
+  it('rMin/cMin are 0 with no pan', () => {
+    const b = computeViewBounds(0, 0, 6, 4, 20, 15, TS);
+    expect(b.rMin).toBe(0);
+    expect(b.cMin).toBe(0);
+  });
+
+  it('rMax/cMax equal view size with no pan (unclamped)', () => {
+    const b = computeViewBounds(0, 0, 6, 4, 20, 15, TS);
+    expect(b.rMax).toBe(4);  // ceil(4*64/64) = 4
+    expect(b.cMax).toBe(6);  // ceil(6*64/64) = 6
+  });
+
+  it('shifts rMin/cMin by pan amount', () => {
+    const b = computeViewBounds(5 * TS, 3 * TS, 6, 4, 20, 15, TS);
+    expect(b.rMin).toBe(3);
+    expect(b.cMin).toBe(5);
+    expect(b.rMax).toBe(7);
+    expect(b.cMax).toBe(11);
+  });
+
+  it('clamps rMax to gridRows-1', () => {
+    const b = computeViewBounds(0, 12 * TS, 6, 4, 20, 15, TS);
+    expect(b.rMax).toBe(14);  // grid has 15 rows (0..14)
+  });
+
+  it('clamps cMax to gridCols-1', () => {
+    const b = computeViewBounds(15 * TS, 0, 6, 4, 20, 15, TS);
+    expect(b.cMax).toBe(19);  // grid has 20 cols (0..19)
+  });
+
+  it('includes partial tile at view boundary', () => {
+    // panY = 0.5 tiles → rMin=0, rMax = ceil((32+256)/64) = ceil(4.5) = 5
+    const b = computeViewBounds(0, 32, 6, 4, 20, 15, TS);
+    expect(b.rMin).toBe(0);
+    expect(b.rMax).toBe(5);
+  });
+});

@@ -22,6 +22,14 @@ import { tileDefConnections } from '../mapUtils';
 import { renderMinimap, minimapDimensions } from './minimap';
 import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
+/** Visible tile range for viewport-culled rendering. All loops use [rMin..rMax] inclusive. */
+export interface ViewBounds {
+  rMin: number;
+  rMax: number;
+  cMin: number;
+  cMax: number;
+}
+
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
 
 /**
@@ -542,23 +550,25 @@ function _drawChapterMapSea(
 /** Draw the chapter map grid lines beneath all tile objects. */
 function _renderChapterMapGridLines(
   ctx: CanvasRenderingContext2D,
-  rows: number,
-  cols: number,
+  rMin: number,
+  rMax: number,
+  cMin: number,
+  cMax: number,
 ): void {
   const CELL = TILE_SIZE;
   ctx.strokeStyle = 'rgba(74,144,217,0.12)';
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
-  for (let r = 0; r <= rows; r++) {
+  for (let r = rMin; r <= rMax + 1; r++) {
     ctx.beginPath();
-    ctx.moveTo(0, r * CELL);
-    ctx.lineTo(cols * CELL, r * CELL);
+    ctx.moveTo(cMin * CELL, r * CELL);
+    ctx.lineTo((cMax + 1) * CELL, r * CELL);
     ctx.stroke();
   }
-  for (let c = 0; c <= cols; c++) {
+  for (let c = cMin; c <= cMax + 1; c++) {
     ctx.beginPath();
-    ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, rows * CELL);
+    ctx.moveTo(c * CELL, rMin * CELL);
+    ctx.lineTo(c * CELL, (rMax + 1) * CELL);
     ctx.stroke();
   }
 }
@@ -571,10 +581,14 @@ function _renderChapterMapPass1Backgrounds(
   cols: number,
   decorations?: ReadonlyMap<string, AmbientDecoration>,
   floorTypes?: ReadonlyMap<string, PipeShape>,
+  rMin: number = 0,
+  rMax: number = rows - 1,
+  cMin: number = 0,
+  cMax: number = cols - 1,
 ): void {
   const CELL = TILE_SIZE;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
       const def = grid[r]?.[c] ?? null;
       const isEmptyCell = def === null || isEmptyFloor(def.shape);
       if (!isEmptyCell) continue;
@@ -606,10 +620,14 @@ function _renderChapterMapPass2NonPipeTiles(
   jitterCell?: { row: number; col: number; dx: number; dy: number },
   floorTypes?: ReadonlyMap<string, PipeShape>,
   style?: LevelStyle,
+  rMin: number = 0,
+  rMax: number = rows - 1,
+  cMin: number = 0,
+  cMax: number = cols - 1,
 ): void {
   const CELL = TILE_SIZE;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
       const def = grid[r]?.[c] ?? null;
       if (def === null || PIPE_SHAPES.has(def.shape) || isEmptyFloor(def.shape)) continue;
       const x = c * CELL;
@@ -687,10 +705,14 @@ function _renderChapterMapPass3PipeTiles(
   cols: number,
   filledKeys: ReadonlySet<string>,
   floorTypes?: ReadonlyMap<string, PipeShape>,
+  rMin: number = 0,
+  rMax: number = rows - 1,
+  cMin: number = 0,
+  cMax: number = cols - 1,
 ): void {
   const CELL = TILE_SIZE;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
       const def = grid[r]?.[c] ?? null;
       if (def === null || !PIPE_SHAPES.has(def.shape)) continue;
       const x = c * CELL;
@@ -751,19 +773,25 @@ export function renderChapterMapCanvas(
   jitterCell?: { row: number; col: number; dx: number; dy: number },
   floorTypes?: ReadonlyMap<string, PipeShape>,
   style?: LevelStyle,
+  viewBounds?: ViewBounds,
 ): void {
   const CELL = TILE_SIZE;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
 
   // Count how many of this chapter's levels the player has completed
   const completedLevelCount = levelDefs.filter(l => progress.completedLevels.has(l.id)).length;
+  const rMin = viewBounds?.rMin ?? 0;
+  const rMax = viewBounds ? Math.min(rows - 1, viewBounds.rMax) : rows - 1;
+  const cMin = viewBounds?.cMin ?? 0;
+  const cMax = viewBounds ? Math.min(cols - 1, viewBounds.cMax) : cols - 1;
 
-  _renderChapterMapGridLines(ctx, rows, cols);
-  _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations, floorTypes);
+  _renderChapterMapGridLines(ctx, rMin, rMax, cMin, cMax);
+  _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations, floorTypes, rMin, rMax, cMin, cMax);
   _renderChapterMapPass2NonPipeTiles(
     ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes, style,
+    rMin, rMax, cMin, cMax,
   );
-  _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys, floorTypes);
+  _renderChapterMapPass3PipeTiles(ctx, grid, rows, cols, filledKeys, floorTypes, rMin, rMax, cMin, cMax);
 
   // Hover highlight – only on level chamber tiles
   if (hoverPos) {

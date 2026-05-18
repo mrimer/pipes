@@ -785,6 +785,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
     ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
+    const mapRows = this._gridState.rows;
+    const mapCols = this._gridState.cols;
+    const rMin = Math.max(0, Math.floor(this._panPixelY / TILE_SIZE));
+    const rMax = Math.min(mapRows - 1, Math.ceil((this._panPixelY + this._viewRows * TILE_SIZE) / TILE_SIZE));
+    const cMin = Math.max(0, Math.floor(this._panPixelX / TILE_SIZE));
+    const cMax = Math.min(mapCols - 1, Math.ceil((this._panPixelX + this._viewCols * TILE_SIZE) / TILE_SIZE));
 
     renderEditorCanvas(
       ctx,
@@ -799,6 +805,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       filledKeys,
       campaign?.style,
       chapterDefs,
+      { rMin, rMax, cMin, cMax },
     );
 
     drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);

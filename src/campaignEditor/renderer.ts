@@ -11,7 +11,7 @@ import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
   WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
-import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs } from '../visuals/chapterMap';
+import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs, type ViewBounds } from '../visuals/chapterMap';
 import { tileDefConnections } from '../mapUtils';
 
 export type { LevelProgressMap };
@@ -71,31 +71,36 @@ export function renderEditorCanvas(
   filledKeys?: ReadonlySet<string>,
   style?: LevelStyle,
   chapterDefs?: readonly LevelDef[],
+  viewBounds?: ViewBounds,
 ): void {
   const CELL = TILE_SIZE;
+  const rMin = viewBounds?.rMin ?? 0;
+  const rMax = viewBounds ? Math.min(rows - 1, viewBounds.rMax) : rows - 1;
+  const cMin = viewBounds?.cMin ?? 0;
+  const cMax = viewBounds ? Math.min(cols - 1, viewBounds.cMax) : cols - 1;
   ctx.clearRect(0, 0, cols * CELL, rows * CELL);
 
   // Grid lines drawn first so they appear underneath all tile content
   ctx.strokeStyle = 'rgba(74,144,217,0.15)';
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
-  for (let r = 0; r <= rows; r++) {
+  for (let r = rMin; r <= rMax + 1; r++) {
     ctx.beginPath();
-    ctx.moveTo(0, r * CELL);
-    ctx.lineTo(cols * CELL, r * CELL);
+    ctx.moveTo(cMin * CELL, r * CELL);
+    ctx.lineTo((cMax + 1) * CELL, r * CELL);
     ctx.stroke();
   }
-  for (let c = 0; c <= cols; c++) {
+  for (let c = cMin; c <= cMax + 1; c++) {
     ctx.beginPath();
-    ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, rows * CELL);
+    ctx.moveTo(c * CELL, rMin * CELL);
+    ctx.lineTo(c * CELL, (rMax + 1) * CELL);
     ctx.stroke();
   }
 
   // Pass 1: Draw all open (player-fillable) spaces first so that pipe rounded
   // caps drawn in pass 2 are never covered by a neighboring empty cell's fill.
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
       const isEmptyCell = def === null || isEmptyFloor(def.shape);
@@ -142,8 +147,8 @@ export function renderEditorCanvas(
   }
 
   // Pass 2: Draw all non-pipe fixed tiles on top of the empty-space backgrounds.
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
       if (def === null || PIPE_SHAPES.has(def.shape) || isEmptyFloor(def.shape)) continue;
@@ -184,8 +189,8 @@ export function renderEditorCanvas(
   // Pass 3: Draw all pipe tiles last so their rounded caps appear on top of
   // every other tile type (e.g. a pipe adjacent to a Chamber won't be clipped
   // by the Chamber's background fill).
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
       if (def === null || !PIPE_SHAPES.has(def.shape)) continue;
