@@ -1038,9 +1038,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._dragState = null;
 
     if (moved) {
-      this._gridState.focusedTilePos = null;
       this._gridState.grid[startPos.row][startPos.col] = null;
       this._gridState.grid[currentPos.row][currentPos.col] = tile;
+      this._gridState.focusedTilePos = currentPos;
+      document.getElementById('campaign-map-tile-params-panel')
+        ?.replaceWith(this._buildTileParamsPanel(campaign));
       this._recordSnapshot();
       this._saveGrid();
     } else {
@@ -1103,9 +1105,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
         if (pos.row === startPos.row && pos.col === startPos.col) {
           this._dragState.currentPos = pos;
           this._dragState.moved = false;
-        } else if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) === null) {
-          this._dragState.currentPos = pos;
-          this._dragState.moved = true;
+        } else {
+          const targetTile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
+          if (targetTile === null || isEmptyFloor(targetTile.shape)) {
+            this._dragState.currentPos = pos;
+            this._dragState.moved = true;
+          }
         }
       }
     }

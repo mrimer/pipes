@@ -583,6 +583,10 @@ function _drawChamberGelContent(ctx: CanvasRenderingContext2D, bw: number, bh: n
   ctx.textBaseline = 'middle';
   if (isWater && lockedCost !== null) {
     // Connected: show the actual water lost as a negative value, like other cost containers.
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = _s(3);
+    ctx.lineJoin = 'round';
+    ctx.strokeText(String(-lockedCost), 0, 0);
     ctx.fillStyle = gelDecorColor;
     ctx.fillText(String(-lockedCost), 0, 0);
   } else {
