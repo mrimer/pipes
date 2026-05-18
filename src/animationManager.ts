@@ -149,6 +149,8 @@ export class AnimationManager {
   private _heatWaves: HeatWave[] = [];
   /** Maps "row,col" → `performance.now()` of the last heat-wave spawn for that tile. */
   private _heatWaveLastSpawn: Map<string, number> = new Map();
+  private _drySourcePulseGradient: CanvasGradient | null = null;
+  private _drySourcePulseGradientKey: string | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -452,15 +454,23 @@ export class AnimationManager {
     const alpha = 0.15 + 0.4 * ((Math.sin(now / 500) + 1) / 2);
 
     const radius = TILE_SIZE * 0.6;
-    const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    grad.addColorStop(0,   `rgba(220,30,30,${alpha.toFixed(3)})`);
-    grad.addColorStop(0.5, `rgba(200,20,20,${(alpha * 0.6).toFixed(3)})`);
-    grad.addColorStop(1,   'rgba(180,0,0,0)');
+    const key = `${cx},${cy},${radius}`;
+    if (this._drySourcePulseGradient === null || this._drySourcePulseGradientKey !== key) {
+      const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, 'rgba(220,30,30,1)');
+      grad.addColorStop(0.5, 'rgba(200,20,20,0.6)');
+      grad.addColorStop(1, 'rgba(180,0,0,0)');
+      this._drySourcePulseGradient = grad;
+      this._drySourcePulseGradientKey = key;
+    }
 
-    this.ctx.fillStyle = grad;
+    this.ctx.save();
+    this.ctx.globalAlpha = alpha;
+    this.ctx.fillStyle = this._drySourcePulseGradient;
     this.ctx.beginPath();
     this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     this.ctx.fill();
+    this.ctx.restore();
   }
 
   // ─── Level lifecycle ──────────────────────────────────────────────────────
@@ -486,6 +496,8 @@ export class AnimationManager {
     this._activePulse = null;
     this._heatWaves = [];
     this._heatWaveLastSpawn = new Map();
+    this._drySourcePulseGradient = null;
+    this._drySourcePulseGradientKey = null;
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */
