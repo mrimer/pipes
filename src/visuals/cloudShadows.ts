@@ -32,7 +32,7 @@ interface CloudShadowPresetConfig {
   maxOpacity: number;
   speedTilesPerSecond: number;
   spawnIntervalMs: number;
-  maxClouds: number;
+  defaultMaxClouds: number;
   minCloudGapTiles: number;
   minSpawnDistanceTiles: number;
   entryMarginTiles: number;
@@ -96,7 +96,7 @@ const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
     maxOpacity: 0.16,
     speedTilesPerSecond: 0.12,
     spawnIntervalMs: 14_000,
-    maxClouds: 3,
+    defaultMaxClouds: 3,
     minCloudGapTiles: 3.2,
     minSpawnDistanceTiles: 5.5,
     entryMarginTiles: 1.1,
@@ -109,7 +109,7 @@ const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
     maxOpacity: 0.14,
     speedTilesPerSecond: 0.075,
     spawnIntervalMs: 4_500,
-    maxClouds: 8,
+    defaultMaxClouds: 8,
     minCloudGapTiles: 1.0,
     minSpawnDistanceTiles: 1.4,
     entryMarginTiles: 0.8,
@@ -122,7 +122,7 @@ const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
     maxOpacity: 0.13,
     speedTilesPerSecond: 0.045,
     spawnIntervalMs: 3_200,
-    maxClouds: 10,
+    defaultMaxClouds: 10,
     minCloudGapTiles: 0.45,
     minSpawnDistanceTiles: 0.8,
     entryMarginTiles: 0.6,
@@ -267,9 +267,9 @@ export class CloudShadowField {
 
   private _getCloudLimit(): number {
     if (this._preset === 'campaign') {
-      return Math.max(this._config.maxClouds, this._getCampaignAreaCloudCount());
+      return Math.max(this._config.defaultMaxClouds, this._getCampaignAreaCloudCount());
     }
-    return this._config.maxClouds;
+    return this._config.defaultMaxClouds;
   }
 
   private _getInitialCloudCount(): number {

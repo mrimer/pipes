@@ -11,7 +11,7 @@ interface CloudShadowFieldInternals {
   _spawnCloud: (options?: Record<string, unknown>) => boolean;
 }
 
-function createSeededRandomGenerator(seed = 12345): () => number {
+function createLCGPRNG(seed = 12345): () => number {
   let state = seed;
   return () => {
     state = (state * 48271) % 0x7fffffff;
@@ -19,7 +19,7 @@ function createSeededRandomGenerator(seed = 12345): () => number {
   };
 }
 
-function getEntryEdgeForCloud(
+function computeCloudEntryEdge(
   cloud: { x: number; y: number },
   dirX: number,
   dirY: number,
@@ -57,7 +57,7 @@ describe('CloudShadowField', () => {
   });
 
   it('pre-seeds campaign maps at one cloud per ten tiles', () => {
-    jest.spyOn(Math, 'random').mockImplementation(createSeededRandomGenerator(17));
+    jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(17));
     const field = new CloudShadowField();
 
     field.resetForScreen(20, 10, 1, 'campaign');
@@ -66,7 +66,7 @@ describe('CloudShadowField', () => {
   });
 
   it('spawns new clouds from one of the two incoming edges', () => {
-    jest.spyOn(Math, 'random').mockImplementation(createSeededRandomGenerator(91));
+    jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(91));
     const field = new CloudShadowField();
     field.resetForScreen(120, 80, 1, 'chapter');
 
@@ -82,10 +82,10 @@ describe('CloudShadowField', () => {
     ]);
 
     expect(
-      getEntryEdgeForCloud(cloud, internals._dirX, internals._dirY, 120, 80),
+      computeCloudEntryEdge(cloud, internals._dirX, internals._dirY, 120, 80),
     ).not.toBeNull();
     expect(
-      incomingEdges.has(getEntryEdgeForCloud(cloud, internals._dirX, internals._dirY, 120, 80) ?? 'left'),
+      incomingEdges.has(computeCloudEntryEdge(cloud, internals._dirX, internals._dirY, 120, 80) ?? 'left'),
     ).toBe(true);
   });
 });
