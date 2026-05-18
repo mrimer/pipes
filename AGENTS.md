@@ -46,6 +46,7 @@ npm install
 - Use `npm test -- <jest flags>` to pass extra flags to Jest.
 - Test files live in `tests/` and are plain TypeScript; no separate compilation step is needed before running them.
 - Tests that touch `localStorage` must have `@jest-environment jsdom` at the top of the file.
+- Wait for `npm install` to finish before running lint/build/test commands; running them in parallel with install can fail with missing tool errors.
 
 ---
 
@@ -104,6 +105,7 @@ src/
 ├── persistence.ts               # All localStorage access — single source of truth for storage keys
 ├── fileIO.ts                    # Gzip+download and gzip-or-JSON file reading helpers
 ├── uiConstants.ts               # UI color tokens, border-radius constants, modal CSS strings
+├── uiBackground.ts              # Shared dim scrolling pipe-pattern background helper for full-screen UI layers
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
 ├── commandKeyManager.ts         # Keyboard shortcut registry
@@ -193,6 +195,7 @@ src/
 | Keyboard shortcuts | `commandKeyManager.ts` |
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
+| Menu/settings/profile background pattern | `uiBackground.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Player profile schema | `playerProfile.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |

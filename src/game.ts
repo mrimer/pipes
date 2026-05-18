@@ -37,7 +37,7 @@ import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
-import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from './uiConstants';
+import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_OVERLAY_BG, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
 import { PlaybackScreen, PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
@@ -45,6 +45,7 @@ import { exportReplay, importReplay } from './profileIO';
 import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
+import { applyScrollingPipeBackground } from './uiBackground';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -353,6 +354,10 @@ export class Game implements InputCallbacks {
       },
       () => loadRecordingSettings(),
     );
+    applyScrollingPipeBackground(this._settingsModalEl, {
+      baseColor: UI_OVERLAY_BG,
+      overlayAlpha: 0.84,
+    });
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
