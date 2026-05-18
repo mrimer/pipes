@@ -2,7 +2,7 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
+import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
 import { Tile, oppositeDirection } from './tile';
 import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS, LevelStyle, floorShapeToStyle } from './types';
 import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
@@ -103,6 +103,12 @@ const SPIN_ANIM_SPEED = (2 * Math.PI) / 1500;
 const BOLT_FILL_COLOR = 'rgba(128,128,134,0.82)';
 /** Border color for the hex bolt head. */
 const BOLT_BORDER_COLOR = 'rgba(72,72,78,0.90)';
+
+/**
+ * Reused scratch set for converting absolute butt-end directions to local tile
+ * directions in drawTile's hot path without allocating a new Set per tile.
+ */
+const LOCAL_BUTT_END_DIRS_BUFFER = new Set<Direction>();
 
 /**
  * Positions of the 3 landing-strip triangles along a Source/Sink connector arm,
@@ -1860,6 +1866,7 @@ export function drawTile(
   graniteNeighbors?: GraniteNeighbors,
   afterOuterCircleFn?: () => void,
   levelStyle?: LevelStyle,
+  nowMs = Date.now(),
 ): void {
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
@@ -1923,9 +1930,14 @@ export function drawTile(
     // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the path
     // endpoints land precisely on the tile edge at every tile size.
     const pathHalf = TILE_SIZE / 2;
-    const localButtEndDirs = effectiveButtEndDirs?.size
-      ? new Set([...effectiveButtEndDirs].map(d => toLocalDir(d, effectiveRotation)))
-      : undefined;
+    let localButtEndDirs: ReadonlySet<Direction> | undefined;
+    if (effectiveButtEndDirs?.size) {
+      LOCAL_BUTT_END_DIRS_BUFFER.clear();
+      for (const dir of effectiveButtEndDirs) {
+        LOCAL_BUTT_END_DIRS_BUFFER.add(toLocalDir(dir, effectiveRotation));
+      }
+      localButtEndDirs = LOCAL_BUTT_END_DIRS_BUFFER;
+    }
     drawPipeBody(ctx, shape, pathHalf, localButtEndDirs, color);
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, null);
@@ -1996,7 +2008,7 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     if (isHovered) {
-      const animAngle = (Date.now() * SPIN_ANIM_SPEED) % (2 * Math.PI);
+      const animAngle = (nowMs * SPIN_ANIM_SPEED) % (2 * Math.PI);
       ctx.rotate(shiftHeld ? -animAngle : animAngle);
     }
     drawSpinArrow(ctx, shiftHeld);
@@ -2096,20 +2108,20 @@ function _renderPass6ErrorHighlights(
   ctx: CanvasRenderingContext2D,
   board: Board,
   highlightedPositions: Set<string>,
+  now: number,
 ): void {
   if (highlightedPositions.size === 0) return;
-  const pulse = 0.35 + 0.25 * ((Math.sin(Date.now() / 120) + 1) / 2);
+  const pulse = 0.35 + 0.25 * ((Math.sin(now / 120) + 1) / 2);
   ctx.fillStyle = `rgba(220,50,50,${pulse.toFixed(3)})`;
   ctx.strokeStyle = ERROR_HIGHLIGHT_BORDER;
   ctx.lineWidth = 3;
-  for (let r = 0; r < board.rows; r++) {
-    for (let c = 0; c < board.cols; c++) {
-      if (!highlightedPositions.has(posKey(r, c))) continue;
-      const x = c * TILE_SIZE;
-      const y = r * TILE_SIZE;
-      ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-      ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-    }
+  for (const key of highlightedPositions) {
+    const [r, c] = parseKey(key);
+    if (r < 0 || r >= board.rows || c < 0 || c >= board.cols) continue;
+    const x = c * TILE_SIZE;
+    const y = r * TILE_SIZE;
+    ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+    ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
   }
 }
 
@@ -2131,6 +2143,7 @@ export function renderBoard(
   winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void,
   sinkVortexFn?: () => void,
 ): void {
+  const now = Date.now();
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -2147,7 +2160,7 @@ export function renderBoard(
   const currentWater = board.getCurrentWater();
 
   // Shimmer phase for gold spaces (oscillates smoothly over time)
-  const shimmerAlpha = 0.2 + 0.25 * ((Math.sin(Date.now() / 500) + 1) / 2);
+  const shimmerAlpha = 0.2 + 0.25 * ((Math.sin(now / 500) + 1) / 2);
 
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
@@ -2156,12 +2169,12 @@ export function renderBoard(
   // Win tile glow overlay: rendered above Source/Sink/Chamber content but beneath
   // pipe strokes, so it is visible on all connected tile types.
   winTileOverlayFn?.(ctx);
-  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, rotationOverrides);
+  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, now, rotationOverrides);
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);
   // Error highlights are drawn last so they appear above all tile content.
-  _renderPass6ErrorHighlights(ctx, board, highlightedPositions);
-  _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater, effectiveFilled);
+  _renderPass6ErrorHighlights(ctx, board, highlightedPositions, now);
+  _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater, effectiveFilled, now);
 }
 
 /**
@@ -2467,6 +2480,7 @@ function _renderPass3PipeTiles(
   currentTemp: number,
   currentPressure: number,
   mouseCanvasPos: { x: number; y: number } | null,
+  now: number,
   rotationOverrides?: Map<string, number>,
 ): void {
   const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
@@ -2508,7 +2522,7 @@ function _renderPass3PipeTiles(
       // Determine which arm directions need a flat (butt) end cap.
       const buttEndDirs = _computeButtEndDirs(board, r, c);
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs);
+      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs, undefined, undefined, undefined, undefined, now);
     }
   }
 }
@@ -2542,9 +2556,10 @@ function _drawPreviewTile(
   py: number,
   previewTile: Tile,
   currentWater: number,
+  now: number,
 ): void {
   const PULSE_PERIOD_MS = 1200;
-  const t = (Date.now() % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
+  const t = (now % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
   const alpha = 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -2577,9 +2592,10 @@ function _renderConnectionPreview(
   hoverCol: number,
   previewTile: Tile,
   filledPositions: Set<string>,
+  now: number,
 ): void {
   const PULSE_PERIOD_MS = 1200;
-  const t = (Date.now() % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
+  const t = (now % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
   const alpha = 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
 
   const px = hoverCol * TILE_SIZE;
@@ -2672,6 +2688,7 @@ function _renderHoverPreview(
   hoverRotationDelta: number,
   currentWater: number,
   filledPositions: Set<string>,
+  now: number,
 ): void {
   if (!mouseCanvasPos) return;
   const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
@@ -2689,8 +2706,8 @@ function _renderHoverPreview(
     const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
     if (canPlace || canReplace) {
       const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
-      _drawPreviewTile(ctx, px, py, previewTile, currentWater);
-      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions);
+      _drawPreviewTile(ctx, px, py, previewTile, currentWater, now);
+      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions, now);
     }
   } else if (hoverRotationDelta > 0) {
     // Rotation preview on an existing tile (no inventory item selected, Q/W or scroll)
@@ -2701,8 +2718,8 @@ function _renderHoverPreview(
         hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
         hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
       );
-      _drawPreviewTile(ctx, px, py, previewTile, currentWater);
-      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions);
+      _drawPreviewTile(ctx, px, py, previewTile, currentWater, now);
+      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions, now);
     }
   }
 }

@@ -242,7 +242,11 @@ export class CloudShadowField {
       cloud.y += dy;
       cloud.distanceAlong += dd;
     }
-    this._clouds = this._clouds.filter((cloud) => cloud.distanceAlong - cloud.radius <= removeDistance);
+    for (let i = this._clouds.length - 1; i >= 0; i--) {
+      if (this._clouds[i].distanceAlong - this._clouds[i].radius > removeDistance) {
+        this._clouds.splice(i, 1);
+      }
+    }
   }
 
   private _seedInitialClouds(): void {

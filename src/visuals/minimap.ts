@@ -249,6 +249,7 @@ const PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
   PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
 ]);
+const CARDINAL_ROTATION_DIRS = [Direction.North, Direction.East, Direction.South, Direction.West] as const;
 
 /**
  * Draws a tiny wireframe chevron (V-shape) on the minimap to indicate a
@@ -263,8 +264,7 @@ function drawOneWayChevron(
   rotation: Rotation,
   ginghamBg: string,
 ): void {
-  const dirs = [Direction.North, Direction.East, Direction.South, Direction.West] as const;
-  const dir = dirs[rotation / 90] ?? Direction.North;
+  const dir = CARDINAL_ROTATION_DIRS[rotation / 90] ?? Direction.North;
 
   ctx.fillStyle = ginghamBg;
   ctx.fillRect(x, y, px, px);
