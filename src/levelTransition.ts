@@ -3,13 +3,12 @@
  * minimap position on the chapter map up to its full in-game size, while
  * simultaneously fading the chapter map out and the play screen in.
  *
- * The snapshot is rendered onto an offscreen canvas using {@link renderBoard},
- * then displayed inside a fixed-position overlay that animates over ~1 second.
+ * The snapshot is copied onto an offscreen canvas, then displayed inside a
+ * fixed-position overlay that animates over ~1 second.
  */
 
 import { Board } from './board';
-import { TILE_SIZE, renderBoard } from './renderer';
-import { CHAPTER_MAP_BG } from './colors';
+import { TILE_SIZE } from './renderer';
 import { RADIUS_SM } from './uiConstants';
 
 
@@ -205,7 +204,7 @@ export function playMapTransition(
   playScreenEl: HTMLElement,
   onComplete: () => void,
 ): void {
-  // ── 1. Render a snapshot of the level grid onto an offscreen canvas ──────
+  // ── 1. Capture a snapshot of the already-rendered level canvas ────────────
 
   const cols = board.cols;
   const rows = board.rows;
@@ -217,13 +216,14 @@ export function playMapTransition(
   offscreen.height = snapshotH;
   const offCtx = offscreen.getContext('2d');
   if (!offCtx) {
-    // Cannot render – skip transition and call completion immediately.
+    // Cannot capture – skip transition and call completion immediately.
     onComplete();
     return;
   }
 
-  // Render a clean board snapshot (no hover, no selection, no highlights).
-  renderBoard(offCtx, offscreen, board, null, 0, null);
+  // Copy the live level canvas so any pre-initialized visual overlays (such as
+  // cloud shadows) are already present at transition start.
+  offCtx.drawImage(gameCanvas, 0, 0, snapshotW, snapshotH);
 
   // ── 2. Compute the target rect (where the game canvas content area is) ──
 
@@ -249,7 +249,7 @@ export function playMapTransition(
     // Full-screen background matching the chapter map background color.
     const fadeOverlay = document.createElement('div');
     fadeOverlay.style.cssText =
-      `position:fixed;inset:0;z-index:${TRANSITION_FADE_OVERLAY_Z};pointer-events:none;background:${CHAPTER_MAP_BG};`;
+      `position:fixed;inset:0;z-index:${TRANSITION_FADE_OVERLAY_Z};pointer-events:none;`;
 
     // Canvas snapshot element, positioned to match the original canvas exactly.
     const snapEl = document.createElement('canvas');
@@ -580,7 +580,7 @@ export function playMapScreenEnterTransition(
     const { canvas: snapSrc, cssRect } = fromSnapshot;
     const fadeOverlay = document.createElement('div');
     fadeOverlay.style.cssText =
-      `position:fixed;inset:0;z-index:${TRANSITION_FADE_OVERLAY_Z};pointer-events:none;background:${CHAPTER_MAP_BG};`;
+      `position:fixed;inset:0;z-index:${TRANSITION_FADE_OVERLAY_Z};pointer-events:none;`;
     const snapEl = document.createElement('canvas');
     snapEl.width  = snapSrc.width;
     snapEl.height = snapSrc.height;

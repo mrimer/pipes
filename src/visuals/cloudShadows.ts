@@ -458,6 +458,10 @@ export class CloudShadowField {
   }
 
   private _drawCloudShadow(ctx: CanvasRenderingContext2D, cloud: CloudShadow): void {
+    const gradient = ctx.createRadialGradient(0, 0, GRADIENT_INNER_RADIUS_SCALE, 0, 0, 1);
+    gradient.addColorStop(0, `rgba(0,0,0,${(cloud.opacity * GRADIENT_CENTER_OPACITY_SCALE).toFixed(3)})`);
+    gradient.addColorStop(GRADIENT_MID_STOP, `rgba(0,0,0,${(cloud.opacity * GRADIENT_MID_OPACITY_SCALE).toFixed(3)})`);
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
     for (const puff of cloud.puffs) {
       const px = cloud.x + this._dirX * puff.offsetAlong + this._perpX * puff.offsetAcross;
       const py = cloud.y + this._dirY * puff.offsetAlong + this._perpY * puff.offsetAcross;
@@ -467,10 +471,6 @@ export class CloudShadowField {
       ctx.translate(px, py);
       ctx.rotate(this._dirAngle);
       ctx.scale(radiusAlong, radiusAcross);
-      const gradient = ctx.createRadialGradient(0, 0, GRADIENT_INNER_RADIUS_SCALE, 0, 0, 1);
-      gradient.addColorStop(0, `rgba(0,0,0,${(cloud.opacity * GRADIENT_CENTER_OPACITY_SCALE).toFixed(3)})`);
-      gradient.addColorStop(GRADIENT_MID_STOP, `rgba(0,0,0,${(cloud.opacity * GRADIENT_MID_OPACITY_SCALE).toFixed(3)})`);
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(0, 0, 1, 0, TAU);
