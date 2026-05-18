@@ -13,6 +13,43 @@ function makeTwoTileBoard(): Board {
   return board;
 }
 
+// Helper mirroring the effectiveFilled logic in renderBoard
+function buildEffectiveFilled(
+  filled: Set<string>,
+  fillExclude: Set<string> | undefined,
+): Set<string> {
+  if (!fillExclude || fillExclude.size === 0) return filled;
+  const result = new Set<string>(filled);
+  for (const k of fillExclude) result.delete(k);
+  return result;
+}
+
+describe('buildEffectiveFilled', () => {
+  it('returns filled unchanged when fillExclude is empty', () => {
+    const filled = new Set(['0,0', '0,1', '1,0']);
+    const result = buildEffectiveFilled(filled, undefined);
+    expect(result).toBe(filled); // same reference — no copy made
+  });
+
+  it('excludes keys present in fillExclude', () => {
+    const filled = new Set(['0,0', '0,1', '1,0', '1,1']);
+    const exclude = new Set(['0,1', '1,0']);
+    const result = buildEffectiveFilled(filled, exclude);
+    expect(result.has('0,0')).toBe(true);
+    expect(result.has('0,1')).toBe(false);
+    expect(result.has('1,0')).toBe(false);
+    expect(result.has('1,1')).toBe(true);
+  });
+
+  it('does not mutate the original filled set', () => {
+    const filled = new Set(['0,0', '0,1']);
+    const exclude = new Set(['0,1']);
+    const result = buildEffectiveFilled(filled, exclude);
+    expect(result).not.toBe(filled);
+    expect(filled.has('0,1')).toBe(true); // original unchanged
+  });
+});
+
 describe('Board.areMutuallyConnected', () => {
   it('returns false when tiles face away from each other', () => {
     const board = makeTwoTileBoard();
