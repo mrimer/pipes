@@ -281,9 +281,10 @@ export class ChapterMapInput {
     this._dragState = null;
 
     if (moved) {
-      this._cb.setFocusedTilePos(null);
       this._cb.getEditGrid()[startPos.row][startPos.col] = null;
       this._cb.getEditGrid()[currentPos.row][currentPos.col] = tile;
+      this._cb.setFocusedTilePos(currentPos);
+      this._cb.rebuildTileParamsPanel(chapter, campaign);
       this._cb.recordSnapshot(chapter);
       this._cb.saveGridState(chapter, campaign);
     } else {
@@ -333,9 +334,12 @@ export class ChapterMapInput {
         if (pos.row === startPos.row && pos.col === startPos.col) {
           this._dragState.currentPos = pos;
           this._dragState.moved = false;
-        } else if ((this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null) === null) {
-          this._dragState.currentPos = pos;
-          this._dragState.moved = true;
+        } else {
+          const targetTile = this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null;
+          if (targetTile === null || isEmptyFloor(targetTile.shape)) {
+            this._dragState.currentPos = pos;
+            this._dragState.moved = true;
+          }
         }
       }
     }
