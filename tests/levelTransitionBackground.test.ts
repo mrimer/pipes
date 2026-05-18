@@ -2,7 +2,13 @@
  * @jest-environment jsdom
  */
 
-import { playMapScreenExitTransition } from '../src/levelTransition';
+jest.mock('../src/renderer', () => ({
+  TILE_SIZE: 64,
+  renderBoard: jest.fn(),
+}));
+
+import { Board } from '../src/board';
+import { playMapScreenEnterTransition, playMapScreenExitTransition, playMapTransition } from '../src/levelTransition';
 
 describe('map zoom transition backgrounds', () => {
   let now = 0;
@@ -66,5 +72,68 @@ describe('map zoom transition backgrounds', () => {
     // Body background is still unmodified after the transition completes.
     expect(document.body.style.backgroundImage).toBe('url("pipes-bg")');
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the destination screen background fully visible during map enter transitions', () => {
+    const fromScreenEl = document.createElement('div');
+    const toScreenEl = document.createElement('div');
+    const toCanvas = document.createElement('canvas');
+    toScreenEl.appendChild(toCanvas);
+    document.body.appendChild(fromScreenEl);
+    document.body.appendChild(toScreenEl);
+
+    playMapScreenEnterTransition(
+      { x: 8, y: 12, width: 24, height: 16 },
+      {
+        canvas: document.createElement('canvas'),
+        cssRect: { left: 40, top: 50, width: 120, height: 90 },
+      },
+      fromScreenEl,
+      toScreenEl,
+      jest.fn(),
+      {
+        canvas: document.createElement('canvas'),
+        cssRect: { left: 10, top: 20, width: 150, height: 110 },
+      },
+    );
+
+    expect(toScreenEl.style.opacity).toBe('1');
+
+    flushAllAnimationFrames();
+
+    expect(toScreenEl.style.opacity).toBe('');
+  });
+
+  it('keeps the play-screen background fully visible during level enter transitions', () => {
+    const playScreenEl = document.createElement('div');
+    const gameCanvas = document.createElement('canvas');
+    playScreenEl.appendChild(gameCanvas);
+    document.body.appendChild(playScreenEl);
+    jest.spyOn(gameCanvas, 'getBoundingClientRect').mockReturnValue({
+      x: 20,
+      y: 30,
+      left: 20,
+      top: 30,
+      right: 160,
+      bottom: 170,
+      width: 140,
+      height: 140,
+      toJSON: () => ({}),
+    });
+
+    playMapTransition(
+      { x: 8, y: 12, width: 24, height: 16 },
+      gameCanvas,
+      new Board(2, 2),
+      null,
+      playScreenEl,
+      jest.fn(),
+    );
+
+    expect(playScreenEl.style.opacity).toBe('1');
+
+    flushAllAnimationFrames();
+
+    expect(playScreenEl.style.opacity).toBe('');
   });
 });

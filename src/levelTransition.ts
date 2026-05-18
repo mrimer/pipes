@@ -596,7 +596,10 @@ export function playMapScreenEnterTransition(
 
   // ── Prepare screen-element styles ─────────────────────────────────────────
 
-  toScreenEl.style.opacity = '0';
+  // Keep the destination screen background fully visible throughout the zoom-in.
+  // The live destination canvas stays hidden until the transition completes, so
+  // this preserves the scrolling pipe backdrop without exposing the map twice.
+  toScreenEl.style.opacity = '1';
 
   // Hide the live canvas inside fromScreenEl to prevent any mouse-move or
   // touch-move handler from re-rendering it at the wrong TILE_SIZE during the

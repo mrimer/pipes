@@ -18,6 +18,13 @@ interface CloudShadow {
   opacity: number;
 }
 
+type CloudSpawnEdge = 'top' | 'right' | 'bottom' | 'left';
+
+interface CloudSpawnedShadow extends CloudShadow {
+  entryEdge: CloudSpawnEdge;
+  entryCoordinate: number;
+}
+
 interface CloudShadowPresetConfig {
   minRadiusTiles: number;
   maxRadiusTiles: number;
@@ -35,33 +42,44 @@ interface CloudShadowPresetConfig {
 interface CloudSpawnOptions {
   distanceMin?: number;
   distanceMax?: number;
+  entryEdge?: CloudSpawnEdge;
+  entryCoordinate?: number;
+  minGapScale?: number;
+  allowGroup?: boolean;
 }
 
 const TAU = Math.PI * 2;
 const MAX_SPAWN_ATTEMPTS = 30;
 const MAX_DT_MS = 80;
-const PUFF_EDGE_SCALE = 1.16;
+const PUFF_EDGE_SCALE = 1.08;
 const SPAWN_TIMER_RANDOMNESS_FACTOR = 0.6;
 const LANE_PADDING_FACTOR = 0.55;
 const MIN_PUFF_COUNT = 5;
 const BASE_MAX_PUFF_COUNT = 8;
 const SIZE_TO_PUFF_COUNT_FACTOR = 4;
-const CENTER_PUFF_MIN_SCALE = 0.58;
-const CENTER_PUFF_MAX_SCALE = 0.74;
-const CENTER_PUFF_ACROSS_RATIO_MIN = 0.62;
-const CENTER_PUFF_ACROSS_RATIO_MAX = 0.84;
+const CENTER_PUFF_MIN_SCALE = 0.74;
+const CENTER_PUFF_MAX_SCALE = 0.9;
+const CENTER_PUFF_ACROSS_RATIO_MIN = 0.74;
+const CENTER_PUFF_ACROSS_RATIO_MAX = 0.92;
 const EDGE_PUFF_OFFSET_ALONG_MIN_SCALE = 0.22;
-const EDGE_PUFF_OFFSET_ALONG_MAX_SCALE = 0.78;
+const EDGE_PUFF_OFFSET_ALONG_MAX_SCALE = 0.66;
 const EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE = 0.05;
-const EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE = 0.42;
-const EDGE_PUFF_RADIUS_ALONG_MIN_SCALE = 0.28;
-const EDGE_PUFF_RADIUS_ALONG_MAX_SCALE = 0.58;
-const EDGE_PUFF_ACROSS_RATIO_MIN = 0.58;
-const EDGE_PUFF_ACROSS_RATIO_MAX = 0.84;
-const GRADIENT_INNER_RADIUS_SCALE = 0.15;
-const GRADIENT_CENTER_OPACITY_SCALE = 0.95;
-const GRADIENT_MID_STOP = 0.65;
-const GRADIENT_MID_OPACITY_SCALE = 0.45;
+const EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE = 0.34;
+const EDGE_PUFF_RADIUS_ALONG_MIN_SCALE = 0.34;
+const EDGE_PUFF_RADIUS_ALONG_MAX_SCALE = 0.62;
+const EDGE_PUFF_ACROSS_RATIO_MIN = 0.64;
+const EDGE_PUFF_ACROSS_RATIO_MAX = 0.9;
+const GRADIENT_INNER_RADIUS_SCALE = 0.32;
+const GRADIENT_CENTER_OPACITY_SCALE = 1;
+const GRADIENT_MID_STOP = 0.82;
+const GRADIENT_MID_OPACITY_SCALE = 0.72;
+const CAMPAIGN_TILES_PER_CLOUD = 10;
+const GROUP_SPAWN_CHANCE = 0.35;
+const GROUP_MIN_EXTRA_CLOUDS = 1;
+const GROUP_MAX_EXTRA_CLOUDS = 2;
+const GROUP_ENTRY_COORDINATE_SPREAD_FACTOR = 1.4;
+const GROUP_DISTANCE_SPREAD_FACTOR = 0.85;
+const GROUP_MIN_GAP_SCALE = 0.2;
 // Include two radii of extra spacing so newly queued entry clouds do not overlap
 // existing clouds that are still close to the spawn edge.
 const SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER = 2;
@@ -142,9 +160,6 @@ export class CloudShadowField {
   private _perpY = 1;
   private _distanceMin = 0;
   private _distanceMax = 0;
-  private _laneMin = 0;
-  private _laneMax = 0;
-
   resetForScreen(
     width: number,
     height: number,
@@ -180,16 +195,10 @@ export class CloudShadowField {
 
     this._distanceMin = Number.POSITIVE_INFINITY;
     this._distanceMax = Number.NEGATIVE_INFINITY;
-    this._laneMin = Number.POSITIVE_INFINITY;
-    this._laneMax = Number.NEGATIVE_INFINITY;
-
     for (const [x, y] of corners) {
       const distance = x * this._dirX + y * this._dirY;
-      const lane = x * this._perpX + y * this._perpY;
       this._distanceMin = Math.min(this._distanceMin, distance);
       this._distanceMax = Math.max(this._distanceMax, distance);
-      this._laneMin = Math.min(this._laneMin, lane);
-      this._laneMax = Math.max(this._laneMax, lane);
     }
 
     this._seedInitialClouds();
@@ -209,7 +218,9 @@ export class CloudShadowField {
 
     while (this._spawnTimerMs >= this._config.spawnIntervalMs) {
       this._spawnTimerMs -= this._config.spawnIntervalMs;
-      if (this._clouds.length < this._config.maxClouds) this._spawnCloud();
+      if (this._clouds.length < this._getCloudLimit()) {
+        this._spawnCloud({ allowGroup: true });
+      }
     }
 
     for (const cloud of this._clouds) {
@@ -239,58 +250,118 @@ export class CloudShadowField {
       this._distanceMin - this._config.entryMarginTiles * this._tileSize - maxRadiusPx;
     const seedDistanceMax =
       this._distanceMax + this._config.exitMarginTiles * this._tileSize + maxRadiusPx;
-    const targetCount = Math.min(
-      this._config.maxClouds,
-      INITIAL_CLOUD_COUNTS[this._preset],
-    );
+    const targetCount = Math.min(this._getCloudLimit(), this._getInitialCloudCount());
+    const seedGapScale = this._preset === 'campaign' ? GROUP_MIN_GAP_SCALE : 1;
     for (let i = 0; i < targetCount; i++) {
-      if (!this._spawnCloud({ distanceMin: seedDistanceMin, distanceMax: seedDistanceMax })) break;
+      if (!this._spawnCloud({
+        distanceMin: seedDistanceMin,
+        distanceMax: seedDistanceMax,
+        minGapScale: seedGapScale,
+        allowGroup: false,
+      })) break;
     }
     // Keep the field non-empty even on small/tight layouts where broad seeding
     // ranges cannot satisfy spacing constraints for multiple clouds.
     if (this._clouds.length === 0) this._spawnCloud();
   }
 
+  private _getCloudLimit(): number {
+    if (this._preset === 'campaign') {
+      return Math.max(this._config.maxClouds, this._getCampaignAreaCloudCount());
+    }
+    return this._config.maxClouds;
+  }
+
+  private _getInitialCloudCount(): number {
+    if (this._preset === 'campaign') {
+      return this._getCampaignAreaCloudCount();
+    }
+    return INITIAL_CLOUD_COUNTS[this._preset];
+  }
+
+  private _getCampaignAreaCloudCount(): number {
+    const areaTiles = (this._width / this._tileSize) * (this._height / this._tileSize);
+    return Math.max(1, Math.round(areaTiles / CAMPAIGN_TILES_PER_CLOUD));
+  }
+
   private _spawnCloud(options: CloudSpawnOptions = {}): boolean {
     for (let attempt = 0; attempt < MAX_SPAWN_ATTEMPTS; attempt++) {
-      const radius = randRange(
-        this._config.minRadiusTiles * this._tileSize,
-        this._config.maxRadiusTiles * this._tileSize,
-      );
-      const lanePadding = radius * LANE_PADDING_FACTOR;
-      const laneStart = this._laneMin + lanePadding;
-      const laneEnd = this._laneMax - lanePadding;
-      if (laneEnd <= laneStart) return false;
+      const cloud = this._buildSpawnedCloud(options);
+      if (!cloud) return false;
+      if (this._isTooCloseToExistingCloud(
+        cloud.x,
+        cloud.y,
+        cloud.radius,
+        cloud.distanceAlong,
+        options.minGapScale,
+      )) {
+        continue;
+      }
 
-      const lane = randRange(laneStart, laneEnd);
-      const entryDistance = this._distanceMin - radius - this._config.entryMarginTiles * this._tileSize;
-      const defaultDistanceMin = entryDistance - (
-        this._config.minSpawnDistanceTiles * this._tileSize
-        + radius * SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER
-      );
-      const requestedDistanceMin = options.distanceMin ?? defaultDistanceMin;
-      const requestedDistanceMax = options.distanceMax ?? entryDistance;
-      // Normalize caller-provided ranges (or computed defaults) so accidental
-      // min/max inversion still yields a valid random sampling interval.
-      const distanceMin = Math.min(requestedDistanceMin, requestedDistanceMax);
-      const distanceMax = Math.max(requestedDistanceMin, requestedDistanceMax);
-      const distance = randRange(distanceMin, distanceMax);
-      const x = this._dirX * distance + this._perpX * lane;
-      const y = this._dirY * distance + this._perpY * lane;
-
-      if (this._isTooCloseToExistingCloud(x, y, radius, distance)) continue;
-
-      this._clouds.push({
-        x,
-        y,
-        radius,
-        distanceAlong: distance,
-        puffs: this._buildPuffs(radius),
-        opacity: randRange(this._config.minOpacity, this._config.maxOpacity),
-      });
+      this._clouds.push(cloud);
+      if (options.allowGroup) this._spawnGroupedClouds(cloud);
       return true;
     }
     return false;
+  }
+
+  private _buildSpawnedCloud(options: CloudSpawnOptions): CloudSpawnedShadow | null {
+    const radius = randRange(
+      this._config.minRadiusTiles * this._tileSize,
+      this._config.maxRadiusTiles * this._tileSize,
+    );
+    const entryEdge = options.entryEdge ?? this._pickIncomingEdge();
+    const entryCoordinate = this._sampleEntryCoordinate(entryEdge, radius, options.entryCoordinate);
+    if (entryCoordinate === null) return null;
+
+    const anchor = this._getEntryAnchor(entryEdge, entryCoordinate);
+    const offsetFromEdge = radius + this._config.entryMarginTiles * this._tileSize;
+    const baseX = anchor.x - this._dirX * offsetFromEdge;
+    const baseY = anchor.y - this._dirY * offsetFromEdge;
+    const baseDistance = this._projectAlongMovement(baseX, baseY);
+    const entryDistance = this._distanceMin - radius - this._config.entryMarginTiles * this._tileSize;
+    const defaultDistanceMin = entryDistance - (
+      this._config.minSpawnDistanceTiles * this._tileSize
+      + radius * SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER
+    );
+    const requestedDistanceMin = options.distanceMin ?? defaultDistanceMin;
+    const requestedDistanceMax = options.distanceMax ?? entryDistance;
+    const distanceMin = Math.min(requestedDistanceMin, requestedDistanceMax);
+    const distanceMax = Math.max(requestedDistanceMin, requestedDistanceMax);
+    const distanceAlong = randRange(distanceMin, distanceMax);
+    const distanceOffset = distanceAlong - baseDistance;
+
+    return {
+      x: baseX + this._dirX * distanceOffset,
+      y: baseY + this._dirY * distanceOffset,
+      radius,
+      distanceAlong,
+      puffs: this._buildPuffs(radius),
+      opacity: randRange(this._config.minOpacity, this._config.maxOpacity),
+      entryEdge,
+      entryCoordinate,
+    };
+  }
+
+  private _spawnGroupedClouds(anchorCloud: CloudSpawnedShadow): void {
+    if (this._clouds.length >= this._getCloudLimit() || Math.random() >= GROUP_SPAWN_CHANCE) return;
+    const extraCount = Math.floor(randRange(GROUP_MIN_EXTRA_CLOUDS, GROUP_MAX_EXTRA_CLOUDS + 1));
+    const coordinateSpread = anchorCloud.radius * GROUP_ENTRY_COORDINATE_SPREAD_FACTOR;
+    const distanceSpread = anchorCloud.radius * GROUP_DISTANCE_SPREAD_FACTOR;
+
+    for (let i = 0; i < extraCount && this._clouds.length < this._getCloudLimit(); i++) {
+      this._spawnCloud({
+        entryEdge: anchorCloud.entryEdge,
+        entryCoordinate: randRange(
+          anchorCloud.entryCoordinate - coordinateSpread,
+          anchorCloud.entryCoordinate + coordinateSpread,
+        ),
+        distanceMin: anchorCloud.distanceAlong - distanceSpread,
+        distanceMax: anchorCloud.distanceAlong + distanceSpread,
+        minGapScale: GROUP_MIN_GAP_SCALE,
+        allowGroup: false,
+      });
+    }
   }
 
   private _isTooCloseToExistingCloud(
@@ -298,9 +369,10 @@ export class CloudShadowField {
     y: number,
     radius: number,
     distance: number,
+    minGapScale = 1,
   ): boolean {
-    const minGapPx = this._config.minCloudGapTiles * this._tileSize;
-    const minSpawnDistancePx = this._config.minSpawnDistanceTiles * this._tileSize;
+    const minGapPx = this._config.minCloudGapTiles * this._tileSize * minGapScale;
+    const minSpawnDistancePx = this._config.minSpawnDistanceTiles * this._tileSize * minGapScale;
     for (const cloud of this._clouds) {
       const dx = cloud.x - x;
       const dy = cloud.y - y;
@@ -312,6 +384,46 @@ export class CloudShadowField {
       }
     }
     return false;
+  }
+
+  private _pickIncomingEdge(): CloudSpawnEdge {
+    const incomingEdges: CloudSpawnEdge[] = [];
+    incomingEdges.push(this._dirX >= 0 ? 'left' : 'right');
+    incomingEdges.push(this._dirY >= 0 ? 'top' : 'bottom');
+    return incomingEdges[Math.floor(Math.random() * incomingEdges.length)] ?? incomingEdges[0];
+  }
+
+  private _sampleEntryCoordinate(
+    edge: CloudSpawnEdge,
+    radius: number,
+    preferredCoordinate?: number,
+  ): number | null {
+    const isHorizontalEdge = edge === 'top' || edge === 'bottom';
+    const limit = isHorizontalEdge ? this._width : this._height;
+    const padding = radius * LANE_PADDING_FACTOR;
+    const start = padding;
+    const end = limit - padding;
+    if (end <= start) return null;
+    if (preferredCoordinate === undefined) return randRange(start, end);
+    return clamp(preferredCoordinate, start, end);
+  }
+
+  private _getEntryAnchor(edge: CloudSpawnEdge, coordinate: number): { x: number; y: number } {
+    switch (edge) {
+      case 'top':
+        return { x: coordinate, y: 0 };
+      case 'right':
+        return { x: this._width, y: coordinate };
+      case 'bottom':
+        return { x: coordinate, y: this._height };
+      case 'left':
+      default:
+        return { x: 0, y: coordinate };
+    }
+  }
+
+  private _projectAlongMovement(x: number, y: number): number {
+    return x * this._dirX + y * this._dirY;
   }
 
   private _buildPuffs(radius: number): CloudPuff[] {
