@@ -35,6 +35,21 @@ const TAU = Math.PI * 2;
 const MAX_SPAWN_ATTEMPTS = 30;
 const MAX_DT_MS = 80;
 const PUFF_EDGE_SCALE = 1.16;
+const SPAWN_TIMER_RANDOMNESS_FACTOR = 0.6;
+const LANE_PADDING_FACTOR = 0.55;
+const MIN_PUFF_COUNT = 5;
+const BASE_MAX_PUFF_COUNT = 8;
+const SIZE_TO_PUFF_COUNT_FACTOR = 4;
+const CENTER_PUFF_MIN_SCALE = 0.58;
+const CENTER_PUFF_MAX_SCALE = 0.74;
+const EDGE_PUFF_OFFSET_MIN_SCALE = 0.18;
+const EDGE_PUFF_OFFSET_MAX_SCALE = 0.62;
+const EDGE_PUFF_RADIUS_MIN_SCALE = 0.28;
+const EDGE_PUFF_RADIUS_MAX_SCALE = 0.58;
+const GRADIENT_INNER_RADIUS_SCALE = 0.15;
+const GRADIENT_CENTER_OPACITY_SCALE = 0.95;
+const GRADIENT_MID_STOP = 0.65;
+const GRADIENT_MID_OPACITY_SCALE = 0.45;
 const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
   level: {
     minRadiusTiles: 1.15,
@@ -121,7 +136,7 @@ export class CloudShadowField {
     this._config = CLOUD_PRESETS[preset];
     this._clouds = [];
     this._lastNow = null;
-    this._spawnTimerMs = randRange(0, this._config.spawnIntervalMs * 0.6);
+    this._spawnTimerMs = randRange(0, this._config.spawnIntervalMs * SPAWN_TIMER_RANDOMNESS_FACTOR);
 
     this._enabled = style !== 'Dark' && width > 0 && height > 0;
     if (!this._enabled) return;
@@ -200,7 +215,7 @@ export class CloudShadowField {
         this._config.minRadiusTiles * this._tileSize,
         this._config.maxRadiusTiles * this._tileSize,
       );
-      const lanePadding = radius * 0.55;
+      const lanePadding = radius * LANE_PADDING_FACTOR;
       const laneStart = this._laneMin + lanePadding;
       const laneEnd = this._laneMax - lanePadding;
       if (laneEnd <= laneStart) return false;
@@ -253,20 +268,20 @@ export class CloudShadowField {
       0,
       1,
     );
-    const puffCount = Math.round(randRange(5, 8 + sizeNorm * 4));
+    const puffCount = Math.round(randRange(MIN_PUFF_COUNT, BASE_MAX_PUFF_COUNT + sizeNorm * SIZE_TO_PUFF_COUNT_FACTOR));
     const puffs: CloudPuff[] = [{
       offsetX: 0,
       offsetY: 0,
-      radius: radius * randRange(0.58, 0.74),
+      radius: radius * randRange(CENTER_PUFF_MIN_SCALE, CENTER_PUFF_MAX_SCALE),
     }];
 
     for (let i = 1; i < puffCount; i++) {
       const angle = Math.random() * TAU;
-      const distance = randRange(0.18, 0.62) * radius;
+      const distance = randRange(EDGE_PUFF_OFFSET_MIN_SCALE, EDGE_PUFF_OFFSET_MAX_SCALE) * radius;
       puffs.push({
         offsetX: Math.cos(angle) * distance,
         offsetY: Math.sin(angle) * distance,
-        radius: radius * randRange(0.28, 0.58),
+        radius: radius * randRange(EDGE_PUFF_RADIUS_MIN_SCALE, EDGE_PUFF_RADIUS_MAX_SCALE),
       });
     }
     return puffs;
@@ -277,9 +292,9 @@ export class CloudShadowField {
       const px = cloud.x + puff.offsetX;
       const py = cloud.y + puff.offsetY;
       const r = puff.radius * PUFF_EDGE_SCALE;
-      const gradient = ctx.createRadialGradient(px, py, r * 0.15, px, py, r);
-      gradient.addColorStop(0, `rgba(0,0,0,${(cloud.opacity * 0.95).toFixed(3)})`);
-      gradient.addColorStop(0.65, `rgba(0,0,0,${(cloud.opacity * 0.45).toFixed(3)})`);
+      const gradient = ctx.createRadialGradient(px, py, r * GRADIENT_INNER_RADIUS_SCALE, px, py, r);
+      gradient.addColorStop(0, `rgba(0,0,0,${(cloud.opacity * GRADIENT_CENTER_OPACITY_SCALE).toFixed(3)})`);
+      gradient.addColorStop(GRADIENT_MID_STOP, `rgba(0,0,0,${(cloud.opacity * GRADIENT_MID_OPACITY_SCALE).toFixed(3)})`);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
