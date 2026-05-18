@@ -38,7 +38,7 @@ describe('map zoom transition backgrounds', () => {
     }
   }
 
-  it('suppresses the body pipes background image until the zoom transition finishes', () => {
+  it('does not modify the body background image during or after a zoom transition', () => {
     const fromScreenEl = document.createElement('div');
     const toScreenEl = document.createElement('div');
     const snapshotCanvas = document.createElement('canvas');
@@ -58,10 +58,12 @@ describe('map zoom transition backgrounds', () => {
       onComplete,
     );
 
-    expect(document.body.style.backgroundImage).toBe('none');
+    // Body background is not suppressed during the transition.
+    expect(document.body.style.backgroundImage).toBe('url("pipes-bg")');
 
     flushAllAnimationFrames();
 
+    // Body background is still unmodified after the transition completes.
     expect(document.body.style.backgroundImage).toBe('url("pipes-bg")');
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
