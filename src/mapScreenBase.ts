@@ -1114,7 +1114,6 @@ export abstract class MapScreenBase {
     }
 
     // Compute jitter offset for the most recently activated cell, if still active
-    const now = performance.now();
     this._jitterAnims = this._jitterAnims.filter(j => now - j.startedAt < MapScreenBase.JITTER_DURATION_MS);
     let jitterCell: { row: number; col: number; dx: number; dy: number } | undefined;
     if (this._jitterAnims.length > 0) {
