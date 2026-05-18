@@ -80,6 +80,7 @@ const GROUP_MAX_EXTRA_CLOUDS = 2;
 const GROUP_ENTRY_COORDINATE_SPREAD_FACTOR = 1.4;
 const GROUP_DISTANCE_SPREAD_FACTOR = 0.85;
 const GROUP_MIN_GAP_SCALE = 0.2;
+const DEFAULT_SEED_GAP_SCALE = 1;
 // Include two radii of extra spacing so newly queued entry clouds do not overlap
 // existing clouds that are still close to the spawn edge.
 const SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER = 2;
@@ -251,7 +252,7 @@ export class CloudShadowField {
     const seedDistanceMax =
       this._distanceMax + this._config.exitMarginTiles * this._tileSize + maxRadiusPx;
     const targetCount = Math.min(this._getCloudLimit(), this._getInitialCloudCount());
-    const seedGapScale = this._preset === 'campaign' ? GROUP_MIN_GAP_SCALE : 1;
+    const seedGapScale = this._preset === 'campaign' ? GROUP_MIN_GAP_SCALE : DEFAULT_SEED_GAP_SCALE;
     for (let i = 0; i < targetCount; i++) {
       if (!this._spawnCloud({
         distanceMin: seedDistanceMin,
@@ -390,7 +391,7 @@ export class CloudShadowField {
     const incomingEdges: CloudSpawnEdge[] = [];
     incomingEdges.push(this._dirX >= 0 ? 'left' : 'right');
     incomingEdges.push(this._dirY >= 0 ? 'top' : 'bottom');
-    return incomingEdges[Math.floor(Math.random() * incomingEdges.length)] ?? incomingEdges[0];
+    return incomingEdges[Math.floor(Math.random() * incomingEdges.length)];
   }
 
   private _sampleEntryCoordinate(

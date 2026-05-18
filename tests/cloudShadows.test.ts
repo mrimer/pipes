@@ -8,7 +8,7 @@ interface CloudShadowFieldInternals {
   _clouds: Array<{ x: number; y: number }>;
   _dirX: number;
   _dirY: number;
-  _spawnCloud: (options?: Record<string, unknown>) => boolean;
+  _spawnCloud: (options?: { allowGroup?: boolean }) => boolean;
 }
 
 function createLCGPRNG(seed = 12345): () => number {
