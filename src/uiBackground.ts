@@ -25,9 +25,6 @@ const DEFAULT_ANIMATION_DURATION_SEC = 60;
 const DEFAULT_BASE_COLOR = '#0d1520';
 const OVERLAY_RGB = '5,10,18';
 
-const PIPE_SCROLL_KEYFRAMES_NAME = 'pipes-menu-bg-scroll';
-const PIPE_SCROLL_KEYFRAMES_ID = 'pipes-menu-bg-keyframes';
-
 const DIR_NORTH = 1;
 const DIR_EAST = 2;
 const DIR_SOUTH = 4;
@@ -41,6 +38,8 @@ const PIPE_MASK_GRID: ReadonlyArray<ReadonlyArray<number>> = [
 ];
 
 let cachedPipePatternDataUrl: string | null = null;
+const synchronizedBackgroundDurationsSec = new Map<HTMLElement, number>();
+let synchronizedBackgroundAnimationFrameId: number | null = null;
 
 export interface ScrollingPipeBackgroundOptions {
   /** Solid fallback/background color below the pattern. */
@@ -101,18 +100,29 @@ function getPipePatternDataUrl(): string {
   return cachedPipePatternDataUrl;
 }
 
-function ensurePipeBackgroundKeyframes(): void {
-  if (document.getElementById(PIPE_SCROLL_KEYFRAMES_ID)) return;
-  const styleEl = document.createElement('style');
-  styleEl.id = PIPE_SCROLL_KEYFRAMES_ID;
-  styleEl.textContent = `@keyframes ${PIPE_SCROLL_KEYFRAMES_NAME}{0%{background-position:0 0,0 0;}100%{background-position:0 0,${PIPE_PATTERN_SIZE_PX}px ${PIPE_PATTERN_SIZE_PX}px;}}`;
-  document.head.appendChild(styleEl);
+function getSynchronizedBackgroundOffsetPx(nowMs: number, durationSec: number): number {
+  if (durationSec <= 0) return 0;
+  const elapsedSecInCycle = (nowMs / 1000) % durationSec;
+  return (elapsedSecInCycle / durationSec) * PIPE_PATTERN_SIZE_PX;
 }
 
-function getSynchronizedNegativeDelaySec(durationSec: number): number {
-  if (durationSec <= 0) return 0;
-  const phaseSec = (Date.now() / 1000) % durationSec;
-  return -phaseSec;
+function setSynchronizedBackgroundPosition(target: HTMLElement, durationSec: number, nowMs: number): void {
+  const offsetPx = getSynchronizedBackgroundOffsetPx(nowMs, durationSec);
+  target.style.backgroundPosition = `0 0, ${offsetPx}px ${offsetPx}px`;
+}
+
+function tickSynchronizedBackgrounds(nowMs: number): void {
+  synchronizedBackgroundAnimationFrameId = null;
+  synchronizedBackgroundDurationsSec.forEach((durationSec, target) => {
+    setSynchronizedBackgroundPosition(target, durationSec, nowMs);
+  });
+  if (synchronizedBackgroundDurationsSec.size === 0) return;
+  synchronizedBackgroundAnimationFrameId = window.requestAnimationFrame(tickSynchronizedBackgrounds);
+}
+
+function ensureSynchronizedBackgroundAnimationRunning(): void {
+  if (synchronizedBackgroundAnimationFrameId !== null || synchronizedBackgroundDurationsSec.size === 0) return;
+  synchronizedBackgroundAnimationFrameId = window.requestAnimationFrame(tickSynchronizedBackgrounds);
 }
 
 /**
@@ -122,17 +132,18 @@ export function applyScrollingPipeBackground(
   target: HTMLElement,
   options: ScrollingPipeBackgroundOptions = {},
 ): void {
-  ensurePipeBackgroundKeyframes();
   const overlayAlpha = options.overlayAlpha ?? DEFAULT_OVERLAY_ALPHA;
   const durationSec = options.animationDurationSec ?? DEFAULT_ANIMATION_DURATION_SEC;
   const patternDataUrl = getPipePatternDataUrl();
   target.style.backgroundColor = options.baseColor ?? DEFAULT_BASE_COLOR;
   target.style.backgroundImage =
     `linear-gradient(rgba(${OVERLAY_RGB},${overlayAlpha}),rgba(${OVERLAY_RGB},${overlayAlpha})),${patternDataUrl}`;
-  target.style.backgroundRepeat = 'repeat,repeat';
-  target.style.backgroundSize = `auto,${PIPE_PATTERN_SIZE_PX}px ${PIPE_PATTERN_SIZE_PX}px`;
-  target.style.backgroundOrigin = 'border-box,border-box';
-  target.style.backgroundPosition = '0 0,0 0';
-  target.style.animation = `${PIPE_SCROLL_KEYFRAMES_NAME} ${durationSec}s linear infinite`;
-  target.style.animationDelay = `${getSynchronizedNegativeDelaySec(durationSec)}s`;
+  target.style.backgroundRepeat = 'repeat, repeat';
+  target.style.backgroundSize = `auto, ${PIPE_PATTERN_SIZE_PX}px ${PIPE_PATTERN_SIZE_PX}px`;
+  target.style.backgroundOrigin = 'border-box, border-box';
+  target.style.animation = '';
+  target.style.animationDelay = '';
+  synchronizedBackgroundDurationsSec.set(target, durationSec);
+  setSynchronizedBackgroundPosition(target, durationSec, performance.now());
+  ensureSynchronizedBackgroundAnimationRunning();
 }
