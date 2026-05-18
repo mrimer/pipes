@@ -2137,9 +2137,13 @@ export function renderBoard(
   const filled = board.getFilledPositions();
   // Tiles currently in a fill animation are rendered as dry so the fill overlay
   // can draw the partial water progress on top.
-  const effectiveFilled = fillExclude && fillExclude.size > 0
-    ? new Set([...filled].filter(k => !fillExclude.has(k)))
-    : filled;
+  let effectiveFilled: Set<string>;
+  if (fillExclude && fillExclude.size > 0) {
+    effectiveFilled = new Set<string>(filled);
+    for (const k of fillExclude) effectiveFilled.delete(k);
+  } else {
+    effectiveFilled = filled;
+  }
   const currentWater = board.getCurrentWater();
 
   // Shimmer phase for gold spaces (oscillates smoothly over time)
