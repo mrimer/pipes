@@ -669,7 +669,7 @@ export class Game implements InputCallbacks {
 
   /** Start (or restart) the given level. */
   startLevel(levelId: number, existingDecorations?: ReadonlyMap<string, AmbientDecoration>, isUserRestart = false): void {
-    const isLevelAlreadyActive = !isUserRestart
+    const isResumingSameLevel = !isUserRestart
       && this.screen === GameScreen.Play
       && this.currentLevel?.id === levelId;
 
@@ -709,8 +709,8 @@ export class Game implements InputCallbacks {
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
     this._animMgr.resetIdleTimer();
-    const shouldResetCloudShadows = !isUserRestart && !isLevelAlreadyActive;
-    if (shouldResetCloudShadows) {
+    const isNewLevelStart = !isUserRestart && !isResumingSameLevel;
+    if (isNewLevelStart) {
       this._cloudShadows.resetForScreen(
         this.canvas.width,
         this.canvas.height,
