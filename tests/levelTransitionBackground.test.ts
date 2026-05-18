@@ -28,13 +28,13 @@ describe('map zoom transition backgrounds', () => {
   });
 
   function flushAllAnimationFrames(): void {
-    let guard = 0;
-    while (rafQueue.length > 0 && guard < 20) {
+    let safetyCounter = 0;
+    while (rafQueue.length > 0 && safetyCounter < 20) {
       const cb = rafQueue.shift();
       expect(cb).toBeDefined();
       now += 250;
       cb!(now);
-      guard++;
+      safetyCounter++;
     }
   }
 
