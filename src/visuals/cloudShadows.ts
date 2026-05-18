@@ -3,9 +3,10 @@ import type { LevelStyle } from '../types';
 export type CloudShadowPreset = 'level' | 'chapter' | 'campaign';
 
 interface CloudPuff {
-  offsetX: number;
-  offsetY: number;
-  radius: number;
+  offsetAlong: number;
+  offsetAcross: number;
+  radiusAlong: number;
+  radiusAcross: number;
 }
 
 interface CloudShadow {
@@ -42,10 +43,16 @@ const BASE_MAX_PUFF_COUNT = 8;
 const SIZE_TO_PUFF_COUNT_FACTOR = 4;
 const CENTER_PUFF_MIN_SCALE = 0.58;
 const CENTER_PUFF_MAX_SCALE = 0.74;
-const EDGE_PUFF_OFFSET_MIN_SCALE = 0.18;
-const EDGE_PUFF_OFFSET_MAX_SCALE = 0.62;
-const EDGE_PUFF_RADIUS_MIN_SCALE = 0.28;
-const EDGE_PUFF_RADIUS_MAX_SCALE = 0.58;
+const CENTER_PUFF_ACROSS_RATIO_MIN = 0.62;
+const CENTER_PUFF_ACROSS_RATIO_MAX = 0.84;
+const EDGE_PUFF_OFFSET_ALONG_MIN_SCALE = 0.22;
+const EDGE_PUFF_OFFSET_ALONG_MAX_SCALE = 0.78;
+const EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE = 0.05;
+const EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE = 0.42;
+const EDGE_PUFF_RADIUS_ALONG_MIN_SCALE = 0.28;
+const EDGE_PUFF_RADIUS_ALONG_MAX_SCALE = 0.58;
+const EDGE_PUFF_ACROSS_RATIO_MIN = 0.58;
+const EDGE_PUFF_ACROSS_RATIO_MAX = 0.84;
 const GRADIENT_INNER_RADIUS_SCALE = 0.15;
 const GRADIENT_CENTER_OPACITY_SCALE = 0.95;
 const GRADIENT_MID_STOP = 0.65;
@@ -116,6 +123,7 @@ export class CloudShadowField {
 
   private _dirX = 1;
   private _dirY = 0;
+  private _dirAngle = 0;
   private _perpX = 0;
   private _perpY = 1;
   private _distanceMin = 0;
@@ -142,6 +150,7 @@ export class CloudShadowField {
     if (!this._enabled) return;
 
     const angle = Math.random() * TAU;
+    this._dirAngle = angle;
     this._dirX = Math.cos(angle);
     this._dirY = Math.sin(angle);
     this._perpX = -this._dirY;
@@ -269,19 +278,23 @@ export class CloudShadowField {
       1,
     );
     const puffCount = Math.round(randRange(MIN_PUFF_COUNT, BASE_MAX_PUFF_COUNT + sizeNorm * SIZE_TO_PUFF_COUNT_FACTOR));
+    const centerRadiusAlong = radius * randRange(CENTER_PUFF_MIN_SCALE, CENTER_PUFF_MAX_SCALE);
     const puffs: CloudPuff[] = [{
-      offsetX: 0,
-      offsetY: 0,
-      radius: radius * randRange(CENTER_PUFF_MIN_SCALE, CENTER_PUFF_MAX_SCALE),
+      offsetAlong: 0,
+      offsetAcross: 0,
+      radiusAlong: centerRadiusAlong,
+      radiusAcross: centerRadiusAlong * randRange(CENTER_PUFF_ACROSS_RATIO_MIN, CENTER_PUFF_ACROSS_RATIO_MAX),
     }];
 
     for (let i = 1; i < puffCount; i++) {
-      const angle = Math.random() * TAU;
-      const distance = randRange(EDGE_PUFF_OFFSET_MIN_SCALE, EDGE_PUFF_OFFSET_MAX_SCALE) * radius;
+      const alongSign = Math.random() < 0.5 ? -1 : 1;
+      const edgeRadiusAlong = radius * randRange(EDGE_PUFF_RADIUS_ALONG_MIN_SCALE, EDGE_PUFF_RADIUS_ALONG_MAX_SCALE);
       puffs.push({
-        offsetX: Math.cos(angle) * distance,
-        offsetY: Math.sin(angle) * distance,
-        radius: radius * randRange(EDGE_PUFF_RADIUS_MIN_SCALE, EDGE_PUFF_RADIUS_MAX_SCALE),
+        offsetAlong: alongSign * randRange(EDGE_PUFF_OFFSET_ALONG_MIN_SCALE, EDGE_PUFF_OFFSET_ALONG_MAX_SCALE) * radius,
+        offsetAcross: randRange(-EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE, EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE) * radius
+          + (Math.random() < 0.5 ? -1 : 1) * EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE * radius,
+        radiusAlong: edgeRadiusAlong,
+        radiusAcross: edgeRadiusAlong * randRange(EDGE_PUFF_ACROSS_RATIO_MIN, EDGE_PUFF_ACROSS_RATIO_MAX),
       });
     }
     return puffs;
@@ -289,17 +302,23 @@ export class CloudShadowField {
 
   private _drawCloudShadow(ctx: CanvasRenderingContext2D, cloud: CloudShadow): void {
     for (const puff of cloud.puffs) {
-      const px = cloud.x + puff.offsetX;
-      const py = cloud.y + puff.offsetY;
-      const r = puff.radius * PUFF_EDGE_SCALE;
-      const gradient = ctx.createRadialGradient(px, py, r * GRADIENT_INNER_RADIUS_SCALE, px, py, r);
+      const px = cloud.x + this._dirX * puff.offsetAlong + this._perpX * puff.offsetAcross;
+      const py = cloud.y + this._dirY * puff.offsetAlong + this._perpY * puff.offsetAcross;
+      const radiusAlong = puff.radiusAlong * PUFF_EDGE_SCALE;
+      const radiusAcross = puff.radiusAcross * PUFF_EDGE_SCALE;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(this._dirAngle);
+      ctx.scale(radiusAlong, radiusAcross);
+      const gradient = ctx.createRadialGradient(0, 0, GRADIENT_INNER_RADIUS_SCALE, 0, 0, 1);
       gradient.addColorStop(0, `rgba(0,0,0,${(cloud.opacity * GRADIENT_CENTER_OPACITY_SCALE).toFixed(3)})`);
       gradient.addColorStop(GRADIENT_MID_STOP, `rgba(0,0,0,${(cloud.opacity * GRADIENT_MID_OPACITY_SCALE).toFixed(3)})`);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(px, py, r, 0, TAU);
+      ctx.arc(0, 0, 1, 0, TAU);
       ctx.fill();
+      ctx.restore();
     }
   }
 }
