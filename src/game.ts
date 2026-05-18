@@ -46,6 +46,7 @@ import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
 import { applyScrollingPipeBackground } from './uiBackground';
+import { CloudShadowField } from './visuals/cloudShadows';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -222,6 +223,8 @@ export class Game implements InputCallbacks {
 
   /** Manages all canvas-based visual effects (particles, fill/rotation animations, labels, rings). */
   private readonly _animMgr: AnimationManager;
+  /** Procedural ambient cloud-shadow overlay rendered above board visuals. */
+  private readonly _cloudShadows = new CloudShadowField();
 
   /** Manages the play-screen HUD metrics, inventory bar, and best-score box. */
   private readonly _metrics: MetricsDisplay;
@@ -666,6 +669,10 @@ export class Game implements InputCallbacks {
 
   /** Start (or restart) the given level. */
   startLevel(levelId: number, existingDecorations?: ReadonlyMap<string, AmbientDecoration>, isUserRestart = false): void {
+    const isSecondStartForSameActiveLevel = !isUserRestart
+      && this.screen === GameScreen.Play
+      && this.currentLevel?.id === levelId;
+
     let level: LevelDef | undefined;
     if (this._campaign.isPlaytesting) {
       // During playtesting the level lives in the editor, not in the active campaign.
@@ -702,6 +709,15 @@ export class Game implements InputCallbacks {
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
     this._animMgr.resetIdleTimer();
+    if (!isUserRestart && !isSecondStartForSameActiveLevel) {
+      this._cloudShadows.resetForScreen(
+        this.canvas.width,
+        this.canvas.height,
+        TILE_SIZE,
+        'level',
+        level.style,
+      );
+    }
 
     if (!this._campaign.isPlaytesting) {
       this._campaign.updateLevelHeader(levelId);
@@ -864,6 +880,8 @@ export class Game implements InputCallbacks {
       currentPressure,
       now,
     );
+
+    this._cloudShadows.updateAndRender(this.ctx, now);
   }
 
   // ─── Win / game-over handling ─────────────────────────────────────────────

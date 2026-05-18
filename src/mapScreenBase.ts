@@ -5,7 +5,7 @@
  * abstract methods declared at the bottom of this file.
  */
 
-import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration } from './types';
+import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration, LevelStyle } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from './board';
 import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes } from './visuals/chapterMap';
@@ -20,6 +20,7 @@ import { applyScrollingPipeBackground } from './uiBackground';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 import { createButton } from './uiHelpers';
+import { CloudShadowField, CloudShadowPreset } from './visuals/cloudShadows';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -140,6 +141,10 @@ export abstract class MapScreenBase {
   private _decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
   /** Pre-computed floor types for chapter map cells. */
   private _floorTypes: ReadonlyMap<string, PipeShape> = new Map();
+  /** Procedural cloud-shadow field rendered over the map board. */
+  private readonly _cloudShadows = new CloudShadowField();
+  /** Cloud scale/speed preset for this map screen variant. */
+  private readonly _cloudShadowPreset: CloudShadowPreset;
 
   // ─── Touch state ────────────────────────────────────────────────────────
   /** Client x where the most recent touch on this canvas started. */
@@ -256,7 +261,8 @@ export abstract class MapScreenBase {
   /** Number of oscillation cycles in the jitter duration. */
   private static readonly JITTER_CYCLES             = 4;
 
-  constructor() {
+  constructor(cloudShadowPreset: CloudShadowPreset = 'chapter') {
+    this._cloudShadowPreset = cloudShadowPreset;
     this.screenEl = this._buildScreenEl();
     document.body.appendChild(this.screenEl);
 
@@ -554,6 +560,7 @@ export abstract class MapScreenBase {
     this._hover = null;
 
     this._populate(campaign, chapterIdx, chapter);
+    this._resetCloudShadows(chapter.style);
     this.screenEl.style.display = 'flex';
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
@@ -606,6 +613,20 @@ export abstract class MapScreenBase {
     this._campaign = campaign;
     this._populate(campaign, this._chapterIdx, chapter);
     this._startAnimLoop();
+  }
+
+  private _resetCloudShadows(style?: LevelStyle): void {
+    const chapter = this._chapter;
+    if (!chapter) return;
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    this._cloudShadows.resetForScreen(
+      cols * TILE_SIZE,
+      rows * TILE_SIZE,
+      TILE_SIZE,
+      this._cloudShadowPreset,
+      style,
+    );
   }
 
   // ─── Private – DOM building ─────────────────────────────────────────────────
@@ -1065,7 +1086,7 @@ export abstract class MapScreenBase {
    * Render the chapter map canvas only (no DOM stats/status updates).
    * Used by both the interactive `_render` path and the animation loop.
    */
-  private _renderCanvas(chapter: ChapterDef): { filledKeys: Set<string>; displayProgress: Set<number> } | null {
+  private _renderCanvas(chapter: ChapterDef, now = performance.now()): { filledKeys: Set<string>; displayProgress: Set<number> } | null {
     const ctx = this._ctx;
     if (!ctx || !chapter.grid) return null;
 
@@ -1128,6 +1149,8 @@ export abstract class MapScreenBase {
       this._floorTypes,
       chapter.style,
     );
+
+    this._cloudShadows.updateAndRender(ctx, now);
 
     ctx.restore();
 
@@ -1399,7 +1422,7 @@ export abstract class MapScreenBase {
     const viewCols = this._viewCols;
 
     // Re-render the base canvas each frame to clear previous particle frames
-    const renderResult = this._renderCanvas(chapter);
+    const renderResult = this._renderCanvas(chapter, now);
     if (!renderResult) return;
     const { filledKeys, displayProgress } = renderResult;
 
