@@ -559,8 +559,8 @@ export abstract class MapScreenBase {
     this._campaign = campaign;
     this._hover = null;
 
-    this._populate(campaign, chapterIdx, chapter);
     this._resetCloudShadows(chapter.style);
+    this._populate(campaign, chapterIdx, chapter);
     this.screenEl.style.display = 'flex';
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
