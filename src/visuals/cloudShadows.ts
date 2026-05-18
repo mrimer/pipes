@@ -288,11 +288,12 @@ export class CloudShadowField {
 
     for (let i = 1; i < puffCount; i++) {
       const alongSign = Math.random() < 0.5 ? -1 : 1;
+      const acrossSign = Math.random() < 0.5 ? -1 : 1;
       const edgeRadiusAlong = radius * randRange(EDGE_PUFF_RADIUS_ALONG_MIN_SCALE, EDGE_PUFF_RADIUS_ALONG_MAX_SCALE);
       puffs.push({
         offsetAlong: alongSign * randRange(EDGE_PUFF_OFFSET_ALONG_MIN_SCALE, EDGE_PUFF_OFFSET_ALONG_MAX_SCALE) * radius,
         offsetAcross: randRange(-EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE, EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE) * radius
-          + (Math.random() < 0.5 ? -1 : 1) * EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE * radius,
+          + acrossSign * EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE * radius,
         radiusAlong: edgeRadiusAlong,
         radiusAcross: edgeRadiusAlong * randRange(EDGE_PUFF_ACROSS_RATIO_MIN, EDGE_PUFF_ACROSS_RATIO_MAX),
       });
