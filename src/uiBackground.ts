@@ -21,7 +21,7 @@ const INNER_JOINT_RADIUS_RATIO = 0.56;
 const HALF_TILE_PX = PIPE_TILE_SIZE_PX / 2;
 
 const DEFAULT_OVERLAY_ALPHA = 0.74;
-const DEFAULT_ANIMATION_DURATION_SEC = 120;
+const DEFAULT_ANIMATION_DURATION_SEC = 60;
 const DEFAULT_BASE_COLOR = '#0d1520';
 const OVERLAY_RGB = '5,10,18';
 
@@ -109,6 +109,12 @@ function ensurePipeBackgroundKeyframes(): void {
   document.head.appendChild(styleEl);
 }
 
+function getSynchronizedNegativeDelaySec(durationSec: number): number {
+  if (durationSec <= 0) return 0;
+  const phaseSec = (Date.now() / 1000) % durationSec;
+  return -phaseSec;
+}
+
 /**
  * Apply the dim scrolling 3×3 pipe-pattern background to a full-screen UI layer.
  */
@@ -125,5 +131,8 @@ export function applyScrollingPipeBackground(
     `linear-gradient(rgba(${OVERLAY_RGB},${overlayAlpha}),rgba(${OVERLAY_RGB},${overlayAlpha})),${patternDataUrl}`;
   target.style.backgroundRepeat = 'repeat,repeat';
   target.style.backgroundSize = `auto,${PIPE_PATTERN_SIZE_PX}px ${PIPE_PATTERN_SIZE_PX}px`;
+  target.style.backgroundOrigin = 'border-box,border-box';
+  target.style.backgroundPosition = '0 0,0 0';
   target.style.animation = `${PIPE_SCROLL_KEYFRAMES_NAME} ${durationSec}s linear infinite`;
+  target.style.animationDelay = `${getSynchronizedNegativeDelaySec(durationSec)}s`;
 }
