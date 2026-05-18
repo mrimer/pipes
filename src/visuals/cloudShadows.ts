@@ -292,7 +292,7 @@ export class CloudShadowField {
       const edgeRadiusAlong = radius * randRange(EDGE_PUFF_RADIUS_ALONG_MIN_SCALE, EDGE_PUFF_RADIUS_ALONG_MAX_SCALE);
       puffs.push({
         offsetAlong: alongSign * randRange(EDGE_PUFF_OFFSET_ALONG_MIN_SCALE, EDGE_PUFF_OFFSET_ALONG_MAX_SCALE) * radius,
-        offsetAcross: radius * acrossSign * randRange(EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE, EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE),
+        offsetAcross: acrossSign * randRange(EDGE_PUFF_OFFSET_ACROSS_MIN_SCALE, EDGE_PUFF_OFFSET_ACROSS_MAX_SCALE) * radius,
         radiusAlong: edgeRadiusAlong,
         radiusAcross: edgeRadiusAlong * randRange(EDGE_PUFF_ACROSS_RATIO_MIN, EDGE_PUFF_ACROSS_RATIO_MAX),
       });
