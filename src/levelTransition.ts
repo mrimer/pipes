@@ -296,8 +296,8 @@ export function playMapTransition(
   // zooming snapshot, so it should not also fade in at full size.
   gameCanvas.style.visibility = 'hidden';
 
-  // Start the play screen invisible so we can fade it in.
-  playScreenEl.style.opacity = '0';
+  // Keep the play screen background fully visible throughout the zoom-in.
+  playScreenEl.style.opacity = '1';
 
   // ── 6. Animate using requestAnimationFrame ──────────────────────────────
 
@@ -321,17 +321,13 @@ export function playMapTransition(
     // Fade chapter map snapshot out (linear)
     if (chapterMapFadeEl) chapterMapFadeEl.style.opacity = `${1 - rawT}`;
 
-    // Fade play screen in (linear), but keep the game canvas hidden
-    // until the very end so it doesn't also appear at full size during the zoom.
-    playScreenEl.style.opacity = `${rawT}`;
-
     if (rawT < 1) {
       requestAnimationFrame(tick);
     } else {
       // ── 7. Clean up and finalize ────────────────────────────────────────
       overlay.remove();
       if (chapterMapFadeEl) chapterMapFadeEl.remove();
-      playScreenEl.style.opacity = '1';
+      playScreenEl.style.opacity = '';
       // Reveal the game canvas now that the zoomed snapshot overlay is gone.
       gameCanvas.style.visibility = '';
       onComplete();
@@ -495,7 +491,7 @@ export function playMapScreenExitTransition(
   const originalFromCanvasVisibility = fromCanvas?.style.visibility ?? '';
   if (fromCanvas) fromCanvas.style.visibility = 'hidden';
   fromScreenEl.style.opacity = '1';
-  toScreenEl.style.opacity = '0';
+  toScreenEl.style.opacity = '1';
 
   const startTime = performance.now();
 
@@ -609,6 +605,9 @@ export function playMapScreenEnterTransition(
   const fromCanvas = fromScreenEl.querySelector<HTMLCanvasElement>('canvas');
   const originalFromCanvasVisibility = fromCanvas?.style.visibility ?? '';
   if (fromCanvas) fromCanvas.style.visibility = 'hidden';
+  const toCanvas = toScreenEl.querySelector<HTMLCanvasElement>('canvas');
+  const originalToCanvasVisibility = toCanvas?.style.visibility ?? '';
+  if (toCanvas) toCanvas.style.visibility = 'hidden';
 
   // When we have a snapshot overlay covering the source screen, hide the live
   // screen element immediately so only the snapshot is visible.  Otherwise fall
@@ -642,14 +641,13 @@ export function playMapScreenEnterTransition(
     } else {
       fromScreenEl.style.opacity = `${1 - rawT}`;
     }
-    toScreenEl.style.opacity = `${rawT}`;
-
     if (rawT < 1) {
       requestAnimationFrame(tick);
     } else {
       overlay.remove();
       if (fromFadeEl) fromFadeEl.remove();
       if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
+      if (toCanvas) toCanvas.style.visibility = originalToCanvasVisibility;
       fromScreenEl.style.opacity = '';
       toScreenEl.style.opacity = '';
       onComplete();
