@@ -460,7 +460,6 @@ export class CampaignManager {
 
     const campaignEl = campaignMapScreen.screenEl;
     const chapterEl = chapterMapScreen.screenEl;
-    chapterEl.style.visibility = 'hidden';
     campaignEl.style.overflow = 'hidden';
     chapterEl.style.overflow = 'hidden';
     playMapScreenEnterTransition(
@@ -469,7 +468,6 @@ export class CampaignManager {
       campaignEl,
       chapterEl,
       () => {
-        chapterEl.style.visibility = '';
         campaignEl.style.overflow = '';
         chapterEl.style.overflow = '';
         campaignMapScreen.hide();

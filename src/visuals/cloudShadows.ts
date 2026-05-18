@@ -32,6 +32,11 @@ interface CloudShadowPresetConfig {
   exitMarginTiles: number;
 }
 
+interface CloudSpawnOptions {
+  distanceMin?: number;
+  distanceMax?: number;
+}
+
 const TAU = Math.PI * 2;
 const MAX_SPAWN_ATTEMPTS = 30;
 const MAX_DT_MS = 80;
@@ -57,6 +62,11 @@ const GRADIENT_INNER_RADIUS_SCALE = 0.15;
 const GRADIENT_CENTER_OPACITY_SCALE = 0.95;
 const GRADIENT_MID_STOP = 0.65;
 const GRADIENT_MID_OPACITY_SCALE = 0.45;
+const INITIAL_CLOUD_COUNTS: Record<CloudShadowPreset, number> = {
+  level: 2,
+  chapter: 6,
+  campaign: 10,
+};
 const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
   level: {
     minRadiusTiles: 1.15,
@@ -117,6 +127,7 @@ export class CloudShadowField {
   private _height = 0;
   private _tileSize = 1;
   private _config: CloudShadowPresetConfig = CLOUD_PRESETS.level;
+  private _preset: CloudShadowPreset = 'level';
   private _enabled = false;
   private _lastNow: number | null = null;
   private _spawnTimerMs = 0;
@@ -142,6 +153,7 @@ export class CloudShadowField {
     this._height = height;
     this._tileSize = Math.max(1, tileSize);
     this._config = CLOUD_PRESETS[preset];
+    this._preset = preset;
     this._clouds = [];
     this._lastNow = null;
     this._spawnTimerMs = randRange(0, this._config.spawnIntervalMs * SPAWN_TIMER_RANDOMNESS_FACTOR);
@@ -177,7 +189,7 @@ export class CloudShadowField {
       this._laneMax = Math.max(this._laneMax, lane);
     }
 
-    this._spawnCloud();
+    this._seedInitialClouds();
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {
@@ -218,7 +230,23 @@ export class CloudShadowField {
     this._clouds = this._clouds.filter((cloud) => cloud.distanceAlong - cloud.radius <= removeDistance);
   }
 
-  private _spawnCloud(): boolean {
+  private _seedInitialClouds(): void {
+    const maxRadiusPx = this._config.maxRadiusTiles * this._tileSize;
+    const seedDistanceMin =
+      this._distanceMin - this._config.entryMarginTiles * this._tileSize - maxRadiusPx;
+    const seedDistanceMax =
+      this._distanceMax + this._config.exitMarginTiles * this._tileSize + maxRadiusPx;
+    const targetCount = Math.min(
+      this._config.maxClouds,
+      INITIAL_CLOUD_COUNTS[this._preset],
+    );
+    for (let i = 0; i < targetCount; i++) {
+      if (!this._spawnCloud({ distanceMin: seedDistanceMin, distanceMax: seedDistanceMax })) break;
+    }
+    if (this._clouds.length === 0) this._spawnCloud();
+  }
+
+  private _spawnCloud(options: CloudSpawnOptions = {}): boolean {
     for (let attempt = 0; attempt < MAX_SPAWN_ATTEMPTS; attempt++) {
       const radius = randRange(
         this._config.minRadiusTiles * this._tileSize,
@@ -230,7 +258,13 @@ export class CloudShadowField {
       if (laneEnd <= laneStart) return false;
 
       const lane = randRange(laneStart, laneEnd);
-      const distance = this._distanceMin - radius - this._config.entryMarginTiles * this._tileSize;
+      const entryDistance = this._distanceMin - radius - this._config.entryMarginTiles * this._tileSize;
+      const defaultDistanceMin = entryDistance - (this._config.minSpawnDistanceTiles * this._tileSize + radius * 2);
+      const requestedDistanceMin = options.distanceMin ?? defaultDistanceMin;
+      const requestedDistanceMax = options.distanceMax ?? entryDistance;
+      const distanceMin = Math.min(requestedDistanceMin, requestedDistanceMax);
+      const distanceMax = Math.max(requestedDistanceMin, requestedDistanceMax);
+      const distance = randRange(distanceMin, distanceMax);
       const x = this._dirX * distance + this._perpX * lane;
       const y = this._dirY * distance + this._perpY * lane;
 
