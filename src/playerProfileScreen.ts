@@ -32,6 +32,7 @@ import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecord
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from './gameModals';
 import { attachHoverWaveAnimation } from './visuals/chapterWaves';
 import type { CampaignDef } from './types';
+import { applyScrollingPipeBackground } from './uiBackground';
 
 // ─── Styling constants ────────────────────────────────────────────────────────
 
@@ -123,8 +124,12 @@ export class PlayerProfileScreen {
     this._el = document.createElement('div');
     this._el.id = 'player-profile-screen';
     this._el.style.cssText =
-      `display:none;position:fixed;inset:0;background:${SCREEN_BG};` +
+      'display:none;position:fixed;inset:0;' +
       'z-index:50;overflow-y:auto;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;';
+    applyScrollingPipeBackground(this._el, {
+      baseColor: SCREEN_BG,
+      overlayAlpha: 0.8,
+    });
 
     // Title
     const titleEl = document.createElement('h1');

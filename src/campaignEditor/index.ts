@@ -49,6 +49,7 @@ import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
 import { commandKeyManager } from '../commandKeyManager';
 import { downloadGzipJson, readGzipOrJsonFile } from '../fileIO';
+import { applyScrollingPipeBackground } from '../uiBackground';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
@@ -153,8 +154,12 @@ export class CampaignEditor {
 
     this._el = document.createElement('div');
     this._el.style.cssText =
-      'display:none;position:fixed;inset:0;background:#0d1520;overflow:auto;z-index:200;' +
+      'display:none;position:fixed;inset:0;overflow:auto;z-index:200;' +
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
+    applyScrollingPipeBackground(this._el, {
+      baseColor: '#0d1520',
+      overlayAlpha: 0.8,
+    });
     document.body.appendChild(this._el);
 
     this._dialogs = new EditorDialogs(this._el, this._btn.bind(this));

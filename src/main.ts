@@ -5,6 +5,7 @@ import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
 import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { migrateIfNeeded, loadActiveSlotIndex } from './playerProfileSlots';
 import { setActiveSlotIndex } from './activeProfile';
+import { applyScrollingPipeBackground } from './uiBackground';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
@@ -25,6 +26,10 @@ if (savedTouchUiEnabled !== null && hasTouchUiSupport()) {
   setTouchUiEnabledOverride(savedTouchUiEnabled);
 }
 document.body.classList.toggle('is-touch', isTouchDevice());
+applyScrollingPipeBackground(document.body, {
+  baseColor: '#1a1a2e',
+  overlayAlpha: 0.82,
+});
 
 function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;
