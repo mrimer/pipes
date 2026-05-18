@@ -18,17 +18,11 @@ import {
   CHAPTER_MAP_TILE_BG, CHAPTER_MAP_EMPTY_BG,
   CHAPTER_MAP_FILLED_CHAMBER_BG,
 } from '../colors';
-import { tileDefConnections } from '../mapUtils';
+import { tileDefConnections, type ViewBounds } from '../mapUtils';
 import { renderMinimap, minimapDimensions } from './minimap';
 import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
-/** Visible tile range for viewport-culled rendering. All loops use [rMin..rMax] inclusive. */
-export interface ViewBounds {
-  rMin: number;
-  rMax: number;
-  cMin: number;
-  cMax: number;
-}
+export type { ViewBounds };
 
 // ─── Butt-end helpers ─────────────────────────────────────────────────────────
 

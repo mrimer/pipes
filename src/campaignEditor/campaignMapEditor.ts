@@ -51,6 +51,7 @@ import { isTileConnectedToSource } from '../tile';
 import { buildCompletionInputWidget } from './chapterEditorUI';
 import { handleMapEditorKeyDown, applyMapValidationState, buildPaletteSubSection } from './mapEditorSectionUtils';
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
+import { computeViewBounds } from '../mapUtils';
 import { MapEditorBase } from './mapEditorBase';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
@@ -785,12 +786,15 @@ export class CampaignMapEditorSection extends MapEditorBase {
     ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
-    const mapRows = this._gridState.rows;
-    const mapCols = this._gridState.cols;
-    const rMin = Math.max(0, Math.floor(this._panPixelY / TILE_SIZE));
-    const rMax = Math.min(mapRows - 1, Math.ceil((this._panPixelY + this._viewRows * TILE_SIZE) / TILE_SIZE));
-    const cMin = Math.max(0, Math.floor(this._panPixelX / TILE_SIZE));
-    const cMax = Math.min(mapCols - 1, Math.ceil((this._panPixelX + this._viewCols * TILE_SIZE) / TILE_SIZE));
+    const viewBounds = computeViewBounds(
+      this._panPixelX,
+      this._panPixelY,
+      this._viewCols,
+      this._viewRows,
+      this._gridState.cols,
+      this._gridState.rows,
+      TILE_SIZE,
+    );
 
     renderEditorCanvas(
       ctx,
@@ -805,7 +809,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       filledKeys,
       campaign?.style,
       chapterDefs,
-      { rMin, rMax, cMin, cMax },
+      viewBounds,
     );
 
     drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);

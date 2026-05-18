@@ -10,7 +10,7 @@ import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from './board';
 import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
-import { computeMapReachable, tileDefConnections, findMapTile } from './mapUtils';
+import { computeMapReachable, tileDefConnections, findMapTile, computeViewBounds } from './mapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
@@ -1132,10 +1132,15 @@ export abstract class MapScreenBase {
     ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
-    const rMin = Math.max(0, Math.floor(this._panPixelY / TILE_SIZE));
-    const rMax = Math.min(rows - 1, Math.ceil((this._panPixelY + this._viewRows * TILE_SIZE) / TILE_SIZE));
-    const cMin = Math.max(0, Math.floor(this._panPixelX / TILE_SIZE));
-    const cMax = Math.min(cols - 1, Math.ceil((this._panPixelX + this._viewCols * TILE_SIZE) / TILE_SIZE));
+    const viewBounds = computeViewBounds(
+      this._panPixelX,
+      this._panPixelY,
+      this._viewCols,
+      this._viewRows,
+      cols,
+      rows,
+      TILE_SIZE,
+    );
 
     renderChapterMapCanvas(
       ctx,
@@ -1151,7 +1156,7 @@ export abstract class MapScreenBase {
       jitterCell,
       this._floorTypes,
       chapter.style,
-      { rMin, rMax, cMin, cMax },
+      viewBounds,
     );
 
     this._cloudShadows.updateAndRender(ctx, now);
