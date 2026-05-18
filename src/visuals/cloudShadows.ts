@@ -62,6 +62,8 @@ const GRADIENT_INNER_RADIUS_SCALE = 0.15;
 const GRADIENT_CENTER_OPACITY_SCALE = 0.95;
 const GRADIENT_MID_STOP = 0.65;
 const GRADIENT_MID_OPACITY_SCALE = 0.45;
+// Include two radii of extra spacing so newly queued entry clouds do not overlap
+// existing clouds that are still close to the spawn edge.
 const SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER = 2;
 const INITIAL_CLOUD_COUNTS: Record<CloudShadowPreset, number> = {
   level: 2,
@@ -244,6 +246,8 @@ export class CloudShadowField {
     for (let i = 0; i < targetCount; i++) {
       if (!this._spawnCloud({ distanceMin: seedDistanceMin, distanceMax: seedDistanceMax })) break;
     }
+    // Keep the field non-empty even on small/tight layouts where broad seeding
+    // ranges cannot satisfy spacing constraints for multiple clouds.
     if (this._clouds.length === 0) this._spawnCloud();
   }
 
