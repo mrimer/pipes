@@ -82,6 +82,17 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+function suppressBodyScrollingBackgroundImage(): () => void {
+  // The body owns the shared scrolling menu background. These zoom transitions
+  // fade full-screen screens via opacity, so temporarily suppress the body image
+  // to prevent it from flashing through between the source and destination views.
+  const originalBackgroundImage = document.body.style.backgroundImage;
+  document.body.style.backgroundImage = 'none';
+  return () => {
+    document.body.style.backgroundImage = originalBackgroundImage;
+  };
+}
+
 interface TransitionStyleSnapshot {
   transform: string;
   transformOrigin: string;
@@ -224,6 +235,7 @@ export function playMapTransition(
 
   // Render a clean board snapshot (no hover, no selection, no highlights).
   renderBoard(offCtx, offscreen, board, null, 0, null);
+  const restoreBodyBackgroundImage = suppressBodyScrollingBackgroundImage();
 
   // ── 2. Compute the target rect (where the game canvas content area is) ──
 
@@ -332,6 +344,7 @@ export function playMapTransition(
       overlay.remove();
       if (chapterMapFadeEl) chapterMapFadeEl.remove();
       playScreenEl.style.opacity = '1';
+      restoreBodyBackgroundImage();
       // Reveal the game canvas now that the zoomed snapshot overlay is gone.
       gameCanvas.style.visibility = '';
       onComplete();
@@ -378,6 +391,7 @@ export function playMapExitTransition(
   };
 
   // ── 2. Create a fixed-position overlay hosting the animating snapshot ─────
+  const restoreBodyBackgroundImage = suppressBodyScrollingBackgroundImage();
 
   const overlay = document.createElement('div');
   overlay.style.cssText = `position:fixed;inset:0;z-index:${TRANSITION_ZOOM_OVERLAY_Z};pointer-events:none;`;
@@ -439,6 +453,7 @@ export function playMapExitTransition(
       overlay.remove();
       playScreenEl.style.opacity = '';
       chapterMapScreenEl.style.opacity = '';
+      restoreBodyBackgroundImage();
       gameCanvas.style.visibility = '';
       onComplete();
     }
@@ -460,6 +475,7 @@ export function playMapScreenExitTransition(
   toScreenEl: HTMLElement,
   onComplete: () => void,
 ): void {
+  const restoreBodyBackgroundImage = suppressBodyScrollingBackgroundImage();
   const startRect: ScreenRect = {
     x: fromSnapshot.cssRect.left,
     y: fromSnapshot.cssRect.top,
@@ -524,6 +540,7 @@ export function playMapScreenExitTransition(
       if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
       fromScreenEl.style.opacity = '';
       toScreenEl.style.opacity = '';
+      restoreBodyBackgroundImage();
       onComplete();
     }
   }
@@ -551,6 +568,7 @@ export function playMapScreenEnterTransition(
   onComplete: () => void,
   fromSnapshot?: ChapterMapSnapshot | null,
 ): void {
+  const restoreBodyBackgroundImage = suppressBodyScrollingBackgroundImage();
   const targetRect: ScreenRect = {
     x: toSnapshot.cssRect.left,
     y: toSnapshot.cssRect.top,
@@ -653,6 +671,7 @@ export function playMapScreenEnterTransition(
       if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
       fromScreenEl.style.opacity = '';
       toScreenEl.style.opacity = '';
+      restoreBodyBackgroundImage();
       onComplete();
     }
   }

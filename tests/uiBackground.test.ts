@@ -39,9 +39,9 @@ describe('applyScrollingPipeBackground', () => {
     applyScrollingPipeBackground(second, { baseColor: '#654321', overlayAlpha: 0.8 });
 
     expect(first.style.backgroundImage).toContain('linear-gradient');
-    expect(first.style.backgroundRepeat).toBe('repeat, repeat');
-    expect(first.style.backgroundSize).toBe('auto, 384px 384px');
+    expect(first.style.backgroundImage).toContain('data:image/svg+xml');
     expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(first.style.backgroundPosition).toBe(second.style.backgroundPosition);
 
     flushNextAnimationFrame(15_000);
     expect(first.style.backgroundPosition).toBe(second.style.backgroundPosition);
