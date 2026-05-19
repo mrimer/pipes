@@ -100,10 +100,18 @@ describe('campaign zoom sizing (pure logic)', () => {
     const outMaxY = Math.max(0, (rows - zoomedOut.viewRows) * zoomedOut.tileSize);
     const inMaxX = Math.max(0, (cols - zoomedIn.viewCols) * zoomedIn.tileSize);
     const inMaxY = Math.max(0, (rows - zoomedIn.viewRows) * zoomedIn.tileSize);
-    expect(Math.max(0, Math.min(outMaxX, 99999))).toBeLessThanOrEqual(outMaxX);
-    expect(Math.max(0, Math.min(outMaxY, 99999))).toBeLessThanOrEqual(outMaxY);
-    expect(Math.max(0, Math.min(inMaxX, 99999))).toBeLessThanOrEqual(inMaxX);
-    expect(Math.max(0, Math.min(inMaxY, 99999))).toBeLessThanOrEqual(inMaxY);
+    expect(outMaxX).toBeGreaterThanOrEqual(0);
+    expect(outMaxY).toBeGreaterThanOrEqual(0);
+    expect(inMaxX).toBeGreaterThanOrEqual(0);
+    expect(inMaxY).toBeGreaterThanOrEqual(0);
+    expect(clampPanEdgeOnly(99999, 99999, rows, cols, zoomedOut.viewRows, zoomedOut.viewCols, zoomedOut.tileSize))
+      .toEqual({ x: outMaxX, y: outMaxY });
+    expect(clampPanEdgeOnly(99999, 99999, rows, cols, zoomedIn.viewRows, zoomedIn.viewCols, zoomedIn.tileSize))
+      .toEqual({ x: inMaxX, y: inMaxY });
+    expect(clampPanEdgeOnly(-99999, -99999, rows, cols, zoomedOut.viewRows, zoomedOut.viewCols, zoomedOut.tileSize))
+      .toEqual({ x: 0, y: 0 });
+    expect(clampPanEdgeOnly(-99999, -99999, rows, cols, zoomedIn.viewRows, zoomedIn.viewCols, zoomedIn.tileSize))
+      .toEqual({ x: 0, y: 0 });
   });
 
   it('zoom state can be preserved across repopulate by reusing zoom scale', () => {

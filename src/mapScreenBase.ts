@@ -47,6 +47,12 @@ export const CAMPAIGN_MAP_ZOOM_STEP = 0.1;
 export const CAMPAIGN_MAP_ZOOM_MIN_SCALE = 0.5;
 /** Maximum zoom scale relative to the campaign map's default tile size. */
 export const CAMPAIGN_MAP_ZOOM_MAX_SCALE = 2;
+/** Floating-point tolerance for no-op campaign zoom comparisons. */
+const CAMPAIGN_ZOOM_EPSILON = 0.0001;
+/** Default map row count when chapter metadata is absent. */
+const DEFAULT_MAP_ROWS = 3;
+/** Default map column count when chapter metadata is absent. */
+const DEFAULT_MAP_COLS = 6;
 
 /** Clamp campaign-map zoom scale to fixed min/max bounds. */
 export function clampCampaignZoomScale(scale: number): number {
@@ -750,8 +756,8 @@ export abstract class MapScreenBase {
   }
 
   private _isPannable(chapter: ChapterDef): boolean {
-    const rows = chapter.rows ?? 3;
-    const cols = chapter.cols ?? 6;
+    const rows = chapter.rows ?? DEFAULT_MAP_ROWS;
+    const cols = chapter.cols ?? DEFAULT_MAP_COLS;
     return rows > this._viewRows || cols > this._viewCols;
   }
 
@@ -760,8 +766,8 @@ export abstract class MapScreenBase {
     oldViewWidthPx: number;
     oldViewHeightPx: number;
   } {
-    const rows = chapter.rows ?? 3;
-    const cols = chapter.cols ?? 6;
+    const rows = chapter.rows ?? DEFAULT_MAP_ROWS;
+    const cols = chapter.cols ?? DEFAULT_MAP_COLS;
     const baseViewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
     const baseViewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
     const oldTileSize = this._lastTileSize > 0 ? this._lastTileSize : TILE_SIZE;
@@ -842,7 +848,7 @@ export abstract class MapScreenBase {
       ? this._campaignZoomScale * zoomFactor
       : this._campaignZoomScale / zoomFactor;
     const clampedScale = clampCampaignZoomScale(nextScale);
-    if (Math.abs(clampedScale - this._campaignZoomScale) < 0.0001) return;
+    if (Math.abs(clampedScale - this._campaignZoomScale) < CAMPAIGN_ZOOM_EPSILON) return;
     this._campaignZoomScale = clampedScale;
 
     this._applyViewSizing(chapter);
