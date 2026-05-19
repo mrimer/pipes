@@ -452,26 +452,16 @@ export interface BubbleParticle {
 const BUBBLE_MAX = 80;
 
 /**
- * Attempt to spawn one new bubble inside a random connected pipe tile.
- * Does nothing when the pool is full or there are no eligible tiles.
+ * Pre-compute the connected tile keys that are eligible to spawn pipe bubbles.
  *
- * @param bubbles         Mutable array of active bubbles.
- * @param board           The current game board.
- * @param filledPositions Pre-computed set of connected tile keys ("row,col").
- * @param shapesFilter    Optional set of PipeShapes to restrict spawning to.
- *                        When omitted, spawns on regular and spin pipes only
- *                        (golden pipes are excluded so they can be handled
- *                        by a separate pool rendered with a distinct color).
+ * This is cached by the owning animation state so the full fill set only needs
+ * to be scanned when the board's connected positions change.
  */
-export function spawnBubble(
-  bubbles: BubbleParticle[],
+export function buildBubbleCandidateKeys(
   board: Board,
-  filledPositions: Set<string>,
+  filledPositions: ReadonlySet<string>,
   shapesFilter?: ReadonlySet<string>,
-): void {
-  if (bubbles.length >= BUBBLE_MAX) return;
-
-  // Collect filled positions that are actual pipe tiles (not source/sink/chamber).
+): string[] {
   const candidates: string[] = [];
   for (const key of filledPositions) {
     const [r, c] = parseKey(key);
@@ -483,6 +473,33 @@ export function spawnBubble(
       candidates.push(key);
     }
   }
+  return candidates;
+}
+
+/**
+ * Attempt to spawn one new bubble inside a random connected pipe tile.
+ * Does nothing when the pool is full or there are no eligible tiles.
+ *
+ * @param bubbles         Mutable array of active bubbles.
+ * @param board           The current game board.
+ * @param filledPositions Pre-computed set of connected tile keys ("row,col").
+ * @param shapesFilter    Optional set of PipeShapes to restrict spawning to.
+ *                        When omitted, spawns on regular and spin pipes only
+ *                        (golden pipes are excluded so they can be handled
+ *                        by a separate pool rendered with a distinct color).
+ * @param candidateKeys   Optional cached eligible keys built from the same
+ *                        fill state. When omitted, candidates are rebuilt.
+ */
+export function spawnBubble(
+  bubbles: BubbleParticle[],
+  board: Board,
+  filledPositions: Set<string>,
+  shapesFilter?: ReadonlySet<string>,
+  candidateKeys?: readonly string[],
+): void {
+  if (bubbles.length >= BUBBLE_MAX) return;
+
+  const candidates = candidateKeys ?? buildBubbleCandidateKeys(board, filledPositions, shapesFilter);
   if (candidates.length === 0) return;
 
   const key = candidates[Math.floor(Math.random() * candidates.length)];
@@ -557,16 +574,10 @@ export function spawnBubble(
  * @param cols      Number of columns in the grid.
  * @param filledKeys Pre-computed set of water-reachable tile keys ("row,col").
  */
-export function spawnChapterMapBubble(
-  bubbles: BubbleParticle[],
+export function buildChapterMapBubbleCandidateKeys(
   grid: (TileDef | null)[][],
-  rows: number,
-  cols: number,
-  filledKeys: Set<string>,
-): void {
-  if (bubbles.length >= BUBBLE_MAX) return;
-
-  // Collect filled positions that are actual pipe tiles (not source/sink/chamber).
+  filledKeys: ReadonlySet<string>,
+): string[] {
   const candidates: string[] = [];
   for (const key of filledKeys) {
     const [r, c] = parseKey(key);
@@ -577,6 +588,20 @@ export function spawnChapterMapBubble(
       candidates.push(key);
     }
   }
+  return candidates;
+}
+
+export function spawnChapterMapBubble(
+  bubbles: BubbleParticle[],
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  filledKeys: Set<string>,
+  candidateKeys?: readonly string[],
+): void {
+  if (bubbles.length >= BUBBLE_MAX) return;
+
+  const candidates = candidateKeys ?? buildChapterMapBubbleCandidateKeys(grid, filledKeys);
   if (candidates.length === 0) return;
 
   const key = candidates[Math.floor(Math.random() * candidates.length)];
@@ -716,24 +741,26 @@ function _leakySprayMaxDist(): number { return TILE_SIZE * 0.4; }
 
 /** Maximum number of simultaneously live leaky spray drops across all leaky pipes. */
 const LEAKY_SPRAY_MAX_DROPS = 40;
+/** Rust-spot positions along a leaky arm, matching the renderer. */
+const LEAKY_RUST_SPOT_FRACTIONS = [0.33, 0.67] as const;
+
+/** One cached leaky spray origin and the arm direction it sprays from. */
+export interface LeakySprayCandidate {
+  cx: number;
+  cy: number;
+  armAngle: number;
+}
 
 /**
- * Attempt to add one new leaky spray drop originating from a rust spot on a
- * randomly chosen connected leaky pipe arm.
- *
- * @param drops          Mutable array of active leaky spray drops.
- * @param board          The current game board.
- * @param filledPositions Pre-computed set of connected tile keys ("row,col").
+ * Pre-compute the rust-spot spray origins for all currently connected leaky
+ * pipe arms. Cached by the animation owner and rebuilt only when fill state or
+ * board state changes.
  */
-export function spawnLeakySprayDrop(
-  drops: LeakySprayDrop[],
+export function buildLeakySprayCandidates(
   board: Board,
-  filledPositions: Set<string>,
-): void {
-  if (drops.length >= LEAKY_SPRAY_MAX_DROPS) return;
-
-  // Collect candidate (position, direction) pairs: non-blocked arms of connected leaky pipes.
-  const candidates: Array<{ cx: number; cy: number; armAngle: number }> = [];
+  filledPositions: ReadonlySet<string>,
+): LeakySprayCandidate[] {
+  const candidates: LeakySprayCandidate[] = [];
 
   for (const key of filledPositions) {
     const [r, c] = parseKey(key);
@@ -744,7 +771,6 @@ export function spawnLeakySprayDrop(
     const tileCy = r * TILE_SIZE + TILE_SIZE / 2;
     const half = TILE_SIZE / 2;
 
-    // Determine the blocked arm (if on a one-way tile).
     const owDir = board.oneWayData.get(key);
     const blockedDir = owDir !== undefined ? oppositeDirection(owDir) : null;
 
@@ -759,8 +785,7 @@ export function spawnLeakySprayDrop(
         case Direction.West:  dx = -1; dy =  0; armAngle =  Math.PI;     break;
       }
 
-      // Two rust spots at 1/3 and 2/3 along the arm (matching _drawLeakyRustSpots).
-      for (const frac of [0.33, 0.67]) {
+      for (const frac of LEAKY_RUST_SPOT_FRACTIONS) {
         candidates.push({
           cx: tileCx + dx * half * frac,
           cy: tileCy + dy * half * frac,
@@ -770,9 +795,30 @@ export function spawnLeakySprayDrop(
     }
   }
 
-  if (candidates.length === 0) return;
+  return candidates;
+}
 
-  const { cx, cy, armAngle } = candidates[Math.floor(Math.random() * candidates.length)];
+/**
+ * Attempt to add one new leaky spray drop originating from a rust spot on a
+ * randomly chosen connected leaky pipe arm.
+ *
+ * @param drops          Mutable array of active leaky spray drops.
+ * @param board          The current game board.
+ * @param filledPositions Pre-computed set of connected tile keys ("row,col").
+ * @param candidates     Optional cached spray origins for the same board state.
+ */
+export function spawnLeakySprayDrop(
+  drops: LeakySprayDrop[],
+  board: Board,
+  filledPositions: Set<string>,
+  candidates?: readonly LeakySprayCandidate[],
+): void {
+  if (drops.length >= LEAKY_SPRAY_MAX_DROPS) return;
+
+  const sprayCandidates = candidates ?? buildLeakySprayCandidates(board, filledPositions);
+  if (sprayCandidates.length === 0) return;
+
+  const { cx, cy, armAngle } = sprayCandidates[Math.floor(Math.random() * sprayCandidates.length)];
 
   // Spray roughly perpendicular to the arm, with some angular spread.
   const perpAngle = armAngle + Math.PI / 2;

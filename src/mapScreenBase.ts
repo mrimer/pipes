@@ -12,7 +12,10 @@ import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeMapReachable, tileDefConnections, findMapTile, computeViewBounds } from './mapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
-import { SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray, BubbleParticle, spawnChapterMapBubble, renderBubbles } from './visuals/waterParticles';
+import {
+  SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray,
+  BubbleParticle, spawnChapterMapBubble, renderBubbles, buildChapterMapBubbleCandidateKeys,
+} from './visuals/waterParticles';
 import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
@@ -217,6 +220,10 @@ export abstract class MapScreenBase {
   private _chapterMapFlowDrops: ChapterMapFlowDrop[] = [];
   private _lastFlowSpawn = 0;
   private _bubbles: BubbleParticle[] = [];
+  /** Cached eligible filled tile keys for chapter-map bubble spawns. */
+  private _bubbleCandidateKeys: string[] = [];
+  /** Whether the chapter-map bubble candidate cache needs rebuilding. */
+  private _bubbleCandidateKeysDirty = true;
   private _lastBubbleSpawn = 0;
   /** Edge flowers that appear along the left/right canvas edges when the chapter is completed. */
   private _edgeFlowers: EdgeFlower[] = [];
@@ -556,6 +563,8 @@ export abstract class MapScreenBase {
       this._chapterMapFlowDrops = [];
       this._bubbles = [];
     }
+    this._bubbleCandidateKeys = [];
+    this._bubbleCandidateKeysDirty = true;
     // Edge flowers always restart fresh when entering the screen
     this._edgeFlowers = [];
     this._leftEdgeFlowersByY = [];
@@ -619,6 +628,8 @@ export abstract class MapScreenBase {
     const chapter = this._chapter;
     if (!chapter) return;
     this._campaign = campaign;
+    this._bubbleCandidateKeys = [];
+    this._bubbleCandidateKeysDirty = true;
     this._populate(campaign, this._chapterIdx, chapter);
     this._startAnimLoop();
   }
@@ -1493,7 +1504,11 @@ export abstract class MapScreenBase {
 
     // Pipe bubbles – fizzing particles inside connected pipe tiles.
     if (now - this._lastBubbleSpawn >= MapScreenBase.BUBBLE_SPAWN_INTERVAL_MS) {
-      spawnChapterMapBubble(this._bubbles, grid, rows, cols, filledKeys);
+      if (this._bubbleCandidateKeysDirty) {
+        this._bubbleCandidateKeys = buildChapterMapBubbleCandidateKeys(grid, filledKeys);
+        this._bubbleCandidateKeysDirty = false;
+      }
+      spawnChapterMapBubble(this._bubbles, grid, rows, cols, filledKeys, this._bubbleCandidateKeys);
       this._lastBubbleSpawn = now;
     }
     renderBubbles(ctx, this._bubbles, WATER_COLOR);

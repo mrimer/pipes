@@ -20,12 +20,12 @@ import {
   ANIM_ITEM_COLOR, ANIM_ITEM_NEG_COLOR,
 } from './visuals/tileAnimation';
 import {
-  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff, LeakySprayDrop,
+  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff, LeakySprayDrop, LeakySprayCandidate,
   spawnSourceSprayDrop, renderSourceSpray,
   spawnDryPuff, renderDryPuffs,
   spawnFlowDrop, renderFlowDrops,
-  spawnBubble, renderBubbles,
-  spawnLeakySprayDrop, renderLeakySpray,
+  spawnBubble, renderBubbles, buildBubbleCandidateKeys,
+  spawnLeakySprayDrop, renderLeakySpray, buildLeakySprayCandidates,
   computeFlowGoodDirs,
 } from './visuals/waterParticles';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -38,7 +38,7 @@ import {
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
 import { WinTileGlow, computeWinTileGlows, renderWinTileGlows } from './visuals/winTileEffect';
 import { IdlePulse, computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
-import { HeatWave, tickHeatWaves, renderHeatWaves } from './visuals/heatWave';
+import { HeatWave, tickHeatWaves, renderHeatWaves, collectHotPlateTiles } from './visuals/heatWave';
 import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
@@ -115,10 +115,20 @@ export class AnimationManager {
   private _goldBubbles: BubbleParticle[] = [];
   /** `performance.now()` of the last golden bubble spawn. */
   private _lastGoldBubbleSpawn = 0;
+  /** Cached eligible tile keys for regular/spin bubble spawns. */
+  private _bubbleCandidates: string[] = [];
+  /** Cached eligible tile keys for golden-pipe bubble spawns. */
+  private _goldBubbleCandidates: string[] = [];
 
   private _leakySprayDrops: LeakySprayDrop[] = [];
   /** `performance.now()` of the last leaky spray drop spawn. */
   private _lastLeakySpraySpawn = 0;
+  /** Cached rust-spot origins for connected leaky pipe spray spawns. */
+  private _leakySprayCandidates: LeakySprayCandidate[] = [];
+  /** Board instance associated with the cached particle candidate arrays. */
+  private _particleCacheBoard: Board | null = null;
+  /** Whether the cached bubble / leaky candidate arrays need to be rebuilt. */
+  private _boardParticleCachesDirty = true;
 
   private _vortexParticles: VortexParticle[] = [];
   /** `performance.now()` of the last vortex particle spawn. */
@@ -149,6 +159,10 @@ export class AnimationManager {
   private _heatWaves: HeatWave[] = [];
   /** Maps "row,col" → `performance.now()` of the last heat-wave spawn for that tile. */
   private _heatWaveLastSpawn: Map<string, number> = new Map();
+  /** Cached hot-plate tile positions for the current board instance. */
+  private _hotPlateTiles: GridPos[] = [];
+  /** Board instance associated with the cached hot-plate position list. */
+  private _hotPlateBoard: Board | null = null;
   private _drySourcePulseGradient: CanvasGradient | null = null;
   private _drySourcePulseGradientKey: string | null = null;
 
@@ -168,6 +182,7 @@ export class AnimationManager {
     filledBefore: Set<string>,
     sparkle: AnimSparkleCallbacks,
   ): void {
+    this._invalidateBoardParticleCaches();
     const filledAfter = board.getFilledPositions();
     const now = performance.now();
     const currentTemp = board.getCurrentTemperature(filledAfter);
@@ -198,6 +213,7 @@ export class AnimationManager {
     reclaimedRow?: number,
     reclaimedCol?: number,
   ): void {
+    this._invalidateBoardParticleCaches();
     const filledAfter = board.getFilledPositions();
     const now = performance.now();
     const currentTemp = board.getCurrentTemperature(filledAfter);
@@ -489,7 +505,12 @@ export class AnimationManager {
     this._flowDrops = [];
     this._bubbles = [];
     this._goldBubbles = [];
+    this._bubbleCandidates = [];
+    this._goldBubbleCandidates = [];
     this._leakySprayDrops = [];
+    this._leakySprayCandidates = [];
+    this._particleCacheBoard = null;
+    this._boardParticleCachesDirty = true;
     this._vortexParticles = [];
     this._flowGoodDirs = null;
     this._rotationAnims = [];
@@ -499,6 +520,8 @@ export class AnimationManager {
     this._activePulse = null;
     this._heatWaves = [];
     this._heatWaveLastSpawn = new Map();
+    this._hotPlateTiles = [];
+    this._hotPlateBoard = null;
     this._drySourcePulseGradient = null;
     this._drySourcePulseGradientKey = null;
   }
@@ -603,13 +626,14 @@ export class AnimationManager {
     const filledPositions = board.getFilledPositions();
     // Only show bubbles when at least one regular pipe tile is in the fill path.
     if (filledPositions.size <= 2) return; // source + sink only → nothing to show
+    this._refreshBoardParticleCaches(board, filledPositions);
     const now = performance.now();
     if (now - this._lastBubbleSpawn >= BUBBLE_SPAWN_INTERVAL_MS) {
-      spawnBubble(this._bubbles, board, filledPositions);
+      spawnBubble(this._bubbles, board, filledPositions, undefined, this._bubbleCandidates);
       this._lastBubbleSpawn = now;
     }
     if (now - this._lastGoldBubbleSpawn >= BUBBLE_SPAWN_INTERVAL_MS) {
-      spawnBubble(this._goldBubbles, board, filledPositions, GOLD_PIPE_SHAPES);
+      spawnBubble(this._goldBubbles, board, filledPositions, GOLD_PIPE_SHAPES, this._goldBubbleCandidates);
       this._lastGoldBubbleSpawn = now;
     }
     renderBubbles(this.ctx, this._bubbles, WATER_COLOR);
@@ -623,19 +647,14 @@ export class AnimationManager {
   private _tickLeakySpray(board: Board, gameState: GameState): void {
     if (gameState !== GameState.Playing) return;
     const filledPositions = board.getFilledPositions();
-    // Check if any leaky pipe is in the fill path.
-    const hasLeakyPipe = [...filledPositions].some((key) => {
-      const [r, c] = parseKey(key);
-      const tile = board.grid[r]?.[c];
-      return tile !== undefined && LEAKY_PIPE_SHAPES.has(tile.shape);
-    });
-    if (!hasLeakyPipe) {
+    this._refreshBoardParticleCaches(board, filledPositions);
+    if (this._leakySprayCandidates.length === 0) {
       this._leakySprayDrops = [];
       return;
     }
     const now = performance.now();
     if (now - this._lastLeakySpraySpawn >= LEAKY_SPRAY_SPAWN_INTERVAL_MS) {
-      spawnLeakySprayDrop(this._leakySprayDrops, board, filledPositions);
+      spawnLeakySprayDrop(this._leakySprayDrops, board, filledPositions, this._leakySprayCandidates);
       this._lastLeakySpraySpawn = now;
     }
     renderLeakySpray(this.ctx, this._leakySprayDrops, WATER_COLOR);
@@ -775,8 +794,28 @@ export class AnimationManager {
   private _tickHeatWaves(board: Board): void {
     const now = performance.now();
     const filled = board.getFilledPositions();
-    tickHeatWaves(this._heatWaves, this._heatWaveLastSpawn, board, filled, now);
+    if (this._hotPlateBoard !== board) {
+      this._hotPlateTiles = collectHotPlateTiles(board);
+      this._hotPlateBoard = board;
+    }
+    tickHeatWaves(this._heatWaves, this._heatWaveLastSpawn, board, filled, now, this._hotPlateTiles);
     renderHeatWaves(this.ctx, this._heatWaves, now);
+  }
+
+  private _refreshBoardParticleCaches(board: Board, filledPositions: Set<string>): void {
+    if (this._particleCacheBoard !== board) {
+      this._particleCacheBoard = board;
+      this._boardParticleCachesDirty = true;
+    }
+    if (!this._boardParticleCachesDirty) return;
+    this._bubbleCandidates = buildBubbleCandidateKeys(board, filledPositions);
+    this._goldBubbleCandidates = buildBubbleCandidateKeys(board, filledPositions, GOLD_PIPE_SHAPES);
+    this._leakySprayCandidates = buildLeakySprayCandidates(board, filledPositions);
+    this._boardParticleCachesDirty = false;
+  }
+
+  private _invalidateBoardParticleCaches(): void {
+    this._boardParticleCachesDirty = true;
   }
 
 
