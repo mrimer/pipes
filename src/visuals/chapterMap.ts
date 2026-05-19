@@ -841,6 +841,33 @@ export function renderChapterMapCanvas(
   }
 }
 
+/**
+ * Render only sea tiles for the chapter map.
+ * Intended for per-frame overlays when the rest of the map is cached.
+ */
+export function renderChapterMapSeaTiles(
+  ctx: CanvasRenderingContext2D,
+  grid: (TileDef | null)[][],
+  rows: number,
+  cols: number,
+  style?: LevelStyle,
+  viewBounds?: ViewBounds,
+): void {
+  const CELL = TILE_SIZE;
+  const rMin = viewBounds?.rMin ?? 0;
+  const rMax = viewBounds ? Math.min(rows - 1, viewBounds.rMax) : rows - 1;
+  const cMin = viewBounds?.cMin ?? 0;
+  const cMax = viewBounds ? Math.min(cols - 1, viewBounds.cMax) : cols - 1;
+
+  for (let r = rMin; r <= rMax; r++) {
+    for (let c = cMin; c <= cMax; c++) {
+      const def = grid[r]?.[c] ?? null;
+      if (def?.shape !== PipeShape.Sea) continue;
+      _drawChapterMapSea(ctx, c * CELL, r * CELL, grid, rows, cols, r, c, style);
+    }
+  }
+}
+
 // ─── Edge completion flowers ───────────────────────────────────────────────────
 
 /** Bright petal colors for edge flowers shown on chapter completion. */

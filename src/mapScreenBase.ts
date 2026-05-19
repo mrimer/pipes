@@ -8,7 +8,7 @@
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration, LevelStyle } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from './board';
-import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes, invalidateMinimapRectCache } from './visuals/chapterMap';
+import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes, invalidateMinimapRectCache, renderChapterMapSeaTiles } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeMapReachable, tileDefConnections, findMapTile, computeViewBounds } from './mapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -1265,6 +1265,30 @@ export abstract class MapScreenBase {
 
     // Blit the static base layer (grid tiles) onto the visible canvas.
     ctx.drawImage(baseCanvas, 0, 0);
+
+    const chapter = this._chapter;
+    if (chapter?.grid) {
+      const rows = chapter.rows ?? 3;
+      const cols = chapter.cols ?? 6;
+      const viewBounds = computeViewBounds(
+        this._panPixelX,
+        this._panPixelY,
+        this._viewCols,
+        this._viewRows,
+        cols,
+        rows,
+        TILE_SIZE,
+      );
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
+      ctx.clip();
+      ctx.translate(-this._panPixelX, -this._panPixelY);
+      // Sea tiles animate in drawSea (color oscillation + ripples), so redraw
+      // them each frame even when the base map layer stays cached.
+      renderChapterMapSeaTiles(ctx, chapter.grid, rows, cols, chapter.style, viewBounds);
+      ctx.restore();
+    }
 
     // Cloud shadows move continuously and must be drawn each frame.
     // They use the same pan transform as the grid render in _renderBase.
