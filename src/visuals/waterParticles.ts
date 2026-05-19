@@ -741,7 +741,7 @@ function _leakySprayMaxDist(): number { return TILE_SIZE * 0.4; }
 
 /** Maximum number of simultaneously live leaky spray drops across all leaky pipes. */
 const LEAKY_SPRAY_MAX_DROPS = 40;
-/** Rust-spot positions along a leaky arm, matching the renderer. */
+/** Rust-spot positions along a leaky arm, matching `_drawLeakyRustSpots` in renderer.ts. */
 const LEAKY_RUST_SPOT_FRACTIONS = [0.33, 0.67] as const;
 
 /** One cached leaky spray origin and the arm direction it sprays from. */
