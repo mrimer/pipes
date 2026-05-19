@@ -79,7 +79,7 @@ export class CampaignMapScreen {
         const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
         return starsTotal === 0 || starsCollected >= starsTotal;
       },
-      formatInstructionText: () => 'Click on an accessible chapter',
+      formatInstructionText: () => 'Click on an accessible chapter.',
       formatStatsText: () => {
         const campaign = this._campaign;
         if (!campaign) return '';
