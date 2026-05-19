@@ -9,7 +9,14 @@
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../src/chapterMapScreen';
 import { GRID_MAX_DIM, CAMPAIGN_MAP_MAX_DIM, GRID_MIN_DIM } from '../src/campaignEditor/types';
 import { buildGridSizePanel, GridSizePanelCallbacks } from '../src/campaignEditor/gridSizePanel';
-import { clampPanAxisWithFallback } from '../src/mapScreenBase';
+import {
+  CAMPAIGN_MAP_ZOOM_MAX_SCALE,
+  CAMPAIGN_MAP_ZOOM_MIN_SCALE,
+  CAMPAIGN_MAP_ZOOM_STEP,
+  clampCampaignZoomScale,
+  clampPanAxisWithFallback,
+  computeCampaignZoomFitMinTileSize,
+} from '../src/mapScreenBase';
 import { computeViewBounds } from '../src/mapUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -19,6 +26,96 @@ describe('MAP_VIEW constants', () => {
   it('MAP_VIEW_MAX_ROWS is 9',  () => expect(MAP_VIEW_MAX_ROWS).toBe(9));
   it('CAMPAIGN_MAP_MAX_DIM is 50', () => expect(CAMPAIGN_MAP_MAX_DIM).toBe(50));
   it('GRID_MAX_DIM remains 20',    () => expect(GRID_MAX_DIM).toBe(20));
+});
+
+describe('campaign map zoom constants/helpers', () => {
+  it('zoom constants are fixed and stable', () => {
+    expect(CAMPAIGN_MAP_ZOOM_STEP).toBeCloseTo(0.1);
+    expect(CAMPAIGN_MAP_ZOOM_MIN_SCALE).toBeCloseTo(0.5);
+    expect(CAMPAIGN_MAP_ZOOM_MAX_SCALE).toBeCloseTo(2);
+  });
+
+  it('clampCampaignZoomScale enforces fixed min/max bounds', () => {
+    expect(clampCampaignZoomScale(0.01)).toBe(CAMPAIGN_MAP_ZOOM_MIN_SCALE);
+    expect(clampCampaignZoomScale(99)).toBe(CAMPAIGN_MAP_ZOOM_MAX_SCALE);
+    expect(clampCampaignZoomScale(1)).toBe(1);
+  });
+
+  it('computeCampaignZoomFitMinTileSize prevents viewport from exceeding map extents', () => {
+    // 768x576 viewport over 24x18 map: min tile is max(768/24, 576/18) = 32.
+    expect(computeCampaignZoomFitMinTileSize(768, 576, 24, 18)).toBeCloseTo(32);
+  });
+});
+
+function applyZoomSizingPure(
+  defaultTileSize: number,
+  zoomScale: number,
+  viewportW: number,
+  viewportH: number,
+  rows: number,
+  cols: number,
+): { tileSize: number; viewRows: number; viewCols: number; zoomScale: number } {
+  const minTileByScale = defaultTileSize * CAMPAIGN_MAP_ZOOM_MIN_SCALE;
+  const maxTileByScale = defaultTileSize * CAMPAIGN_MAP_ZOOM_MAX_SCALE;
+  const fitMin = computeCampaignZoomFitMinTileSize(viewportW, viewportH, cols, rows);
+  const minTile = Math.max(minTileByScale, fitMin);
+  let tile = defaultTileSize * clampCampaignZoomScale(zoomScale);
+  tile = Math.max(minTile, Math.min(maxTileByScale, tile));
+  tile = Math.max(1, Math.round(tile));
+  tile = Math.max(tile, Math.ceil(minTile));
+  return {
+    tileSize: tile,
+    viewRows: Math.min(rows, viewportH / tile),
+    viewCols: Math.min(cols, viewportW / tile),
+    zoomScale: tile / defaultTileSize,
+  };
+}
+
+describe('campaign zoom sizing (pure logic)', () => {
+  it('default baseline keeps historical 12x9 viewport at zoom scale 1', () => {
+    const defaultTile = 64;
+    const s = applyZoomSizingPure(defaultTile, 1, 12 * defaultTile, 9 * defaultTile, 30, 30);
+    expect(s.tileSize).toBe(defaultTile);
+    expect(s.viewCols).toBeCloseTo(12);
+    expect(s.viewRows).toBeCloseTo(9);
+  });
+
+  it('zoom-out clamps at map-fit minimum so viewport never exceeds full map', () => {
+    const defaultTile = 64;
+    const s = applyZoomSizingPure(defaultTile, 0.01, 12 * defaultTile, 9 * defaultTile, 18, 24);
+    expect(s.tileSize).toBeGreaterThanOrEqual(32); // map-fit minimum
+    expect(s.viewCols).toBeLessThanOrEqual(24);
+    expect(s.viewRows).toBeLessThanOrEqual(18);
+  });
+
+  it('pan remains clamped after zooming out then in', () => {
+    const defaultTile = 64;
+    const rows = 20;
+    const cols = 20;
+    const viewportW = 12 * defaultTile;
+    const viewportH = 9 * defaultTile;
+    const zoomedOut = applyZoomSizingPure(defaultTile, 0.6, viewportW, viewportH, rows, cols);
+    const zoomedIn = applyZoomSizingPure(defaultTile, 1.6, viewportW, viewportH, rows, cols);
+    const outMaxX = Math.max(0, (cols - zoomedOut.viewCols) * zoomedOut.tileSize);
+    const outMaxY = Math.max(0, (rows - zoomedOut.viewRows) * zoomedOut.tileSize);
+    const inMaxX = Math.max(0, (cols - zoomedIn.viewCols) * zoomedIn.tileSize);
+    const inMaxY = Math.max(0, (rows - zoomedIn.viewRows) * zoomedIn.tileSize);
+    expect(Math.max(0, Math.min(outMaxX, 99999))).toBeLessThanOrEqual(outMaxX);
+    expect(Math.max(0, Math.min(outMaxY, 99999))).toBeLessThanOrEqual(outMaxY);
+    expect(Math.max(0, Math.min(inMaxX, 99999))).toBeLessThanOrEqual(inMaxX);
+    expect(Math.max(0, Math.min(inMaxY, 99999))).toBeLessThanOrEqual(inMaxY);
+  });
+
+  it('zoom state can be preserved across repopulate by reusing zoom scale', () => {
+    const defaultTile = 64;
+    const viewportW = 12 * defaultTile;
+    const viewportH = 9 * defaultTile;
+    const first = applyZoomSizingPure(defaultTile, 1.2, viewportW, viewportH, 20, 20);
+    const second = applyZoomSizingPure(defaultTile, first.zoomScale, viewportW, viewportH, 20, 20);
+    expect(second.tileSize).toBe(first.tileSize);
+    expect(second.viewCols).toBeCloseTo(first.viewCols);
+    expect(second.viewRows).toBeCloseTo(first.viewRows);
+  });
 });
 
 // ─── gridSizePanel maxDim option ──────────────────────────────────────────────

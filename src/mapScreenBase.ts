@@ -41,6 +41,32 @@ const CHAPTER_MAP_CANVAS_BORDER_RADIUS = 6;
 export const MAP_VIEW_MAX_COLS = 12;
 /** Maximum number of tile rows displayed in the map view window. */
 export const MAP_VIEW_MAX_ROWS = 9;
+/** Fixed wheel-zoom increment for campaign map zooming (10% per notch). */
+export const CAMPAIGN_MAP_ZOOM_STEP = 0.1;
+/** Minimum zoom scale relative to the campaign map's default tile size. */
+export const CAMPAIGN_MAP_ZOOM_MIN_SCALE = 0.5;
+/** Maximum zoom scale relative to the campaign map's default tile size. */
+export const CAMPAIGN_MAP_ZOOM_MAX_SCALE = 2;
+
+/** Clamp campaign-map zoom scale to fixed min/max bounds. */
+export function clampCampaignZoomScale(scale: number): number {
+  return Math.max(CAMPAIGN_MAP_ZOOM_MIN_SCALE, Math.min(CAMPAIGN_MAP_ZOOM_MAX_SCALE, scale));
+}
+
+/**
+ * Compute the minimum tile size that still guarantees the viewport cannot show
+ * beyond the map bounds in either axis.
+ */
+export function computeCampaignZoomFitMinTileSize(
+  viewportWidthPx: number,
+  viewportHeightPx: number,
+  mapCols: number,
+  mapRows: number,
+): number {
+  const minByWidth = viewportWidthPx / Math.max(1, mapCols);
+  const minByHeight = viewportHeightPx / Math.max(1, mapRows);
+  return Math.max(minByWidth, minByHeight);
+}
 
 /**
  * Clamp one pan axis to a preferred range, including the "inverted range"
@@ -199,6 +225,14 @@ export abstract class MapScreenBase {
   private _viewRows = MAP_VIEW_MAX_ROWS;
   /** Number of tile cols visible in the current view window (≤ MAP_VIEW_MAX_COLS). */
   private _viewCols = MAP_VIEW_MAX_COLS;
+  /** Baseline campaign-map tile size used for zoom scale = 1. */
+  private _campaignDefaultTileSize = 0;
+  /** Baseline campaign-map viewport width in pixels at zoom scale = 1. */
+  private _campaignViewportWidthPx = 0;
+  /** Baseline campaign-map viewport height in pixels at zoom scale = 1. */
+  private _campaignViewportHeightPx = 0;
+  /** Campaign-map zoom scale (session-scoped, persisted on this screen instance). */
+  private _campaignZoomScale = 1;
 
   // ─── Pan drag state ──────────────────────────────────────────────────────
   /** Active mouse-drag-to-pan state, null when no pan drag is in progress. */
@@ -679,6 +713,25 @@ export abstract class MapScreenBase {
     );
   }
 
+  private _reflowCloudShadows(style?: LevelStyle): void {
+    const chapter = this._chapter;
+    if (!chapter) return;
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    this._cloudShadows.reflowForScreen(
+      cols * TILE_SIZE,
+      rows * TILE_SIZE,
+      TILE_SIZE,
+      style,
+    );
+    this._campaignBirdFlock.reflowForScreen(
+      cols * TILE_SIZE,
+      rows * TILE_SIZE,
+      TILE_SIZE,
+      this._cloudShadowPreset === 'campaign' ? style : 'Dark',
+    );
+  }
+
   // ─── Private – DOM building ─────────────────────────────────────────────────
 
   private _buildScreenEl(): HTMLElement {
@@ -690,6 +743,120 @@ export abstract class MapScreenBase {
       'padding:20px;box-sizing:border-box;gap:16px;';
     applyScrollingPipeBackground(el, { baseColor: BG_COLOR });
     return el;
+  }
+
+  private _isCampaignZoomEnabled(): boolean {
+    return this._cloudShadowPreset === 'campaign';
+  }
+
+  private _isPannable(chapter: ChapterDef): boolean {
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    return rows > this._viewRows || cols > this._viewCols;
+  }
+
+  private _applyViewSizing(chapter: ChapterDef): {
+    oldTileSize: number;
+    oldViewWidthPx: number;
+    oldViewHeightPx: number;
+  } {
+    const rows = chapter.rows ?? 3;
+    const cols = chapter.cols ?? 6;
+    const baseViewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
+    const baseViewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
+    const oldTileSize = this._lastTileSize > 0 ? this._lastTileSize : TILE_SIZE;
+    const oldViewWidthPx = this._viewCols * oldTileSize;
+    const oldViewHeightPx = this._viewRows * oldTileSize;
+
+    const defaultTileSize = computeTileSize(baseViewRows, baseViewCols, CHAPTER_MAP_GRID_OVERHEAD);
+    let tileSize = defaultTileSize;
+    let viewRows = baseViewRows;
+    let viewCols = baseViewCols;
+
+    if (this._isCampaignZoomEnabled()) {
+      this._campaignDefaultTileSize = defaultTileSize;
+      this._campaignViewportWidthPx = baseViewCols * defaultTileSize;
+      this._campaignViewportHeightPx = baseViewRows * defaultTileSize;
+      const minTileByScale = defaultTileSize * CAMPAIGN_MAP_ZOOM_MIN_SCALE;
+      const maxTileByScale = defaultTileSize * CAMPAIGN_MAP_ZOOM_MAX_SCALE;
+      const fitMinTile = computeCampaignZoomFitMinTileSize(
+        this._campaignViewportWidthPx,
+        this._campaignViewportHeightPx,
+        cols,
+        rows,
+      );
+      const minTile = Math.max(minTileByScale, fitMinTile);
+      const requestedTile = defaultTileSize * clampCampaignZoomScale(this._campaignZoomScale);
+      tileSize = Math.max(minTile, Math.min(maxTileByScale, requestedTile));
+      tileSize = Math.max(1, Math.round(tileSize));
+      tileSize = Math.max(tileSize, Math.ceil(minTile));
+      this._campaignZoomScale = tileSize / defaultTileSize;
+      viewRows = Math.min(rows, this._campaignViewportHeightPx / tileSize);
+      viewCols = Math.min(cols, this._campaignViewportWidthPx / tileSize);
+    } else {
+      this._campaignDefaultTileSize = 0;
+      this._campaignViewportWidthPx = 0;
+      this._campaignViewportHeightPx = 0;
+      this._campaignZoomScale = 1;
+    }
+
+    setTileSize(tileSize);
+    if (TILE_SIZE !== oldTileSize) {
+      invalidateMinimapRectCache();
+    }
+    this._lastTileSize = TILE_SIZE;
+    this._viewRows = viewRows;
+    this._viewCols = viewCols;
+
+    if (!this._canvas) return { oldTileSize, oldViewWidthPx, oldViewHeightPx };
+    this._canvas.width = Math.max(1, Math.round(this._viewCols * TILE_SIZE));
+    this._canvas.height = Math.max(1, Math.round(this._viewRows * TILE_SIZE));
+    if (!this._baseCanvas) {
+      this._baseCanvas = document.createElement('canvas');
+      this._baseCtx = this._baseCanvas.getContext('2d') ?? null;
+    }
+    this._baseCanvas.width = this._canvas.width;
+    this._baseCanvas.height = this._canvas.height;
+    this._chapterMapDirty = true;
+
+    return { oldTileSize, oldViewWidthPx, oldViewHeightPx };
+  }
+
+  private _updateCampaignZoomFromWheel(
+    chapter: ChapterDef,
+    deltaY: number,
+    anchorPxX: number,
+    anchorPxY: number,
+  ): void {
+    if (!this._isCampaignZoomEnabled() || deltaY === 0) return;
+    const oldTileSize = TILE_SIZE;
+    if (oldTileSize <= 0) return;
+    const oldCanvasWidth = Math.max(1, Math.round(this._viewCols * oldTileSize));
+    const oldCanvasHeight = Math.max(1, Math.round(this._viewRows * oldTileSize));
+    const anchorRatioX = Math.max(0, Math.min(1, anchorPxX / oldCanvasWidth));
+    const anchorRatioY = Math.max(0, Math.min(1, anchorPxY / oldCanvasHeight));
+    const anchorGridX = (this._panPixelX + anchorPxX) / oldTileSize;
+    const anchorGridY = (this._panPixelY + anchorPxY) / oldTileSize;
+    const zoomFactor = 1 + CAMPAIGN_MAP_ZOOM_STEP;
+    const nextScale = deltaY < 0
+      ? this._campaignZoomScale * zoomFactor
+      : this._campaignZoomScale / zoomFactor;
+    const clampedScale = clampCampaignZoomScale(nextScale);
+    if (Math.abs(clampedScale - this._campaignZoomScale) < 0.0001) return;
+    this._campaignZoomScale = clampedScale;
+
+    this._applyViewSizing(chapter);
+
+    const newCanvasWidth = Math.max(1, Math.round(this._viewCols * TILE_SIZE));
+    const newCanvasHeight = Math.max(1, Math.round(this._viewRows * TILE_SIZE));
+    const newAnchorPxX = anchorRatioX * newCanvasWidth;
+    const newAnchorPxY = anchorRatioY * newCanvasHeight;
+    this._panPixelX = anchorGridX * TILE_SIZE - newAnchorPxX;
+    this._panPixelY = anchorGridY * TILE_SIZE - newAnchorPxY;
+    this._clampPan(chapter, this._viewRows, this._viewCols);
+    this._reflowCloudShadows(chapter.style);
+    this._chapterMapDirty = true;
+    this._render(chapter);
   }
 
   private _populate(campaign: CampaignDef, chapterIdx: number, chapter: ChapterDef): void {
@@ -748,30 +915,11 @@ export abstract class MapScreenBase {
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
 
-    // Use a view-window capped at MAP_VIEW_MAX_COLS × MAP_VIEW_MAX_ROWS.
-    // When the map fits within that cap, view == full grid (unchanged behaviour).
-    const viewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
-    const viewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
-    const isOversized = rows > MAP_VIEW_MAX_ROWS || cols > MAP_VIEW_MAX_COLS;
-
-    // Scale tile size to fit the view window on screen.
-    // Use the tile size this instance last used (not the global) as the reference
-    // for rescaling the pan offset on repopulate.  The global TILE_SIZE may have
-    // been mutated by another screen (e.g. the chapter map) while this screen was
-    // hidden, which would produce an incorrect rescale factor if used directly.
-    const oldTileSize = this._lastTileSize > 0 ? this._lastTileSize : TILE_SIZE;
-    setTileSize(computeTileSize(viewRows, viewCols, CHAPTER_MAP_GRID_OVERHEAD));
-    if (TILE_SIZE !== oldTileSize) {
-      // Evict stale minimap-rect cache entries from the previous tile size.
-      invalidateMinimapRectCache();
-    }
-    this._lastTileSize = TILE_SIZE;
-    this._viewRows = viewRows;
-    this._viewCols = viewCols;
+    const { oldTileSize } = this._applyViewSizing(chapter);
 
     // Compute or preserve pan position.
     if (!this._panInitialized) {
-      this._computeInitialSnap(chapter, viewRows, viewCols);
+      this._computeInitialSnap(chapter, this._viewRows, this._viewCols);
       this._panInitialized = true;
     } else {
       // On resize (repopulate with same map), rescale the pan pixel offset so
@@ -780,26 +928,16 @@ export abstract class MapScreenBase {
         this._panPixelX = this._panPixelX * TILE_SIZE / oldTileSize;
         this._panPixelY = this._panPixelY * TILE_SIZE / oldTileSize;
       }
-      this._clampPan(chapter, viewRows, viewCols);
+      this._clampPan(chapter, this._viewRows, this._viewCols);
+    }
+    if (oldTileSize !== TILE_SIZE && oldTileSize > 0) {
+      this._reflowCloudShadows(chapter.style);
     }
 
-    canvas.width  = viewCols * TILE_SIZE;
-    canvas.height = viewRows * TILE_SIZE;
-
-    // (Re-)size the off-screen base canvas to match the view window.
-    // A new base canvas is created here on first populate; subsequent calls resize it.
-    if (!this._baseCanvas) {
-      this._baseCanvas = document.createElement('canvas');
-      this._baseCtx = this._baseCanvas.getContext('2d') ?? null;
-    }
-    this._baseCanvas.width  = viewCols * TILE_SIZE;
-    this._baseCanvas.height = viewRows * TILE_SIZE;
-    this._chapterMapDirty = true;
-
-    const defaultCursor = isOversized ? 'grab' : 'pointer';
+    const defaultCursor = (): string => (this._isPannable(chapter) ? 'grab' : 'pointer');
     canvas.style.cssText =
       `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
-      `cursor:${defaultCursor};` +
+      `cursor:${defaultCursor()};` +
       'display:block;max-width:100%;height:auto;margin:0 auto;';
 
     // ── Mouse events ──────────────────────────────────────────────────────────
@@ -831,7 +969,7 @@ export abstract class MapScreenBase {
             this._panPixelX = this._panDrag.startPanX - dx * cp.scaleX;
             this._panPixelY = this._panDrag.startPanY - dy * cp.scaleY;
           }
-          this._clampPan(chapter, viewRows, viewCols);
+          this._clampPan(chapter, this._viewRows, this._viewCols);
           this._hover = null;
           this._render(chapter);
           canvas.style.cursor = 'grabbing';
@@ -879,7 +1017,7 @@ export abstract class MapScreenBase {
     canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return;
       if (this._panDrag?.moved) {
-        canvas.style.cursor = defaultCursor;
+        canvas.style.cursor = defaultCursor();
       }
       // Click handling is deferred to the 'click' event so the browser can
       // fire it; we only use mouseup to restore the cursor.
@@ -890,7 +1028,7 @@ export abstract class MapScreenBase {
       this._mouseClientPos = null;
       this._hover = null;
       this._hideTooltip();
-      canvas.style.cursor = defaultCursor;
+      canvas.style.cursor = defaultCursor();
       this._render(chapter);
     });
 
@@ -903,6 +1041,15 @@ export abstract class MapScreenBase {
       this._panDrag = null;
       this._onClick(e, campaign, chapter);
     });
+
+    canvas.addEventListener('wheel', (e) => {
+      if (!this._isCampaignZoomEnabled()) return;
+      const cp = this._clientToCanvasPx(e.clientX, e.clientY);
+      if (!cp) return;
+      e.preventDefault();
+      this._updateCampaignZoomFromWheel(chapter, e.deltaY, cp.px, cp.py);
+      canvas.style.cursor = defaultCursor();
+    }, { passive: false });
 
     // ── Touch events for mobile/tablet devices ────────────────────────────────
     canvas.style.touchAction = 'none'; // prevent scroll/zoom on the canvas
@@ -938,14 +1085,14 @@ export abstract class MapScreenBase {
           this._touchLongPressTimer = null;
         }
         this._hideTooltip();
-        // Pan the map for oversized maps.
-        if (isOversized) {
+        // Pan the map when the current zoom level does not fit the full map.
+        if (this._isPannable(chapter)) {
           const cp = this._clientToCanvasPx(touch.clientX, touch.clientY);
           if (cp) {
             this._panPixelX = this._touchPanStartPanX - dx * cp.scaleX;
             this._panPixelY = this._touchPanStartPanY - dy * cp.scaleY;
           }
-          this._clampPan(chapter, viewRows, viewCols);
+          this._clampPan(chapter, this._viewRows, this._viewCols);
           this._hover = null;
           this._render(chapter);
         }
@@ -986,9 +1133,10 @@ export abstract class MapScreenBase {
     const instruction = document.createElement('p');
     instruction.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:0;';
     const baseInstruction = this._formatInstructionText() ?? 'Click on an accessible level';
-    instruction.textContent = isOversized
-      ? `${baseInstruction}. Drag with the mouse to pan around the map.`
-      : baseInstruction;
+    const instructionParts = [baseInstruction];
+    if (this._isPannable(chapter)) instructionParts.push('Drag with the mouse to pan around the map.');
+    if (this._isCampaignZoomEnabled()) instructionParts.push('Roll the mouse wheel over the map to zoom.');
+    instruction.textContent = instructionParts.join(' ');
     el.appendChild(instruction);
 
     // Status text (shown when the sink is filled / chapter complete)
