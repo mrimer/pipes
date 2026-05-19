@@ -630,8 +630,7 @@ const BIRD_BODY_BACK = 0.65;
 const BIRD_WING_HALF_SPAN = 1.2;
 /**
  * Maximum shift of the quadratic-bezier control point along the flight axis
- * at peak flap phase, relative to bird size.  Positive bends wings forward
- * (down-stroke), negative bends them backward (up-stroke).
+ * at peak flap phase, relative to bird size. Positive bends wings forward.
  */
 const BIRD_WING_BEND_MAX = 0.55;
 /** Fractional position of the bezier control point along the wing half-span. */
@@ -751,9 +750,9 @@ export class CampaignBirdFlockField {
    *
    * The cross shape consists of a body line (along the flight axis) and two
    * quadratic-bezier wings (perpendicular to flight).  During a flap the bezier
-   * control point shifts along the flight axis, bending each wing smoothly
-   * forward then backward.
-   */
+    * control point shifts along the flight axis, bending each wing smoothly
+    * forward and back to neutral (without a backward sweep).
+    */
   private _updateBirdCache(flock: BirdFlock, flapPhase: number): void {
     const size = flock.baseSize;
     const sw   = flock.baseStrokeWidth;
@@ -776,8 +775,7 @@ export class CampaignBirdFlockField {
     const cx = halfSize;
     const cy = halfSize;
     const halfSpan = size * BIRD_WING_HALF_SPAN;
-    // Control-point X shift: positive bends wings forward (down-stroke),
-    // negative bends them backward (up-stroke).
+    // Control-point X shift: positive bends wings forward.
     const ctrlX = cx + flapPhase * size * BIRD_WING_BEND_MAX;
     const ctrlMid = halfSpan * BIRD_WING_CTRL_FRAC;
 
@@ -802,9 +800,9 @@ export class CampaignBirdFlockField {
     const flapProgress = flock.flapDurationMs > 0
       ? clamp(flock.flapElapsedMs / flock.flapDurationMs, 0, 1)
       : 0;
-    // Smooth signed sine: −1 = wings swept forward, 0 = level, +1 = swept back.
+    // Smooth forward-only bend: 0 = level, 1 = max forward bend, 0 = level.
     const flapPhase = flock.flapDurationMs > 0
-      ? Math.sin(flapProgress * flock.flapBeats * TAU)
+      ? Math.sin(flapProgress * flock.flapBeats * Math.PI)
       : 0;
 
     this._updateBirdCache(flock, flapPhase);
@@ -843,9 +841,10 @@ export class CampaignBirdFlockField {
 
     let boundingRadius = 0;
     for (const bird of birds) {
+      const stampHalfSize = Math.ceil(bird.size * BIRD_CANVAS_HALF_SIZE_FACTOR + bird.strokeWidth);
       boundingRadius = Math.max(
         boundingRadius,
-        Math.hypot(bird.offsetAlong, bird.offsetAcross) + bird.size * 1.2,
+        Math.hypot(bird.offsetAlong, bird.offsetAcross) + stampHalfSize,
       );
     }
 
