@@ -597,6 +597,10 @@ interface BirdFlock {
   flapDurationMs: number;
   flapElapsedMs: number;
   flapBeats: number;
+  /** Size of the reference bird used to render the shared OffscreenCanvas stamp. */
+  baseSize: number;
+  /** Stroke width of the reference bird for the shared canvas stamp. */
+  baseStrokeWidth: number;
 }
 
 const BIRD_MIN_SPEED_TILES_PER_SECOND = 0.85;
@@ -614,15 +618,34 @@ const BIRD_MIN_SIZE_TILES = 0.08;
 const BIRD_MAX_SIZE_TILES = 0.12;
 const BIRD_MIN_COOLDOWN_MS = 2_200;
 const BIRD_MAX_COOLDOWN_MS = 6_000;
-const BIRD_MIN_FLAP_DURATION_MS = 520;
-const BIRD_MAX_FLAP_DURATION_MS = 920;
-const BIRD_MIN_FLAP_BEATS = 3;
-const BIRD_MAX_FLAP_BEATS = 5;
-const BIRD_WING_SPREAD_BASE = 0.36;
-const BIRD_WING_SPREAD_FLAP_BOOST = 0.8;
+/** Duration of a single full flap cycle (down-stroke + up-stroke) in ms, yielding 1 Hz flapping. */
+const BIRD_FLAP_MS_PER_BEAT = 1000;
+const BIRD_MIN_FLAP_BEATS = 2;
+const BIRD_MAX_FLAP_BEATS = 4;
+/** Body length forward of the wing junction (head/beak side), relative to bird size. */
+const BIRD_BODY_FRONT = 0.45;
+/** Body length behind the wing junction (tail side), relative to bird size. */
+const BIRD_BODY_BACK = 0.65;
+/** Half-span of each wing (center to tip), relative to bird size. */
+const BIRD_WING_HALF_SPAN = 1.2;
+/**
+ * Maximum shift of the quadratic-bezier control point along the flight axis
+ * at peak flap phase, relative to bird size.  Positive bends wings forward
+ * (down-stroke), negative bends them backward (up-stroke).
+ */
+const BIRD_WING_BEND_MAX = 0.55;
+/** Fractional position of the bezier control point along the wing half-span. */
+const BIRD_WING_CTRL_FRAC = 0.5;
 const BIRD_STROKE_MIN = 1;
 const BIRD_STROKE_MAX = 2.2;
+/** Stroke width as a fraction of bird size. */
+const BIRD_STROKE_SIZE_RATIO = 0.24;
 const BIRD_COLOR = '#1c2533';
+/**
+ * Half-size of the OffscreenCanvas stamp, expressed as a multiple of bird
+ * size.  Must be large enough to contain the longest dimension (wings).
+ */
+const BIRD_CANVAS_HALF_SIZE_FACTOR = 1.4;
 
 /**
  * Campaign-only ambient bird flock rendered over the campaign map board.
@@ -636,6 +659,9 @@ export class CampaignBirdFlockField {
   private _enabled = false;
   private _lastNow: number | null = null;
   private _flock: BirdFlock | null = null;
+  /** Shared OffscreenCanvas stamp reused for every bird in the flock each frame. */
+  private _birdCache: OffscreenCanvas | null = null;
+  private _birdCacheHalfSize = 0;
 
   resetForScreen(width: number, height: number, tileSize: number, style?: LevelStyle): void {
     this._width = width;
@@ -643,6 +669,7 @@ export class CampaignBirdFlockField {
     this._tileSize = Math.max(1, tileSize);
     this._enabled = style !== 'Dark' && width > 0 && height > 0;
     this._lastNow = null;
+    this._birdCache = null;
     this._flock = this._enabled ? this._spawnFlock() : null;
   }
 
@@ -711,44 +738,98 @@ export class CampaignBirdFlockField {
 
     flock.flapCooldownMs -= dt;
     if (flock.flapCooldownMs <= 0) {
-      flock.flapDurationMs = randRange(BIRD_MIN_FLAP_DURATION_MS, BIRD_MAX_FLAP_DURATION_MS);
-      flock.flapElapsedMs = 0;
       flock.flapBeats = Math.floor(randRange(BIRD_MIN_FLAP_BEATS, BIRD_MAX_FLAP_BEATS + 1));
+      // Each beat is exactly one full flap cycle (1 s), giving 1 flap per second.
+      flock.flapDurationMs = flock.flapBeats * BIRD_FLAP_MS_PER_BEAT;
+      flock.flapElapsedMs = 0;
     }
+  }
+
+  /**
+   * Render one reference bird (at flock.baseSize) to the shared OffscreenCanvas,
+   * replacing any previous frame's image.  Called once per frame before stamping.
+   *
+   * The cross shape consists of a body line (along the flight axis) and two
+   * quadratic-bezier wings (perpendicular to flight).  During a flap the bezier
+   * control point shifts along the flight axis, bending each wing smoothly
+   * forward then backward.
+   */
+  private _updateBirdCache(flock: BirdFlock, flapPhase: number): void {
+    const size = flock.baseSize;
+    const sw   = flock.baseStrokeWidth;
+    const halfSize = Math.ceil(size * BIRD_CANVAS_HALF_SIZE_FACTOR + sw);
+    const canvasSize = halfSize * 2;
+
+    if (!this._birdCache || this._birdCache.width !== canvasSize) {
+      this._birdCache = new OffscreenCanvas(canvasSize, canvasSize);
+    }
+    this._birdCacheHalfSize = halfSize;
+
+    const bCtx = this._birdCache.getContext('2d')!;
+    bCtx.clearRect(0, 0, canvasSize, canvasSize);
+    bCtx.strokeStyle = BIRD_COLOR;
+    bCtx.lineCap    = 'round';
+    bCtx.lineJoin   = 'round';
+    bCtx.lineWidth  = sw;
+
+    // Work in a coordinate system centred at the canvas middle.
+    const cx = halfSize;
+    const cy = halfSize;
+    const halfSpan = size * BIRD_WING_HALF_SPAN;
+    // Control-point X shift: positive bends wings forward (down-stroke),
+    // negative bends them backward (up-stroke).
+    const ctrlX = cx + flapPhase * size * BIRD_WING_BEND_MAX;
+    const ctrlMid = halfSpan * BIRD_WING_CTRL_FRAC;
+
+    bCtx.beginPath();
+
+    // Body: tail (−X) to head/beak (+X)
+    bCtx.moveTo(cx - size * BIRD_BODY_BACK,  cy);
+    bCtx.lineTo(cx + size * BIRD_BODY_FRONT, cy);
+
+    // Left wing (−Y)
+    bCtx.moveTo(cx, cy);
+    bCtx.quadraticCurveTo(ctrlX, cy - ctrlMid, cx, cy - halfSpan);
+
+    // Right wing (+Y)
+    bCtx.moveTo(cx, cy);
+    bCtx.quadraticCurveTo(ctrlX, cy + ctrlMid, cx, cy + halfSpan);
+
+    bCtx.stroke();
   }
 
   private _drawFlock(ctx: CanvasRenderingContext2D, flock: BirdFlock): void {
     const flapProgress = flock.flapDurationMs > 0
       ? clamp(flock.flapElapsedMs / flock.flapDurationMs, 0, 1)
       : 0;
-    const flapWave = flock.flapDurationMs > 0
-      ? Math.abs(Math.sin(flapProgress * flock.flapBeats * TAU))
+    // Smooth signed sine: −1 = wings swept forward, 0 = level, +1 = swept back.
+    const flapPhase = flock.flapDurationMs > 0
+      ? Math.sin(flapProgress * flock.flapBeats * TAU)
       : 0;
-    const wingSpread = BIRD_WING_SPREAD_BASE + flapWave * BIRD_WING_SPREAD_FLAP_BOOST;
+
+    this._updateBirdCache(flock, flapPhase);
+    const birdCanvas = this._birdCache!;
+    const halfSize   = this._birdCacheHalfSize;
 
     ctx.save();
     ctx.translate(flock.x, flock.y);
     ctx.rotate(flock.angle);
-    ctx.strokeStyle = BIRD_COLOR;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+
     for (const bird of flock.birds) {
-      const wingDepth = bird.size * wingSpread;
       ctx.save();
       ctx.translate(bird.offsetAlong, bird.offsetAcross);
-      ctx.lineWidth = bird.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(-bird.size, -wingDepth);
-      ctx.lineTo(0, 0);
-      ctx.lineTo(-bird.size, wingDepth);
-      ctx.stroke();
+      // Scale the stamp proportionally so each bird keeps its own size.
+      const scale    = bird.size / flock.baseSize;
+      const drawHalf = halfSize * scale;
+      ctx.drawImage(birdCanvas, -drawHalf, -drawHalf, drawHalf * 2, drawHalf * 2);
       ctx.restore();
     }
+
     ctx.restore();
   }
 
   private _spawnFlock(): BirdFlock | null {
-    const birds = this._buildVFormation();
+    const { birds, baseSize, baseStrokeWidth } = this._buildVFormation();
     if (birds.length === 0) return null;
 
     const edge = this._pickSpawnEdge();
@@ -776,6 +857,8 @@ export class CampaignBirdFlockField {
       angle,
       speedPxPerMs,
       birds,
+      baseSize,
+      baseStrokeWidth,
       boundingRadius,
       hasEntered: false,
       flapCooldownMs: randRange(BIRD_MIN_COOLDOWN_MS, BIRD_MAX_COOLDOWN_MS),
@@ -785,30 +868,31 @@ export class CampaignBirdFlockField {
     };
   }
 
-  private _buildVFormation(): FlockBird[] {
+  private _buildVFormation(): { birds: FlockBird[]; baseSize: number; baseStrokeWidth: number } {
     const armDepth = Math.floor(randRange(BIRD_MIN_ARM_DEPTH, BIRD_MAX_ARM_DEPTH + 1));
     const spacingAlong = randRange(BIRD_MIN_SPACING_ALONG_TILES, BIRD_MAX_SPACING_ALONG_TILES) * this._tileSize;
     const spacingAcross = randRange(BIRD_MIN_SPACING_ACROSS_TILES, BIRD_MAX_SPACING_ACROSS_TILES) * this._tileSize;
     const baseSize = randRange(BIRD_MIN_SIZE_TILES, BIRD_MAX_SIZE_TILES) * this._tileSize;
+    const baseStrokeWidth = clamp(baseSize * BIRD_STROKE_SIZE_RATIO, BIRD_STROKE_MIN, BIRD_STROKE_MAX);
     const birds: FlockBird[] = [{
       offsetAlong: 0,
       offsetAcross: 0,
       size: baseSize * 1.04,
-      strokeWidth: clamp(baseSize * 0.24, BIRD_STROKE_MIN, BIRD_STROKE_MAX),
+      strokeWidth: baseStrokeWidth,
     }];
 
     for (let rank = 1; rank <= armDepth; rank++) {
       const offsetAlong = -rank * spacingAlong;
       const offsetAcross = rank * spacingAcross;
       const size = baseSize * randRange(0.9, 1.08);
-      const strokeWidth = clamp(size * 0.24, BIRD_STROKE_MIN, BIRD_STROKE_MAX);
+      const strokeWidth = clamp(size * BIRD_STROKE_SIZE_RATIO, BIRD_STROKE_MIN, BIRD_STROKE_MAX);
       birds.push(
         { offsetAlong, offsetAcross, size, strokeWidth },
         { offsetAlong, offsetAcross: -offsetAcross, size, strokeWidth },
       );
     }
 
-    return birds;
+    return { birds, baseSize, baseStrokeWidth };
   }
 
   private _pickSpawnEdge(): CloudSpawnEdge {
