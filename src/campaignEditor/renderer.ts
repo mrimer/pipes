@@ -192,7 +192,7 @@ export function renderEditorCanvas(
   // by the Chamber's background fill).
   for (let r = rMin; r <= rMax; r++) {
     for (let c = cMin; c <= cMax; c++) {
-      const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
+      const isDragSource = dragRow === r && dragCol === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
       if (def === null || !PIPE_SHAPES.has(def.shape)) continue;
       const x = c * CELL;
