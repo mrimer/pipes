@@ -52,7 +52,7 @@ const CAMPAIGN_ZOOM_EPSILON = 0.0001;
 /** Default map row count when chapter metadata is absent. */
 const DEFAULT_MAP_ROWS = 3;
 /** Default map column count when chapter metadata is absent. */
-const DEFAULT_MAP_COLS = 6;
+const DEFAULT_MAP_COLUMNS = 6;
 
 /** Clamp campaign-map zoom scale to fixed min/max bounds. */
 export function clampCampaignZoomScale(scale: number): number {
@@ -702,8 +702,8 @@ export abstract class MapScreenBase {
   private _resetCloudShadows(style?: LevelStyle): void {
     const chapter = this._chapter;
     if (!chapter) return;
-    const rows = chapter.rows ?? 3;
-    const cols = chapter.cols ?? 6;
+    const rows = chapter.rows ?? DEFAULT_MAP_ROWS;
+    const cols = chapter.cols ?? DEFAULT_MAP_COLUMNS;
     this._cloudShadows.resetForScreen(
       cols * TILE_SIZE,
       rows * TILE_SIZE,
@@ -722,8 +722,8 @@ export abstract class MapScreenBase {
   private _reflowCloudShadows(style?: LevelStyle): void {
     const chapter = this._chapter;
     if (!chapter) return;
-    const rows = chapter.rows ?? 3;
-    const cols = chapter.cols ?? 6;
+    const rows = chapter.rows ?? DEFAULT_MAP_ROWS;
+    const cols = chapter.cols ?? DEFAULT_MAP_COLUMNS;
     this._cloudShadows.reflowForScreen(
       cols * TILE_SIZE,
       rows * TILE_SIZE,
@@ -757,7 +757,7 @@ export abstract class MapScreenBase {
 
   private _isPannable(chapter: ChapterDef): boolean {
     const rows = chapter.rows ?? DEFAULT_MAP_ROWS;
-    const cols = chapter.cols ?? DEFAULT_MAP_COLS;
+    const cols = chapter.cols ?? DEFAULT_MAP_COLUMNS;
     return rows > this._viewRows || cols > this._viewCols;
   }
 
@@ -767,7 +767,7 @@ export abstract class MapScreenBase {
     oldViewHeightPx: number;
   } {
     const rows = chapter.rows ?? DEFAULT_MAP_ROWS;
-    const cols = chapter.cols ?? DEFAULT_MAP_COLS;
+    const cols = chapter.cols ?? DEFAULT_MAP_COLUMNS;
     const baseViewRows = Math.min(rows, MAP_VIEW_MAX_ROWS);
     const baseViewCols = Math.min(cols, MAP_VIEW_MAX_COLS);
     const oldTileSize = this._lastTileSize > 0 ? this._lastTileSize : TILE_SIZE;
