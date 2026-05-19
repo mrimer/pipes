@@ -10,7 +10,7 @@
 import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { DragState } from './renderer';
-import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
+import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette, isTreeShape } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
@@ -160,13 +160,20 @@ export class ChapterMapInput {
 
     // Auto-select the palette item that matches the focused tile's type
     const tileAtPos = this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null;
+    const selectedPalette = this._cb.getPalette();
+    const preserveTreePaletteSelection =
+      tileAtPos !== null &&
+      isTreeShape(selectedPalette as PipeShape) &&
+      isTreeShape(tileAtPos.shape);
     if (tileAtPos !== null) {
       const paletteForTile: EditorPalette =
         tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'level'
           ? LEVEL_CHAMBER_PALETTE
           : tileAtPos.shape;
-      this._cb.setPalette(paletteForTile);
-      this._cb.rebuildPalette(chapter, campaign);
+      if (!preserveTreePaletteSelection) {
+        this._cb.setPalette(paletteForTile);
+        this._cb.rebuildPalette(chapter, campaign);
+      }
     }
 
     // Rebuild the tile params panel so it reflects the newly focused tile
@@ -215,7 +222,12 @@ export class ChapterMapInput {
     const isEmptyFloorPalette = palette !== 'erase' && EMPTY_FLOOR_SHAPES.includes(palette as PipeShape);
     const existingIsEmptyFloor = existingTile === null ||
       (existingTile !== null && isEmptyFloor(existingTile.shape));
-    if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette) {
+    const canOverwriteTree =
+      existingTile !== null &&
+      REPEATABLE_EDITOR_TILES.has(palette) &&
+      isTreeShape(palette as PipeShape) &&
+      isTreeShape(existingTile.shape);
+    if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette && !canOverwriteTree) {
       // Start dragging the existing tile
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._cb.renderCanvas();
@@ -227,7 +239,7 @@ export class ChapterMapInput {
         this._cb.showSinkError();
         return; // Only one sink allowed
       }
-      if (existingIsEmptyFloor && REPEATABLE_EDITOR_TILES.has(palette)) {
+      if ((existingIsEmptyFloor || canOverwriteTree) && REPEATABLE_EDITOR_TILES.has(palette)) {
         this._paintDragActive = true;
         this._cb.getEditGrid()[pos.row][pos.col] = this._cb.buildTileDef();
         this._playChapterPlacementSfx(pos);
@@ -319,7 +331,12 @@ export class ChapterMapInput {
       const grid = this._cb.getEditGrid();
       const cur = grid[pos.row]?.[pos.col] ?? null;
       const curIsEmpty = cur === null || (cur !== null && isEmptyFloor(cur.shape));
-      if (curIsEmpty) {
+      const palette = this._cb.getPalette();
+      const canOverwriteTree = cur !== null &&
+        REPEATABLE_EDITOR_TILES.has(palette) &&
+        isTreeShape(palette as PipeShape) &&
+        isTreeShape(cur.shape);
+      if (curIsEmpty || canOverwriteTree) {
         grid[pos.row][pos.col] = this._cb.buildTileDef();
       }
     } else if (this._rightEraseDragActive && pos) {
