@@ -1634,7 +1634,7 @@ export abstract class MapScreenBase {
     let low = 0;
     let high = sideFlowers.length;
     while (low < high) {
-      const mid = (low + high) >> 1;
+      const mid = Math.floor((low + high) / 2);
       if (sideFlowers[mid].y <= flower.y) {
         low = mid + 1;
       } else {
