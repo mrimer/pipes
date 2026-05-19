@@ -6,6 +6,7 @@ import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './d
 import { migrateIfNeeded, loadActiveSlotIndex } from './playerProfileSlots';
 import { setActiveSlotIndex } from './activeProfile';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
+import { BG_COLOR } from './colors';
 import { setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
 
@@ -38,7 +39,7 @@ setEnvironmentalEnabled(_envEnabled);
 // Always apply the background (registering the target), then immediately
 // disable the pattern when the Background setting is off.
 applyScrollingPipeBackground(document.body, {
-  baseColor: '#1a1a2e',
+  baseColor: BG_COLOR,
   overlayAlpha: 0.82,
 });
 if (!_bgEnabled) {

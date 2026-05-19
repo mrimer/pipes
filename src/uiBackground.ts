@@ -42,6 +42,7 @@ const synchronizedBackgroundDurationsSec = new Map<HTMLElement, number>();
 /** Persisted options for each registered background target, used when re-applying after a toggle. */
 const registeredBackgroundOptions = new Map<HTMLElement, ScrollingPipeBackgroundOptions>();
 let synchronizedBackgroundAnimationFrameId: number | null = null;
+let backgroundPatternEnabled = true;
 
 export interface ScrollingPipeBackgroundOptions {
   /** Solid fallback/background color below the pattern. */
@@ -134,6 +135,12 @@ export function applyScrollingPipeBackground(
   target: HTMLElement,
   options: ScrollingPipeBackgroundOptions = {},
 ): void {
+  registeredBackgroundOptions.set(target, options);
+  if (!backgroundPatternEnabled) {
+    _applyBackgroundOnly(target, options);
+    return;
+  }
+
   const overlayAlpha = options.overlayAlpha ?? DEFAULT_OVERLAY_ALPHA;
   const durationSec = options.animationDurationSec ?? DEFAULT_ANIMATION_DURATION_SEC;
   const patternDataUrl = getPipePatternDataUrl();
@@ -145,7 +152,6 @@ export function applyScrollingPipeBackground(
   target.style.backgroundOrigin = 'border-box, border-box';
   target.style.animation = '';
   target.style.animationDelay = '';
-  registeredBackgroundOptions.set(target, options);
   synchronizedBackgroundDurationsSec.set(target, durationSec);
   setSynchronizedBackgroundPosition(target, durationSec, performance.now());
   ensureSynchronizedBackgroundAnimationRunning();
@@ -171,6 +177,7 @@ function _applyBackgroundOnly(target: HTMLElement, options: ScrollingPipeBackgro
  * color; when re-enabled the full animated pattern is restored.
  */
 export function setGlobalBackgroundPatternEnabled(enabled: boolean): void {
+  backgroundPatternEnabled = enabled;
   registeredBackgroundOptions.forEach((options, target) => {
     if (enabled) {
       applyScrollingPipeBackground(target, options);

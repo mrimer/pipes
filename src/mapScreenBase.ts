@@ -16,7 +16,7 @@ import {
   SourceSprayDrop, spawnSourceSprayDrop, renderSourceSpray,
   BubbleParticle, spawnChapterMapBubble, renderBubbles, buildChapterMapBubbleCandidateKeys,
 } from './visuals/waterParticles';
-import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
+import { BG_COLOR, SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { applyScrollingPipeBackground } from './uiBackground';
@@ -688,7 +688,7 @@ export abstract class MapScreenBase {
       'display:none;position:fixed;inset:0;flex-direction:column;' +
       'align-items:center;justify-content:flex-start;overflow:auto;z-index:10;' +
       'padding:20px;box-sizing:border-box;gap:16px;';
-    applyScrollingPipeBackground(el);
+    applyScrollingPipeBackground(el, { baseColor: BG_COLOR });
     return el;
   }
 
