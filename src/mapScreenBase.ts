@@ -1553,11 +1553,14 @@ export abstract class MapScreenBase {
     const viewCols = this._viewCols;
 
     // Active jitter animations animate the base grid layer, so keep it dirty
-    // for the duration of the animation.
-    for (const j of this._jitterAnims) {
-      if (now - j.startedAt < MapScreenBase.JITTER_DURATION_MS) {
-        this._chapterMapDirty = true;
-        break;
+    // for the duration of the animation.  The length check avoids iterating
+    // the array on the common path when no jitter is in progress.
+    if (this._jitterAnims.length > 0) {
+      for (const j of this._jitterAnims) {
+        if (now - j.startedAt < MapScreenBase.JITTER_DURATION_MS) {
+          this._chapterMapDirty = true;
+          break;
+        }
       }
     }
 
