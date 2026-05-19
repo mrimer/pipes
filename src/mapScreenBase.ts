@@ -98,6 +98,8 @@ interface EdgeFlower {
   variant: number;
   /** Static per-flower rotation offset in radians. */
   baseRotation: number;
+  /** True when the flower is on the left edge; false for the right edge. */
+  isLeft: boolean;
 }
 
 /**
@@ -218,6 +220,10 @@ export abstract class MapScreenBase {
   private _lastBubbleSpawn = 0;
   /** Edge flowers that appear along the left/right canvas edges when the chapter is completed. */
   private _edgeFlowers: EdgeFlower[] = [];
+  /** Left-edge flowers, kept sorted by y to avoid per-spawn re-sorting. */
+  private _leftEdgeFlowersByY: EdgeFlower[] = [];
+  /** Right-edge flowers, kept sorted by y to avoid per-spawn re-sorting. */
+  private _rightEdgeFlowersByY: EdgeFlower[] = [];
   private _lastFlowerSpawn = 0;
   /** Which edge (0 = left, 1 = right) receives the next spawned flower. */
   private _nextFlowerSide = 0;
@@ -552,6 +558,8 @@ export abstract class MapScreenBase {
     }
     // Edge flowers always restart fresh when entering the screen
     this._edgeFlowers = [];
+    this._leftEdgeFlowersByY = [];
+    this._rightEdgeFlowersByY = [];
     this._lastFlowerSpawn = 0;
     this._nextFlowerSide = 0;
     this._chapter = chapter;
@@ -1517,11 +1525,15 @@ export abstract class MapScreenBase {
         const r = Math.round(180 + t * 75);         // 180–255
         const g = Math.round(130 + t * 85);         // 130–215
         const color = `rgb(${r},${g},0)`;
-        this._borderColor = color;
-        this._canvas.style.borderColor = color;
+        if (color !== this._borderColor) {
+          this._borderColor = color;
+          this._canvas.style.borderColor = color;
+        }
       } else {
-        this._borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
-        this._canvas.style.borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
+        if (this._borderColor !== CHAPTER_MAP_CANVAS_BORDER_COLOR) {
+          this._borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
+          this._canvas.style.borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
+        }
       }
     }
   }
@@ -1556,33 +1568,40 @@ export abstract class MapScreenBase {
       : totalW - CELL * 0.18 + jitter;
     // Place new flower at the midpoint of the largest vertical gap among existing
     // flowers on the same edge, so spacing is evened out over time.
-    const sideFlowerYs = this._edgeFlowers
-      .filter(f => (isLeft ? f.x < totalW / 2 : f.x >= totalW / 2))
-      .map(f => f.y)
-      .sort((a, b) => a - b);
+    const sideFlowers = isLeft ? this._leftEdgeFlowersByY : this._rightEdgeFlowersByY;
     let y: number;
-    if (sideFlowerYs.length === 0) {
+    if (sideFlowers.length === 0) {
       y = Math.random() * totalH;
     } else {
-      const bounds = [0, ...sideFlowerYs, totalH];
-      let bestGapStart = 0;
+      let prevY = 0;
+      let bestGapStart = prevY;
       let bestGapSize = 0;
-      for (let i = 0; i < bounds.length - 1; i++) {
-        const gapSize = bounds[i + 1] - bounds[i];
+      for (let i = 0; i < sideFlowers.length; i++) {
+        const nextY = sideFlowers[i].y;
+        const gapSize = nextY - prevY;
         if (gapSize > bestGapSize) {
           bestGapSize = gapSize;
-          bestGapStart = bounds[i];
+          bestGapStart = prevY;
         }
+        prevY = nextY;
+      }
+      const tailGapSize = totalH - prevY;
+      if (tailGapSize > bestGapSize) {
+        bestGapSize = tailGapSize;
+        bestGapStart = prevY;
       }
       y = bestGapStart + bestGapSize / 2;
     }
-    this._edgeFlowers.push({
+    const flower: EdgeFlower = {
       x,
       y,
       spawnedAt: now,
       variant: Math.floor(Math.random() * 8),
       baseRotation: Math.random() * Math.PI * 2,
-    });
+      isLeft,
+    };
+    this._edgeFlowers.push(flower);
+    this._insertEdgeFlowerByY(flower);
   }
 
   /**
@@ -1595,6 +1614,7 @@ export abstract class MapScreenBase {
       const f = this._edgeFlowers[i];
       const age = now - f.spawnedAt;
       if (age >= MapScreenBase.FLOWER_LIFETIME_MS) {
+        this._removeEdgeFlowerByY(f);
         this._edgeFlowers.splice(i, 1);
         continue;
       }
@@ -1605,6 +1625,31 @@ export abstract class MapScreenBase {
       const scale = Math.min(1, age / MapScreenBase.FLOWER_GROW_MS);
       drawEdgeFlower(ctx, f.x, f.y, f.variant, scale, alpha, swayAngle, f.baseRotation);
       i++;
+    }
+  }
+
+  /** Insert an edge flower into the side-specific y-sorted index. */
+  private _insertEdgeFlowerByY(flower: EdgeFlower): void {
+    const sideFlowers = flower.isLeft ? this._leftEdgeFlowersByY : this._rightEdgeFlowersByY;
+    let low = 0;
+    let high = sideFlowers.length;
+    while (low < high) {
+      const mid = (low + high) >> 1;
+      if (sideFlowers[mid].y <= flower.y) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    sideFlowers.splice(low, 0, flower);
+  }
+
+  /** Remove an edge flower from the side-specific y-sorted index. */
+  private _removeEdgeFlowerByY(flower: EdgeFlower): void {
+    const sideFlowers = flower.isLeft ? this._leftEdgeFlowersByY : this._rightEdgeFlowersByY;
+    const idx = sideFlowers.indexOf(flower);
+    if (idx >= 0) {
+      sideFlowers.splice(idx, 1);
     }
   }
 
