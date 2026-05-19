@@ -94,8 +94,8 @@ const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
     minRadiusTiles: 1.15,
     maxRadiusTiles: 2.5, // ≈ 5x5 max footprint
     minOpacity: 0.09,
-    maxOpacity: 0.16,
-    speedTilesPerSecond: 0.12,
+    maxOpacity: 0.15,
+    speedTilesPerSecond: 0.14,
     spawnIntervalMs: 14_000,
     defaultMaxClouds: 3,
     minCloudGapTiles: 3.2,
@@ -105,26 +105,26 @@ const CLOUD_PRESETS: Record<CloudShadowPreset, CloudShadowPresetConfig> = {
   },
   chapter: {
     minRadiusTiles: 0.25,
-    maxRadiusTiles: 0.52, // ≈ 1x1 max footprint
+    maxRadiusTiles: 1.0, // ≈ 2x2 max footprint
     minOpacity: 0.08,
     maxOpacity: 0.14,
-    speedTilesPerSecond: 0.075,
+    speedTilesPerSecond: 0.08,
     spawnIntervalMs: 4_500,
     defaultMaxClouds: 8,
-    minCloudGapTiles: 1.0,
+    minCloudGapTiles: 1.1,
     minSpawnDistanceTiles: 1.4,
     entryMarginTiles: 0.8,
     exitMarginTiles: 0.8,
   },
   campaign: {
     minRadiusTiles: 0.12,
-    maxRadiusTiles: 0.26, // ≈ 0.5x0.5 max footprint
-    minOpacity: 0.08,
+    maxRadiusTiles: 0.5, // ≈ 1x1 max footprint
+    minOpacity: 0.07,
     maxOpacity: 0.13,
-    speedTilesPerSecond: 0.045,
+    speedTilesPerSecond: 0.05,
     spawnIntervalMs: 3_200,
     defaultMaxClouds: 10,
-    minCloudGapTiles: 0.45,
+    minCloudGapTiles: 0.5,
     minSpawnDistanceTiles: 0.8,
     entryMarginTiles: 0.6,
     exitMarginTiles: 0.6,
