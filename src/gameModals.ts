@@ -275,6 +275,11 @@ export function buildSettingsModal(
   onTouchUiChange: (enabled: boolean) => void,
   onConfirm: (el: HTMLElement) => void,
   getRecordingSettings?: () => import('./types').RecordingSettings,
+  initialBackgroundEnabled = true,
+  onBackgroundChange?: (enabled: boolean) => void,
+  initialEnvironmentalEnabled = true,
+  onEnvironmentalChange?: (enabled: boolean) => void,
+  onCancel?: (el: HTMLElement) => void,
 ): HTMLElement {
   const el = createModalOverlay(0.5);
   const box = document.createElement('div');
@@ -442,7 +447,7 @@ export function buildSettingsModal(
   resetCommandsBtn.type = 'button';
   resetCommandsBtn.textContent = 'Reset Commands';
   resetCommandsBtn.style.cssText =
-    `padding:8px 12px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:flex-start;`;
+    `padding:8px 12px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:center;`;
   resetCommandsBtn.addEventListener('click', () => {
     const confirmed = window.confirm('Reset all command key assignments to defaults?');
     if (!confirmed) return;
@@ -491,6 +496,44 @@ export function buildSettingsModal(
 
   box.appendChild(recordingSection);
 
+  // ── Graphics section ──────────────────────────────────────────────────────
+  const graphicsSection = document.createElement('div');
+  graphicsSection.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;';
+
+  const graphicsHeader = document.createElement('div');
+  graphicsHeader.style.cssText = 'font-weight:bold;color:#7ed321;margin-top:4px;';
+  graphicsHeader.textContent = '🖼️ Graphics';
+  graphicsSection.appendChild(graphicsHeader);
+
+  const makeGraphicsToggleRow = (
+    labelText: string,
+    dataAttr: string,
+    defaultChecked: boolean,
+    onChange?: (enabled: boolean) => void,
+  ): HTMLInputElement => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;';
+    const span = document.createElement('span');
+    span.textContent = labelText;
+    span.style.cssText = 'color:#eee;font-size:0.9rem;';
+    const toggle = document.createElement('input');
+    toggle.type = 'checkbox';
+    toggle.checked = defaultChecked;
+    toggle.dataset[dataAttr] = '1';
+    if (onChange) {
+      toggle.addEventListener('change', () => onChange(toggle.checked));
+    }
+    row.appendChild(span);
+    row.appendChild(toggle);
+    graphicsSection.appendChild(row);
+    return toggle;
+  };
+
+  makeGraphicsToggleRow('Background', 'graphicsBackground', initialBackgroundEnabled, onBackgroundChange);
+  makeGraphicsToggleRow('Environmental', 'graphicsEnvironmental', initialEnvironmentalEnabled, onEnvironmentalChange);
+
+  box.appendChild(graphicsSection);
+
   // ── Confirm button ───────────────────────────────────────────────────────
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
@@ -507,6 +550,20 @@ export function buildSettingsModal(
 
   actions.appendChild(confirmBtn);
   box.appendChild(actions);
+
+  // ── Esc closes modal without saving ─────────────────────────────────────
+  // Attach to document so Esc is caught regardless of which element has focus,
+  // but only when the modal is visible and no key-capture is in progress.
+  const onEscKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || el.style.display === 'none') return;
+    // When capturing a command key, Esc cancels capture mode (handled by the
+    // existing onDocKeyDown listener); do not also close the modal.
+    if (capturing !== null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (onCancel) onCancel(el);
+  };
+  document.addEventListener('keydown', onEscKey);
 
   el.appendChild(box);
   document.body.appendChild(el);

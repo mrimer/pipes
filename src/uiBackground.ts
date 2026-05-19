@@ -39,6 +39,8 @@ const PIPE_MASK_GRID: ReadonlyArray<ReadonlyArray<number>> = [
 
 let cachedPipePatternDataUrl: string | null = null;
 const synchronizedBackgroundDurationsSec = new Map<HTMLElement, number>();
+/** Persisted options for each registered background target, used when re-applying after a toggle. */
+const registeredBackgroundOptions = new Map<HTMLElement, ScrollingPipeBackgroundOptions>();
 let synchronizedBackgroundAnimationFrameId: number | null = null;
 
 export interface ScrollingPipeBackgroundOptions {
@@ -143,7 +145,37 @@ export function applyScrollingPipeBackground(
   target.style.backgroundOrigin = 'border-box, border-box';
   target.style.animation = '';
   target.style.animationDelay = '';
+  registeredBackgroundOptions.set(target, options);
   synchronizedBackgroundDurationsSec.set(target, durationSec);
   setSynchronizedBackgroundPosition(target, durationSec, performance.now());
   ensureSynchronizedBackgroundAnimationRunning();
+}
+
+/**
+ * Show only the solid base color on a registered background target, hiding the
+ * scrolling pipe pattern.  The registration is retained so the pattern can be
+ * re-enabled via {@link setGlobalBackgroundPatternEnabled}.
+ */
+function _applyBackgroundOnly(target: HTMLElement, options: ScrollingPipeBackgroundOptions): void {
+  target.style.backgroundColor = options.baseColor ?? DEFAULT_BASE_COLOR;
+  target.style.backgroundImage = '';
+  target.style.backgroundRepeat = '';
+  target.style.backgroundSize = '';
+  target.style.backgroundOrigin = '';
+  synchronizedBackgroundDurationsSec.delete(target);
+}
+
+/**
+ * Enable or disable the scrolling pipe pattern on all registered background
+ * targets.  When `enabled` is false each target shows only its solid base
+ * color; when re-enabled the full animated pattern is restored.
+ */
+export function setGlobalBackgroundPatternEnabled(enabled: boolean): void {
+  registeredBackgroundOptions.forEach((options, target) => {
+    if (enabled) {
+      applyScrollingPipeBackground(target, options);
+    } else {
+      _applyBackgroundOnly(target, options);
+    }
+  });
 }

@@ -20,6 +20,7 @@ import { SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, S
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { applyScrollingPipeBackground } from './uiBackground';
+import { isEnvironmentalEnabled } from './graphicsSettings';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 import { createButton } from './uiHelpers';
@@ -1294,13 +1295,15 @@ export abstract class MapScreenBase {
     // They use the same pan transform as the grid render in _renderBase.
     const viewW = this._viewCols * TILE_SIZE;
     const viewH = this._viewRows * TILE_SIZE;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, viewW, viewH);
-    ctx.clip();
-    ctx.translate(-this._panPixelX, -this._panPixelY);
-    this._cloudShadows.updateAndRender(ctx, now);
-    ctx.restore();
+    if (isEnvironmentalEnabled()) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, viewW, viewH);
+      ctx.clip();
+      ctx.translate(-this._panPixelX, -this._panPixelY);
+      this._cloudShadows.updateAndRender(ctx, now);
+      ctx.restore();
+    }
 
     const birdExpand = this._campaignBirdFlock.getClipExpansion();
     ctx.save();

@@ -680,3 +680,52 @@ export function saveRecordingSettings(settings: RecordingSettings): void {
     localStorage.setItem(RECORDING_SETTINGS_KEY(), JSON.stringify(settings));
   } catch { /* ignore storage errors */ }
 }
+
+// ─── Graphics settings ────────────────────────────────────────────────────────
+
+const BACKGROUND_ENABLED_KEY    = (): string => `pipes_${p()}background_enabled`;
+const ENVIRONMENTAL_ENABLED_KEY = (): string => `pipes_${p()}environmental_enabled`;
+
+/**
+ * Load the persisted Background setting.
+ * @returns true when enabled (or not yet set), false when explicitly disabled.
+ */
+export function loadBackgroundEnabled(): boolean {
+  try {
+    if (localStorage.getItem(BACKGROUND_ENABLED_KEY()) === '0') return false;
+  } catch { /* ignore */ }
+  return true;
+}
+
+/** Persist the Background setting. */
+export function saveBackgroundEnabled(enabled: boolean): void {
+  try {
+    if (!enabled) {
+      localStorage.setItem(BACKGROUND_ENABLED_KEY(), '0');
+    } else {
+      localStorage.removeItem(BACKGROUND_ENABLED_KEY());
+    }
+  } catch { /* ignore */ }
+}
+
+/**
+ * Load the persisted Environmental setting.
+ * @returns true when enabled (or not yet set), false when explicitly disabled.
+ */
+export function loadEnvironmentalEnabled(): boolean {
+  try {
+    if (localStorage.getItem(ENVIRONMENTAL_ENABLED_KEY()) === '0') return false;
+  } catch { /* ignore */ }
+  return true;
+}
+
+/** Persist the Environmental setting. */
+export function saveEnvironmentalEnabled(enabled: boolean): void {
+  try {
+    if (!enabled) {
+      localStorage.setItem(ENVIRONMENTAL_ENABLED_KEY(), '0');
+    } else {
+      localStorage.removeItem(ENVIRONMENTAL_ENABLED_KEY());
+    }
+  } catch { /* ignore */ }
+}

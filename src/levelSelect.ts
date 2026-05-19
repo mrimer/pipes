@@ -221,8 +221,8 @@ export function renderLevelList(
     h2.style.textAlign = 'center';
 
     if (onSettingsClick) {
-      // Row containing the gear/settings button (left), "Select a Level" heading,
-      // and an optional player-profile button (right).
+      // Row containing the player-profile button (left), "Select a Level" heading,
+      // and the gear/settings button (right).
       const selectRow = document.createElement('div');
       selectRow.style.cssText =
         'display:flex;align-items:center;justify-content:center;gap:10px;width:100%;position:relative;';
@@ -233,10 +233,10 @@ export function renderLevelList(
       gearBtn.textContent = '⚙️';
       gearBtn.style.cssText =
         'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
-        'position:absolute;left:0;';
+        'position:absolute;right:0;';
       gearBtn.addEventListener('click', () => onSettingsClick());
-      selectRow.appendChild(gearBtn);
       selectRow.appendChild(h2);
+      selectRow.appendChild(gearBtn);
 
       if (onPlayerProfileClick) {
         const profileBtn = document.createElement('button');
@@ -245,9 +245,9 @@ export function renderLevelList(
         profileBtn.textContent = '👤';
         profileBtn.style.cssText =
           'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
-          'position:absolute;right:0;';
+          'position:absolute;left:0;';
         profileBtn.addEventListener('click', () => onPlayerProfileClick());
-        selectRow.appendChild(profileBtn);
+        selectRow.insertBefore(profileBtn, h2);
       }
 
       levelListEl.appendChild(selectRow);

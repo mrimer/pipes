@@ -35,6 +35,10 @@ import {
   saveCommandKeyAssignments,
   loadAllRecordings,
   saveRecording,
+  loadBackgroundEnabled,
+  saveBackgroundEnabled,
+  loadEnvironmentalEnabled,
+  saveEnvironmentalEnabled,
 } from './persistence';
 import { CampaignDef, PlaySequenceRecord } from './types';
 
@@ -103,6 +107,16 @@ export interface PlayerProfilePayload {
    * exists locally; otherwise cleared to null.
    */
   activeCampaignId?: string | null;
+  /**
+   * Whether the scrolling pipe-pattern background is shown on menu screens.
+   * Defaults to true when absent (older profiles).
+   */
+  backgroundEnabled?: boolean;
+  /**
+   * Whether environmental visuals (clouds, cloud shadows) are rendered.
+   * Defaults to true when absent (older profiles).
+   */
+  environmentalEnabled?: boolean;
   campaignProgress: CampaignProgressBlock[];
   /**
    * Playback recordings belonging to this profile.
@@ -192,13 +206,15 @@ export function buildPlayerProfilePayload(
   });
 
   const payload: PlayerProfilePayload = {
-    guid:             guid ?? _generateFallbackGuid(),
-    lastPlayedAt:     lastPlayedAt ?? null,
-    playerName:       loadPlayerName(),
-    sfxVolume:        loadSfxVolume(),
-    touchUiEnabled:   loadTouchUiEnabled(),
-    commandKeys:      loadCommandKeyAssignments(),
-    activeCampaignId: loadActiveCampaignId(),
+    guid:                guid ?? _generateFallbackGuid(),
+    lastPlayedAt:        lastPlayedAt ?? null,
+    playerName:          loadPlayerName(),
+    sfxVolume:           loadSfxVolume(),
+    touchUiEnabled:      loadTouchUiEnabled(),
+    commandKeys:         loadCommandKeyAssignments(),
+    activeCampaignId:    loadActiveCampaignId(),
+    backgroundEnabled:   loadBackgroundEnabled(),
+    environmentalEnabled: loadEnvironmentalEnabled(),
     campaignProgress,
   };
   if (recordings !== undefined) {
@@ -375,6 +391,12 @@ export function applyPlayerProfile(
   }
   if (payload.commandKeys) {
     saveCommandKeyAssignments(payload.commandKeys);
+  }
+  if (payload.backgroundEnabled !== undefined) {
+    saveBackgroundEnabled(payload.backgroundEnabled);
+  }
+  if (payload.environmentalEnabled !== undefined) {
+    saveEnvironmentalEnabled(payload.environmentalEnabled);
   }
 
   // ── Per-campaign progress ──────────────────────────────────────────────────

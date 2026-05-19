@@ -14,6 +14,10 @@ import {
   deleteRecording,
   loadRecordingSettings,
   saveRecordingSettings,
+  loadBackgroundEnabled,
+  saveBackgroundEnabled,
+  loadEnvironmentalEnabled,
+  saveEnvironmentalEnabled,
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
@@ -45,7 +49,8 @@ import { exportReplay, importReplay } from './profileIO';
 import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
-import { applyScrollingPipeBackground } from './uiBackground';
+import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
+import { isEnvironmentalEnabled, setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -347,15 +352,43 @@ export class Game implements InputCallbacks {
       (el) => {
         const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
         const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
+        const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
+        const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
         saveSfxVolume(sfxManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
         saveRecordingSettings({
           recordSuccesses: recordSuccessesToggle?.checked ?? true,
           recordFailures:  recordFailuresToggle?.checked  ?? false,
         });
+        saveBackgroundEnabled(bgToggle?.checked ?? true);
+        saveEnvironmentalEnabled(envToggle?.checked ?? true);
         el.style.display = 'none';
       },
       () => loadRecordingSettings(),
+      // Graphics: initial values loaded from persistence
+      loadBackgroundEnabled(),
+      // live background toggle: update in-memory flag and all registered backgrounds immediately
+      (enabled) => {
+        setBackgroundEnabled(enabled);
+        setGlobalBackgroundPatternEnabled(enabled);
+      },
+      loadEnvironmentalEnabled(),
+      // live environmental toggle: update in-memory flag immediately
+      (enabled) => { setEnvironmentalEnabled(enabled); },
+      // Esc cancels: revert live graphics changes and hide modal
+      (el) => {
+        const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
+        const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+        // Revert any live-previewed graphics changes back to the persisted state.
+        const persistedBg  = loadBackgroundEnabled();
+        const persistedEnv = loadEnvironmentalEnabled();
+        if (bgToggle) bgToggle.checked = persistedBg;
+        if (envToggle) envToggle.checked = persistedEnv;
+        setBackgroundEnabled(persistedBg);
+        setGlobalBackgroundPatternEnabled(persistedBg);
+        setEnvironmentalEnabled(persistedEnv);
+        el.style.display = 'none';
+      },
     );
     applyScrollingPipeBackground(this._settingsModalEl, {
       baseColor: UI_OVERLAY_BG,
@@ -432,19 +465,23 @@ export class Game implements InputCallbacks {
       },
       showRules: () => this.showRules(),
       showSettings: () => {
-        // Sync slider and value display to current volume before showing.
+        // Sync slider, toggles to current persisted values before showing.
         const v = sfxManager.getVolume();
         const savedTouchUiEnabled = loadTouchUiEnabled();
         const effectiveTouchEnabled = hasTouchUiSupport() ? (savedTouchUiEnabled ?? isTouchDevice()) : false;
         const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
         const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
         const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
+        const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
+        const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
         if (slider) slider.value = String(v);
         if (valueEl) valueEl.textContent = String(v);
         if (touchToggle) {
           touchToggle.checked = effectiveTouchEnabled;
           touchToggle.disabled = !hasTouchUiSupport();
         }
+        if (bgToggle)  bgToggle.checked  = loadBackgroundEnabled();
+        if (envToggle) envToggle.checked = loadEnvironmentalEnabled();
         this._settingsModalEl.style.display = 'flex';
       },
       showPlayerProfile: () => this._showPlayerProfileScreen(),
@@ -882,7 +919,9 @@ export class Game implements InputCallbacks {
       now,
     );
 
-    this._cloudShadows.updateAndRender(this.ctx, now);
+    if (isEnvironmentalEnabled()) {
+      this._cloudShadows.updateAndRender(this.ctx, now);
+    }
   }
 
   // ─── Win / game-over handling ─────────────────────────────────────────────
