@@ -936,10 +936,10 @@ export abstract class MapScreenBase {
       this._reflowCloudShadows(chapter.style);
     }
 
-    const defaultCursor = (): string => (this._isPannable(chapter) ? 'grab' : 'pointer');
+    const getDefaultCursor = (): string => (this._isPannable(chapter) ? 'grab' : 'pointer');
     canvas.style.cssText =
       `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
-      `cursor:${defaultCursor()};` +
+      `cursor:${getDefaultCursor()};` +
       'display:block;max-width:100%;height:auto;margin:0 auto;';
 
     // ── Mouse events ──────────────────────────────────────────────────────────
@@ -1019,7 +1019,7 @@ export abstract class MapScreenBase {
     canvas.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return;
       if (this._panDrag?.moved) {
-        canvas.style.cursor = defaultCursor();
+        canvas.style.cursor = getDefaultCursor();
       }
       // Click handling is deferred to the 'click' event so the browser can
       // fire it; we only use mouseup to restore the cursor.
@@ -1030,7 +1030,7 @@ export abstract class MapScreenBase {
       this._mouseClientPos = null;
       this._hover = null;
       this._hideTooltip();
-      canvas.style.cursor = defaultCursor();
+      canvas.style.cursor = getDefaultCursor();
       this._render(chapter);
     });
 
@@ -1050,7 +1050,7 @@ export abstract class MapScreenBase {
       if (!cp) return;
       e.preventDefault();
       this._updateCampaignZoomFromWheel(chapter, e.deltaY, cp.px, cp.py);
-      canvas.style.cursor = defaultCursor();
+      canvas.style.cursor = getDefaultCursor();
     }, { passive: false });
 
     // ── Touch events for mobile/tablet devices ────────────────────────────────
