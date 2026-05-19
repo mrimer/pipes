@@ -96,16 +96,26 @@ function _drawLockIcon(
 // ─── Level chamber tile ────────────────────────────────────────────────────────
 
 /**
- * Cache for {@link computeMinimapRect} results.  The cache key encodes all
- * inputs that affect the result: `"${cellX},${cellY},${rows},${cols}"`.
- * TILE_SIZE is embedded implicitly because cellX and cellY are multiples of
- * TILE_SIZE, so a resize produces different keys and the cache is cleared
- * entirely (via {@link invalidateMinimapRectCache}) to prevent unbounded growth.
+ * Cache for {@link computeMinimapRect} results.  The key is a single integer
+ * encoding `(cellX, cellY, levelDef.rows, levelDef.cols)` using multipliers
+ * chosen so that no two distinct inputs produce the same value given realistic
+ * grid/tile-size bounds: cellX/cellY ≤ 50 tiles × 256 px = 12 800 px; rows/cols ≤ 99.
+ *
+ * Call {@link invalidateMinimapRectCache} after any TILE_SIZE change to evict stale entries.
  */
-const _minimapRectCache = new Map<string, { x: number; y: number; width: number; height: number }>();
+const _minimapRectCache = new Map<number, { x: number; y: number; width: number; height: number }>();
 
-/**
- * Discard all cached {@link computeMinimapRect} entries.
+/** Encode four integer inputs as a single collision-free Number key for the minimap rect cache. */
+function _minimapRectKey(cellX: number, cellY: number, rows: number, cols: number): number {
+  // Multipliers ensure each component occupies a unique decimal range:
+  //   cellX × 1e9  (max ~1.28e13, < 2^44 → safely below 2^53 integer limit)
+  //   cellY × 1e4  (max 1.28e8, << cellX resolution of 1e9 per tile)
+  //   rows  × 1e2  (max 9900, << cellY resolution of 1e4 per tile)
+  //   cols  × 1    (max 99,   << rows resolution of 1e2)
+  return cellX * 1e9 + cellY * 1e4 + rows * 1e2 + cols;
+}
+
+/** Discard all cached {@link computeMinimapRect} entries.
  * Call this whenever TILE_SIZE changes (e.g. after `setTileSize`) so stale
  * entries from the previous tile size do not accumulate in memory.
  */
@@ -128,7 +138,7 @@ export function computeMinimapRect(
   cellY: number,
   levelDef: LevelDef,
 ): { x: number; y: number; width: number; height: number } {
-  const cacheKey = `${cellX},${cellY},${levelDef.rows},${levelDef.cols}`;
+  const cacheKey = _minimapRectKey(cellX, cellY, levelDef.rows, levelDef.cols);
   const cached = _minimapRectCache.get(cacheKey);
   if (cached) return cached;
 
