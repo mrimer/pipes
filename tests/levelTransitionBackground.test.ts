@@ -44,6 +44,13 @@ describe('map zoom transition backgrounds', () => {
     }
   }
 
+  function flushSingleAnimationFrame(): void {
+    const cb = rafQueue.shift();
+    expect(cb).toBeDefined();
+    now += 250;
+    cb!(now);
+  }
+
   it('does not modify the body background image during or after a zoom transition', () => {
     const fromScreenEl = document.createElement('div');
     const toScreenEl = document.createElement('div');
@@ -74,7 +81,7 @@ describe('map zoom transition backgrounds', () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the destination screen background fully visible during map enter transitions', () => {
+  it('fades destination screen UI in during map enter transitions', () => {
     const fromScreenEl = document.createElement('div');
     const toScreenEl = document.createElement('div');
     const toCanvas = document.createElement('canvas');
@@ -97,14 +104,17 @@ describe('map zoom transition backgrounds', () => {
       },
     );
 
-    expect(toScreenEl.style.opacity).toBe('1');
+    expect(toScreenEl.style.opacity).toBe('0');
+    flushSingleAnimationFrame();
+    expect(toScreenEl.style.opacity).not.toBe('0');
+    expect(toScreenEl.style.opacity).not.toBe('1');
 
     flushAllAnimationFrames();
 
     expect(toScreenEl.style.opacity).toBe('');
   });
 
-  it('keeps the play-screen background fully visible during level enter transitions', () => {
+  it('fades play-screen UI in during level enter transitions', () => {
     const playScreenEl = document.createElement('div');
     const gameCanvas = document.createElement('canvas');
     playScreenEl.appendChild(gameCanvas);
@@ -130,7 +140,10 @@ describe('map zoom transition backgrounds', () => {
       jest.fn(),
     );
 
-    expect(playScreenEl.style.opacity).toBe('1');
+    expect(playScreenEl.style.opacity).toBe('0');
+    flushSingleAnimationFrame();
+    expect(playScreenEl.style.opacity).not.toBe('0');
+    expect(playScreenEl.style.opacity).not.toBe('1');
 
     flushAllAnimationFrames();
 
