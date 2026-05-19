@@ -96,12 +96,22 @@ function _drawLockIcon(
 // ─── Level chamber tile ────────────────────────────────────────────────────────
 
 /**
- * Per-frame cache for {@link computeMinimapRect} results.  The cache key encodes
- * all inputs that affect the result: `"${cellX},${cellY},${rows},${cols}"`.
- * When TILE_SIZE changes, cellX/cellY (multiples of TILE_SIZE) also change, so
- * stale entries are naturally bypassed and new ones are inserted.
+ * Cache for {@link computeMinimapRect} results.  The cache key encodes all
+ * inputs that affect the result: `"${cellX},${cellY},${rows},${cols}"`.
+ * TILE_SIZE is embedded implicitly because cellX and cellY are multiples of
+ * TILE_SIZE, so a resize produces different keys and the cache is cleared
+ * entirely (via {@link invalidateMinimapRectCache}) to prevent unbounded growth.
  */
 const _minimapRectCache = new Map<string, { x: number; y: number; width: number; height: number }>();
+
+/**
+ * Discard all cached {@link computeMinimapRect} entries.
+ * Call this whenever TILE_SIZE changes (e.g. after `setTileSize`) so stale
+ * entries from the previous tile size do not accumulate in memory.
+ */
+export function invalidateMinimapRectCache(): void {
+  _minimapRectCache.clear();
+}
 
 /**
  * Compute the canvas-space bounding rectangle of the minimap image drawn
@@ -110,8 +120,8 @@ const _minimapRectCache = new Map<string, { x: number; y: number; width: number;
  * This is used both for rendering the minimap (in {@link drawLevelChamberTile})
  * and for the level-transition animation (via {@link ChapterMapScreen.getMinimapScreenRect}).
  *
- * The result is memoized by `(cellX, cellY, levelDef.rows, levelDef.cols)` because
- * the computation is pure and identical for the same tile dimensions and position.
+ * Results are memoized by `(cellX, cellY, levelDef.rows, levelDef.cols)`.
+ * Call {@link invalidateMinimapRectCache} after any TILE_SIZE change to evict stale entries.
  */
 export function computeMinimapRect(
   cellX: number,
