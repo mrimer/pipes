@@ -1449,11 +1449,13 @@ export abstract class MapScreenBase {
     renderChapterMapConnectorLights(ctx, positions, now);
 
     // Sink vortex – spawn and render one vortex per sink tile
-    for (const sink of positions.sinks) {
-      if (now - this._lastVortexSpawn >= MapScreenBase.VORTEX_SPAWN_INTERVAL_MS) {
+    if (now - this._lastVortexSpawn >= MapScreenBase.VORTEX_SPAWN_INTERVAL_MS) {
+      for (const _sink of positions.sinks) {
         spawnVortexParticle(this._vortexParticles);
-        this._lastVortexSpawn = now;
       }
+      this._lastVortexSpawn = now;
+    }
+    for (const sink of positions.sinks) {
       const color = sink.isFilled ? SINK_WATER_COLOR : SINK_COLOR;
       renderVortex(ctx, this._vortexParticles, sink.x, sink.y, color);
     }

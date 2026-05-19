@@ -553,18 +553,18 @@ function _renderChapterMapGridLines(
   ctx.strokeStyle = 'rgba(74,144,217,0.12)';
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
+  ctx.beginPath();
   for (let r = rMin; r <= rMax + 1; r++) {
-    ctx.beginPath();
     ctx.moveTo(cMin * CELL, r * CELL);
     ctx.lineTo((cMax + 1) * CELL, r * CELL);
-    ctx.stroke();
   }
+  ctx.stroke();
+  ctx.beginPath();
   for (let c = cMin; c <= cMax + 1; c++) {
-    ctx.beginPath();
     ctx.moveTo(c * CELL, rMin * CELL);
     ctx.lineTo(c * CELL, (rMax + 1) * CELL);
-    ctx.stroke();
   }
+  ctx.stroke();
 }
 
 /** Pass 1: Draw gingham backgrounds for empty (non-tile) cells, with ambient decorations. */

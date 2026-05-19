@@ -84,21 +84,24 @@ export function renderEditorCanvas(
   ctx.strokeStyle = 'rgba(74,144,217,0.15)';
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
+  ctx.beginPath();
   for (let r = rMin; r <= rMax + 1; r++) {
-    ctx.beginPath();
     ctx.moveTo(cMin * CELL, r * CELL);
     ctx.lineTo((cMax + 1) * CELL, r * CELL);
-    ctx.stroke();
   }
+  ctx.stroke();
+  ctx.beginPath();
   for (let c = cMin; c <= cMax + 1; c++) {
-    ctx.beginPath();
     ctx.moveTo(c * CELL, rMin * CELL);
     ctx.lineTo(c * CELL, (rMax + 1) * CELL);
-    ctx.stroke();
   }
+  ctx.stroke();
 
   // Pass 1: Draw all open (player-fillable) spaces first so that pipe rounded
   // caps drawn in pass 2 are never covered by a neighboring empty cell's fill.
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
   for (let r = rMin; r <= rMax; r++) {
     for (let c = cMin; c <= cMax; c++) {
       const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
@@ -111,11 +114,7 @@ export function renderEditorCanvas(
       ctx.fillStyle = '#1a2840';
       ctx.fillRect(x, y, CELL, CELL);
       // Dashed border
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = '#2a3a5e';
-      ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
-      ctx.setLineDash([]);
       if (def === null) {
         // Subtle dot for level editor
         ctx.fillStyle = '#2a3a5e';
@@ -145,6 +144,7 @@ export function renderEditorCanvas(
       }
     }
   }
+  ctx.setLineDash([]);
 
   // Pass 2: Draw all non-pipe fixed tiles on top of the empty-space backgrounds.
   for (let r = rMin; r <= rMax; r++) {
@@ -181,7 +181,6 @@ export function renderEditorCanvas(
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
-      ctx.setLineDash([]);
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
     }
   }
@@ -210,7 +209,6 @@ export function renderEditorCanvas(
       // Solid border for fixed tiles
       ctx.strokeStyle = '#2a3a5e';
       ctx.lineWidth = 1;
-      ctx.setLineDash([]);
       ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
     }
   }
@@ -227,7 +225,6 @@ export function renderEditorCanvas(
       ctx.globalAlpha = 1;
       ctx.strokeStyle = '#f0c040';
       ctx.lineWidth = 2;
-      ctx.setLineDash([]);
       ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
       ctx.restore();
     }
@@ -247,7 +244,6 @@ export function renderEditorCanvas(
         ctx.fillRect(x, y, CELL, CELL);
         ctx.strokeStyle = '#ff4040';
         ctx.lineWidth = 2;
-        ctx.setLineDash([]);
         ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
         ctx.strokeStyle = 'rgba(255,64,64,0.8)';
         ctx.lineWidth = _s(3);
@@ -263,7 +259,6 @@ export function renderEditorCanvas(
         ctx.globalAlpha = Math.min(1, overlay.alpha + 0.3);
         ctx.strokeStyle = '#f0c040';
         ctx.lineWidth = 2;
-        ctx.setLineDash([]);
         ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
       }
       ctx.restore();
@@ -281,7 +276,6 @@ export function renderEditorCanvas(
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(x + 1.5, y + 1.5, CELL - 3, CELL - 3);
-      ctx.setLineDash([]);
       ctx.restore();
     }
   }
