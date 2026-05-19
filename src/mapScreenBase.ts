@@ -1292,12 +1292,27 @@ export abstract class MapScreenBase {
 
     // Cloud shadows move continuously and must be drawn each frame.
     // They use the same pan transform as the grid render in _renderBase.
+    const viewW = this._viewCols * TILE_SIZE;
+    const viewH = this._viewRows * TILE_SIZE;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
+    ctx.rect(0, 0, viewW, viewH);
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
     this._cloudShadows.updateAndRender(ctx, now);
+    ctx.restore();
+
+    const birdExpand = this._campaignBirdFlock.getClipExpansion();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(
+      -birdExpand,
+      -birdExpand,
+      viewW + 2 * birdExpand,
+      viewH + 2 * birdExpand,
+    );
+    ctx.clip();
+    ctx.translate(-this._panPixelX, -this._panPixelY);
     this._campaignBirdFlock.updateAndRender(ctx, now);
     ctx.restore();
   }

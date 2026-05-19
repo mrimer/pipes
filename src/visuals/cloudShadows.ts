@@ -691,6 +691,10 @@ export class CampaignBirdFlockField {
     this._drawFlock(ctx, flock);
   }
 
+  getClipExpansion(): number {
+    return this._flock?.boundingRadius ?? 0;
+  }
+
   private _advanceFlock(dt: number): void {
     const flock = this._flock;
     if (!flock || dt <= 0) return;
