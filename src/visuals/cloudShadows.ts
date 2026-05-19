@@ -672,11 +672,12 @@ export class CampaignBirdFlockField {
 
     if (flock.hasEntered) {
       const margin = BIRD_RESPAWN_MARGIN_TILES * this._tileSize;
+      const despawnDistance = flock.boundingRadius + margin;
       const outOfBounds =
-        flock.x < -flock.boundingRadius - margin
-        || flock.x > this._width + flock.boundingRadius + margin
-        || flock.y < -flock.boundingRadius - margin
-        || flock.y > this._height + flock.boundingRadius + margin;
+        flock.x < -despawnDistance
+        || flock.x > this._width + despawnDistance
+        || flock.y < -despawnDistance
+        || flock.y > this._height + despawnDistance;
       if (outOfBounds) {
         this._flock = this._spawnFlock();
       }
