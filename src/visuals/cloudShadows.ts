@@ -699,6 +699,16 @@ export class CampaignBirdFlockField {
     return this._flock?.boundingRadius ?? 0;
   }
 
+  /**
+   * Returns the rendered half-size used when stamping a bird from the shared
+   * cached canvas, matching the draw-time scale math exactly.
+   */
+  private _getRenderedBirdHalfSize(flock: Pick<BirdFlock, 'baseSize' | 'baseStrokeWidth'>, bird: Pick<FlockBird, 'size'>): number {
+    if (flock.baseSize <= 0) return 0;
+    const stampHalfSize = Math.ceil(flock.baseSize * BIRD_CANVAS_HALF_SIZE_FACTOR + flock.baseStrokeWidth);
+    return stampHalfSize * (bird.size / flock.baseSize);
+  }
+
   private _advanceFlock(dt: number): void {
     const flock = this._flock;
     if (!flock || dt <= 0) return;
@@ -737,7 +747,7 @@ export class CampaignBirdFlockField {
     for (const bird of flock.birds) {
       const x = flock.x + bird.offsetAlong * cosA - bird.offsetAcross * sinA;
       const y = flock.y + bird.offsetAlong * sinA + bird.offsetAcross * cosA;
-      const halfSize = Math.ceil(bird.size * BIRD_CANVAS_HALF_SIZE_FACTOR + bird.strokeWidth);
+      const halfSize = this._getRenderedBirdHalfSize(flock, bird);
       const intersectsBounds =
         x + halfSize >= minX
         && x - halfSize <= maxX
@@ -781,7 +791,7 @@ export class CampaignBirdFlockField {
   private _updateBirdCache(flock: BirdFlock, flapPhase: number): void {
     const size = flock.baseSize;
     const sw   = flock.baseStrokeWidth;
-    const halfSize = Math.ceil(size * BIRD_CANVAS_HALF_SIZE_FACTOR + sw);
+    const halfSize = this._getRenderedBirdHalfSize(flock, { size });
     const canvasSize = halfSize * 2;
 
     if (!this._birdCache || this._birdCache.width !== canvasSize) {
@@ -842,8 +852,7 @@ export class CampaignBirdFlockField {
       ctx.save();
       ctx.translate(bird.offsetAlong, bird.offsetAcross);
       // Scale the stamp proportionally so each bird keeps its own size.
-      const scale    = bird.size / flock.baseSize;
-      const drawHalf = halfSize * scale;
+      const drawHalf = this._getRenderedBirdHalfSize(flock, bird);
       ctx.drawImage(birdCanvas, -drawHalf, -drawHalf, drawHalf * 2, drawHalf * 2);
       ctx.restore();
     }
@@ -865,8 +874,9 @@ export class CampaignBirdFlockField {
     const speedPxPerMs = randRange(BIRD_MIN_SPEED_TILES_PER_SECOND, BIRD_MAX_SPEED_TILES_PER_SECOND) * this._tileSize / 1000;
 
     let boundingRadius = 0;
+    const flockSizeBasis = { baseSize, baseStrokeWidth };
     for (const bird of birds) {
-      const stampHalfSize = Math.ceil(bird.size * BIRD_CANVAS_HALF_SIZE_FACTOR + bird.strokeWidth);
+      const stampHalfSize = this._getRenderedBirdHalfSize(flockSizeBasis, bird);
       boundingRadius = Math.max(
         boundingRadius,
         Math.hypot(bird.offsetAlong, bird.offsetAcross) + stampHalfSize,
