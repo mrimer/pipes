@@ -13,7 +13,7 @@
 
 import { TILE_SIZE, scalePx as _s } from '../renderer';
 import { Board, posKey } from '../board';
-import { PipeShape } from '../types';
+import { GridPos, PipeShape } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,6 +31,20 @@ export interface HeatWave {
   col: number;
   /** `performance.now()` when this wave started. */
   startTime: number;
+}
+
+/** Scan the board once and return the positions of all hot_plate chamber tiles. */
+export function collectHotPlateTiles(board: Board): GridPos[] {
+  const hotPlateTiles: GridPos[] = [];
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      const tile = board.grid[r][c];
+      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'hot_plate') {
+        hotPlateTiles.push({ row: r, col: c });
+      }
+    }
+  }
+  return hotPlateTiles;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -52,32 +66,28 @@ export function tickHeatWaves(
   board: Board,
   filled: ReadonlySet<string>,
   now: number,
+  hotPlateTiles: readonly GridPos[] = collectHotPlateTiles(board),
 ): void {
-  for (let r = 0; r < board.rows; r++) {
-    for (let c = 0; c < board.cols; c++) {
-      const tile = board.grid[r][c];
-      if (tile.shape !== PipeShape.Chamber || tile.chamberContent !== 'hot_plate') continue;
+  for (const { row: r, col: c } of hotPlateTiles) {
+    const key = posKey(r, c);
 
-      const key = posKey(r, c);
+    // Skip connected (water-filled) tiles and reset their timer so the
+    // effect fires fresh once they become dry again.
+    if (filled.has(key)) {
+      lastSpawnTimes.delete(key);
+      continue;
+    }
 
-      // Skip connected (water-filled) tiles and reset their timer so the
-      // effect fires fresh once they become dry again.
-      if (filled.has(key)) {
-        lastSpawnTimes.delete(key);
-        continue;
-      }
-
-      if (!lastSpawnTimes.has(key)) {
-        // First frame this tile is seen as dry – stagger the initial delay by
-        // position so tiles don't all wave in unison.
-        const stagger = ((r * 3 + c * 7) * 1137) % HEAT_WAVE_INTERVAL_MS;
-        lastSpawnTimes.set(key, now - stagger);
-      }
-      const last = lastSpawnTimes.get(key)!;
-      if (now - last >= HEAT_WAVE_INTERVAL_MS) {
-        waves.push({ row: r, col: c, startTime: now });
-        lastSpawnTimes.set(key, now);
-      }
+    if (!lastSpawnTimes.has(key)) {
+      // First frame this tile is seen as dry – stagger the initial delay by
+      // position so tiles don't all wave in unison.
+      const stagger = ((r * 3 + c * 7) * 1137) % HEAT_WAVE_INTERVAL_MS;
+      lastSpawnTimes.set(key, now - stagger);
+    }
+    const last = lastSpawnTimes.get(key)!;
+    if (now - last >= HEAT_WAVE_INTERVAL_MS) {
+      waves.push({ row: r, col: c, startTime: now });
+      lastSpawnTimes.set(key, now);
     }
   }
 }
