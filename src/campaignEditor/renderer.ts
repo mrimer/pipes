@@ -102,9 +102,11 @@ export function renderEditorCanvas(
   ctx.setLineDash([4, 4]);
   ctx.strokeStyle = '#2a3a5e';
   ctx.lineWidth = 1;
+  const dragRow = drag?.fromPos.row ?? -1;
+  const dragCol = drag?.fromPos.col ?? -1;
   for (let r = rMin; r <= rMax; r++) {
     for (let c = cMin; c <= cMax; c++) {
-      const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
+      const isDragSource = dragRow === r && dragCol === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
       const isEmptyCell = def === null || isEmptyFloor(def.shape);
       if (!isEmptyCell) continue;
@@ -149,7 +151,7 @@ export function renderEditorCanvas(
   // Pass 2: Draw all non-pipe fixed tiles on top of the empty-space backgrounds.
   for (let r = rMin; r <= rMax; r++) {
     for (let c = cMin; c <= cMax; c++) {
-      const isDragSource = drag && drag.fromPos.row === r && drag.fromPos.col === c;
+      const isDragSource = dragRow === r && dragCol === c;
       const def = isDragSource ? null : (grid[r]?.[c] ?? null);
       if (def === null || PIPE_SHAPES.has(def.shape) || isEmptyFloor(def.shape)) continue;
       const x = c * CELL;
