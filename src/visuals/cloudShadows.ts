@@ -21,6 +21,7 @@ interface CloudShadow {
 }
 
 type CloudSpawnEdge = 'top' | 'right' | 'bottom' | 'left';
+const SPAWN_EDGES: CloudSpawnEdge[] = ['top', 'right', 'bottom', 'left'];
 
 interface CloudSpawnedShadow extends CloudShadow {
   entryEdge: CloudSpawnEdge;
@@ -147,9 +148,38 @@ function randRange(min: number, max: number): number {
 function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
 }
+function edgeAnchorWithMargin(
+  edge: CloudSpawnEdge,
+  width: number,
+  height: number,
+  coordinate: number,
+  margin = 0,
+): { x: number; y: number } {
+  switch (edge) {
+    case 'top':
+      return { x: coordinate, y: -margin };
+    case 'right':
+      return { x: width + margin, y: coordinate };
+    case 'bottom':
+      return { x: coordinate, y: height + margin };
+    case 'left':
+    default:
+      return { x: -margin, y: coordinate };
+  }
+}
 
-function randIntInclusive(min: number, max: number): number {
-  return min + Math.floor(Math.random() * (max - min + 1));
+function inwardAngleFromEdge(edge: CloudSpawnEdge): number {
+  switch (edge) {
+    case 'top':
+      return Math.PI / 2;
+    case 'right':
+      return Math.PI;
+    case 'bottom':
+      return -Math.PI / 2;
+    case 'left':
+    default:
+      return 0;
+  }
 }
 
 /**
@@ -430,17 +460,7 @@ export class CloudShadowField {
   }
 
   private _getEntryAnchor(edge: CloudSpawnEdge, coordinate: number): { x: number; y: number } {
-    switch (edge) {
-      case 'top':
-        return { x: coordinate, y: 0 };
-      case 'right':
-        return { x: this._width, y: coordinate };
-      case 'bottom':
-        return { x: coordinate, y: this._height };
-      case 'left':
-      default:
-        return { x: 0, y: coordinate };
-    }
+    return edgeAnchorWithMargin(edge, this._width, this._height, coordinate);
   }
 
   private _projectAlongMovement(x: number, y: number): number {
@@ -678,7 +698,7 @@ export class CampaignBirdFlockField {
     if (flock.flapCooldownMs <= 0) {
       flock.flapDurationMs = randRange(BIRD_MIN_FLAP_DURATION_MS, BIRD_MAX_FLAP_DURATION_MS);
       flock.flapElapsedMs = 0;
-      flock.flapBeats = randIntInclusive(BIRD_MIN_FLAP_BEATS, BIRD_MAX_FLAP_BEATS);
+      flock.flapBeats = Math.floor(randRange(BIRD_MIN_FLAP_BEATS, BIRD_MAX_FLAP_BEATS + 1));
     }
   }
 
@@ -751,7 +771,7 @@ export class CampaignBirdFlockField {
   }
 
   private _buildVFormation(): FlockBird[] {
-    const armDepth = randIntInclusive(BIRD_MIN_ARM_DEPTH, BIRD_MAX_ARM_DEPTH);
+    const armDepth = Math.floor(randRange(BIRD_MIN_ARM_DEPTH, BIRD_MAX_ARM_DEPTH + 1));
     const spacingAlong = randRange(BIRD_MIN_SPACING_ALONG_TILES, BIRD_MAX_SPACING_ALONG_TILES) * this._tileSize;
     const spacingAcross = randRange(BIRD_MIN_SPACING_ACROSS_TILES, BIRD_MAX_SPACING_ACROSS_TILES) * this._tileSize;
     const baseSize = randRange(BIRD_MIN_SIZE_TILES, BIRD_MAX_SIZE_TILES) * this._tileSize;
@@ -777,35 +797,17 @@ export class CampaignBirdFlockField {
   }
 
   private _pickSpawnEdge(): CloudSpawnEdge {
-    const edges: CloudSpawnEdge[] = ['top', 'right', 'bottom', 'left'];
-    return edges[Math.floor(Math.random() * edges.length)];
+    return SPAWN_EDGES[Math.floor(Math.random() * SPAWN_EDGES.length)];
   }
 
   private _getInwardAngle(edge: CloudSpawnEdge): number {
-    switch (edge) {
-      case 'top':
-        return Math.PI / 2;
-      case 'right':
-        return Math.PI;
-      case 'bottom':
-        return -Math.PI / 2;
-      case 'left':
-      default:
-        return 0;
-    }
+    return inwardAngleFromEdge(edge);
   }
 
   private _buildSpawnPoint(edge: CloudSpawnEdge, margin: number): { x: number; y: number } {
-    switch (edge) {
-      case 'top':
-        return { x: randRange(0, this._width), y: -margin };
-      case 'right':
-        return { x: this._width + margin, y: randRange(0, this._height) };
-      case 'bottom':
-        return { x: randRange(0, this._width), y: this._height + margin };
-      case 'left':
-      default:
-        return { x: -margin, y: randRange(0, this._height) };
-    }
+    const coordinate = edge === 'top' || edge === 'bottom'
+      ? randRange(0, this._width)
+      : randRange(0, this._height);
+    return edgeAnchorWithMargin(edge, this._width, this._height, coordinate, margin);
   }
 }
