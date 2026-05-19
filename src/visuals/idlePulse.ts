@@ -200,6 +200,21 @@ export function renderIdlePulse(
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
 /**
+ * Per-context radial-gradient cache for `_drawGlowAt`.
+ *
+ * Gradients are keyed by "r,g,b" color string inside a per-context entry that
+ * also records the LINE_WIDTH at which they were built.  When LINE_WIDTH changes
+ * (i.e. on window resize) the entire entry is replaced so the radii stay
+ * accurate; color-keyed gradients are then repopulated on demand.  Using the
+ * context object as the outer key keeps gradient objects bound to the correct
+ * rendering surface even if multiple canvases are in use.
+ */
+const _glowCacheByCtx = new Map<
+  CanvasRenderingContext2D,
+  { lineWidth: number; gradients: Map<string, { outer: CanvasGradient; inner: CanvasGradient }> }
+>();
+
+/**
  * Parse a `#rrggbb` hex string and return the blended-toward-white RGB
  * components as an `[r, g, b]` tuple (integers 0–255).
  */
@@ -245,6 +260,13 @@ export function drawIdlePulseGlow(
  * Two concentric gradients are drawn: a bright, more opaque inner core and a
  * softer, larger outer halo.  Both fade to transparent at the edge, so the
  * glow blends naturally over any underlying pipe artwork.
+ *
+ * Gradients are cached per (context, color, LINE_WIDTH) to avoid recreating
+ * them every frame.  They are built at the canvas origin and repositioned via
+ * `ctx.translate` so the same objects can be reused regardless of position.
+ * `ctx.globalAlpha` drives the per-call opacity, keeping the color-stop alphas
+ * constant (outer halo center = 0.625, inner core center = 1.0) and avoiding
+ * any per-frame string allocation.
  */
 function _drawGlowAt(
   ctx: CanvasRenderingContext2D,
@@ -258,23 +280,48 @@ function _drawGlowAt(
   const innerRadius = LINE_WIDTH * 0.625;
   const outerRadius = LINE_WIDTH * 1.0;
 
-  // Outer soft halo.
-  const outer = ctx.createRadialGradient(hx, hy, 0, hx, hy, outerRadius);
-  outer.addColorStop(0, `rgba(${r},${g},${b},${(alpha * 0.625).toFixed(3)})`);
-  outer.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  ctx.fillStyle = outer;
+  // Retrieve or create the per-context cache entry, invalidating it whenever
+  // LINE_WIDTH changes (i.e. on window resize) so radii stay accurate.
+  let entry = _glowCacheByCtx.get(ctx);
+  if (!entry || entry.lineWidth !== LINE_WIDTH) {
+    entry = { lineWidth: LINE_WIDTH, gradients: new Map() };
+    _glowCacheByCtx.set(ctx, entry);
+  }
+
+  // Retrieve or build gradients for this (r, g, b) color.  Gradients are
+  // anchored at (0, 0) and moved to (hx, hy) via ctx.translate below.
+  const colorKey = `${r},${g},${b}`;
+  let grads = entry.gradients.get(colorKey);
+  if (!grads) {
+    const outer = ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
+    // Alpha in the stop is fixed at 0.625 (halo) / 1.0 (core); overall
+    // brightness is controlled by ctx.globalAlpha at draw time.
+    outer.addColorStop(0, `rgba(${r},${g},${b},0.625)`);
+    outer.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    const inner = ctx.createRadialGradient(0, 0, 0, 0, 0, innerRadius);
+    inner.addColorStop(0, `rgba(${r},${g},${b},1)`);
+    inner.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    grads = { outer, inner };
+    entry.gradients.set(colorKey, grads);
+  }
+
+  // Translate to the glow centre so the origin-anchored gradients appear at
+  // (hx, hy).  ctx.globalAlpha drives per-call alpha without touching stops.
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.globalAlpha = alpha;
+
+  ctx.fillStyle = grads.outer;
   ctx.beginPath();
-  ctx.arc(hx, hy, outerRadius, 0, Math.PI * 2);
+  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
   ctx.fill();
 
-  // Inner bright core.
-  const inner = ctx.createRadialGradient(hx, hy, 0, hx, hy, innerRadius);
-  inner.addColorStop(0, `rgba(${r},${g},${b},${alpha.toFixed(3)})`);
-  inner.addColorStop(1, `rgba(${r},${g},${b},0)`);
-  ctx.fillStyle = inner;
+  ctx.fillStyle = grads.inner;
   ctx.beginPath();
-  ctx.arc(hx, hy, innerRadius, 0, Math.PI * 2);
+  ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.restore();
 }
 
 /**
