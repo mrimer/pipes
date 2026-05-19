@@ -2,13 +2,35 @@
  * @jest-environment jsdom
  */
 
-import { CloudShadowField } from '../src/visuals/cloudShadows';
+import { CampaignBirdFlockField, CloudShadowField } from '../src/visuals/cloudShadows';
 
 interface CloudShadowFieldInternals {
   _clouds: Array<{ x: number; y: number }>;
   _dirX: number;
   _dirY: number;
   _spawnCloud: (options?: { allowGroup?: boolean }) => boolean;
+}
+
+interface BirdFlockTestShape {
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  angle: number;
+  speedPxPerMs: number;
+  birds: Array<{ offsetAlong: number; offsetAcross: number; size: number; strokeWidth: number }>;
+  boundingRadius: number;
+  hasEntered: boolean;
+  flapCooldownMs: number;
+  flapDurationMs: number;
+  flapElapsedMs: number;
+  flapBeats: number;
+  baseSize: number;
+  baseStrokeWidth: number;
+}
+
+interface CampaignBirdFlockInternals {
+  _isFlockFullyOffscreen: (flock: BirdFlockTestShape, margin: number) => boolean;
 }
 
 function createLCGPRNG(seed = 12345): () => number {
@@ -87,5 +109,68 @@ describe('CloudShadowField', () => {
     expect(
       incomingEdges.has(computeCloudEntryEdge(cloud, internals._dirX, internals._dirY, 120, 80) ?? 'left'),
     ).toBe(true);
+  });
+});
+
+describe('CampaignBirdFlockField', () => {
+  it('keeps a right-moving flock alive until trailing birds fully exit the board', () => {
+    const field = new CampaignBirdFlockField();
+    field.resetForScreen(100, 100, 10, 'campaign');
+    const internals = field as unknown as CampaignBirdFlockInternals;
+
+    const flock: BirdFlockTestShape = {
+      x: 130,
+      y: 50,
+      dirX: 1,
+      dirY: 0,
+      angle: 0,
+      speedPxPerMs: 0,
+      birds: [
+        { offsetAlong: 0, offsetAcross: 0, size: 10, strokeWidth: 2 },
+        { offsetAlong: -40, offsetAcross: 0, size: 10, strokeWidth: 2 },
+      ],
+      boundingRadius: 0,
+      hasEntered: true,
+      flapCooldownMs: 0,
+      flapDurationMs: 0,
+      flapElapsedMs: 0,
+      flapBeats: 0,
+      baseSize: 10,
+      baseStrokeWidth: 2,
+    };
+
+    expect(internals._isFlockFullyOffscreen(flock, 0)).toBe(false);
+    flock.x = 160;
+    expect(internals._isFlockFullyOffscreen(flock, 0)).toBe(true);
+  });
+
+  it('uses rendered stamp size so larger scaled birds do not despawn early at the edge', () => {
+    const field = new CampaignBirdFlockField();
+    field.resetForScreen(100, 100, 10, 'campaign');
+    const internals = field as unknown as CampaignBirdFlockInternals;
+
+    const flock: BirdFlockTestShape = {
+      x: 132,
+      y: 50,
+      dirX: 1,
+      dirY: 0,
+      angle: 0,
+      speedPxPerMs: 0,
+      birds: [
+        { offsetAlong: 0, offsetAcross: 0, size: 20, strokeWidth: 2.2 },
+      ],
+      boundingRadius: 0,
+      hasEntered: true,
+      flapCooldownMs: 0,
+      flapDurationMs: 0,
+      flapElapsedMs: 0,
+      flapBeats: 0,
+      baseSize: 10,
+      baseStrokeWidth: 2.2,
+    };
+
+    expect(internals._isFlockFullyOffscreen(flock, 0)).toBe(false);
+    flock.x = 135;
+    expect(internals._isFlockFullyOffscreen(flock, 0)).toBe(true);
   });
 });
