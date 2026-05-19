@@ -4,6 +4,7 @@
  */
 
 import { TILE_SIZE, setTileSize, BASE_TILE_SIZE, computeTileSize } from '../renderer';
+import { invalidateMinimapRectCache } from '../visuals/chapterMap';
 import { MAX_EDITOR_CANVAS_PX, EDITOR_CANVAS_BORDER } from './types';
 
 /**
@@ -140,7 +141,7 @@ export function updateCanvasDisplaySize(
   const fit = constrainHeight ? Math.floor(Math.min(fitW, availH / rows)) : fitW;
   const newTileSize = Math.max(BASE_TILE_SIZE, Math.min(MAX_TILE_SIZE, fit));
   setTileSize(newTileSize);
-
+  invalidateMinimapRectCache();
   const intrinsicW = cols * TILE_SIZE;
   const intrinsicH = rows * TILE_SIZE;
   canvas.width  = intrinsicW;
@@ -220,6 +221,7 @@ export function updateMapEditorCanvas(
   }
 
   setTileSize(newTileSize);
+  invalidateMinimapRectCache();
   canvas.width  = cols * TILE_SIZE;
   canvas.height = rows * TILE_SIZE;
   canvas.style.width  = Math.round(cols * TILE_SIZE * scale) + 'px';

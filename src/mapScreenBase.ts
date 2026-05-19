@@ -8,7 +8,7 @@
 import { ChapterDef, CampaignDef, LevelDef, TileDef, PipeShape, Direction, AmbientDecoration, LevelStyle } from './types';
 import { TILE_SIZE, setTileSize, computeTileSize } from './renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from './board';
-import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes } from './visuals/chapterMap';
+import { renderChapterMapCanvas, findChapterMapAnimPositions, ChapterMapFlowDrop, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes, invalidateMinimapRectCache } from './visuals/chapterMap';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { computeMapReachable, tileDefConnections, findMapTile, computeViewBounds } from './mapUtils';
 import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
@@ -752,6 +752,10 @@ export abstract class MapScreenBase {
     // hidden, which would produce an incorrect rescale factor if used directly.
     const oldTileSize = this._lastTileSize > 0 ? this._lastTileSize : TILE_SIZE;
     setTileSize(computeTileSize(viewRows, viewCols, CHAPTER_MAP_GRID_OVERHEAD));
+    if (TILE_SIZE !== oldTileSize) {
+      // Evict stale minimap-rect cache entries from the previous tile size.
+      invalidateMinimapRectCache();
+    }
     this._lastTileSize = TILE_SIZE;
     this._viewRows = viewRows;
     this._viewCols = viewCols;
@@ -1165,8 +1169,11 @@ export abstract class MapScreenBase {
 
     const filledKeys = this._computeFilledCells();
 
-    // Recompute accessible level indices alongside filledKeys (Task G: O(rows×cols)
-    // scan pulled out of the per-frame render loop and cached as a class field).
+    // Recompute accessible level indices alongside filledKeys.  The result is
+    // stored in _accessibleLevelIdxs and consumed by renderChapterMapCanvas to
+    // determine which level chambers should show a minimap rather than a lock
+    // icon.  Keeping this scan inside _renderBase (which only runs when dirty)
+    // means the O(rows×cols) grid scan is skipped on frames with no state change.
     const accessibleLevelIdxs = new Set<number>();
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -1547,8 +1554,11 @@ export abstract class MapScreenBase {
 
     // Active jitter animations animate the base grid layer, so keep it dirty
     // for the duration of the animation.
-    if (this._jitterAnims.some(j => now - j.startedAt < MapScreenBase.JITTER_DURATION_MS)) {
-      this._chapterMapDirty = true;
+    for (const j of this._jitterAnims) {
+      if (now - j.startedAt < MapScreenBase.JITTER_DURATION_MS) {
+        this._chapterMapDirty = true;
+        break;
+      }
     }
 
     // Re-render the base grid only when state has changed; otherwise reuse the
