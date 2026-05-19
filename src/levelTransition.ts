@@ -298,8 +298,8 @@ export function playMapTransition(
   // zooming snapshot, so it should not also fade in at full size.
   gameCanvas.style.visibility = 'hidden';
 
-  // Keep the play screen background fully visible throughout the zoom-in.
-  playScreenEl.style.opacity = '1';
+  // Start with the destination UI hidden, then fade it in as the zoom progresses.
+  playScreenEl.style.opacity = '0';
 
   // ── 6. Animate using requestAnimationFrame ──────────────────────────────
 
@@ -322,6 +322,7 @@ export function playMapTransition(
 
     // Fade chapter map snapshot out (linear)
     if (chapterMapFadeEl) chapterMapFadeEl.style.opacity = `${1 - rawT}`;
+    playScreenEl.style.opacity = `${rawT}`;
 
     if (rawT < 1) {
       requestAnimationFrame(tick);
@@ -598,10 +599,8 @@ export function playMapScreenEnterTransition(
 
   // ── Prepare screen-element styles ─────────────────────────────────────────
 
-  // Keep the destination screen background fully visible throughout the zoom-in.
-  // The live destination canvas stays hidden until the transition completes, so
-  // this preserves the scrolling pipe backdrop without exposing the map twice.
-  toScreenEl.style.opacity = '1';
+  // Start with destination UI hidden, then fade it in during the zoom-in.
+  toScreenEl.style.opacity = '0';
 
   // Hide the live canvas inside fromScreenEl to prevent any mouse-move or
   // touch-move handler from re-rendering it at the wrong TILE_SIZE during the
@@ -646,6 +645,7 @@ export function playMapScreenEnterTransition(
     } else {
       fromScreenEl.style.opacity = `${1 - rawT}`;
     }
+    toScreenEl.style.opacity = `${rawT}`;
     if (rawT < 1) {
       requestAnimationFrame(tick);
     } else {
