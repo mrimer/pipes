@@ -1633,6 +1633,7 @@ export abstract class MapScreenBase {
     const sideFlowers = flower.isLeft ? this._leftEdgeFlowersByY : this._rightEdgeFlowersByY;
     let low = 0;
     let high = sideFlowers.length;
+    // Binary-search the insertion point so this side list always stays sorted by y.
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
       if (sideFlowers[mid].y < flower.y) {
@@ -1647,9 +1648,21 @@ export abstract class MapScreenBase {
   /** Remove an edge flower from the side-specific y-sorted index. */
   private _removeEdgeFlowerByY(flower: EdgeFlower): void {
     const sideFlowers = flower.isLeft ? this._leftEdgeFlowersByY : this._rightEdgeFlowersByY;
-    const idx = sideFlowers.indexOf(flower);
-    if (idx >= 0) {
-      sideFlowers.splice(idx, 1);
+    let low = 0;
+    let high = sideFlowers.length;
+    while (low < high) {
+      const mid = Math.floor((low + high) / 2);
+      if (sideFlowers[mid].y < flower.y) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    for (let i = low; i < sideFlowers.length && sideFlowers[i].y === flower.y; i++) {
+      if (sideFlowers[i] === flower) {
+        sideFlowers.splice(i, 1);
+        return;
+      }
     }
   }
 
