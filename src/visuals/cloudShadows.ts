@@ -691,6 +691,10 @@ export class CampaignBirdFlockField {
     this._drawFlock(ctx, flock);
   }
 
+  /**
+   * Returns the current flock's pixel-space bounding radius for viewport clip
+   * expansion, or 0 when no flock is active.
+   */
   getClipExpansion(): number {
     return this._flock?.boundingRadius ?? 0;
   }
