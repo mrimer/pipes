@@ -31,6 +31,7 @@ import {
   PALETTE_ITEM_UNSELECTED_COLOR,
   REPEATABLE_EDITOR_TILES,
   isPipePlacementPalette,
+  isTreeShape,
   buildMapTileDef,
   CAMPAIGN_MAP_MAX_DIM,
 } from './types';
@@ -924,14 +925,20 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._gridState.focusedTilePos = pos;
 
     const tileAtPos = this._gridState.grid[pos.row]?.[pos.col] ?? null;
+    const preserveTreePaletteSelection =
+      tileAtPos !== null &&
+      isTreeShape(this._palette as PipeShape) &&
+      isTreeShape(tileAtPos.shape);
     if (tileAtPos !== null) {
       const paletteForTile: EditorPalette =
         tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'chapter'
           ? CHAPTER_CHAMBER_PALETTE
           : tileAtPos.shape;
-      this._palette = paletteForTile;
-      document.getElementById('campaign-map-palette-panel')
-        ?.replaceWith(this._buildPalettePanel(campaign));
+      if (!preserveTreePaletteSelection) {
+        this._palette = paletteForTile;
+        document.getElementById('campaign-map-palette-panel')
+          ?.replaceWith(this._buildPalettePanel(campaign));
+      }
     }
 
     document.getElementById('campaign-map-tile-params-panel')
@@ -977,8 +984,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const isEmptyFloorPalette = palette !== 'erase' && EMPTY_FLOOR_SHAPES.includes(palette as PipeShape);
     const existingIsEmptyFloor = existingTile === null ||
       (existingTile !== null && isEmptyFloor(existingTile.shape));
+    const canOverwriteTree =
+      existingTile !== null &&
+      REPEATABLE_EDITOR_TILES.has(palette) &&
+      isTreeShape(palette as PipeShape) &&
+      isTreeShape(existingTile.shape);
 
-    if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette) {
+    if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette && !canOverwriteTree) {
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._renderCanvas();
     } else {
@@ -989,7 +1001,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
         this._showSinkError();
         return;
       }
-      if (existingIsEmptyFloor && REPEATABLE_EDITOR_TILES.has(palette)) {
+      if ((existingIsEmptyFloor || canOverwriteTree) && REPEATABLE_EDITOR_TILES.has(palette)) {
         this._paintDragActive = true;
         this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
         this._playPlacementSfx(pos);
@@ -1102,7 +1114,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     if (this._paintDragActive && pos) {
       const cur = this._gridState.grid[pos.row]?.[pos.col] ?? null;
-      if (cur === null || isEmptyFloor(cur.shape)) {
+      const canOverwriteTree = cur !== null &&
+        REPEATABLE_EDITOR_TILES.has(this._palette) &&
+        isTreeShape(this._palette as PipeShape) &&
+        isTreeShape(cur.shape);
+      if (cur === null || isEmptyFloor(cur.shape) || canOverwriteTree) {
         this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
       }
     } else if (this._rightEraseDragActive && pos) {

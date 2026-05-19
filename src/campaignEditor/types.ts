@@ -380,6 +380,19 @@ export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
   PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
 ]);
 
+/** Tree tile variants that can be painted over each other in map editors. */
+export const TREE_EDITOR_TILE_SHAPES = new Set<PipeShape>([
+  PipeShape.Tree,
+  PipeShape.Tree2,
+  PipeShape.Tree3,
+  PipeShape.Tree4,
+]);
+
+/** Returns true if the provided shape is one of the tree tile variants. */
+export function isTreeShape(shape: PipeShape): boolean {
+  return TREE_EDITOR_TILE_SHAPES.has(shape);
+}
+
 // ─── Helper: generate a unique ID ─────────────────────────────────────────────
 
 

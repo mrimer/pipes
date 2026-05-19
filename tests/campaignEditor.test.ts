@@ -3859,6 +3859,135 @@ describe('CampaignEditor – campaign map editor pan-drag precedence', () => {
   });
 });
 
+describe('CampaignEditor – tree overwrite on map editors', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  function mockCanvasRect(canvas: HTMLCanvasElement): void {
+    Object.defineProperty(canvas, 'getBoundingClientRect', {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: canvas.width || 768,
+        height: canvas.height || 576,
+        right: canvas.width || 768,
+        bottom: canvas.height || 576,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+      configurable: true,
+    });
+  }
+
+  it('campaign map editor allows placing one tree variant over another', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_tree_overwrite',
+      name: 'Tree Overwrite Campaign',
+      author: 'Tester',
+      rows: 2,
+      cols: 2,
+      grid: [[null, null], [null, null]],
+      chapters: [],
+    };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    const state = editor as unknown as {
+      _el: HTMLElement;
+      _activeCampaignId: string | null;
+      _showCampaignDetail(): void;
+      _campaignMapEditor: {
+        _palette: import('../src/campaignEditor/types').EditorPalette;
+        _gridState: { grid: (TileDef | null)[][] };
+      };
+    };
+    state._activeCampaignId = 'cmp_tree_overwrite';
+    state._showCampaignDetail();
+    state._el.style.display = 'flex';
+
+    const canvas = document.querySelector<HTMLCanvasElement>('#campaign-map-editor-section canvas');
+    expect(canvas).toBeTruthy();
+    mockCanvasRect(canvas!);
+
+    state._campaignMapEditor._gridState.grid[0][0] = { shape: PipeShape.Tree };
+    state._campaignMapEditor._palette = PipeShape.Tree4;
+
+    canvas!.dispatchEvent(new MouseEvent('mousedown', { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true }));
+
+    expect(state._campaignMapEditor._gridState.grid[0][0]?.shape).toBe(PipeShape.Tree4);
+  });
+
+  it('chapter map editor allows placing one tree variant over another', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp_ch_tree_overwrite',
+      name: 'Chapter Tree Overwrite Campaign',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Ch 1',
+        rows: 2,
+        cols: 2,
+        grid: [[null, null], [null, null]],
+        levels: [],
+      }],
+    };
+    const editor = makeEditor([campaign]);
+    editor.show();
+    const state = editor as unknown as {
+      _el: HTMLElement;
+      _activeCampaignId: string | null;
+      _activeChapterIdx: number;
+      _showChapterDetail(chapterIdx: number): void;
+      _chapterMapEditor: {
+        _palette: import('../src/campaignEditor/types').EditorPalette;
+        _gridState: { grid: (TileDef | null)[][] };
+      };
+    };
+    state._activeCampaignId = 'cmp_ch_tree_overwrite';
+    state._activeChapterIdx = 0;
+    state._showChapterDetail(0);
+    state._el.style.display = 'flex';
+
+    const canvas = document.querySelector<HTMLCanvasElement>('#chapter-map-editor-section canvas');
+    expect(canvas).toBeTruthy();
+    mockCanvasRect(canvas!);
+
+    state._chapterMapEditor._gridState.grid[0][0] = { shape: PipeShape.Tree3 };
+    state._chapterMapEditor._palette = PipeShape.Tree2;
+
+    canvas!.dispatchEvent(new MouseEvent('mousedown', { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true }));
+
+    expect(state._chapterMapEditor._gridState.grid[0][0]?.shape).toBe(PipeShape.Tree2);
+  });
+});
+
 // ─── CampaignEditor – Ctrl+Z/Y on chapter map screen ─────────────────────────
 
 describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
