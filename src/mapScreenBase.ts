@@ -1450,9 +1450,7 @@ export abstract class MapScreenBase {
 
     // Sink vortex – spawn and render one vortex per sink tile
     if (now - this._lastVortexSpawn >= MapScreenBase.VORTEX_SPAWN_INTERVAL_MS) {
-      for (let i = 0; i < positions.sinks.length; i++) {
-        spawnVortexParticle(this._vortexParticles);
-      }
+      spawnVortexParticle(this._vortexParticles);
       this._lastVortexSpawn = now;
     }
     for (const sink of positions.sinks) {
