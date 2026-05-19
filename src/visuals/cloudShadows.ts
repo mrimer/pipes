@@ -18,6 +18,16 @@ interface CloudShadow {
   opacity: number;
   bodyTone: number;
   bodyOpacity: number;
+  /** Pre-formatted color-stop string for the shadow gradient center stop (computed at spawn). */
+  gradientCenter: string;
+  /** Pre-formatted color-stop string for the shadow gradient mid stop (computed at spawn). */
+  gradientMid: string;
+  /** Pre-formatted color-stop string for the campaign body gradient inner stop (computed at spawn). */
+  bodyInner: string;
+  /** Pre-formatted color-stop string for the campaign body gradient mid stop (computed at spawn). */
+  bodyMidStop: string;
+  /** Pre-formatted color-stop string for the campaign body gradient outer stop (computed at spawn). */
+  bodyOuter: string;
 }
 
 type CloudSpawnEdge = 'top' | 'right' | 'bottom' | 'left';
@@ -380,15 +390,35 @@ export class CloudShadowField {
     const distanceAlong = randRange(distanceMin, distanceMax);
     const distanceOffset = distanceAlong - baseDistance;
 
+    const opacity = randRange(this._config.minOpacity, this._config.maxOpacity);
+    const bodyTone = randRange(0, 1);
+    const bodyOpacity = randRange(0.82, 0.95);
+
+    // Pre-format gradient color-stop strings; these values are constant for the
+    // cloud's lifetime so computing them once at spawn avoids per-frame toFixed
+    // allocations inside the render loop.
+    const baseGray = Math.round(
+      CAMPAIGN_CLOUD_BODY_GRAY_MIN
+      + bodyTone * (CAMPAIGN_CLOUD_BODY_GRAY_MAX - CAMPAIGN_CLOUD_BODY_GRAY_MIN),
+    );
+    const innerGray = Math.min(255, baseGray + 4);
+    const midGray = baseGray;
+    const outerGray = Math.max(220, baseGray - 10);
+
     return {
       x: baseX + this._dirX * distanceOffset,
       y: baseY + this._dirY * distanceOffset,
       radius,
       distanceAlong,
       puffs: this._buildPuffs(radius),
-      opacity: randRange(this._config.minOpacity, this._config.maxOpacity),
-      bodyTone: randRange(0, 1),
-      bodyOpacity: randRange(0.82, 0.95),
+      opacity,
+      bodyTone,
+      bodyOpacity,
+      gradientCenter: `rgba(0,0,0,${(opacity * GRADIENT_CENTER_OPACITY_SCALE).toFixed(3)})`,
+      gradientMid: `rgba(0,0,0,${(opacity * GRADIENT_MID_OPACITY_SCALE).toFixed(3)})`,
+      bodyInner: `rgba(${innerGray},${innerGray},${innerGray},${(bodyOpacity * CAMPAIGN_CLOUD_INNER_ALPHA).toFixed(3)})`,
+      bodyMidStop: `rgba(${midGray},${midGray},${midGray},${(bodyOpacity * CAMPAIGN_CLOUD_MID_ALPHA).toFixed(3)})`,
+      bodyOuter: `rgba(${outerGray},${outerGray},${outerGray},${(bodyOpacity * CAMPAIGN_CLOUD_OUTER_ALPHA).toFixed(3)})`,
       entryEdge,
       entryCoordinate,
     };
@@ -499,8 +529,8 @@ export class CloudShadowField {
 
   private _drawCloudShadow(ctx: CanvasRenderingContext2D, cloud: CloudShadow): void {
     const gradient = ctx.createRadialGradient(0, 0, GRADIENT_INNER_RADIUS_SCALE, 0, 0, 1);
-    gradient.addColorStop(0, `rgba(0,0,0,${(cloud.opacity * GRADIENT_CENTER_OPACITY_SCALE).toFixed(3)})`);
-    gradient.addColorStop(GRADIENT_MID_STOP, `rgba(0,0,0,${(cloud.opacity * GRADIENT_MID_OPACITY_SCALE).toFixed(3)})`);
+    gradient.addColorStop(0, cloud.gradientCenter);
+    gradient.addColorStop(GRADIENT_MID_STOP, cloud.gradientMid);
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     for (const puff of cloud.puffs) {
       const px = cloud.x + this._dirX * puff.offsetAlong + this._perpX * puff.offsetAcross;
@@ -522,27 +552,11 @@ export class CloudShadowField {
   private _drawCampaignCloudBody(ctx: CanvasRenderingContext2D, cloud: CloudShadow): void {
     const bodyOffsetX = -CAMPAIGN_CLOUD_BODY_OFFSET_X_TILES * this._tileSize;
     const bodyOffsetY = -CAMPAIGN_CLOUD_BODY_OFFSET_Y_TILES * this._tileSize;
-    const baseGray = Math.round(
-      CAMPAIGN_CLOUD_BODY_GRAY_MIN
-      + cloud.bodyTone * (CAMPAIGN_CLOUD_BODY_GRAY_MAX - CAMPAIGN_CLOUD_BODY_GRAY_MIN),
-    );
-    const innerGray = Math.min(255, baseGray + 4);
-    const midGray = baseGray;
-    const outerGray = Math.max(220, baseGray - 10);
 
     const gradient = ctx.createRadialGradient(0, 0, GRADIENT_INNER_RADIUS_SCALE, 0, 0, 1);
-    gradient.addColorStop(
-      0,
-      `rgba(${innerGray},${innerGray},${innerGray},${(cloud.bodyOpacity * CAMPAIGN_CLOUD_INNER_ALPHA).toFixed(3)})`,
-    );
-    gradient.addColorStop(
-      GRADIENT_MID_STOP,
-      `rgba(${midGray},${midGray},${midGray},${(cloud.bodyOpacity * CAMPAIGN_CLOUD_MID_ALPHA).toFixed(3)})`,
-    );
-    gradient.addColorStop(
-      1,
-      `rgba(${outerGray},${outerGray},${outerGray},${(cloud.bodyOpacity * CAMPAIGN_CLOUD_OUTER_ALPHA).toFixed(3)})`,
-    );
+    gradient.addColorStop(0, cloud.bodyInner);
+    gradient.addColorStop(GRADIENT_MID_STOP, cloud.bodyMidStop);
+    gradient.addColorStop(1, cloud.bodyOuter);
 
     for (const puff of cloud.puffs) {
       const px = cloud.x + this._dirX * puff.offsetAlong + this._perpX * puff.offsetAcross + bodyOffsetX;

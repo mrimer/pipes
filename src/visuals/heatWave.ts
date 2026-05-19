@@ -153,6 +153,9 @@ function _renderOneHeatWave(
 
   ctx.lineCap = 'round';
   ctx.lineWidth = _s(1.5);
+  // strokeStyle is constant for all shimmer lines; only alpha varies per line
+  // and is driven via ctx.globalAlpha to avoid per-line string allocations.
+  ctx.strokeStyle = 'rgb(255, 185, 80)';
 
   for (let w = 0; w < WAVE_COUNT; w++) {
     // Each shimmer line sits a fixed distance above the leading edge.
@@ -174,8 +177,8 @@ function _renderOneHeatWave(
     const STEPS = 10;
     const stepWidth = (bw * 2) / STEPS;
 
+    ctx.globalAlpha = alpha;
     ctx.beginPath();
-    ctx.strokeStyle = `rgba(255, 185, 80, ${alpha.toFixed(3)})`;
 
     for (let s = 0; s <= STEPS; s++) {
       const sx = cx - bw + s * stepWidth;

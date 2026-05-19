@@ -56,20 +56,38 @@ export function animColor(value: number): string {
 /** The water droplet emoji used in animation labels. */
 const DROPLET_CHAR = '💧';
 
+// Font strings and rise amount scale with TILE_SIZE (changes only on resize).
+// These module-level variables cache the computed values so that Math.round
+// and string interpolation are skipped on frames where TILE_SIZE is unchanged.
+let _cachedAnimTileSize = -1;
+let _cachedMainFont = '';
+let _cachedDropletFont = '';
+let _cachedRiseAmount = 0;
+
+/** Ensure cached font/rise values match the current TILE_SIZE. */
+function _refreshAnimCache(): void {
+  if (TILE_SIZE === _cachedAnimTileSize) return;
+  _cachedAnimTileSize = TILE_SIZE;
+  const mainFontSize = Math.round(30 * TILE_SIZE / 64);
+  const dropletFontSize = Math.round(18 * TILE_SIZE / 64);
+  _cachedMainFont = `bold ${mainFontSize}px Arial`;
+  _cachedDropletFont = `bold ${dropletFontSize}px Arial`;
+  _cachedRiseAmount = ANIM_RISE_PX * TILE_SIZE / 64;
+}
+
 export function renderAnimations(
   ctx: CanvasRenderingContext2D,
   animations: TileAnimation[],
   canvasWidth?: number,
 ): void {
   const now = performance.now();
-  const mainFontSize = Math.round(30 * TILE_SIZE / 64);
-  const dropletFontSize = Math.round(18 * TILE_SIZE / 64);
-  const mainFont = `bold ${mainFontSize}px Arial`;
-  const dropletFont = `bold ${dropletFontSize}px Arial`;
+  _refreshAnimCache();
+  const mainFont = _cachedMainFont;
+  const dropletFont = _cachedDropletFont;
+  const riseAmount = _cachedRiseAmount;
   ctx.font = mainFont;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const riseAmount = ANIM_RISE_PX * TILE_SIZE / 64;
   let i = 0;
   while (i < animations.length) {
     const anim = animations[i];
