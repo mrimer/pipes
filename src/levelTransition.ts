@@ -93,6 +93,11 @@ interface TransitionStyleSnapshot {
   webkitMaskSize: string;
 }
 
+interface ElementOpacitySnapshot {
+  el: HTMLElement;
+  opacity: string;
+}
+
 function captureTransitionStyles(el: HTMLElement): TransitionStyleSnapshot {
   return {
     transform: el.style.transform,
@@ -117,6 +122,42 @@ function restoreTransitionStyles(el: HTMLElement, snapshot: TransitionStyleSnaps
   el.style.maskSize = snapshot.maskSize;
   el.style.webkitMaskImage = snapshot.webkitMaskImage;
   el.style.webkitMaskSize = snapshot.webkitMaskSize;
+}
+
+function collectForegroundFadeTargets(screenEl: HTMLElement, liveCanvas: HTMLCanvasElement | null): HTMLElement[] {
+  const targets: HTMLElement[] = [];
+  const visit = (el: HTMLElement): void => {
+    if (el instanceof HTMLCanvasElement) return;
+    const isCanvasBranch = liveCanvas !== null && el !== liveCanvas && el.contains(liveCanvas);
+    if (isCanvasBranch) {
+      for (const child of Array.from(el.children)) {
+        if (child instanceof HTMLElement) visit(child);
+      }
+      return;
+    }
+    targets.push(el);
+  };
+
+  for (const child of Array.from(screenEl.children)) {
+    if (child instanceof HTMLElement) visit(child);
+  }
+  return targets;
+}
+
+function captureElementOpacities(elements: HTMLElement[]): ElementOpacitySnapshot[] {
+  return elements.map((el) => ({ el, opacity: el.style.opacity }));
+}
+
+function setElementsOpacity(elements: HTMLElement[], opacity: string): void {
+  for (const el of elements) {
+    el.style.opacity = opacity;
+  }
+}
+
+function restoreElementOpacities(snapshots: ElementOpacitySnapshot[]): void {
+  for (const { el, opacity } of snapshots) {
+    el.style.opacity = opacity;
+  }
 }
 
 function applySwirlFrame(el: HTMLElement, rawT: number, reverse: boolean): void {
@@ -298,8 +339,10 @@ export function playMapTransition(
   // zooming snapshot, so it should not also fade in at full size.
   gameCanvas.style.visibility = 'hidden';
 
-  // Start with the destination UI hidden, then fade it in as the zoom progresses.
-  playScreenEl.style.opacity = '0';
+  // Fade only the destination foreground UI; keep screen/background opacity untouched.
+  const playForegroundEls = collectForegroundFadeTargets(playScreenEl, gameCanvas);
+  const playForegroundSnapshots = captureElementOpacities(playForegroundEls);
+  setElementsOpacity(playForegroundEls, '0');
 
   // ── 6. Animate using requestAnimationFrame ──────────────────────────────
 
@@ -322,7 +365,7 @@ export function playMapTransition(
 
     // Fade chapter map snapshot out (linear)
     if (chapterMapFadeEl) chapterMapFadeEl.style.opacity = `${1 - rawT}`;
-    playScreenEl.style.opacity = `${rawT}`;
+    setElementsOpacity(playForegroundEls, `${rawT}`);
 
     if (rawT < 1) {
       requestAnimationFrame(tick);
@@ -330,7 +373,7 @@ export function playMapTransition(
       // ── 7. Clean up and finalize ────────────────────────────────────────
       overlay.remove();
       if (chapterMapFadeEl) chapterMapFadeEl.remove();
-      playScreenEl.style.opacity = '';
+      restoreElementOpacities(playForegroundSnapshots);
       // Reveal the game canvas now that the zoomed snapshot overlay is gone.
       gameCanvas.style.visibility = '';
       onComplete();
@@ -599,9 +642,6 @@ export function playMapScreenEnterTransition(
 
   // ── Prepare screen-element styles ─────────────────────────────────────────
 
-  // Start with destination UI hidden, then fade it in during the zoom-in.
-  toScreenEl.style.opacity = '0';
-
   // Hide the live canvas inside fromScreenEl to prevent any mouse-move or
   // touch-move handler from re-rendering it at the wrong TILE_SIZE during the
   // transition.  When a fromSnapshot overlay is present it visually replaces
@@ -612,6 +652,11 @@ export function playMapScreenEnterTransition(
   const toCanvas = toScreenEl.querySelector<HTMLCanvasElement>('canvas');
   const originalToCanvasVisibility = toCanvas?.style.visibility ?? '';
   if (toCanvas) toCanvas.style.visibility = 'hidden';
+
+  // Fade only destination foreground UI; keep screen/background opacity untouched.
+  const toForegroundEls = collectForegroundFadeTargets(toScreenEl, toCanvas ?? null);
+  const toForegroundSnapshots = captureElementOpacities(toForegroundEls);
+  setElementsOpacity(toForegroundEls, '0');
 
   // When we have a snapshot overlay covering the source screen, hide the live
   // screen element immediately so only the snapshot is visible.  Otherwise fall
@@ -645,7 +690,7 @@ export function playMapScreenEnterTransition(
     } else {
       fromScreenEl.style.opacity = `${1 - rawT}`;
     }
-    toScreenEl.style.opacity = `${rawT}`;
+    setElementsOpacity(toForegroundEls, `${rawT}`);
     if (rawT < 1) {
       requestAnimationFrame(tick);
     } else {
@@ -654,7 +699,7 @@ export function playMapScreenEnterTransition(
       if (fromCanvas) fromCanvas.style.visibility = originalFromCanvasVisibility;
       if (toCanvas) toCanvas.style.visibility = originalToCanvasVisibility;
       fromScreenEl.style.opacity = '';
-      toScreenEl.style.opacity = '';
+      restoreElementOpacities(toForegroundSnapshots);
       onComplete();
     }
   }

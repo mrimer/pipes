@@ -84,7 +84,9 @@ describe('map zoom transition backgrounds', () => {
   it('fades destination screen UI in during map enter transitions', () => {
     const fromScreenEl = document.createElement('div');
     const toScreenEl = document.createElement('div');
+    const toHeader = document.createElement('div');
     const toCanvas = document.createElement('canvas');
+    toScreenEl.appendChild(toHeader);
     toScreenEl.appendChild(toCanvas);
     document.body.appendChild(fromScreenEl);
     document.body.appendChild(toScreenEl);
@@ -104,19 +106,23 @@ describe('map zoom transition backgrounds', () => {
       },
     );
 
-    expect(toScreenEl.style.opacity).toBe('0');
+    expect(toScreenEl.style.opacity).toBe('');
+    expect(toHeader.style.opacity).toBe('0');
     flushSingleAnimationFrame();
-    expect(toScreenEl.style.opacity).not.toBe('0');
-    expect(toScreenEl.style.opacity).not.toBe('1');
+    expect(toHeader.style.opacity).not.toBe('0');
+    expect(toHeader.style.opacity).not.toBe('1');
 
     flushAllAnimationFrames();
 
+    expect(toHeader.style.opacity).toBe('');
     expect(toScreenEl.style.opacity).toBe('');
   });
 
   it('fades play-screen UI in during level enter transitions', () => {
     const playScreenEl = document.createElement('div');
+    const playHeader = document.createElement('div');
     const gameCanvas = document.createElement('canvas');
+    playScreenEl.appendChild(playHeader);
     playScreenEl.appendChild(gameCanvas);
     document.body.appendChild(playScreenEl);
     jest.spyOn(gameCanvas, 'getBoundingClientRect').mockReturnValue({
@@ -140,13 +146,15 @@ describe('map zoom transition backgrounds', () => {
       jest.fn(),
     );
 
-    expect(playScreenEl.style.opacity).toBe('0');
+    expect(playScreenEl.style.opacity).toBe('');
+    expect(playHeader.style.opacity).toBe('0');
     flushSingleAnimationFrame();
-    expect(playScreenEl.style.opacity).not.toBe('0');
-    expect(playScreenEl.style.opacity).not.toBe('1');
+    expect(playHeader.style.opacity).not.toBe('0');
+    expect(playHeader.style.opacity).not.toBe('1');
 
     flushAllAnimationFrames();
 
+    expect(playHeader.style.opacity).toBe('');
     expect(playScreenEl.style.opacity).toBe('');
   });
 });
