@@ -795,7 +795,6 @@ export abstract class MapScreenBase {
       const requestedTile = defaultTileSize * clampCampaignZoomScale(this._campaignZoomScale);
       tileSize = Math.max(minTile, Math.min(maxTileByScale, requestedTile));
       tileSize = Math.max(1, Math.round(tileSize));
-      tileSize = Math.max(tileSize, Math.ceil(minTile));
       this._campaignZoomScale = tileSize / defaultTileSize;
       viewRows = Math.min(rows, this._campaignViewportHeightPx / tileSize);
       viewCols = Math.min(cols, this._campaignViewportWidthPx / tileSize);

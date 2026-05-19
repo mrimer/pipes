@@ -101,6 +101,8 @@ const GROUP_ENTRY_COORDINATE_SPREAD_FACTOR = 1.4;
 const GROUP_DISTANCE_SPREAD_FACTOR = 0.85;
 const GROUP_MIN_GAP_SCALE = 0.2;
 const DEFAULT_SEED_GAP_SCALE = 1;
+/** Lower bound to prevent degenerate reflow scaling factors. */
+const REFLOW_MIN_SCALE_EPSILON = 0.0001;
 // Include two radii of extra spacing so newly queued entry clouds do not overlap
 // existing clouds that are still close to the spawn edge.
 const SPAWN_DISTANCE_RADIUS_CLEARANCE_MULTIPLIER = 2;
@@ -282,7 +284,7 @@ export class CloudShadowField {
     }
 
     const prevTile = this._tileSize;
-    const scale = Math.max(0.0001, tileSize / prevTile);
+    const scale = Math.max(REFLOW_MIN_SCALE_EPSILON, tileSize / prevTile);
     this._width = width;
     this._height = height;
     this._tileSize = Math.max(1, tileSize);
@@ -739,7 +741,7 @@ export class CampaignBirdFlockField {
     }
 
     const prevTile = this._tileSize;
-    const scale = Math.max(0.0001, tileSize / prevTile);
+    const scale = Math.max(REFLOW_MIN_SCALE_EPSILON, tileSize / prevTile);
     this._width = width;
     this._height = height;
     this._tileSize = Math.max(1, tileSize);

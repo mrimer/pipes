@@ -62,7 +62,6 @@ function applyZoomSizingPure(
   let tile = defaultTileSize * clampCampaignZoomScale(zoomScale);
   tile = Math.max(minTile, Math.min(maxTileByScale, tile));
   tile = Math.max(1, Math.round(tile));
-  tile = Math.max(tile, Math.ceil(minTile));
   return {
     tileSize: tile,
     viewRows: Math.min(rows, viewportH / tile),
