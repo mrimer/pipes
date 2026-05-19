@@ -214,6 +214,23 @@ export class CloudShadowField {
   private _perpY = 1;
   private _distanceMin = 0;
   private _distanceMax = 0;
+
+  private _recomputeDistanceBounds(): void {
+    const corners: Array<[number, number]> = [
+      [0, 0],
+      [this._width, 0],
+      [0, this._height],
+      [this._width, this._height],
+    ];
+    this._distanceMin = Number.POSITIVE_INFINITY;
+    this._distanceMax = Number.NEGATIVE_INFINITY;
+    for (const [x, y] of corners) {
+      const distance = x * this._dirX + y * this._dirY;
+      this._distanceMin = Math.min(this._distanceMin, distance);
+      this._distanceMax = Math.max(this._distanceMax, distance);
+    }
+  }
+
   resetForScreen(
     width: number,
     height: number,
@@ -239,23 +256,51 @@ export class CloudShadowField {
     this._dirY = Math.sin(angle);
     this._perpX = -this._dirY;
     this._perpY = this._dirX;
-
-    const corners: Array<[number, number]> = [
-      [0, 0],
-      [this._width, 0],
-      [0, this._height],
-      [this._width, this._height],
-    ];
-
-    this._distanceMin = Number.POSITIVE_INFINITY;
-    this._distanceMax = Number.NEGATIVE_INFINITY;
-    for (const [x, y] of corners) {
-      const distance = x * this._dirX + y * this._dirY;
-      this._distanceMin = Math.min(this._distanceMin, distance);
-      this._distanceMax = Math.max(this._distanceMax, distance);
-    }
+    this._recomputeDistanceBounds();
 
     this._seedInitialClouds();
+  }
+
+  /**
+   * Resize the field while preserving existing cloud positions over the map grid.
+   * Used for campaign map zoom so ambient clouds keep continuity.
+   */
+  reflowForScreen(width: number, height: number, tileSize: number, style?: LevelStyle): void {
+    const nextEnabled = style !== 'Dark' && width > 0 && height > 0;
+    if (!nextEnabled) {
+      this._width = width;
+      this._height = height;
+      this._tileSize = Math.max(1, tileSize);
+      this._enabled = false;
+      this._clouds = [];
+      this._lastNow = null;
+      return;
+    }
+    if (!this._enabled || this._width <= 0 || this._height <= 0 || this._tileSize <= 0) {
+      this.resetForScreen(width, height, tileSize, this._preset, style);
+      return;
+    }
+
+    const prevTile = this._tileSize;
+    const scale = Math.max(0.0001, tileSize / prevTile);
+    this._width = width;
+    this._height = height;
+    this._tileSize = Math.max(1, tileSize);
+    this._enabled = true;
+    this._recomputeDistanceBounds();
+
+    for (const cloud of this._clouds) {
+      cloud.x *= scale;
+      cloud.y *= scale;
+      cloud.radius *= scale;
+      cloud.distanceAlong *= scale;
+      for (const puff of cloud.puffs) {
+        puff.offsetAlong *= scale;
+        puff.offsetAcross *= scale;
+        puff.radiusAlong *= scale;
+        puff.radiusAcross *= scale;
+      }
+    }
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {
@@ -670,6 +715,59 @@ export class CampaignBirdFlockField {
     this._lastNow = null;
     this._birdCache = null;
     this._flock = this._enabled ? this._spawnFlock() : null;
+  }
+
+  /**
+   * Resize while preserving flock map-relative position and formation dimensions.
+   * Used by campaign wheel zoom so birds stay aligned with the grid.
+   */
+  reflowForScreen(width: number, height: number, tileSize: number, style?: LevelStyle): void {
+    const nextEnabled = style !== 'Dark' && width > 0 && height > 0;
+    if (!nextEnabled) {
+      this._width = width;
+      this._height = height;
+      this._tileSize = Math.max(1, tileSize);
+      this._enabled = false;
+      this._flock = null;
+      this._birdCache = null;
+      this._lastNow = null;
+      return;
+    }
+    if (!this._enabled || this._tileSize <= 0 || this._width <= 0 || this._height <= 0 || !this._flock) {
+      this.resetForScreen(width, height, tileSize, style);
+      return;
+    }
+
+    const prevTile = this._tileSize;
+    const scale = Math.max(0.0001, tileSize / prevTile);
+    this._width = width;
+    this._height = height;
+    this._tileSize = Math.max(1, tileSize);
+    this._enabled = true;
+    this._birdCache = null;
+
+    const flock = this._flock;
+    flock.x *= scale;
+    flock.y *= scale;
+    flock.speedPxPerMs *= scale;
+    flock.baseSize *= scale;
+    flock.baseStrokeWidth *= scale;
+    for (const bird of flock.birds) {
+      bird.offsetAlong *= scale;
+      bird.offsetAcross *= scale;
+      bird.size *= scale;
+      bird.strokeWidth *= scale;
+    }
+
+    let boundingRadius = 0;
+    for (const bird of flock.birds) {
+      const stampHalfSize = this._getRenderedBirdHalfSize(flock, bird);
+      boundingRadius = Math.max(
+        boundingRadius,
+        Math.hypot(bird.offsetAlong, bird.offsetAcross) + stampHalfSize,
+      );
+    }
+    flock.boundingRadius = boundingRadius;
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {

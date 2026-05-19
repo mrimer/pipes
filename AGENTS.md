@@ -204,6 +204,7 @@ src/
 | Idle pulse animation | `visuals/idlePulse.ts` |
 | Win confetti | `visuals/confetti.ts` |
 | Cloud shadow overlay | `visuals/cloudShadows.ts` |
+| Campaign-map wheel zoom + zoom sizing clamps | `mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
 | Map sea-wave animation on chapter/campaign screens | `mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |
 | Campaign CRUD | `campaignEditor/campaignService.ts` |
 | Editor undo/redo | `campaignEditor/historyManager.ts` + `mapEditorBase.ts` |
