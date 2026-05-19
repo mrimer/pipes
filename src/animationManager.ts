@@ -457,6 +457,9 @@ export class AnimationManager {
     const key = `${cx},${cy},${radius}`;
     if (this._drySourcePulseGradient === null || this._drySourcePulseGradientKey !== key) {
       const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      // Keep stop alphas constant and drive the pulse with ctx.globalAlpha below.
+      // This preserves the previous alpha ratio between stops while allowing the
+      // expensive gradient object to be reused across frames.
       grad.addColorStop(0, 'rgba(220,30,30,1)');
       grad.addColorStop(0.5, 'rgba(200,20,20,0.6)');
       grad.addColorStop(1, 'rgba(180,0,0,0)');
