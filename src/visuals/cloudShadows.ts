@@ -712,16 +712,33 @@ export class CampaignBirdFlockField {
 
     if (flock.hasEntered) {
       const margin = BIRD_RESPAWN_MARGIN_TILES * this._tileSize;
-      const despawnDistance = flock.boundingRadius + margin;
-      const outOfBounds =
-        flock.x < -despawnDistance
-        || flock.x > this._width + despawnDistance
-        || flock.y < -despawnDistance
-        || flock.y > this._height + despawnDistance;
-      if (outOfBounds) {
+      if (this._isFlockFullyOffscreen(flock, margin)) {
         this._flock = this._spawnFlock();
       }
     }
+  }
+
+  private _isFlockFullyOffscreen(flock: BirdFlock, margin: number): boolean {
+    const minX = -margin;
+    const maxX = this._width + margin;
+    const minY = -margin;
+    const maxY = this._height + margin;
+    const cosA = Math.cos(flock.angle);
+    const sinA = Math.sin(flock.angle);
+
+    for (const bird of flock.birds) {
+      const x = flock.x + bird.offsetAlong * cosA - bird.offsetAcross * sinA;
+      const y = flock.y + bird.offsetAlong * sinA + bird.offsetAcross * cosA;
+      const halfSize = Math.ceil(bird.size * BIRD_CANVAS_HALF_SIZE_FACTOR + bird.strokeWidth);
+      const intersectsBounds =
+        x + halfSize >= minX
+        && x - halfSize <= maxX
+        && y + halfSize >= minY
+        && y - halfSize <= maxY;
+      if (intersectsBounds) return false;
+    }
+
+    return true;
   }
 
   private _tickFlapState(flock: BirdFlock, dt: number): void {
@@ -797,12 +814,12 @@ export class CampaignBirdFlockField {
   }
 
   private _drawFlock(ctx: CanvasRenderingContext2D, flock: BirdFlock): void {
-    const flapProgress = flock.flapDurationMs > 0
-      ? clamp(flock.flapElapsedMs / flock.flapDurationMs, 0, 1)
+    const flapBeatProgress = flock.flapDurationMs > 0
+      ? (flock.flapElapsedMs % BIRD_FLAP_MS_PER_BEAT) / BIRD_FLAP_MS_PER_BEAT
       : 0;
-    // Smooth forward-only bend: 0 = level, 1 = max forward bend, 0 = level.
+    // One forward-only bend per beat: 0 = level, 1 = max forward bend, 0 = level.
     const flapPhase = flock.flapDurationMs > 0
-      ? Math.sin(flapProgress * flock.flapBeats * Math.PI)
+      ? Math.sin(flapBeatProgress * Math.PI)
       : 0;
 
     this._updateBirdCache(flock, flapPhase);
