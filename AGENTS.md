@@ -106,6 +106,7 @@ src/
 ├── fileIO.ts                    # Gzip+download and gzip-or-JSON file reading helpers
 ├── uiConstants.ts               # UI color tokens, border-radius constants, modal CSS strings
 ├── uiBackground.ts              # Shared dim scrolling pipe-pattern background helper for full-screen UI layers
+├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
 ├── commandKeyManager.ts         # Keyboard shortcut registry
@@ -197,6 +198,7 @@ src/
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
 | Menu/settings/profile background pattern | `uiBackground.ts` |
+| Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Player profile schema | `playerProfile.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |

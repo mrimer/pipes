@@ -5,7 +5,9 @@ import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
 import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { migrateIfNeeded, loadActiveSlotIndex } from './playerProfileSlots';
 import { setActiveSlotIndex } from './activeProfile';
-import { applyScrollingPipeBackground } from './uiBackground';
+import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
+import { setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
+import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
@@ -26,10 +28,22 @@ if (savedTouchUiEnabled !== null && hasTouchUiSupport()) {
   setTouchUiEnabledOverride(savedTouchUiEnabled);
 }
 document.body.classList.toggle('is-touch', isTouchDevice());
+
+// Initialize graphics settings cache from persistence.
+const _bgEnabled  = loadBackgroundEnabled();
+const _envEnabled = loadEnvironmentalEnabled();
+setBackgroundEnabled(_bgEnabled);
+setEnvironmentalEnabled(_envEnabled);
+
+// Always apply the background (registering the target), then immediately
+// disable the pattern when the Background setting is off.
 applyScrollingPipeBackground(document.body, {
   baseColor: '#1a1a2e',
   overlayAlpha: 0.82,
 });
+if (!_bgEnabled) {
+  setGlobalBackgroundPatternEnabled(false);
+}
 
 function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id) as T | null;
