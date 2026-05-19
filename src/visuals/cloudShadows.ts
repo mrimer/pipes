@@ -148,6 +148,10 @@ function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
 }
 
+function randIntInclusive(min: number, max: number): number {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
 /**
  * Procedural, screen-scoped cloud-shadow field.
  * Clouds are generated as soft overlapping puffs and drift together at one speed.
@@ -674,7 +678,7 @@ export class CampaignBirdFlockField {
     if (flock.flapCooldownMs <= 0) {
       flock.flapDurationMs = randRange(BIRD_MIN_FLAP_DURATION_MS, BIRD_MAX_FLAP_DURATION_MS);
       flock.flapElapsedMs = 0;
-      flock.flapBeats = Math.floor(randRange(BIRD_MIN_FLAP_BEATS, BIRD_MAX_FLAP_BEATS + 1));
+      flock.flapBeats = randIntInclusive(BIRD_MIN_FLAP_BEATS, BIRD_MAX_FLAP_BEATS);
     }
   }
 
@@ -747,7 +751,7 @@ export class CampaignBirdFlockField {
   }
 
   private _buildVFormation(): FlockBird[] {
-    const armDepth = Math.floor(randRange(BIRD_MIN_ARM_DEPTH, BIRD_MAX_ARM_DEPTH + 1));
+    const armDepth = randIntInclusive(BIRD_MIN_ARM_DEPTH, BIRD_MAX_ARM_DEPTH);
     const spacingAlong = randRange(BIRD_MIN_SPACING_ALONG_TILES, BIRD_MAX_SPACING_ALONG_TILES) * this._tileSize;
     const spacingAcross = randRange(BIRD_MIN_SPACING_ACROSS_TILES, BIRD_MAX_SPACING_ACROSS_TILES) * this._tileSize;
     const baseSize = randRange(BIRD_MIN_SIZE_TILES, BIRD_MAX_SIZE_TILES) * this._tileSize;
