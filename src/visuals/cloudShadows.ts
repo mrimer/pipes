@@ -842,7 +842,6 @@ export class CampaignBirdFlockField {
 
     this._updateBirdCache(flock, flapPhase);
     const birdCanvas = this._birdCache!;
-    const halfSize   = this._birdCacheHalfSize;
 
     ctx.save();
     ctx.translate(flock.x, flock.y);

@@ -115,7 +115,7 @@ describe('CloudShadowField', () => {
 describe('CampaignBirdFlockField', () => {
   it('keeps a right-moving flock alive until trailing birds fully exit the board', () => {
     const field = new CampaignBirdFlockField();
-    field.resetForScreen(100, 100, 10, 'campaign');
+    field.resetForScreen(100, 100, 10, 'Grass');
     const internals = field as unknown as CampaignBirdFlockInternals;
 
     const flock: BirdFlockTestShape = {
@@ -146,7 +146,7 @@ describe('CampaignBirdFlockField', () => {
 
   it('uses rendered stamp size so larger scaled birds do not despawn early at the edge', () => {
     const field = new CampaignBirdFlockField();
-    field.resetForScreen(100, 100, 10, 'campaign');
+    field.resetForScreen(100, 100, 10, 'Grass');
     const internals = field as unknown as CampaignBirdFlockInternals;
 
     const flock: BirdFlockTestShape = {
