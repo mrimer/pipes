@@ -263,7 +263,10 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
       // Going from `neighbor` towards `current` is only useful if `current` has
       // at least one good direction that does NOT immediately return to `neighbor`
       // (which would be a pointless U-turn ending in `neighbor` again).
-      const hasUsefulExit = [...currentDirs].some((d) => d !== dirToNeighbor);
+      let hasUsefulExit = false;
+      for (const d of currentDirs) {
+        if (d !== dirToNeighbor) { hasUsefulExit = true; break; }
+      }
       if (!hasUsefulExit) continue;
 
       const neighborDirs = getDirs(neighbor);

@@ -96,17 +96,32 @@ function _drawLockIcon(
 // ─── Level chamber tile ────────────────────────────────────────────────────────
 
 /**
+ * Per-frame cache for {@link computeMinimapRect} results.  The cache key encodes
+ * all inputs that affect the result: `"${cellX},${cellY},${rows},${cols}"`.
+ * When TILE_SIZE changes, cellX/cellY (multiples of TILE_SIZE) also change, so
+ * stale entries are naturally bypassed and new ones are inserted.
+ */
+const _minimapRectCache = new Map<string, { x: number; y: number; width: number; height: number }>();
+
+/**
  * Compute the canvas-space bounding rectangle of the minimap image drawn
  * inside a level-chamber tile whose top-left corner is at pixel (cellX, cellY).
  *
  * This is used both for rendering the minimap (in {@link drawLevelChamberTile})
  * and for the level-transition animation (via {@link ChapterMapScreen.getMinimapScreenRect}).
+ *
+ * The result is memoized by `(cellX, cellY, levelDef.rows, levelDef.cols)` because
+ * the computation is pure and identical for the same tile dimensions and position.
  */
 export function computeMinimapRect(
   cellX: number,
   cellY: number,
   levelDef: LevelDef,
 ): { x: number; y: number; width: number; height: number } {
+  const cacheKey = `${cellX},${cellY},${levelDef.rows},${levelDef.cols}`;
+  const cached = _minimapRectCache.get(cacheKey);
+  if (cached) return cached;
+
   const CELL = TILE_SIZE;
   const cx = cellX + CELL / 2;
   const cy = cellY + CELL / 2;
@@ -127,7 +142,9 @@ export function computeMinimapRect(
   const mx = Math.round(cx - mw / 2);
   const my = contentY + Math.round((contentH - mh) / 2) - _s(2);
 
-  return { x: mx, y: my, width: mw, height: mh };
+  const result = { x: mx, y: my, width: mw, height: mh };
+  _minimapRectCache.set(cacheKey, result);
+  return result;
 }
 
 /** Draw a level-chamber tile in the editor/chapter-map canvas at pixel (x, y).

@@ -250,6 +250,28 @@ export abstract class MapScreenBase {
    * in the snapshot image.
    */
   private _borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
+
+  // ─── Render caching ──────────────────────────────────────────────────────────
+  /** Off-screen canvas for the cached base grid render (without clouds or particles). */
+  private _baseCanvas: HTMLCanvasElement | null = null;
+  /** 2D context for {@link _baseCanvas}. */
+  private _baseCtx: CanvasRenderingContext2D | null = null;
+  /**
+   * True when the base grid layer must be re-rendered before compositing.
+   * Set whenever any state that affects the grid changes (chapter load, completion,
+   * hover, pan, or active jitter animation).
+   */
+  private _chapterMapDirty = true;
+  /** Cached water-reachable cell keys from the most recent base render. */
+  private _cachedFilledKeys: Set<string> = new Set();
+  /** Cached completed-level ID set from the most recent base render. */
+  private _cachedDisplayProgress: Set<number> = new Set();
+  /**
+   * Cached set of level indices whose chamber tiles are currently water-reachable.
+   * Updated whenever the base grid is re-rendered (which is whenever filledKeys
+   * could have changed, i.e. on chapter load or after completing a level).
+   */
+  private _accessibleLevelIdxs: Set<number> = new Set();
   private static readonly VORTEX_SPAWN_INTERVAL_MS  = 80;
   private static readonly SPRAY_SPAWN_INTERVAL_MS   = 150;
   /** One new flow-drop pulse per second when the chapter is completed. */
@@ -750,6 +772,17 @@ export abstract class MapScreenBase {
 
     canvas.width  = viewCols * TILE_SIZE;
     canvas.height = viewRows * TILE_SIZE;
+
+    // (Re-)size the off-screen base canvas to match the view window.
+    // A new base canvas is created here on first populate; subsequent calls resize it.
+    if (!this._baseCanvas) {
+      this._baseCanvas = document.createElement('canvas');
+      this._baseCtx = this._baseCanvas.getContext('2d') ?? null;
+    }
+    this._baseCanvas.width  = viewCols * TILE_SIZE;
+    this._baseCanvas.height = viewRows * TILE_SIZE;
+    this._chapterMapDirty = true;
+
     const defaultCursor = isOversized ? 'grab' : 'pointer';
     canvas.style.cssText =
       `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
@@ -1102,12 +1135,23 @@ export abstract class MapScreenBase {
   // ─── Private – rendering ────────────────────────────────────────────────────
 
   /**
-   * Render the chapter map canvas only (no DOM stats/status updates).
-   * Used by both the interactive `_render` path and the animation loop.
+   * Render the static grid layer to the off-screen {@link _baseCanvas}.
+   *
+   * This is the expensive part of the render pipeline: it loads progress data
+   * from storage, runs the BFS water-fill computation, and executes all three
+   * tile-render passes.  The result is cached until {@link _chapterMapDirty} is
+   * set true by a state change.  Cloud shadows and particle effects are NOT
+   * rendered here — they are added each frame by {@link _compositeFrame} and
+   * {@link _tickAnimations} respectively.
+   *
+   * Side-effects:
+   *  - Updates {@link _cachedFilledKeys}, {@link _cachedDisplayProgress}, and
+   *    {@link _accessibleLevelIdxs} from the freshly computed values.
+   *  - Clears {@link _chapterMapDirty}.
    */
-  private _renderCanvas(chapter: ChapterDef, now = performance.now()): { filledKeys: Set<string>; displayProgress: Set<number> } | null {
-    const ctx = this._ctx;
-    if (!ctx || !chapter.grid) return null;
+  private _renderBase(chapter: ChapterDef, now = performance.now()): { filledKeys: Set<string>; displayProgress: Set<number> } | null {
+    const baseCtx = this._baseCtx;
+    if (!baseCtx || !chapter.grid) return null;
 
     const grid = chapter.grid;
     const rows = chapter.rows ?? 3;
@@ -1121,6 +1165,8 @@ export abstract class MapScreenBase {
 
     const filledKeys = this._computeFilledCells();
 
+    // Recompute accessible level indices alongside filledKeys (Task G: O(rows×cols)
+    // scan pulled out of the per-frame render loop and cached as a class field).
     const accessibleLevelIdxs = new Set<number>();
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
@@ -1144,13 +1190,13 @@ export abstract class MapScreenBase {
     }
 
     // Apply pan transform so the view window scrolls over the full grid.
-    // The canvas is sized to the view window (viewCols × viewRows tiles), and
+    // The base canvas is sized to the view window (viewCols × viewRows tiles), and
     // the transform shifts the draw origin so that the panned region is visible.
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
-    ctx.clip();
-    ctx.translate(-this._panPixelX, -this._panPixelY);
+    baseCtx.save();
+    baseCtx.beginPath();
+    baseCtx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
+    baseCtx.clip();
+    baseCtx.translate(-this._panPixelX, -this._panPixelY);
     const viewBounds = computeViewBounds(
       this._panPixelX,
       this._panPixelY,
@@ -1162,7 +1208,7 @@ export abstract class MapScreenBase {
     );
 
     renderChapterMapCanvas(
-      ctx,
+      baseCtx,
       grid,
       rows,
       cols,
@@ -1178,11 +1224,56 @@ export abstract class MapScreenBase {
       viewBounds,
     );
 
-    this._cloudShadows.updateAndRender(ctx, now);
+    baseCtx.restore();
 
-    ctx.restore();
+    // Persist computed values so the animation loop can reuse them without
+    // re-running the BFS or storage reads on every frame.
+    this._cachedFilledKeys = filledKeys;
+    this._cachedDisplayProgress = displayProgress;
+    this._accessibleLevelIdxs = accessibleLevelIdxs;
+    this._chapterMapDirty = false;
 
     return { filledKeys, displayProgress };
+  }
+
+  /**
+   * Copy the cached base canvas to the visible canvas and draw the animated
+   * cloud-shadow overlay on top.
+   *
+   * Called every animation frame so that cloud shadows always animate smoothly
+   * regardless of whether the underlying grid layer was re-rendered.
+   */
+  private _compositeFrame(now: number): void {
+    const ctx = this._ctx;
+    const baseCanvas = this._baseCanvas;
+    if (!ctx || !baseCanvas) return;
+
+    // Blit the static base layer (grid tiles) onto the visible canvas.
+    ctx.drawImage(baseCanvas, 0, 0);
+
+    // Cloud shadows move continuously and must be drawn each frame.
+    // They use the same pan transform as the grid render in _renderBase.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
+    ctx.clip();
+    ctx.translate(-this._panPixelX, -this._panPixelY);
+    this._cloudShadows.updateAndRender(ctx, now);
+    ctx.restore();
+  }
+
+  /**
+   * Render the chapter map canvas only (no DOM stats/status updates).
+   * Used by both the interactive `_render` path and the animation loop.
+   *
+   * Delegates to {@link _renderBase} (grid render to off-screen canvas) and
+   * then {@link _compositeFrame} (blit base + cloud shadows to visible canvas).
+   */
+  private _renderCanvas(chapter: ChapterDef, now = performance.now()): { filledKeys: Set<string>; displayProgress: Set<number> } | null {
+    const result = this._renderBase(chapter, now);
+    if (!result) return null;
+    this._compositeFrame(now);
+    return result;
   }
 
   private _render(chapter: ChapterDef): void {
@@ -1437,6 +1528,11 @@ export abstract class MapScreenBase {
   /**
    * Advance and render animation particles (sink vortex, source spray) on top
    * of the already-rendered chapter map canvas.
+   *
+   * The base grid layer ({@link _renderBase}) is only re-rendered when
+   * {@link _chapterMapDirty} is true, avoiding the full BFS + 3-pass grid draw
+   * on every frame.  Cloud shadows are composited every frame via
+   * {@link _compositeFrame} because they animate continuously.
    */
   private _tickAnimations(now: number): void {
     const ctx = this._ctx;
@@ -1449,15 +1545,28 @@ export abstract class MapScreenBase {
     const viewRows = this._viewRows;
     const viewCols = this._viewCols;
 
-    // Re-render the base canvas each frame to clear previous particle frames
-    const renderResult = this._renderCanvas(chapter, now);
-    if (!renderResult) return;
-    const { filledKeys, displayProgress } = renderResult;
+    // Active jitter animations animate the base grid layer, so keep it dirty
+    // for the duration of the animation.
+    if (this._jitterAnims.some(j => now - j.startedAt < MapScreenBase.JITTER_DURATION_MS)) {
+      this._chapterMapDirty = true;
+    }
+
+    // Re-render the base grid only when state has changed; otherwise reuse the
+    // cached off-screen canvas to avoid the expensive BFS + 3-pass render.
+    if (this._chapterMapDirty) {
+      if (!this._renderBase(chapter, now)) return;
+    }
+
+    // Blit the cached base layer and draw cloud shadows (always animated).
+    this._compositeFrame(now);
+
+    const filledKeys = this._cachedFilledKeys;
+    const displayProgress = this._cachedDisplayProgress;
 
     const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
 
     // All particle/animation effects that use grid-space coordinates are rendered
-    // under the same pan transform that was applied in _renderCanvas.
+    // under the same pan transform that was applied in _renderBase.
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, viewCols * TILE_SIZE, viewRows * TILE_SIZE);
