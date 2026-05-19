@@ -23,7 +23,7 @@ import { applyScrollingPipeBackground } from './uiBackground';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 import { createButton } from './uiHelpers';
-import { CloudShadowField, CloudShadowPreset } from './visuals/cloudShadows';
+import { CampaignBirdFlockField, CloudShadowField, CloudShadowPreset } from './visuals/cloudShadows';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -148,6 +148,8 @@ export abstract class MapScreenBase {
   private _floorTypes: ReadonlyMap<string, PipeShape> = new Map();
   /** Procedural cloud-shadow field rendered over the map board. */
   private readonly _cloudShadows = new CloudShadowField();
+  /** Campaign-only bird flock ambient effect rendered over the map board. */
+  private readonly _campaignBirdFlock = new CampaignBirdFlockField();
   /** Cloud scale/speed preset for this map screen variant. */
   private readonly _cloudShadowPreset: CloudShadowPreset;
 
@@ -667,6 +669,12 @@ export abstract class MapScreenBase {
       TILE_SIZE,
       this._cloudShadowPreset,
       style,
+    );
+    this._campaignBirdFlock.resetForScreen(
+      cols * TILE_SIZE,
+      rows * TILE_SIZE,
+      TILE_SIZE,
+      this._cloudShadowPreset === 'campaign' ? style : 'Dark',
     );
   }
 
@@ -1266,6 +1274,7 @@ export abstract class MapScreenBase {
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
     this._cloudShadows.updateAndRender(ctx, now);
+    this._campaignBirdFlock.updateAndRender(ctx, now);
     ctx.restore();
   }
 
