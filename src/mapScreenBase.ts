@@ -912,9 +912,6 @@ export abstract class MapScreenBase {
     const ctx = canvas.getContext('2d');
     if (ctx) this._ctx = ctx;
 
-    const rows = chapter.rows ?? 3;
-    const cols = chapter.cols ?? 6;
-
     const { oldTileSize } = this._applyViewSizing(chapter);
 
     // Compute or preserve pan position.
