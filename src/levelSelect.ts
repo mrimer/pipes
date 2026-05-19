@@ -235,8 +235,6 @@ export function renderLevelList(
         'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
         'position:absolute;right:0;';
       gearBtn.addEventListener('click', () => onSettingsClick());
-      selectRow.appendChild(h2);
-      selectRow.appendChild(gearBtn);
 
       if (onPlayerProfileClick) {
         const profileBtn = document.createElement('button');
@@ -247,8 +245,10 @@ export function renderLevelList(
           'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
           'position:absolute;left:0;';
         profileBtn.addEventListener('click', () => onPlayerProfileClick());
-        selectRow.insertBefore(profileBtn, h2);
+        selectRow.appendChild(profileBtn);
       }
+      selectRow.appendChild(h2);
+      selectRow.appendChild(gearBtn);
 
       levelListEl.appendChild(selectRow);
 

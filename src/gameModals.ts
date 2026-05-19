@@ -554,6 +554,8 @@ export function buildSettingsModal(
   // ── Esc closes modal without saving ─────────────────────────────────────
   // Attach to document so Esc is caught regardless of which element has focus,
   // but only when the modal is visible and no key-capture is in progress.
+  // The modal element is never removed from the DOM (it is reused across
+  // openings), so this listener remains valid for the lifetime of the page.
   const onEscKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || el.style.display === 'none') return;
     // When capturing a command key, Esc cancels capture mode (handled by the
