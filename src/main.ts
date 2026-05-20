@@ -9,6 +9,7 @@ import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from 
 import { BG_COLOR } from './colors';
 import { setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
+import { showIntroTitleScreen } from './titleScreen';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
@@ -69,47 +70,53 @@ const redoBtnEl      = getEl<HTMLButtonElement>('redo-btn');
 const exitBtnEl      = getEl<HTMLButtonElement>('exit-btn');
 const rulesBtnEl     = getEl<HTMLButtonElement>('rules-btn');
 
-const game = new Game(
-  canvas,
-  levelSelectEl,
-  levelListEl,
-  playScreenEl,
-  levelHeaderEl,
-  inventoryBarEl,
-  waterDisplayEl,
-  winModalEl,
-  gameoverModalEl,
-  gameoverMsgEl,
-  undoBtnEl,
-  redoBtnEl,
-  exitBtnEl,
-);
+async function bootstrap(): Promise<void> {
+  await showIntroTitleScreen();
 
-// Attach a persistent water-wave background animation (alpha 0.2) to the inventory box, stats box, and best-score box.
-attachInventoryWaveAnimation(statsBoxEl);
-attachInventoryWaveAnimation(inventoryBarEl);
-attachInventoryWaveAnimation(bestScoreBoxEl);
+  const game = new Game(
+    canvas,
+    levelSelectEl,
+    levelListEl,
+    playScreenEl,
+    levelHeaderEl,
+    inventoryBarEl,
+    waterDisplayEl,
+    winModalEl,
+    gameoverModalEl,
+    gameoverMsgEl,
+    undoBtnEl,
+    redoBtnEl,
+    exitBtnEl,
+  );
 
-// Win modal buttons
-getEl('win-next-btn').addEventListener('click',  () => { game.exitToMenu(); sfxManager.play(SfxId.Click); });
-getEl('win-undo-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.undoWinningMove(); });
-getEl('win-retry-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
+  // Attach a persistent water-wave background animation (alpha 0.2) to the inventory box, stats box, and best-score box.
+  attachInventoryWaveAnimation(statsBoxEl);
+  attachInventoryWaveAnimation(inventoryBarEl);
+  attachInventoryWaveAnimation(bestScoreBoxEl);
 
-// Game-over modal buttons
-getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove());
-getEl('gameover-retry-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
-getEl('gameover-menu-btn').addEventListener('click',  () => { game.exitToMenu(); sfxManager.play(SfxId.Click); });
+  // Win modal buttons
+  getEl('win-next-btn').addEventListener('click',  () => { game.exitToMenu(); sfxManager.play(SfxId.Click); });
+  getEl('win-undo-btn').addEventListener('click',  () => { sfxManager.play(SfxId.Click); game.undoWinningMove(); });
+  getEl('win-retry-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
 
-// HUD undo / redo / restart buttons
-undoBtnEl.addEventListener('click', () => game.performUndo());
-redoBtnEl.addEventListener('click', () => game.performRedo());
-getEl('restart-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
+  // Game-over modal buttons
+  getEl('gameover-undo-btn').addEventListener('click',  () => game.undoLastMove());
+  getEl('gameover-retry-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
+  getEl('gameover-menu-btn').addEventListener('click',  () => { game.exitToMenu(); sfxManager.play(SfxId.Click); });
 
-// Exit to menu button on play screen
-exitBtnEl.addEventListener('click', () => {
-  game.exitToMenu();
-  sfxManager.play(SfxId.Back);
-});
+  // HUD undo / redo / restart buttons
+  undoBtnEl.addEventListener('click', () => game.performUndo());
+  redoBtnEl.addEventListener('click', () => game.performRedo());
+  getEl('restart-btn').addEventListener('click', () => { sfxManager.play(SfxId.Click); game.retryLevel(); });
 
-// Rules button on play screen
-rulesBtnEl.addEventListener('click', () => { sfxManager.play(SfxId.Click); game.showRules(); });
+  // Exit to menu button on play screen
+  exitBtnEl.addEventListener('click', () => {
+    game.exitToMenu();
+    sfxManager.play(SfxId.Back);
+  });
+
+  // Rules button on play screen
+  rulesBtnEl.addEventListener('click', () => { sfxManager.play(SfxId.Click); game.showRules(); });
+}
+
+void bootstrap();
