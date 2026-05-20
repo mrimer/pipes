@@ -21,17 +21,19 @@ interface GlyphLayout {
   readonly letterCount: number;
 }
 
-const TITLE_LINES = ['COOL', 'PIPES'] as const;
+const TITLE_TEXT = 'COOL PIPES';
+const WORD_GAP_COLUMNS = 2;
 const LETTER_GAP_COLUMNS = 1;
-const LINE_GAP_ROWS = 2;
 const TILE_PADDING_RATIO = 0.08;
 const MIN_TILE_SIZE = 16;
-const MAX_TILE_SIZE = 38;
+/** Generous upper bound; the width-driven sizing will normally cap tiles below this. */
+const MAX_TILE_SIZE = 56;
 const LETTER_FILL_STEP_MS = 130;
 const LETTER_GAP_MS = 190;
 const PROMPT_FADE_MS = 900;
 const OVERLAY_ALPHA = 0.96;
-const TITLE_ROWS = 7;
+/** Pixel height of each glyph bitmap (rows in every GLYPHS entry). */
+const GLYPH_ROWS = 7;
 const PRESS_PROMPT_COLOR = '#d6e8ff';
 const PRESS_PROMPT_FONT_WEIGHT = 600;
 const PRESS_PROMPT_FONT_FAMILY = 'Arial, sans-serif';
@@ -157,68 +159,57 @@ function pipeShapeFromDirections(directions: ReadonlySet<Direction>): { shape: P
   return { shape: PipeShape.Straight, rotation: 0 };
 }
 
-function lineWidth(line: string): number {
-  let width = 0;
-  let seenLetter = false;
-  for (const rawChar of line) {
-    const glyph = GLYPHS[rawChar as TitleLetter];
-    if (!glyph) continue;
-    if (seenLetter) {
-      width += LETTER_GAP_COLUMNS;
-    }
-    width += glyph[0]?.length ?? 0;
-    seenLetter = true;
-  }
-  return width;
-}
-
-export function buildTitleGlyphLayout(lines: readonly string[] = TITLE_LINES): GlyphLayout {
+export function buildTitleGlyphLayout(text = TITLE_TEXT): GlyphLayout {
   const cells: GlyphCell[] = [];
   let letterIndex = 0;
-  const maxCols = lines.reduce((best, line) => Math.max(best, lineWidth(line)), 0);
+  let colOffset = 0;
+  let seenLetter = false;
 
-  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-    const line = lines[lineIndex];
-    const rowOffset = lineIndex * (TITLE_ROWS + LINE_GAP_ROWS);
-    const centeredStartCol = Math.floor((maxCols - lineWidth(line)) / 2);
-    let colOffset = centeredStartCol;
-
-    for (const rawChar of line) {
-      const glyph = GLYPHS[rawChar as TitleLetter];
-      if (!glyph) continue;
-      const occupied = new Set<string>();
-      for (let row = 0; row < glyph.length; row++) {
-        const rowText = glyph[row];
-        for (let col = 0; col < rowText.length; col++) {
-          if (rowText[col] === '1') {
-            occupied.add(key(row + rowOffset, colOffset + col));
-          }
-        }
+  for (const rawChar of text) {
+    const glyph = GLYPHS[rawChar as TitleLetter];
+    if (!glyph) {
+      // Unrecognised character (space) → word gap.
+      if (seenLetter) {
+        colOffset += WORD_GAP_COLUMNS;
       }
-
-      for (const posKey of occupied) {
-        const { row, col } = decodeKey(posKey);
-        const directions = new Set<Direction>();
-        for (const [direction, dr, dc] of DIRECTION_DELTAS) {
-          if (occupied.has(key(row + dr, col + dc))) {
-            directions.add(direction);
-          }
-        }
-        const { shape, rotation } = pipeShapeFromDirections(directions);
-        cells.push({ row, col, letterIndex, directions, shape, rotation });
-      }
-
-      letterIndex++;
-      colOffset += (glyph[0]?.length ?? 0) + LETTER_GAP_COLUMNS;
+      continue;
     }
-  }
 
-  const maxRow = cells.reduce((best, cell) => Math.max(best, cell.row), -1);
+    if (seenLetter) {
+      colOffset += LETTER_GAP_COLUMNS;
+    }
+    seenLetter = true;
+
+    const occupied = new Set<string>();
+    for (let row = 0; row < glyph.length; row++) {
+      const rowText = glyph[row];
+      for (let col = 0; col < rowText.length; col++) {
+        if (rowText[col] === '1') {
+          occupied.add(key(row, colOffset + col));
+        }
+      }
+    }
+
+    for (const posKey of occupied) {
+      const { row, col } = decodeKey(posKey);
+      const directions = new Set<Direction>();
+      for (const [direction, dr, dc] of DIRECTION_DELTAS) {
+        if (occupied.has(key(row + dr, col + dc))) {
+          directions.add(direction);
+        }
+      }
+      const { shape, rotation } = pipeShapeFromDirections(directions);
+      cells.push({ row, col, letterIndex, directions, shape, rotation });
+    }
+
+    letterIndex++;
+    colOffset += glyph[0]?.length ?? 0;
+  }
 
   return {
     cells,
-    rows: maxRow + 1,
-    cols: maxCols,
+    rows: GLYPH_ROWS,
+    cols: colOffset,
     letterCount: letterIndex,
   };
 }
@@ -371,8 +362,10 @@ export function showIntroTitleScreen(): Promise<void> {
       ctx.fillStyle = BG_COLOR;
       ctx.fillRect(0, 0, width, height);
 
-      const availableWidth = Math.max(1, width * 0.92);
-      const availableHeight = Math.max(1, height * 0.5);
+      // Logo is a single wide row – give it most of the viewport width and
+      // up to ~55% of the height so tiles can be generously sized on landscape.
+      const availableWidth = Math.max(1, width * 0.96);
+      const availableHeight = Math.max(1, height * 0.55);
       const tileSize = Math.max(
         MIN_TILE_SIZE,
         Math.min(
