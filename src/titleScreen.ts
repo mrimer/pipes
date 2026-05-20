@@ -1,6 +1,7 @@
 import { drawPipeBody } from './renderer';
 import { BG_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
 import { Direction, PipeShape, Rotation } from './types';
+import { oppositeDirection } from './tile';
 
 type TitleLetter = 'C' | 'O' | 'L' | 'P' | 'I' | 'E' | 'S';
 
@@ -31,6 +32,10 @@ const LETTER_GAP_MS = 190;
 const PROMPT_FADE_MS = 900;
 const OVERLAY_ALPHA = 0.96;
 const TITLE_ROWS = 7;
+const PRESS_PROMPT_COLOR = '#d6e8ff';
+const PRESS_PROMPT_FONT_WEIGHT = 600;
+const PRESS_PROMPT_FONT_FAMILY = 'Arial, sans-serif';
+const PRESS_PROMPT_FONT_SIZE_RATIO = 0.95;
 
 const GLYPHS: Record<TitleLetter, readonly string[]> = {
   C: [
@@ -104,23 +109,21 @@ const DIRECTION_DELTAS: ReadonlyArray<readonly [Direction, number, number]> = [
   [Direction.South, 1, 0],
   [Direction.West, 0, -1],
 ];
+const DIRECTION_TO_DELTA = new Map<Direction, readonly [number, number]>(
+  DIRECTION_DELTAS.map(([direction, dr, dc]) => [direction, [dr, dc] as const]),
+);
 
 function key(row: number, col: number): string {
   return `${row},${col}`;
 }
 
-function oppositeDirection(direction: Direction): Direction {
-  switch (direction) {
-    case Direction.North: return Direction.South;
-    case Direction.South: return Direction.North;
-    case Direction.East: return Direction.West;
-    case Direction.West: return Direction.East;
-  }
-}
-
 function decodeKey(encoded: string): { row: number; col: number } {
   const [rowText, colText] = encoded.split(',');
   return { row: Number(rowText), col: Number(colText) };
+}
+
+function deltaForDirection(direction: Direction): readonly [number, number] {
+  return DIRECTION_TO_DELTA.get(direction) ?? [0, 0];
 }
 
 function pipeShapeFromDirections(directions: ReadonlySet<Direction>): { shape: PipeShape; rotation: Rotation } {
@@ -239,13 +242,7 @@ function buildLetterDepthMap(layout: GlyphLayout): {
       const current = cellLookup.get(encoded);
       if (!current) continue;
       for (const direction of current.directions) {
-        const [dr, dc] = direction === Direction.North
-          ? [-1, 0]
-          : direction === Direction.East
-            ? [0, 1]
-            : direction === Direction.South
-              ? [1, 0]
-              : [0, -1];
+        const [dr, dc] = deltaForDirection(direction);
         const nextKey = key(current.row + dr, current.col + dc);
         if (seen.has(nextKey)) continue;
         const neighbor = cellLookup.get(nextKey);
@@ -309,13 +306,15 @@ export function showIntroTitleScreen(): Promise<void> {
     const layout = buildTitleGlyphLayout();
     const flow = buildLetterDepthMap(layout);
     const startMs = performance.now();
-    let rafId = 0;
+    let rafId: number | null = null;
     let cleaned = false;
 
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
-      cancelAnimationFrame(rafId);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
       window.removeEventListener('resize', renderFrame);
       window.removeEventListener('keydown', onAnyInput, true);
       window.removeEventListener('pointerdown', onAnyInput, true);
@@ -329,9 +328,7 @@ export function showIntroTitleScreen(): Promise<void> {
       resolve();
     };
 
-    const onAnyInput = (event: Event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    const onAnyInput = () => {
       finish();
     };
 
@@ -393,9 +390,9 @@ export function showIntroTitleScreen(): Promise<void> {
       if (pressFade > 0) {
         ctx.save();
         ctx.globalAlpha = pressFade;
-        ctx.fillStyle = '#d6e8ff';
-        const fontSize = Math.max(20, Math.floor(tileSize * 0.95));
-        ctx.font = `600 ${fontSize}px Arial, sans-serif`;
+        ctx.fillStyle = PRESS_PROMPT_COLOR;
+        const fontSize = Math.max(20, Math.floor(tileSize * PRESS_PROMPT_FONT_SIZE_RATIO));
+        ctx.font = `${PRESS_PROMPT_FONT_WEIGHT} ${fontSize}px ${PRESS_PROMPT_FONT_FAMILY}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.fillText('Press any key', Math.floor(width / 2), originY + titleHeight + Math.floor(tileSize * 1.6));
