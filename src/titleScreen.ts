@@ -296,10 +296,12 @@ function anyGamepadButtonPressed(): boolean {
 
 function applyIntroSfxVolume(): void {
   const activeSlotIndex = getActiveSlotIndex();
-  if (activeSlotIndex === null || !loadSlotMeta(activeSlotIndex)) {
+  const activeProfileMeta = activeSlotIndex !== null ? loadSlotMeta(activeSlotIndex) : null;
+  if (!activeProfileMeta) {
     sfxManager.setVolume(100);
     return;
   }
+  // loadSfxVolume() reads from the currently active slot namespace.
   sfxManager.setVolume(loadSfxVolume());
 }
 
