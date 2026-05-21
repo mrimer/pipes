@@ -39,6 +39,7 @@ const PRESS_PROMPT_COLOR = '#d6e8ff';
 const PRESS_PROMPT_FONT_WEIGHT = 600;
 const PRESS_PROMPT_FONT_FAMILY = 'Arial, sans-serif';
 const PRESS_PROMPT_FONT_SIZE_RATIO = 0.95;
+const TITLE_BUBBLES_LOOP_INTERVAL_MS = 6000;
 
 const GLYPHS: Record<TitleLetter, readonly string[]> = {
   C: [
@@ -321,30 +322,50 @@ export function showIntroTitleScreen(): Promise<void> {
     const flow = buildLetterDepthMap(layout);
     const startMs = performance.now();
     let rafId: number | null = null;
+    let titleBubblesTimerId: number | null = null;
     let cleaned = false;
 
-    const cleanup = () => {
+    const cleanup = (stopSfx = true) => {
       if (cleaned) return;
       cleaned = true;
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
       }
-      sfxManager.stopAll();
+      if (titleBubblesTimerId !== null) {
+        clearTimeout(titleBubblesTimerId);
+        titleBubblesTimerId = null;
+      }
+      if (stopSfx) {
+        sfxManager.stopAll();
+      }
       window.removeEventListener('resize', renderFrame);
-      window.removeEventListener('keydown', onAnyInput, true);
-      window.removeEventListener('pointerdown', onAnyInput, true);
-      window.removeEventListener('mousedown', onAnyInput, true);
-      window.removeEventListener('touchstart', onAnyInput, true);
+      window.removeEventListener('keydown', onKeyboardExitInput, true);
+      window.removeEventListener('pointerdown', onPointerExitInput, true);
+      window.removeEventListener('mousedown', onPointerExitInput, true);
+      window.removeEventListener('touchstart', onPointerExitInput, true);
       overlay.remove();
     };
 
-    const finish = () => {
-      cleanup();
+    const finish = (stopSfx = true) => {
+      cleanup(stopSfx);
       resolve();
     };
 
-    const onAnyInput = () => {
+    const onKeyboardExitInput = () => {
       finish();
+    };
+
+    const onPointerExitInput = () => {
+      if (cleaned) return;
+      sfxManager.stopAll();
+      sfxManager.play(SfxId.UIConfirm);
+      finish(false);
+    };
+
+    const scheduleTitleBubbles = () => {
+      if (cleaned) return;
+      sfxManager.play(SfxId.TitleBubbles);
+      titleBubblesTimerId = window.setTimeout(scheduleTitleBubbles, TITLE_BUBBLES_LOOP_INTERVAL_MS);
     };
 
     const draw = (now: number) => {
@@ -429,12 +450,12 @@ export function showIntroTitleScreen(): Promise<void> {
     };
 
     window.addEventListener('resize', renderFrame);
-    window.addEventListener('keydown', onAnyInput, true);
-    window.addEventListener('pointerdown', onAnyInput, true);
-    window.addEventListener('mousedown', onAnyInput, true);
-    window.addEventListener('touchstart', onAnyInput, true);
+    window.addEventListener('keydown', onKeyboardExitInput, true);
+    window.addEventListener('pointerdown', onPointerExitInput, true);
+    window.addEventListener('mousedown', onPointerExitInput, true);
+    window.addEventListener('touchstart', onPointerExitInput, true);
 
-    sfxManager.play(SfxId.TitleBubbles);
+    scheduleTitleBubbles();
     rafId = requestAnimationFrame(draw);
   });
 }
