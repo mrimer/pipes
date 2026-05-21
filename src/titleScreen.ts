@@ -28,8 +28,8 @@ const TILE_PADDING_RATIO = 0.08;
 const MIN_TILE_SIZE = 16;
 /** Generous upper bound; the width-driven sizing will normally cap tiles below this. */
 const MAX_TILE_SIZE = 56;
-const LETTER_FILL_STEP_MS = 130;
-const LETTER_GAP_MS = 190;
+const LETTER_FILL_STEP_MS = 100;
+const LETTER_GAP_MS = 150;
 const PROMPT_FADE_MS = 900;
 const OVERLAY_ALPHA = 0.96;
 /** Pixel height of each glyph bitmap (rows in every GLYPHS entry). */
