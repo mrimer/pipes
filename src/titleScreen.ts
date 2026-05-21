@@ -3,6 +3,9 @@ import { BG_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
 import { Direction, PipeShape, Rotation } from './types';
 import { oppositeDirection } from './tile';
 import { sfxManager, SfxId } from './sfxManager';
+import { getActiveSlotIndex } from './activeProfile';
+import { loadSlotMeta } from './playerProfileSlots';
+import { loadSfxVolume } from './persistence';
 
 type TitleLetter = 'C' | 'O' | 'L' | 'P' | 'I' | 'E' | 'S';
 
@@ -291,8 +294,19 @@ function anyGamepadButtonPressed(): boolean {
   return false;
 }
 
+function applyIntroSfxVolume(): void {
+  const activeSlotIndex = getActiveSlotIndex();
+  if (activeSlotIndex === null || !loadSlotMeta(activeSlotIndex)) {
+    sfxManager.setVolume(100);
+    return;
+  }
+  sfxManager.setVolume(loadSfxVolume());
+}
+
 export function showIntroTitleScreen(): Promise<void> {
   return new Promise((resolve) => {
+    applyIntroSfxVolume();
+
     const overlay = document.createElement('div');
     overlay.style.cssText = [
       'position:fixed',
