@@ -2,6 +2,7 @@ import { drawPipeBody } from './renderer';
 import { BG_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
 import { Direction, PipeShape, Rotation } from './types';
 import { oppositeDirection } from './tile';
+import { sfxManager, SfxId } from './sfxManager';
 
 type TitleLetter = 'C' | 'O' | 'L' | 'P' | 'I' | 'E' | 'S';
 
@@ -328,6 +329,7 @@ export function showIntroTitleScreen(): Promise<void> {
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
       }
+      sfxManager.stopAll();
       window.removeEventListener('resize', renderFrame);
       window.removeEventListener('keydown', onAnyInput, true);
       window.removeEventListener('pointerdown', onAnyInput, true);
@@ -432,6 +434,7 @@ export function showIntroTitleScreen(): Promise<void> {
     window.addEventListener('mousedown', onAnyInput, true);
     window.addEventListener('touchstart', onAnyInput, true);
 
+    sfxManager.play(SfxId.TitleBubbles);
     rafId = requestAnimationFrame(draw);
   });
 }

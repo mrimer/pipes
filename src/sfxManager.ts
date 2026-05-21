@@ -87,6 +87,7 @@ import sandstone2Url from '../data/sfx/sandstone-2.ogg';
 import sandstone3Url from '../data/sfx/sandstone-3.ogg';
 import gelUrl from '../data/sfx/gel.ogg';
 import siphonUrl from '../data/sfx/siphon.ogg';
+import titleBubblesUrl from '../data/sfx/title-bubbles.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ export const enum SfxId {
   MasterChapter    = 56,
   Gel              = 57,
   Siphon           = 58,
+  TitleBubbles     = 59,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -220,6 +222,7 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.MasterChapter]:    [masterChapterUrl],
   [SfxId.Gel]:              [gelUrl],
   [SfxId.Siphon]:           [siphonUrl],
+  [SfxId.TitleBubbles]:     [titleBubblesUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -314,6 +317,7 @@ export class SfxManager {
     [SfxId.MasterChapter]:    -1,
     [SfxId.Gel]:              -1,
     [SfxId.Siphon]:           -1,
+    [SfxId.TitleBubbles]:     -1,
   };
 
   /**
