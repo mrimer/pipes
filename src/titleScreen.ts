@@ -361,11 +361,14 @@ export function showIntroTitleScreen(): Promise<void> {
       resolve();
     };
 
+    let exiting = false;
     const onExitInput = () => {
       if (cleaned) return;
-      sfxManager.stopAll();
-      sfxManager.play(SfxId.UIConfirm);
-      finish(false);
+      if (exiting) return;
+      exiting = true;
+      sfxManager.playWithDoneCallback(SfxId.UIConfirm, () => {
+        finish(false);
+      });
     };
 
     const draw = (now: number) => {

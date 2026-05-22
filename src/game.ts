@@ -509,7 +509,7 @@ export class Game implements InputCallbacks {
     // Show the level-select screen or, if no profile slot is active, show the
     // profile screen so the player can choose or create a profile first.
     if (getActiveSlotIndex() !== null) {
-      this._showLevelSelect();
+      this._showLevelSelect(false);
     } else {
       this._showPlayerProfileScreen();
     }
