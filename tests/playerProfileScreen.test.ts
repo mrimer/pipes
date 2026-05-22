@@ -31,7 +31,7 @@ describe('PlayerProfileScreen', () => {
     expect(heading?.nextElementSibling).toBe(cards);
   });
 
-  it('resets overlay scroll and keeps content top-aligned when shown', () => {
+  it('resets overlay scroll, keeps cards centered, and pins heading at top', () => {
     const screen = new PlayerProfileScreen();
     const overlay = document.getElementById('player-profile-screen') as HTMLDivElement | null;
     expect(overlay).not.toBeNull();
@@ -40,7 +40,11 @@ describe('PlayerProfileScreen', () => {
     screen.show();
 
     expect(overlay!.scrollTop).toBe(0);
-    expect(overlay!.style.justifyContent).toBe('flex-start');
+    const heading = overlay!.querySelector('h1') as HTMLHeadingElement | null;
+    expect(overlay!.style.justifyContent).toBe('center');
+    expect(heading).not.toBeNull();
+    expect(heading!.style.position).toBe('absolute');
+    expect(heading!.style.top).toBe('24px');
   });
 
   it('plays Click when selecting a profile card button', () => {
