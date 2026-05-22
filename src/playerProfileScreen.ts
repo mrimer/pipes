@@ -280,6 +280,7 @@ export class PlayerProfileScreen {
     // Active badge
     if (isActive) {
       const badge = document.createElement('div');
+      badge.className = 'player-profile-active-badge';
       badge.textContent = '✅ Active';
       badge.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;text-align:center;';
       card.appendChild(badge);

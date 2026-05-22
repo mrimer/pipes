@@ -99,9 +99,8 @@ describe('PlayerProfileScreen', () => {
 
     screen.show();
 
-    const activeBadge = Array.from(document.querySelectorAll<HTMLDivElement>('#player-profile-screen div'))
-      .find((el) => el.textContent === '✅ Active');
-    expect(activeBadge).toBeDefined();
+    const activeBadge = document.querySelector<HTMLDivElement>('#player-profile-screen .player-profile-active-badge');
+    expect(activeBadge).not.toBeNull();
     const activeCard = activeBadge?.parentElement as HTMLDivElement | null;
     expect(activeCard).not.toBeNull();
 
