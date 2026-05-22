@@ -400,10 +400,10 @@ export class Game implements InputCallbacks {
       // Restore the active campaign from the new slot's persisted state, then
       // show the level-select screen.
       this._campaign.restoreFromPersistence();
-      this._showLevelSelect();
+      this._showLevelSelect(false);
     };
     this._profileScreen.onReturnToMenu = () => {
-      this._showLevelSelect();
+      this._showLevelSelect(false);
     };
 
     // Create the campaign manager and restore persisted campaign state

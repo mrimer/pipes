@@ -366,6 +366,7 @@ export function showIntroTitleScreen(): Promise<void> {
       if (cleaned) return;
       if (exiting) return;
       exiting = true;
+      sfxManager.stopAll();
       sfxManager.playWithDoneCallback(SfxId.UIConfirm, () => {
         finish(false);
       });
