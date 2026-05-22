@@ -135,7 +135,7 @@ export class PlayerProfileScreen {
     });
 
     // Title
-    const titleEl = document.createElement('h1');
+    const titleEl = document.createElement('h2');
     titleEl.textContent = '👤 Select Player';
     titleEl.style.cssText =
       'position:absolute;top:24px;left:0;right:0;z-index:1;' +

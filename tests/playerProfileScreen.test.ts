@@ -25,7 +25,7 @@ describe('PlayerProfileScreen', () => {
     screen.show();
 
     const overlay = document.getElementById('player-profile-screen');
-    const heading = overlay?.querySelector('h1') ?? null;
+    const heading = overlay?.querySelector('h2') ?? null;
     const cards = overlay?.querySelector('div') ?? null;
     expect(heading?.textContent).toBe('👤 Select Player');
     expect(heading?.nextElementSibling).toBe(cards);
@@ -40,7 +40,7 @@ describe('PlayerProfileScreen', () => {
     screen.show();
 
     expect(overlay!.scrollTop).toBe(0);
-    const heading = overlay!.querySelector('h1') as HTMLHeadingElement | null;
+    const heading = overlay!.querySelector('h2') as HTMLHeadingElement | null;
     expect(overlay!.style.justifyContent).toBe('center');
     expect(heading).not.toBeNull();
     expect(heading!.style.position).toBe('absolute');
