@@ -19,13 +19,25 @@ describe('PlayerProfileScreen', () => {
     setActiveSlotIndex(null);
   });
 
-  it('shows the "Select a Player Profile" heading', () => {
+  it('shows the "👤 Select Player" heading', () => {
     const screen = new PlayerProfileScreen();
 
     screen.show();
 
     const heading = document.querySelector('#player-profile-screen h1');
-    expect(heading?.textContent).toBe('Select a Player Profile');
+    expect(heading?.textContent).toBe('👤 Select Player');
+  });
+
+  it('resets overlay scroll and top-aligns content when shown', () => {
+    const screen = new PlayerProfileScreen();
+    const overlay = document.getElementById('player-profile-screen') as HTMLDivElement | null;
+    expect(overlay).not.toBeNull();
+    overlay!.scrollTop = 120;
+
+    screen.show();
+
+    expect(overlay!.scrollTop).toBe(0);
+    expect(overlay!.style.justifyContent).toBe('flex-start');
   });
 
   it('plays Click when selecting a profile card button', () => {

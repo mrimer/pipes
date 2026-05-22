@@ -128,7 +128,7 @@ export class PlayerProfileScreen {
     this._el.id = 'player-profile-screen';
     this._el.style.cssText =
       'display:none;position:fixed;inset:0;' +
-      'z-index:50;overflow-y:auto;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px;';
+      'z-index:50;overflow-y:auto;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px 16px;box-sizing:border-box;';
     applyScrollingPipeBackground(this._el, {
       baseColor: SCREEN_BG,
       overlayAlpha: 0.8,
@@ -136,7 +136,7 @@ export class PlayerProfileScreen {
 
     // Title
     const titleEl = document.createElement('h1');
-    titleEl.textContent = 'Select a Player Profile';
+    titleEl.textContent = '👤 Select Player';
     titleEl.style.cssText = 'color:#eee;font-size:1.6rem;margin:0 0 24px;text-align:center;';
     this._el.appendChild(titleEl);
 
@@ -163,6 +163,7 @@ export class PlayerProfileScreen {
     this._campaigns = campaigns;
     this._render();
     this._el.style.display = 'flex';
+    this._el.scrollTop = 0;
     document.addEventListener('keydown', this._onKeyDown);
   }
 
