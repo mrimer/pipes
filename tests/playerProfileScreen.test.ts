@@ -24,11 +24,14 @@ describe('PlayerProfileScreen', () => {
 
     screen.show();
 
-    const heading = document.querySelector('#player-profile-screen h1');
+    const overlay = document.getElementById('player-profile-screen');
+    const heading = overlay?.querySelector('h1') ?? null;
+    const cards = overlay?.querySelector('div') ?? null;
     expect(heading?.textContent).toBe('👤 Select Player');
+    expect(heading?.nextElementSibling).toBe(cards);
   });
 
-  it('resets overlay scroll and top-aligns content when shown', () => {
+  it('resets overlay scroll and centers content when shown', () => {
     const screen = new PlayerProfileScreen();
     const overlay = document.getElementById('player-profile-screen') as HTMLDivElement | null;
     expect(overlay).not.toBeNull();
@@ -37,7 +40,7 @@ describe('PlayerProfileScreen', () => {
     screen.show();
 
     expect(overlay!.scrollTop).toBe(0);
-    expect(overlay!.style.justifyContent).toBe('flex-start');
+    expect(overlay!.style.justifyContent).toBe('center');
   });
 
   it('plays Click when selecting a profile card button', () => {
@@ -84,5 +87,27 @@ describe('PlayerProfileScreen', () => {
     expect(playSpy).toHaveBeenCalledWith(SfxId.Back);
     expect(onReturnToMenu).toHaveBeenCalledTimes(1);
     expect(overlay?.style.display).toBe('none');
+  });
+
+  it('plays Click and returns to menu when clicking the active profile card', () => {
+    saveSlotMeta(0, { guid: 'guid-0', name: 'Alice', lastPlayedAt: null });
+    setActiveSlotIndex(0);
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
+    const onReturnToMenu = jest.fn();
+    const screen = new PlayerProfileScreen();
+    screen.onReturnToMenu = onReturnToMenu;
+
+    screen.show();
+
+    const activeBadge = Array.from(document.querySelectorAll<HTMLDivElement>('#player-profile-screen div'))
+      .find((el) => el.textContent === '✅ Active');
+    expect(activeBadge).toBeDefined();
+    const activeCard = activeBadge?.parentElement as HTMLDivElement | null;
+    expect(activeCard).not.toBeNull();
+
+    activeCard!.click();
+
+    expect(playSpy).toHaveBeenCalledWith(SfxId.Click);
+    expect(onReturnToMenu).toHaveBeenCalledTimes(1);
   });
 });
