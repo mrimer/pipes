@@ -10,6 +10,7 @@ import { BG_COLOR } from './colors';
 import { setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
 import { showIntroTitleScreen } from './titleScreen';
+import { showSplashScreen } from './splashScreen';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
@@ -71,6 +72,7 @@ const exitBtnEl      = getEl<HTMLButtonElement>('exit-btn');
 const rulesBtnEl     = getEl<HTMLButtonElement>('rules-btn');
 
 async function bootstrap(): Promise<void> {
+  await showSplashScreen();
   await showIntroTitleScreen();
 
   const game = new Game(

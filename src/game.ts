@@ -354,6 +354,7 @@ export class Game implements InputCallbacks {
         const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
         const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
         const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+        sfxManager.play(SfxId.Click);
         saveSfxVolume(sfxManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
         saveRecordingSettings({
@@ -379,6 +380,7 @@ export class Game implements InputCallbacks {
       (el) => {
         const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
         const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+        sfxManager.play(SfxId.Back);
         // Revert any live-previewed graphics changes back to the persisted state.
         const persistedBg  = loadBackgroundEnabled();
         const persistedEnv = loadEnvironmentalEnabled();

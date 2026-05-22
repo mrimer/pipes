@@ -14,6 +14,10 @@ module.exports = {
         test: /\.ogg$/,
         type: 'asset/resource',
       },
+      {
+        test: /\.(png|jpg|jpeg|gif|svg)$/i,
+        type: 'asset/resource',
+      },
     ],
   },
   resolve: {

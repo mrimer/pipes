@@ -91,6 +91,8 @@ src/
 ├── gameModals.ts                # Core game modals (level complete, level fail, rules)
 ├── recordingModals.ts           # Record/playback list modals
 ├── rulesModal.ts                # Rules/help modal
+├── splashScreen.ts              # Caravel Games logo splash screen (shown before title intro)
+├── titleScreen.ts               # COOL PIPES glyph title intro animation
 ├── levelSelect.ts               # Level-select screen
 ├── levelTransition.ts           # Zoom/transition animations between screens
 │
@@ -201,6 +203,8 @@ src/
 | Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Player profile schema | `playerProfile.ts` |
+| Splash screen (Caravel Games logo) | `splashScreen.ts` |
+| Title intro animation (COOL PIPES glyphs) | `titleScreen.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |
 | Win confetti | `visuals/confetti.ts` |
 | Cloud shadow overlay | `visuals/cloudShadows.ts` |
