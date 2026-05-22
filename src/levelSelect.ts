@@ -234,7 +234,10 @@ export function renderLevelList(
       gearBtn.style.cssText =
         'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
         'position:absolute;right:0;';
-      gearBtn.addEventListener('click', () => onSettingsClick());
+      gearBtn.addEventListener('click', () => {
+        sfxManager.play(SfxId.Click);
+        onSettingsClick();
+      });
 
       if (onPlayerProfileClick) {
         const profileBtn = document.createElement('button');
@@ -244,7 +247,10 @@ export function renderLevelList(
         profileBtn.style.cssText =
           'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
           'position:absolute;left:0;';
-        profileBtn.addEventListener('click', () => onPlayerProfileClick());
+        profileBtn.addEventListener('click', () => {
+          sfxManager.play(SfxId.Click);
+          onPlayerProfileClick();
+        });
         selectRow.appendChild(profileBtn);
       }
       selectRow.appendChild(h2);

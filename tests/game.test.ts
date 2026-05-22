@@ -6,6 +6,7 @@ import { Game } from '../src/game';
 import { LevelDef, PipeShape, CampaignDef } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
 import { saveImportedCampaigns, loadActiveCampaignId, saveLevelWater } from '../src/persistence';
+import { sfxManager, SfxId } from '../src/sfxManager';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
 jest.mock('../src/visuals/confetti', () => ({
@@ -1470,6 +1471,21 @@ describe('Game – R key resets the level', () => {
 // ─── Tests: Escape key returns to level select ────────────────────────────────
 
 describe('Game – Escape key returns to level select', () => {
+  it('plays Back and closes the settings modal when Escape is pressed while it is open', () => {
+    const { game } = makeGame();
+    const hooks = game as unknown as {
+      _settingsModalEl: HTMLElement;
+      _input: { _handleDocKeyDown(e: KeyboardEvent): void };
+    };
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
+
+    hooks._settingsModalEl.style.display = 'flex';
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(playSpy).toHaveBeenCalledWith(SfxId.Back);
+    expect(hooks._settingsModalEl.style.display).toBe('none');
+  });
+
   it('shows the exit-confirm modal when Escape is pressed during play instead of immediately exiting', () => {
     const { game } = makeGame();
     game.startLevel(1);

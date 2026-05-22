@@ -6,6 +6,7 @@
 
 import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
+import { sfxManager, SfxId } from '../src/sfxManager';
 import { TileDef } from '../src/types';
 import { makeLevelDef } from './testHelpers';
 
@@ -618,6 +619,67 @@ describe('renderLevelList – no-campaign / campaign header', () => {
   });
 });
 
+describe('renderLevelList – main-menu button SFX', () => {
+  let container: HTMLElement;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  it('plays Click and opens Settings when the settings button is clicked', () => {
+    const onSettingsClick = jest.fn();
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
+
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      { name: 'My Campaign', author: 'Author', completionPct: 0 },
+      [{ id: 1, name: 'Ch1', levels: [] }],
+      {},
+      {},
+      undefined,
+      undefined,
+      onSettingsClick,
+    );
+
+    const settingsBtn = container.querySelector<HTMLButtonElement>('button[title="Settings"]');
+    expect(settingsBtn).not.toBeNull();
+    settingsBtn!.click();
+
+    expect(playSpy).toHaveBeenCalledWith(SfxId.Click);
+    expect(onSettingsClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('plays Click and opens Player Profile when the profile button is clicked', () => {
+    const onPlayerProfileClick = jest.fn();
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
+
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      { name: 'My Campaign', author: 'Author', completionPct: 0 },
+      [{ id: 1, name: 'Ch1', levels: [] }],
+      {},
+      {},
+      undefined,
+      undefined,
+      () => {},
+      undefined,
+      false,
+      undefined,
+      onPlayerProfileClick,
+    );
+
+    const profileBtn = container.querySelector<HTMLButtonElement>('button[title="Switch Player"]');
+    expect(profileBtn).not.toBeNull();
+    profileBtn!.click();
+
+    expect(playSpy).toHaveBeenCalledWith(SfxId.Click);
+    expect(onPlayerProfileClick).toHaveBeenCalledTimes(1);
+  });
+});
+
 // ─── renderLevelList – Reset Progress button visibility ───────────────────────
 
 describe('renderLevelList – Reset Progress button', () => {
@@ -997,4 +1059,3 @@ describe('renderLevelList – Continue button location text', () => {
 });
 
 // ─── Export / Import Progress buttons ────────────────────────────────────────
-

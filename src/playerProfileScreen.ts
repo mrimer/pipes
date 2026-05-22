@@ -26,7 +26,7 @@ import {
 } from './playerProfileSlots';
 import { setActiveSlotIndex, getActiveSlotIndex, withSlot } from './activeProfile';
 import { savePlayerName, loadSfxVolume, loadTouchUiEnabled } from './persistence';
-import { sfxManager } from './sfxManager';
+import { sfxManager, SfxId } from './sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from './deviceUtils';
 import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profileIO';
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from './gameModals';
@@ -69,7 +69,10 @@ function btn(
     `padding:7px 14px;font-size:0.82rem;background:${bgColor};color:#eee;` +
     `border:1px solid ${borderColor};border-radius:6px;cursor:pointer;` +
     `font-family:inherit;${extraCss}`;
-  b.addEventListener('click', onClick);
+  b.addEventListener('click', () => {
+    sfxManager.play(SfxId.Click);
+    onClick();
+  });
   return b;
 }
 
@@ -133,7 +136,7 @@ export class PlayerProfileScreen {
 
     // Title
     const titleEl = document.createElement('h1');
-    titleEl.textContent = '👤 Select Player';
+    titleEl.textContent = 'Select a Player Profile';
     titleEl.style.cssText = 'color:#eee;font-size:1.6rem;margin:0 0 24px;text-align:center;';
     this._el.appendChild(titleEl);
 
@@ -148,6 +151,7 @@ export class PlayerProfileScreen {
     // Escape key returns to the main menu when a profile is active.
     this._onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && getActiveSlotIndex() !== null) {
+        sfxManager.play(SfxId.Back);
         this.hide();
         this.onReturnToMenu();
       }
@@ -243,6 +247,7 @@ export class PlayerProfileScreen {
       'background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0 0 0 4px;line-height:1;vertical-align:middle;opacity:0.7;';
     pencilBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      sfxManager.play(SfxId.Click);
       buildEditPlayerNameModal(meta.name, (newName) => {
         withSlot(slotIndex, () => savePlayerName(newName));
         saveSlotMeta(slotIndex, { ...meta, name: newName });

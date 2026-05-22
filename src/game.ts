@@ -377,20 +377,7 @@ export class Game implements InputCallbacks {
       // live environmental toggle: update in-memory flag immediately
       (enabled) => { setEnvironmentalEnabled(enabled); },
       // Esc cancels: revert live graphics changes and hide modal
-      (el) => {
-        const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
-        const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
-        sfxManager.play(SfxId.Back);
-        // Revert any live-previewed graphics changes back to the persisted state.
-        const persistedBg  = loadBackgroundEnabled();
-        const persistedEnv = loadEnvironmentalEnabled();
-        if (bgToggle) bgToggle.checked = persistedBg;
-        if (envToggle) envToggle.checked = persistedEnv;
-        setBackgroundEnabled(persistedBg);
-        setGlobalBackgroundPatternEnabled(persistedBg);
-        setEnvironmentalEnabled(persistedEnv);
-        el.style.display = 'none';
-      },
+      () => { this._cancelSettingsModal(); },
     );
     applyScrollingPipeBackground(this._settingsModalEl, {
       baseColor: UI_OVERLAY_BG,
@@ -1657,7 +1644,9 @@ export class Game implements InputCallbacks {
    * confirm modal during play, or exit to the menu otherwise.
    */
   handleEscapeKey(): void {
-    if (this._rulesModalEl.style.display !== 'none') {
+    if (this._settingsModalEl.style.display !== 'none') {
+      this._cancelSettingsModal();
+    } else if (this._rulesModalEl.style.display !== 'none') {
       this._rulesModalEl.style.display = 'none';
       this.canvas.focus();
     } else if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
@@ -2071,6 +2060,21 @@ export class Game implements InputCallbacks {
   private _showPlayerProfileScreen(): void {
     this.levelSelectEl.style.display = 'none';
     this._profileScreen.show(this.campaignEditor.getAllCampaigns());
+  }
+
+  /** Revert live Settings previews and hide the settings modal. */
+  private _cancelSettingsModal(): void {
+    const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
+    const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+    sfxManager.play(SfxId.Back);
+    const persistedBg  = loadBackgroundEnabled();
+    const persistedEnv = loadEnvironmentalEnabled();
+    if (bgToggle) bgToggle.checked = persistedBg;
+    if (envToggle) envToggle.checked = persistedEnv;
+    setBackgroundEnabled(persistedBg);
+    setGlobalBackgroundPatternEnabled(persistedBg);
+    setEnvironmentalEnabled(persistedEnv);
+    this._settingsModalEl.style.display = 'none';
   }
 
   // ─── Campaign Editor integration ──────────────────────────────────────────
