@@ -134,7 +134,7 @@ export function showSplashScreen(): Promise<void> {
       if (finished) return;
       const elapsed = now - startMs;
 
-      const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
       const vw = Math.max(1, window.innerWidth);
       const vh = Math.max(1, window.innerHeight);
 
@@ -143,9 +143,11 @@ export function showSplashScreen(): Promise<void> {
       const logoW = Math.round(Math.min(smallerDim * LOGO_VIEWPORT_FRACTION, vw * 0.72));
       const logoH = Math.round(logoW * (LOGO_INTRINSIC_H / LOGO_INTRINSIC_W));
 
-      if (canvas.width !== logoW * dpr || canvas.height !== logoH * dpr) {
-        canvas.width = logoW * dpr;
-        canvas.height = logoH * dpr;
+      const canvasW = Math.round(logoW * dpr);
+      const canvasH = Math.round(logoH * dpr);
+      if (canvas.width !== canvasW || canvas.height !== canvasH) {
+        canvas.width = canvasW;
+        canvas.height = canvasH;
       }
       canvas.style.width = `${logoW}px`;
       canvas.style.height = `${logoH}px`;
@@ -165,6 +167,8 @@ export function showSplashScreen(): Promise<void> {
         ctx.globalAlpha = alpha;
 
         const scaleY = logoH / LOGO_INTRINSIC_H;
+        // Precompute dest strip height once; add 1px overlap to avoid hairline gaps between strips.
+        const destStripH = Math.ceil(STRIP_HEIGHT * scaleY) + 1;
 
         // Draw the logo in thin horizontal strips, each horizontally displaced
         // by a sine function of its vertical position (spatial wave) plus the
@@ -181,7 +185,7 @@ export function showSplashScreen(): Promise<void> {
             0,    srcY,             // source x, y
             LOGO_INTRINSIC_W, srcH, // source w, h (full width strip)
             xOff, destY,            // dest x (shifted), y
-            logoW, Math.ceil(STRIP_HEIGHT * scaleY), // dest w, h
+            logoW, destStripH,      // dest w, h
           );
         }
         ctx.restore();
