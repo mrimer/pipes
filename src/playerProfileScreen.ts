@@ -138,7 +138,7 @@ export class PlayerProfileScreen {
     const titleEl = document.createElement('h1');
     titleEl.textContent = '👤 Select Player';
     titleEl.style.cssText =
-      'position:absolute;top:24px;left:0;right:0;z-index:1;pointer-events:none;' +
+      'position:absolute;top:24px;left:0;right:0;z-index:1;' +
       'color:#eee;font-size:1.6rem;margin:0;text-align:center;';
     this._el.appendChild(titleEl);
 
