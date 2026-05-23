@@ -82,6 +82,7 @@ export interface CampaignMapEditorCallbacks {
 
 export class CampaignMapEditorSection extends MapEditorBase {
   private readonly _cbs: CampaignMapEditorCallbacks;
+  private _seaAnimationFrameId: number | null = null;
 
   // ── Palette / selection state ─────────────────────────────────────────────
   private _selectedChapterIdx: number | null = null;
@@ -150,6 +151,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
   /** Initialize grid state from the given campaign (or create defaults). */
   init(campaign: CampaignDef): void {
+    this.stopSeaAnimationLoop();
     this._detachInput();
     this._panPixelX = 0;
     this._panPixelY = 0;
@@ -177,6 +179,19 @@ export class CampaignMapEditorSection extends MapEditorBase {
   /** Re-render the campaign map canvas. */
   renderCanvas(): void {
     this._renderCanvas();
+  }
+
+  /** Start continuously refreshing the campaign-map canvas (for animated sea tiles). */
+  startSeaAnimationLoop(): void {
+    if (this._seaAnimationFrameId !== null) return;
+    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+  }
+
+  /** Stop continuously refreshing the campaign-map canvas. */
+  stopSeaAnimationLoop(): void {
+    if (this._seaAnimationFrameId === null) return;
+    cancelAnimationFrame(this._seaAnimationFrameId);
+    this._seaAnimationFrameId = null;
   }
 
   /** Sync undo/redo button enabled state with current history availability. */
@@ -817,6 +832,15 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     ctx.restore();
   }
+
+  /** RAF callback that keeps animated sea tiles updating while this editor is active. */
+  private _seaAnimationTick = (): void => {
+    if (this._seaAnimationFrameId === null) return;
+    if (this._canvas && this._ctx && !this._mapBoxCollapsed) {
+      this._renderCampaignCanvas();
+    }
+    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+  };
 
   // ── Private: tile building ─────────────────────────────────────────────────
 

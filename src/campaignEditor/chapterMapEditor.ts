@@ -46,6 +46,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
   private readonly _callbacks: ChapterMapEditorCallbacks;
   private _ui: ChapterEditorUI | null = null;
   private _input: ChapterMapInput | null = null;
+  private _seaAnimationFrameId: number | null = null;
 
   // ── State fields ──────────────────────────────────────────────────────────
   private _chapterSelectedLevelIdx: number | null = null;
@@ -73,6 +74,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
 
   /** Initialize grid state from the given chapter (or create defaults). */
   init(chapter: ChapterDef): void {
+    this.stopSeaAnimationLoop();
     this._input?.detach();
     this._input = null;
     this._initChapterGridState(chapter);
@@ -99,6 +101,19 @@ export class ChapterMapEditorSection extends MapEditorBase {
   /** Re-render the chapter map canvas. */
   renderCanvas(): void {
     this._renderCanvas();
+  }
+
+  /** Start continuously refreshing the chapter-map canvas (for animated sea tiles). */
+  startSeaAnimationLoop(): void {
+    if (this._seaAnimationFrameId !== null) return;
+    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+  }
+
+  /** Stop continuously refreshing the chapter-map canvas. */
+  stopSeaAnimationLoop(): void {
+    if (this._seaAnimationFrameId === null) return;
+    cancelAnimationFrame(this._seaAnimationFrameId);
+    this._seaAnimationFrameId = null;
   }
 
   /** Sync undo/redo button enabled state with current history availability. */
@@ -464,6 +479,15 @@ export class ChapterMapEditorSection extends MapEditorBase {
 
     drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);
   }
+
+  /** RAF callback that keeps animated sea tiles updating while this editor is active. */
+  private _seaAnimationTick = (): void => {
+    if (this._seaAnimationFrameId === null) return;
+    if (this._canvas && this._ctx && !this._mapBoxCollapsed) {
+      this._renderChapterCanvas();
+    }
+    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+  };
 
   /** Build a TileDef from the current chapter palette selection and params. */
   private _buildChapterTileDef(): TileDef {

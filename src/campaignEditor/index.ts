@@ -77,6 +77,7 @@ export class CampaignEditor {
   private _editorCanvas: HTMLCanvasElement | null = null;
   private _editorCtx: CanvasRenderingContext2D | null = null;
   private _editorSourceErrorEl: HTMLDivElement | null = null;
+  private _levelSeaAnimationFrameId: number | null = null;
   /** The outermost flex container of the level editor layout, used to measure available canvas space. */
   private _editorMainLayout: HTMLElement | null = null;
   /** Canvas input handler: owns all gesture state and event listeners. */
@@ -238,14 +239,45 @@ export class CampaignEditor {
 
   /** Hide the campaign editor. */
   hide(): void {
+    this._stopEditorSeaAnimationLoops();
     this._el.style.display = 'none';
     document.body.classList.remove('editor-open');
   }
 
   /** Remove event listeners and clean up DOM resources. */
   destroy(): void {
+    this._stopEditorSeaAnimationLoops();
     document.removeEventListener('keydown', this._keydownHandler);
   }
+
+  /** Start continuously refreshing the level editor canvas (for animated sea tiles). */
+  private _startLevelSeaAnimationLoop(): void {
+    if (this._levelSeaAnimationFrameId !== null) return;
+    this._levelSeaAnimationFrameId = requestAnimationFrame(this._levelSeaAnimationTick);
+  }
+
+  /** Stop continuously refreshing the level editor canvas. */
+  private _stopLevelSeaAnimationLoop(): void {
+    if (this._levelSeaAnimationFrameId === null) return;
+    cancelAnimationFrame(this._levelSeaAnimationFrameId);
+    this._levelSeaAnimationFrameId = null;
+  }
+
+  /** Stop all editor animation loops that keep animated sea tiles refreshed. */
+  private _stopEditorSeaAnimationLoops(): void {
+    this._stopLevelSeaAnimationLoop();
+    this._campaignMapEditor.stopSeaAnimationLoop();
+    this._chapterMapEditor.stopSeaAnimationLoop();
+  }
+
+  /** RAF callback for level editor sea-tile animation. */
+  private _levelSeaAnimationTick = (): void => {
+    if (this._levelSeaAnimationFrameId === null) return;
+    if (this._screen === EditorScreen.LevelEditor && this._el.style.display !== 'none') {
+      this._renderEditorCanvas();
+    }
+    this._levelSeaAnimationFrameId = requestAnimationFrame(this._levelSeaAnimationTick);
+  };
 
   // ─── Toolbar ─────────────────────────────────────────────────────────────
 
@@ -399,6 +431,7 @@ export class CampaignEditor {
   // ─── Screen: Campaign list ────────────────────────────────────────────────
 
   private _showCampaignList(): void {
+    this._stopEditorSeaAnimationLoops();
     this._screen = EditorScreen.List;
     this._el.innerHTML = '';
 
@@ -543,6 +576,7 @@ export class CampaignEditor {
   }
 
   private _showCampaignDetail(): void {
+    this._stopEditorSeaAnimationLoops();
     this._screen = EditorScreen.Campaign;
     this._el.innerHTML = '';
 
@@ -696,6 +730,7 @@ export class CampaignEditor {
       this._campaignMapEditor.updateCanvasDisplaySize();
       this._campaignMapEditor.renderCanvas();
       this._campaignMapEditor.syncUndoRedoButtons();
+      this._campaignMapEditor.startSeaAnimationLoop();
     });
   }
 
@@ -757,6 +792,7 @@ export class CampaignEditor {
   // ─── Screen: Chapter detail ───────────────────────────────────────────────
 
   private _showChapterDetail(): void {
+    this._stopEditorSeaAnimationLoops();
     this._editorInput?.detach();
     this._editorInput = null;
     this._screen = EditorScreen.Chapter;
@@ -830,6 +866,7 @@ export class CampaignEditor {
       this._chapterMapEditor.updateCanvasDisplaySize();
       this._chapterMapEditor.renderCanvas();
       this._chapterMapEditor.syncUndoRedoButtons();
+      this._chapterMapEditor.startSeaAnimationLoop();
     });
   }
 
@@ -921,6 +958,7 @@ export class CampaignEditor {
   }
 
   private _showLevelEditor(readOnly: boolean): void {
+    this._stopEditorSeaAnimationLoops();
     // Clean up any existing input handler before building a new one.
     this._editorInput?.detach();
     this._editorInput = null;
@@ -1016,6 +1054,7 @@ export class CampaignEditor {
 
     // Initial render
     this._renderEditorCanvas();
+    this._startLevelSeaAnimationLoop();
     this._updateEditorUndoRedoButtons();
   }
 
