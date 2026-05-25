@@ -315,7 +315,7 @@ export class PlaybackScreen {
     }
 
     const filledBefore = this.board.getFilledPositions();
-    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     let moveResult: MoveResult;
     let reclaimedTile: Tile | undefined;
     let rotationInfo: { row: number; col: number; oldRotation: number } | undefined;
