@@ -1153,12 +1153,7 @@ export class Game implements InputCallbacks {
       this.board.recordMove(encodeDeleteMove(pos.row, pos.col));
       const sparkle = this._metrics.sparkleCallbacks();
       this._animMgr.spawnDisconnectionAnimations(
-        this.board,
-        filledBefore,
-        sparkle,
-        tileBeforeReclaim,
-        pos.row,
-        pos.col,
+        this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col,
         lockedWaterImpactBefore,
       );
       this._animMgr.spawnLockedCostChangeAnimations(changes);
