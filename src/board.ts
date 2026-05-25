@@ -1469,17 +1469,10 @@ export class Board {
     return this._turnState.getLockedWaterImpact(pos);
   }
 
-  /**
-   * Capture locked water impacts for the provided tile keys.
-   * Keys without a locked impact are skipped.
-   */
-  captureLockedWaterImpacts(keys: Iterable<string>): Map<string, number> {
-    const impacts = new Map<string, number>();
-    for (const key of keys) {
-      const impact = this._turnState.lockedWaterImpact.get(key);
-      if (impact !== undefined) impacts.set(key, impact);
-    }
-    return impacts;
+  /** Capture a copy of all currently locked water impacts. */
+  captureLockedWaterImpacts(): Map<string, number> {
+    // Map values are numbers, so a shallow Map copy is sufficient.
+    return new Map(this._turnState.lockedWaterImpact);
   }
 
   /**

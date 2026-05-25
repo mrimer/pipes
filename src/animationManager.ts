@@ -912,9 +912,10 @@ export class AnimationManager {
         ({ text, color } = this._formatWaterCostLabel(raw, dir));
       } else if (tile.chamberContent === 'sandstone') {
         if (dir === 'disconnect' && disconnectedLockedWaterImpact !== null) {
-          const reversedImpact = -disconnectedLockedWaterImpact;
-          text = reversedImpact > 0 ? `+${reversedImpact}💧` : reversedImpact < 0 ? `${reversedImpact}💧` : '+0💧';
-          color = animColor(reversedImpact);
+          // Use the locked impact captured before disconnection so the refund label
+          // matches the original locked cost shown at connection time.
+          const lockedRefundRaw = Math.max(0, -disconnectedLockedWaterImpact);
+          ({ text, color } = this._formatWaterCostLabel(lockedRefundRaw, 'disconnect'));
         } else {
           const { shatterOverride, costPerDeltaTemp } =
             sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);

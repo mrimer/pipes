@@ -1136,7 +1136,7 @@ export class Game implements InputCallbacks {
     const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
     const hadNoSelection = this.selectedShape === null;
     const filledBefore = this.board.getFilledPositions();
-    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const result = this.board.reclaimTile(pos);
     if (result.success) {
       const reclaimedPosKey = `${pos.row},${pos.col}`;
@@ -1192,7 +1192,7 @@ export class Game implements InputCallbacks {
     rotationInfo: { row: number; col: number; oldRotation: number },
   ): void {
     if (!this.board) return;
-    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const tile = this.board.getTile(rotationInfo);
     const delta = tile ? (tile.rotation - rotationInfo.oldRotation + 360) % 360 : 0;
     sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
@@ -1564,7 +1564,7 @@ export class Game implements InputCallbacks {
     replacedCol: number,
   ): void {
     if (!this.board) return;
-    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
@@ -1831,7 +1831,7 @@ export class Game implements InputCallbacks {
     sfxManager.play(SfxId.Redo);
     this._animMgr.resetIdleTimer();
     const filledBefore = this.board.getFilledPositions();
-    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     this.board.redoMove();
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
