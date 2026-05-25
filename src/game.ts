@@ -1575,12 +1575,7 @@ export class Game implements InputCallbacks {
     // Spawn all animations.
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(
-      this.board,
-      filledBefore,
-      sparkle,
-      replacedTile,
-      replacedRow,
-      replacedCol,
+      this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol,
       lockedWaterImpactBefore,
     );
     this._animMgr.spawnFillAnims(this.board, filledBefore);
