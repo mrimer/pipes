@@ -2813,6 +2813,54 @@ describe('Board.applyTurnDelta (re-evaluation on heater/pump disconnect)', () =>
     expect(board.getCurrentWater()).toBe(99);
     expect(board.frozen).toBe(0);
   });
+
+  it('disconnecting a cooler does not re-evaluate locked ice cost', () => {
+    const board = makeBoard();
+    // Treat a negative heater as a cooler.
+    board.grid[0][0].temperature = 25;
+    board.grid[2][0].temperature = -20;
+
+    // Turn 1: connect Cooler(2,0) – temp drops from 25 to 5.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect Ice(0,2) – deltaTemp=max(0,10-5)=5, cost=10.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(88); // 100 − 1 − 1 − 10
+
+    // Turn 3: disconnect Cooler. Locked ice cost should remain 10.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(89); // 100 − 1 − 10
+    expect(board.frozen).toBe(10);
+  });
+
+  it('disconnecting a heater with effect < 1 does not re-evaluate locked ice cost', () => {
+    const board = makeBoard();
+    board.grid[2][0].temperature = 0.5;
+
+    // Turn 1: connect weak heater (+0.5 temp).
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect Ice(0,2) – deltaTemp=max(0,10-0.5)=9.5, cost=19.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(79); // 100 − 1 − 1 − 19
+
+    // Turn 3: disconnect weak heater. Locked ice cost should remain 19.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(80); // 100 − 1 − 19
+    expect(board.frozen).toBeCloseTo(19, 10);
+  });
 });
 
 // ─── New: applyTurnDelta – snow re-evaluation when pump disconnects ────────
@@ -2855,6 +2903,71 @@ describe('Board.applyTurnDelta (re-evaluation on pump disconnect)', () => {
     // WeakIce re-evaluated: pump gone, pressure=source pressure=1, effectiveCost=ceil(4/1)=4, deltaTemp=5; impact=-(4×5)=-20.
     // 100 − 1 (E-W Straight) − 20 (WeakIce re-evaluated) = 79
     expect(board.getCurrentWater()).toBe(79);
+  });
+
+  it('disconnecting a vacuum chamber does not re-evaluate locked snow cost', () => {
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0, 2);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, new Set([Direction.East, Direction.West]), 'snow', 5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,   0, true, 0, 0, null, 1, new Set([Direction.West]));
+    // Treat a negative pump as a vacuum chamber.
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, -1);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    board.initHistory();
+
+    // Turn 1: connect vacuum – pressure drops from 2 to 1.
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect snow – ceil(4/1)=4, deltaTemp=5, cost=20.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(78); // 100 − 1 − 1 − 20
+
+    // Turn 3: disconnect vacuum. Locked snow cost should remain 20.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(79); // 100 − 1 − 20
+    expect(board.frozen).toBe(20);
+  });
+
+  it('disconnecting a pump with effect < 1 does not re-evaluate locked snow cost', () => {
+    const board = new Board(3, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.sourceCapacity = 100;
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, new Set([Direction.East, Direction.South]), null, 0, 1);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 4, null, 1, new Set([Direction.East, Direction.West]), 'snow', 5);
+    board.grid[0][3] = new Tile(PipeShape.Sink,   0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.grid[2][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, new Set([Direction.North]), 'pump', 0, 0.5);
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    board.initHistory();
+
+    // Turn 1: connect weak pump (+0.5 pressure).
+    board.placeInventoryTile({ row: 1, col: 0 }, PipeShape.Straight, 0);
+    board.applyTurnDelta();
+    board.recordMove();
+
+    // Turn 2: connect snow – pressure=1.5, ceil(4/1.5)=3, deltaTemp=5, cost=15.
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(83); // 100 − 1 − 1 − 15
+
+    // Turn 3: disconnect weak pump. Locked snow cost should remain 15.
+    board.reclaimTile({ row: 1, col: 0 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(84); // 100 − 1 − 15
+    expect(board.frozen).toBe(15);
   });
 });
 

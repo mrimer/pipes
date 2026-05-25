@@ -35,6 +35,8 @@ export type TurnStateSnapshot = {
  *  - Capture and restore snapshots for undo/redo.
  */
 export class TurnStateManager {
+  private static readonly MIN_BENEFICIAL_ENV_EFFECT = 1;
+
   private _lockedWaterImpact: Map<string, number> = new Map();
   private _turnNumber: number = 0;
   private _connectionTurn: Map<string, number> = new Map();
@@ -223,9 +225,9 @@ export class TurnStateManager {
   }
 
   /**
-   * Returns true when any heater or pump that was previously locked is no
-   * longer in the current fill set.  When true, still-connected cost tiles
-   * must be re-evaluated to reflect the loss of the beneficial tile.
+   * Returns true when any previously-locked heater/pump with a beneficial
+   * effect (>= 1) is no longer in the current fill set.  When true,
+   * still-connected cost tiles must be re-evaluated to reflect the loss.
    */
   private _detectBeneficialDisconnect(filled: Set<string>): boolean {
     for (const key of this._lockedWaterImpact.keys()) {
@@ -235,11 +237,26 @@ export class TurnStateManager {
         if (
           tile?.shape === PipeShape.Chamber &&
           tile.chamberContent !== null &&
-          ENV_MODIFIER_CONTENTS.has(tile.chamberContent)
+          ENV_MODIFIER_CONTENTS.has(tile.chamberContent) &&
+          this._isBeneficialEnvModifier(tile)
         ) {
           return true;
         }
       }
+    }
+    return false;
+  }
+
+  /**
+   * Heater/pump chambers only count as beneficial when their contribution is
+   * at least 1.  Coolers, vacuums, and no-op modifiers (< 1) are excluded.
+   */
+  private _isBeneficialEnvModifier(tile: Tile): boolean {
+    if (tile.chamberContent === 'heater') {
+      return tile.temperature >= TurnStateManager.MIN_BENEFICIAL_ENV_EFFECT;
+    }
+    if (tile.chamberContent === 'pump') {
+      return tile.pressure >= TurnStateManager.MIN_BENEFICIAL_ENV_EFFECT;
     }
     return false;
   }
