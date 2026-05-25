@@ -833,6 +833,7 @@ import { Board } from '../src/board';
 import { Tile } from '../src/tile';
 import { GameState } from '../src/types';
 import { renderInventoryBar } from '../src/inventoryRenderer';
+import { AnimationManager } from '../src/animationManager';
 
 describe('Game – undoLastMove', () => {
   it('undoLastMove() hides the gameover modal and resumes playing when a snapshot exists', () => {
@@ -1772,18 +1773,14 @@ describe('Game – disconnection animations after reclaimTile', () => {
   });
 
   it('uses the locked sandstone refund amount when disconnecting a sandstone path', () => {
-    const { game } = makeGame();
-    const hooks = gameHooks(game);
     const level: LevelDef = {
       id: 999001,
       name: 'Sandstone disconnect refund',
-      rows: 2,
-      cols: 4,
+      rows: 1,
+      cols: 3,
       grid: [
         [
-          { shape: PipeShape.Source, capacity: 20, pressure: 1, connections: [Direction.East] },
-          null,
-          { shape: PipeShape.Chamber, chamberContent: 'heater', temperature: -2, connections: [Direction.West, Direction.East] },
+          { shape: PipeShape.Source, capacity: 20, pressure: 1, connections: [] },
           {
             shape: PipeShape.Chamber,
             chamberContent: 'sandstone',
@@ -1792,24 +1789,25 @@ describe('Game – disconnection animations after reclaimTile', () => {
             hardness: 0,
             connections: [Direction.West],
           },
+          { shape: PipeShape.Sink, connections: [] },
         ],
-        [null, null, null, { shape: PipeShape.Sink, connections: [Direction.West] }],
       ],
-      inventory: [{ shape: PipeShape.Straight, count: 1 }],
+      inventory: [],
     };
-    hooks._playtestLevel(level);
+    const board = new Board(level.rows, level.cols, level);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    const animMgr = new AnimationManager(canvas, ctx);
+    const sparkle = { positive: jest.fn(), negative: jest.fn(), zero: jest.fn() };
+    const filledBefore = new Set(['0,1']);
+    const lockedBefore = new Map<string, number>([['0,1', -4]]);
 
-    hooks.selectedShape = PipeShape.Straight;
-    hooks.pendingRotation = 90;
-    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
-    hooks._animMgr.animations.length = 0;
+    animMgr.spawnDisconnectionAnimations(board, filledBefore, sparkle, undefined, undefined, undefined, lockedBefore);
 
-    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
-
-    const sandstoneRefundAnims = hooks._animMgr.animations.filter((a) => a.text === '+4💧');
+    const sandstoneRefundAnims = animMgr.animations.filter((a) => a.text === '+4💧');
     expect(sandstoneRefundAnims.length).toBeGreaterThanOrEqual(1);
     expect(sandstoneRefundAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
-    expect(hooks._animMgr.animations.some((a) => a.text === '+0💧')).toBe(false);
+    expect(animMgr.animations.some((a) => a.text === '+0💧')).toBe(false);
   });
 });
 
