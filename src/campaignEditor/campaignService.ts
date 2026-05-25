@@ -253,6 +253,7 @@ export class CampaignService {
       cols: 6,
       grid,
       inventory: [],
+      style: chapter.style,
     };
     chapter.levels.push(newLevel);
     this.touch(campaign);
