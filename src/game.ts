@@ -546,7 +546,10 @@ export class Game implements InputCallbacks {
             info.lockedWaterImpactBefore,
           );
         } else {
-          this._animMgr.spawnDisconnectionAnimations(board, info.filledBefore, sparkle, undefined, undefined, undefined, info.lockedWaterImpactBefore);
+          this._animMgr.spawnDisconnectionAnimations(
+            board, info.filledBefore, sparkle, undefined, undefined, undefined,
+            info.lockedWaterImpactBefore
+          );
         }
         const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
         this._animMgr.spawnFillAnims(board, info.filledBefore, fillDelay);
@@ -1215,7 +1218,10 @@ export class Game implements InputCallbacks {
     }
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
-    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, undefined, undefined, undefined, lockedWaterImpactBefore);
+    this._animMgr.spawnDisconnectionAnimations(
+      this.board, filledBefore, sparkle, undefined, undefined, undefined,
+      lockedWaterImpactBefore
+    );
     this._animMgr.spawnFillAnims(this.board, filledBefore, fillDelay);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
@@ -1825,7 +1831,10 @@ export class Game implements InputCallbacks {
     this.board.redoMove();
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
-    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, undefined, undefined, undefined, lockedWaterImpactBefore);
+    this._animMgr.spawnDisconnectionAnimations(
+      this.board, filledBefore, sparkle, undefined, undefined, undefined,
+      lockedWaterImpactBefore
+    );
     this._finalizeHistoryJump();
     this._checkWinLose();
   }
