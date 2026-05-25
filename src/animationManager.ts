@@ -212,6 +212,7 @@ export class AnimationManager {
     reclaimedTile?: Tile,
     reclaimedRow?: number,
     reclaimedCol?: number,
+    lockedWaterImpactBefore?: ReadonlyMap<string, number>,
   ): void {
     this._invalidateBoardParticleCaches();
     const filledAfter = board.getFilledPositions();
@@ -227,7 +228,18 @@ export class AnimationManager {
         ? reclaimedTile
         : board.grid[r]?.[c];
       if (!tile) continue;
-      this._pushTileAnimLabels(board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle);
+      this._pushTileAnimLabels(
+        board,
+        tile,
+        r,
+        c,
+        'disconnect',
+        currentTemp,
+        currentPressure,
+        now,
+        sparkle,
+        lockedWaterImpactBefore?.get(key) ?? null,
+      );
     }
   }
 
@@ -840,6 +852,7 @@ export class AnimationManager {
     currentPressure: number,
     now: number,
     sparkle: AnimSparkleCallbacks,
+    disconnectedLockedWaterImpact: number | null = null,
   ): void {
     // Lower-right quadrant (avoids drawing over the pipe image)
     const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
@@ -898,14 +911,20 @@ export class AnimationManager {
         const raw = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
         ({ text, color } = this._formatWaterCostLabel(raw, dir));
       } else if (tile.chamberContent === 'sandstone') {
-        const { shatterOverride, costPerDeltaTemp } =
-          sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-        if (shatterOverride) {
-          text = dir === 'connect' ? '-0' : '+0';
-          color = ANIM_ZERO_COLOR;
+        if (dir === 'disconnect' && disconnectedLockedWaterImpact !== null) {
+          const reversedImpact = -disconnectedLockedWaterImpact;
+          text = reversedImpact > 0 ? `+${reversedImpact}💧` : reversedImpact < 0 ? `${reversedImpact}💧` : '+0💧';
+          color = animColor(reversedImpact);
         } else {
-          const raw = costPerDeltaTemp * computeDeltaTemp(tile.temperature, currentTemp);
-          ({ text, color } = this._formatWaterCostLabel(raw, dir));
+          const { shatterOverride, costPerDeltaTemp } =
+            sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
+          if (shatterOverride) {
+            text = dir === 'connect' ? '-0' : '+0';
+            color = ANIM_ZERO_COLOR;
+          } else {
+            const raw = costPerDeltaTemp * computeDeltaTemp(tile.temperature, currentTemp);
+            ({ text, color } = this._formatWaterCostLabel(raw, dir));
+          }
         }
       } else if (tile.chamberContent === 'hot_plate') {
         ({ text, color } = this._pushHotPlateAnimLabels(board, tile, r, c, dir, currentTemp, cx, cy, now));

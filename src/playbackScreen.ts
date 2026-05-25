@@ -38,6 +38,8 @@ const CORRUPT_FLASH_MS = 3000;
 export interface MoveAnimationInfo {
   /** Filled-position set captured immediately before the move was applied. */
   filledBefore: Set<string>;
+  /** Locked water impacts for tiles in `filledBefore`, captured before the move was applied. */
+  lockedWaterImpactBefore: Map<string, number>;
   /** The decoded move that was applied. */
   decodedMove: DecodedMove;
   /** Result returned by the board operation (carries `cementDecrement` when set). */
@@ -313,6 +315,7 @@ export class PlaybackScreen {
     }
 
     const filledBefore = this.board.getFilledPositions();
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
     let moveResult: MoveResult;
     let reclaimedTile: Tile | undefined;
     let rotationInfo: { row: number; col: number; oldRotation: number } | undefined;
@@ -341,6 +344,7 @@ export class PlaybackScreen {
 
     this._cb.spawnMoveAnimations(this.board, {
       filledBefore,
+      lockedWaterImpactBefore,
       decodedMove: decoded,
       moveResult,
       turnChanges,

@@ -3,7 +3,7 @@
  */
 
 import { Game } from '../src/game';
-import { LevelDef, PipeShape, CampaignDef } from '../src/types';
+import { LevelDef, PipeShape, CampaignDef, Direction } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
 import { saveImportedCampaigns, loadActiveCampaignId, saveLevelWater } from '../src/persistence';
 import { sfxManager, SfxId } from '../src/sfxManager';
@@ -1769,6 +1769,47 @@ describe('Game – disconnection animations after reclaimTile', () => {
 
     // No animation since the pipe was not in the fill path
     expect(hooks._animMgr.animations.filter((a) => a.text === '+1💧').length).toBe(0);
+  });
+
+  it('uses the locked sandstone refund amount when disconnecting a sandstone path', () => {
+    const { game } = makeGame();
+    const hooks = gameHooks(game);
+    const level: LevelDef = {
+      id: 999001,
+      name: 'Sandstone disconnect refund',
+      rows: 2,
+      cols: 4,
+      grid: [
+        [
+          { shape: PipeShape.Source, capacity: 20, pressure: 1, connections: [Direction.East] },
+          null,
+          { shape: PipeShape.Chamber, chamberContent: 'heater', temperature: -2, connections: [Direction.West, Direction.East] },
+          {
+            shape: PipeShape.Chamber,
+            chamberContent: 'sandstone',
+            cost: 2,
+            temperature: 0,
+            hardness: 0,
+            connections: [Direction.West],
+          },
+        ],
+        [null, null, null, { shape: PipeShape.Sink, connections: [Direction.West] }],
+      ],
+      inventory: [{ shape: PipeShape.Straight, count: 1 }],
+    };
+    hooks._playtestLevel(level);
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 90;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    hooks._animMgr.animations.length = 0;
+
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 96, clientY: 32 }));
+
+    const sandstoneRefundAnims = hooks._animMgr.animations.filter((a) => a.text === '+4💧');
+    expect(sandstoneRefundAnims.length).toBeGreaterThanOrEqual(1);
+    expect(sandstoneRefundAnims[0].color).toBe(ANIM_POSITIVE_COLOR);
+    expect(hooks._animMgr.animations.some((a) => a.text === '+0💧')).toBe(false);
   });
 });
 

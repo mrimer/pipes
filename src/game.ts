@@ -543,9 +543,10 @@ export class Game implements InputCallbacks {
           this._animMgr.spawnDisconnectionAnimations(
             board, info.filledBefore, sparkle,
             info.reclaimedTile, info.decodedMove.row, info.decodedMove.col,
+            info.lockedWaterImpactBefore,
           );
         } else {
-          this._animMgr.spawnDisconnectionAnimations(board, info.filledBefore, sparkle);
+          this._animMgr.spawnDisconnectionAnimations(board, info.filledBefore, sparkle, undefined, undefined, undefined, info.lockedWaterImpactBefore);
         }
         const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
         this._animMgr.spawnFillAnims(board, info.filledBefore, fillDelay);
@@ -1135,6 +1136,7 @@ export class Game implements InputCallbacks {
     const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
     const hadNoSelection = this.selectedShape === null;
     const filledBefore = this.board.getFilledPositions();
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
     const result = this.board.reclaimTile(pos);
     if (result.success) {
       const reclaimedPosKey = `${pos.row},${pos.col}`;
@@ -1150,7 +1152,15 @@ export class Game implements InputCallbacks {
       // Record delete move before board.recordMove() increments historyIndex.
       this.board.recordMove(encodeDeleteMove(pos.row, pos.col));
       const sparkle = this._metrics.sparkleCallbacks();
-      this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col);
+      this._animMgr.spawnDisconnectionAnimations(
+        this.board,
+        filledBefore,
+        sparkle,
+        tileBeforeReclaim,
+        pos.row,
+        pos.col,
+        lockedWaterImpactBefore,
+      );
       this._animMgr.spawnLockedCostChangeAnimations(changes);
       this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
       this._deselectIfDepleted();
@@ -1182,6 +1192,7 @@ export class Game implements InputCallbacks {
     rotationInfo: { row: number; col: number; oldRotation: number },
   ): void {
     if (!this.board) return;
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
     const tile = this.board.getTile(rotationInfo);
     const delta = tile ? (tile.rotation - rotationInfo.oldRotation + 360) % 360 : 0;
     sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
@@ -1209,7 +1220,7 @@ export class Game implements InputCallbacks {
     }
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
-    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle);
+    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, undefined, undefined, undefined, lockedWaterImpactBefore);
     this._animMgr.spawnFillAnims(this.board, filledBefore, fillDelay);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
@@ -1553,6 +1564,7 @@ export class Game implements InputCallbacks {
     replacedCol: number,
   ): void {
     if (!this.board) return;
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
@@ -1567,7 +1579,15 @@ export class Game implements InputCallbacks {
 
     // Spawn all animations.
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
-    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol);
+    this._animMgr.spawnDisconnectionAnimations(
+      this.board,
+      filledBefore,
+      sparkle,
+      replacedTile,
+      replacedRow,
+      replacedCol,
+      lockedWaterImpactBefore,
+    );
     this._animMgr.spawnFillAnims(this.board, filledBefore);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
@@ -1811,10 +1831,11 @@ export class Game implements InputCallbacks {
     sfxManager.play(SfxId.Redo);
     this._animMgr.resetIdleTimer();
     const filledBefore = this.board.getFilledPositions();
+    const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts(filledBefore);
     this.board.redoMove();
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
-    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle);
+    this._animMgr.spawnDisconnectionAnimations(this.board, filledBefore, sparkle, undefined, undefined, undefined, lockedWaterImpactBefore);
     this._finalizeHistoryJump();
     this._checkWinLose();
   }
