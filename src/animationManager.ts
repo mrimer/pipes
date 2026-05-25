@@ -229,15 +229,7 @@ export class AnimationManager {
         : board.grid[r]?.[c];
       if (!tile) continue;
       this._pushTileAnimLabels(
-        board,
-        tile,
-        r,
-        c,
-        'disconnect',
-        currentTemp,
-        currentPressure,
-        now,
-        sparkle,
+        board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle,
         lockedWaterImpactBefore?.get(key) ?? null,
       );
     }
