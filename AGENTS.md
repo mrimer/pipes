@@ -46,6 +46,7 @@ npm install
 - Use `npm test -- <jest flags>` to pass extra flags to Jest.
 - Test files live in `tests/` and are plain TypeScript; no separate compilation step is needed before running them.
 - Tests that touch `localStorage` must have `@jest-environment jsdom` at the top of the file.
+- Tests that touch `document`/DOM APIs (modal builders, keyboard events, etc.) must also have `@jest-environment jsdom`.
 - Wait for `npm install` to finish before running lint/build/test commands; running them in parallel with install can fail with missing tool errors.
 
 ---

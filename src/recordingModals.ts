@@ -273,9 +273,14 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   const exportBtn  = makeBtn('Export',  false);
   const importBtn  = makeBtn('Import',  false);
 
-  replayBtn.disabled = true;
-  deleteBtn.disabled = true;
-  exportBtn.disabled = true;
+  const setSelectedRecord = (record: PlaySequenceRecord | null): void => {
+    selectedRecord = record;
+    const hasSelection = selectedRecord !== null;
+    replayBtn.disabled = !hasSelection;
+    deleteBtn.disabled = !hasSelection;
+    exportBtn.disabled = !hasSelection;
+  };
+  setSelectedRecord(null);
 
   actionsEl.appendChild(replayBtn);
   actionsEl.appendChild(returnBtn);
@@ -288,14 +293,26 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   document.body.appendChild(el);
   el.style.display = 'flex';
 
+  const closeModal = (onClose?: () => void): void => {
+    document.removeEventListener('keydown', onEscKey);
+    el.remove();
+    onClose?.();
+  };
+
+  const onEscKey = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || !el.isConnected) return;
+    if (document.body.lastElementChild !== el) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeModal(callbacks.onReturn);
+  };
+  document.addEventListener('keydown', onEscKey);
+
   // ── Helper: render the list ──────────────────────────────────────────────
   function renderList(): void {
     const records = callbacks.getRecords();
     listEl.innerHTML = '';
-    selectedRecord = null;
-    replayBtn.disabled = true;
-    deleteBtn.disabled = true;
-    exportBtn.disabled = true;
+    setSelectedRecord(null);
 
     if (records.length === 0) {
       const emptyMsg = document.createElement('li');
@@ -319,20 +336,24 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
           sib.style.background = '';
         }
         li.style.background = '#1a3a5e';
-        selectedRecord = record;
-        replayBtn.disabled = false;
-        deleteBtn.disabled = false;
-        exportBtn.disabled = false;
+        setSelectedRecord(record);
       });
 
       li.addEventListener('dblclick', () => {
-        el.remove();
-        callbacks.onReplay(record);
+        closeModal(() => callbacks.onReplay(record));
       });
 
       listEl.appendChild(li);
     }
   }
+
+  listContainer.addEventListener('click', (event) => {
+    if (event.target !== listContainer && event.target !== listEl) return;
+    for (const sib of listEl.querySelectorAll<HTMLElement>('li')) {
+      sib.style.background = '';
+    }
+    setSelectedRecord(null);
+  });
 
   renderList();
 
@@ -340,13 +361,11 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   replayBtn.addEventListener('click', () => {
     if (!selectedRecord) return;
     const rec = selectedRecord;
-    el.remove();
-    callbacks.onReplay(rec);
+    closeModal(() => callbacks.onReplay(rec));
   });
 
   returnBtn.addEventListener('click', () => {
-    el.remove();
-    callbacks.onReturn();
+    closeModal(callbacks.onReturn);
   });
 
   deleteBtn.addEventListener('click', () => {
@@ -364,8 +383,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   });
 
   importBtn.addEventListener('click', () => {
-    el.remove();
-    callbacks.onImport();
+    closeModal(callbacks.onImport);
   });
 
   return el;
