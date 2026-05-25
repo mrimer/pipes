@@ -1470,6 +1470,19 @@ export class Board {
   }
 
   /**
+   * Capture locked water impacts for the provided tile keys.
+   * Keys without a locked impact are skipped.
+   */
+  captureLockedWaterImpacts(keys: Iterable<string>): Map<string, number> {
+    const impacts = new Map<string, number>();
+    for (const key of keys) {
+      const impact = this._turnState.lockedWaterImpact.get(key);
+      if (impact !== undefined) impacts.set(key, impact);
+    }
+    return impacts;
+  }
+
+  /**
    * Return the locked frozen water consumed (waterGain) for a hot_plate tile at the given
    * position, or `null` if that tile is not a connected hot_plate.
    * Used by the UI to display the gain/loss breakdown for hot_plate tiles.
