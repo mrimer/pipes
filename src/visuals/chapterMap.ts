@@ -478,8 +478,10 @@ function _drawChapterMapGranite(
   floorType: PipeShape = PipeShape.Empty,
 ): void {
   const CELL = TILE_SIZE;
+  // On map edges, off-grid directions are treated as granite so border tiles seam
+  // closed against the map boundary the same way sea tiles do.
   const _isGranite = (rr: number, cc: number): boolean =>
-    rr >= 0 && rr < rows && cc >= 0 && cc < cols && grid[rr]?.[cc]?.shape === PipeShape.Granite;
+    rr < 0 || rr >= rows || cc < 0 || cc >= cols || grid[rr]?.[cc]?.shape === PipeShape.Granite;
   const neighbors: GraniteNeighbors = {
     north: _isGranite(r - 1, c),
     south: _isGranite(r + 1, c),
