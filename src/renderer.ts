@@ -492,12 +492,12 @@ export interface GraniteNeighbors {
 
 /**
  * Compute granite-tile neighbor data for the tile at (row, col) on the given board.
- * Returns which of the 8 neighbors are granite tiles.  Out-of-bounds positions are
- * treated as non-granite.
+ * Returns which of the 8 neighbors are granite tiles. Out-of-bounds positions are
+ * treated as granite so border tiles seam closed against level boundaries.
  */
 export function computeGraniteNeighbors(board: Board, row: number, col: number): GraniteNeighbors {
   const _isGranite = (r: number, c: number): boolean =>
-    r >= 0 && r < board.rows && c >= 0 && c < board.cols &&
+    r < 0 || r >= board.rows || c < 0 || c >= board.cols ||
     board.grid[r][c].shape === PipeShape.Granite;
   return {
     north: _isGranite(row - 1, col),
