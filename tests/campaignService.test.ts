@@ -408,6 +408,14 @@ describe('CampaignService – addLevel', () => {
     expect(l1.id).not.toBe(l2.id);
   });
 
+  it('inherits chapter style for new levels', () => {
+    const campaign = campaignWithChapter();
+    campaign.chapters[0].style = 'Winter';
+    const svc = makeService([campaign]);
+    const lv = svc.addLevel(campaign, 0, 'Styled');
+    expect(lv.style).toBe('Winter');
+  });
+
   it('throws for an invalid chapter index', () => {
     const campaign = emptyCampaign();
     const svc = makeService([campaign]);
