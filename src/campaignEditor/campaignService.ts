@@ -152,9 +152,11 @@ export class CampaignService {
 
   private _remapLevelRefsOnInsert(chapter: ChapterDef, insertIdx: number): void {
     if (!chapter.grid) return;
-    for (const row of chapter.grid) {
-      for (const tile of row) {
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined && tile.levelIdx >= insertIdx) {
+    for (const mapRow of chapter.grid) {
+      for (let col = 0; col < mapRow.length; col++) {
+        const tile = mapRow[col];
+        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
+        if (tile.levelIdx >= insertIdx) {
           tile.levelIdx += 1;
         }
       }
