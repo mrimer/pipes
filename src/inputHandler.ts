@@ -641,7 +641,8 @@ export class InputHandler {
     }
     if (e.key === 'Shift' && !this.shiftHeld) {
       this.shiftHeld = true;
-      if (this._cb.getScreen() === GameScreen.Play && this._cb.getGameState() === GameState.Playing) {
+      if (this._cb.getScreen() === GameScreen.Play && this._cb.getGameState() === GameState.Playing &&
+          !commandKeyManager.isShiftUsedAsModifier()) {
         this._cb.selectNextAvailableInventory();
       }
     }

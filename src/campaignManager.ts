@@ -202,6 +202,9 @@ export class CampaignManager {
   deactivate(): void {
     this._activeCampaign = null;
     this._activeCampaignProgress = new Set();
+    this._activeCampaignCompletedChapters = new Set();
+    this._activeCampaignMasteredChaptersShown = new Set();
+    this._campaignMasteredShown = false;
     this._campaignCompleteShown = false;
     clearActiveCampaignId();
     this._callbacks.showLevelSelect();
@@ -628,6 +631,11 @@ export class CampaignManager {
    * Called when the player chooses to play the challenge level (or by the
    * auto-dismiss timer after the modal fades out).
    * Dismisses the challenge modal and starts the pending level.
+   *
+   * Safe against concurrent calls: `_cancelChallengeAutoPlay()` cancels any
+   * pending timers, and the `_pendingLevelId === null` guard ensures
+   * `startLevel` is invoked at most once even if this is called from both a
+   * button click and the close timer in quick succession.
    */
   playChallengeLevel(): void {
     this._cancelChallengeAutoPlay();
