@@ -114,7 +114,7 @@ export class ChapterMapInput {
       if (this._suppressContextMenu) { this._suppressContextMenu = false; return; }
       this._onRightClick(e, campaign, chapter);
     };
-    this._mouseLeaveHandler = () => this._onMouseLeave(chapter);
+    this._mouseLeaveHandler = () => this._onMouseLeave(chapter, campaign);
     this._wheelHandler = (e: WheelEvent) => this._onWheel(e, campaign, chapter);
 
     canvas.addEventListener('mousedown', this._mouseDownHandler);
@@ -413,16 +413,18 @@ export class ChapterMapInput {
     this._cb.openLevelEditor(tile.levelIdx, readOnly);
   }
 
-  private _onMouseLeave(chapter: ChapterDef): void {
+  private _onMouseLeave(chapter: ChapterDef, campaign: CampaignDef): void {
     this._hover = null;
     if (this._dragState) this._dragState = null;
     if (this._paintDragActive) {
       this._paintDragActive = false;
       this._cb.recordSnapshot(chapter);
+      this._cb.saveGridState(chapter, campaign);
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
       this._cb.recordSnapshot(chapter);
+      this._cb.saveGridState(chapter, campaign);
     }
     this._cb.renderCanvas();
   }

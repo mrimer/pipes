@@ -330,6 +330,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
       setChapterStyle: (style: LevelStyle, ch: ChapterDef) => {
         ch.style = style;
         this._recordSnapshot();
+        this._saveGrid();
         this._renderCanvas();
       },
       recordSnapshot: (...args) => this._recordSnapshot(args[1] as boolean | undefined),
