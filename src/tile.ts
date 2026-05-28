@@ -272,17 +272,26 @@ export function isTileConnectedToSource(
   }
   if (!sourcePos) return false;
 
+  /**
+   * Return the open connection set for a TileDef, honouring the optional
+   * `connections` override field before falling back to rotation-based lookup.
+   */
+  function getTileDefConnections(tile: TileDef): ConnectionSet {
+    if (tile.connections && tile.connections.length > 0) return new Set(tile.connections);
+    return getConnections(tile.shape, (tile.rotation ?? 0) as Rotation);
+  }
+
   const reached = bfs(sourcePos, (current) => {
     const currentTile = grid[current.row]?.[current.col];
     if (!currentTile) return [];
-    const currentConns = getConnections(currentTile.shape, (currentTile.rotation ?? 0) as Rotation);
+    const currentConns = getTileDefConnections(currentTile);
     const neighbors: Array<{ row: number; col: number }> = [];
     for (const dir of currentConns) {
       const delta = DIRECTION_DELTA[dir];
       const next = { row: current.row + delta.row, col: current.col + delta.col };
       const nextTile = grid[next.row]?.[next.col];
       if (!nextTile) continue;
-      const nextConns = getConnections(nextTile.shape, (nextTile.rotation ?? 0) as Rotation);
+      const nextConns = getTileDefConnections(nextTile);
       if (!nextConns.has(oppositeDirection(dir))) continue;
       // Valve check: only enter a chamber via a first-connection direction.
       if (nextTile.firstConnections && nextTile.firstConnections.length > 0) {

@@ -210,6 +210,11 @@ export class CommandKeyManager {
     this._bindings = this.getDefaultBindings();
     clearCommandKeyAssignments();
   }
+
+  /** Returns true if any command binding currently uses Shift as a modifier key. */
+  isShiftUsedAsModifier(): boolean {
+    return Object.values(this._bindings).some(b => b.shift);
+  }
 }
 
 export const commandKeyManager = new CommandKeyManager();

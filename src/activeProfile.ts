@@ -55,7 +55,9 @@ export function getActiveSlotPrefix(): string {
 export function withSlot<T>(n: number | null, fn: () => T): T {
   const prev = _activeSlotIndex;
   _activeSlotIndex = n;
-  const result = fn();
-  _activeSlotIndex = prev;
-  return result;
+  try {
+    return fn();
+  } finally {
+    _activeSlotIndex = prev;
+  }
 }
