@@ -101,6 +101,83 @@ export class CampaignService {
     return grid.every((row) => Array.isArray(row) && row.length === cols);
   }
 
+  private _remapChapterRefsOnCampaignDelete(campaign: CampaignDef, deletedChapterIdx: number): void {
+    if (!campaign.grid) return;
+    for (let row = 0; row < campaign.grid.length; row++) {
+      const mapRow = campaign.grid[row];
+      for (let col = 0; col < mapRow.length; col++) {
+        const tile = mapRow[col];
+        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'chapter' || tile.chapterIdx === undefined) continue;
+        if (tile.chapterIdx === deletedChapterIdx) {
+          mapRow[col] = null;
+        } else if (tile.chapterIdx > deletedChapterIdx) {
+          tile.chapterIdx -= 1;
+        }
+      }
+    }
+  }
+
+  private _remapChapterRefsOnCampaignReorder(campaign: CampaignDef, fromIdx: number, toIdx: number): void {
+    if (!campaign.grid) return;
+    for (const row of campaign.grid) {
+      for (const tile of row) {
+        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'chapter' || tile.chapterIdx === undefined) continue;
+        const i = tile.chapterIdx;
+        if (i === fromIdx) {
+          tile.chapterIdx = toIdx;
+        } else if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
+          tile.chapterIdx = i - 1;
+        } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
+          tile.chapterIdx = i + 1;
+        }
+      }
+    }
+  }
+
+  private _remapLevelRefsOnDelete(chapter: ChapterDef, deletedLevelIdx: number): void {
+    if (!chapter.grid) return;
+    for (let row = 0; row < chapter.grid.length; row++) {
+      const mapRow = chapter.grid[row];
+      for (let col = 0; col < mapRow.length; col++) {
+        const tile = mapRow[col];
+        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
+        if (tile.levelIdx === deletedLevelIdx) {
+          mapRow[col] = null;
+        } else if (tile.levelIdx > deletedLevelIdx) {
+          tile.levelIdx -= 1;
+        }
+      }
+    }
+  }
+
+  private _remapLevelRefsOnInsert(chapter: ChapterDef, insertIdx: number): void {
+    if (!chapter.grid) return;
+    for (const row of chapter.grid) {
+      for (const tile of row) {
+        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined && tile.levelIdx >= insertIdx) {
+          tile.levelIdx += 1;
+        }
+      }
+    }
+  }
+
+  private _remapLevelRefsOnReorder(chapter: ChapterDef, fromIdx: number, toIdx: number): void {
+    if (!chapter.grid) return;
+    for (const row of chapter.grid) {
+      for (const tile of row) {
+        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
+        const i = tile.levelIdx;
+        if (i === fromIdx) {
+          tile.levelIdx = toIdx;
+        } else if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
+          tile.levelIdx = i - 1;
+        } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
+          tile.levelIdx = i + 1;
+        }
+      }
+    }
+  }
+
   /** Ensure every campaign has at least a default empty campaign map. */
   ensureCampaignMaps(): boolean {
     let changed = false;
@@ -210,6 +287,7 @@ export class CampaignService {
   /** Remove a chapter (and all its levels) from a campaign and persist. */
   deleteChapter(campaign: CampaignDef, chapterIdx: number): void {
     campaign.chapters.splice(chapterIdx, 1);
+    this._remapChapterRefsOnCampaignDelete(campaign, chapterIdx);
     this.touch(campaign);
     this.save();
   }
@@ -235,6 +313,7 @@ export class CampaignService {
     ) return;
     const [moved] = chapters.splice(fromIdx, 1);
     chapters.splice(toIdx, 0, moved);
+    this._remapChapterRefsOnCampaignReorder(campaign, fromIdx, toIdx);
     this.touch(campaign);
     this.save();
   }
@@ -266,6 +345,7 @@ export class CampaignService {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
     chapter.levels.splice(levelIdx, 1);
+    this._remapLevelRefsOnDelete(chapter, levelIdx);
     this.touch(campaign);
     this.save();
   }
@@ -308,6 +388,12 @@ export class CampaignService {
     const [movedLevel] = srcChapter.levels.splice(fromLevel, 1);
     if (movedLevel === undefined) return;
     const insertIdx = Math.min(toLevel, dstChapter.levels.length);
+    if (srcChapter === dstChapter) {
+      this._remapLevelRefsOnReorder(srcChapter, fromLevel, insertIdx);
+    } else {
+      this._remapLevelRefsOnDelete(srcChapter, fromLevel);
+      this._remapLevelRefsOnInsert(dstChapter, insertIdx);
+    }
     dstChapter.levels.splice(insertIdx, 0, movedLevel);
     this.touch(campaign);
     this.save();
@@ -355,22 +441,7 @@ export class CampaignService {
     ) return;
     const [moved] = levels.splice(fromIdx, 1);
     levels.splice(toIdx, 0, moved);
-    if (chapter.grid) {
-      for (const row of chapter.grid) {
-        for (const tile of row) {
-          if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined) {
-            const i = tile.levelIdx;
-            if (i === fromIdx) {
-              tile.levelIdx = toIdx;
-            } else if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
-              tile.levelIdx = i - 1;
-            } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
-              tile.levelIdx = i + 1;
-            }
-          }
-        }
-      }
-    }
+    this._remapLevelRefsOnReorder(chapter, fromIdx, toIdx);
     this.touch(campaign);
     this.save();
   }
