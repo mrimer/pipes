@@ -143,14 +143,19 @@ export class TooltipManager {
     } else if (content === 'hot_plate') {
       const currentTemp = board.getCurrentTemperature();
       const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+      const waterGain = Math.min(board.frozen, effectiveCost);
+      const waterLoss = Math.max(0, effectiveCost - waterGain);
       tooltipText += `\n${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
-      predictedCost = effectiveCost;
+      tooltipText += ` (+${waterGain} -${waterLoss})`;
+      predictedCost = waterLoss - waterGain;
     } else {
       predictedCost = 0;
     }
 
     if (predictedCost !== null && predictedCost !== 0) {
-      tooltipText += ` cost: ${predictedCost}`;
+      tooltipText += predictedCost > 0
+        ? ` cost: ${predictedCost}`
+        : ` gain: ${Math.abs(predictedCost)}`;
     }
     return tooltipText;
   }

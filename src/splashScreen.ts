@@ -167,16 +167,15 @@ export function showSplashScreen(): Promise<void> {
         ctx.globalAlpha = alpha;
 
         const scaleY = logoH / LOGO_INTRINSIC_H;
-        // Precompute dest strip height once; add 1px overlap to avoid hairline gaps between strips.
-        const destStripH = Math.ceil(STRIP_HEIGHT * scaleY) + 1;
 
         // Draw the logo in thin horizontal strips, each horizontally displaced
         // by a sine function of its vertical position (spatial wave) plus the
         // advancing temporal phase so the wave appears to oscillate.
-        for (let destY = 0; destY < logoH; destY += STRIP_HEIGHT) {
-          const srcY = destY / scaleY;
-          const srcH = Math.min(STRIP_HEIGHT / scaleY, LOGO_INTRINSIC_H - srcY);
-          if (srcH <= 0) break;
+        for (let srcY = 0; srcY < LOGO_INTRINSIC_H; srcY += STRIP_HEIGHT) {
+          const srcH = Math.min(STRIP_HEIGHT, LOGO_INTRINSIC_H - srcY);
+          const destY = Math.floor(srcY * scaleY);
+          // Add a 1px overlap to avoid hairline gaps between strips.
+          const destStripH = Math.ceil(srcH * scaleY) + 1;
 
           const xOff = amplitude * Math.sin(SPATIAL_FREQ * destY + temporalPhase);
 

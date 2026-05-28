@@ -14,6 +14,8 @@ import type { CampaignImportOutcome } from './playerProfile';
  * no circular imports.
  */
 
+let settingsEscListenerCleanup: (() => void) | null = null;
+
 // ─── Low-level helpers ────────────────────────────────────────────────────────
 
 /**
@@ -554,8 +556,12 @@ export function buildSettingsModal(
   // ── Esc closes modal without saving ─────────────────────────────────────
   // Attach to document so Esc is caught regardless of which element has focus,
   // but only when the modal is visible and no key-capture is in progress.
-  // The modal element is never removed from the DOM (it is reused across
-  // openings), so this listener remains valid for the lifetime of the page.
+  // Ensure at most one settings Esc listener exists to avoid stacking listeners
+  // when the game instance (and modal tree) is rebuilt.
+  if (settingsEscListenerCleanup) {
+    settingsEscListenerCleanup();
+    settingsEscListenerCleanup = null;
+  }
   const onEscKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || el.style.display === 'none') return;
     // When capturing a command key, Esc cancels capture mode (handled by the
@@ -566,6 +572,9 @@ export function buildSettingsModal(
     if (onCancel) onCancel(el);
   };
   document.addEventListener('keydown', onEscKey);
+  settingsEscListenerCleanup = () => {
+    document.removeEventListener('keydown', onEscKey);
+  };
 
   el.appendChild(box);
   document.body.appendChild(el);
