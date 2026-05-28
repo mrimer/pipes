@@ -254,6 +254,7 @@ function _makeLevelRecordStore(
 
 const _starsStore = _makeLevelRecordStore(
   (campaignId?) => campaignId ? `pipes_${p()}campaign_stars_${campaignId}` : `pipes_${p()}level_stars`,
+  (newVal, existing) => newVal > existing,
 );
 
 /** Load the map of level IDs → stars collected from localStorage. */

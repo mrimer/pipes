@@ -796,8 +796,8 @@ export abstract class MapScreenBase {
       tileSize = Math.max(minTile, Math.min(maxTileByScale, requestedTile));
       tileSize = Math.max(1, Math.round(tileSize));
       this._campaignZoomScale = tileSize / defaultTileSize;
-      viewRows = Math.min(rows, this._campaignViewportHeightPx / tileSize);
-      viewCols = Math.min(cols, this._campaignViewportWidthPx / tileSize);
+      viewRows = Math.max(1, Math.ceil(Math.min(rows, this._campaignViewportHeightPx / tileSize)));
+      viewCols = Math.max(1, Math.ceil(Math.min(cols, this._campaignViewportWidthPx / tileSize)));
     } else {
       this._campaignDefaultTileSize = 0;
       this._campaignViewportWidthPx = 0;
@@ -2001,6 +2001,10 @@ export abstract class MapScreenBase {
         sideFlowers.splice(i, 1);
         return;
       }
+    }
+    const fallbackIdx = sideFlowers.indexOf(flower);
+    if (fallbackIdx >= 0) {
+      sideFlowers.splice(fallbackIdx, 1);
     }
   }
 

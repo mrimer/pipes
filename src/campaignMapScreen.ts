@@ -193,14 +193,21 @@ export class CampaignMapScreen {
 
   private _buildPseudoChapter(campaign: CampaignDef): ChapterDef {
     const completedLevels = this._callbacks.getCompletedLevels();
+    const usedPseudoLevelIds = new Set<number>();
     const levels: LevelDef[] = campaign.chapters.map((chapter, chapterIdx) => {
       const rows = chapter.rows ?? 1;
       const cols = chapter.cols ?? 1;
       const grid = chapter.grid ?? [[{ shape: PipeShape.Empty } as TileDef]];
       const totalStars = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
       const hasUncompletedChallenge = chapterHasUncompletedChallenge(chapter, completedLevels);
+      let pseudoLevelId = chapter.id;
+      if (usedPseudoLevelIds.has(pseudoLevelId)) {
+        pseudoLevelId = -1000 - chapterIdx;
+        while (usedPseudoLevelIds.has(pseudoLevelId)) pseudoLevelId--;
+      }
+      usedPseudoLevelIds.add(pseudoLevelId);
       return {
-        id: chapter.id ?? (-1000 - chapterIdx),
+        id: pseudoLevelId,
         name: chapter.name,
         rows,
         cols,

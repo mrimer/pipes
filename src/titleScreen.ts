@@ -450,7 +450,11 @@ export function showIntroTitleScreen(): Promise<void> {
     };
 
     const renderFrame = () => {
-      draw(performance.now());
+      if (cleaned) return;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+      rafId = requestAnimationFrame(draw);
     };
 
     window.addEventListener('resize', renderFrame);

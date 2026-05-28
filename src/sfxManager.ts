@@ -440,16 +440,22 @@ export class SfxManager {
     } else if (typeof Audio !== 'undefined') {
       const audio = new Audio(url);
       audio.volume = this._volume;
-      audio.addEventListener('ended', () => onDone(), { once: true });
-      audio.addEventListener('error', () => onDone(), { once: true });
+      let doneCalled = false;
+      const doneOnce = () => {
+        if (doneCalled) return;
+        doneCalled = true;
+        onDone();
+      };
+      audio.addEventListener('ended', doneOnce, { once: true });
+      audio.addEventListener('error', doneOnce, { once: true });
       try {
         const playResult = audio.play();
         if (playResult !== undefined) {
-          playResult.catch((err) => { this._warn('HTMLAudio play failed', err); onDone(); });
+          playResult.catch((err) => { this._warn('HTMLAudio play failed', err); doneOnce(); });
         }
       } catch (err) {
         this._warn('HTMLAudio play threw synchronously', err);
-        onDone();
+        doneOnce();
       }
     } else {
       onDone();
