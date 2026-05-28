@@ -56,6 +56,18 @@ export class EditorInputHandler {
   private _rightEraseDragActive = false;
   private _suppressNextContextMenu = false;
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
+  private readonly _mouseDownHandler = (e: MouseEvent) => this.onMouseDown(e);
+  private readonly _mouseMoveHandler = (e: MouseEvent) => this.onMouseMove(e);
+  private readonly _contextMenuHandler = (e: MouseEvent) => {
+    e.preventDefault();
+    if (this._suppressNextContextMenu) {
+      this._suppressNextContextMenu = false;
+      return;
+    }
+    this.onRightClick(e);
+  };
+  private readonly _mouseLeaveHandler = () => this.onMouseLeave();
+  private readonly _wheelHandler = (e: WheelEvent) => this.onWheel(e);
 
   constructor(
     private readonly _canvas: HTMLCanvasElement,
@@ -86,18 +98,17 @@ export class EditorInputHandler {
 
   /** Register all canvas and window event listeners. */
   attach(): void {
-    this._canvas.addEventListener('mousedown',   (e) => this.onMouseDown(e));
-    this._canvas.addEventListener('mousemove',   (e) => this.onMouseMove(e));
-    this._canvas.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      if (this._suppressNextContextMenu) {
-        this._suppressNextContextMenu = false;
-        return;
-      }
-      this.onRightClick(e);
-    });
-    this._canvas.addEventListener('mouseleave',  () => this.onMouseLeave());
-    this._canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+    this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
+    this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
+    this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+    this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
+    this._canvas.removeEventListener('wheel', this._wheelHandler);
+
+    this._canvas.addEventListener('mousedown', this._mouseDownHandler);
+    this._canvas.addEventListener('mousemove', this._mouseMoveHandler);
+    this._canvas.addEventListener('contextmenu', this._contextMenuHandler);
+    this._canvas.addEventListener('mouseleave', this._mouseLeaveHandler);
+    this._canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
 
     // Listen on window so mouseup is captured even when released outside the canvas.
     // Remove any previous handler first to avoid duplicates.
@@ -108,8 +119,13 @@ export class EditorInputHandler {
     window.addEventListener('mouseup', this._windowMouseUpHandler);
   }
 
-  /** Remove the window mouseup listener. Call when leaving the level editor. */
+  /** Remove all listeners. Call when leaving the level editor. */
   detach(): void {
+    this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
+    this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
+    this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+    this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
+    this._canvas.removeEventListener('wheel', this._wheelHandler);
     if (this._windowMouseUpHandler) {
       window.removeEventListener('mouseup', this._windowMouseUpHandler);
       this._windowMouseUpHandler = null;

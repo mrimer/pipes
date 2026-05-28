@@ -104,6 +104,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
   private _rightEraseDragActive = false;
   private _suppressContextMenu = false;
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
+  private _mouseDownHandler: ((e: MouseEvent) => void) | null = null;
+  private _mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private _dblClickHandler: ((e: MouseEvent) => void) | null = null;
+  private _contextMenuHandler: ((e: MouseEvent) => void) | null = null;
+  private _mouseLeaveHandler: (() => void) | null = null;
+  private _wheelHandler: ((e: WheelEvent) => void) | null = null;
 
   // ── Viewport / pan state (for oversized maps > MAP_VIEW_MAX_COLS × MAP_VIEW_MAX_ROWS) ──
   /** Horizontal pixel scroll offset in canvas-pixels. */
@@ -851,16 +857,26 @@ export class CampaignMapEditorSection extends MapEditorBase {
   // ── Private: mouse input ───────────────────────────────────────────────────
 
   private _attachInput(canvas: HTMLCanvasElement, campaign: CampaignDef): void {
-    canvas.addEventListener('mousedown',   (e) => this._onMouseDown(e, campaign));
-    canvas.addEventListener('mousemove',   (e) => this._onMouseMove(e));
-    canvas.addEventListener('dblclick',    (e) => this._onDblClick(e));
-    canvas.addEventListener('contextmenu', (e) => {
+    this._detachInput();
+    this._canvas = canvas;
+
+    this._mouseDownHandler = (e: MouseEvent) => this._onMouseDown(e, campaign);
+    this._mouseMoveHandler = (e: MouseEvent) => this._onMouseMove(e);
+    this._dblClickHandler = (e: MouseEvent) => this._onDblClick(e);
+    this._contextMenuHandler = (e: MouseEvent) => {
       e.preventDefault();
       if (this._suppressContextMenu) { this._suppressContextMenu = false; return; }
       this._onRightClick(e, campaign);
-    });
-    canvas.addEventListener('mouseleave',  () => this._onMouseLeave());
-    canvas.addEventListener('wheel',       (e) => this._onWheel(e), { passive: false });
+    };
+    this._mouseLeaveHandler = () => this._onMouseLeave();
+    this._wheelHandler = (e: WheelEvent) => this._onWheel(e);
+
+    canvas.addEventListener('mousedown', this._mouseDownHandler);
+    canvas.addEventListener('mousemove', this._mouseMoveHandler);
+    canvas.addEventListener('dblclick', this._dblClickHandler);
+    canvas.addEventListener('contextmenu', this._contextMenuHandler);
+    canvas.addEventListener('mouseleave', this._mouseLeaveHandler);
+    canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
 
     if (this._windowMouseUpHandler) window.removeEventListener('mouseup', this._windowMouseUpHandler);
     this._windowMouseUpHandler = (e: MouseEvent) => this._onMouseUp(e, campaign);
@@ -868,6 +884,20 @@ export class CampaignMapEditorSection extends MapEditorBase {
   }
 
   private _detachInput(): void {
+    if (this._canvas) {
+      if (this._mouseDownHandler) this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
+      if (this._mouseMoveHandler) this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
+      if (this._dblClickHandler) this._canvas.removeEventListener('dblclick', this._dblClickHandler);
+      if (this._contextMenuHandler) this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+      if (this._mouseLeaveHandler) this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
+      if (this._wheelHandler) this._canvas.removeEventListener('wheel', this._wheelHandler);
+    }
+    this._mouseDownHandler = null;
+    this._mouseMoveHandler = null;
+    this._dblClickHandler = null;
+    this._contextMenuHandler = null;
+    this._mouseLeaveHandler = null;
+    this._wheelHandler = null;
     if (this._windowMouseUpHandler) {
       window.removeEventListener('mouseup', this._windowMouseUpHandler);
       this._windowMouseUpHandler = null;
