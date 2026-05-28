@@ -424,6 +424,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
         if (campaign.style !== style) {
           campaign.style = style;
           this._recordSnapshot();
+          this._saveGrid();
           this._renderCanvas();
         }
         document.getElementById('campaign-map-style-panel')?.replaceWith(this._buildStylePanel(campaign));
@@ -1229,10 +1230,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (this._paintDragActive) {
       this._paintDragActive = false;
       this._recordSnapshot();
+      this._saveGrid();
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
       this._recordSnapshot();
+      this._saveGrid();
     }
     this._renderCanvas();
   }

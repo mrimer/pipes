@@ -226,6 +226,7 @@ export abstract class MapEditorBase {
   protected _slideGrid(dir: 'N' | 'E' | 'S' | 'W'): void {
     this._gridState.slide(dir);
     this._recordSnapshot();
+    this._saveGrid();
     sfxManager.play(SfxId.BoardSlide);
     this._renderCanvas();
   }
@@ -233,6 +234,7 @@ export abstract class MapEditorBase {
   protected _rotateGrid(clockwise: boolean): void {
     this._gridState.rotate(clockwise);
     this._recordSnapshot();
+    this._saveGrid();
     sfxManager.play(SfxId.BoardSlide);
     this._updateCanvasDisplaySize();
     this._renderCanvas();
@@ -241,6 +243,7 @@ export abstract class MapEditorBase {
   protected _reflectGrid(): void {
     this._gridState.reflect();
     this._recordSnapshot();
+    this._saveGrid();
     sfxManager.play(SfxId.BoardSlide);
     this._updateCanvasDisplaySize();
     this._renderCanvas();
@@ -249,6 +252,7 @@ export abstract class MapEditorBase {
   protected _flipGridHorizontal(): void {
     this._gridState.flipHorizontal();
     this._recordSnapshot();
+    this._saveGrid();
     sfxManager.play(SfxId.BoardSlide);
     this._renderCanvas();
   }
@@ -256,6 +260,7 @@ export abstract class MapEditorBase {
   protected _flipGridVertical(): void {
     this._gridState.flipVertical();
     this._recordSnapshot();
+    this._saveGrid();
     sfxManager.play(SfxId.BoardSlide);
     this._renderCanvas();
   }
