@@ -103,13 +103,11 @@ export class CampaignService {
 
   private _remapChapterRefsOnCampaignDelete(campaign: CampaignDef, deletedChapterIdx: number): void {
     if (!campaign.grid) return;
-    for (let row = 0; row < campaign.grid.length; row++) {
-      const mapRow = campaign.grid[row];
-      for (let col = 0; col < mapRow.length; col++) {
-        const tile = mapRow[col];
+    for (const row of campaign.grid) {
+      for (const [col, tile] of row.entries()) {
         if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'chapter' || tile.chapterIdx === undefined) continue;
         if (tile.chapterIdx === deletedChapterIdx) {
-          mapRow[col] = null;
+          row[col] = null;
         } else if (tile.chapterIdx > deletedChapterIdx) {
           tile.chapterIdx -= 1;
         }
@@ -136,13 +134,11 @@ export class CampaignService {
 
   private _remapLevelRefsOnDelete(chapter: ChapterDef, deletedLevelIdx: number): void {
     if (!chapter.grid) return;
-    for (let row = 0; row < chapter.grid.length; row++) {
-      const mapRow = chapter.grid[row];
-      for (let col = 0; col < mapRow.length; col++) {
-        const tile = mapRow[col];
+    for (const row of chapter.grid) {
+      for (const [col, tile] of row.entries()) {
         if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
         if (tile.levelIdx === deletedLevelIdx) {
-          mapRow[col] = null;
+          row[col] = null;
         } else if (tile.levelIdx > deletedLevelIdx) {
           tile.levelIdx -= 1;
         }
@@ -152,9 +148,8 @@ export class CampaignService {
 
   private _remapLevelRefsOnInsert(chapter: ChapterDef, insertIdx: number): void {
     if (!chapter.grid) return;
-    for (const mapRow of chapter.grid) {
-      for (let col = 0; col < mapRow.length; col++) {
-        const tile = mapRow[col];
+    for (const row of chapter.grid) {
+      for (const tile of row) {
         if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
         if (tile.levelIdx >= insertIdx) {
           tile.levelIdx += 1;
