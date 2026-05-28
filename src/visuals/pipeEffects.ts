@@ -191,15 +191,17 @@ export function computeFillOrder(
       const next = { row: cur.row + delta.row, col: cur.col + delta.col };
       const nextKey = posKey(next.row, next.col);
       if (bfsVisited.has(nextKey)) continue;
-      bfsVisited.add(nextKey);
 
       // Valve check: only enter a Chamber tile via one of its first-connection
-      // directions (mirrors the guard in Board.getFilledPositions).
+      // directions (matches the guard in Board.getFilledPositions).
+      // Must be done BEFORE marking visited so a chamber first reached via an
+      // invalid direction can still be entered later via a valid direction.
       const nextTile = board.grid[next.row]?.[next.col];
       if (nextTile?.firstConnections && nextTile.firstConnections.size > 0) {
         const arrivalDir = oppositeDirection(dir);
         if (!nextTile.firstConnections.has(arrivalDir)) continue;
       }
+      bfsVisited.add(nextKey);
 
       const nextIsNew = !filledBefore.has(nextKey);
       // animDepth for the next tile:
