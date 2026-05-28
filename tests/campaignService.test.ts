@@ -329,6 +329,32 @@ describe('CampaignService – deleteChapter', () => {
     svc.deleteChapter(campaign, 0);
     expect(loadImportedCampaigns()[0].chapters).toHaveLength(0);
   });
+
+  it('removes/remaps campaign.grid chapterIdx chamber references', () => {
+    const chapterTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'chapter',
+      chapterIdx: idx,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [
+        makeChapterDef({ id: 1, name: 'A', levels: [] }),
+        makeChapterDef({ id: 2, name: 'B', levels: [] }),
+        makeChapterDef({ id: 3, name: 'C', levels: [] }),
+      ],
+      rows: 1,
+      cols: 3,
+      grid: [[chapterTile(0), chapterTile(1), chapterTile(2)]],
+    };
+    const svc = makeService([campaign]);
+    svc.deleteChapter(campaign, 1);
+    const grid = campaign.grid!;
+    expect(grid[0][0]).not.toBeNull();
+    expect(grid[0][1]).toBeNull();
+    expect((grid[0][2] as TileDef).chapterIdx).toBe(1);
+  });
 });
 
 // ─── renameChapter ────────────────────────────────────────────────────────────
@@ -377,6 +403,32 @@ describe('CampaignService – reorderChapters', () => {
     const svc = makeService([campaign]);
     expect(() => svc.reorderChapters(campaign, 0, 5)).not.toThrow();
     expect(campaign.chapters[0].name).toBe('A');
+  });
+
+  it('remaps campaign.grid chapterIdx references after reorder', () => {
+    const chapterTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'chapter',
+      chapterIdx: idx,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [
+        makeChapterDef({ id: 1, name: 'A', levels: [] }),
+        makeChapterDef({ id: 2, name: 'B', levels: [] }),
+        makeChapterDef({ id: 3, name: 'C', levels: [] }),
+      ],
+      rows: 1,
+      cols: 3,
+      grid: [[chapterTile(0), chapterTile(1), chapterTile(2)]],
+    };
+    const svc = makeService([campaign]);
+    svc.reorderChapters(campaign, 0, 2); // [B, C, A]
+    const grid = campaign.grid!;
+    expect((grid[0][0] as TileDef).chapterIdx).toBe(2);
+    expect((grid[0][1] as TileDef).chapterIdx).toBe(0);
+    expect((grid[0][2] as TileDef).chapterIdx).toBe(1);
   });
 });
 
@@ -439,6 +491,34 @@ describe('CampaignService – deleteLevel', () => {
     svc.deleteLevel(campaign, 0, 0);
     expect(loadImportedCampaigns()[0].chapters[0].levels).toHaveLength(0);
   });
+
+  it('removes/remaps chapter.grid levelIdx chamber references', () => {
+    const levelTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'level',
+      levelIdx: idx,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [makeChapterDef({
+        id: 1,
+        name: 'A',
+        levels: [
+          makeLevelDef({ id: 10, name: 'L1', rows: 1, cols: 1, grid: [[null]] }),
+          makeLevelDef({ id: 11, name: 'L2', rows: 1, cols: 1, grid: [[null]] }),
+          makeLevelDef({ id: 12, name: 'L3', rows: 1, cols: 1, grid: [[null]] }),
+        ],
+        grid: [[levelTile(0), levelTile(1), levelTile(2)]],
+      })],
+    };
+    const svc = makeService([campaign]);
+    svc.deleteLevel(campaign, 0, 1);
+    const grid = campaign.chapters[0].grid!;
+    expect(grid[0][0]).not.toBeNull();
+    expect(grid[0][1]).toBeNull();
+    expect((grid[0][2] as TileDef).levelIdx).toBe(1);
+  });
 });
 
 // ─── duplicateLevel ───────────────────────────────────────────────────────────
@@ -490,6 +570,47 @@ describe('CampaignService – moveLevel', () => {
     const campaign = campaignWithChapter();
     const svc = makeService([campaign]);
     expect(() => svc.moveLevel(campaign, 0, 0, 99, 0)).not.toThrow();
+  });
+
+  it('removes/remaps source map refs and remaps destination refs on cross-chapter move', () => {
+    const levelTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      rotation: 0,
+      chamberContent: 'level',
+      levelIdx: idx,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [
+        makeChapterDef({
+          id: 1,
+          name: 'A',
+          levels: [
+            makeLevelDef({ id: 10, name: 'L1', rows: 1, cols: 1, grid: [[null]] }),
+            makeLevelDef({ id: 11, name: 'L2', rows: 1, cols: 1, grid: [[null]] }),
+            makeLevelDef({ id: 12, name: 'L3', rows: 1, cols: 1, grid: [[null]] }),
+          ],
+          grid: [[levelTile(0), levelTile(1), levelTile(2)]],
+        }),
+        makeChapterDef({
+          id: 2,
+          name: 'B',
+          levels: [
+            makeLevelDef({ id: 20, name: 'M1', rows: 1, cols: 1, grid: [[null]] }),
+            makeLevelDef({ id: 21, name: 'M2', rows: 1, cols: 1, grid: [[null]] }),
+          ],
+          grid: [[levelTile(0), levelTile(1)]],
+        }),
+      ],
+    };
+    const svc = makeService([campaign]);
+    svc.moveLevel(campaign, 0, 1, 1, 1);
+    const srcGrid = campaign.chapters[0].grid!;
+    const dstGrid = campaign.chapters[1].grid!;
+    expect(srcGrid[0][1]).toBeNull();
+    expect((srcGrid[0][2] as TileDef).levelIdx).toBe(1);
+    expect((dstGrid[0][0] as TileDef).levelIdx).toBe(0);
+    expect((dstGrid[0][1] as TileDef).levelIdx).toBe(2);
   });
 });
 
