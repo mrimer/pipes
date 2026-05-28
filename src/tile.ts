@@ -273,7 +273,7 @@ export function isTileConnectedToSource(
   if (!sourcePos) return false;
 
   /**
-   * Return the open connection set for a TileDef, honouring the optional
+   * Return the open connection set for a TileDef, honoring the optional
    * `connections` override field before falling back to rotation-based lookup.
    */
   function getTileDefConnections(tile: TileDef): ConnectionSet {
