@@ -47,6 +47,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
   private _ui: ChapterEditorUI | null = null;
   private _input: ChapterMapInput | null = null;
   private _seaAnimationFrameId: number | null = null;
+  private _seaAnimationLoopToken = 0;
 
   // ── State fields ──────────────────────────────────────────────────────────
   private _chapterSelectedLevelIdx: number | null = null;
@@ -108,11 +109,13 @@ export class ChapterMapEditorSection extends MapEditorBase {
   /** Start continuously refreshing the chapter-map canvas (for animated sea tiles). */
   startSeaAnimationLoop(): void {
     if (this._seaAnimationFrameId !== null) return;
-    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+    const token = ++this._seaAnimationLoopToken;
+    this._seaAnimationFrameId = requestAnimationFrame(() => this._seaAnimationTick(token));
   }
 
   /** Stop continuously refreshing the chapter-map canvas. */
   stopSeaAnimationLoop(): void {
+    this._seaAnimationLoopToken++;
     if (this._seaAnimationFrameId === null) return;
     cancelAnimationFrame(this._seaAnimationFrameId);
     this._seaAnimationFrameId = null;
@@ -484,12 +487,12 @@ export class ChapterMapEditorSection extends MapEditorBase {
   }
 
   /** RAF callback that keeps animated sea tiles updating while this editor is active. */
-  private _seaAnimationTick = (): void => {
-    if (this._seaAnimationFrameId === null) return;
+  private _seaAnimationTick = (token: number): void => {
+    if (this._seaAnimationFrameId === null || token !== this._seaAnimationLoopToken) return;
     if (this._canvas && this._ctx && !this._mapBoxCollapsed) {
       this._renderChapterCanvas();
     }
-    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+    this._seaAnimationFrameId = requestAnimationFrame(() => this._seaAnimationTick(token));
   };
 
   /** Build a TileDef from the current chapter palette selection and params. */

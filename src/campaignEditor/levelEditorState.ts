@@ -207,6 +207,10 @@ export class LevelEditorState {
     this.grid = resizeGrid(this.grid, this.rows, this.cols, newRows, newCols);
     this.rows = newRows;
     this.cols = newCols;
+    if (this._linkedTilePos) {
+      const { row, col } = this._linkedTilePos;
+      if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) this.clearLink();
+    }
     this.recordSnapshot();
   }
 

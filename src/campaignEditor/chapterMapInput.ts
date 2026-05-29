@@ -197,11 +197,13 @@ export class ChapterMapInput {
       isTreeShape(selectedPalette as PipeShape) &&
       isTreeShape(tileAtPos.shape);
     if (tileAtPos !== null) {
-      const paletteForTile: EditorPalette =
+      const paletteForTile: EditorPalette | null =
         tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'level'
           ? LEVEL_CHAMBER_PALETTE
-          : tileAtPos.shape;
-      if (!preserveTreePaletteSelection) {
+          : tileAtPos.shape === PipeShape.Chamber
+            ? null
+            : tileAtPos.shape;
+      if (paletteForTile !== null && !preserveTreePaletteSelection) {
         this._cb.setPalette(paletteForTile);
         this._cb.rebuildPalette(chapter, campaign);
       }

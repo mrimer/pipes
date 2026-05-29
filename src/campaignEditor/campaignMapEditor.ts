@@ -83,6 +83,7 @@ export interface CampaignMapEditorCallbacks {
 export class CampaignMapEditorSection extends MapEditorBase {
   private readonly _cbs: CampaignMapEditorCallbacks;
   private _seaAnimationFrameId: number | null = null;
+  private _seaAnimationLoopToken = 0;
 
   // ── Palette / selection state ─────────────────────────────────────────────
   private _selectedChapterIdx: number | null = null;
@@ -191,11 +192,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
   /** Start continuously refreshing the campaign-map canvas (for animated sea tiles). */
   startSeaAnimationLoop(): void {
     if (this._seaAnimationFrameId !== null) return;
-    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+    const token = ++this._seaAnimationLoopToken;
+    this._seaAnimationFrameId = requestAnimationFrame(() => this._seaAnimationTick(token));
   }
 
   /** Stop continuously refreshing the campaign-map canvas. */
   stopSeaAnimationLoop(): void {
+    this._seaAnimationLoopToken++;
     if (this._seaAnimationFrameId === null) return;
     cancelAnimationFrame(this._seaAnimationFrameId);
     this._seaAnimationFrameId = null;
@@ -842,12 +845,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
   }
 
   /** RAF callback that keeps animated sea tiles updating while this editor is active. */
-  private _seaAnimationTick = (): void => {
-    if (this._seaAnimationFrameId === null) return;
+  private _seaAnimationTick = (token: number): void => {
+    if (this._seaAnimationFrameId === null || token !== this._seaAnimationLoopToken) return;
     if (this._canvas && this._ctx && !this._mapBoxCollapsed) {
       this._renderCampaignCanvas();
     }
-    this._seaAnimationFrameId = requestAnimationFrame(this._seaAnimationTick);
+    this._seaAnimationFrameId = requestAnimationFrame(() => this._seaAnimationTick(token));
   };
 
   // ── Private: tile building ─────────────────────────────────────────────────
