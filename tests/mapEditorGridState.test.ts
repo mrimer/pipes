@@ -108,6 +108,14 @@ describe('MapEditorGridState.slide', () => {
     expect(s.grid[1][0]?.shape).toBe(PipeShape.Granite);
     expect(s.grid[0][0]).toBeNull();
   });
+
+  it('clears focusedTilePos after slide', () => {
+    const s = makeState(2, 2);
+    s.init(2, 2, [[tile(PipeShape.Granite), null], [null, null]]);
+    s.focusedTilePos = { row: 0, col: 0 };
+    s.slide('E');
+    expect(s.focusedTilePos).toBeNull();
+  });
 });
 
 // ─── rotate ───────────────────────────────────────────────────────────────────
@@ -236,6 +244,22 @@ describe('MapEditorGridState.resize', () => {
     expect(s.rows).toBe(2);
     expect(s.cols).toBe(2);
     expect(s.grid[0][2]).toBeUndefined();
+  });
+
+  it('clears focusedTilePos when resize moves it out of bounds', () => {
+    const s = makeState(2, 4);
+    s.init(2, 4, [[null, null, null, null], [null, null, null, null]]);
+    s.focusedTilePos = { row: 1, col: 3 };
+    s.resize(2, 2);
+    expect(s.focusedTilePos).toBeNull();
+  });
+
+  it('keeps focusedTilePos when still in bounds after resize', () => {
+    const s = makeState(2, 4);
+    s.init(2, 4, [[null, null, null, null], [null, null, null, null]]);
+    s.focusedTilePos = { row: 1, col: 1 };
+    s.resize(2, 2);
+    expect(s.focusedTilePos).toEqual({ row: 1, col: 1 });
   });
 });
 
