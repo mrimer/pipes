@@ -1016,11 +1016,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
       isTreeShape(this._palette as PipeShape) &&
       isTreeShape(tileAtPos.shape);
     if (tileAtPos !== null) {
-      const paletteForTile: EditorPalette =
+      const paletteForTile: EditorPalette | null =
         tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'chapter'
           ? CHAPTER_CHAMBER_PALETTE
-          : tileAtPos.shape;
-      if (!preserveTreePaletteSelection) {
+          : tileAtPos.shape === PipeShape.Chamber
+            ? null  // Non-chapter chamber (e.g. stray 'level' content): don't corrupt the palette
+            : tileAtPos.shape;
+      if (paletteForTile !== null && !preserveTreePaletteSelection) {
         this._palette = paletteForTile;
         document.getElementById('campaign-map-palette-panel')
           ?.replaceWith(this._buildPalettePanel(campaign));

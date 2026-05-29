@@ -399,20 +399,25 @@ export class CampaignService {
 
   /**
    * Save a built LevelDef back into the campaign.
-   * When updating an existing level, clears stored star/water records so the
-   * player must replay the new version to set a new score, then persists.
+   * When updating an existing level and `clearRecords` is true (the default),
+   * clears stored star/water records so the player must replay the new version
+   * to set a new score.  Pass `clearRecords: false` when saving as a side-effect
+   * of an operation (e.g. Playtest) that should not invalidate prior progress.
    */
   saveLevel(
     campaign: CampaignDef,
     chapterIdx: number,
     levelIdx: number,
     levelDef: LevelDef,
+    options?: { clearRecords?: boolean },
   ): void {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
     if (levelIdx >= 0 && levelIdx < chapter.levels.length) {
-      clearLevelStarRecord(levelDef.id, campaign.id);
-      clearLevelWaterRecord(levelDef.id, campaign.id);
+      if (options?.clearRecords !== false) {
+        clearLevelStarRecord(levelDef.id, campaign.id);
+        clearLevelWaterRecord(levelDef.id, campaign.id);
+      }
       chapter.levels[levelIdx] = levelDef;
     } else {
       chapter.levels.push(levelDef);
