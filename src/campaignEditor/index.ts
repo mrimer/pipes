@@ -1107,13 +1107,13 @@ export class CampaignEditor {
         alert(`❌ Validation\n\n${result.messages.join('\n')}`);
         return;
       }
-      this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
-      const chapter = campaign.chapters[this._activeChapterIdx];
-      const level = chapter?.levels[this._activeLevelIdx];
-      if (!level) return;
+      // Save the current level so it persists, but do NOT wipe star/water
+      // records: those should only be cleared when the user explicitly saves
+      // via the Save button after making design changes.
+      this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx, { clearRecords: false });
       const chapterNum = this._activeChapterIdx + 1;
       const levelNum = this._activeLevelIdx + 1;
-      this._onPlaytest({ ...level, name: `${chapterNum}-${levelNum}: ${level.name}` });
+      this._onPlaytest({ ...levelDef, name: `${chapterNum}-${levelNum}: ${levelDef.name}` });
     }));
 
     // Save
@@ -1447,9 +1447,14 @@ export class CampaignEditor {
 
   // ─── Save level ────────────────────────────────────────────────────────────
 
-  private _saveLevel(campaign: CampaignDef, chapterIdx: number, levelIdx: number): void {
+  private _saveLevel(
+    campaign: CampaignDef,
+    chapterIdx: number,
+    levelIdx: number,
+    options?: { clearRecords?: boolean },
+  ): void {
     const newLevel = this._buildCurrentLevelDef();
-    this._service.saveLevel(campaign, chapterIdx, levelIdx, newLevel);
+    this._service.saveLevel(campaign, chapterIdx, levelIdx, newLevel, options);
     this._state.markSaved();
 
     // Visual confirmation on the Save button

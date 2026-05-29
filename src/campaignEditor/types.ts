@@ -238,6 +238,21 @@ export function buildMapTileDef(palette: EditorPalette, params: TileParams): Til
   if (palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
   if (palette === PipeShape.EmptySpring) return { shape: PipeShape.EmptySpring };
   if (palette === PipeShape.Empty)       return { shape: PipeShape.Empty };
+  if (isChamberPalette(palette)) {
+    // Chamber placement bypasses this path (uses hardcoded [E, W] connections),
+    // but this branch is reached for the hover-ghost when the chamber palette is
+    // active without a pending chapter/level selection.  Return a valid TileDef
+    // so the ghost renders as a chamber instead of a fallback tile.
+    const chamberContent = chamberPaletteContent(palette as ChamberPalette);
+    const connDirs: Direction[] = [];
+    if (params.connections.N) connDirs.push(Direction.North);
+    if (params.connections.E) connDirs.push(Direction.East);
+    if (params.connections.S) connDirs.push(Direction.South);
+    if (params.connections.W) connDirs.push(Direction.West);
+    const chamberDef: TileDef = { shape: PipeShape.Chamber, chamberContent };
+    if (connDirs.length < 4) chamberDef.connections = connDirs;
+    return chamberDef;
+  }
   const shape = palette as PipeShape;
   const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
   if (needsConn) {

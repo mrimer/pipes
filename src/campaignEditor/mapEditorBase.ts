@@ -212,6 +212,10 @@ export abstract class MapEditorBase {
       isChamberPalette(this._palette) &&
       chamberPaletteContent(this._palette) === tile.chamberContent;
     if (this._palette === tile.shape || isMatchingChamberPalette) {
+      // Keep _params.connections in sync so the tile-params panel reflects the
+      // rotated state and the hover ghost (via buildMapTileDef) shows the same
+      // connections.  Note: *new* chamber placements use a separate code path
+      // that hardcodes [E, W] connections, so this sync does not affect them.
       this._params.connections = {
         N: newConns.includes(Direction.North),
         E: newConns.includes(Direction.East),
