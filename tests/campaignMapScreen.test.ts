@@ -1,11 +1,13 @@
 /**
+ * @jest-environment jsdom
+ *
  * Tests for helper functions exported from campaignMapScreen.ts:
  *  - augmentChapterLevelWater
  *  - chapterHasUncompletedChallenge
  */
 
-import { ChapterDef } from '../src/types';
-import { augmentChapterLevelWater, chapterHasUncompletedChallenge } from '../src/campaignMapScreen';
+import { CampaignDef, ChapterDef, PipeShape, TileDef } from '../src/types';
+import { CampaignMapScreen, augmentChapterLevelWater, chapterHasUncompletedChallenge } from '../src/campaignMapScreen';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -150,5 +152,44 @@ describe('chapterHasUncompletedChallenge', () => {
   it('returns true when multiple challenges exist and at least one is uncompleted', () => {
     const chapter = makeChapter(1, [101, 102, 103], [101, 102, 103]);
     expect(chapterHasUncompletedChallenge(chapter, new Set([101, 102]))).toBe(true);
+  });
+});
+
+describe('CampaignMapScreen pseudo-level IDs', () => {
+  function makeScreen(): CampaignMapScreen {
+    return new CampaignMapScreen({
+      getCompletedChapters: () => new Set<number>(),
+      getCompletedLevels: () => new Set<number>(),
+      getActiveCampaignId: () => null,
+      onShowLevelSelect: () => undefined,
+      onChapterSelected: () => undefined,
+    });
+  }
+
+  it('avoids collisions with actual level IDs when assigning pseudo-level IDs', () => {
+    const campaign: CampaignDef = {
+      id: 'cmp',
+      name: 'Campaign',
+      author: 'Author',
+      rows: 1,
+      cols: 2,
+      grid: [[
+        { shape: PipeShape.Chamber, chamberContent: 'chapter', chapterIdx: 0 } as TileDef,
+        { shape: PipeShape.Chamber, chamberContent: 'chapter', chapterIdx: 1 } as TileDef,
+      ]],
+      chapters: [
+        makeChapter(100, [100, 101]),
+        makeChapter(101, [102]),
+      ],
+    };
+    const screen = makeScreen();
+    const pseudoChapter = (screen as any)._buildPseudoChapter(campaign) as ChapterDef;
+    const pseudoLevelIds = pseudoChapter.levels.map((level) => level.id);
+    const realLevelIds = new Set(campaign.chapters.flatMap((chapter) => chapter.levels.map((level) => level.id)));
+
+    expect(new Set(pseudoLevelIds).size).toBe(pseudoLevelIds.length);
+    for (const id of pseudoLevelIds) {
+      expect(realLevelIds.has(id)).toBe(false);
+    }
   });
 });

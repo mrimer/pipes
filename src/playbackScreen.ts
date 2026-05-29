@@ -285,12 +285,14 @@ export class PlaybackScreen {
 
     const movesToApply = this._record.moves.slice(0, step);
     const result = replayMoves(this._level, movesToApply, this._decorations);
+    const wasCorrupted = this._corrupted;
 
     this._currentStep = result.stoppedAt; // may be < step if corrupt
     this.board = result.board;
     this._cb.setBoard(result.board);
+    this._corrupted = result.corrupted;
 
-    if (result.corrupted && !this._corrupted) {
+    if (result.corrupted && !wasCorrupted) {
       this._handleCorruption(result.stoppedAt);
     }
 

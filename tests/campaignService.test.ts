@@ -554,6 +554,38 @@ describe('CampaignService – duplicateLevel', () => {
     const copy = svc.duplicateLevel(campaign, 0, 0);
     expect(copy.name).toBe('Level 1 (copy)');
   });
+
+  it('remaps chapter.grid levelIdx refs at and after the inserted index', () => {
+    const levelTile = (idx: number): TileDef => ({
+      shape: PipeShape.Chamber,
+      chamberContent: 'level',
+      levelIdx: idx,
+      chapterIdx: 0,
+    });
+    const campaign: CampaignDef = {
+      ...emptyCampaign(),
+      chapters: [{
+        id: 1,
+        name: 'Ch',
+        levels: [
+          { id: 10, name: 'L0', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          { id: 11, name: 'L1', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+          { id: 12, name: 'L2', rows: 1, cols: 1, grid: [[null]], inventory: [] },
+        ],
+        rows: 1,
+        cols: 3,
+        grid: [[levelTile(0), levelTile(1), levelTile(2)]],
+      }],
+    };
+    const svc = makeService([campaign]);
+
+    svc.duplicateLevel(campaign, 0, 0);
+
+    const grid = campaign.chapters[0].grid!;
+    expect((grid[0][0] as TileDef).levelIdx).toBe(0);
+    expect((grid[0][1] as TileDef).levelIdx).toBe(2);
+    expect((grid[0][2] as TileDef).levelIdx).toBe(3);
+  });
 });
 
 // ─── moveLevel ────────────────────────────────────────────────────────────────
