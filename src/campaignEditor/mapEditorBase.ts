@@ -31,6 +31,8 @@ import {
   TileParams,
   DEFAULT_PARAMS,
   EditorSnapshot,
+  isChamberPalette,
+  chamberPaletteContent,
 } from './types';
 
 export abstract class MapEditorBase {
@@ -205,7 +207,11 @@ export abstract class MapEditorBase {
     const newConns = rotateConnectionsBy90(tile.connections, clockwise);
     tile.connections = newConns;
 
-    if (this._palette === tile.shape) {
+    const isMatchingChamberPalette =
+      tile.shape === PipeShape.Chamber &&
+      isChamberPalette(this._palette) &&
+      chamberPaletteContent(this._palette) === tile.chamberContent;
+    if (this._palette === tile.shape || isMatchingChamberPalette) {
       this._params.connections = {
         N: newConns.includes(Direction.North),
         E: newConns.includes(Direction.East),

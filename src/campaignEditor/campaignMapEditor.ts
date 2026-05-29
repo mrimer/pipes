@@ -12,7 +12,7 @@
  * rotation helpers, and reachability utilities.
  */
 
-import { CampaignDef, TileDef, PipeShape, Direction, LevelDef } from '../types';
+import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction, LevelDef } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
@@ -57,6 +57,38 @@ import { MapEditorBase } from './mapEditorBase';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
 const CHAPTER_CHAMBER_PALETTE: EditorPalette = 'chamber:chapter';
+const DEFAULT_CHAPTER_MAP_ROWS = 3;
+const DEFAULT_CHAPTER_MAP_COLS = 6;
+
+export function buildChapterPreviewLevelDefs(
+  chapters: readonly ChapterDef[] | undefined,
+  defaultRows = DEFAULT_CHAPTER_MAP_ROWS,
+  defaultCols = DEFAULT_CHAPTER_MAP_COLS,
+): LevelDef[] {
+  return (chapters ?? []).map(ch => {
+    const inferredRows = ch.grid?.length ?? 0;
+    const inferredCols = ch.grid?.reduce((max, row) => Math.max(max, row?.length ?? 0), 0) ?? 0;
+    const rows = typeof ch.rows === 'number' && ch.rows > 0
+      ? ch.rows
+      : (inferredRows > 0 ? inferredRows : defaultRows);
+    const cols = typeof ch.cols === 'number' && ch.cols > 0
+      ? ch.cols
+      : (inferredCols > 0 ? inferredCols : defaultCols);
+    const grid = ch.grid ?? Array.from(
+      { length: rows },
+      () => Array(cols).fill(null) as (TileDef | null)[],
+    );
+    return {
+      id: ch.id,
+      name: ch.name,
+      rows,
+      cols,
+      grid,
+      inventory: [],
+      style: ch.style,
+    };
+  });
+}
 
 // ─── Internal drag state ──────────────────────────────────────────────────────
 
@@ -140,8 +172,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
   } | null = null;
 
   /** Default campaign grid dimensions (same as chapter map defaults). */
-  private static readonly DEFAULT_ROWS = 3;
-  private static readonly DEFAULT_COLS = 6;
+  private static readonly DEFAULT_ROWS = DEFAULT_CHAPTER_MAP_ROWS;
+  private static readonly DEFAULT_COLS = DEFAULT_CHAPTER_MAP_COLS;
 
   protected get _chamberContentType(): 'chapter' { return 'chapter'; }
   protected get _undoBtnId(): string { return 'campaign-map-undo-btn'; }
@@ -797,15 +829,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     // Build pseudo-LevelDefs from campaign chapters so that chapter chambers
     // render with the chapter's own map minimap inside the tile.
     const campaign = this._cbs.getActiveCampaign();
-    const chapterDefs: LevelDef[] = (campaign?.chapters ?? []).map(ch => ({
-      id: ch.id,
-      name: ch.name,
-      rows: ch.rows ?? 0,
-      cols: ch.cols ?? 0,
-      grid: ch.grid ?? [],
-      inventory: [],
-      style: ch.style,
-    }));
+    const chapterDefs = buildChapterPreviewLevelDefs(campaign?.chapters);
 
     // Apply pan transform so the view window scrolls over the full grid.
     ctx.save();

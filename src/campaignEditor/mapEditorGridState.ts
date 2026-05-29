@@ -67,6 +67,7 @@ export class MapEditorGridState {
   /** Slide all tiles one cell in `dir`, discarding tiles that fall off the edge. */
   slide(dir: 'N' | 'E' | 'S' | 'W'): void {
     this.grid = slideGrid(this.grid, this.rows, this.cols, dir);
+    this.focusedTilePos = null;
   }
 
   /** Rotate 90° CW or CCW; swaps rows/cols and updates the focused tile position. */
@@ -118,6 +119,12 @@ export class MapEditorGridState {
     this.grid = resizeGrid(this.grid, this.rows, this.cols, newRows, newCols);
     this.rows = newRows;
     this.cols = newCols;
+    if (this.focusedTilePos) {
+      const { row, col } = this.focusedTilePos;
+      if (row < 0 || row >= this.rows || col < 0 || col >= this.cols) {
+        this.focusedTilePos = null;
+      }
+    }
   }
 
   /** Clear the focused tile position if it matches the given position. */
