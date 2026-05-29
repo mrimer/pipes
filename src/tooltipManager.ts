@@ -48,7 +48,14 @@ export class TooltipManager {
     return `(${deltaTemp}° x ⌈${tile.cost}/(${pressure}-${tile.hardness})P⌉=${effectiveCost})`;
   }
 
-  /** Returns the formula text "(tileTemp+envTemp° x cost)" for hot plate tile tooltips. */
+  /**
+   * Returns the formula text "(tileTemp+envTemp° x cost)" for hot plate tile tooltips.
+   * This shows the effectiveCost calculation only.  The actual water split into gain
+   * (melted frozen water) and loss (excess heat on liquid water) is computed separately
+   * from board.frozen and appended alongside this formula as "(+gain -loss)".
+   * Intentionally kept as a compact effectiveCost formula rather than encoding the
+   * full gain/loss derivation inline.
+   */
   private _hotPlateCostFormula(tileTemp: number, envTemp: number, cost: number): string {
     return `(${tileTemp}+${envTemp}° x ${cost})`;
   }
