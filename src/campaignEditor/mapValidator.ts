@@ -67,15 +67,18 @@ export function validateMapGrid(
         def.chamberContent === config.chamberContent
       ) {
         const idx = def[config.entityIdxField as keyof TileDef] as number | undefined;
-        if (idx !== undefined) {
-          if (idx < 0 || idx >= config.entityCount) {
-            msgs.push(
-              `❌ ${config.chamberContent} chamber at (${r},${c}) has invalid ${config.entityIdxField} (${idx}).`,
-            );
-            ok = false;
-          } else {
-            placedEntityIdxs.add(idx);
-          }
+        if (idx === undefined) {
+          msgs.push(
+            `❌ ${config.chamberContent} chamber at (${r},${c}) is missing ${config.entityIdxField}.`,
+          );
+          ok = false;
+        } else if (idx < 0 || idx >= config.entityCount) {
+          msgs.push(
+            `❌ ${config.chamberContent} chamber at (${r},${c}) has invalid ${config.entityIdxField} (${idx}).`,
+          );
+          ok = false;
+        } else {
+          placedEntityIdxs.add(idx);
         }
       }
     }

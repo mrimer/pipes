@@ -36,11 +36,23 @@ export class EditorDialogs {
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
-    msg.innerHTML =
-      `<strong style="color:#fff;">"${name}"</strong> is already up to date.<br><br>` +
-      `The imported campaign has the same version as your local copy<br>` +
-      `(last updated: <em>${this._formatTimestamp(ts)}</em>).<br><br>` +
-      `The campaign will not be updated.`;
+    const campaignName = document.createElement('strong');
+    campaignName.style.color = '#fff';
+    campaignName.textContent = `"${name}"`;
+    const sameVersionTs = document.createElement('em');
+    sameVersionTs.textContent = this._formatTimestamp(ts);
+    msg.appendChild(campaignName);
+    msg.appendChild(document.createTextNode(' is already up to date.'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('The imported campaign has the same version as your local copy'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('(last updated: '));
+    msg.appendChild(sameVersionTs);
+    msg.appendChild(document.createTextNode(').'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('The campaign will not be updated.'));
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
@@ -73,14 +85,28 @@ export class EditorDialogs {
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
-    const localLabel = `Local version: <em>${this._formatTimestamp(existing.lastUpdated)}</em>`;
-    const importedLabel = `Imported version: <em>${this._formatTimestamp(imported.lastUpdated)}</em> (${isNewer ? 'newer' : 'older'})`;
-    msg.innerHTML =
-      `<strong style="color:#fff;">"${imported.name}"</strong> already exists locally.<br><br>` +
-      `${localLabel}<br>` +
-      `${importedLabel}<br><br>` +
-      `Importing will replace all chapters and levels in the local campaign.<br>` +
-      `Player progress will be retained.`;
+    const importedName = document.createElement('strong');
+    importedName.style.color = '#fff';
+    importedName.textContent = `"${imported.name}"`;
+    const localTs = document.createElement('em');
+    localTs.textContent = this._formatTimestamp(existing.lastUpdated);
+    const importedTs = document.createElement('em');
+    importedTs.textContent = this._formatTimestamp(imported.lastUpdated);
+    msg.appendChild(importedName);
+    msg.appendChild(document.createTextNode(' already exists locally.'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('Local version: '));
+    msg.appendChild(localTs);
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('Imported version: '));
+    msg.appendChild(importedTs);
+    msg.appendChild(document.createTextNode(` (${isNewer ? 'newer' : 'older'})`));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('Importing will replace all chapters and levels in the local campaign.'));
+    msg.appendChild(document.createElement('br'));
+    msg.appendChild(document.createTextNode('Player progress will be retained.'));
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;

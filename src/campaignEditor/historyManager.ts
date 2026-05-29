@@ -26,11 +26,13 @@ export class HistoryManager<T> {
   record(snapshot: T): void {
     const clone = structuredClone(snapshot);
     if (this._idx < this._history.length - 1) {
-      this._history = this._history.slice(0, this._idx + 1);
+      const nextLength = this._idx + 1;
+      this._history = this._history.slice(0, nextLength);
+      if (this._savedIdx >= nextLength) this._savedIdx = -1;
     }
     this._history.push(clone);
     this._idx = this._history.length - 1;
-    if (this._idx > 0) this._unsavedChanges = true;
+    this._unsavedChanges = this._idx !== this._savedIdx;
   }
 
   /**
