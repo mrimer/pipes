@@ -468,6 +468,14 @@ describe('CampaignService – addLevel', () => {
     expect(lv.style).toBe('Winter');
   });
 
+  it('does not write a style field when chapter style is unset', () => {
+    const campaign = campaignWithChapter();
+    delete campaign.chapters[0].style;
+    const svc = makeService([campaign]);
+    const lv = svc.addLevel(campaign, 0, 'Unstyled');
+    expect(Object.prototype.hasOwnProperty.call(lv, 'style')).toBe(false);
+  });
+
   it('throws for an invalid chapter index', () => {
     const campaign = emptyCampaign();
     const svc = makeService([campaign]);

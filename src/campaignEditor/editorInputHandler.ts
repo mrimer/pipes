@@ -54,6 +54,7 @@ export class EditorInputHandler {
   private _dragState: InternalDragState | null = null;
   private _paintDragActive = false;
   private _rightEraseDragActive = false;
+  private _rightEraseChanged = false;
   private _suppressNextContextMenu = false;
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   private readonly _mouseDownHandler = (e: MouseEvent) => this.onMouseDown(e);
@@ -161,10 +162,14 @@ export class EditorInputHandler {
       if (!pos) return;
       // Start a right-button erase-drag: erase the first cell immediately.
       this._rightEraseDragActive = true;
+      this._rightEraseChanged = false;
       this._suppressNextContextMenu = false;
-      if (state.grid[pos.row][pos.col] !== null) {
-        state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
+      const current = state.grid[pos.row][pos.col];
+      const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
+      if (!this._sameFloorDef(current, erased)) {
+        state.grid[pos.row][pos.col] = erased;
         state.clearLinkAt(pos);
+        this._rightEraseChanged = true;
         sfxManager.play(SfxId.Delete);
         this._cb.renderCanvas();
       }
@@ -246,8 +251,11 @@ export class EditorInputHandler {
       // End right-erase-drag: record the undo snapshot now (PR #101 pattern).
       this._rightEraseDragActive = false;
       this._suppressNextContextMenu = true;
-      state.recordSnapshot();
-      this._cb.updateUndoRedoButtons();
+      if (this._rightEraseChanged) {
+        state.recordSnapshot();
+        this._cb.updateUndoRedoButtons();
+      }
+      this._rightEraseChanged = false;
       this._cb.renderCanvas();
       return;
     }
@@ -347,8 +355,11 @@ export class EditorInputHandler {
     const state = this._cb.getState();
     const pos = this.canvasPos(e);
     if (!pos) return;
-    if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
-    state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
+    const current = state.grid[pos.row][pos.col];
+    const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
+    if (this._sameFloorDef(current, erased)) return;
+    sfxManager.play(SfxId.Delete);
+    state.grid[pos.row][pos.col] = erased;
     // Clear the link if the erased tile was linked
     state.clearLinkAt(pos);
     // Snapshot after mutation so the erased state is captured and redo restores it correctly.
@@ -374,9 +385,12 @@ export class EditorInputHandler {
       }
     } else if (this._rightEraseDragActive && pos) {
       // Erase each non-empty cell the cursor enters during a right-erase-drag.
-      if (state.grid[pos.row][pos.col] !== null) {
-        state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
+      const current = state.grid[pos.row][pos.col];
+      const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
+      if (!this._sameFloorDef(current, erased)) {
+        state.grid[pos.row][pos.col] = erased;
         state.clearLinkAt(pos);
+        this._rightEraseChanged = true;
       }
     } else if (this._dragState && pos) {
       const { startPos, currentPos } = this._dragState;
@@ -432,10 +446,17 @@ export class EditorInputHandler {
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
-      state.recordSnapshot();
-      this._cb.updateUndoRedoButtons();
+      if (this._rightEraseChanged) {
+        state.recordSnapshot();
+        this._cb.updateUndoRedoButtons();
+      }
+      this._rightEraseChanged = false;
     }
     this._cb.renderCanvas();
+  }
+
+  private _sameFloorDef(a: TileDef | null, b: TileDef | null): boolean {
+    return (a?.shape ?? null) === (b?.shape ?? null);
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────

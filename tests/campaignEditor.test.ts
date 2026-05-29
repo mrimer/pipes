@@ -2298,13 +2298,13 @@ describe('CampaignEditor – context-menu right-click erase snapshot is recorded
     expect(state._state.grid[0][0]).toBeNull();
   });
 
-  it('right-clicking an empty cell records a snapshot but leaves cell null', () => {
+  it('right-clicking an empty cell is a no-op (no snapshot, no mutation)', () => {
     const state = makeRightClickEditor(makeLevel(4, 4));
     const historyLenBefore = state._state.historyLength;
 
     state._editorInput!.onRightClick(rightClickEvent(32, 32)); // row 0, col 0 is already empty
 
-    expect(state._state.historyLength).toBe(historyLenBefore + 1);
+    expect(state._state.historyLength).toBe(historyLenBefore);
     expect(state._state.grid[0][0]).toBeNull();
   });
 });

@@ -73,6 +73,7 @@ export class ChapterMapInput {
   private _dragState: ChapterDragState | null = null;
   private _paintDragActive = false;
   private _rightEraseDragActive = false;
+  private _rightEraseChanged = false;
   private _suppressContextMenu = false;
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   private _mouseDownHandler: ((e: MouseEvent) => void) | null = null;
@@ -170,11 +171,13 @@ export class ChapterMapInput {
       const pos = this._canvasPos(e);
       if (!pos) return;
       this._rightEraseDragActive = true;
+      this._rightEraseChanged = false;
       this._suppressContextMenu = false;
       const existingTile = this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null;
       if (existingTile !== null) {
         this._cb.getEditGrid()[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
+        this._rightEraseChanged = true;
         sfxManager.play(SfxId.Delete);
         this._cb.renderCanvas();
       }
@@ -300,9 +303,12 @@ export class ChapterMapInput {
       if (!this._rightEraseDragActive) return;
       this._rightEraseDragActive = false;
       this._suppressContextMenu = true;
-      this._cb.rebuildLevelInventory(chapter, campaign);
-      this._cb.recordSnapshot(chapter);
-      this._cb.saveGridState(chapter, campaign);
+      if (this._rightEraseChanged) {
+        this._cb.rebuildLevelInventory(chapter, campaign);
+        this._cb.recordSnapshot(chapter);
+        this._cb.saveGridState(chapter, campaign);
+      }
+      this._rightEraseChanged = false;
       this._cb.renderCanvas();
       return;
     }
@@ -372,6 +378,7 @@ export class ChapterMapInput {
       if ((grid[pos.row]?.[pos.col] ?? null) !== null) {
         grid[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
+        this._rightEraseChanged = true;
       }
     } else if (this._dragState && pos) {
       const { startPos, currentPos } = this._dragState;
@@ -394,7 +401,8 @@ export class ChapterMapInput {
   private _onRightClick(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
     const pos = this._canvasPos(e);
     if (!pos) return;
-    if ((this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null) !== null) sfxManager.play(SfxId.Delete);
+    if ((this._cb.getEditGrid()[pos.row]?.[pos.col] ?? null) === null) return;
+    sfxManager.play(SfxId.Delete);
     this._cb.getEditGrid()[pos.row][pos.col] = null;
     this._cb.clearFocusIfAt(pos);
     this._cb.rebuildLevelInventory(chapter, campaign);
@@ -423,8 +431,11 @@ export class ChapterMapInput {
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
-      this._cb.recordSnapshot(chapter);
-      this._cb.saveGridState(chapter, campaign);
+      if (this._rightEraseChanged) {
+        this._cb.recordSnapshot(chapter);
+        this._cb.saveGridState(chapter, campaign);
+      }
+      this._rightEraseChanged = false;
     }
     this._cb.renderCanvas();
   }

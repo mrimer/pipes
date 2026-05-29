@@ -105,6 +105,7 @@ export class CampaignEditor {
 
   /** Bound keydown handler stored so it can be removed by destroy(). */
   private readonly _keydownHandler: (e: KeyboardEvent) => void;
+  private _saveFeedbackResetTimer: number | null = null;
 
   constructor(
     onClose: () => void,
@@ -240,6 +241,7 @@ export class CampaignEditor {
   /** Hide the campaign editor. */
   hide(): void {
     this._stopEditorSeaAnimationLoops();
+    this._clearSaveFeedbackTimer();
     this._el.style.display = 'none';
     document.body.classList.remove('editor-open');
   }
@@ -247,7 +249,14 @@ export class CampaignEditor {
   /** Remove event listeners and clean up DOM resources. */
   destroy(): void {
     this._stopEditorSeaAnimationLoops();
+    this._clearSaveFeedbackTimer();
     document.removeEventListener('keydown', this._keydownHandler);
+  }
+
+  private _clearSaveFeedbackTimer(): void {
+    if (this._saveFeedbackResetTimer === null) return;
+    clearTimeout(this._saveFeedbackResetTimer);
+    this._saveFeedbackResetTimer = null;
   }
 
   /** Start continuously refreshing the level editor canvas (for animated sea tiles). */
@@ -432,6 +441,7 @@ export class CampaignEditor {
 
   private _showCampaignList(): void {
     this._stopEditorSeaAnimationLoops();
+    this._clearSaveFeedbackTimer();
     this._screen = EditorScreen.List;
     this._el.innerHTML = '';
 
@@ -577,6 +587,7 @@ export class CampaignEditor {
 
   private _showCampaignDetail(): void {
     this._stopEditorSeaAnimationLoops();
+    this._clearSaveFeedbackTimer();
     this._screen = EditorScreen.Campaign;
     this._el.innerHTML = '';
 
@@ -777,7 +788,8 @@ export class CampaignEditor {
     }));
 
     if (!readOnly) {
-      this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail());
+      this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail(),
+        (fromIdx, toIdx) => this._service.reorderChapters(campaign, fromIdx, toIdx));
       btns.appendChild(this._btn('🗑', UI_BG, ERROR_COLOR, () => {
         if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
           this._service.deleteChapter(campaign, chapterIdx);
@@ -793,6 +805,7 @@ export class CampaignEditor {
 
   private _showChapterDetail(): void {
     this._stopEditorSeaAnimationLoops();
+    this._clearSaveFeedbackTimer();
     this._editorInput?.detach();
     this._editorInput = null;
     this._screen = EditorScreen.Chapter;
@@ -959,6 +972,7 @@ export class CampaignEditor {
 
   private _showLevelEditor(readOnly: boolean): void {
     this._stopEditorSeaAnimationLoops();
+    this._clearSaveFeedbackTimer();
     // Clean up any existing input handler before building a new one.
     this._editorInput?.detach();
     this._editorInput = null;
@@ -1441,9 +1455,13 @@ export class CampaignEditor {
     // Visual confirmation on the Save button
     const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
     if (saveBtn) {
-      const orig = saveBtn.textContent;
       saveBtn.textContent = '✅ Saved!';
-      setTimeout(() => { saveBtn.textContent = orig; }, 1500);
+      this._clearSaveFeedbackTimer();
+      this._saveFeedbackResetTimer = window.setTimeout(() => {
+        this._saveFeedbackResetTimer = null;
+        const activeSaveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
+        if (activeSaveBtn) activeSaveBtn.textContent = '💾 Save';
+      }, 1500);
     }
   }
 
