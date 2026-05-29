@@ -77,6 +77,8 @@ export class ChapterMapEditorSection extends MapEditorBase {
     this.stopSeaAnimationLoop();
     this._input?.detach();
     this._input = null;
+    this._canvas = null;
+    this._ctx = null;
     this._initChapterGridState(chapter);
   }
 

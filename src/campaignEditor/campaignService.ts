@@ -329,8 +329,8 @@ export class CampaignService {
       cols: 6,
       grid,
       inventory: [],
-      style: chapter.style,
     };
+    if (chapter.style !== undefined) newLevel.style = chapter.style;
     chapter.levels.push(newLevel);
     this.touch(campaign);
     this.save();

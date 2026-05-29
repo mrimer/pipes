@@ -46,6 +46,8 @@ export function validateLevel(levelDef: LevelDef): ValidationResult {
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
       if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'sandstone') {
+        // Board construction normalizes missing hardness to 0 via def.hardness ?? 0,
+        // so this subtraction always uses a numeric hardness.
         const deltaDamage = initialPressure - tile.hardness;
         if (deltaDamage <= 0) {
           msgs.push(

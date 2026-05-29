@@ -102,6 +102,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
   private _dragState: CampaignDragState | null = null;
   private _paintDragActive = false;
   private _rightEraseDragActive = false;
+  private _rightEraseChanged = false;
   private _suppressContextMenu = false;
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
   private _mouseDownHandler: ((e: MouseEvent) => void) | null = null;
@@ -953,13 +954,16 @@ export class CampaignMapEditorSection extends MapEditorBase {
     }
     if (e.button === 2) {
       this._leftPanCandidate = null;
+      this._panDrag = null;
       const pos = this._canvasPos(e);
       if (!pos) return;
       this._rightEraseDragActive = true;
+      this._rightEraseChanged = false;
       this._suppressContextMenu = false;
       if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) !== null) {
         this._gridState.grid[pos.row][pos.col] = null;
         this._gridState.clearFocusIfAt(pos);
+        this._rightEraseChanged = true;
         sfxManager.play(SfxId.Delete);
         this._renderCanvas();
       }
@@ -1094,10 +1098,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
       if (!this._rightEraseDragActive) return;
       this._rightEraseDragActive = false;
       this._suppressContextMenu = true;
-      document.getElementById('campaign-map-chapter-inventory')
-        ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-      this._recordSnapshot();
-      this._saveGrid();
+      if (this._rightEraseChanged) {
+        document.getElementById('campaign-map-chapter-inventory')
+          ?.replaceWith(this._buildChapterInventoryPanel(campaign));
+        this._recordSnapshot();
+        this._saveGrid();
+      }
+      this._rightEraseChanged = false;
       this._renderCanvas();
       return;
     }
@@ -1180,6 +1187,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) !== null) {
         this._gridState.grid[pos.row][pos.col] = null;
         this._gridState.clearFocusIfAt(pos);
+        this._rightEraseChanged = true;
       }
     } else if (this._dragState && pos) {
       const { startPos, currentPos } = this._dragState;
@@ -1202,7 +1210,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
   private _onRightClick(e: MouseEvent, campaign: CampaignDef): void {
     const pos = this._canvasPos(e);
     if (!pos) return;
-    if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) !== null) sfxManager.play(SfxId.Delete);
+    if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) === null) return;
+    sfxManager.play(SfxId.Delete);
     this._gridState.grid[pos.row][pos.col] = null;
     this._gridState.clearFocusIfAt(pos);
     document.getElementById('campaign-map-chapter-inventory')
@@ -1234,8 +1243,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
-      this._recordSnapshot();
-      this._saveGrid();
+      if (this._rightEraseChanged) {
+        this._recordSnapshot();
+        this._saveGrid();
+      }
+      this._rightEraseChanged = false;
     }
     this._renderCanvas();
   }

@@ -403,7 +403,12 @@ export class LevelEditorState {
       if (cc === 'snow') { def.cost = p.cost; def.temperature = p.temperature; }
       if (cc === 'sandstone') { def.cost = p.cost; def.temperature = p.temperature; if (p.hardness !== 0) def.hardness = p.hardness; if (p.shatter !== 0) def.shatter = p.shatter; }
       if (cc === 'hot_plate') { def.cost = p.cost; def.temperature = p.temperature; }
-      if (cc === 'item') { def.itemShape = p.itemShape; def.itemCount = p.itemCount; }
+      if (cc === 'item') {
+        // Item chambers always persist itemShape/itemCount (including defaults)
+        // so placed rewards are explicit in exported JSON.
+        def.itemShape = p.itemShape;
+        def.itemCount = p.itemCount;
+      }
       if (cc === 'regulator') { def.cost = p.cost; def.regulatorStat = p.regulatorStat; def.regulatorOperator = p.regulatorOperator; }
     }
 
@@ -577,4 +582,3 @@ export class LevelEditorState {
     this._linkedTileDirty = false;
   }
 }
-
