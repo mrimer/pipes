@@ -513,8 +513,8 @@ export function applyPlayerProfile(
   }
 
   // ── Active campaign ────────────────────────────────────────────────────────
-  if ('activeCampaignId' in payload && payload.activeCampaignId) {
-    if (localById.has(payload.activeCampaignId)) {
+  if ('activeCampaignId' in payload) {
+    if (payload.activeCampaignId && localById.has(payload.activeCampaignId)) {
       saveActiveCampaignId(payload.activeCampaignId);
     } else {
       clearActiveCampaignId();

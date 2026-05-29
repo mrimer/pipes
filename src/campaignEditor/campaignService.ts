@@ -361,6 +361,7 @@ export class CampaignService {
       id: generateLevelId(),
       name: `${level.name} (copy)`,
     };
+    this._remapLevelRefsOnInsert(chapter, levelIdx + 1);
     chapter.levels.splice(levelIdx + 1, 0, copy);
     this.touch(campaign);
     this.save();

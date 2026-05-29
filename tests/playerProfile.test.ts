@@ -32,6 +32,7 @@ import {
   loadMasteredChaptersShown,
   loadCampaignMasteredShown,
   loadCampaignCompleteShown,
+  loadActiveCampaignId,
   savePlayerName,
   saveSfxVolume,
   saveTouchUiEnabled,
@@ -524,6 +525,29 @@ describe('applyPlayerProfile – campaign progress', () => {
     expect(ignored).toHaveLength(1);
     expect(ignored[0].campaignId).toBe('cmp_missing');
     expect((ignored[0] as { campaignName: string }).campaignName).toBe('Missing Campaign');
+  });
+});
+
+describe('applyPlayerProfile – active campaign', () => {
+  beforeEach(clearStorage);
+
+  it('clears active campaign when payload explicitly sets activeCampaignId to null', () => {
+    const local = makeMinimalCampaign('cmp_local');
+    localStorage.setItem('activeCampaignId', 'cmp_local');
+    const payload: PlayerProfilePayload = {
+      guid: 'test-guid',
+      lastPlayedAt: null,
+      playerName: 'Test',
+      sfxVolume: 100,
+      touchUiEnabled: null,
+      commandKeys: null,
+      activeCampaignId: null,
+      campaignProgress: [],
+    };
+
+    applyPlayerProfile(payload, [local]);
+
+    expect(loadActiveCampaignId()).toBeNull();
   });
 });
 
