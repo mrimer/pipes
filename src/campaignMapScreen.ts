@@ -200,9 +200,8 @@ export class CampaignMapScreen {
       const grid = chapter.grid ?? [[{ shape: PipeShape.Empty } as TileDef]];
       const totalStars = chapter.levels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
       const hasUncompletedChallenge = chapterHasUncompletedChallenge(chapter, completedLevels);
-      let pseudoLevelId = chapter.id;
+      let pseudoLevelId = chapter.id ?? (-1000 - chapterIdx);
       if (usedPseudoLevelIds.has(pseudoLevelId)) {
-        pseudoLevelId = -1000 - chapterIdx;
         while (usedPseudoLevelIds.has(pseudoLevelId)) pseudoLevelId--;
       }
       usedPseudoLevelIds.add(pseudoLevelId);
