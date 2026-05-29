@@ -5,6 +5,7 @@
 import { MapEditorBase } from '../src/campaignEditor/mapEditorBase';
 import { PipeShape, Direction } from '../src/types';
 import type { EditorSnapshot } from '../src/campaignEditor/types';
+import type { EditorPalette } from '../src/campaignEditor/types';
 import type { TileDef } from '../src/types';
 
 class TestMapEditorBase extends MapEditorBase {
@@ -18,7 +19,7 @@ class TestMapEditorBase extends MapEditorBase {
   protected _rebuildTileParamsPanel(): void {}
   protected _applySnapshot(_snap: EditorSnapshot): void {}
 
-  setPalette(palette: PipeShape | 'erase' | `chamber:${string}`): void {
+  setPalette(palette: EditorPalette): void {
     this._palette = palette;
   }
 
