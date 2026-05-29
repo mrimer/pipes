@@ -118,6 +118,11 @@ export class TurnStateManager {
     return val !== undefined ? val : null;
   }
 
+  /** Return a snapshot copy of the hot-plate water-gain map, for use before applyTurnDelta clears disconnected entries. */
+  captureLockedHotPlateGains(): Map<string, number> {
+    return new Map(this._hotPlateWaterGain);
+  }
+
   /**
    * Return the board temperature that was recorded when the tile at the given
    * position first connected, or `null` if that tile has not yet been evaluated.

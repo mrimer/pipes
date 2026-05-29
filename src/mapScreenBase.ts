@@ -130,7 +130,7 @@ interface EdgeFlower {
   y: number;
   /** Timestamp (from requestAnimationFrame `now`) when this flower was spawned. */
   spawnedAt: number;
-  /** Color variant 0–2, matching the decor flower palette. */
+  /** Color variant 0–7, matching the eight entries in EDGE_FLOWER_PETAL_COLORS. */
   variant: number;
   /** Static per-flower rotation offset in radians. */
   baseRotation: number;

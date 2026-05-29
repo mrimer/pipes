@@ -213,6 +213,7 @@ export class AnimationManager {
     reclaimedRow?: number,
     reclaimedCol?: number,
     lockedWaterImpactBefore?: ReadonlyMap<string, number>,
+    lockedHotPlateGainBefore?: ReadonlyMap<string, number>,
   ): void {
     this._invalidateBoardParticleCaches();
     const filledAfter = board.getFilledPositions();
@@ -231,6 +232,7 @@ export class AnimationManager {
       this._pushTileAnimLabels(
         board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle,
         lockedWaterImpactBefore?.get(key) ?? null,
+        lockedHotPlateGainBefore?.get(key) ?? null,
       );
     }
   }
@@ -845,6 +847,7 @@ export class AnimationManager {
     now: number,
     sparkle: AnimSparkleCallbacks,
     disconnectedLockedWaterImpact: number | null = null,
+    disconnectedHotPlateGain: number | null = null,
   ): void {
     // Lower-right quadrant (avoids drawing over the pipe image)
     const cx = c * TILE_SIZE + TILE_SIZE * 3 / 4;
@@ -920,7 +923,7 @@ export class AnimationManager {
           }
         }
       } else if (tile.chamberContent === 'hot_plate') {
-        ({ text, color } = this._pushHotPlateAnimLabels(board, tile, r, c, dir, currentTemp, cx, cy, now));
+        ({ text, color } = this._pushHotPlateAnimLabels(board, tile, r, c, dir, currentTemp, cx, cy, now, disconnectedLockedWaterImpact, disconnectedHotPlateGain));
       } else if (tile.chamberContent === 'star' && dir === 'connect') {
         // Star tile connected – spawn golden sparkle burst from the tile center.
         const starCx = c * TILE_SIZE + TILE_SIZE / 2;
@@ -982,6 +985,8 @@ export class AnimationManager {
     cx: number,
     cy: number,
     now: number,
+    disconnectedLockedWaterImpact: number | null = null,
+    disconnectedHotPlateGain: number | null = null,
   ): { text: string | null; color: string } {
     if (dir === 'connect') {
       // Use the locked values computed by applyTurnDelta.
@@ -1004,11 +1009,15 @@ export class AnimationManager {
       }
       return { text: null, color: ANIM_ZERO_COLOR };
     } else {
-      // Disconnecting: reverse the hot plate's effects.
+      // Disconnecting: reverse the hot plate's effects using the locked values captured
+      // before applyTurnDelta cleared them.  Using the pre-disconnect gain avoids the
+      // original bug where currentTemp (post-disconnect) produced wrong label values
+      // when the board temperature had changed between connect and disconnect.
       // gain (from frozen) is lost; water loss is recovered.
-      const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-      const waterGain = Math.min(board.frozen, effectiveCost);
-      const waterLoss = Math.max(0, effectiveCost - waterGain);
+      const waterGain = disconnectedHotPlateGain ?? Math.min(board.frozen, tile.cost * (tile.temperature + currentTemp));
+      const waterLoss = disconnectedLockedWaterImpact !== null
+        ? waterGain - disconnectedLockedWaterImpact   // impact = waterGain − waterLoss
+        : Math.max(0, tile.cost * (tile.temperature + currentTemp) - waterGain);
       if (waterLoss > 0 && waterGain > 0) {
         this.animations.push({ x: cx, y: cy - TILE_SIZE / 4, text: `+${waterLoss}💧`, color: ANIM_POSITIVE_COLOR, startTime: now, duration: ANIM_DURATION });
         this.animations.push({ x: cx, y: cy + TILE_SIZE / 4, text: `-${waterGain}💧`, color: ANIM_NEGATIVE_COLOR, startTime: now, duration: ANIM_DURATION });

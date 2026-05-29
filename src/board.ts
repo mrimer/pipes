@@ -1475,6 +1475,11 @@ export class Board {
     return new Map(this._turnState.lockedWaterImpact);
   }
 
+  /** Capture a copy of all hot-plate water gains (frozen water consumed), for use before applyTurnDelta clears disconnected entries. */
+  captureLockedHotPlateGains(): Map<string, number> {
+    return this._turnState.captureLockedHotPlateGains();
+  }
+
   /**
    * Return the locked frozen water consumed (waterGain) for a hot_plate tile at the given
    * position, or `null` if that tile is not a connected hot_plate.

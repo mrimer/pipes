@@ -572,6 +572,10 @@ export function buildSettingsModal(
     if (onCancel) onCancel(el);
   };
   document.addEventListener('keydown', onEscKey);
+  // settingsEscListenerCleanup is called the next time buildSettingsModal runs
+  // (rebuilding the game instance).  Between modal close and the next rebuild the
+  // listener remains registered but is harmless: onEscKey early-returns when
+  // el.style.display === 'none', which is always true after the modal is hidden.
   settingsEscListenerCleanup = () => {
     document.removeEventListener('keydown', onEscKey);
   };

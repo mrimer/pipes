@@ -543,12 +543,12 @@ export class Game implements InputCallbacks {
           this._animMgr.spawnDisconnectionAnimations(
             board, info.filledBefore, sparkle,
             info.reclaimedTile, info.decodedMove.row, info.decodedMove.col,
-            info.lockedWaterImpactBefore,
+            info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
           );
         } else {
           this._animMgr.spawnDisconnectionAnimations(
             board, info.filledBefore, sparkle, undefined, undefined, undefined,
-            info.lockedWaterImpactBefore
+            info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
           );
         }
         const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
@@ -1140,6 +1140,7 @@ export class Game implements InputCallbacks {
     const hadNoSelection = this.selectedShape === null;
     const filledBefore = this.board.getFilledPositions();
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
+    const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     const result = this.board.reclaimTile(pos);
     if (result.success) {
       const reclaimedPosKey = `${pos.row},${pos.col}`;
@@ -1157,7 +1158,7 @@ export class Game implements InputCallbacks {
       const sparkle = this._metrics.sparkleCallbacks();
       this._animMgr.spawnDisconnectionAnimations(
         this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col,
-        lockedWaterImpactBefore,
+        lockedWaterImpactBefore, lockedHotPlateGainBefore,
       );
       this._animMgr.spawnLockedCostChangeAnimations(changes);
       this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
@@ -1191,6 +1192,7 @@ export class Game implements InputCallbacks {
   ): void {
     if (!this.board) return;
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
+    const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     const tile = this.board.getTile(rotationInfo);
     const delta = tile ? (tile.rotation - rotationInfo.oldRotation + 360) % 360 : 0;
     sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
@@ -1220,7 +1222,7 @@ export class Game implements InputCallbacks {
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(
       this.board, filledBefore, sparkle, undefined, undefined, undefined,
-      lockedWaterImpactBefore
+      lockedWaterImpactBefore, lockedHotPlateGainBefore,
     );
     this._animMgr.spawnFillAnims(this.board, filledBefore, fillDelay);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
@@ -1566,6 +1568,7 @@ export class Game implements InputCallbacks {
   ): void {
     if (!this.board) return;
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
+    const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
@@ -1582,7 +1585,7 @@ export class Game implements InputCallbacks {
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(
       this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol,
-      lockedWaterImpactBefore,
+      lockedWaterImpactBefore, lockedHotPlateGainBefore,
     );
     this._animMgr.spawnFillAnims(this.board, filledBefore);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
@@ -1828,12 +1831,13 @@ export class Game implements InputCallbacks {
     this._animMgr.resetIdleTimer();
     const filledBefore = this.board.getFilledPositions();
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
+    const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     this.board.redoMove();
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(
       this.board, filledBefore, sparkle, undefined, undefined, undefined,
-      lockedWaterImpactBefore
+      lockedWaterImpactBefore, lockedHotPlateGainBefore,
     );
     this._finalizeHistoryJump();
     this._checkWinLose();

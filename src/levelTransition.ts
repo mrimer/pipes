@@ -202,6 +202,10 @@ function runSwirlPhase(
   onComplete: () => void,
 ): void {
   const startTime = performance.now();
+  // scheduleFrame uses both requestAnimationFrame and a setTimeout fallback, guarded
+  // by a `fired` closure flag so only the first to fire executes the callback.
+  // This is intentional defensive practice: RAF may be throttled or suppressed in
+  // hidden/background tabs, so the timeout ensures the animation still advances.
   const scheduleFrame = (cb: () => void): void => {
     let fired = false;
     const timeoutId = setTimeout(() => {

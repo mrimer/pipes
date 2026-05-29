@@ -40,6 +40,8 @@ export interface MoveAnimationInfo {
   filledBefore: Set<string>;
   /** Locked water impacts for tiles in `filledBefore`, captured before the move was applied. */
   lockedWaterImpactBefore: Map<string, number>;
+  /** Hot-plate water gains captured before the move was applied (cleared from board after applyTurnDelta). */
+  lockedHotPlateGainBefore: Map<string, number>;
   /** The decoded move that was applied. */
   decodedMove: DecodedMove;
   /** Result returned by the board operation (carries `cementDecrement` when set). */
@@ -187,11 +189,13 @@ export class PlaybackScreen {
     this.board = null;
   }
 
-  /** Step forward one move.  Returns false if already at the end or corrupted. */
+  /** Step forward one move.  Returns false if already at the end or if the move is corrupted. */
   stepForward(): boolean {
     if (!this._record || !this._level) return false;
     if (this._currentStep >= this._stepLimit) return false;
-    if (this._corrupted) return false;
+    // _corrupted marks the record as permanently corrupt but does not prevent stepping
+    // forward through valid moves that precede the corruption point.  _applyMoveIncremental
+    // will block (and return false) when it actually reaches the bad move.
     return this._applyMoveIncremental();
   }
 
@@ -316,6 +320,7 @@ export class PlaybackScreen {
 
     const filledBefore = this.board.getFilledPositions();
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
+    const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     let moveResult: MoveResult;
     let reclaimedTile: Tile | undefined;
     let rotationInfo: { row: number; col: number; oldRotation: number } | undefined;
@@ -345,6 +350,7 @@ export class PlaybackScreen {
     this._cb.spawnMoveAnimations(this.board, {
       filledBefore,
       lockedWaterImpactBefore,
+      lockedHotPlateGainBefore,
       decodedMove: decoded,
       moveResult,
       turnChanges,
