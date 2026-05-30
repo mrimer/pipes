@@ -3,7 +3,7 @@
  */
 
 import { createGameRulesModal, refreshGameRulesModalCommands } from '../src/rulesModal';
-import { CommandKeyManager } from '../src/commandKeyManager';
+import { CommandKeyManager, commandKeyManager } from '../src/commandKeyManager';
 
 describe('createGameRulesModal', () => {
   beforeEach(() => {
@@ -13,6 +13,7 @@ describe('createGameRulesModal', () => {
 
   afterEach(() => {
     localStorage.clear();
+    commandKeyManager.resetToDefaults();
   });
 
   it('appends a modal element to document.body', () => {

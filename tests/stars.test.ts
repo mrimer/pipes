@@ -119,6 +119,10 @@ describe('renderLevelList star display', () => {
     container = makeLevelListEl();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('shows ⭐ X/Y in chapter header when all levels are complete and chapter has stars', () => {
     const level = makeLevelDef({ id: 1, starCount: 3 });
     const chapters = [{ id: 1, name: 'Ch1', levels: [level] }];

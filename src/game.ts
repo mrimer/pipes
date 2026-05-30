@@ -52,6 +52,7 @@ import { PlayerProfileScreen } from './playerProfileScreen';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
 import { isEnvironmentalEnabled, setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';
+import { hasDuplicateAutoRecording } from './autoRecording';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -2037,10 +2038,7 @@ export class Game implements InputCallbacks {
 
     // Dedup: skip if an identical auto-recorded sequence already exists for this level.
     const existing = loadRecordingsForLevel(campaignId, levelId);
-    const movesJson = JSON.stringify(moves);
-    const isDuplicate = existing.some(
-      (r) => r.autoRecorded && JSON.stringify(r.moves) === movesJson,
-    );
+    const isDuplicate = hasDuplicateAutoRecording(existing, moves);
     if (isDuplicate) return;
 
     const autoActiveSlot = getActiveSlotIndex();

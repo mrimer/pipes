@@ -166,11 +166,13 @@ describe('Board.areMutuallyConnected – one-way tiles', () => {
 
 
 describe('Board.isSolved', () => {
-  it('returns false for a newly constructed board (random grid)', () => {
-    // A freshly randomised board is virtually never instantly solved;
-    // We just verify the method runs without error.
-    const board = new Board(4, 4);
-    expect(typeof board.isSolved()).toBe('boolean');
+  it('returns false for a newly constructed board', () => {
+    const board = new Board(1, 2);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Straight, 0, true); // N-S
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90, true); // E-W
+    expect(board.isSolved()).toBe(false);
   });
 
   it('returns true when source and sink are directly connected', () => {

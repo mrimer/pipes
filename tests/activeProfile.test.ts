@@ -12,6 +12,10 @@ beforeEach(() => {
   setActiveSlotIndex(null);
 });
 
+afterEach(() => {
+  setActiveSlotIndex(null);
+});
+
 // ─── getActiveSlotIndex / setActiveSlotIndex ──────────────────────────────────
 
 describe('getActiveSlotIndex / setActiveSlotIndex', () => {
