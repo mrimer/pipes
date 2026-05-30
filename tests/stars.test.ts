@@ -631,6 +631,10 @@ describe('renderLevelList – main-menu button SFX', () => {
     container = makeLevelListEl();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('plays Click and opens Settings when the settings button is clicked', () => {
     const onSettingsClick = jest.fn();
     const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});

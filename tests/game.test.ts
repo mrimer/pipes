@@ -55,6 +55,8 @@ const MOCK_CTX = {
 let originalInnerWidth: PropertyDescriptor | undefined;
 let originalInnerHeight: PropertyDescriptor | undefined;
 let originalCanvasGetContext: PropertyDescriptor | undefined;
+/** Tracks every Game created by makeGame() so afterEach can destroy them. */
+const activeGames: Game[] = [];
 
 beforeEach(() => {
   originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
@@ -71,6 +73,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Destroy all Game instances to remove InputHandler event listeners from
+  // canvas and document; without this they accumulate across makeGame() calls.
+  for (const g of activeGames) g.destroy();
+  activeGames.length = 0;
   jest.restoreAllMocks();
   if (originalInnerWidth) {
     Object.defineProperty(window, 'innerWidth', originalInnerWidth);
@@ -163,6 +169,7 @@ function makeGame(): {
   saveImportedCampaigns([testCampaign]);
   gameHooks(game)._activateCampaign(testCampaign);
 
+  activeGames.push(game);
   return { game, levelSelectEl, playScreenEl, winModalEl, gameoverModalEl, exitBtnEl,
     winNextBtnEl: get('win-next-btn') as HTMLButtonElement };
 }

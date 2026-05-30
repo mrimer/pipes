@@ -25,7 +25,11 @@ describe('buildPlaybackListModal', () => {
   });
 
   afterEach(() => {
-    // Ensure any open modal unregisters its Escape key listener from document.
+    // buildPlaybackListModal registers a keydown listener on `document` for
+    // Escape.  The listener removes itself when the modal is closed, but if a
+    // test ends without closing the modal (e.g. the second test below), the
+    // listener would persist into the next test and fire on unrelated events.
+    // Dispatching Escape here triggers the cleanup path in any still-open modal.
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     document.body.innerHTML = '';
   });

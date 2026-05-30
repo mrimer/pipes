@@ -623,7 +623,10 @@ describe('applyPlayerProfile recording merge', () => {
     const recA = makeRecord({ id: 'dup-1', playerName: 'A' });
     const recB = makeRecord({ id: 'dup-1', playerName: 'B' });
     applyPlayerProfile(makeBasePayload({ recordings: [recA, recB] }), []);
-    expect(loadAllRecordings()).toHaveLength(1);
+    const stored = loadAllRecordings();
+    expect(stored).toHaveLength(1);
+    // First-seen record wins; the second duplicate must be dropped.
+    expect(stored[0].playerName).toBe('A');
   });
 
   it('does nothing when payload.recordings is absent', () => {

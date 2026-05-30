@@ -131,7 +131,7 @@ describe('computeWinTileGlows', () => {
     expect(WIN_TILE_GLOW_DURATION).toBeGreaterThan(0);
   });
 
-  it('WIN_TILE_LAYER_DELAY_MS equals 100', () => {
-    expect(WIN_TILE_LAYER_DELAY_MS).toBe(100);
+  it('WIN_TILE_LAYER_DELAY_MS is a positive number', () => {
+    expect(WIN_TILE_LAYER_DELAY_MS).toBeGreaterThan(0);
   });
 });

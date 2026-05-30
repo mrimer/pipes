@@ -28,7 +28,7 @@ class FakeContext {
   strokeStyle = '';
   lineWidth = 0;
   fills: FillCall[] = [];
-  strokes: Array<unknown[]> = [];
+  strokes: Array<{ style: string }> = [];
   arcs: Array<{ style: string; cx: number; cy: number; r: number }> = [];
   roundRects: Array<{ x: number; y: number; w: number; h: number; radius: number | number[] }> = [];
 
@@ -38,7 +38,7 @@ class FakeContext {
   beginPath(): void { /* no-op */ }
   moveTo(): void { /* no-op */ }
   lineTo(): void { /* no-op */ }
-  stroke(): void { this.strokes.push([]); }
+  stroke(): void { this.strokes.push({ style: this.strokeStyle }); }
   arc(cx: number, cy: number, r: number): void {
     this.arcs.push({ style: this.fillStyle, cx, cy, r });
   }
@@ -210,14 +210,14 @@ describe('renderMinimap: tileColor coverage via fills', () => {
       { shape: PipeShape.Chamber, chamberContent: 'item', itemShape: PipeShape.GoldStraight },
     ]]);
     renderMinimap(levelGold);
-    expect(ctxGold.strokeStyle).toBe(CONTAINER_COLOR);
+    expect(ctxGold.strokes.some(s => s.style === CONTAINER_COLOR)).toBe(true);
 
     const ctxReg = installCanvasMock();
     const levelReg = makeLevel(1, 1, [[
       { shape: PipeShape.Chamber, chamberContent: 'item', itemShape: PipeShape.Straight },
     ]]);
     renderMinimap(levelReg);
-    expect(ctxReg.strokeStyle).toBe(PIPE_COLOR);
+    expect(ctxReg.strokes.some(s => s.style === PIPE_COLOR)).toBe(true);
   });
 
   it('draws SpinStraight tile', () => {

@@ -1936,6 +1936,16 @@ export class Game implements InputCallbacks {
     this._rulesModalEl.style.display = 'flex';
   }
 
+  /**
+   * Release all resources held by this Game instance.
+   * Removes input event listeners registered on the canvas and document so
+   * that they do not accumulate when multiple Game instances are created in
+   * the same document (e.g. across test cases).
+   */
+  destroy(): void {
+    this._input.destroy();
+  }
+
   // ─── Recording ────────────────────────────────────────────────────────────
 
   /**
