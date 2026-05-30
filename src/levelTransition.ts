@@ -405,7 +405,7 @@ export function playMapTransition(
  * @param playScreenEl       The play-screen element to fade out.
  * @param onComplete         Callback invoked when the animation finishes.
  */
-export function playMapExitTransition(
+export function playLevelExitTransition(
   minimapRect: ScreenRect,
   chapterMapScreenEl: HTMLElement,
   gameCanvas: HTMLCanvasElement,
@@ -528,7 +528,7 @@ export function playMapScreenExitTransition(
   document.body.appendChild(overlay);
 
   // Hide only the live canvas inside fromScreenEl, not the whole screen element.
-  // This mirrors the technique in playMapExitTransition where the game canvas is
+  // This mirrors the technique in playLevelExitTransition where the game canvas is
   // hidden with visibility:hidden while the play-screen container fades out via
   // opacity.  The canvas is replaced visually by the zooming snapshot overlay, so
   // any concurrent TILE_SIZE change in the chapter-map animation loop cannot
@@ -756,4 +756,3 @@ export function playSwirlScreenTransition(
 
 // Backward-compatible aliases.
 export const playLevelTransition = playMapTransition;
-export const playLevelExitTransition = playMapExitTransition;
