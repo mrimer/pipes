@@ -523,12 +523,12 @@ describe('CampaignEditor – _exportCampaign', () => {
     if (originalCreateObjectURL) {
       URL.createObjectURL = originalCreateObjectURL;
     } else {
-      delete (URL as typeof URL & { createObjectURL?: typeof URL.createObjectURL }).createObjectURL;
+      (URL as unknown as { createObjectURL?: typeof URL.createObjectURL }).createObjectURL = undefined;
     }
     if (originalRevokeObjectURL) {
       URL.revokeObjectURL = originalRevokeObjectURL;
     } else {
-      delete (URL as typeof URL & { revokeObjectURL?: typeof URL.revokeObjectURL }).revokeObjectURL;
+      (URL as unknown as { revokeObjectURL?: typeof URL.revokeObjectURL }).revokeObjectURL = undefined;
     }
     jest.restoreAllMocks();
     jest.useRealTimers();
