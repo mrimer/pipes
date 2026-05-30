@@ -94,24 +94,26 @@ describe('_heightToRgb', () => {
 
 // ─── attachChapterWaveAnimation ───────────────────────────────────────────────
 
-// Minimal canvas mock used by jsdom for tests.
-const MOCK_CTX = {
-  clearRect:   jest.fn(),
-  putImageData: jest.fn(),
-  drawImage:   jest.fn(),
-  createImageData: jest.fn(() => ({
-    data: new Uint8ClampedArray(4 * 10 * 10),
-    width: 10,
-    height: 10,
-  })),
-  imageSmoothingEnabled: false,
-  imageSmoothingQuality: 'high' as ImageSmoothingQuality,
-};
+function createMockCtx() {
+  return {
+    clearRect:   jest.fn(),
+    putImageData: jest.fn(),
+    drawImage:   jest.fn(),
+    createImageData: jest.fn(() => ({
+      data: new Uint8ClampedArray(4 * 10 * 10),
+      width: 10,
+      height: 10,
+    })),
+    imageSmoothingEnabled: false,
+    imageSmoothingQuality: 'high' as ImageSmoothingQuality,
+  };
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
+  const mockCtx = createMockCtx();
   // Patch HTMLCanvasElement.getContext so our test canvas returns the mock ctx.
-  jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(MOCK_CTX as unknown as CanvasRenderingContext2D);
+  jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
 });
 
 afterEach(() => {

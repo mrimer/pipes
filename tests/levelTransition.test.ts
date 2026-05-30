@@ -32,7 +32,6 @@ describe('playSwirlScreenTransition', () => {
       const cb = rafQueue.shift()!;
       now += 125;
       cb(now);
-      jest.runOnlyPendingTimers();
       guard++;
     }
     if (rafQueue.length > 0) {

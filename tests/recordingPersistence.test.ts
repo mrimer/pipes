@@ -16,6 +16,7 @@ import {
   saveRecordingSettings,
 } from '../src/persistence';
 import { PlaySequenceRecord, RecordingSettings } from '../src/types';
+import { hasDuplicateAutoRecording } from '../src/autoRecording';
 import { makeRecord } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,51 +123,35 @@ describe('loadRecordingSettings', () => {
 
 // ─── Auto-recording dedup logic ───────────────────────────────────────────────
 
-/**
- * Simulate the dedup logic from Game._maybeAutoRecord to keep the test
- * isolated from Game (which requires a real DOM and many collaborators).
- */
-function simulateMaybeAutoRecord(
-  existingRecords: PlaySequenceRecord[],
-  newMoves: string[],
-): boolean {
-  const movesJson = JSON.stringify(newMoves);
-  const isDuplicate = existingRecords.some(
-    (r) => r.autoRecorded && JSON.stringify(r.moves) === movesJson,
-  );
-  return !isDuplicate;
-}
-
 describe('auto-recording dedup logic', () => {
-  it('records when no auto-recorded sequence exists', () => {
+  it('reports no duplicate when no auto-recorded sequence exists', () => {
     const existing: PlaySequenceRecord[] = [];
-    expect(simulateMaybeAutoRecord(existing, ['P:Straight:0:1:90'])).toBe(true);
+    expect(hasDuplicateAutoRecording(existing, ['P:Straight:0:1:90'])).toBe(false);
   });
 
-  it('skips when an identical auto-recorded sequence exists', () => {
+  it('reports duplicate when an identical auto-recorded sequence exists', () => {
     const existing = [makeRecord({ autoRecorded: true, moves: ['P:Straight:0:1:90'] })];
-    expect(simulateMaybeAutoRecord(existing, ['P:Straight:0:1:90'])).toBe(false);
+    expect(hasDuplicateAutoRecording(existing, ['P:Straight:0:1:90'])).toBe(true);
   });
 
-  it('records when the existing auto-recorded sequence differs', () => {
+  it('reports no duplicate when the existing auto-recorded sequence differs', () => {
     const existing = [makeRecord({ autoRecorded: true, moves: ['P:Straight:0:1:0'] })];
-    expect(simulateMaybeAutoRecord(existing, ['P:Straight:0:1:90'])).toBe(true);
+    expect(hasDuplicateAutoRecording(existing, ['P:Straight:0:1:90'])).toBe(false);
   });
 
-  it('records when an identical sequence exists but was manually recorded (not auto)', () => {
-    // A manual recording with the same moves should NOT prevent a new auto-recording.
+  it('reports no duplicate when an identical sequence exists but was manually recorded', () => {
     const existing = [makeRecord({ autoRecorded: false, moves: ['P:Straight:0:1:90'] })];
-    expect(simulateMaybeAutoRecord(existing, ['P:Straight:0:1:90'])).toBe(true);
+    expect(hasDuplicateAutoRecording(existing, ['P:Straight:0:1:90'])).toBe(false);
   });
 
-  it('records when the move sequence is empty (edge case)', () => {
+  it('reports no duplicate when the move sequence is empty and no auto-record exists', () => {
     const existing: PlaySequenceRecord[] = [];
-    expect(simulateMaybeAutoRecord(existing, [])).toBe(true);
+    expect(hasDuplicateAutoRecording(existing, [])).toBe(false);
   });
 
-  it('skips when an identical empty sequence was already auto-recorded', () => {
+  it('reports duplicate when an identical empty sequence was already auto-recorded', () => {
     const existing = [makeRecord({ autoRecorded: true, moves: [] })];
-    expect(simulateMaybeAutoRecord(existing, [])).toBe(false);
+    expect(hasDuplicateAutoRecording(existing, [])).toBe(true);
   });
 });
 

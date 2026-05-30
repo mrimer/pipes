@@ -8,6 +8,7 @@ import { VortexParticle, spawnVortexParticle, renderVortex } from '../src/visual
 function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[] } {
   const calls: string[] = [];
   const fillStylesAtFill: string[] = [];
+  let fillStyle = '';
   const ctx = {
     calls,
     fillStylesAtFill,
@@ -21,7 +22,6 @@ function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStyles
     },
     globalAlpha: 1,
   };
-  let fillStyle = '';
   Object.defineProperty(ctx, 'fillStyle', {
     configurable: true,
     get: () => fillStyle,
