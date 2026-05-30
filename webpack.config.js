@@ -27,6 +27,8 @@ module.exports = {
     filename: '[name].[contenthash].js',
     chunkFilename: '[name].[contenthash].js',
     path: path.resolve(__dirname, 'dist'),
+    // Use relative URLs so GitHub Pages project-site paths (e.g. /pipes/) resolve assets correctly.
+    publicPath: './',
     clean: true,
   },
   plugins: [

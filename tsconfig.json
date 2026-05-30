@@ -6,9 +6,12 @@
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
+    // Keep baseline strictness stable; additional strict flags are deferred until
+    // a dedicated migration can address resulting diagnostics across the codebase.
     "esModuleInterop": true,
     "outDir": "./dist",
     "rootDir": "./src",
+    // Kept on for local debugging/tests; webpack production output does not emit .map files.
     "sourceMap": true,
     "lib": ["ES2020", "DOM"]
   },
