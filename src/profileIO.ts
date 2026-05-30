@@ -112,6 +112,15 @@ export function importReplay(
       alert('Import failed: not a valid replay file.');
       return;
     }
+    const replayVersion = parsed.version;
+    if (typeof replayVersion !== 'number' || !Number.isFinite(replayVersion)) {
+      alert('Import failed: replay file is missing a valid version.');
+      return;
+    }
+    if (replayVersion > REPLAY_FILE_VERSION) {
+      alert('Import failed: file from newer version');
+      return;
+    }
     const recordJson = JSON.stringify(parsed.record);
     if (typeof parsed.checksum === 'string' && computeChecksum(recordJson) !== parsed.checksum) {
       alert('Import failed: replay file checksum mismatch (file may be corrupted).');
@@ -125,7 +134,10 @@ export function importReplay(
       alert(err instanceof Error ? err.message : 'Import failed: invalid replay record.');
       return;
     }
-    const record = recordCandidate as PlaySequenceRecord;
+    const record = {
+      ...(recordCandidate as PlaySequenceRecord),
+      formatVersion: (recordCandidate as PlaySequenceRecord).formatVersion ?? 1,
+    };
     saveRecording(record);
 
     const campaign = campaigns.find((c) => c.id === record.campaignId);

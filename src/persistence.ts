@@ -613,6 +613,7 @@ export function saveChapterEditorMapBoxCollapsed(collapsed: boolean): void {
 
 const RECORDINGS_KEY = 'pipes_recordings';
 const RECORDING_SETTINGS_KEY = (): string => `pipes_${p()}recording_settings`;
+const SUPPORTED_RECORDING_FORMAT_VERSION = 1;
 
 /** Load all saved {@link PlaySequenceRecord} entries from localStorage. */
 export function loadAllRecordings(): PlaySequenceRecord[] {
@@ -621,16 +622,27 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
     if (raw) {
       const parsed = JSON.parse(raw) as unknown;
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter(
-        (entry): entry is PlaySequenceRecord => !!(
-          entry
-          && typeof entry === 'object'
-          && typeof (entry as Record<string, unknown>)['id'] === 'string'
-          && typeof (entry as Record<string, unknown>)['campaignId'] === 'string'
-          && typeof (entry as Record<string, unknown>)['levelId'] === 'number'
-          && Array.isArray((entry as Record<string, unknown>)['moves'])
-        ),
-      );
+      return parsed.flatMap((entry): PlaySequenceRecord[] => {
+        if (
+          !entry
+          || typeof entry !== 'object'
+          || typeof (entry as Record<string, unknown>)['id'] !== 'string'
+          || typeof (entry as Record<string, unknown>)['campaignId'] !== 'string'
+          || typeof (entry as Record<string, unknown>)['levelId'] !== 'number'
+          || !Array.isArray((entry as Record<string, unknown>)['moves'])
+        ) {
+          return [];
+        }
+        const candidate = entry as Record<string, unknown>;
+        const formatVersion = typeof candidate['formatVersion'] === 'number' ? candidate['formatVersion'] : 1;
+        if (formatVersion > SUPPORTED_RECORDING_FORMAT_VERSION) {
+          console.warn(
+            `Dropping recording "${candidate['id']}" with unsupported formatVersion ${formatVersion}.`,
+          );
+          return [];
+        }
+        return [{ ...(candidate as PlaySequenceRecord), formatVersion }];
+      });
     }
   } catch { /* ignore parse errors */ }
   return [];
@@ -667,11 +679,15 @@ export function loadRecordingsForProfile(guid: string, name: string): PlaySequen
 export function saveRecording(record: PlaySequenceRecord): void {
   try {
     const all = loadAllRecordings();
+    const recordToSave: PlaySequenceRecord = {
+      ...record,
+      formatVersion: record.formatVersion ?? 1,
+    };
     const idx = all.findIndex((r) => r.id === record.id);
     if (idx >= 0) {
-      all[idx] = record;
+      all[idx] = recordToSave;
     } else {
-      all.push(record);
+      all.push(recordToSave);
     }
     localStorage.setItem(RECORDINGS_KEY, JSON.stringify(all));
   } catch { /* ignore storage errors */ }

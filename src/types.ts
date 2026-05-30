@@ -459,6 +459,8 @@ export interface CampaignDef {
  * reconstructed by replaying the moves from the initial level state.
  */
 export interface PlaySequenceRecord {
+  /** Save-data schema version for this record. Missing implies legacy version 1. */
+  formatVersion?: number;
   /** Unique identifier for this record (timestamp-based). */
   id: string;
   /** Campaign this recording belongs to. */

@@ -301,6 +301,26 @@ function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
   return true;
 }
 
+function migratePayloadV1ToV2(payload: Record<string, unknown>): Record<string, unknown> {
+  if (!payload['guid'] || typeof payload['guid'] !== 'string') {
+    payload['guid'] = _generateFallbackGuid();
+  }
+  if (!('lastPlayedAt' in payload)) {
+    payload['lastPlayedAt'] = null;
+  }
+  return payload;
+}
+
+function migratePayloadV2ToV3(payload: Record<string, unknown>): Record<string, unknown> {
+  // v3 introduced activeCampaignId; older files can safely default to null.
+  if (!('activeCampaignId' in payload)) {
+    payload['activeCampaignId'] = null;
+  }
+  // Future structural migrations should keep this version-cursor pattern:
+  // add migratePayloadVnToVn+1 and advance cursor one step at a time.
+  return payload;
+}
+
 /**
  * Parse and validate a player-profile JSON string.
  *
@@ -345,6 +365,7 @@ export function parsePlayerFile(json: string): PlayerFileResult {
 
   const storedChecksum = file['checksum'];
   const payload        = file['payload'];
+  const versionRaw     = file['version'];
   if (typeof storedChecksum !== 'string' || !payload || typeof payload !== 'object') {
     return { ok: false, error: 'Invalid player profile file: missing required fields.' };
   }
@@ -359,13 +380,26 @@ export function parsePlayerFile(json: string): PlayerFileResult {
   }
 
   const rawPayload = payload as Record<string, unknown>;
-
-  // Forward-compatibility: v1 files lack `guid` and `lastPlayedAt`.
-  if (!rawPayload['guid'] || typeof rawPayload['guid'] !== 'string') {
-    rawPayload['guid'] = _generateFallbackGuid();
+  if (typeof versionRaw !== 'number' || !Number.isFinite(versionRaw)) {
+    return { ok: false, error: 'Invalid player profile file: missing or invalid version.' };
   }
-  if (!('lastPlayedAt' in rawPayload)) {
-    rawPayload['lastPlayedAt'] = null;
+  if (versionRaw > PROFILE_FORMAT_VERSION) {
+    return { ok: false, error: 'file from newer version' };
+  }
+
+  let payloadVersion = Math.floor(versionRaw);
+  while (payloadVersion < PROFILE_FORMAT_VERSION) {
+    if (payloadVersion === 1) {
+      migratePayloadV1ToV2(rawPayload);
+      payloadVersion = 2;
+      continue;
+    }
+    if (payloadVersion === 2) {
+      migratePayloadV2ToV3(rawPayload);
+      payloadVersion = 3;
+      continue;
+    }
+    return { ok: false, error: `Unsupported player profile version: ${payloadVersion}` };
   }
   if (!hasValidPayloadShape(rawPayload)) {
     return {
