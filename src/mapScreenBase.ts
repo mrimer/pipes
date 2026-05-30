@@ -19,7 +19,7 @@ import {
 import { BG_COLOR, SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
-import { applyScrollingPipeBackground } from './uiBackground';
+import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from './uiBackground';
 import { isEnvironmentalEnabled } from './graphicsSettings';
 import { WinTileGlow, computeChapterMapWinGlows, renderWinTileGlows, WIN_TILE_GLOW_DURATION } from './visuals/winTileEffect';
 import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
@@ -643,6 +643,7 @@ export abstract class MapScreenBase {
 
     this._resetCloudShadows(chapter.style);
     this._populate(campaign, chapterIdx, chapter);
+    applyScrollingPipeBackground(this.screenEl, { baseColor: BG_COLOR });
     this.screenEl.style.display = 'flex';
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
@@ -662,6 +663,7 @@ export abstract class MapScreenBase {
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
     window.removeEventListener('resize', this._onResize);
+    unregisterScrollingPipeBackground(this.screenEl);
     this._ctrlHeld = false;
     this._hideTooltip();
     // Clear any pending long-press timer.

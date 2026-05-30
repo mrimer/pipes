@@ -32,7 +32,7 @@ import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecord
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from './gameModals';
 import { attachHoverWaveAnimation } from './visuals/chapterWaves';
 import type { CampaignDef } from './types';
-import { applyScrollingPipeBackground } from './uiBackground';
+import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from './uiBackground';
 
 // ─── Styling constants ────────────────────────────────────────────────────────
 
@@ -164,6 +164,10 @@ export class PlayerProfileScreen {
   show(campaigns: CampaignDef[] = []): void {
     this._campaigns = campaigns;
     this._render();
+    applyScrollingPipeBackground(this._el, {
+      baseColor: SCREEN_BG,
+      overlayAlpha: 0.8,
+    });
     this._el.style.display = 'flex';
     this._el.scrollTop = 0;
     document.addEventListener('keydown', this._onKeyDown);
@@ -173,6 +177,7 @@ export class PlayerProfileScreen {
   hide(): void {
     this._el.style.display = 'none';
     document.removeEventListener('keydown', this._onKeyDown);
+    unregisterScrollingPipeBackground(this._el);
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────

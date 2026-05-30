@@ -49,7 +49,7 @@ import { exportReplay, importReplay } from './profileIO';
 import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
-import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
+import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled, unregisterScrollingPipeBackground } from './uiBackground';
 import { isEnvironmentalEnabled, setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';
 import { hasDuplicateAutoRecording } from './autoRecording';
@@ -143,6 +143,14 @@ export class Game implements InputCallbacks {
 
   /** Input handler that owns all event listeners and input state. */
   private readonly _input: InputHandler;
+  /** Window resize handler stored for proper listener cleanup on destroy. */
+  private _resizeHandler!: () => void;
+  /** Debounce timer for resize handling. */
+  private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  /** RAF id for the main render loop. */
+  private _renderRafId: number | null = null;
+  /** True after destroy() is called to stop async callbacks. */
+  private _destroyed = false;
 
   // Screens / overlays (managed by DOM, not canvas)
   private readonly levelSelectEl: HTMLElement;
@@ -487,14 +495,14 @@ export class Game implements InputCallbacks {
     this._input = new InputHandler(canvas, this);
 
     // Re-layout on orientation change / window resize (debounced at 100 ms).
-    let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
-    window.addEventListener('resize', () => {
-      if (_resizeTimer !== null) clearTimeout(_resizeTimer);
-      _resizeTimer = setTimeout(() => {
-        _resizeTimer = null;
+    this._resizeHandler = () => {
+      if (this._resizeTimer !== null) clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        this._resizeTimer = null;
         this._handleResize();
       }, 100);
-    });
+    };
+    window.addEventListener('resize', this._resizeHandler);
 
     // Show the level-select screen or, if no profile slot is active, show the
     // profile screen so the player can choose or create a profile first.
@@ -859,12 +867,16 @@ export class Game implements InputCallbacks {
   // ─── Main render loop ──────────────────────────────────────────────────────
 
   private _loop(): void {
+    if (this._destroyed) return;
     if (this.screen === GameScreen.Play || this.screen === GameScreen.Playback) {
       this._renderBoard();
       this._animMgr.tick(this.board, this.gameState);
       this._metrics.tickGoldenInventoryTwinkle();
     }
-    requestAnimationFrame(() => this._loop());
+    this._renderRafId = requestAnimationFrame(() => {
+      if (this._destroyed) return;
+      this._loop();
+    });
   }
 
   private _renderBoard(): void {
@@ -1943,6 +1955,17 @@ export class Game implements InputCallbacks {
    * the same document (e.g. across test cases).
    */
   destroy(): void {
+    this._destroyed = true;
+    if (this._resizeTimer !== null) {
+      clearTimeout(this._resizeTimer);
+      this._resizeTimer = null;
+    }
+    window.removeEventListener('resize', this._resizeHandler);
+    if (this._renderRafId !== null) {
+      cancelAnimationFrame(this._renderRafId);
+      this._renderRafId = null;
+    }
+    unregisterScrollingPipeBackground(this._settingsModalEl);
     this._input.destroy();
   }
 

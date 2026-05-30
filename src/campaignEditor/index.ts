@@ -49,12 +49,13 @@ import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
 import { commandKeyManager } from '../commandKeyManager';
 import { downloadGzipJson, readGzipOrJsonFile } from '../fileIO';
-import { applyScrollingPipeBackground } from '../uiBackground';
+import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from '../uiBackground';
 
 /** Horizontal padding (px) of the main editor layout container. */
 const EDITOR_LAYOUT_PADDING = 16;
 /** Gap (px) between flex columns in the main editor layout. */
 const EDITOR_LAYOUT_GAP = 16;
+const EDITOR_BG_COLOR = '#0d1520';
 
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export class CampaignEditor {
 
   /** Bound keydown handler stored so it can be removed by destroy(). */
   private readonly _keydownHandler: (e: KeyboardEvent) => void;
+  private _keydownAttached = false;
   private _saveFeedbackResetTimer: number | null = null;
 
   constructor(
@@ -159,7 +161,7 @@ export class CampaignEditor {
       'display:none;position:fixed;inset:0;overflow:auto;z-index:200;' +
       'font-family:Arial,sans-serif;color:#eee;flex-direction:column;align-items:center;';
     applyScrollingPipeBackground(this._el, {
-      baseColor: '#0d1520',
+      baseColor: EDITOR_BG_COLOR,
       overlayAlpha: 0.8,
     });
     document.body.appendChild(this._el);
@@ -201,14 +203,19 @@ export class CampaignEditor {
         }
       }
     };
-    document.addEventListener('keydown', this._keydownHandler);
+    this._attachKeydownHandler();
   }
 
   /** Show the campaign editor (campaign list screen). */
   show(): void {
     this._service.ensureCampaignMaps();
+    applyScrollingPipeBackground(this._el, {
+      baseColor: EDITOR_BG_COLOR,
+      overlayAlpha: 0.8,
+    });
     this._el.style.display = 'flex';
     document.body.classList.add('editor-open');
+    this._attachKeydownHandler();
     this._showCampaignList();
   }
 
@@ -218,8 +225,13 @@ export class CampaignEditor {
    */
   showAndRestore(): void {
     this._service.ensureCampaignMaps();
+    applyScrollingPipeBackground(this._el, {
+      baseColor: EDITOR_BG_COLOR,
+      overlayAlpha: 0.8,
+    });
     this._el.style.display = 'flex';
     document.body.classList.add('editor-open');
+    this._attachKeydownHandler();
     switch (this._screen) {
       case EditorScreen.LevelEditor: {
         const campaign = this._getActiveCampaign();
@@ -242,6 +254,8 @@ export class CampaignEditor {
   hide(): void {
     this._stopEditorSeaAnimationLoops();
     this._clearSaveFeedbackTimer();
+    this._detachKeydownHandler();
+    unregisterScrollingPipeBackground(this._el);
     this._el.style.display = 'none';
     document.body.classList.remove('editor-open');
   }
@@ -250,7 +264,20 @@ export class CampaignEditor {
   destroy(): void {
     this._stopEditorSeaAnimationLoops();
     this._clearSaveFeedbackTimer();
+    this._detachKeydownHandler();
+    unregisterScrollingPipeBackground(this._el);
+  }
+
+  private _attachKeydownHandler(): void {
+    if (this._keydownAttached) return;
+    document.addEventListener('keydown', this._keydownHandler);
+    this._keydownAttached = true;
+  }
+
+  private _detachKeydownHandler(): void {
+    if (!this._keydownAttached) return;
     document.removeEventListener('keydown', this._keydownHandler);
+    this._keydownAttached = false;
   }
 
   private _clearSaveFeedbackTimer(): void {

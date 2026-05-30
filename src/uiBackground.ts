@@ -158,6 +158,19 @@ export function applyScrollingPipeBackground(
 }
 
 /**
+ * Remove a target from global scrolling-background bookkeeping.
+ * Use this when a screen is hidden or destroyed so target references do not accumulate.
+ */
+export function unregisterScrollingPipeBackground(target: HTMLElement): void {
+  registeredBackgroundOptions.delete(target);
+  synchronizedBackgroundDurationsSec.delete(target);
+  if (synchronizedBackgroundDurationsSec.size === 0 && synchronizedBackgroundAnimationFrameId !== null) {
+    cancelAnimationFrame(synchronizedBackgroundAnimationFrameId);
+    synchronizedBackgroundAnimationFrameId = null;
+  }
+}
+
+/**
  * Show only the solid base color on a registered background target, hiding the
  * scrolling pipe pattern.  The registration is retained so the pattern can be
  * re-enabled via {@link setGlobalBackgroundPatternEnabled}.
