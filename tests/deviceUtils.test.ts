@@ -17,7 +17,7 @@ type MatchMediaState = {
 
 describe('deviceUtils touch-ui detection', () => {
   const originalMatchMedia = window.matchMedia;
-  const hadOwnMaxTouchPoints = Object.prototype.hasOwnProperty.call(navigator, 'maxTouchPoints');
+  const hasOwnMaxTouchPoints = Object.prototype.hasOwnProperty.call(navigator, 'maxTouchPoints');
   // Tests patch `navigator.maxTouchPoints` on the navigator instance, so capture and restore
   // the instance descriptor to prevent own-property leakage between test cases.
   const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints');
@@ -55,7 +55,7 @@ describe('deviceUtils touch-ui detection', () => {
   afterEach(() => {
     setTouchUiEnabledOverride(null);
     window.matchMedia = originalMatchMedia;
-    if (hadOwnMaxTouchPoints && originalMaxTouchPoints) {
+    if (hasOwnMaxTouchPoints && originalMaxTouchPoints) {
       Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints);
     } else {
       // No original own property existed; remove the test-added override to expose prototype behavior.

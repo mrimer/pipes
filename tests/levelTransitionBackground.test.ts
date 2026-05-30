@@ -43,7 +43,11 @@ describe('map zoom transition backgrounds', () => {
       cb!(now);
       safetyCounter++;
     }
-    expect(rafQueue.length).toBe(0);
+    if (rafQueue.length > 0) {
+      throw new Error(
+        `flushAllAnimationFrames hit cap (${maxFrames}) with ${rafQueue.length} callbacks still queued`,
+      );
+    }
   }
 
   function flushSingleAnimationFrame(): void {

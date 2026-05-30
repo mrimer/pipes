@@ -35,7 +35,9 @@ describe('playSwirlScreenTransition', () => {
       jest.runOnlyPendingTimers();
       guard++;
     }
-    expect(rafQueue.length).toBe(0);
+    if (rafQueue.length > 0) {
+      throw new Error(`flushAllRaf hit cap (${maxFrames}) with ${rafQueue.length} callbacks still queued`);
+    }
     jest.runOnlyPendingTimers();
   }
 
