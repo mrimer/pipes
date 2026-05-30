@@ -37,7 +37,12 @@ describe('playSwirlScreenTransition', () => {
     if (rafQueue.length > 0) {
       throw new Error(`flushAllRaf hit cap (${maxFrames}) with ${rafQueue.length} callbacks still queued`);
     }
-    jest.runOnlyPendingTimers();
+    // Note: jest.runOnlyPendingTimers() is intentionally NOT called here.
+    // scheduleFrame() pairs each RAF with a setTimeout fallback and clears the
+    // timeout when the RAF fires, so there are no pending timers after draining
+    // the RAF queue.  Firing timers here would cause the fallback callbacks to
+    // run a second time (before the `fired` guard could stop them) and could
+    // also trigger unrelated timers registered elsewhere.
   }
 
   it('collapses to black, reveals destination, and removes blocker', () => {

@@ -74,11 +74,20 @@ const makeCtx = () => {
 };
 
 describe('renderAnimations', () => {
+  // Pin performance.now() to a fixed value so elapsed-time calculations are
+  // deterministic even on slow CI machines (wall-clock flakiness).
+  const FIXED_NOW = 10_000;
+  beforeEach(() => {
+    jest.spyOn(performance, 'now').mockReturnValue(FIXED_NOW);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('draws active animations with fillText', () => {
     const ctx = makeCtx();
-    const now = performance.now();
     const anims: TileAnimation[] = [
-      { x: 100, y: 50, text: '-1', color: ANIM_NEGATIVE_COLOR, startTime: now - 100, duration: 900 },
+      { x: 100, y: 50, text: '-1', color: ANIM_NEGATIVE_COLOR, startTime: FIXED_NOW - 100, duration: 900 },
     ];
     renderAnimations(ctx, anims);
     expect((ctx.fillText as jest.Mock).mock.calls[0]).toEqual(['-1', 100, expect.any(Number)]);
@@ -87,10 +96,9 @@ describe('renderAnimations', () => {
 
   it('removes animations that have expired', () => {
     const ctx = makeCtx();
-    const now = performance.now();
     const anims: TileAnimation[] = [
       // Already past its duration
-      { x: 10, y: 10, text: '+5', color: ANIM_POSITIVE_COLOR, startTime: now - 1000, duration: 900 },
+      { x: 10, y: 10, text: '+5', color: ANIM_POSITIVE_COLOR, startTime: FIXED_NOW - 1000, duration: 900 },
     ];
     renderAnimations(ctx, anims);
     expect(anims).toHaveLength(0); // expired → removed
@@ -99,10 +107,9 @@ describe('renderAnimations', () => {
 
   it('applies partial alpha for a mid-animation frame', () => {
     const ctx = makeCtx();
-    const now = performance.now();
     const half = 450; // halfway through a 900ms animation
     const anims: TileAnimation[] = [
-      { x: 64, y: 32, text: '+3', color: ANIM_POSITIVE_COLOR, startTime: now - half, duration: 900 },
+      { x: 64, y: 32, text: '+3', color: ANIM_POSITIVE_COLOR, startTime: FIXED_NOW - half, duration: 900 },
     ];
     renderAnimations(ctx, anims);
     // At exactly 50% elapsed, the fade has just started so alpha is at its

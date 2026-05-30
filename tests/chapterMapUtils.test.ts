@@ -150,6 +150,9 @@ describe('tileDefConnections', () => {
   });
 
   it('Cross connects all four directions regardless of rotation', () => {
+    // Cross is rotation-invariant by design: all four connections are always
+    // present no matter how the tile is rotated. The loop verifies this holds
+    // for every valid rotation rather than only spot-checking one value.
     for (const rotation of [0, 90, 180, 270] as const) {
       const conns = tileDefConnections({ shape: PipeShape.Cross, rotation });
       expect(conns.size).toBe(4);

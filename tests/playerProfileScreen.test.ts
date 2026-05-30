@@ -38,9 +38,12 @@ describe('PlayerProfileScreen', () => {
 
     const overlay = document.getElementById('player-profile-screen');
     const heading = overlay?.querySelector('h2') ?? null;
-    const cards = overlay?.querySelector('div') ?? null;
+    // The cards container is always the immediate next sibling of the heading.
+    // Using nextElementSibling instead of querySelector('div') avoids brittleness
+    // if additional divs are ever inserted before the cards container.
+    const cards = (heading?.nextElementSibling as HTMLElement | null) ?? null;
     expect(heading?.textContent).toBe('👤 Select Player');
-    expect(heading?.nextElementSibling).toBe(cards);
+    expect(cards?.tagName.toLowerCase()).toBe('div');
   });
 
   it('resets overlay scroll, keeps cards centered, and pins heading at top', () => {

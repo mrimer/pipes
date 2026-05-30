@@ -27,10 +27,17 @@ describe('createGameRulesModal', () => {
     expect(modal.style.display).toBe('none');
   });
 
-  it('shows when display is set to flex', () => {
+  it('second Close button at the bottom of the modal also hides the modal', () => {
     const modal = createGameRulesModal();
     modal.style.display = 'flex';
-    expect(modal.style.display).toBe('flex');
+
+    const closeButtons = Array.from(document.body.querySelectorAll('button')).filter(
+      btn => btn.textContent === 'Close',
+    );
+    expect(closeButtons).toHaveLength(2);
+
+    closeButtons[1].click();
+    expect(modal.style.display).toBe('none');
   });
 
   it('contains a Game Rules heading', () => {
