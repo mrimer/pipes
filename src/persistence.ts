@@ -90,8 +90,23 @@ export function loadImportedCampaigns(): CampaignDef[] {
   try {
     const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
     if (raw) {
-      const campaigns = JSON.parse(raw) as CampaignDef[];
-      return campaigns.map(migrateCampaign);
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      const campaigns: CampaignDef[] = [];
+      for (const entry of parsed) {
+        if (
+          entry
+          && typeof entry === 'object'
+          && typeof (entry as Record<string, unknown>)['id'] === 'string'
+          && typeof (entry as Record<string, unknown>)['name'] === 'string'
+          && Array.isArray((entry as Record<string, unknown>)['chapters'])
+        ) {
+          campaigns.push(migrateCampaign(entry as CampaignDef));
+        } else {
+          console.warn('Dropping invalid imported campaign entry from storage.');
+        }
+      }
+      return campaigns;
     }
   } catch {
     // ignore parse errors
@@ -603,7 +618,20 @@ const RECORDING_SETTINGS_KEY = (): string => `pipes_${p()}recording_settings`;
 export function loadAllRecordings(): PlaySequenceRecord[] {
   try {
     const raw = localStorage.getItem(RECORDINGS_KEY);
-    if (raw) return JSON.parse(raw) as PlaySequenceRecord[];
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (entry): entry is PlaySequenceRecord => !!(
+          entry
+          && typeof entry === 'object'
+          && typeof (entry as Record<string, unknown>)['id'] === 'string'
+          && typeof (entry as Record<string, unknown>)['campaignId'] === 'string'
+          && typeof (entry as Record<string, unknown>)['levelId'] === 'number'
+          && Array.isArray((entry as Record<string, unknown>)['moves'])
+        ),
+      );
+    }
   } catch { /* ignore parse errors */ }
   return [];
 }
