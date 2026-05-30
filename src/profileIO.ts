@@ -23,6 +23,19 @@ const REPLAY_FILE_VERSION = 1;
 const FILE_READ_ERROR_MESSAGE =
   'Failed to read the selected file. It may be corrupted or an unsupported format.';
 
+function assertReplayRecordShape(record: unknown): asserts record is { id: string; moves: unknown[] } {
+  if (!record || typeof record !== 'object') {
+    throw new Error('Import failed: replay record is not an object.');
+  }
+  const candidate = record as Record<string, unknown>;
+  if (typeof candidate.id !== 'string') {
+    throw new Error('Import failed: replay record is missing a valid string "id".');
+  }
+  if (!Array.isArray(candidate.moves)) {
+    throw new Error('Import failed: replay record is missing a valid "moves" array.');
+  }
+}
+
 function sanitizeFilenamePart(value: string, fallback: string): string {
   const safeValue = value
     .replace(FILENAME_SAFE_CHARACTERS_REGEX, '')
@@ -105,7 +118,14 @@ export function importReplay(
       return;
     }
 
-    const record = parsed.record as PlaySequenceRecord;
+    const recordCandidate = parsed.record as unknown;
+    try {
+      assertReplayRecordShape(recordCandidate);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Import failed: invalid replay record.');
+      return;
+    }
+    const record = recordCandidate as PlaySequenceRecord;
     saveRecording(record);
 
     const campaign = campaigns.find((c) => c.id === record.campaignId);

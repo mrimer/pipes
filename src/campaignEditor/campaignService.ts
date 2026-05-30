@@ -492,10 +492,14 @@ export class CampaignService {
       delete raw['type'];
     }
 
-    const data = migrateCampaign(raw as unknown as CampaignDef);
-    if (!data.id || !data.name || !Array.isArray(data.chapters)) {
+    if (
+      typeof raw['id'] !== 'string'
+      || typeof raw['name'] !== 'string'
+      || !Array.isArray(raw['chapters'])
+    ) {
       throw new Error('Invalid campaign file format.');
     }
+    const data = migrateCampaign(raw as unknown as CampaignDef);
     // Silently remap the reserved "official" ID to avoid collision with the
     // built-in official campaign.
     if (data.id === 'official') {

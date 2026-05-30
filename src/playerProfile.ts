@@ -269,6 +269,38 @@ export interface PlayerFileSuccess {
 
 export type PlayerFileResult = PlayerFileSuccess | PlayerFileError;
 
+function hasValidRecordingsShape(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const record = entry as Record<string, unknown>;
+    if (
+      typeof record['id'] !== 'string'
+      || !Array.isArray(record['moves'])
+      || typeof record['campaignId'] !== 'string'
+      || typeof record['levelId'] !== 'number'
+    ) {
+      return false;
+    }
+    if ('stars' in record && record['stars'] !== undefined && typeof record['stars'] !== 'number') return false;
+    if ('waterScore' in record && record['waterScore'] !== undefined && typeof record['waterScore'] !== 'number') return false;
+    return true;
+  });
+}
+
+function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
+  if (typeof payload['guid'] !== 'string') return false;
+  if (!(payload['lastPlayedAt'] === null || typeof payload['lastPlayedAt'] === 'string')) return false;
+  if (typeof payload['playerName'] !== 'string') return false;
+  if (typeof payload['sfxVolume'] !== 'number') return false;
+  if (!(payload['touchUiEnabled'] === null || typeof payload['touchUiEnabled'] === 'boolean')) return false;
+  if (!(payload['commandKeys'] === null || typeof payload['commandKeys'] === 'object')) return false;
+  if (!Array.isArray(payload['campaignProgress'])) return false;
+  if ('activeCampaignId' in payload && payload['activeCampaignId'] !== null && typeof payload['activeCampaignId'] !== 'string') return false;
+  if ('recordings' in payload && !hasValidRecordingsShape(payload['recordings'])) return false;
+  return true;
+}
+
 /**
  * Parse and validate a player-profile JSON string.
  *
@@ -334,6 +366,12 @@ export function parsePlayerFile(json: string): PlayerFileResult {
   }
   if (!('lastPlayedAt' in rawPayload)) {
     rawPayload['lastPlayedAt'] = null;
+  }
+  if (!hasValidPayloadShape(rawPayload)) {
+    return {
+      ok: false,
+      error: 'Invalid player profile file: payload shape mismatch.',
+    };
   }
 
   return { ok: true, payload: rawPayload as unknown as PlayerProfilePayload };
