@@ -112,7 +112,7 @@ describe('computeWinTileGlows', () => {
     expect(branchGlow!.startTime).toBe(base + WIN_TILE_LAYER_DELAY_MS);
   });
 
-  it('returns an empty array when no tiles are filled (disconnected board)', () => {
+  it('includes the source tile but excludes disconnected sink tiles', () => {
     const board = new Board(1, 2);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 1 };

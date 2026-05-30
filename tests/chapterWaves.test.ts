@@ -109,18 +109,18 @@ function createMockCtx() {
   };
 }
 
-beforeEach(() => {
-  jest.clearAllMocks();
-  const mockCtx = createMockCtx();
-  // Patch HTMLCanvasElement.getContext so our test canvas returns the mock ctx.
-  jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
-});
-
-afterEach(() => {
-  jest.restoreAllMocks();
-});
-
 describe('attachChapterWaveAnimation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const mockCtx = createMockCtx();
+    // Patch HTMLCanvasElement.getContext so our test canvas returns the mock ctx.
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('inserts a canvas element as the last child of the header', () => {
     const header = document.createElement('button');
     const span   = document.createElement('span');
@@ -206,6 +206,16 @@ describe('attachChapterWaveAnimation', () => {
 // ─── attachInventoryWaveAnimation ─────────────────────────────────────────────
 
 describe('attachInventoryWaveAnimation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    const mockCtx = createMockCtx();
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('inserts a canvas element as the last child of the element', () => {
     const el   = document.createElement('div');
     const span = document.createElement('span');

@@ -33,7 +33,7 @@ export interface VortexParticle {
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** Maximum number of simultaneously active vortex particles. */
-const VORTEX_MAX_PARTICLES = 18;
+export const VORTEX_MAX_PARTICLES = 18;
 
 /**
  * Outer spawn radius as a fraction of the tile half-size.

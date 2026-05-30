@@ -1,6 +1,11 @@
 /** Tests for the sinkVortex visual-effect utilities. */
 
-import { VortexParticle, spawnVortexParticle, renderVortex } from '../src/visuals/sinkVortex';
+import {
+  VORTEX_MAX_PARTICLES,
+  VortexParticle,
+  spawnVortexParticle,
+  renderVortex,
+} from '../src/visuals/sinkVortex';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -43,9 +48,9 @@ describe('spawnVortexParticle', () => {
 
   it('does not exceed the maximum pool size', () => {
     const particles: VortexParticle[] = [];
-    // Spawn far more particles than the max (18).
+    // Spawn far more particles than the configured max.
     for (let i = 0; i < 50; i++) spawnVortexParticle(particles);
-    expect(particles.length).toBeLessThanOrEqual(18);
+    expect(particles.length).toBe(VORTEX_MAX_PARTICLES);
   });
 
   it('gives each particle a positive spawn radius', () => {
