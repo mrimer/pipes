@@ -1,6 +1,7 @@
 /** Tests for the shared BFS helpers in src/bfs.ts. */
 
 import { bfs, bfsWithDepth } from '../src/bfs';
+import { posKey } from '../src/board';
 import { GridPos } from '../src/types';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -90,11 +91,9 @@ describe('bfs', () => {
   });
 
   it('produces keys compatible with the posKey format from board.ts', () => {
-    // board.ts posKey(r, c) === `${r},${c}` — verify keys match
     const result = bfs({ row: 1, col: 3 }, gridNeighbors(3, 5));
-    // All keys should match the "row,col" format
     for (const [k, pos] of result) {
-      expect(k).toBe(`${pos.row},${pos.col}`);
+      expect(k).toBe(posKey(pos.row, pos.col));
     }
   });
 

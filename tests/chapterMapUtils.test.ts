@@ -150,8 +150,14 @@ describe('tileDefConnections', () => {
   });
 
   it('Cross connects all four directions regardless of rotation', () => {
-    const conns = tileDefConnections({ shape: PipeShape.Cross, rotation: 0 });
-    expect(conns.size).toBe(4);
+    for (const rotation of [0, 90, 180, 270] as const) {
+      const conns = tileDefConnections({ shape: PipeShape.Cross, rotation });
+      expect(conns.size).toBe(4);
+      expect(conns.has(Direction.North)).toBe(true);
+      expect(conns.has(Direction.East)).toBe(true);
+      expect(conns.has(Direction.South)).toBe(true);
+      expect(conns.has(Direction.West)).toBe(true);
+    }
   });
 
   it('Granite returns empty set (no connections)', () => {
@@ -318,15 +324,17 @@ describe('computeChapterMapReachable', () => {
   });
 
   it('respects getConns isEntry flag for one-sided traversal', () => {
-    // Custom getConns: exiting (0,0) allows East; entering (0,1) only allows West (N-S pipe)
     const grid: (TileDef | null)[][] = [[
-      { shape: PipeShape.Straight, rotation: 90 }, // E-W (exit East OK)
-      { shape: PipeShape.Straight, rotation: 0 },  // N-S (entry from West blocked)
+      { shape: PipeShape.Cross },
+      { shape: PipeShape.Cross },
     ]];
-    // editorTileConns treats everything by structural shape so (0,1) N-S pipe won't connect West.
-    const reached = computeChapterMapReachable(grid, 1, 2, { row: 0, col: 0 }, editorConns);
+    const getConns = (_def: TileDef, isEntry: boolean): Set<Direction> => {
+      if (isEntry) return new Set();
+      return new Set([Direction.East, Direction.West, Direction.North, Direction.South]);
+    };
+    const reached = computeChapterMapReachable(grid, 1, 2, { row: 0, col: 0 }, getConns);
     expect(reached.has('0,0')).toBe(true);
-    expect(reached.has('0,1')).toBe(false); // N-S pipe has no West connection
+    expect(reached.has('0,1')).toBe(false);
   });
 
   it('level chamber with explicit connections blocks exit when uncompleted', () => {

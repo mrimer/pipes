@@ -8,6 +8,11 @@ import { CommandKeyManager } from '../src/commandKeyManager';
 describe('createGameRulesModal', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   it('appends a modal element to document.body', () => {

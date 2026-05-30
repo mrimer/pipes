@@ -18,6 +18,11 @@ import { renderMinimap } from '../src/visuals/minimap';
 
 interface FillCall { style: string; x: number; y: number; w: number; h: number }
 
+const originalGetContextDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLCanvasElement.prototype,
+  'getContext',
+);
+
 class FakeContext {
   fillStyle = '';
   strokeStyle = '';
@@ -54,6 +59,14 @@ function installCanvasMock(): FakeContext {
 
 beforeEach(() => {
   installCanvasMock();
+});
+
+afterEach(() => {
+  if (originalGetContextDescriptor) {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', originalGetContextDescriptor);
+  } else {
+    delete (HTMLCanvasElement.prototype as Partial<HTMLCanvasElement>).getContext;
+  }
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

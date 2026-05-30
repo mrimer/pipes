@@ -46,19 +46,32 @@ describe('ANIM_ITEM_COLOR', () => {
 // ─── renderAnimations ─────────────────────────────────────────────────────────
 
 /** Minimal canvas context stub for testing. */
-const makeCtx = () => ({
-  save:         jest.fn(),
-  restore:      jest.fn(),
-  fillText:     jest.fn(),
-  strokeText:   jest.fn(),
-  globalAlpha:  1,
-  font:         '',
-  textAlign:    '',
-  textBaseline: '',
-  fillStyle:    '',
-  strokeStyle:  '',
-  lineWidth:    0,
-} as unknown as CanvasRenderingContext2D);
+const makeCtx = () => {
+  const alphaWrites: number[] = [];
+  const ctx = {
+    save:         jest.fn(),
+    restore:      jest.fn(),
+    fillText:     jest.fn(),
+    strokeText:   jest.fn(),
+    font:         '',
+    textAlign:    '',
+    textBaseline: '',
+    fillStyle:    '',
+    strokeStyle:  '',
+    lineWidth:    0,
+    alphaWrites,
+  };
+  let alpha = 1;
+  Object.defineProperty(ctx, 'globalAlpha', {
+    configurable: true,
+    get: () => alpha,
+    set: (value: number) => {
+      alpha = value;
+      alphaWrites.push(value);
+    },
+  });
+  return ctx as unknown as CanvasRenderingContext2D & { alphaWrites: number[] };
+};
 
 describe('renderAnimations', () => {
   it('draws active animations with fillText', () => {
@@ -94,15 +107,15 @@ describe('renderAnimations', () => {
     renderAnimations(ctx, anims);
     // At exactly 50% elapsed, the fade has just started so alpha is at its
     // boundary value (1.0). The Y offset is already halfway up.
-    const appliedAlpha = (ctx as unknown as { globalAlpha: number }).globalAlpha;
-    // globalAlpha is set inside the mock – retrieve from fillText call context
-    // The stub doesn't capture the intermediate state, but we can verify fillText was called
     expect((ctx.fillText as jest.Mock)).toHaveBeenCalled();
+    expect(ctx.alphaWrites.length).toBeGreaterThan(0);
+    const appliedAlpha = ctx.alphaWrites[ctx.alphaWrites.length - 1];
+    expect(appliedAlpha).toBeGreaterThan(0.95);
+    expect(appliedAlpha).toBeLessThanOrEqual(1);
     // Y position should be shifted upward
     const [, , y] = (ctx.fillText as jest.Mock).mock.calls[0] as [string, number, number];
     expect(y).toBeLessThan(32); // started at 32, shifted up
     expect(y).toBeGreaterThan(32 - ANIM_RISE_PX); // within bounds
-    void appliedAlpha; // suppress unused warning
   });
 
   it('handles an empty animation array without errors', () => {
