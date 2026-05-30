@@ -79,8 +79,8 @@ describe('playSwirlScreenTransition', () => {
     flushRafFrames(1);
 
     expect(showDestination).not.toHaveBeenCalled();
-    expect(blocker?.style.transform).not.toBe('');
-    expect(blocker?.style.opacity).not.toBe('');
+    expect(fromEl.style.transform).not.toBe('');
+    expect(fromEl.style.opacity).not.toBe('');
 
     flushAllRaf();
 
