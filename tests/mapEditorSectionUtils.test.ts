@@ -93,6 +93,10 @@ describe('handleMapEditorKeyDown – Alt key guard', () => {
 // ─── Input focus guard ────────────────────────────────────────────────────────
 
 describe('handleMapEditorKeyDown – input focus guard', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
   it('ignores Q when an INPUT has focus', () => {
     const { cbs, calls } = makeCallbacks();
     const input = document.createElement('input');

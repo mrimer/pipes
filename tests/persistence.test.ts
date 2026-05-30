@@ -283,8 +283,10 @@ describe('migrateCampaign', () => {
     const campaign = makeCampaignWithGrid([
       [{ shape: 'CHAMBER', chamberContent: 'snow' }],
     ]);
-    migrateCampaign(campaign);
-    expect(campaign.chapters[0].levels[0].grid[0][0]?.chamberContent).toBe('snow');
+    const migrated = migrateCampaign(campaign);
+    // migrateCampaign intentionally mutates in place and returns the same object.
+    expect(migrated).toBe(campaign);
+    expect(migrated.chapters[0].levels[0].grid[0][0]?.chamberContent).toBe('snow');
   });
 
   it('migrates deprecated single-string "hint" to "hints" array', () => {

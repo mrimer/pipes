@@ -52,7 +52,7 @@ const MOCK_CTX = {
 };
 
 // Stub out requestAnimationFrame so _loop() never fires.
-beforeAll(() => {
+beforeEach(() => {
   // Keep TILE_SIZE at 64 for tests by simulating a small viewport.
   Object.defineProperty(window, 'innerWidth',  { value: 0, configurable: true });
   Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
@@ -63,7 +63,7 @@ beforeAll(() => {
   });
 });
 
-afterAll(() => {
+afterEach(() => {
   jest.restoreAllMocks();
 });
 
@@ -2059,61 +2059,73 @@ describe('Game – note and hint boxes', () => {
     // Inject a note into level 1
     const level = LEVELS.find((l) => l.id === 1)!;
     const origNote = level.note;
-    level.note = 'Connect the pipes!';
-    game.startLevel(1);
-    const { noteBoxEl } = getBoxEls(game);
-    expect(noteBoxEl.style.display).toBe('block');
-    expect(noteBoxEl.textContent).toBe('\u2755  Connect the pipes!');
-    level.note = origNote; // restore
+    try {
+      level.note = 'Connect the pipes!';
+      game.startLevel(1);
+      const { noteBoxEl } = getBoxEls(game);
+      expect(noteBoxEl.style.display).toBe('block');
+      expect(noteBoxEl.textContent).toBe('\u2755  Connect the pipes!');
+    } finally {
+      level.note = origNote; // restore
+    }
   });
 
   it('hint box is shown (collapsed) when the level has a hint', () => {
     const { game } = makeGame();
     const level = LEVELS.find((l) => l.id === 1)!;
     const origHints = level.hints;
-    level.hints = ['Try placing a straight pipe first.'];
-    game.startLevel(1);
-    const { hintBoxEl, hintTextEl, hintToggleBtnEl } = getBoxEls(game);
-    expect(hintBoxEl.style.display).toBe('block');
-    expect(hintTextEl!.style.display).toBe('none');   // collapsed by default
-    expect(hintToggleBtnEl!.textContent).toBe('💡 Show Hint');
-    level.hints = origHints; // restore
+    try {
+      level.hints = ['Try placing a straight pipe first.'];
+      game.startLevel(1);
+      const { hintBoxEl, hintTextEl, hintToggleBtnEl } = getBoxEls(game);
+      expect(hintBoxEl.style.display).toBe('block');
+      expect(hintTextEl!.style.display).toBe('none');   // collapsed by default
+      expect(hintToggleBtnEl!.textContent).toBe('💡 Show Hint');
+    } finally {
+      level.hints = origHints; // restore
+    }
   });
 
   it('clicking the hint toggle reveals the hint text', () => {
     const { game } = makeGame();
     const level = LEVELS.find((l) => l.id === 1)!;
     const origHints = level.hints;
-    level.hints = ['A secret tip.'];
-    game.startLevel(1);
-    const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
-    // Hint is collapsed; click to expand
-    hintToggleBtnEl!.click();
-    expect(hintTextEl!.style.display).toBe('block');
-    expect(hintToggleBtnEl!.textContent).toBe('💡 Hide Hint');
-    // Click again to collapse
-    hintToggleBtnEl!.click();
-    expect(hintTextEl!.style.display).toBe('none');
-    expect(hintToggleBtnEl!.textContent).toBe('💡 Show Hint');
-    level.hints = origHints; // restore
+    try {
+      level.hints = ['A secret tip.'];
+      game.startLevel(1);
+      const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
+      // Hint is collapsed; click to expand
+      hintToggleBtnEl!.click();
+      expect(hintTextEl!.style.display).toBe('block');
+      expect(hintToggleBtnEl!.textContent).toBe('💡 Hide Hint');
+      // Click again to collapse
+      hintToggleBtnEl!.click();
+      expect(hintTextEl!.style.display).toBe('none');
+      expect(hintToggleBtnEl!.textContent).toBe('💡 Show Hint');
+    } finally {
+      level.hints = origHints; // restore
+    }
   });
 
   it('hint always starts collapsed when restarting a level', () => {
     const { game } = makeGame();
     const level = LEVELS.find((l) => l.id === 1)!;
     const origHints = level.hints;
-    level.hints = ['A secret tip.'];
-    game.startLevel(1);
-    const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
-    // Expand the hint
-    hintToggleBtnEl!.click();
-    expect(hintTextEl!.style.display).toBe('block');
-    // Restart the level – elements are rebuilt so re-query
-    game.startLevel(1);
-    const { hintTextEl: hintTextEl2, hintToggleBtnEl: hintToggleBtnEl2 } = getBoxEls(game);
-    expect(hintTextEl2!.style.display).toBe('none');
-    expect(hintToggleBtnEl2!.textContent).toBe('💡 Show Hint');
-    level.hints = origHints; // restore
+    try {
+      level.hints = ['A secret tip.'];
+      game.startLevel(1);
+      const { hintTextEl, hintToggleBtnEl } = getBoxEls(game);
+      // Expand the hint
+      hintToggleBtnEl!.click();
+      expect(hintTextEl!.style.display).toBe('block');
+      // Restart the level – elements are rebuilt so re-query
+      game.startLevel(1);
+      const { hintTextEl: hintTextEl2, hintToggleBtnEl: hintToggleBtnEl2 } = getBoxEls(game);
+      expect(hintTextEl2!.style.display).toBe('none');
+      expect(hintToggleBtnEl2!.textContent).toBe('💡 Show Hint');
+    } finally {
+      level.hints = origHints; // restore
+    }
   });
 });
 

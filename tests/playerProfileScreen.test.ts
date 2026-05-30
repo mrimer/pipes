@@ -8,19 +8,31 @@ import { saveSlotMeta } from '../src/playerProfileSlots';
 import { sfxManager, SfxId } from '../src/sfxManager';
 
 describe('PlayerProfileScreen', () => {
+  let screens: PlayerProfileScreen[] = [];
+
+  const makeScreen = (): PlayerProfileScreen => {
+    const screen = new PlayerProfileScreen();
+    screens.push(screen);
+    return screen;
+  };
+
   beforeEach(() => {
     localStorage.clear();
     document.body.innerHTML = '';
     setActiveSlotIndex(null);
     jest.restoreAllMocks();
+    screens = [];
   });
 
   afterEach(() => {
+    for (const screen of screens) {
+      screen.hide();
+    }
     setActiveSlotIndex(null);
   });
 
   it('shows the "👤 Select Player" heading', () => {
-    const screen = new PlayerProfileScreen();
+    const screen = makeScreen();
 
     screen.show();
 
@@ -32,7 +44,7 @@ describe('PlayerProfileScreen', () => {
   });
 
   it('resets overlay scroll, keeps cards centered, and pins heading at top', () => {
-    const screen = new PlayerProfileScreen();
+    const screen = makeScreen();
     const overlay = document.getElementById('player-profile-screen') as HTMLDivElement | null;
     expect(overlay).not.toBeNull();
     overlay!.scrollTop = 120;
@@ -50,7 +62,7 @@ describe('PlayerProfileScreen', () => {
   it('plays Click when selecting a profile card button', () => {
     saveSlotMeta(0, { guid: 'guid-0', name: 'Alice', lastPlayedAt: null });
     const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
-    const screen = new PlayerProfileScreen();
+    const screen = makeScreen();
 
     screen.show();
 
@@ -65,7 +77,7 @@ describe('PlayerProfileScreen', () => {
   it('plays Click when clicking the rename pencil button', () => {
     saveSlotMeta(0, { guid: 'guid-0', name: 'Alice', lastPlayedAt: null });
     const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
-    const screen = new PlayerProfileScreen();
+    const screen = makeScreen();
 
     screen.show();
 
@@ -81,7 +93,7 @@ describe('PlayerProfileScreen', () => {
     setActiveSlotIndex(0);
     const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
     const onReturnToMenu = jest.fn();
-    const screen = new PlayerProfileScreen();
+    const screen = makeScreen();
     screen.onReturnToMenu = onReturnToMenu;
 
     screen.show();
@@ -98,7 +110,7 @@ describe('PlayerProfileScreen', () => {
     setActiveSlotIndex(0);
     const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
     const onReturnToMenu = jest.fn();
-    const screen = new PlayerProfileScreen();
+    const screen = makeScreen();
     screen.onReturnToMenu = onReturnToMenu;
 
     screen.show();

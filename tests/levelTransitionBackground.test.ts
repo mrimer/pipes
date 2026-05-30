@@ -34,14 +34,16 @@ describe('map zoom transition backgrounds', () => {
   });
 
   function flushAllAnimationFrames(): void {
+    const maxFrames = 20;
     let safetyCounter = 0;
-    while (rafQueue.length > 0 && safetyCounter < 20) {
+    while (rafQueue.length > 0 && safetyCounter < maxFrames) {
       const cb = rafQueue.shift();
       expect(cb).toBeDefined();
       now += 250;
       cb!(now);
       safetyCounter++;
     }
+    expect(rafQueue.length).toBe(0);
   }
 
   function flushSingleAnimationFrame(): void {
