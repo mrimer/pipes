@@ -26,14 +26,16 @@ describe('playSwirlScreenTransition', () => {
   });
 
   function flushAllRaf(): void {
+    const maxFrames = 100;
     let guard = 0;
-    while (rafQueue.length > 0 && guard < 100) {
+    while (rafQueue.length > 0 && guard < maxFrames) {
       const cb = rafQueue.shift()!;
       now += 125;
       cb(now);
       jest.runOnlyPendingTimers();
       guard++;
     }
+    expect(rafQueue.length).toBe(0);
     jest.runOnlyPendingTimers();
   }
 

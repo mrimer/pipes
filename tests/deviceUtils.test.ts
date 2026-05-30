@@ -17,7 +17,7 @@ type MatchMediaState = {
 
 describe('deviceUtils touch-ui detection', () => {
   const originalMatchMedia = window.matchMedia;
-  const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(Navigator.prototype, 'maxTouchPoints');
+  const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints');
   let mm: MatchMediaState;
 
   function setMaxTouchPoints(value: number): void {
@@ -53,7 +53,9 @@ describe('deviceUtils touch-ui detection', () => {
     setTouchUiEnabledOverride(null);
     window.matchMedia = originalMatchMedia;
     if (originalMaxTouchPoints) {
-      Object.defineProperty(Navigator.prototype, 'maxTouchPoints', originalMaxTouchPoints);
+      Object.defineProperty(navigator, 'maxTouchPoints', originalMaxTouchPoints);
+    } else {
+      Reflect.deleteProperty(navigator, 'maxTouchPoints');
     }
   });
 
