@@ -12,11 +12,6 @@
 let _backgroundEnabled = true;
 let _environmentalEnabled = true;
 
-/** Returns whether the scrolling pipe-pattern background is enabled. */
-export function isBackgroundEnabled(): boolean {
-  return _backgroundEnabled;
-}
-
 /** Sets the in-memory background-enabled flag. */
 export function setBackgroundEnabled(enabled: boolean): void {
   _backgroundEnabled = enabled;
