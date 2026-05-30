@@ -57,6 +57,8 @@ function installCanvasMock(): FakeContext {
   return ctx;
 }
 
+// Keep a default canvas mock for tests that call renderMinimap without creating
+// a per-test context (some suites intentionally override this setup in each `it`).
 beforeEach(() => {
   installCanvasMock();
 });

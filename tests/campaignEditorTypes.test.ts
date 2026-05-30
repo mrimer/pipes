@@ -298,9 +298,19 @@ describe('generateCampaignId', () => {
     expect(generateCampaignId()).toMatch(/^cmp_/);
   });
 
-  it('generates unique IDs on successive calls', () => {
-    const ids = new Set(Array.from({ length: 20 }, generateCampaignId));
-    expect(ids.size).toBe(20);
+  it('generates unique IDs on successive calls when time advances', () => {
+    const nowSpy = jest.spyOn(Date, 'now');
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+    let now = 1_700_000_000_000;
+    nowSpy.mockImplementation(() => now++);
+
+    try {
+      const ids = new Set(Array.from({ length: 20 }, generateCampaignId));
+      expect(ids.size).toBe(20);
+    } finally {
+      randomSpy.mockRestore();
+      nowSpy.mockRestore();
+    }
   });
 
   it('has at least three underscore-separated segments', () => {

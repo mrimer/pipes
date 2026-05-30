@@ -90,7 +90,8 @@ describe('createGameRulesModal', () => {
     const cells = Array.from(document.body.querySelectorAll('td')).map(td => td.textContent ?? '');
     expect(cells).toContain('Q');
     expect(cells).toContain('W');
-    expect(cells).not.toContain('Tab');
+    const allCellText = cells.join(' ');
+    expect(allCellText).not.toMatch(/\bTab\b/i);
   });
 
   it('lists Ctrl+Z and Ctrl+Y for undo and redo', () => {
