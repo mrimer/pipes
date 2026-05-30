@@ -10,13 +10,16 @@ import {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Build a fake CanvasRenderingContext2D that records calls made on it. */
-function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[] } {
+function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[]; alphasAtFill: number[] } {
   const calls: string[] = [];
   const fillStylesAtFill: string[] = [];
+  const alphasAtFill: number[] = [];
   let fillStyle = '';
+  let globalAlpha = 1;
   const ctx = {
     calls,
     fillStylesAtFill,
+    alphasAtFill,
     save:        () => { calls.push('save'); },
     restore:     () => { calls.push('restore'); },
     beginPath:   () => { calls.push('beginPath'); },
@@ -24,9 +27,16 @@ function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStyles
     fill:        () => {
       calls.push('fill');
       fillStylesAtFill.push(fillStyle);
+      alphasAtFill.push(globalAlpha);
     },
-    globalAlpha: 1,
   };
+  Object.defineProperty(ctx, 'globalAlpha', {
+    configurable: true,
+    get: () => globalAlpha,
+    set: (value: number) => {
+      globalAlpha = value;
+    },
+  });
   Object.defineProperty(ctx, 'fillStyle', {
     configurable: true,
     get: () => fillStyle,
@@ -34,7 +44,7 @@ function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStyles
       fillStyle = value;
     },
   });
-  return ctx as unknown as CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[] };
+  return ctx as unknown as CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[]; alphasAtFill: number[] };
 }
 
 // ─── spawnVortexParticle ──────────────────────────────────────────────────────
@@ -89,6 +99,16 @@ describe('spawnVortexParticle', () => {
 // ─── renderVortex ─────────────────────────────────────────────────────────────
 
 describe('renderVortex', () => {
+  let now = 5_000;
+
+  beforeEach(() => {
+    jest.spyOn(performance, 'now').mockImplementation(() => now);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('removes expired particles without drawing them', () => {
     const ctx = makeFakeCtx();
     // Build a particle that has already expired (startTime far in the past).
@@ -97,7 +117,7 @@ describe('renderVortex', () => {
       startAngle:   0,
       angularSpeed: 0.001,
       dotSize:      4,
-      startTime:    performance.now() - 99999,
+      startTime:    now - 99999,
       duration:     100,
     };
     const particles = [p];
@@ -110,13 +130,12 @@ describe('renderVortex', () => {
 
   it('draws live particles with save/restore guards', () => {
     const ctx = makeFakeCtx();
-    // Particle that just spawned – elapsed ≈ 0 ms, well within its lifetime.
     const p: VortexParticle = {
       spawnRadius:  30,
       startAngle:   0,
       angularSpeed: 0.001,
       dotSize:      4,
-      startTime:    performance.now(),
+      startTime:    now - 2500,
       duration:     5000,
     };
     const particles = [p];
@@ -127,6 +146,7 @@ describe('renderVortex', () => {
     expect(ctx.calls).toContain('save');
     expect(ctx.calls).toContain('restore');
     expect(ctx.calls).toContain('fill');
+    expect(ctx.alphasAtFill).toContain(0.75);
   });
 
   it('applies the supplied color to drawn particles', () => {
@@ -136,7 +156,7 @@ describe('renderVortex', () => {
       startAngle:   0,
       angularSpeed: 0.001,
       dotSize:      4,
-      startTime:    performance.now(),
+      startTime:    now - 2500,
       duration:     5000,
     };
     renderVortex(ctx, [p], 0, 0, '#purple-test');

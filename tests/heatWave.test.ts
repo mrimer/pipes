@@ -55,11 +55,13 @@ function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[] } {
 // ─── tickHeatWaves ────────────────────────────────────────────────────────────
 
 describe('tickHeatWaves', () => {
+  const BASE_TIME_MS = 10_000;
+
   it('does nothing when there are no hot_plate tiles', () => {
     const board = makeBoard(2, 2) as unknown as Parameters<typeof tickHeatWaves>[2];
     const waves: HeatWave[] = [];
     const times = new Map<string, number>();
-    tickHeatWaves(waves, times, board, new Set(), performance.now());
+    tickHeatWaves(waves, times, board, new Set(), BASE_TIME_MS);
     expect(waves.length).toBe(0);
   });
 
@@ -70,7 +72,7 @@ describe('tickHeatWaves', () => {
     const times = new Map<string, number>();
 
     // Simulate the first tick: initialises the timer with a stagger offset.
-    const t0 = performance.now();
+    const t0 = BASE_TIME_MS;
     tickHeatWaves(waves, times, board, new Set(), t0);
 
     // Fast-forward time past the full interval to force a spawn.
@@ -89,7 +91,7 @@ describe('tickHeatWaves', () => {
 
     // Mark the tile as filled (connected).
     const filled = new Set(['0,0']);
-    const future = performance.now() + HEAT_WAVE_INTERVAL_MS + 1;
+    const future = BASE_TIME_MS + HEAT_WAVE_INTERVAL_MS + 1;
     tickHeatWaves(waves, times, board, filled, future);
 
     expect(waves.length).toBe(0);
@@ -101,7 +103,7 @@ describe('tickHeatWaves', () => {
     const waves: HeatWave[] = [];
     const times = new Map<string, number>();
 
-    const t0 = performance.now();
+    const t0 = BASE_TIME_MS;
     // First dry tick – initialises the stagger timer.
     tickHeatWaves(waves, times, board, new Set(), t0);
     expect(times.has('1,1')).toBe(true);
@@ -141,7 +143,7 @@ describe('tickHeatWaves', () => {
     const waves: HeatWave[] = [];
     const times = new Map<string, number>();
 
-    const t0 = performance.now();
+    const t0 = BASE_TIME_MS;
     tickHeatWaves(waves, times, board, new Set(), t0);
     // Both tiles should have independent timer entries.
     expect(times.has('0,0')).toBe(true);
@@ -153,15 +155,17 @@ describe('tickHeatWaves', () => {
 // ─── renderHeatWaves ──────────────────────────────────────────────────────────
 
 describe('renderHeatWaves', () => {
+  const BASE_TIME_MS = 20_000;
+
   it('removes expired waves without drawing', () => {
     const ctx = makeFakeCtx();
     const wave: HeatWave = {
       row: 0,
       col: 0,
-      startTime: performance.now() - HEAT_WAVE_DURATION_MS - 1,
+      startTime: BASE_TIME_MS - HEAT_WAVE_DURATION_MS - 1,
     };
     const waves: HeatWave[] = [wave];
-    renderHeatWaves(ctx, waves, performance.now());
+    renderHeatWaves(ctx, waves, BASE_TIME_MS);
     expect(waves.length).toBe(0);
     expect(ctx.calls).not.toContain('stroke');
   });
@@ -171,7 +175,7 @@ describe('renderHeatWaves', () => {
     const wave: HeatWave = {
       row: 0,
       col: 0,
-      startTime: performance.now(),
+      startTime: BASE_TIME_MS,
     };
     const waves: HeatWave[] = [wave];
     // Use a time well into the animation (50 % progress) to ensure lines are visible.
@@ -186,7 +190,7 @@ describe('renderHeatWaves', () => {
     const wave: HeatWave = {
       row: 1,
       col: 2,
-      startTime: performance.now(),
+      startTime: BASE_TIME_MS,
     };
     const waves: HeatWave[] = [wave];
     renderHeatWaves(ctx, waves, wave.startTime + 100);
@@ -195,13 +199,13 @@ describe('renderHeatWaves', () => {
 
   it('handles an empty wave array without errors', () => {
     const ctx = makeFakeCtx();
-    expect(() => renderHeatWaves(ctx, [], performance.now())).not.toThrow();
+    expect(() => renderHeatWaves(ctx, [], BASE_TIME_MS)).not.toThrow();
     expect(ctx.calls.length).toBe(0);
   });
 
   it('removes all waves once they expire', () => {
     const ctx = makeFakeCtx();
-    const now = performance.now();
+    const now = BASE_TIME_MS;
     const waves: HeatWave[] = [
       { row: 0, col: 0, startTime: now - HEAT_WAVE_DURATION_MS - 5 },
       { row: 1, col: 1, startTime: now - HEAT_WAVE_DURATION_MS - 5 },

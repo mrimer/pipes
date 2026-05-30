@@ -26,12 +26,21 @@ describe('playSwirlScreenTransition', () => {
     jest.restoreAllMocks();
   });
 
-  function flushAllRaf(): void {
-    const maxFrames = 100;
+  function flushRafFrames(count: number, stepMs = 16): void {
+    for (let i = 0; i < count; i++) {
+      const cb = rafQueue.shift();
+      if (!cb) return;
+      now += stepMs;
+      cb(now);
+    }
+  }
+
+  function flushAllRaf(stepMs = 16): void {
+    const maxFrames = 200;
     let guard = 0;
     while (rafQueue.length > 0 && guard < maxFrames) {
       const cb = rafQueue.shift()!;
-      now += 125;
+      now += stepMs;
       cb(now);
       guard++;
     }
@@ -66,6 +75,12 @@ describe('playSwirlScreenTransition', () => {
     const blocker = document.body.querySelector<HTMLElement>('[data-transition-blocker="true"]');
     expect(blocker).not.toBeNull();
     expect(blocker?.style.background).toBe('transparent');
+
+    flushRafFrames(1);
+
+    expect(showDestination).not.toHaveBeenCalled();
+    expect(blocker?.style.transform).not.toBe('');
+    expect(blocker?.style.opacity).not.toBe('');
 
     flushAllRaf();
 

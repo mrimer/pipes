@@ -43,6 +43,8 @@ function keyEvent(key: string, opts: KeyboardEventInit = {}): KeyboardEvent {
   return new KeyboardEvent('keydown', { key, bubbles: true, ...opts });
 }
 
+// commandKeyManager is a shared module singleton, so reset it around each test to
+// keep this file isolated from other suites that exercise command rebinding.
 beforeEach(() => {
   commandKeyManager.resetToDefaults();
 });
