@@ -107,18 +107,17 @@ describe('renderAnimations', () => {
 
   it('applies partial alpha for a mid-animation frame', () => {
     const ctx = makeCtx();
-    const half = 450; // halfway through a 900ms animation
+    const justAfterHalf = 451; // just after 50% of a 900ms animation
     const anims: TileAnimation[] = [
-      { x: 64, y: 32, text: '+3', color: ANIM_POSITIVE_COLOR, startTime: FIXED_NOW - half, duration: 900 },
+      { x: 64, y: 32, text: '+3', color: ANIM_POSITIVE_COLOR, startTime: FIXED_NOW - justAfterHalf, duration: 900 },
     ];
     renderAnimations(ctx, anims);
-    // At exactly 50% elapsed, the fade has just started so alpha is at its
-    // boundary value (1.0). The Y offset is already halfway up.
+    // Just after 50% elapsed, fade-out must be active (alpha < 1).
     expect((ctx.fillText as jest.Mock)).toHaveBeenCalled();
     expect(ctx.alphaWrites.length).toBeGreaterThan(0);
     const appliedAlpha = ctx.alphaWrites[ctx.alphaWrites.length - 1];
-    expect(appliedAlpha).toBeGreaterThan(0.95);
-    expect(appliedAlpha).toBeLessThanOrEqual(1);
+    expect(appliedAlpha).toBeGreaterThan(0);
+    expect(appliedAlpha).toBeLessThan(1);
     // Y position should be shifted upward
     const [, , y] = (ctx.fillText as jest.Mock).mock.calls[0] as [string, number, number];
     expect(y).toBeLessThan(32); // started at 32, shifted up

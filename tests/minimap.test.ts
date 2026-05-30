@@ -10,7 +10,7 @@
  * canvas mock that records calls to fillRect / fillStyle.
  */
 
-import { PipeShape, Direction } from '../src/types';
+import { PipeShape } from '../src/types';
 import { LevelDef } from '../src/types';
 import { renderMinimap } from '../src/visuals/minimap';
 

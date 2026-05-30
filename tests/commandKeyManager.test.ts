@@ -57,8 +57,10 @@ describe('CommandKeyManager', () => {
     const mgr = new CommandKeyManager();
     const evt = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true });
     const wrong = new KeyboardEvent('keydown', { key: 'z', ctrlKey: false });
+    const wrongKey = new KeyboardEvent('keydown', { key: 'x', ctrlKey: true });
     expect(mgr.matches('undo', evt)).toBe(true);
     expect(mgr.matches('undo', wrong)).toBe(false);
+    expect(mgr.matches('undo', wrongKey)).toBe(false);
   });
 
   afterEach(() => {

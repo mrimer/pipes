@@ -166,6 +166,7 @@ describe('attachChapterWaveAnimation', () => {
   afterEach(() => {
     rafHarness.clear();
     jest.restoreAllMocks();
+    document.body.innerHTML = '';
   });
 
   it('inserts a canvas element as the last child of the header', () => {
@@ -278,6 +279,7 @@ describe('attachInventoryWaveAnimation', () => {
   afterEach(() => {
     rafHarness.clear();
     jest.restoreAllMocks();
+    document.body.innerHTML = '';
   });
 
   it('inserts a canvas element as the last child of the element', () => {

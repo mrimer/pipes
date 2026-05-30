@@ -91,10 +91,13 @@ describe('tickHeatWaves', () => {
 
     // Mark the tile as filled (connected).
     const filled = new Set(['0,0']);
-    const future = BASE_TIME_MS + HEAT_WAVE_INTERVAL_MS + 1;
-    tickHeatWaves(waves, times, board, filled, future);
+    // Seed an already-due timer to ensure this test exercises the connected-tile
+    // spawn gating path rather than the "first seen" initialisation path.
+    times.set('0,0', BASE_TIME_MS - HEAT_WAVE_INTERVAL_MS - 1);
+    tickHeatWaves(waves, times, board, filled, BASE_TIME_MS);
 
     expect(waves.length).toBe(0);
+    expect(times.has('0,0')).toBe(false);
   });
 
   it('resets the spawn timer when a tile becomes connected, so it fires fresh once dry again', () => {

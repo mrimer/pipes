@@ -250,7 +250,10 @@ describe('editorTileConns', () => {
 // ─── computeChapterMapReachable ───────────────────────────────────────────────
 
 /** Helper: use editorTileConns as getConns for simple tests. */
-function editorConns(def: TileDef, _isEntry: boolean): Set<Direction> {
+function editorConns(def: TileDef, isEntry: boolean): Set<Direction> {
+  // Intentional: editorTileConns is entry-invariant for non-level-aware tests.
+  // Entry-sensitive behavior is covered below with dedicated levelAwareConns.
+  void isEntry;
   return editorTileConns(def);
 }
 
