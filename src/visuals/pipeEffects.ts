@@ -72,12 +72,12 @@ export interface PipeFillAnim {
 // ─── Key helpers ─────────────────────────────────────────────────────────────
 
 /** Return the canonical string key for a rotation animation. */
-export function rotationAnimKey(anim: PipeRotationAnim): string {
+function rotationAnimKey(anim: PipeRotationAnim): string {
   return posKey(anim.row, anim.col);
 }
 
 /** Return the canonical string key for a fill animation. */
-export function fillAnimKey(anim: PipeFillAnim): string {
+function fillAnimKey(anim: PipeFillAnim): string {
   return posKey(anim.row, anim.col);
 }
 

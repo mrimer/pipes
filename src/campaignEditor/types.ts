@@ -396,7 +396,7 @@ export const REPEATABLE_EDITOR_TILES = new Set<EditorPalette>([
 ]);
 
 /** Tree tile variants that can be painted over each other in map editors. */
-export const TREE_EDITOR_TILE_SHAPES = new Set<PipeShape>([
+const TREE_EDITOR_TILE_SHAPES = new Set<PipeShape>([
   PipeShape.Tree,
   PipeShape.Tree2,
   PipeShape.Tree3,
@@ -575,7 +575,7 @@ export function rotatePositionBy90(
     ? { row: pos.col, col: oldRows - 1 - pos.row }
     : { row: oldCols - 1 - pos.col, col: pos.row };
 }
-export function rotateDirectionBy90(dir: Direction, clockwise: boolean): Direction {
+function rotateDirectionBy90(dir: Direction, clockwise: boolean): Direction {
   if (clockwise) {
     switch (dir) {
       case Direction.North: return Direction.East;
@@ -745,7 +745,7 @@ export function reflectPositionAboutDiagonal(
  *
  * East ↔ West; North and South are unchanged.
  */
-export function flipDirectionHorizontal(dir: Direction): Direction {
+function flipDirectionHorizontal(dir: Direction): Direction {
   switch (dir) {
     case Direction.East:  return Direction.West;
     case Direction.West:  return Direction.East;
@@ -759,7 +759,7 @@ export function flipDirectionHorizontal(dir: Direction): Direction {
  *
  * North ↔ South; East and West are unchanged.
  */
-export function flipDirectionVertical(dir: Direction): Direction {
+function flipDirectionVertical(dir: Direction): Direction {
   switch (dir) {
     case Direction.North: return Direction.South;
     case Direction.South: return Direction.North;

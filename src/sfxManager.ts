@@ -231,7 +231,7 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
 // ─── SfxManager class ─────────────────────────────────────────────────────────
 
 /** Manages playback and volume for all in-game sound effects. */
-export class SfxManager {
+class SfxManager {
   /** Volume as a linear factor in [0, 1]. */
   private _volume = 1.0;
 
