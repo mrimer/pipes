@@ -36,6 +36,8 @@ interface CampaignBirdFlockInternals {
 function createLCGPRNG(seed = 12345): () => number {
   let state = seed;
   return () => {
+    // Park–Miller LCG: for seeds in [1, 0x7ffffffe], state remains in [1, 0x7ffffffe],
+    // so dividing by 0x7fffffff yields values in (0, 1), matching Math.random()'s < 1 upper bound.
     state = (state * 48271) % 0x7fffffff;
     return state / 0x7fffffff;
   };

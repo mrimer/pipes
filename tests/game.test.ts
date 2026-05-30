@@ -54,10 +54,12 @@ const MOCK_CTX = {
 // Stub out requestAnimationFrame so _loop() never fires.
 let originalInnerWidth: PropertyDescriptor | undefined;
 let originalInnerHeight: PropertyDescriptor | undefined;
+let originalCanvasGetContext: PropertyDescriptor | undefined;
 
 beforeEach(() => {
   originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
   originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+  originalCanvasGetContext = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'getContext');
   // Keep TILE_SIZE at 64 for tests by simulating a small viewport.
   Object.defineProperty(window, 'innerWidth',  { value: 0, configurable: true });
   Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
@@ -75,6 +77,11 @@ afterEach(() => {
   }
   if (originalInnerHeight) {
     Object.defineProperty(window, 'innerHeight', originalInnerHeight);
+  }
+  if (originalCanvasGetContext) {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', originalCanvasGetContext);
+  } else {
+    delete (HTMLCanvasElement.prototype as { getContext?: unknown }).getContext;
   }
 });
 
