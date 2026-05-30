@@ -17,6 +17,8 @@ type MatchMediaState = {
 
 describe('deviceUtils touch-ui detection', () => {
   const originalMatchMedia = window.matchMedia;
+  // Tests patch `navigator.maxTouchPoints` on the navigator instance, so capture and restore
+  // the instance descriptor to prevent own-property leakage between test cases.
   const originalMaxTouchPoints = Object.getOwnPropertyDescriptor(navigator, 'maxTouchPoints');
   let mm: MatchMediaState;
 
