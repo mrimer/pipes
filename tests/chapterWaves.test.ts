@@ -97,6 +97,7 @@ describe('_heightToRgb', () => {
 function createMockCtx() {
   return {
     clearRect:   jest.fn(),
+    fillRect:    jest.fn(),
     putImageData: jest.fn(),
     drawImage:   jest.fn(),
     createImageData: jest.fn(() => ({
@@ -109,15 +110,61 @@ function createMockCtx() {
   };
 }
 
+function setElementSize(el: HTMLElement, width: number, height: number): void {
+  Object.defineProperty(el, 'offsetWidth', {
+    configurable: true,
+    get: () => width,
+  });
+  Object.defineProperty(el, 'offsetHeight', {
+    configurable: true,
+    get: () => height,
+  });
+}
+
+function installRafHarness(): { flushNextFrame: (ts?: number) => boolean; clear: () => void } {
+  const queue = new Map<number, FrameRequestCallback>();
+  let nextId = 1;
+  let now = 0;
+
+  jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback): number => {
+    const id = nextId++;
+    queue.set(id, cb);
+    return id;
+  });
+  jest.spyOn(window, 'cancelAnimationFrame').mockImplementation((id: number): void => {
+    queue.delete(id);
+  });
+
+  return {
+    flushNextFrame(ts?: number): boolean {
+      const next = queue.entries().next().value as [number, FrameRequestCallback] | undefined;
+      if (!next) return false;
+      const [id, cb] = next;
+      queue.delete(id);
+      now = ts ?? now + 16;
+      cb(now);
+      return true;
+    },
+    clear(): void {
+      queue.clear();
+    },
+  };
+}
+
 describe('attachChapterWaveAnimation', () => {
+  let mockCtx: ReturnType<typeof createMockCtx>;
+  let rafHarness: ReturnType<typeof installRafHarness>;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    const mockCtx = createMockCtx();
+    mockCtx = createMockCtx();
     // Patch HTMLCanvasElement.getContext so our test canvas returns the mock ctx.
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
+    rafHarness = installRafHarness();
   });
 
   afterEach(() => {
+    rafHarness.clear();
     jest.restoreAllMocks();
   });
 
@@ -201,20 +248,35 @@ describe('attachChapterWaveAnimation', () => {
     const header = document.createElement('button');
     expect(() => attachChapterWaveAnimation(header, true)).not.toThrow();
   });
+
+  it('paints the idle background on the first animation frame', () => {
+    const header = document.createElement('button');
+    setElementSize(header, 120, 36);
+
+    attachChapterWaveAnimation(header, false);
+    expect(mockCtx.fillRect).not.toHaveBeenCalled();
+
+    expect(rafHarness.flushNextFrame()).toBe(true);
+
+    expect(mockCtx.fillRect).toHaveBeenCalledWith(0, 0, 120, 36);
+  });
 });
 
 // ─── attachInventoryWaveAnimation ─────────────────────────────────────────────
 
 describe('attachInventoryWaveAnimation', () => {
+  let mockCtx: ReturnType<typeof createMockCtx>;
+  let rafHarness: ReturnType<typeof installRafHarness>;
+
   beforeEach(() => {
     jest.clearAllMocks();
-    const mockCtx = createMockCtx();
+    mockCtx = createMockCtx();
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
-    jest.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
-    jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    rafHarness = installRafHarness();
   });
 
   afterEach(() => {
+    rafHarness.clear();
     jest.restoreAllMocks();
   });
 
@@ -284,5 +346,19 @@ describe('attachInventoryWaveAnimation', () => {
   it('does not throw', () => {
     const el = document.createElement('div');
     expect(() => attachInventoryWaveAnimation(el)).not.toThrow();
+  });
+
+  it('renders a wave frame when requestAnimationFrame fires', () => {
+    const el = document.createElement('div');
+    setElementSize(el, 80, 48);
+
+    attachInventoryWaveAnimation(el);
+    expect(mockCtx.createImageData).not.toHaveBeenCalled();
+
+    expect(rafHarness.flushNextFrame(1000)).toBe(true);
+
+    expect(mockCtx.createImageData).toHaveBeenCalled();
+    expect(mockCtx.putImageData).toHaveBeenCalled();
+    expect(mockCtx.drawImage).toHaveBeenCalled();
   });
 });

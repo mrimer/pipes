@@ -6,6 +6,8 @@ import { createGameRulesModal, refreshGameRulesModalCommands } from '../src/rule
 import { CommandKeyManager, commandKeyManager } from '../src/commandKeyManager';
 
 describe('createGameRulesModal', () => {
+  // commandKeyManager is a shared module singleton, so reset it around each test
+  // to keep this suite independent from other command-binding tests.
   beforeEach(() => {
     document.body.innerHTML = '';
     localStorage.clear();
