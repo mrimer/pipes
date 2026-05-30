@@ -24,6 +24,12 @@ describe('buildPlaybackListModal', () => {
     document.body.innerHTML = '';
   });
 
+  afterEach(() => {
+    // Ensure any open modal unregisters its Escape key listener from document.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    document.body.innerHTML = '';
+  });
+
   it('dismisses the modal and triggers onReturn when Escape is pressed', () => {
     const onReturn = jest.fn();
     const modal = buildPlaybackListModal({

@@ -50,6 +50,10 @@ function makeLevel(): LevelDef {
 }
 
 describe('PlaybackScreen corruption recovery', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('clears _corrupted when rebuilding to a valid step', () => {
     const callbacks = makeCallbacks();
     const screen = new PlaybackScreen(callbacks) as any;

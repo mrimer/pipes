@@ -620,8 +620,9 @@ describe('applyPlayerProfile recording merge', () => {
   });
 
   it('handles duplicate ids within the imported list itself', () => {
-    const rec = makeRecord({ id: 'dup-1' });
-    applyPlayerProfile(makeBasePayload({ recordings: [rec, rec] }), []);
+    const recA = makeRecord({ id: 'dup-1', playerName: 'A' });
+    const recB = makeRecord({ id: 'dup-1', playerName: 'B' });
+    applyPlayerProfile(makeBasePayload({ recordings: [recA, recB] }), []);
     expect(loadAllRecordings()).toHaveLength(1);
   });
 

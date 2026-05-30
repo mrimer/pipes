@@ -22,9 +22,23 @@ import { CampaignDef, LevelDef, PipeShape } from '../src/types';
 import { TileParams } from '../src/campaignEditor/types';
 
 // Keep TILE_SIZE at 64 for all tests by simulating a small viewport.
+let originalInnerWidth: PropertyDescriptor | undefined;
+let originalInnerHeight: PropertyDescriptor | undefined;
+
 beforeAll(() => {
+  originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+  originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
   Object.defineProperty(window, 'innerWidth',  { value: 0, configurable: true });
   Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
+});
+
+afterAll(() => {
+  if (originalInnerWidth) {
+    Object.defineProperty(window, 'innerWidth', originalInnerWidth);
+  }
+  if (originalInnerHeight) {
+    Object.defineProperty(window, 'innerHeight', originalInnerHeight);
+  }
 });
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
@@ -485,14 +499,37 @@ describe('CampaignEditor – note and hint in level definitions', () => {
 // ─── gzip export ─────────────────────────────────────────────────────────────
 
 describe('CampaignEditor – _exportCampaign', () => {
+  let originalCreateObjectURL: typeof URL.createObjectURL | undefined;
+  let originalRevokeObjectURL: typeof URL.revokeObjectURL | undefined;
+
+  const waitFor = async (predicate: () => boolean, maxTicks = 10): Promise<void> => {
+    for (let i = 0; i < maxTicks; i += 1) {
+      if (predicate()) return;
+      await Promise.resolve();
+    }
+    throw new Error('Timed out waiting for asynchronous export side effects.');
+  };
+
   beforeEach(() => {
     localStorage.clear();
     document.body.innerHTML = '';
+    originalCreateObjectURL = URL.createObjectURL;
+    originalRevokeObjectURL = URL.revokeObjectURL;
     if (!URL.createObjectURL) URL.createObjectURL = () => 'blob:fake';
     if (!URL.revokeObjectURL) URL.revokeObjectURL = () => undefined;
   });
 
   afterEach(() => {
+    if (originalCreateObjectURL) {
+      URL.createObjectURL = originalCreateObjectURL;
+    } else {
+      delete (URL as typeof URL & { createObjectURL?: typeof URL.createObjectURL }).createObjectURL;
+    }
+    if (originalRevokeObjectURL) {
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    } else {
+      delete (URL as typeof URL & { revokeObjectURL?: typeof URL.revokeObjectURL }).revokeObjectURL;
+    }
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
@@ -544,8 +581,7 @@ describe('CampaignEditor – _exportCampaign', () => {
     jest.useFakeTimers();
     (editor as unknown as { _exportCampaign(c: CampaignDef): void })._exportCampaign(campaign);
 
-    // Flush the microtask queue so the gzipString mock resolves.
-    await Promise.resolve();
+    await waitFor(() => gzipSpy.mock.calls.length > 0 && appendedAnchors.length === 1 && clickedAnchors.length === 1 && removedAnchors.length === 1);
 
     expect(gzipSpy).toHaveBeenCalled();
     expect(appendedAnchors).toHaveLength(1);
@@ -590,7 +626,7 @@ describe('CampaignEditor – _exportCampaign', () => {
     jest.useFakeTimers();
 
     (editor as unknown as { _exportCampaign(c: CampaignDef): void })._exportCampaign(campaign);
-    await Promise.resolve();
+    await waitFor(() => downloadNames.length === 1);
 
     expect(downloadNames).toHaveLength(1);
     expect(downloadNames[0]).toBe('My_Cool_Campaign.pipes.json.gz');

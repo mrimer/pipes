@@ -243,7 +243,9 @@ describe('MapEditorGridState.resize', () => {
     s.resize(2, 2);
     expect(s.rows).toBe(2);
     expect(s.cols).toBe(2);
-    expect(s.grid[0][2]).toBeUndefined();
+    expect(s.grid[0]).toHaveLength(2);
+    expect(s.grid[1]).toHaveLength(2);
+    expect(s.grid.flat().some((cell) => cell?.shape === PipeShape.Granite)).toBe(false);
   });
 
   it('clears focusedTilePos when resize moves it out of bounds', () => {
