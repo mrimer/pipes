@@ -138,7 +138,11 @@ export class PlaybackScreen {
   enter(record: PlaySequenceRecord, level: LevelDef): void {
     const formatVersion = record.formatVersion ?? 1;
     if (formatVersion > SUPPORTED_PLAYBACK_RECORDING_FORMAT_VERSION) {
-      showTimedMessage(this._cb.errorFlashEl, 'Recording from incompatible version', CORRUPT_FLASH_MS);
+      showTimedMessage(
+        this._cb.errorFlashEl,
+        `Recording from incompatible version (found ${formatVersion}, max ${SUPPORTED_PLAYBACK_RECORDING_FORMAT_VERSION})`,
+        CORRUPT_FLASH_MS,
+      );
       return;
     }
     const normalizedRecord = { ...record, formatVersion };

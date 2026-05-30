@@ -30,7 +30,7 @@ import { setActiveSlotIndex, getActiveSlotPrefix } from '../src/activeProfile';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeMeta(name = 'Alice'): ProfileSlotMeta {
-  return { guid: generateGuid(), name, lastPlayedAt: null };
+  return { formatVersion: 1, guid: generateGuid(), name, lastPlayedAt: null };
 }
 
 beforeEach(() => {
