@@ -2007,6 +2007,7 @@ export class Game implements InputCallbacks {
         if (!this.board || !this.currentLevel) return;
         const activeSlot = getActiveSlotIndex();
         const record: PlaySequenceRecord = {
+          formatVersion: 1,
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           campaignId: this._campaign.activeCampaign?.id ?? '',
           levelId: this.currentLevel.id,
@@ -2076,6 +2077,7 @@ export class Game implements InputCallbacks {
 
     const autoActiveSlot = getActiveSlotIndex();
     const record: PlaySequenceRecord = {
+      formatVersion: 1,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       campaignId,
       levelId,

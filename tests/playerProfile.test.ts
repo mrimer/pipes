@@ -268,6 +268,12 @@ describe('parsePlayerFile', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/shape mismatch/i);
   });
+
+  it('rejects files from newer profile format versions', () => {
+    const result = parsePlayerFile(makeValidJson({ version: 99 }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/file from newer version/i);
+  });
 });
 
 // ─── applyPlayerProfile ───────────────────────────────────────────────────────

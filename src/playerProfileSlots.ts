@@ -37,6 +37,8 @@ export const PROFILE_SLOT_COUNT = 4;
  * the full slot namespace.
  */
 export interface ProfileSlotMeta {
+  /** Save-data schema version for slot metadata. Missing implies legacy version 1. */
+  formatVersion?: number;
   /** UUID v4 that uniquely identifies this profile across devices. */
   guid: string;
   /** Display name for this profile (same as `pipes_p<n>_player_name`). */
@@ -51,9 +53,26 @@ export interface ProfileSlotMeta {
 // ─── localStorage key helpers ─────────────────────────────────────────────────
 
 const ACTIVE_SLOT_KEY = 'pipes_active_slot';
+const PROFILE_SLOT_META_FORMAT_VERSION = 1;
 
 function slotMetaKey(n: number): string {
   return `pipes_profile_slot_${n}`;
+}
+
+function normalizeSlotMeta(raw: unknown): ProfileSlotMeta | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const candidate = raw as Record<string, unknown>;
+  if (typeof candidate.guid !== 'string') return null;
+  if (typeof candidate.name !== 'string') return null;
+  if (!(candidate.lastPlayedAt === null || typeof candidate.lastPlayedAt === 'string')) return null;
+  return {
+    guid: candidate.guid,
+    name: candidate.name,
+    lastPlayedAt: candidate.lastPlayedAt as string | null,
+    formatVersion: typeof candidate.formatVersion === 'number'
+      ? candidate.formatVersion
+      : PROFILE_SLOT_META_FORMAT_VERSION,
+  };
 }
 
 // ─── Slot metadata CRUD ───────────────────────────────────────────────────────
@@ -62,7 +81,7 @@ function slotMetaKey(n: number): string {
 export function loadSlotMeta(n: number): ProfileSlotMeta | null {
   try {
     const raw = localStorage.getItem(slotMetaKey(n));
-    if (raw) return JSON.parse(raw) as ProfileSlotMeta;
+    if (raw) return normalizeSlotMeta(JSON.parse(raw));
   } catch { /* ignore parse errors */ }
   return null;
 }
@@ -70,7 +89,13 @@ export function loadSlotMeta(n: number): ProfileSlotMeta | null {
 /** Persist metadata for slot `n`. */
 export function saveSlotMeta(n: number, meta: ProfileSlotMeta): void {
   try {
-    localStorage.setItem(slotMetaKey(n), JSON.stringify(meta));
+    localStorage.setItem(
+      slotMetaKey(n),
+      JSON.stringify({
+        ...meta,
+        formatVersion: meta.formatVersion ?? PROFILE_SLOT_META_FORMAT_VERSION,
+      }),
+    );
   } catch { /* ignore storage errors */ }
 }
 

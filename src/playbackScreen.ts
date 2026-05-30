@@ -30,6 +30,7 @@ const MIN_SPEED_MS = 100;
 const MAX_SPEED_MS = 5000;
 /** How long the "invalid move" flash stays visible (ms). */
 const CORRUPT_FLASH_MS = 3000;
+const SUPPORTED_PLAYBACK_RECORDING_FORMAT_VERSION = 1;
 
 /**
  * Data captured around a single replay move, passed to the {@link PlaybackCallbacks.spawnMoveAnimations}
@@ -135,6 +136,12 @@ export class PlaybackScreen {
    * Saves the current game state, builds a replay board, and sets up controls.
    */
   enter(record: PlaySequenceRecord, level: LevelDef): void {
+    const formatVersion = record.formatVersion ?? 1;
+    if (formatVersion > SUPPORTED_PLAYBACK_RECORDING_FORMAT_VERSION) {
+      showTimedMessage(this._cb.errorFlashEl, 'Recording from incompatible version', CORRUPT_FLASH_MS);
+      return;
+    }
+    const normalizedRecord = { ...record, formatVersion };
     const existingBoard = this._cb.getBoard();
 
     // Save current game state for restoration on exit.
@@ -146,7 +153,7 @@ export class PlaybackScreen {
       screen: GameScreen.Play,
     };
 
-    this._record = record;
+    this._record = normalizedRecord;
     this._level = level;
     this._decorations = existingBoard?.ambientDecorations;
     this._currentStep = 0;
@@ -155,7 +162,7 @@ export class PlaybackScreen {
 
     // Determine the effective upper bound for steps.  If the record is already
     // marked corrupted, stoppedAt is where replay will abort; we cap there.
-    this._stepLimit = record.moves.length;
+    this._stepLimit = normalizedRecord.moves.length;
 
     // Build the initial board state (step 0 = empty board).
     this._applyStep(0);

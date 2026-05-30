@@ -52,6 +52,22 @@ describe('loadAllRecordings', () => {
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe('ok-record');
   });
+
+  it('drops recordings from newer unsupported format versions', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(
+      'pipes_recordings',
+      JSON.stringify([
+        makeRecord({ id: 'legacy-no-version' }),
+        makeRecord({ id: 'too-new', formatVersion: 999 }),
+      ]),
+    );
+    const all = loadAllRecordings();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe('legacy-no-version');
+    expect(all[0].formatVersion).toBe(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/unsupported formatVersion 999/i));
+  });
 });
 
 // ─── loadRecordingsForLevel ───────────────────────────────────────────────────
