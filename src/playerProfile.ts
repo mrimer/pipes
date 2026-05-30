@@ -384,7 +384,10 @@ export function parsePlayerFile(json: string): PlayerFileResult {
     return { ok: false, error: 'Invalid player profile file: missing or invalid version.' };
   }
   if (versionRaw > PROFILE_FORMAT_VERSION) {
-    return { ok: false, error: 'file from newer version' };
+    return {
+      ok: false,
+      error: `file from newer version (profile format ${versionRaw} > supported ${PROFILE_FORMAT_VERSION})`,
+    };
   }
 
   let payloadVersion = Math.floor(versionRaw);
@@ -399,6 +402,7 @@ export function parsePlayerFile(json: string): PlayerFileResult {
       payloadVersion = 3;
       continue;
     }
+    // Guardrail for incomplete future migration chains during development.
     return { ok: false, error: `Unsupported player profile version: ${payloadVersion}` };
   }
   if (!hasValidPayloadShape(rawPayload)) {

@@ -118,7 +118,7 @@ export function importReplay(
       return;
     }
     if (replayVersion > REPLAY_FILE_VERSION) {
-      alert('Import failed: file from newer version');
+      alert('Import failed: file from newer version (replay file is from a newer game version).');
       return;
     }
     const recordJson = JSON.stringify(parsed.record);

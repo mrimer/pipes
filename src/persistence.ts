@@ -623,17 +623,25 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
       const parsed = JSON.parse(raw) as unknown;
       if (!Array.isArray(parsed)) return [];
       return parsed.flatMap((entry): PlaySequenceRecord[] => {
+        const candidate = entry as Record<string, unknown>;
+        const moves = candidate['moves'];
         if (
           !entry
           || typeof entry !== 'object'
-          || typeof (entry as Record<string, unknown>)['id'] !== 'string'
-          || typeof (entry as Record<string, unknown>)['campaignId'] !== 'string'
-          || typeof (entry as Record<string, unknown>)['levelId'] !== 'number'
-          || !Array.isArray((entry as Record<string, unknown>)['moves'])
+          || typeof candidate['id'] !== 'string'
+          || typeof candidate['campaignId'] !== 'string'
+          || typeof candidate['levelId'] !== 'number'
+          || !Array.isArray(moves)
+          || !moves.every((move) => typeof move === 'string')
+          || typeof candidate['outcome'] !== 'string'
+          || !['success', 'failure', 'partial'].includes(candidate['outcome'] as string)
+          || typeof candidate['autoRecorded'] !== 'boolean'
+          || typeof candidate['timestamp'] !== 'number'
+          || typeof candidate['playerName'] !== 'string'
+          || typeof candidate['corrupted'] !== 'boolean'
         ) {
           return [];
         }
-        const candidate = entry as Record<string, unknown>;
         const formatVersion = typeof candidate['formatVersion'] === 'number' ? candidate['formatVersion'] : 1;
         if (formatVersion > SUPPORTED_RECORDING_FORMAT_VERSION) {
           console.warn(
@@ -641,7 +649,22 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
           );
           return [];
         }
-        return [{ ...(candidate as PlaySequenceRecord), formatVersion }];
+        return [{
+          id: candidate['id'] as string,
+          campaignId: candidate['campaignId'] as string,
+          levelId: candidate['levelId'] as number,
+          moves: candidate['moves'] as string[],
+          outcome: candidate['outcome'] as 'success' | 'failure' | 'partial',
+          autoRecorded: candidate['autoRecorded'] as boolean,
+          timestamp: candidate['timestamp'] as number,
+          playerName: candidate['playerName'] as string,
+          corrupted: candidate['corrupted'] as boolean,
+          formatVersion,
+          playerGuid: typeof candidate['playerGuid'] === 'string' ? candidate['playerGuid'] : undefined,
+          waterScore: typeof candidate['waterScore'] === 'number' ? candidate['waterScore'] : undefined,
+          stars: typeof candidate['stars'] === 'number' ? candidate['stars'] : undefined,
+          annotation: typeof candidate['annotation'] === 'string' ? candidate['annotation'] : undefined,
+        }];
       });
     }
   } catch { /* ignore parse errors */ }
