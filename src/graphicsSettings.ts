@@ -14,6 +14,7 @@ let _environmentalEnabled = true;
 
 /** Sets the in-memory background-enabled flag. */
 export function setBackgroundEnabled(enabled: boolean): void {
+  if (_backgroundEnabled === enabled) return;
   _backgroundEnabled = enabled;
 }
 
