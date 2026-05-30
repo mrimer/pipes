@@ -99,19 +99,6 @@ export const CROSS_PIPE_SHAPES = new Set<PipeShape>([
 ]);
 
 /**
- * Elbow pipe shapes – two-connection pipes that form a 90° corner.  When drawn
- * arm-by-arm (e.g. because one or both arms uses a butt end cap), the corner
- * at the tile centre needs an explicit round nub to avoid a visual gap.
- */
-export const ELBOW_PIPE_SHAPES = new Set<PipeShape>([
-  PipeShape.Elbow,
-  PipeShape.GoldElbow,
-  PipeShape.SpinElbow,
-  PipeShape.SpinElbowCement,
-  PipeShape.LeakyElbow,
-]);
-
-/**
  * Returns true for impassable obstacle tiles (Granite, Tree, Sea).
  * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
  */
@@ -228,16 +215,6 @@ export function computeFloorTypesFromGrid(
   }
 
   return map;
-}
-
-/**
- * Returns true for tile shapes that have connector arms: ordinary pipe shapes
- * as well as Source and Sink tiles.  These are the shapes that use a black
- * stroke outline on their arms and therefore need connection-bridge patches at
- * shared tile boundaries to hide the stroke overflow.
- */
-export function isConnectorShape(shape: PipeShape): boolean {
-  return PIPE_SHAPES.has(shape) || shape === PipeShape.Source || shape === PipeShape.Sink;
 }
 
 // ── Error message constants ────────────────────────────────────────────────

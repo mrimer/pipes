@@ -227,8 +227,6 @@ export const SANDSTONE_SHATTER_COLOR       = '#e8c89a';
 export const SANDSTONE_SHATTER_WATER_COLOR = '#f0d8b0';
 /** Star chamber tile color (bright gold). */
 export const STAR_COLOR       = '#f0c040';
-/** Star chamber tile color when water is flowing through it. */
-export const STAR_WATER_COLOR = '#ffe880';
 /** Regulator chamber tile color (medium green-gray). */
 export const REGULATOR_COLOR       = '#4a7a6a';
 /** Regulator chamber tile color when water is flowing through it (more saturated green). */
@@ -265,8 +263,6 @@ export const LEAKY_PIPE_COLOR       = '#8b5c2a';
 export const LEAKY_PIPE_WATER_COLOR = '#b07840';
 /** Rust spot overlay color for leaky pipe tiles. */
 export const LEAKY_RUST_COLOR       = '#7a2c10';
-/** Water droplet spray color for leaky pipe spray animation. */
-export const LEAKY_SPRAY_COLOR      = '#56c8e8';
 /** Base sea water color (medium blue). */
 export const SEA_COLOR              = '#2a7fbf';
 /** Land border color for sea tiles (sandy tan). */
@@ -275,14 +271,10 @@ export const SEA_BORDER_COLOR       = '#c8a96e';
 export const SEA_FILL_COLOR         = '#2a7fbf';
 /** Success/completion green color used for completed status indicators. */
 export const SUCCESS_COLOR          = '#7ed321';
-/** Chapter/campaign map screen root background color (matches main/level background). */
-export const CHAPTER_MAP_BG         = BG_COLOR;
-/** Background fill for chapter map tile cells (non-empty, slightly lighter than CHAPTER_MAP_BG). */
+/** Background fill for chapter map tile cells (non-empty, slightly lighter than BG_COLOR). */
 export const CHAPTER_MAP_TILE_BG    = '#1a2840';
 /** Background fill for chapter map empty (null) cells. */
 export const CHAPTER_MAP_EMPTY_BG   = '#0d1520';
-/** Grid border/cell outline color for chapter map tiles. */
-export const CHAPTER_MAP_BORDER_COLOR = '#2a3a5e';
 /** Interior fill color for a level chamber tile when water has reached it. */
 export const CHAPTER_MAP_FILLED_CHAMBER_BG    = '#1a3d60';
 

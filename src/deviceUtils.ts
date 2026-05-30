@@ -44,11 +44,3 @@ export function setTouchUiEnabledOverride(enabled: boolean | null): void {
 export function isPortrait(): boolean {
   return window.innerHeight > window.innerWidth;
 }
-
-/**
- * Returns true when the viewport is narrower than 600 px.
- * Used to trigger compact/mobile layout overrides.
- */
-export function isNarrowScreen(): boolean {
-  return window.innerWidth < 600;
-}
