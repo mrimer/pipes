@@ -114,6 +114,10 @@ beforeEach(() => {
   jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(MOCK_CTX as unknown as CanvasRenderingContext2D);
 });
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 describe('attachChapterWaveAnimation', () => {
   it('inserts a canvas element as the last child of the header', () => {
     const header = document.createElement('button');

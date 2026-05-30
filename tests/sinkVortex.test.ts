@@ -5,18 +5,31 @@ import { VortexParticle, spawnVortexParticle, renderVortex } from '../src/visual
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Build a fake CanvasRenderingContext2D that records calls made on it. */
-function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[] } {
+function makeFakeCtx(): CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[] } {
   const calls: string[] = [];
-  return {
+  const fillStylesAtFill: string[] = [];
+  const ctx = {
     calls,
+    fillStylesAtFill,
     save:        () => { calls.push('save'); },
     restore:     () => { calls.push('restore'); },
     beginPath:   () => { calls.push('beginPath'); },
     arc:         () => { calls.push('arc'); },
-    fill:        () => { calls.push('fill'); },
-    fillStyle:   '',
+    fill:        () => {
+      calls.push('fill');
+      fillStylesAtFill.push(fillStyle);
+    },
     globalAlpha: 1,
-  } as unknown as CanvasRenderingContext2D & { calls: string[] };
+  };
+  let fillStyle = '';
+  Object.defineProperty(ctx, 'fillStyle', {
+    configurable: true,
+    get: () => fillStyle,
+    set: (value: string) => {
+      fillStyle = value;
+    },
+  });
+  return ctx as unknown as CanvasRenderingContext2D & { calls: string[]; fillStylesAtFill: string[] };
 }
 
 // ─── spawnVortexParticle ──────────────────────────────────────────────────────
@@ -123,7 +136,7 @@ describe('renderVortex', () => {
       duration:     5000,
     };
     renderVortex(ctx, [p], 0, 0, '#purple-test');
-    expect((ctx as unknown as { fillStyle: string }).fillStyle).toBe('#purple-test');
+    expect(ctx.fillStylesAtFill).toContain('#purple-test');
   });
 
   it('leaves an empty particle pool unchanged and issues no draw calls', () => {
