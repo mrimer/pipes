@@ -52,10 +52,12 @@ const MOCK_CTX = {
 };
 
 // Stub out requestAnimationFrame so _loop() never fires.
-const originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
-const originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+let originalInnerWidth: PropertyDescriptor | undefined;
+let originalInnerHeight: PropertyDescriptor | undefined;
 
 beforeEach(() => {
+  originalInnerWidth = Object.getOwnPropertyDescriptor(window, 'innerWidth');
+  originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
   // Keep TILE_SIZE at 64 for tests by simulating a small viewport.
   Object.defineProperty(window, 'innerWidth',  { value: 0, configurable: true });
   Object.defineProperty(window, 'innerHeight', { value: 0, configurable: true });
