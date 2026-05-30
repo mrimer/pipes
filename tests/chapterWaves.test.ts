@@ -351,6 +351,7 @@ describe('attachInventoryWaveAnimation', () => {
   it('renders a wave frame when requestAnimationFrame fires', () => {
     const el = document.createElement('div');
     setElementSize(el, 80, 48);
+    document.body.appendChild(el);
 
     attachInventoryWaveAnimation(el);
     expect(mockCtx.createImageData).not.toHaveBeenCalled();
