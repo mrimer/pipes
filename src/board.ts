@@ -115,7 +115,7 @@ export const ELBOW_PIPE_SHAPES = new Set<PipeShape>([
  * Returns true for impassable obstacle tiles (Granite, Tree, Sea).
  * Obstacle tiles have no connections, cannot be moved, and water cannot flow through them.
  */
-export function isObstacleTile(shape: PipeShape): boolean {
+function isObstacleTile(shape: PipeShape): boolean {
   return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Tree2
     || shape === PipeShape.Tree3 || shape === PipeShape.Tree4 || shape === PipeShape.Sea;
 }
@@ -333,7 +333,7 @@ const DECORATION_DENSITY = 0.30;
  * used by {@link generateAmbientDecorations} so the logic is not duplicated
  * across the game board and chapter-map contexts.
  */
-export function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
+function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] {
   switch (floorType) {
     case PipeShape.EmptyFall:   return ['grass', 'pebbles', 'dandelion', 'sunflower', 'leaves'];
     case PipeShape.EmptyDark:   return ['mushroom', 'crystal', 'pebbles'];

@@ -114,16 +114,16 @@ const LOCAL_BUTT_END_DIRS_BUFFER = new Set<Direction>();
  * Positions of the 3 landing-strip triangles along a Source/Sink connector arm,
  * as fractions of `half` (the half tile size).
  */
-export const CONNECTOR_TRI_FRACS = [0.58, 0.72, 0.86] as const;
+const CONNECTOR_TRI_FRACS = [0.58, 0.72, 0.86] as const;
 /** Depth (along-arm extent) of each landing-strip triangle, as a fraction of `half`. */
-export const CONNECTOR_TRI_DEPTH = 0.10;
+const CONNECTOR_TRI_DEPTH = 0.10;
 /** Half-width (perpendicular extent) of each landing-strip triangle, as a fraction of `half`. */
-export const CONNECTOR_TRI_WING  = 0.09;
+const CONNECTOR_TRI_WING  = 0.09;
 
 /** Number of distinct triangle positions (steps) in one landing-strip cycle. */
-export const CONNECTOR_LIGHT_STEPS = CONNECTOR_TRI_FRACS.length;
+const CONNECTOR_LIGHT_STEPS = CONNECTOR_TRI_FRACS.length;
 /** Full landing-strip cycle duration in ms (CONNECTOR_LIGHT_STEPS steps × 300 ms each). */
-export const CONNECTOR_LIGHT_CYCLE_MS = CONNECTOR_LIGHT_STEPS * 300;
+const CONNECTOR_LIGHT_CYCLE_MS = CONNECTOR_LIGHT_STEPS * 300;
 
 /**
  * Compute which triangle index (0 … CONNECTOR_LIGHT_STEPS−1) should be lit
@@ -256,7 +256,7 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
  * @param isSource  When true triangles point outward (away from centre);
  *                  when false they point inward (toward centre).
  */
-export function drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number, half: number, isSource: boolean): void {
+function drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number, half: number, isSource: boolean): void {
   const depth = half * CONNECTOR_TRI_DEPTH;
   const wing  = half * CONNECTOR_TRI_WING;
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -1632,7 +1632,7 @@ function _buildCrossPath(
  * @param localButtEndDirs Directions in the LOCAL frame whose tile-edge end
  *                         should be flat (butt) rather than rounded.
  */
-export function buildPipeBodyPath(
+function buildPipeBodyPath(
   ctx: CanvasRenderingContext2D,
   shape: PipeShape,
   half: number,

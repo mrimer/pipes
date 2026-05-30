@@ -368,7 +368,7 @@ export function drawLevelChamberTile(
 
 }
 
-export function drawMapChamberTile(
+function drawMapChamberTile(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,

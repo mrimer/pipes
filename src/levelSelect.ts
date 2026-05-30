@@ -25,7 +25,7 @@ export interface ActiveCampaignInfo {
  * A level is considered "available for selection" when it would not be shown as
  * locked in the level list (same locking logic used by renderLevelList).
  */
-export function findContinueLevelId(
+function findContinueLevelId(
   chapters: import('./types').ChapterDef[],
   completedLevels: Set<number>,
   levelStars: Record<number, number> = {},
@@ -91,7 +91,7 @@ export function findContinueLevelId(
  * Find the index of the latest unlocked chapter that has a chapter map (grid).
  * Returns the 0-based chapter index, or `null` if no such chapter is accessible.
  */
-export function findContinueChapterIdx(
+function findContinueChapterIdx(
   chapters: import('./types').ChapterDef[],
   completedLevels: Set<number>,
   completedChapters?: ReadonlySet<number>,

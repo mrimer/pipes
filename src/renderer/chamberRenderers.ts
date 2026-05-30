@@ -512,9 +512,9 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
 /**
  * Return a brief human-readable label for the stat check on a Regulator tile.
  * Format examples: ">10💧" (water), "<5°" (temperature), "=2P" (pressure), ">3❄" (frozen).
- * Exported so the tooltip manager and rules modal can reuse this without duplicating logic.
+ * Shared helper for tooltip manager and rules modal text without duplicating logic.
  */
-export function regulatorCheckText(tile: Tile): string {
+function regulatorCheckText(tile: Tile): string {
   const op   = tile.regulatorOperator ?? '>';
   const cost = tile.cost;
   const stat = tile.regulatorStat ?? 'water';

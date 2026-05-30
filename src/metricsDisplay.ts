@@ -9,11 +9,11 @@ import { AnimSparkleCallbacks } from './animationManager';
 import { CampaignManager } from './campaignManager';
 
 /** Sparkle color palette for metric increases (gold). */
-export const METRIC_SPARKLE_GOLD: readonly string[] = ['#ffd700', '#ffe866', '#ffec8b', '#ffc200', '#fff0a0', '#f0c040'];
+const METRIC_SPARKLE_GOLD: readonly string[] = ['#ffd700', '#ffe866', '#ffec8b', '#ffc200', '#fff0a0', '#f0c040'];
 /** Sparkle color palette for metric decreases (light blue). */
-export const METRIC_SPARKLE_BLUE: readonly string[] = ['#add8e6', '#87ceeb', '#b0e0e6', '#e0f7ff', '#cce8ff', '#aed6f1'];
+const METRIC_SPARKLE_BLUE: readonly string[] = ['#add8e6', '#87ceeb', '#b0e0e6', '#e0f7ff', '#cce8ff', '#aed6f1'];
 /** Sparkle color palette for frozen metric decreases (red). */
-export const METRIC_SPARKLE_RED:  readonly string[] = ['#ff4444', '#ff7777', '#ff9999', '#ff6666', '#ffaaaa', '#cc3333'];
+const METRIC_SPARKLE_RED:  readonly string[] = ['#ff4444', '#ff7777', '#ff9999', '#ff6666', '#ffaaaa', '#cc3333'];
 
 /**
  * Manages the play-screen HUD metric displays (water, temperature, frozen, pressure),
