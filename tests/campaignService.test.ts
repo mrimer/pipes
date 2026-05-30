@@ -874,6 +874,11 @@ describe('CampaignService – parseImport', () => {
     expect(() => svc.parseImport(JSON.stringify({ id: 'x', name: 'X' }))).toThrow();
   });
 
+  it('throws for invalid campaign shape before migration runs', () => {
+    const svc = makeService();
+    expect(() => svc.parseImport(JSON.stringify({ id: 'x', name: 'X', chapters: {} }))).toThrow(/invalid campaign file format/i);
+  });
+
   it('strips the official flag on import', () => {
     const campaign: CampaignDef = { ...emptyCampaign('cmp_official_strip'), official: true };
     const svc = makeService();

@@ -39,6 +39,19 @@ describe('loadAllRecordings', () => {
     expect(all).toHaveLength(1);
     expect(all[0].id).toBe(r.id);
   });
+
+  it('filters out invalid entries from stored recordings JSON', () => {
+    localStorage.setItem(
+      'pipes_recordings',
+      JSON.stringify([
+        makeRecord({ id: 'ok-record' }),
+        { id: 5, moves: [], campaignId: 'cmp_a', levelId: 1 },
+      ]),
+    );
+    const all = loadAllRecordings();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe('ok-record');
+  });
 });
 
 // ─── loadRecordingsForLevel ───────────────────────────────────────────────────

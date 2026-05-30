@@ -65,6 +65,23 @@ describe('Campaign persistence', () => {
     expect(loadImportedCampaigns()).toEqual([]);
   });
 
+  it('loadImportedCampaigns drops invalid entries from parsed storage array', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(
+      'pipes_campaigns',
+      JSON.stringify([
+        { id: 'ok', name: 'Valid Campaign', author: 'A', chapters: [] },
+        { id: 123, name: 'Bad Campaign', chapters: [] },
+      ]),
+    );
+
+    const loaded = loadImportedCampaigns();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].id).toBe('ok');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it('loadCampaignProgress returns empty set when nothing is stored', () => {
     expect(loadCampaignProgress('cmp_test').size).toBe(0);
   });

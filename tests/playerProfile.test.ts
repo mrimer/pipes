@@ -245,6 +245,29 @@ describe('parsePlayerFile', () => {
     const result = parsePlayerFile(json);
     expect(result.ok).toBe(false);
   });
+
+  it('returns ok:false when payload recordings have invalid shape', () => {
+    const { computeChecksum: cs } = require('../src/playerProfile');
+    const payload = {
+      guid: 'test-guid-bob',
+      lastPlayedAt: null,
+      playerName: 'Bob',
+      sfxVolume: 80,
+      touchUiEnabled: null,
+      commandKeys: null,
+      campaignProgress: [],
+      recordings: [{ id: 'r-1', campaignId: 'cmp_1', levelId: 1, moves: [], waterScore: 'bad' }],
+    };
+    const json = JSON.stringify({
+      type: FILE_TYPE_PLAYER,
+      version: 1,
+      payload,
+      checksum: cs(JSON.stringify(payload)),
+    });
+    const result = parsePlayerFile(json);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/shape mismatch/i);
+  });
 });
 
 // ─── applyPlayerProfile ───────────────────────────────────────────────────────
