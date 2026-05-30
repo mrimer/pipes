@@ -210,6 +210,8 @@ describe('attachInventoryWaveAnimation', () => {
     jest.clearAllMocks();
     const mockCtx = createMockCtx();
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as unknown as CanvasRenderingContext2D);
+    jest.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1);
+    jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
   });
 
   afterEach(() => {

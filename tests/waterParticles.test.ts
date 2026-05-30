@@ -24,6 +24,12 @@ function makeLinearBoardWithDeadEnd(): Board {
   const board = new Board(2, 4);
   board.source = { row: 0, col: 0 };
   board.sink   = { row: 0, col: 3 };
+  // Clear all cells first; Board without `level` seeds random legacy tiles.
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    }
+  }
 
   // customConnections is the 8th constructor parameter
   board.grid[0][0] = new Tile(PipeShape.Source, 0, false, 0, 0, null, 1, new Set([Direction.East]));

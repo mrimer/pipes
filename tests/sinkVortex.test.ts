@@ -78,12 +78,11 @@ describe('spawnVortexParticle', () => {
   });
 
   it('records a startTime near the current time', () => {
-    const before = performance.now();
+    const nowSpy = jest.spyOn(performance, 'now').mockReturnValue(1234);
     const particles: VortexParticle[] = [];
     spawnVortexParticle(particles);
-    const after = performance.now();
-    expect(particles[0].startTime).toBeGreaterThanOrEqual(before);
-    expect(particles[0].startTime).toBeLessThanOrEqual(after);
+    expect(particles[0].startTime).toBe(1234);
+    nowSpy.mockRestore();
   });
 });
 

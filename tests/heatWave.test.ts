@@ -120,11 +120,10 @@ describe('tickHeatWaves', () => {
     setHotPlate(board as unknown as StubBoard, 0, 1);
     const waves: HeatWave[] = [];
     const times = new Map<string, number>();
+    const t = 10_000;
 
     // Force the timer directly to guarantee a spawn on the next tick.
-    times.set('0,1', performance.now() - HEAT_WAVE_INTERVAL_MS - 1);
-
-    const t = performance.now();
+    times.set('0,1', t - HEAT_WAVE_INTERVAL_MS - 1);
     // First call spawns one wave.
     tickHeatWaves(waves, times, board, new Set(), t);
     expect(waves.length).toBe(1);

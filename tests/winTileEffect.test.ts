@@ -39,6 +39,12 @@ function makeBranchedBoard(): Board {
   const board = new Board(2, 3);
   board.source = { row: 0, col: 0 };
   board.sink   = { row: 0, col: 2 };
+  // Clear all cells first; Board without `level` seeds random legacy tiles.
+  for (let r = 0; r < board.rows; r++) {
+    for (let c = 0; c < board.cols; c++) {
+      board.grid[r][c] = new Tile(PipeShape.Empty, 0);
+    }
+  }
   board.grid[0][0] = new Tile(PipeShape.Source, 0, false, 0, 0, null, 1, new Set([Direction.East]));
   board.grid[0][1] = new Tile(PipeShape.Tee, 90);              // E, S, W
   board.grid[0][2] = new Tile(PipeShape.Sink, 0, false, 0, 0, null, 1, new Set([Direction.West]));
