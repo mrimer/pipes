@@ -21,6 +21,7 @@ describe('playSwirlScreenTransition', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
     jest.restoreAllMocks();
   });

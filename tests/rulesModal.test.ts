@@ -9,6 +9,7 @@ describe('createGameRulesModal', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     localStorage.clear();
+    commandKeyManager.resetToDefaults();
   });
 
   afterEach(() => {

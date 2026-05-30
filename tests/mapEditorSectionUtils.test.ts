@@ -7,6 +7,7 @@
  */
 
 import { handleMapEditorKeyDown, MapEditorKeydownCallbacks } from '../src/campaignEditor/mapEditorSectionUtils';
+import { commandKeyManager } from '../src/commandKeyManager';
 import { PipeShape } from '../src/types';
 import type { TileDef } from '../src/types';
 
@@ -41,6 +42,14 @@ function makeCallbacks(overrides: Partial<MapEditorKeydownCallbacks> = {}): {
 function keyEvent(key: string, opts: KeyboardEventInit = {}): KeyboardEvent {
   return new KeyboardEvent('keydown', { key, bubbles: true, ...opts });
 }
+
+beforeEach(() => {
+  commandKeyManager.resetToDefaults();
+});
+
+afterEach(() => {
+  commandKeyManager.resetToDefaults();
+});
 
 // ─── Ctrl+Z / Ctrl+Y ─────────────────────────────────────────────────────────
 
