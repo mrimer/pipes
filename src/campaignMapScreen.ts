@@ -50,12 +50,13 @@ export class CampaignMapScreen {
   private readonly _inner: ChapterMapScreen;
   private readonly _callbacks: CampaignMapCallbacks;
   private _pseudoLevels: LevelDef[] = [];
+  private _completedPseudoLevelIds: Set<number> = new Set();
   private _campaign: CampaignDef | null = null;
 
   constructor(callbacks: CampaignMapCallbacks) {
     this._callbacks = callbacks;
     const chapterCallbacks: ChapterMapCallbacks = {
-      getDisplayProgress: () => callbacks.getCompletedChapters(),
+      getDisplayProgress: () => this._completedPseudoLevelIds,
       getActiveCampaignId: () => callbacks.getActiveCampaignId(),
       onShowLevelSelect: () => callbacks.onShowLevelSelect(),
       onLevelSelected: (levelDef) => {
@@ -152,6 +153,7 @@ export class CampaignMapScreen {
     this._campaign = campaign;
     const pseudoChapter = this._buildPseudoChapter(campaign);
     this._pseudoLevels = pseudoChapter.levels;
+    this._completedPseudoLevelIds = this._mapCompletedPseudoLevelIds(campaign);
     const pseudoCampaign: CampaignDef = {
       ...campaign,
       chapters: [pseudoChapter],
@@ -161,6 +163,7 @@ export class CampaignMapScreen {
 
   hide(): void {
     this._campaign = null;
+    this._completedPseudoLevelIds.clear();
     this._inner.hide();
   }
 
@@ -238,5 +241,17 @@ export class CampaignMapScreen {
       grid,
       style: campaign.style,
     };
+  }
+
+  private _mapCompletedPseudoLevelIds(campaign: CampaignDef): Set<number> {
+    const completedChapters = this._callbacks.getCompletedChapters();
+    const mapped = new Set<number>();
+    for (let i = 0; i < campaign.chapters.length; i++) {
+      const chapter = campaign.chapters[i];
+      const pseudoLevel = this._pseudoLevels[i];
+      if (!pseudoLevel) continue;
+      if (completedChapters.has(chapter.id)) mapped.add(pseudoLevel.id);
+    }
+    return mapped;
   }
 }
