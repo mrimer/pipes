@@ -1,6 +1,14 @@
 import { buildIntroIcicleSeeds, buildLetterFillDoneTimes, buildTitleGlyphLayout } from '../src/titleScreen';
 import { PipeShape } from '../src/types';
 
+function createSeededRandom(seed: number): () => number {
+  let state = seed;
+  return () => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff;
+    return state / 0x80000000;
+  };
+}
+
 describe('buildTitleGlyphLayout', () => {
   test('builds COOL PIPES as a single landscape row of connected pipe-only glyph cells', () => {
     const layout = buildTitleGlyphLayout();
@@ -39,41 +47,36 @@ describe('buildTitleGlyphLayout', () => {
     }
   });
 
-  describe('title intro icicle helpers', () => {
-    test('computes letter fill done times from letter starts and global done time', () => {
-      const layout = buildTitleGlyphLayout();
-      const letterStarts = Array.from({ length: layout.letterCount }, (_, i) => i * 1000);
-      const doneTimes = buildLetterFillDoneTimes(layout, letterStarts, layout.letterCount * 1000);
+});
 
-      expect(doneTimes).toHaveLength(layout.letterCount);
-      expect(doneTimes[0]).toBe(850);
-      expect(doneTimes[layout.letterCount - 1]).toBe(layout.letterCount * 1000 - 150);
-    });
+describe('title intro icicle helpers', () => {
+  test('computes letter fill done times from letter starts and global done time', () => {
+    const layout = buildTitleGlyphLayout();
+    const letterStarts = Array.from({ length: layout.letterCount }, (_, i) => i * 1000);
+    const doneTimes = buildLetterFillDoneTimes(layout, letterStarts, layout.letterCount * 1000);
 
-    test('creates randomized icicle seeds only for COOL letters with bounded timing', () => {
-      const layout = buildTitleGlyphLayout();
-      const flow = {
-        letterStarts: Array.from({ length: layout.letterCount }, (_, i) => i * 1000),
-        allLettersDoneAt: layout.letterCount * 1000,
-      };
-      const seededRandom = (() => {
-        let state = 1337;
-        return () => {
-          state = (state * 1103515245 + 12345) & 0x7fffffff;
-          return state / 0x80000000;
-        };
-      })();
-      const seeds = buildIntroIcicleSeeds(layout, flow, seededRandom);
+    expect(doneTimes).toHaveLength(layout.letterCount);
+    expect(doneTimes[0]).toBe(850);
+    expect(doneTimes[layout.letterCount - 1]).toBe(layout.letterCount * 1000 - 150);
+  });
 
-      expect(seeds.length).toBeGreaterThanOrEqual(8);
-      for (const seed of seeds) {
-        expect(seed.letterIndex).toBeLessThan(4);
-        const letterDoneAt = (flow.letterStarts[seed.letterIndex + 1] ?? flow.allLettersDoneAt) - 150;
-        expect(seed.growthStartMs).toBeGreaterThanOrEqual(letterDoneAt);
-        expect(seed.growthStartMs).toBeLessThanOrEqual(letterDoneAt + 420);
-        expect(seed.detachDelayMs).toBeGreaterThanOrEqual(0);
-        expect(seed.detachDelayMs).toBeLessThanOrEqual(299);
-      }
-    });
+  test('creates randomized icicle seeds only for COOL letters with bounded timing', () => {
+    const layout = buildTitleGlyphLayout();
+    const flow = {
+      letterStarts: Array.from({ length: layout.letterCount }, (_, i) => i * 1000),
+      allLettersDoneAt: layout.letterCount * 1000,
+    };
+    const seededRandom = createSeededRandom(1337);
+    const seeds = buildIntroIcicleSeeds(layout, flow, seededRandom);
+
+    expect(seeds.length).toBeGreaterThanOrEqual(8);
+    for (const seed of seeds) {
+      expect(seed.letterIndex).toBeLessThan(4);
+      const letterDoneAt = (flow.letterStarts[seed.letterIndex + 1] ?? flow.allLettersDoneAt) - 150;
+      expect(seed.growthStartMs).toBeGreaterThanOrEqual(letterDoneAt);
+      expect(seed.growthStartMs).toBeLessThanOrEqual(letterDoneAt + 420);
+      expect(seed.detachDelayMs).toBeGreaterThanOrEqual(0);
+      expect(seed.detachDelayMs).toBeLessThanOrEqual(299);
+    }
   });
 });

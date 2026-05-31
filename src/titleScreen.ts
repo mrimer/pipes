@@ -66,6 +66,8 @@ const DROPLET_MAX_SPEED_RATIO = 2.0;
 const DROPLET_MIN_RADIUS_RATIO = 0.045;
 const DROPLET_MAX_RADIUS_RATIO = 0.085;
 const DROPLET_MAX_JITTER_X_RATIO = 0.18;
+const DROPLET_OFFSCREEN_MARGIN = 16;
+const ICICLE_OFFSCREEN_MARGIN = 24;
 
 interface IntroIcicleSeed {
   readonly letterIndex: number;
@@ -448,6 +450,7 @@ function applyIntroSfxVolume(): void {
 export function showIntroTitleScreen(): Promise<void> {
   return new Promise((resolve) => {
     applyIntroSfxVolume();
+    const random = Math.random;
 
     const overlay = document.createElement('div');
     overlay.style.cssText = [
@@ -522,10 +525,13 @@ export function showIntroTitleScreen(): Promise<void> {
       exiting = true;
       exitElapsedMs = performance.now() - startMs;
       sfxManager.stopAll();
-      sfxManager.play(SfxId.UIConfirm);
       if (icicles.length === 0) {
-        finish(false);
+        sfxManager.playWithDoneCallback(SfxId.UIConfirm, () => {
+          finish(false);
+        });
+        return;
       }
+      sfxManager.play(SfxId.UIConfirm);
     };
 
     const draw = (now: number) => {
@@ -594,7 +600,7 @@ export function showIntroTitleScreen(): Promise<void> {
         const droplet = droplets[i];
         droplet.vy += DROPLET_FALL_ACCEL_PX * dt;
         droplet.y += droplet.vy * dt;
-        if (droplet.y - droplet.radius > height + 16) {
+        if (droplet.y - droplet.radius > height + DROPLET_OFFSCREEN_MARGIN) {
           droplets.splice(i, 1);
         }
       }
@@ -631,10 +637,10 @@ export function showIntroTitleScreen(): Promise<void> {
           if (!exiting && growth >= 1) {
             while (elapsed >= icicle.nextDropMs) {
               droplets.push({
-                x: anchorX + randomRange(-DROPLET_MAX_JITTER_X_RATIO, DROPLET_MAX_JITTER_X_RATIO, Math.random) * tileSize,
+                x: anchorX + randomRange(-DROPLET_MAX_JITTER_X_RATIO, DROPLET_MAX_JITTER_X_RATIO, random) * tileSize,
                 y: anchorY + currentLength,
-                vy: randomRange(DROPLET_MIN_SPEED_RATIO, DROPLET_MAX_SPEED_RATIO, Math.random) * tileSize,
-                radius: randomRange(DROPLET_MIN_RADIUS_RATIO, DROPLET_MAX_RADIUS_RATIO, Math.random) * tileSize,
+                vy: randomRange(DROPLET_MIN_SPEED_RATIO, DROPLET_MAX_SPEED_RATIO, random) * tileSize,
+                radius: randomRange(DROPLET_MIN_RADIUS_RATIO, DROPLET_MAX_RADIUS_RATIO, random) * tileSize,
               });
               icicle.nextDropMs += icicle.dropIntervalMs;
             }
@@ -649,7 +655,7 @@ export function showIntroTitleScreen(): Promise<void> {
           + 0.5 * ICICLE_FALL_ACCEL_PX * fallSeconds * fallSeconds;
         const detachedLength = Math.max(1, icicle.detachedLength);
         const detachedHalfWidth = Math.max(1, icicle.detachedHalfWidth);
-        if (detachedY - detachedHalfWidth > height + detachedLength + 24) {
+        if (detachedY - detachedHalfWidth > height + detachedLength + ICICLE_OFFSCREEN_MARGIN) {
           icicle.fallenOffscreen = true;
           continue;
         }
