@@ -23,6 +23,19 @@ const BODY_INSIDE_TILE_BUFFER_SCALE = 0.12;
 const MIN_WING_OPENNESS = 0.35;
 const WING_ALPHA = 0.8;
 const HEAD_RATIO = 0.54;
+const WING_JOIN_X_RATIO = 0;
+const FRONT_WING_CTRL_X_SCALE = 0.62;
+const FRONT_WING_CTRL_Y_SCALE = 1.45;
+const FRONT_WING_OUT_X_SCALE = 1.08;
+const FRONT_WING_OUT_Y_SCALE = 0.46;
+const FRONT_WING_INNER_CTRL_X_SCALE = 0.46;
+const FRONT_WING_INNER_CTRL_Y_SCALE = 0.24;
+const BACK_WING_CTRL_X_SCALE = -0.55;
+const BACK_WING_CTRL_Y_SCALE = 1.1;
+const BACK_WING_OUT_X_SCALE = -0.9;
+const BACK_WING_OUT_Y_SCALE = 0.28;
+const BACK_WING_INNER_CTRL_X_SCALE = -0.44;
+const BACK_WING_INNER_CTRL_Y_SCALE = 0.16;
 
 interface ButterflyBoard {
   getTile(pos: GridPos): { shape: PipeShape } | null;
@@ -276,21 +289,22 @@ export class ButterflyField {
 
     ctx.fillStyle = butterfly.color;
     ctx.globalAlpha = WING_ALPHA;
+    const wingJoinX = bodyHalfLength * WING_JOIN_X_RATIO;
     for (const side of [-1, 1] as const) {
       const wingSign = side * wingYScale;
 
       ctx.beginPath();
-      ctx.moveTo(headX * 0.1, 0);
+      ctx.moveTo(wingJoinX, 0);
       ctx.quadraticCurveTo(
-        bodyHalfLength * 0.55,
-        wingSign * butterfly.sizePx * 1.3,
-        bodyHalfLength * 0.9,
-        wingSign * butterfly.sizePx * 0.35,
+        bodyHalfLength * FRONT_WING_CTRL_X_SCALE,
+        wingSign * butterfly.sizePx * FRONT_WING_CTRL_Y_SCALE,
+        bodyHalfLength * FRONT_WING_OUT_X_SCALE,
+        wingSign * butterfly.sizePx * FRONT_WING_OUT_Y_SCALE,
       );
       ctx.quadraticCurveTo(
-        bodyHalfLength * 0.4,
-        wingSign * butterfly.sizePx * 0.2,
-        headX * 0.1,
+        bodyHalfLength * FRONT_WING_INNER_CTRL_X_SCALE,
+        wingSign * butterfly.sizePx * FRONT_WING_INNER_CTRL_Y_SCALE,
+        wingJoinX,
         0,
       );
       ctx.fill();
@@ -298,17 +312,17 @@ export class ButterflyField {
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.moveTo(-bodyHalfLength * 0.1, 0);
+      ctx.moveTo(wingJoinX, 0);
       ctx.quadraticCurveTo(
-        -bodyHalfLength * 0.45,
-        wingSign * butterfly.sizePx * 0.95,
-        -bodyHalfLength * 0.75,
-        wingSign * butterfly.sizePx * 0.2,
+        bodyHalfLength * BACK_WING_CTRL_X_SCALE,
+        wingSign * butterfly.sizePx * BACK_WING_CTRL_Y_SCALE,
+        bodyHalfLength * BACK_WING_OUT_X_SCALE,
+        wingSign * butterfly.sizePx * BACK_WING_OUT_Y_SCALE,
       );
       ctx.quadraticCurveTo(
-        -bodyHalfLength * 0.35,
-        wingSign * butterfly.sizePx * 0.12,
-        -bodyHalfLength * 0.1,
+        bodyHalfLength * BACK_WING_INNER_CTRL_X_SCALE,
+        wingSign * butterfly.sizePx * BACK_WING_INNER_CTRL_Y_SCALE,
+        wingJoinX,
         0,
       );
       ctx.fill();
