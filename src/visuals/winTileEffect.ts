@@ -14,7 +14,7 @@
  */
 
 import { Board, NEIGHBOUR_DELTA } from '../board';
-import { Direction, DIRECTIONS, GridPos } from '../types';
+import { DIRECTIONS, GridPos } from '../types';
 import { TILE_SIZE } from '../renderer';
 import { bfsWithDepth } from '../bfs';
 
