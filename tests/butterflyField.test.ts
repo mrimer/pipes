@@ -32,8 +32,11 @@ function createSequencePRNG(values: number[]): () => number {
   let index = 0;
   return () => {
     const value = values[index];
+    if (value === undefined) {
+      throw new Error('PRNG sequence exhausted');
+    }
     index += 1;
-    return value ?? 0;
+    return value;
   };
 }
 
@@ -130,7 +133,7 @@ describe('ButterflyField', () => {
   });
 
   it('keeps newly spawned off-grid butterflies alive while they move toward the board', () => {
-    jest.spyOn(Math, 'random').mockImplementation(createSequencePRNG([0, 0.01, 0.5, 1, 0, 1]));
+    jest.spyOn(Math, 'random').mockImplementation(createSequencePRNG([0, 0.01, 0.5, 1, 0, 1, 0]));
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new ButterflyField();
     field.resetForLevel(20, 20, 10, 'Grass', null);
@@ -144,9 +147,9 @@ describe('ButterflyField', () => {
     expect(butterfly.y).toBeGreaterThan(initialY);
   });
 
-  it('initial spawn heading always moves butterflies inward from each edge', () => {
+  it('initial spawned heading always moves butterflies inward from each edge', () => {
     const randomSpy = jest.spyOn(Math, 'random');
-    jest.spyOn(performance, 'now').mockReturnValue(1000);
+    const nowSpy = jest.spyOn(performance, 'now').mockReturnValue(1000);
     const edgeCases = [
       { edge: 0, assertInward: (from: { x: number; y: number }, to: { x: number; y: number }) => to.y > from.y },
       { edge: 1, assertInward: (from: { x: number; y: number }, to: { x: number; y: number }) => to.x < from.x },
@@ -154,25 +157,31 @@ describe('ButterflyField', () => {
       { edge: 3, assertInward: (from: { x: number; y: number }, to: { x: number; y: number }) => to.x > from.x },
     ];
 
-    for (const { edge, assertInward } of edgeCases) {
-      randomSpy.mockImplementation(createSequencePRNG([
-        0,
-        (edge + 0.1) / 4,
-        0.5,
-        1,
-        0,
-        1,
-      ]));
-      const field = new ButterflyField();
-      field.resetForLevel(20, 20, 10, 'Grass', null);
-      field.updateAndRender(createMockCtx(), 1000);
+    try {
+      for (const { edge, assertInward } of edgeCases) {
+        randomSpy.mockImplementation(createSequencePRNG([
+          0,
+          (edge + 0.1) / 4,
+          0.5,
+          1,
+          0,
+          1,
+          0,
+        ]));
+        const field = new ButterflyField();
+        field.resetForLevel(20, 20, 10, 'Grass', null);
+        field.updateAndRender(createMockCtx(), 1000);
 
-      const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
-      const from = { x: butterfly.x, y: butterfly.y };
-      field.updateAndRender(createMockCtx(), 1250);
+        const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
+        const from = { x: butterfly.x, y: butterfly.y };
+        field.updateAndRender(createMockCtx(), 1250);
 
-      const to = { x: butterfly.x, y: butterfly.y };
-      expect(assertInward(from, to)).toBe(true);
+        const to = { x: butterfly.x, y: butterfly.y };
+        expect(assertInward(from, to)).toBe(true);
+      }
+    } finally {
+      randomSpy.mockRestore();
+      nowSpy.mockRestore();
     }
   });
 });
