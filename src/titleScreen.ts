@@ -43,6 +43,63 @@ const PRESS_PROMPT_COLOR = '#d6e8ff';
 const PRESS_PROMPT_FONT_WEIGHT = 600;
 const PRESS_PROMPT_FONT_FAMILY = 'Arial, sans-serif';
 const PRESS_PROMPT_FONT_SIZE_RATIO = 0.95;
+const ICICLE_MIN_PER_LETTER = 2;
+const ICICLE_MAX_PER_LETTER = 4;
+const ICICLE_GROWTH_START_JITTER_MS = 420;
+const ICICLE_MIN_GROWTH_MS = 1400;
+const ICICLE_MAX_GROWTH_MS = 3000;
+const ICICLE_MIN_LENGTH_RATIO = 0.75;
+const ICICLE_MAX_LENGTH_RATIO = 2.25;
+const ICICLE_MIN_HALF_WIDTH_RATIO = 0.08;
+const ICICLE_MAX_HALF_WIDTH_RATIO = 0.24;
+const ICICLE_DROP_DELAY_MAX_MS = 520;
+const ICICLE_DROP_MIN_INTERVAL_MS = 380;
+const ICICLE_DROP_MAX_INTERVAL_MS = 820;
+const ICICLE_DETACH_MAX_JITTER_MS = 299;
+const ICICLE_FALL_ACCEL_PX = 1700;
+const ICICLE_MIN_FALL_SPEED_RATIO = 2.6;
+const ICICLE_MAX_FALL_SPEED_RATIO = 4.2;
+const ICICLE_MAX_DRIFT_SPEED_RATIO = 0.22;
+const DROPLET_FALL_ACCEL_PX = 1600;
+const DROPLET_MIN_SPEED_RATIO = 1.2;
+const DROPLET_MAX_SPEED_RATIO = 2.0;
+const DROPLET_MIN_RADIUS_RATIO = 0.045;
+const DROPLET_MAX_RADIUS_RATIO = 0.085;
+const DROPLET_MAX_JITTER_X_RATIO = 0.18;
+
+interface IntroIcicleSeed {
+  readonly letterIndex: number;
+  readonly row: number;
+  readonly col: number;
+  readonly anchorOffsetRatio: number;
+  readonly growthStartMs: number;
+  readonly growthDurationMs: number;
+  readonly maxLengthRatio: number;
+  readonly maxHalfWidthRatio: number;
+  readonly dropIntervalMs: number;
+  readonly dropDelayMs: number;
+  readonly detachDelayMs: number;
+  readonly fallSpeedRatio: number;
+  readonly driftSpeedRatio: number;
+}
+
+interface IntroDroplet {
+  x: number;
+  y: number;
+  vy: number;
+  radius: number;
+}
+
+interface IntroIcicleState extends IntroIcicleSeed {
+  nextDropMs: number;
+  detached: boolean;
+  detachedAtMs: number;
+  detachedX: number;
+  detachedY: number;
+  detachedLength: number;
+  detachedHalfWidth: number;
+  fallenOffscreen: boolean;
+}
 
 const GLYPHS: Record<TitleLetter, readonly string[]> = {
   C: [
@@ -277,6 +334,88 @@ function buildLetterDepthMap(layout: GlyphLayout): {
   return { depths, letterStarts, allLettersDoneAt: currentStart };
 }
 
+export function buildLetterFillDoneTimes(layout: GlyphLayout, letterStarts: readonly number[], allLettersDoneAt: number): readonly number[] {
+  const doneTimes: number[] = [];
+  for (let i = 0; i < layout.letterCount; i++) {
+    const nextStart = letterStarts[i + 1] ?? allLettersDoneAt;
+    doneTimes.push(Math.max(letterStarts[i] ?? 0, nextStart - LETTER_GAP_MS));
+  }
+  return doneTimes;
+}
+
+function randomIntInclusive(min: number, max: number, random: () => number): number {
+  const low = Math.ceil(Math.min(min, max));
+  const high = Math.floor(Math.max(min, max));
+  return Math.floor(random() * (high - low + 1)) + low;
+}
+
+function randomRange(min: number, max: number, random: () => number): number {
+  return min + (max - min) * random();
+}
+
+function pickRandomUnique<T>(items: readonly T[], count: number, random: () => number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = randomIntInclusive(0, i, random);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, Math.max(0, Math.min(count, copy.length)));
+}
+
+function collectLetterBottomCells(layout: GlyphLayout): Map<number, GlyphCell[]> {
+  const byLetter = new Map<number, GlyphCell[]>();
+  const cellLookup = new Set(layout.cells.map((cell) => key(cell.row, cell.col)));
+  for (const cell of layout.cells) {
+    const below = key(cell.row + 1, cell.col);
+    if (cellLookup.has(below)) {
+      continue;
+    }
+    const existing = byLetter.get(cell.letterIndex);
+    if (existing) {
+      existing.push(cell);
+    } else {
+      byLetter.set(cell.letterIndex, [cell]);
+    }
+  }
+  return byLetter;
+}
+
+export function buildIntroIcicleSeeds(
+  layout: GlyphLayout,
+  flow: { readonly letterStarts: readonly number[]; readonly allLettersDoneAt: number },
+  random: () => number = Math.random,
+): readonly IntroIcicleSeed[] {
+  const bottomCells = collectLetterBottomCells(layout);
+  const fillDoneTimes = buildLetterFillDoneTimes(layout, flow.letterStarts, flow.allLettersDoneAt);
+  const seeds: IntroIcicleSeed[] = [];
+  for (let letterIndex = 0; letterIndex < Math.min(COOL_LETTER_COUNT, layout.letterCount); letterIndex++) {
+    const anchors = bottomCells.get(letterIndex) ?? [];
+    if (anchors.length === 0) continue;
+    const count = randomIntInclusive(ICICLE_MIN_PER_LETTER, ICICLE_MAX_PER_LETTER, random);
+    const selected = pickRandomUnique(anchors, count, random);
+    const letterFillDoneAt = fillDoneTimes[letterIndex] ?? 0;
+    for (const anchor of selected) {
+      const growthDurationMs = randomRange(ICICLE_MIN_GROWTH_MS, ICICLE_MAX_GROWTH_MS, random);
+      seeds.push({
+        letterIndex,
+        row: anchor.row,
+        col: anchor.col,
+        anchorOffsetRatio: randomRange(-0.5, 0.5, random),
+        growthStartMs: letterFillDoneAt + randomRange(0, ICICLE_GROWTH_START_JITTER_MS, random),
+        growthDurationMs,
+        maxLengthRatio: randomRange(ICICLE_MIN_LENGTH_RATIO, ICICLE_MAX_LENGTH_RATIO, random),
+        maxHalfWidthRatio: randomRange(ICICLE_MIN_HALF_WIDTH_RATIO, ICICLE_MAX_HALF_WIDTH_RATIO, random),
+        dropIntervalMs: randomRange(ICICLE_DROP_MIN_INTERVAL_MS, ICICLE_DROP_MAX_INTERVAL_MS, random),
+        dropDelayMs: randomRange(0, ICICLE_DROP_DELAY_MAX_MS, random),
+        detachDelayMs: randomIntInclusive(0, ICICLE_DETACH_MAX_JITTER_MS, random),
+        fallSpeedRatio: randomRange(ICICLE_MIN_FALL_SPEED_RATIO, ICICLE_MAX_FALL_SPEED_RATIO, random),
+        driftSpeedRatio: randomRange(-ICICLE_MAX_DRIFT_SPEED_RATIO, ICICLE_MAX_DRIFT_SPEED_RATIO, random),
+      });
+    }
+  }
+  return seeds;
+}
+
 function clamp01(v: number): number {
   if (v <= 0) return 0;
   if (v >= 1) return 1;
@@ -336,7 +475,20 @@ export function showIntroTitleScreen(): Promise<void> {
 
     const layout = buildTitleGlyphLayout();
     const flow = buildLetterDepthMap(layout);
+    const icicles: IntroIcicleState[] = buildIntroIcicleSeeds(layout, flow).map((seed) => ({
+      ...seed,
+      nextDropMs: seed.growthStartMs + seed.growthDurationMs + seed.dropDelayMs,
+      detached: false,
+      detachedAtMs: 0,
+      detachedX: 0,
+      detachedY: 0,
+      detachedLength: 0,
+      detachedHalfWidth: 0,
+      fallenOffscreen: false,
+    }));
+    const droplets: IntroDroplet[] = [];
     const startMs = performance.now();
+    let lastFrameMs = startMs;
     let rafId: number | null = null;
     let cleaned = false;
 
@@ -363,18 +515,23 @@ export function showIntroTitleScreen(): Promise<void> {
     };
 
     let exiting = false;
+    let exitElapsedMs = 0;
     const onExitInput = () => {
       if (cleaned) return;
       if (exiting) return;
       exiting = true;
+      exitElapsedMs = performance.now() - startMs;
       sfxManager.stopAll();
-      sfxManager.playWithDoneCallback(SfxId.UIConfirm, () => {
+      sfxManager.play(SfxId.UIConfirm);
+      if (icicles.length === 0) {
         finish(false);
-      });
+      }
     };
 
     const draw = (now: number) => {
       if (cleaned) return;
+      const dt = Math.max(0, Math.min(0.05, (now - lastFrameMs) / 1000));
+      lastFrameMs = now;
       const elapsed = now - startMs;
       const rawDpr = typeof window.devicePixelRatio === 'number' ? window.devicePixelRatio : 1;
       const dpr = Math.max(1, Math.floor(rawDpr));
@@ -433,8 +590,89 @@ export function showIntroTitleScreen(): Promise<void> {
         ctx.restore();
       }
 
+      for (let i = droplets.length - 1; i >= 0; i--) {
+        const droplet = droplets[i];
+        droplet.vy += DROPLET_FALL_ACCEL_PX * dt;
+        droplet.y += droplet.vy * dt;
+        if (droplet.y - droplet.radius > height + 16) {
+          droplets.splice(i, 1);
+        }
+      }
+
+      for (const icicle of icicles) {
+        if (icicle.fallenOffscreen) continue;
+
+        const growth = clamp01((elapsed - icicle.growthStartMs) / Math.max(1, icicle.growthDurationMs));
+        const currentLength = Math.max(0, tileSize * icicle.maxLengthRatio * growth);
+        const currentHalfWidth = Math.max(0, tileSize * icicle.maxHalfWidthRatio * growth);
+        const anchorX = originX + (icicle.col + 0.5 + icicle.anchorOffsetRatio * 0.34) * tileSize;
+        const anchorY = originY + (icicle.row + 1) * tileSize - pad * 0.2;
+
+        if (exiting && !icicle.detached && elapsed >= exitElapsedMs + icicle.detachDelayMs) {
+          icicle.detached = true;
+          icicle.detachedAtMs = elapsed;
+          icicle.detachedX = anchorX;
+          icicle.detachedY = anchorY;
+          icicle.detachedLength = currentLength;
+          icicle.detachedHalfWidth = currentHalfWidth;
+        }
+
+        if (!icicle.detached) {
+          if (currentLength > 0.5 && currentHalfWidth > 0.5) {
+            ctx.fillStyle = LABEL_COLOR;
+            ctx.beginPath();
+            ctx.moveTo(anchorX - currentHalfWidth, anchorY);
+            ctx.lineTo(anchorX + currentHalfWidth, anchorY);
+            ctx.lineTo(anchorX, anchorY + currentLength);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          if (!exiting && growth >= 1) {
+            while (elapsed >= icicle.nextDropMs) {
+              droplets.push({
+                x: anchorX + randomRange(-DROPLET_MAX_JITTER_X_RATIO, DROPLET_MAX_JITTER_X_RATIO, Math.random) * tileSize,
+                y: anchorY + currentLength,
+                vy: randomRange(DROPLET_MIN_SPEED_RATIO, DROPLET_MAX_SPEED_RATIO, Math.random) * tileSize,
+                radius: randomRange(DROPLET_MIN_RADIUS_RATIO, DROPLET_MAX_RADIUS_RATIO, Math.random) * tileSize,
+              });
+              icicle.nextDropMs += icicle.dropIntervalMs;
+            }
+          }
+          continue;
+        }
+
+        const fallSeconds = Math.max(0, (elapsed - icicle.detachedAtMs) / 1000);
+        const detachedX = icicle.detachedX + icicle.driftSpeedRatio * tileSize * fallSeconds;
+        const detachedY = icicle.detachedY
+          + (icicle.fallSpeedRatio * tileSize) * fallSeconds
+          + 0.5 * ICICLE_FALL_ACCEL_PX * fallSeconds * fallSeconds;
+        const detachedLength = Math.max(1, icicle.detachedLength);
+        const detachedHalfWidth = Math.max(1, icicle.detachedHalfWidth);
+        if (detachedY - detachedHalfWidth > height + detachedLength + 24) {
+          icicle.fallenOffscreen = true;
+          continue;
+        }
+        ctx.fillStyle = LABEL_COLOR;
+        ctx.beginPath();
+        ctx.moveTo(detachedX - detachedHalfWidth, detachedY);
+        ctx.lineTo(detachedX + detachedHalfWidth, detachedY);
+        ctx.lineTo(detachedX, detachedY + detachedLength);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (droplets.length > 0) {
+        ctx.fillStyle = WATER_COLOR;
+        for (const droplet of droplets) {
+          ctx.beginPath();
+          ctx.arc(droplet.x, droplet.y, droplet.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
       const pressFade = clamp01((elapsed - flow.allLettersDoneAt) / PROMPT_FADE_MS);
-      if (pressFade > 0) {
+      if (pressFade > 0 && !exiting) {
         ctx.save();
         ctx.globalAlpha = pressFade;
         ctx.fillStyle = PRESS_PROMPT_COLOR;
@@ -446,8 +684,11 @@ export function showIntroTitleScreen(): Promise<void> {
         ctx.restore();
       }
 
-      if (anyGamepadButtonPressed()) {
+      if (!exiting && anyGamepadButtonPressed()) {
         onExitInput();
+      }
+      if (exiting && icicles.length > 0 && icicles.every((icicle) => icicle.fallenOffscreen)) {
+        finish(false);
         return;
       }
       rafId = requestAnimationFrame(draw);
