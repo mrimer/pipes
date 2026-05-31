@@ -39,9 +39,10 @@ describe('FireflyField', () => {
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new FireflyField();
 
-    field.resetForLevel(20, 10, 1, 'Dark');
+    // 100x100 px at 10 px per tile => 10x10 tile grid (100 tiles) => 10 fireflies.
+    field.resetForLevel(100, 100, 10, 'Dark');
 
-    expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(20);
+    expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(10);
   });
 
   it('does not spawn fireflies on non-dark levels', () => {

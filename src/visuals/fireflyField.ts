@@ -11,6 +11,15 @@ const MAX_DIAMETER_TILES = 0.10;
 const MIN_ARC_RADIUS_TILES = 5;
 const MAX_ARC_RADIUS_TILES = 10;
 const TILE_TRAVERSE_MS = 8000;
+const MIN_TILE_SIZE = 1;
+const MAX_PULSE_OFFSET_MS = 1200;
+const PULSE_MIN = 0.8;
+const PULSE_AMPLITUDE = 0.2;
+const PULSE_PERIOD_MS = 650;
+const GLOW_RADIUS_MULTIPLIER = 3.5;
+const GLOW_MID_STOP = 0.45;
+const GLOW_MID_ALPHA = 0.45;
+const CORE_ALPHA_BOOST = 1.15;
 
 interface Firefly {
   centerX: number;
@@ -39,7 +48,8 @@ export class FireflyField {
   resetForLevel(width: number, height: number, tileSize: number, style?: LevelStyle): void {
     this._width = width;
     this._height = height;
-    this._tileSize = Math.max(1, tileSize);
+    // Guard against transient/invalid layout states during resize.
+    this._tileSize = Math.max(MIN_TILE_SIZE, tileSize);
     this._enabled = style === 'Dark' && width > 0 && height > 0;
     this._fireflies = [];
     if (!this._enabled) {
@@ -108,7 +118,7 @@ export class FireflyField {
       angularSpeed,
       radiusPx,
       color,
-      pulseOffsetMs: Math.random() * 1200,
+      pulseOffsetMs: Math.random() * MAX_PULSE_OFFSET_MS,
       startTime: now,
     };
   }
@@ -128,13 +138,13 @@ export class FireflyField {
     const angle = firefly.startAngle + firefly.angularSpeed * ageMs;
     const x = firefly.centerX + Math.cos(angle) * firefly.orbitRadiusPx;
     const y = firefly.centerY + Math.sin(angle) * firefly.orbitRadiusPx;
-    const pulse = 0.8 + 0.2 * ((Math.sin((ageMs + firefly.pulseOffsetMs) / 650) + 1) * 0.5);
+    const pulse = PULSE_MIN + PULSE_AMPLITUDE * ((Math.sin((ageMs + firefly.pulseOffsetMs) / PULSE_PERIOD_MS) + 1) * 0.5);
     const alpha = lifeAlpha * pulse;
 
-    const glowRadius = firefly.radiusPx * 3.5;
+    const glowRadius = firefly.radiusPx * GLOW_RADIUS_MULTIPLIER;
     const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
     grad.addColorStop(0, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${alpha.toFixed(3)})`);
-    grad.addColorStop(0.45, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${(alpha * 0.45).toFixed(3)})`);
+    grad.addColorStop(GLOW_MID_STOP, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${(alpha * GLOW_MID_ALPHA).toFixed(3)})`);
     grad.addColorStop(1, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},0)`);
 
     ctx.save();
@@ -142,7 +152,7 @@ export class FireflyField {
     ctx.beginPath();
     ctx.arc(x, y, glowRadius, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${Math.min(1, alpha * 1.15).toFixed(3)})`;
+    ctx.fillStyle = `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${Math.min(1, alpha * CORE_ALPHA_BOOST).toFixed(3)})`;
     ctx.beginPath();
     ctx.arc(x, y, firefly.radiusPx, 0, TAU);
     ctx.fill();
