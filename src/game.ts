@@ -903,6 +903,11 @@ export class Game implements InputCallbacks {
     if (this.screen === GameScreen.Play || this.screen === GameScreen.Playback) {
       this._renderBoard();
       this._animMgr.tick(this.board, this.gameState);
+      if (isEnvironmentalEnabled()) {
+        const now = performance.now();
+        this._fireflies.updateAndRender(this.ctx, now);
+        this._butterflies.updateAndRender(this.ctx, now);
+      }
       this._metrics.tickGoldenInventoryTwinkle();
     }
     this._renderRafId = requestAnimationFrame(() => {
@@ -959,8 +964,6 @@ export class Game implements InputCallbacks {
 
     if (isEnvironmentalEnabled()) {
       this._cloudShadows.updateAndRender(this.ctx, now);
-      this._fireflies.updateAndRender(this.ctx, now);
-      this._butterflies.updateAndRender(this.ctx, now);
     }
   }
 

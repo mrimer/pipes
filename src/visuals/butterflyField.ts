@@ -1,4 +1,4 @@
-import { GridPos, LevelStyle, PipeShape } from '../types';
+import { AmbientDecorationType, GridPos, LevelStyle, PipeShape } from '../types';
 import { clamp, randRange } from './fieldUtils';
 
 const TAU = Math.PI * 2;
@@ -39,6 +39,7 @@ const BACK_WING_INNER_CTRL_Y_SCALE = 0.16;
 
 interface ButterflyBoard {
   getTile(pos: GridPos): { shape: PipeShape } | null;
+  ambientDecorations?: ReadonlyMap<string, { type: AmbientDecorationType }>;
 }
 
 interface Butterfly {
@@ -193,7 +194,7 @@ export class ButterflyField {
     butterfly.x = butterfly.segmentStartX + Math.cos(butterfly.heading) * butterfly.segmentDistancePx * flapProgress;
     butterfly.y = butterfly.segmentStartY + Math.sin(butterfly.heading) * butterfly.segmentDistancePx * flapProgress;
 
-    if (!butterfly.hasLanded && this._canLandOnGranite(butterfly)) {
+    if (!butterfly.hasLanded && this._canLandOnPerchTile(butterfly)) {
       butterfly.hasLanded = true;
       butterfly.isLanded = true;
       butterfly.landStartTime = now;
@@ -201,7 +202,7 @@ export class ButterflyField {
     }
   }
 
-  private _canLandOnGranite(butterfly: Butterfly): boolean {
+  private _canLandOnPerchTile(butterfly: Butterfly): boolean {
     if (!this._board) return false;
     if (
       butterfly.x < 0 ||
@@ -212,7 +213,9 @@ export class ButterflyField {
     const col = Math.floor(butterfly.x / this._tileSize);
     const row = Math.floor(butterfly.y / this._tileSize);
     const tile = this._board.getTile({ row, col });
-    if (!tile || tile.shape !== PipeShape.Granite) return false;
+    const decorType = this._board.ambientDecorations?.get(`${row},${col}`)?.type;
+    const hasPerchDecor = decorType === 'mushroom' || decorType === 'flower';
+    if ((!tile || tile.shape !== PipeShape.Granite) && !hasPerchDecor) return false;
 
     const bodyHalfLength = butterfly.sizePx * BODY_LENGTH_SCALE * 0.5;
     const dirX = Math.cos(butterfly.heading);
