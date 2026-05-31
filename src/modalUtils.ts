@@ -81,14 +81,6 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
   const onKeyDown = (event: KeyboardEvent): void => {
     if (!isOpen) return;
 
-    if (event.key === 'Escape') {
-      if (options.canCloseOnEscape && !options.canCloseOnEscape()) return;
-      event.preventDefault();
-      event.stopPropagation();
-      closeModal();
-      return;
-    }
-
     if (event.key !== 'Tab') return;
 
     const focusable = getFocusableElements(el);
@@ -115,7 +107,19 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
     }
   };
 
+  const onDocumentKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return;
+    if (!isOpen) activate();
+    if (!isOpen) return;
+    if (document.body.lastElementChild !== el) return;
+    if (options.canCloseOnEscape && !options.canCloseOnEscape()) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeModal();
+  };
+
   el.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keydown', onDocumentKeyDown);
 
   const visibilityObserver = new MutationObserver(() => {
     activate();
@@ -134,6 +138,7 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
       previouslyFocused = null;
     }
     el.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('keydown', onDocumentKeyDown);
     visibilityObserver.disconnect();
     connectionObserver.disconnect();
   });
