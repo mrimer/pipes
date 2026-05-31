@@ -1,5 +1,5 @@
 import { drawPipeBody } from './renderer';
-import { BG_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
+import { BG_COLOR, LABEL_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
 import { Direction, PipeShape, Rotation } from './types';
 import { oppositeDirection } from './tile';
 import { sfxManager, SfxId } from './sfxManager';
@@ -427,7 +427,7 @@ export function showIntroTitleScreen(): Promise<void> {
         ctx.translate(x + half, y + half);
         ctx.rotate((cell.rotation * Math.PI) / 180);
         const fillColor = isFilled
-          ? (cell.letterIndex < COOL_LETTER_COUNT ? '#ffffff' : WATER_COLOR)
+          ? (cell.letterIndex < COOL_LETTER_COUNT ? LABEL_COLOR : WATER_COLOR)
           : PIPE_COLOR;
         drawPipeBody(ctx, cell.shape, half - pad, undefined, fillColor);
         ctx.restore();
