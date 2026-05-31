@@ -115,24 +115,26 @@ export class ButterflyField {
     const edge = Math.floor(Math.random() * 4);
     let x = 0;
     let y = 0;
+    let inwardHeading = 0;
     if (edge === 0) {
       x = Math.random() * this._width;
       y = -margin;
+      inwardHeading = Math.PI / 2;
     } else if (edge === 1) {
       x = this._width + margin;
       y = Math.random() * this._height;
+      inwardHeading = Math.PI;
     } else if (edge === 2) {
       x = Math.random() * this._width;
       y = this._height + margin;
+      inwardHeading = -Math.PI / 2;
     } else {
       x = -margin;
       y = Math.random() * this._height;
+      inwardHeading = 0;
     }
 
-    const centerX = this._width * 0.5;
-    const centerY = this._height * 0.5;
-    const headingToCenter = Math.atan2(centerY - y, centerX - x);
-    const heading = headingToCenter + randRange(-SPAWN_HEADING_JITTER_RAD, SPAWN_HEADING_JITTER_RAD);
+    const heading = inwardHeading + randRange(-SPAWN_HEADING_JITTER_RAD, SPAWN_HEADING_JITTER_RAD);
     const hue = Math.floor(Math.random() * 360);
     const color = `hsl(${hue}, 95%, 56%)`;
 
@@ -225,7 +227,10 @@ export class ButterflyField {
   }
 
   private _isFullyOutOfBounds(butterfly: Butterfly): boolean {
-    const extent = butterfly.sizePx * 3;
+    const extent = Math.max(
+      butterfly.sizePx * 3,
+      this._tileSize * OFFGRID_MARGIN_TILES + butterfly.sizePx * 2,
+    );
     return (
       butterfly.x < -extent ||
       butterfly.y < -extent ||
