@@ -10,7 +10,7 @@ import { sfxManager, SfxId } from '../src/sfxManager';
 import { CloudShadowField } from '../src/visuals/cloudShadows';
 import { FireflyField } from '../src/visuals/fireflyField';
 import { ButterflyField } from '../src/visuals/butterflyField';
-import { setEnvironmentalEnabled } from '../src/graphicsSettings';
+import { isEnvironmentalEnabled, setEnvironmentalEnabled } from '../src/graphicsSettings';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
 jest.mock('../src/visuals/confetti', () => ({
@@ -309,20 +309,29 @@ describe('Game – playtest mode button labels', () => {
   });
 
   it('renders fireflies and butterflies after animation-manager overlay ticks', () => {
+    const originalEnvironmentalEnabled = isEnvironmentalEnabled();
     setEnvironmentalEnabled(true);
     const { game } = makeGame();
-    game.startLevel(1);
-    const tickSpy = jest.spyOn((game as unknown as { _animMgr: { tick(board: unknown, gameState: unknown): void } })._animMgr, 'tick');
-    const fireflySpy = jest.spyOn(FireflyField.prototype, 'updateAndRender');
-    const butterflySpy = jest.spyOn(ButterflyField.prototype, 'updateAndRender');
+    try {
+      game.startLevel(1);
+      const hooks = game as unknown as {
+        _animMgr: { tick(board: unknown, gameState: unknown): void };
+        _loop(): void;
+      };
+      const tickSpy = jest.spyOn(hooks._animMgr, 'tick');
+      const fireflySpy = jest.spyOn(FireflyField.prototype, 'updateAndRender');
+      const butterflySpy = jest.spyOn(ButterflyField.prototype, 'updateAndRender');
 
-    (game as unknown as { _loop(): void })._loop();
+      hooks._loop();
 
-    expect(tickSpy).toHaveBeenCalled();
-    expect(fireflySpy).toHaveBeenCalled();
-    expect(butterflySpy).toHaveBeenCalled();
-    expect(fireflySpy.mock.invocationCallOrder[0]).toBeGreaterThan(tickSpy.mock.invocationCallOrder[0]);
-    expect(butterflySpy.mock.invocationCallOrder[0]).toBeGreaterThan(tickSpy.mock.invocationCallOrder[0]);
+      expect(tickSpy).toHaveBeenCalled();
+      expect(fireflySpy).toHaveBeenCalled();
+      expect(butterflySpy).toHaveBeenCalled();
+      expect(fireflySpy.mock.invocationCallOrder[0]).toBeGreaterThan(tickSpy.mock.invocationCallOrder[0]);
+      expect(butterflySpy.mock.invocationCallOrder[0]).toBeGreaterThan(tickSpy.mock.invocationCallOrder[0]);
+    } finally {
+      setEnvironmentalEnabled(originalEnvironmentalEnabled);
+    }
   });
 });
 
