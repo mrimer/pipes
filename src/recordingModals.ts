@@ -11,6 +11,7 @@
 import { EDITOR_INPUT_BG, RADIUS_LG, UI_BG, UI_INPUT_BORDER } from './uiConstants';
 import { createModalOverlay } from './gameModals';
 import type { PlaySequenceRecord } from './types';
+import { setupModal } from './modalUtils';
 
 // ─── Record modal ─────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export function buildRecordModal(
   const title = document.createElement('h2');
   title.textContent = '📼 Record Play Sequence';
   box.appendChild(title);
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
   // Summary row
   const summaryEl = document.createElement('div');
@@ -108,7 +110,7 @@ export function buildRecordModal(
   recordBtn.className = 'modal-btn primary';
   recordBtn.type = 'button';
   recordBtn.addEventListener('click', () => {
-    el.remove();
+    closeModal();
     onRecord(annotationInput.value.trim());
   });
 
@@ -117,7 +119,7 @@ export function buildRecordModal(
   cancelBtn.className = 'modal-btn secondary';
   cancelBtn.type = 'button';
   cancelBtn.addEventListener('click', () => {
-    el.remove();
+    closeModal();
     onCancel();
   });
 
@@ -150,6 +152,7 @@ function _showConfirmDeleteDialog(record: PlaySequenceRecord, onConfirm: () => v
   const title = document.createElement('h2');
   title.textContent = '🗑️ Delete Recording?';
   box.appendChild(title);
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
   const msg = document.createElement('p');
   msg.style.cssText = 'font-size:0.9rem;color:#ddd;margin:0;';
@@ -165,7 +168,7 @@ function _showConfirmDeleteDialog(record: PlaySequenceRecord, onConfirm: () => v
   confirmBtn.type = 'button';
   confirmBtn.style.cssText += 'color:#f66;border-color:#a33;';
   confirmBtn.addEventListener('click', () => {
-    el.remove();
+    closeModal();
     onConfirm();
   });
 
@@ -173,7 +176,7 @@ function _showConfirmDeleteDialog(record: PlaySequenceRecord, onConfirm: () => v
   cancelBtn.textContent = 'Cancel';
   cancelBtn.className = 'modal-btn primary';
   cancelBtn.type = 'button';
-  cancelBtn.addEventListener('click', () => { el.remove(); });
+  cancelBtn.addEventListener('click', () => { closeModal(); });
 
   actionsEl.appendChild(confirmBtn);
   actionsEl.appendChild(cancelBtn);
@@ -241,6 +244,13 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   const title = document.createElement('h2');
   title.textContent = '▶️ Saved Recordings';
   box.appendChild(title);
+  const { closeModal } = setupModal(el, {
+    titleEl: title,
+    onClose: () => {
+      el.remove();
+      callbacks.onReturn();
+    },
+  });
 
   // Scrollable recording list
   let selectedRecord: PlaySequenceRecord | null = null;
@@ -293,20 +303,11 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   document.body.appendChild(el);
   el.style.display = 'flex';
 
-  const closeModal = (onClose?: () => void): void => {
-    document.removeEventListener('keydown', onEscKey);
+  const dismiss = (onClose?: () => void): void => {
     el.remove();
+    closeModal(true);
     onClose?.();
   };
-
-  const onEscKey = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape' || !el.isConnected) return;
-    if (document.body.lastElementChild !== el) return;
-    event.preventDefault();
-    event.stopPropagation();
-    closeModal(callbacks.onReturn);
-  };
-  document.addEventListener('keydown', onEscKey);
 
   // ── Helper: render the list ──────────────────────────────────────────────
   function renderList(): void {
@@ -340,7 +341,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
       });
 
       li.addEventListener('dblclick', () => {
-        closeModal(() => callbacks.onReplay(record));
+        dismiss(() => callbacks.onReplay(record));
       });
 
       listEl.appendChild(li);
@@ -361,11 +362,11 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   replayBtn.addEventListener('click', () => {
     if (!selectedRecord) return;
     const rec = selectedRecord;
-    closeModal(() => callbacks.onReplay(rec));
+    dismiss(() => callbacks.onReplay(rec));
   });
 
   returnBtn.addEventListener('click', () => {
-    closeModal(callbacks.onReturn);
+    closeModal();
   });
 
   deleteBtn.addEventListener('click', () => {
@@ -383,7 +384,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   });
 
   importBtn.addEventListener('click', () => {
-    closeModal(callbacks.onImport);
+    dismiss(callbacks.onImport);
   });
 
   return el;
@@ -416,6 +417,7 @@ export function showReplayImportSuccessModal(
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#4a90d9;';
   title.textContent = '📥 Recording Imported';
   box.appendChild(title);
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
   const infoEl = document.createElement('p');
   infoEl.style.cssText = 'font-size:0.95rem;color:#ddd;margin:0;';
@@ -429,7 +431,7 @@ export function showReplayImportSuccessModal(
   closeBtn.textContent = 'OK';
   closeBtn.className = 'modal-btn primary';
   closeBtn.type = 'button';
-  closeBtn.addEventListener('click', () => { el.remove(); });
+  closeBtn.addEventListener('click', () => { closeModal(); });
   box.appendChild(closeBtn);
 
   el.appendChild(box);

@@ -230,6 +230,7 @@ export function renderLevelList(
       const gearBtn = document.createElement('button');
       gearBtn.type = 'button';
       gearBtn.title = 'Settings';
+      gearBtn.setAttribute('aria-label', 'Settings');
       gearBtn.textContent = '⚙️';
       gearBtn.style.cssText =
         'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
@@ -243,6 +244,7 @@ export function renderLevelList(
         const profileBtn = document.createElement('button');
         profileBtn.type = 'button';
         profileBtn.title = playerName ? `Player: ${playerName}` : 'Switch Player';
+        profileBtn.setAttribute('aria-label', 'Player profile');
         profileBtn.textContent = '👤';
         profileBtn.style.cssText =
           'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +

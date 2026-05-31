@@ -2,6 +2,7 @@ import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG
 import { createButton } from './uiHelpers';
 import { CommandAction, COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
 import type { CampaignImportOutcome } from './playerProfile';
+import { setupModal } from './modalUtils';
 /**
  * Factory functions for building the game's modal overlay elements.
  *
@@ -13,8 +14,6 @@ import type { CampaignImportOutcome } from './playerProfile';
  * None of the functions retain a reference to the `Game` class, so there are
  * no circular imports.
  */
-
-let settingsEscListenerCleanup: (() => void) | null = null;
 
 // ─── Low-level helpers ────────────────────────────────────────────────────────
 
@@ -131,6 +130,7 @@ export function buildResetModal(
   box.appendChild(actions);
   el.appendChild(box);
   document.body.appendChild(el);
+  setupModal(el, { titleEl: title, onClose: onCancel });
 
   function updateInfo(info: ResetProgressInfo | null): void {
     if (!info) {
@@ -170,6 +170,7 @@ export function buildNewChapterModal(
   onStart: () => void,
 ): { el: HTMLElement; numberEl: HTMLElement; nameEl: HTMLElement } {
   const { el, box, actionsEl } = buildModalShell('✨ New Chapter');
+  const titleEl = box.querySelector('h2');
   const numberEl = document.createElement('p');
   numberEl.style.cssText = 'font-size:1.2rem;font-weight:bold;color:#74b9ff;';
   const nameEl = document.createElement('p');
@@ -182,6 +183,12 @@ export function buildNewChapterModal(
   startBtn.type = 'button';
   startBtn.addEventListener('click', () => onStart());
   actionsEl.appendChild(startBtn);
+  setupModal(el, {
+    titleEl,
+    onClose: () => {
+      el.style.display = 'none';
+    },
+  });
   return { el, numberEl, nameEl };
 }
 
@@ -203,6 +210,7 @@ export function buildChallengeModal(
   onSkip: () => void,
 ): { el: HTMLElement; msgEl: HTMLElement; playBtnEl: HTMLButtonElement; skipBtnEl: HTMLButtonElement } {
   const { el, box, actionsEl } = buildModalShell('☠️ Challenge Level ☠️');
+  const titleEl = box.querySelector('h2');
   const msgEl = document.createElement('p');
   msgEl.style.cssText = 'font-size:0.95rem;color:#aaa;';
   msgEl.textContent = 'This is an optional challenge level. You may skip it without affecting your progress.';
@@ -219,6 +227,12 @@ export function buildChallengeModal(
   skipBtnEl.type = 'button';
   skipBtnEl.addEventListener('click', () => onSkip());
   actionsEl.appendChild(skipBtnEl);
+  setupModal(el, {
+    titleEl,
+    onClose: () => {
+      el.style.display = 'none';
+    },
+  });
   return { el, msgEl, playBtnEl, skipBtnEl };
 }
 
@@ -236,6 +250,7 @@ export function buildExitConfirmModal(
   onContinue: () => void,
 ): HTMLElement {
   const { el, box, actionsEl } = buildModalShell('🚪 Abandon Level?');
+  const titleEl = box.querySelector('h2');
   const msgEl = document.createElement('p');
   msgEl.textContent = 'Your progress on this level will be lost.';
   box.insertBefore(msgEl, actionsEl);
@@ -251,6 +266,7 @@ export function buildExitConfirmModal(
   continueBtn.addEventListener('click', () => onContinue());
   actionsEl.appendChild(exitBtn);
   actionsEl.appendChild(continueBtn);
+  setupModal(el, { titleEl, onClose: onContinue });
   return el;
 }
 
@@ -299,7 +315,9 @@ export function buildSettingsModal(
   const sfxLabel = document.createElement('div');
   sfxLabel.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
 
-  const sfxLabelText = document.createElement('span');
+  const sliderId = `settings-sfx-slider-${Math.random().toString(36).slice(2, 10)}`;
+  const sfxLabelText = document.createElement('label');
+  sfxLabelText.htmlFor = sliderId;
   sfxLabelText.textContent = '🔊 Sound Effects';
 
   const sfxValueEl = document.createElement('span');
@@ -312,6 +330,7 @@ export function buildSettingsModal(
 
   const slider = document.createElement('input');
   slider.type = 'range';
+  slider.id = sliderId;
   slider.min = '0';
   slider.max = '100';
   slider.value = String(getVolume());
@@ -408,6 +427,12 @@ export function buildSettingsModal(
         ? 'Press keys...'
         : commandKeyManager.getBindingDisplay(action);
       row.buttonEl.textContent = capturing === action ? '✖️' : '⌨️';
+      row.buttonEl.setAttribute(
+        'aria-label',
+        capturing === action
+          ? `Cancel key reassignment for ${COMMAND_LABELS[action]}`
+          : `Reassign key for ${COMMAND_LABELS[action]}`,
+      );
     }
     syncCaptureListener();
   }
@@ -430,6 +455,7 @@ export function buildSettingsModal(
     const assignBtn = document.createElement('button');
     assignBtn.type = 'button';
     assignBtn.title = `Reassign ${COMMAND_LABELS[action]}`;
+    assignBtn.setAttribute('aria-label', `Reassign key for ${COMMAND_LABELS[action]}`);
     assignBtn.style.cssText =
       `padding:4px 8px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #555;border-radius:4px;cursor:pointer;`;
     assignBtn.addEventListener('click', () => {
@@ -553,35 +579,15 @@ export function buildSettingsModal(
   actions.appendChild(confirmBtn);
   box.appendChild(actions);
 
-  // ── Esc closes modal without saving ─────────────────────────────────────
-  // Attach to document so Esc is caught regardless of which element has focus,
-  // but only when the modal is visible and no key-capture is in progress.
-  // Ensure at most one settings Esc listener exists to avoid stacking listeners
-  // when the game instance (and modal tree) is rebuilt.
-  if (settingsEscListenerCleanup) {
-    settingsEscListenerCleanup();
-    settingsEscListenerCleanup = null;
-  }
-  const onEscKey = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape' || el.style.display === 'none') return;
-    // When capturing a command key, Esc cancels capture mode (handled by the
-    // existing onDocKeyDown listener); do not also close the modal.
-    if (capturing !== null) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (onCancel) onCancel(el);
-  };
-  document.addEventListener('keydown', onEscKey);
-  // settingsEscListenerCleanup is called the next time buildSettingsModal runs
-  // (rebuilding the game instance).  Between modal close and the next rebuild the
-  // listener remains registered but is harmless: onEscKey early-returns when
-  // el.style.display === 'none', which is always true after the modal is hidden.
-  settingsEscListenerCleanup = () => {
-    document.removeEventListener('keydown', onEscKey);
-  };
-
   el.appendChild(box);
   document.body.appendChild(el);
+  setupModal(el, {
+    titleEl: title,
+    onClose: () => {
+      if (onCancel) onCancel(el);
+    },
+    canCloseOnEscape: () => capturing === null,
+  });
   return el;
 }
 
@@ -632,6 +638,7 @@ export function buildCampaignMasteredModal(
 
   el.appendChild(box);
   document.body.appendChild(el);
+  setupModal(el, { titleEl, onClose: onKudos });
   return el;
 }
 
@@ -644,6 +651,7 @@ export function buildCampaignMasteredModal(
  */
 export function buildUnplayableModal(onExit: () => void): HTMLElement {
   const { el, box, actionsEl } = buildModalShell('⚠️ Level Unplayable');
+  const titleEl = box.querySelector('h2');
   const msgEl = document.createElement('p');
   msgEl.textContent = 'This level starts in a losing position and cannot be played.';
   box.insertBefore(msgEl, actionsEl);
@@ -653,6 +661,7 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
   exitBtn.type = 'button';
   exitBtn.addEventListener('click', () => onExit());
   actionsEl.appendChild(exitBtn);
+  setupModal(el, { titleEl, onClose: onExit });
   return el;
 }
 
@@ -720,12 +729,12 @@ export function buildEditPlayerNameModal(
     `padding:8px 20px;font-size:0.95rem;background:#1a4a9a;color:#fff;` +
     `border:1px solid #4a90d9;border-radius:${RADIUS_MD};cursor:pointer;`;
 
-  const dismiss = (): void => { el.remove(); };
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
-  cancelBtn.addEventListener('click', () => { dismiss(); onCancel(); });
+  cancelBtn.addEventListener('click', () => { closeModal(); onCancel(); });
   okBtn.addEventListener('click', () => {
     const name = input.value.trim() || currentName;
-    dismiss();
+    closeModal();
     onOK(name);
   });
   input.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -803,12 +812,12 @@ export function buildNewPlayerModal(
     `padding:8px 20px;font-size:0.95rem;background:#1a4a9a;color:#fff;` +
     `border:1px solid #4a90d9;border-radius:${RADIUS_MD};cursor:pointer;`;
 
-  const dismiss = (): void => { el.remove(); };
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
-  cancelBtn.addEventListener('click', () => { dismiss(); onCancel(); });
+  cancelBtn.addEventListener('click', () => { closeModal(); onCancel(); });
   okBtn.addEventListener('click', () => {
     const name = input.value.trim() || defaultName;
-    dismiss();
+    closeModal();
     onOK(name);
   });
   input.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -868,9 +877,9 @@ export function buildConfirmModal(
     `padding:8px 18px;font-size:0.95rem;background:${ERROR_COLOR};color:#fff;` +
     `border:none;border-radius:${RADIUS_MD};cursor:pointer;`;
 
-  const dismiss = (): void => { el.remove(); };
-  cancelBtn.addEventListener('click',  () => { dismiss(); onCancel(); });
-  confirmBtn.addEventListener('click', () => { dismiss(); onConfirm(); });
+  const { closeModal } = setupModal(el, { titleEl: null, onClose: () => { el.remove(); } });
+  cancelBtn.addEventListener('click',  () => { closeModal(); onCancel(); });
+  confirmBtn.addEventListener('click', () => { closeModal(); onConfirm(); });
 
   actions.appendChild(cancelBtn);
   actions.appendChild(confirmBtn);
@@ -1005,7 +1014,8 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   closeBtn.style.cssText =
     `align-self:flex-end;padding:8px 24px;font-size:0.95rem;background:${MUTED_BTN_BG};` +
     `color:#eee;border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;margin-top:4px;`;
-  closeBtn.addEventListener('click', () => { el.remove(); });
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
+  closeBtn.addEventListener('click', () => { closeModal(); });
   box.appendChild(closeBtn);
 
   el.appendChild(box);

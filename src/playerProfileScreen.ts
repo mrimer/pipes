@@ -252,6 +252,7 @@ export class PlayerProfileScreen {
     pencilBtn.type = 'button';
     pencilBtn.textContent = '✏️';
     pencilBtn.title = 'Edit player name';
+    pencilBtn.setAttribute('aria-label', 'Edit name');
     pencilBtn.style.cssText =
       'background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0 0 0 4px;line-height:1;vertical-align:middle;opacity:0.7;';
     pencilBtn.addEventListener('click', (e) => {

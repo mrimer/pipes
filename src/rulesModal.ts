@@ -6,6 +6,7 @@ import { isTouchDevice } from './deviceUtils';
 import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 import { CommandAction, CommandKeyManager, commandKeyManager } from './commandKeyManager';
+import { setupModal } from './modalUtils';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -328,11 +329,12 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     'padding:28px 32px;max-width:560px;width:100%;' +
     'display:flex;flex-direction:column;gap:16px;margin:auto;';
 
+  let closeModal = (): void => { overlay.style.display = 'none'; };
   const createCloseButton = (): HTMLButtonElement => createButton(
     'Close',
     UI_BORDER,
     '#fff',
-    () => { overlay.style.display = 'none'; },
+    () => { closeModal(); },
     'align-self:center;padding:10px 32px;font-size:1rem;border:none;margin-top:4px;',
   );
 
@@ -434,10 +436,11 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   // ── Close buttons ─────────────────────────────────────────────────────────
   const topCloseBtn = createCloseButton();
   const bottomCloseBtn = createCloseButton();
+  ({ closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.style.display = 'none'; } }));
 
   // Allow closing by clicking the backdrop
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.style.display = 'none';
+    if (e.target === overlay) closeModal();
   });
 
   box.appendChild(title);
