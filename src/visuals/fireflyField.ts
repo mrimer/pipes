@@ -17,6 +17,7 @@ const PULSE_MIN = 0.8;
 const PULSE_AMPLITUDE = 0.2;
 const PULSE_PERIOD_MS = 650;
 const GLOW_RADIUS_MULTIPLIER = 3.5;
+const GLOW_SPRITE_DIAMETER_MULTIPLIER = 2;
 const GLOW_MID_STOP = 0.45;
 const GLOW_MID_ALPHA = 0.45;
 const CORE_ALPHA_BOOST = 1.15;
@@ -107,13 +108,14 @@ export class FireflyField {
     const glowRadiusPx = radiusPx * GLOW_RADIUS_MULTIPLIER;
 
     const warm = Math.random();
+    const g = Math.round(255 - warm * 32);
+    const b = Math.round(255 - warm * 120);
     const color = {
       r: 255,
-      g: Math.round(255 - warm * 32),
-      b: Math.round(255 - warm * 120),
-      rgb: '',
+      g,
+      b,
+      rgb: `rgb(255,${g},${b})`,
     };
-    color.rgb = `rgb(${color.r},${color.g},${color.b})`;
 
     return {
       centerX,
@@ -134,9 +136,12 @@ export class FireflyField {
     glowRadiusPx: number,
     color: { r: number; g: number; b: number },
   ): HTMLCanvasElement | null {
-    if (typeof document === 'undefined' || glowRadiusPx <= 0 || !Number.isFinite(glowRadiusPx)) return null;
-    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) return null;
-    const size = Math.max(1, Math.ceil(glowRadiusPx * 2));
+    if (
+      typeof document === 'undefined' ||
+      glowRadiusPx <= 0 ||
+      !Number.isFinite(glowRadiusPx)
+    ) return null;
+    const size = Math.max(1, Math.ceil(glowRadiusPx * GLOW_SPRITE_DIAMETER_MULTIPLIER));
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
