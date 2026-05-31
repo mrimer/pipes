@@ -8,6 +8,7 @@
 
 import { CampaignDef } from '../types';
 import { ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG } from '../uiConstants';
+import { setupModal } from '../modalUtils';
 
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 export const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -33,6 +34,7 @@ export class EditorDialogs {
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
     title.textContent = '✅ Same Version';
+    const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
@@ -56,7 +58,7 @@ export class EditorDialogs {
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
-    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
+    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => closeModal()));
 
     dialog.appendChild(title);
     dialog.appendChild(msg);
@@ -82,6 +84,7 @@ export class EditorDialogs {
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
     title.textContent = isNewer ? '⏩ Import Newer Version?' : '⏪ Import Older Version?';
+    const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
@@ -114,10 +117,10 @@ export class EditorDialogs {
     const confirmLabel = isNewer ? '⏩ Import newer version' : '⏪ Overwrite with older version';
     const confirmColor = isNewer ? '#27ae60' : '#e67e22';
     const confirmBtn = this._btn(confirmLabel, confirmColor, '#fff', () => {
-      overlay.remove();
+      closeModal();
       onConfirm();
     });
-    const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => overlay.remove());
+    const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => closeModal());
 
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(confirmBtn);
@@ -132,6 +135,7 @@ export class EditorDialogs {
    */
   showUnsavedChanges(onSave: () => void, onDiscard: () => void): void {
     const { overlay, dialog } = this._createOverlay('420px');
+    const { closeModal } = setupModal(overlay, { onClose: () => { overlay.remove(); } });
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:1rem;color:#eee;line-height:1.5;';
@@ -141,15 +145,15 @@ export class EditorDialogs {
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
 
     const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
-      overlay.remove();
+      closeModal();
       onSave();
     });
     const discardBtn = this._btn('🗑 Discard', ERROR_DARK, '#fff', () => {
-      overlay.remove();
+      closeModal();
       onDiscard();
     });
     const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => {
-      overlay.remove();
+      closeModal();
     });
 
     btnRow.appendChild(cancelBtn);
