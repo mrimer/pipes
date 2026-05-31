@@ -26,6 +26,7 @@ interface GlyphLayout {
 }
 
 const TITLE_TEXT = 'COOL PIPES';
+const COOL_LETTER_COUNT = Math.max(0, TITLE_TEXT.indexOf(' '));
 const WORD_GAP_COLUMNS = 2;
 const LETTER_GAP_COLUMNS = 1;
 const TILE_PADDING_RATIO = 0.08;
@@ -425,7 +426,10 @@ export function showIntroTitleScreen(): Promise<void> {
         ctx.save();
         ctx.translate(x + half, y + half);
         ctx.rotate((cell.rotation * Math.PI) / 180);
-        drawPipeBody(ctx, cell.shape, half - pad, undefined, isFilled ? WATER_COLOR : PIPE_COLOR);
+        const fillColor = isFilled
+          ? (cell.letterIndex < COOL_LETTER_COUNT ? '#ffffff' : WATER_COLOR)
+          : PIPE_COLOR;
+        drawPipeBody(ctx, cell.shape, half - pad, undefined, fillColor);
         ctx.restore();
       }
 

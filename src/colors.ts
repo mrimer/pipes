@@ -1,6 +1,7 @@
 /** Color palette used across game rendering. */
 
-export const PIPE_COLOR              = '#7090a8';
+export const UNCONNECTED_PIPE_COLOR  = '#5f7f97';
+export const PIPE_COLOR              = UNCONNECTED_PIPE_COLOR;
 export const WATER_COLOR             = '#56c8e8';
 export const BG_COLOR                = '#1a1a2e';
 export const TILE_BG                 = '#16213e';
@@ -19,7 +20,7 @@ export const SINK_CONNECTOR_LIT         = '#cc88ff';
 export const SINK_WATER_CONNECTOR_LIT   = '#d4a0ff';
 export const TANK_COLOR              = '#2196f3';
 export const TANK_WATER_COLOR        = '#00bcd4';
-export const FIXED_PIPE_COLOR        = '#4a6878';
+export const FIXED_PIPE_COLOR        = UNCONNECTED_PIPE_COLOR;
 export const FIXED_PIPE_WATER_COLOR  = '#3a9cb8';
 /** Light shade for gingham empty-tile pattern (top-left of 2x2 cell). */
 export const EMPTY_COLOR_LIGHT       = '#386038';
@@ -244,7 +245,7 @@ export const HOT_PLATE_COLOR       = '#e44';
 /** Hot plate chamber tile color when water is flowing through it. */
 export const HOT_PLATE_WATER_COLOR = '#f86';
 /** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
-export const SPIN_PIPE_COLOR  = '#3a5868';
+export const SPIN_PIPE_COLOR  = UNCONNECTED_PIPE_COLOR;
 /** Color for positive (beneficial) floating animation labels. */
 export const ANIM_POSITIVE_COLOR = '#4caf50';
 /** Color for negative (costly) floating animation labels. */
