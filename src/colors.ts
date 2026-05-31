@@ -245,7 +245,7 @@ export const SIPHON_WATER_COLOR = '#80d8ff';
 export const HOT_PLATE_COLOR       = '#e44';
 /** Hot plate chamber tile color when water is flowing through it. */
 export const HOT_PLATE_WATER_COLOR = '#f86';
-/** Spinner pipe tile color on minimap (darker blue-gray to distinguish from regular pipes). */
+/** Spinner pipe body/line color for unconnected state visuals. */
 export const SPINNER_PIPE_BODY_COLOR = UNCONNECTED_PIPE_BODY_COLOR;
 export const SPIN_PIPE_COLOR         = SPINNER_PIPE_BODY_COLOR;
 /** Color for positive (beneficial) floating animation labels. */
