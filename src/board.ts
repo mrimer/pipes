@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
+import { AmbientDecoration, AmbientDecorationType, Direction, DIRECTIONS, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
@@ -507,6 +507,9 @@ export class Board {
    */
   private _hadDiscardedMove: boolean = false;
 
+  /** Cached result of {@link getFilledPositions}. Null when invalidated. */
+  private _filledPositionsCache: Set<string> | null = null;
+
   /**
    * @param rows - Number of rows.
    * @param cols - Number of columns.
@@ -825,6 +828,7 @@ export class Board {
 
   /** Restore the board grid and inventory from a snapshot. */
   private _restoreSnapshot(snap: Snapshot): void {
+    this._invalidateFilledCache();
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         // Deep-copy each Tile so that subsequent in-place mutations (e.g. rotate())
@@ -877,8 +881,10 @@ export class Board {
     // Simulate tile removal and verify no inventory count would go below zero.
     const currentBonuses = this.getContainerBonuses();
     const savedTile = this.grid[pos.row][pos.col];
+    this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
     const newBonuses = this.getContainerBonuses();
+    this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = savedTile; // restore
 
     for (const [shape, currentBonus] of currentBonuses) {
@@ -900,9 +906,11 @@ export class Board {
     // (This can happen when removing a pipe that carried the only path to a pump chamber.)
     {
       const filledBefore = this.getFilledPositions();
+      this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       const filledAfter = this.getFilledPositions();
       const { error, positions } = this._validateConstraints(filledAfter);
+      this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
       if (error) {
         // Highlight only tiles that are both disconnected by the removal AND
@@ -923,6 +931,7 @@ export class Board {
     }
 
     this._reclaimInventory(tile.shape);
+    this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
     return { success: true };
   }
@@ -1003,10 +1012,12 @@ export class Board {
     this._spendInventory(shape);
     // Compute the pre-placement fill set for valve-gate checking.
     const filledBefore = this.getFilledPositions();
+    this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(shape, rotation);
 
     // Rolls back both the grid cell and the inventory spend on failure.
     const rollback = () => {
+      this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
       this._unspendInventory(shape);
     };
@@ -1088,6 +1099,7 @@ export class Board {
     // Rolls back both the inventory snapshot and the grid cell on failure.
     const rollback = () => {
       this.inventory = savedInventory;
+      this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = tile;
     };
 
@@ -1103,6 +1115,7 @@ export class Board {
     const baseCount = newExisting?.count ?? 0;
     // Capture the pre-replacement fill for valve-gate checking (old tile still in grid).
     const filledBeforeReplace = this.getFilledPositions();
+    this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
     const bonuses = this.getContainerBonuses();
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
@@ -1111,6 +1124,7 @@ export class Board {
       // Check whether the new shape was available before the replacement (with the old tile
       // in place).  If it was, the replacement itself is disconnecting the container that
       // grants the new shape – report that as a user-visible error.
+      this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = tile; // temporarily restore old tile for bonus check
       const originalBonuses = this.getContainerBonuses();
       const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
@@ -1156,9 +1170,11 @@ export class Board {
         if (!originalBonuses) {
           // Temporarily restore the old tile to compute the fill and bonuses as
           // they were before this replacement, then put the new tile back.
+          this._invalidateFilledCache();
           this.grid[pos.row][pos.col] = tile;
           originalFilled = this.getFilledPositions();
           originalBonuses = this.getContainerBonuses(originalFilled);
+          this._invalidateFilledCache();
           this.grid[pos.row][pos.col] = newTileRef;
         }
         const savedItem = savedInventory.find((it) => it.shape === item.shape);
@@ -1723,7 +1739,7 @@ export class Board {
         const label = 'Chamber(tank)';
 
         // ── Edge check: no access point may lead off-grid ──────────────
-        for (const dir of Object.values(Direction)) {
+        for (const dir of DIRECTIONS) {
           if (!tile.connections.has(dir)) continue;
           const delta = NEIGHBOUR_DELTA[dir];
           const nr = r + delta.row;
@@ -1736,7 +1752,7 @@ export class Board {
         }
 
         // ── Adjacent tank-like symmetry check ────────────────────────────────────
-        for (const dir of Object.values(Direction)) {
+        for (const dir of DIRECTIONS) {
           const delta = NEIGHBOUR_DELTA[dir];
           const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
           const neighbor = this.getTile(neighborPos);
@@ -1881,6 +1897,7 @@ export class Board {
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
     }
+    this._invalidateFilledCache();
 
     // Valve gate: reject if this rotation connects to a non-valve side
     // of an unsatisfied valve chamber.
@@ -1889,6 +1906,7 @@ export class Board {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
+      this._invalidateFilledCache();
       return valveViolation;
     }
 
@@ -1900,6 +1918,7 @@ export class Board {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
+      this._invalidateFilledCache();
       return { success: false, error: regError3, errorTilePositions: regPositions3 ?? undefined };
     }
     const { error: constraintError, positions: constraintPositions } = this._validateConstraints(filled);
@@ -1908,6 +1927,7 @@ export class Board {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
+      this._invalidateFilledCache();
       // Highlight only tiles that are both disconnected by the rotation AND
       // in the constraint-violating positions set.  Falls back to positions
       // when the intersection is empty.
@@ -1924,6 +1944,7 @@ export class Board {
           for (let i = 0; i < 4 - normalizedSteps; i++) {
             tile.rotate();
           }
+          this._invalidateFilledCache();
           // After reverting the rotation the tile is back to its original state.
           // Find item chambers granting this shape in the original (pre-rotation) fill.
           const origFilled = this.getFilledPositions();
@@ -1940,6 +1961,7 @@ export class Board {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
+      this._invalidateFilledCache();
       return { success: false, error: postRegError3, errorTilePositions: postRegPositions3 ?? undefined };
     }
 
@@ -1998,6 +2020,8 @@ export class Board {
    * @returns Set of stringified "row,col" keys that are water-filled.
    */
   getFilledPositions(): Set<string> {
+    if (this._filledPositionsCache !== null) return this._filledPositionsCache;
+
     const reached = new Map<string, GridPos>();
     const sourceKey = posKey(this.source.row, this.source.col);
     reached.set(sourceKey, this.source);
@@ -2006,7 +2030,7 @@ export class Board {
     let qi = 0;
     while (qi < queue.length) {
       const pos = queue[qi++];
-      for (const dir of Object.values(Direction)) {
+      for (const dir of DIRECTIONS) {
         if (!this.areMutuallyConnected(pos, dir)) continue;
         const delta = NEIGHBOUR_DELTA[dir];
         const nextPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
@@ -2024,7 +2048,13 @@ export class Board {
       }
     }
 
-    return new Set(reached.keys());
+    this._filledPositionsCache = new Set(reached.keys());
+    return this._filledPositionsCache;
+  }
+
+  /** Invalidate the {@link getFilledPositions} cache after any grid mutation. */
+  private _invalidateFilledCache(): void {
+    this._filledPositionsCache = null;
   }
 
   /**

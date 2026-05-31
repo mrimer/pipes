@@ -15,7 +15,7 @@
  * spreads outward along all connected arms over the full tile duration.
  */
 
-import { Direction } from '../types';
+import { Direction, DIRECTIONS } from '../types';
 import { Board, NEIGHBOUR_DELTA, posKey } from '../board';
 import { oppositeDirection } from '../tile';
 import { GOLD_PIPE_WATER_COLOR, WATER_COLOR } from '../colors';
@@ -79,7 +79,7 @@ export function computePulseLayers(board: Board): IdlePulseLayer[] {
 
   // Collect the source tile's mutually-connected directions.
   const sourceConnections = new Set<Direction>();
-  for (const dir of Object.values(Direction)) {
+  for (const dir of DIRECTIONS) {
     if (board.areMutuallyConnected(board.source, dir)) sourceConnections.add(dir);
   }
 
@@ -110,7 +110,7 @@ export function computePulseLayers(board: Board): IdlePulseLayer[] {
   while (qi < queue.length) {
     const cur = queue[qi++];
 
-    for (const dir of Object.values(Direction)) {
+    for (const dir of DIRECTIONS) {
       if (!board.areMutuallyConnected(cur, dir)) continue;
       const delta = NEIGHBOUR_DELTA[dir];
       const next = { row: cur.row + delta.row, col: cur.col + delta.col };

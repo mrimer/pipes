@@ -8,6 +8,14 @@ export enum Direction {
   West = 'W',
 }
 
+/** All four cardinal directions in a stable order (N, E, S, W). */
+export const DIRECTIONS: readonly Direction[] = Object.freeze([
+  Direction.North,
+  Direction.East,
+  Direction.South,
+  Direction.West,
+]);
+
 /**
  * Pipe shapes defined by which directions they connect.
  * Key: shape name, Value: array of connected directions before rotation.
