@@ -28,7 +28,9 @@ interface Firefly {
   startAngle: number;
   angularSpeed: number;
   radiusPx: number;
-  color: { r: number; g: number; b: number };
+  glowRadiusPx: number;
+  color: { r: number; g: number; b: number; rgb: string };
+  glowSprite: HTMLCanvasElement | null;
   pulseOffsetMs: number;
   startTime: number;
 }
@@ -102,13 +104,16 @@ export class FireflyField {
 
     const diameterPx = randRange(MIN_DIAMETER_TILES, MAX_DIAMETER_TILES) * this._tileSize;
     const radiusPx = diameterPx * 0.5;
+    const glowRadiusPx = radiusPx * GLOW_RADIUS_MULTIPLIER;
 
     const warm = Math.random();
     const color = {
       r: 255,
       g: Math.round(255 - warm * 32),
       b: Math.round(255 - warm * 120),
+      rgb: '',
     };
+    color.rgb = `rgb(${color.r},${color.g},${color.b})`;
 
     return {
       centerX,
@@ -117,10 +122,42 @@ export class FireflyField {
       startAngle,
       angularSpeed,
       radiusPx,
+      glowRadiusPx,
       color,
+      glowSprite: this._createGlowSprite(glowRadiusPx, color),
       pulseOffsetMs: Math.random() * MAX_PULSE_OFFSET_MS,
       startTime: now,
     };
+  }
+
+  private _createGlowSprite(
+    glowRadiusPx: number,
+    color: { r: number; g: number; b: number },
+  ): HTMLCanvasElement | null {
+    if (typeof document === 'undefined' || glowRadiusPx <= 0 || !Number.isFinite(glowRadiusPx)) return null;
+    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) return null;
+    const size = Math.max(1, Math.ceil(glowRadiusPx * 2));
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    let spriteCtx: CanvasRenderingContext2D | null = null;
+    try {
+      spriteCtx = canvas.getContext('2d');
+    } catch {
+      spriteCtx = null;
+    }
+    if (!spriteCtx) return null;
+
+    const center = size * 0.5;
+    const grad = spriteCtx.createRadialGradient(center, center, 0, center, center, glowRadiusPx);
+    grad.addColorStop(0, `rgba(${color.r},${color.g},${color.b},1)`);
+    grad.addColorStop(GLOW_MID_STOP, `rgba(${color.r},${color.g},${color.b},${GLOW_MID_ALPHA})`);
+    grad.addColorStop(1, `rgba(${color.r},${color.g},${color.b},0)`);
+    spriteCtx.fillStyle = grad;
+    spriteCtx.beginPath();
+    spriteCtx.arc(center, center, glowRadiusPx, 0, TAU);
+    spriteCtx.fill();
+    return canvas;
   }
 
   private _computeLifecycleAlpha(ageMs: number): number {
@@ -141,18 +178,22 @@ export class FireflyField {
     const pulse = PULSE_MIN + PULSE_AMPLITUDE * ((Math.sin((ageMs + firefly.pulseOffsetMs) / PULSE_PERIOD_MS) + 1) * 0.5);
     const alpha = lifeAlpha * pulse;
 
-    const glowRadius = firefly.radiusPx * GLOW_RADIUS_MULTIPLIER;
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
-    grad.addColorStop(0, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${alpha.toFixed(3)})`);
-    grad.addColorStop(GLOW_MID_STOP, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${(alpha * GLOW_MID_ALPHA).toFixed(3)})`);
-    grad.addColorStop(1, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},0)`);
-
     ctx.save();
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(x, y, glowRadius, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${Math.min(1, alpha * CORE_ALPHA_BOOST).toFixed(3)})`;
+    if (firefly.glowSprite) {
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(firefly.glowSprite, x - firefly.glowRadiusPx, y - firefly.glowRadiusPx);
+    } else {
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, firefly.glowRadiusPx);
+      grad.addColorStop(0, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${alpha.toFixed(3)})`);
+      grad.addColorStop(GLOW_MID_STOP, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},${(alpha * GLOW_MID_ALPHA).toFixed(3)})`);
+      grad.addColorStop(1, `rgba(${firefly.color.r},${firefly.color.g},${firefly.color.b},0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, firefly.glowRadiusPx, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = Math.min(1, alpha * CORE_ALPHA_BOOST);
+    ctx.fillStyle = firefly.color.rgb;
     ctx.beginPath();
     ctx.arc(x, y, firefly.radiusPx, 0, TAU);
     ctx.fill();

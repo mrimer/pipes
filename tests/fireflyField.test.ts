@@ -24,7 +24,9 @@ function createMockCtx(): CanvasRenderingContext2D {
     beginPath: jest.fn(),
     arc: jest.fn(),
     fill: jest.fn(),
+    drawImage: jest.fn(),
     createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    globalAlpha: 1,
     fillStyle: '',
   } as unknown as CanvasRenderingContext2D;
 }
