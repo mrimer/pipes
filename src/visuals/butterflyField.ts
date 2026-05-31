@@ -36,6 +36,7 @@ const BACK_WING_OUT_X_SCALE = -0.9;
 const BACK_WING_OUT_Y_SCALE = 0.28;
 const BACK_WING_INNER_CTRL_X_SCALE = -0.44;
 const BACK_WING_INNER_CTRL_Y_SCALE = 0.16;
+const PERCH_DECORATION_TYPES = new Set<AmbientDecorationType>(['mushroom', 'flower']);
 
 interface ButterflyBoard {
   getTile(pos: GridPos): { shape: PipeShape } | null;
@@ -214,8 +215,9 @@ export class ButterflyField {
     const row = Math.floor(butterfly.y / this._tileSize);
     const tile = this._board.getTile({ row, col });
     const decorType = this._board.ambientDecorations?.get(`${row},${col}`)?.type;
-    const hasPerchDecor = decorType === 'mushroom' || decorType === 'flower';
-    if ((!tile || tile.shape !== PipeShape.Granite) && !hasPerchDecor) return false;
+    const hasPerchDecor = decorType !== undefined && PERCH_DECORATION_TYPES.has(decorType);
+    const canPerchHere = hasPerchDecor || tile?.shape === PipeShape.Granite;
+    if (!canPerchHere) return false;
 
     const bodyHalfLength = butterfly.sizePx * BODY_LENGTH_SCALE * 0.5;
     const dirX = Math.cos(butterfly.heading);
