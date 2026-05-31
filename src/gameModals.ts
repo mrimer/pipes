@@ -315,7 +315,9 @@ export function buildSettingsModal(
   const sfxLabel = document.createElement('div');
   sfxLabel.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
 
-  const sliderId = `settings-sfx-slider-${Math.random().toString(36).slice(2, 10)}`;
+  const sliderId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? `settings-sfx-slider-${crypto.randomUUID()}`
+    : `settings-sfx-slider-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   const sfxLabelText = document.createElement('label');
   sfxLabelText.htmlFor = sliderId;
   sfxLabelText.textContent = '🔊 Sound Effects';
