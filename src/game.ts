@@ -53,6 +53,7 @@ import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled, unregi
 import { isEnvironmentalEnabled, setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';
 import { FireflyField } from './visuals/fireflyField';
+import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -242,6 +243,8 @@ export class Game implements InputCallbacks {
   private readonly _cloudShadows = new CloudShadowField();
   /** Dark-level ambient fireflies rendered above tile visuals. */
   private readonly _fireflies = new FireflyField();
+  /** Summer-level ambient butterflies rendered above tile visuals. */
+  private readonly _butterflies = new ButterflyField();
 
   /** Manages the play-screen HUD metrics, inventory bar, and best-score box. */
   private readonly _metrics: MetricsDisplay;
@@ -640,6 +643,13 @@ export class Game implements InputCallbacks {
       TILE_SIZE,
       this.currentLevel.style,
     );
+    this._butterflies.resetForLevel(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      this.currentLevel.style,
+      this.board,
+    );
   }
 
   /**
@@ -772,6 +782,13 @@ export class Game implements InputCallbacks {
       this.canvas.height,
       TILE_SIZE,
       level.style,
+    );
+    this._butterflies.resetForLevel(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      level.style,
+      this.board,
     );
 
     if (!this._campaign.isPlaytesting) {
@@ -943,6 +960,7 @@ export class Game implements InputCallbacks {
     if (isEnvironmentalEnabled()) {
       this._cloudShadows.updateAndRender(this.ctx, now);
       this._fireflies.updateAndRender(this.ctx, now);
+      this._butterflies.updateAndRender(this.ctx, now);
     }
   }
 
