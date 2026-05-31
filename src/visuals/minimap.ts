@@ -14,7 +14,7 @@ import { ginghamColorsForFloor } from '../renderer';
 import {
   EMPTY_COLOR,
   PIPE_COLOR,
-  FIXED_PIPE_COLOR,
+  FIXED_PIPE_BODY_COLOR,
   SOURCE_COLOR,
   SINK_COLOR,
   TANK_COLOR,
@@ -30,7 +30,7 @@ import {
   GOLD_SPACE_BASE_COLOR,
   GOLD_PIPE_COLOR,
   CONTAINER_COLOR,
-  SPIN_PIPE_COLOR,
+  SPINNER_PIPE_BODY_COLOR,
   BG_COLOR,
   TILE_BG,
   HOT_PLATE_COLOR,
@@ -187,14 +187,14 @@ function tileColor(tile: TileDef | null, r: number, c: number, floorType: PipeSh
     case PipeShape.Elbow:
     case PipeShape.Tee:
     case PipeShape.Cross:
-      return FIXED_PIPE_COLOR;
+      return FIXED_PIPE_BODY_COLOR;
     case PipeShape.SpinStraight:
     case PipeShape.SpinElbow:
     case PipeShape.SpinTee:
     case PipeShape.SpinStraightCement:
     case PipeShape.SpinElbowCement:
     case PipeShape.SpinTeeCement:
-      return SPIN_PIPE_COLOR;
+      return SPINNER_PIPE_BODY_COLOR;
     case PipeShape.LeakyStraight:
     case PipeShape.LeakyElbow:
     case PipeShape.LeakyTee:
@@ -318,11 +318,11 @@ function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
   }
   if (shape === PipeShape.SpinStraight || shape === PipeShape.SpinElbow ||
       shape === PipeShape.SpinTee) {
-    return { bg: EMPTY_COLOR, line: SPIN_PIPE_COLOR };
+    return { bg: EMPTY_COLOR, line: SPINNER_PIPE_BODY_COLOR };
   }
   if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement ||
       shape === PipeShape.SpinTeeCement) {
-    return { bg: CEMENT_FILL_COLOR, line: SPIN_PIPE_COLOR };
+    return { bg: CEMENT_FILL_COLOR, line: SPINNER_PIPE_BODY_COLOR };
   }
   if (shape === PipeShape.LeakyStraight || shape === PipeShape.LeakyElbow ||
       shape === PipeShape.LeakyTee || shape === PipeShape.LeakyCross) {

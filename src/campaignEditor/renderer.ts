@@ -10,7 +10,7 @@ import { Tile, rotateDirection } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
-  WATER_COLOR, PIPE_COLOR, FIXED_PIPE_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
+  WATER_COLOR, PIPE_COLOR, FIXED_PIPE_BODY_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
 import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs, type ViewBounds } from '../visuals/chapterMap';
 import { tileDefConnections } from '../mapUtils';
 
@@ -1021,7 +1021,7 @@ function _drawChapterEditorPipeTile(
   ctx.fillRect(x, y, CELL, CELL);
 
   // Pipe arm color – matches the gameplay chapter map colors (isFilled → water color, else dry color)
-  const pipeColor = isSpin ? (isFilled ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_COLOR)
+  const pipeColor = isSpin ? (isFilled ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_BODY_COLOR)
                  : isGold  ? (isFilled ? GOLD_PIPE_WATER_COLOR  : GOLD_PIPE_COLOR)
                  : isLeaky ? (isFilled ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
                  : (isFilled ? WATER_COLOR : PIPE_COLOR);
