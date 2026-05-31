@@ -192,4 +192,34 @@ describe('CampaignMapScreen pseudo-level IDs', () => {
       expect(realLevelIds.has(id)).toBe(false);
     }
   });
+
+  it('maps completed chapter progress to pseudo-level IDs used on the campaign map', () => {
+    const completedChapters = new Set<number>([100]);
+    const screen = new CampaignMapScreen({
+      getCompletedChapters: () => completedChapters,
+      getCompletedLevels: () => new Set<number>(),
+      getActiveCampaignId: () => null,
+      onShowLevelSelect: () => undefined,
+      onChapterSelected: () => undefined,
+    });
+    const campaign: CampaignDef = {
+      id: 'cmp',
+      name: 'Campaign',
+      author: 'Author',
+      rows: 1,
+      cols: 1,
+      grid: [[
+        { shape: PipeShape.Chamber, chamberContent: 'chapter', chapterIdx: 0 } as TileDef,
+      ]],
+      chapters: [
+        makeChapter(100, [100]),
+      ],
+    };
+
+    screen.show(campaign);
+    const pseudoLevelId = (screen as any)._pseudoLevels[0].id as number;
+
+    expect(pseudoLevelId).not.toBe(100);
+    expect((screen as any)._completedPseudoLevelIds.has(pseudoLevelId)).toBe(true);
+  });
 });
