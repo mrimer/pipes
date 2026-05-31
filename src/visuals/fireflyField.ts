@@ -1,4 +1,5 @@
 import { LevelStyle } from '../types';
+import { randRange } from './fieldUtils';
 
 const TAU = Math.PI * 2;
 const FIREFLY_FADE_IN_MS = 5000;
@@ -38,10 +39,6 @@ interface Firefly {
   glowSprite: HTMLCanvasElement | null;
   pulseOffsetMs: number;
   startTime: number;
-}
-
-function randRange(min: number, max: number): number {
-  return min + Math.random() * (max - min);
 }
 
 export class FireflyField {

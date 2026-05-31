@@ -133,7 +133,7 @@ describe('ButterflyField', () => {
   });
 
   it('keeps newly spawned off-grid butterflies alive while they move toward the board', () => {
-    jest.spyOn(Math, 'random').mockImplementation(createSequencePRNG([0, 0.01, 0.5, 1, 0, 1, 0]));
+    jest.spyOn(Math, 'random').mockImplementation(createSequencePRNG([0, 0.01, 0.5, 1, 0, 1, 0, 0.5, 0.5]));
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new ButterflyField();
     field.resetForLevel(20, 20, 10, 'Grass', null);
@@ -167,6 +167,8 @@ describe('ButterflyField', () => {
           0,
           1,
           0,
+          0.5,
+          0.5,
         ]));
         const field = new ButterflyField();
         field.resetForLevel(20, 20, 10, 'Grass', null);

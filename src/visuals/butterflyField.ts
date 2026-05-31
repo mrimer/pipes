@@ -1,4 +1,5 @@
 import { GridPos, LevelStyle, PipeShape } from '../types';
+import { clamp, randRange } from './fieldUtils';
 
 const TAU = Math.PI * 2;
 const MIN_TILE_SIZE = 1;
@@ -41,14 +42,6 @@ interface Butterfly {
   segmentStartY: number;
   segmentStartTime: number;
   segmentDistancePx: number;
-}
-
-function randRange(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 export class ButterflyField {
