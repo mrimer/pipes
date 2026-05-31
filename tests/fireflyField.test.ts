@@ -40,15 +40,22 @@ describe('FireflyField', () => {
     jest.restoreAllMocks();
   });
 
-  it('spawns one firefly per ten tiles on dark levels', () => {
+  it('spawns fireflies over time on dark levels up to the target count', () => {
     jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(17));
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new FireflyField();
 
     // 100x100 px at 10 px per tile => 10x10 tile grid (100 tiles) => 10 fireflies.
     field.resetForLevel(100, 100, 10, 'Dark');
+    const ctx = createMockCtx();
 
-    expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(10);
+    expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(0);
+    field.updateAndRender(ctx, 1000);
+    expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(1);
+    field.updateAndRender(ctx, 5999);
+    expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(1);
+    field.updateAndRender(ctx, 11000);
+    expect((field as unknown as FireflyInternals)._fireflies.length).toBeGreaterThanOrEqual(2);
   });
 
   it('does not spawn fireflies on non-dark levels', () => {
@@ -70,12 +77,13 @@ describe('FireflyField', () => {
   });
 
   it('respawns fireflies after they expire', () => {
-    jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(91));
+    jest.spyOn(Math, 'random').mockReturnValue(0);
     jest.spyOn(performance, 'now').mockReturnValue(500);
     const field = new FireflyField();
     field.resetForLevel(8, 8, 8, 'Dark');
 
     const ctx = createMockCtx();
+    field.updateAndRender(ctx, 500);
     const before = (field as unknown as FireflyInternals)._fireflies[0].startTime;
     field.updateAndRender(ctx, before + 20001);
     const after = (field as unknown as FireflyInternals)._fireflies[0].startTime;

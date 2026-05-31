@@ -9,6 +9,8 @@ const OFFGRID_MARGIN_TILES = 1.5;
 const BASE_FLAP_PERIOD_MS = 500;
 const LANDED_FLAP_PERIOD_MS = 2000;
 const TILE_TRAVERSE_MS = 3000;
+const MIN_SPAWN_COOLDOWN_MS = 5000;
+const MAX_SPAWN_COOLDOWN_MS = 10000;
 const MIN_LAND_MS = 10_000;
 const MAX_LAND_MS = 15_000;
 const MAX_TURN_PER_FLAP_RAD = Math.PI / 12;
@@ -57,6 +59,7 @@ export class ButterflyField {
   private _targetCount = 0;
   private _board: ButterflyBoard | null = null;
   private _butterflies: Butterfly[] = [];
+  private _nextSpawnAt = 0;
 
   resetForLevel(
     width: number,
@@ -77,9 +80,7 @@ export class ButterflyField {
     }
     this._targetCount = this._computeTargetCount();
     const now = performance.now();
-    for (let i = 0; i < this._targetCount; i++) {
-      this._butterflies.push(this._spawnButterfly(now));
-    }
+    this._nextSpawnAt = now;
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {
@@ -93,8 +94,9 @@ export class ButterflyField {
       }
     }
 
-    while (this._butterflies.length < this._targetCount) {
+    while (this._butterflies.length < this._targetCount && now >= this._nextSpawnAt) {
       this._butterflies.push(this._spawnButterfly(now));
+      this._nextSpawnAt = now + randRange(MIN_SPAWN_COOLDOWN_MS, MAX_SPAWN_COOLDOWN_MS);
     }
 
     for (const butterfly of this._butterflies) {

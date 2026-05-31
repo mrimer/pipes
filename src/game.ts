@@ -2182,6 +2182,26 @@ export class Game implements InputCallbacks {
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level);
     this._enterPlayScreenState(level);
+    this._cloudShadows.resetForScreen(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      'level',
+      level.style,
+    );
+    this._fireflies.resetForLevel(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      level.style,
+    );
+    this._butterflies.resetForLevel(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      level.style,
+      this.board,
+    );
     this._campaign.currentChapterId = 0;
     this.levelHeaderEl.innerHTML = '';
     const ptLine1 = document.createElement('div');
