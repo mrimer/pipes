@@ -244,13 +244,10 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   const title = document.createElement('h2');
   title.textContent = '▶️ Saved Recordings';
   box.appendChild(title);
-  const { closeModal } = setupModal(el, {
-    titleEl: title,
-    onClose: () => {
-      el.remove();
-      callbacks.onReturn();
-    },
-  });
+  let closeModal: (onCloseOverride?: () => void) => void = () => {
+    el.remove();
+    callbacks.onReturn();
+  };
 
   // Scrollable recording list
   let selectedRecord: PlaySequenceRecord | null = null;
@@ -302,12 +299,13 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   el.appendChild(box);
   document.body.appendChild(el);
   el.style.display = 'flex';
-
-  const dismiss = (onClose?: () => void): void => {
-    el.remove();
-    closeModal(true);
-    onClose?.();
-  };
+  ({ closeModal } = setupModal(el, {
+    titleEl: title,
+    onClose: () => {
+      el.remove();
+      callbacks.onReturn();
+    },
+  }));
 
   // ── Helper: render the list ──────────────────────────────────────────────
   function renderList(): void {
@@ -341,7 +339,10 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
       });
 
       li.addEventListener('dblclick', () => {
-        dismiss(() => callbacks.onReplay(record));
+        closeModal(() => {
+          el.remove();
+          callbacks.onReplay(record);
+        });
       });
 
       listEl.appendChild(li);
@@ -362,7 +363,10 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   replayBtn.addEventListener('click', () => {
     if (!selectedRecord) return;
     const rec = selectedRecord;
-    dismiss(() => callbacks.onReplay(rec));
+    closeModal(() => {
+      el.remove();
+      callbacks.onReplay(rec);
+    });
   });
 
   returnBtn.addEventListener('click', () => {
@@ -384,7 +388,10 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
   });
 
   importBtn.addEventListener('click', () => {
-    dismiss(callbacks.onImport);
+    closeModal(() => {
+      el.remove();
+      callbacks.onImport();
+    });
   });
 
   return el;

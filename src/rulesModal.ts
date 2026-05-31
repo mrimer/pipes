@@ -329,7 +329,11 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     'padding:28px 32px;max-width:560px;width:100%;' +
     'display:flex;flex-direction:column;gap:16px;margin:auto;';
 
-  let closeModal = (): void => { overlay.style.display = 'none'; };
+  // ── Title ──────────────────────────────────────────────────────────────────
+  const title = document.createElement('h2');
+  title.style.cssText = 'font-size:1.5rem;text-align:center;';
+  title.textContent = '📋 Game Rules';
+  const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.style.display = 'none'; } });
   const createCloseButton = (): HTMLButtonElement => createButton(
     'Close',
     UI_BORDER,
@@ -337,11 +341,6 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     () => { closeModal(); },
     'align-self:center;padding:10px 32px;font-size:1rem;border:none;margin-top:4px;',
   );
-
-  // ── Title ──────────────────────────────────────────────────────────────────
-  const title = document.createElement('h2');
-  title.style.cssText = 'font-size:1.5rem;text-align:center;';
-  title.textContent = '📋 Game Rules';
 
   // ── Summary ────────────────────────────────────────────────────────────────
   const summary = document.createElement('p');
@@ -436,7 +435,6 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   // ── Close buttons ─────────────────────────────────────────────────────────
   const topCloseBtn = createCloseButton();
   const bottomCloseBtn = createCloseButton();
-  ({ closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.style.display = 'none'; } }));
 
   // Allow closing by clicking the backdrop
   overlay.addEventListener('click', (e) => {

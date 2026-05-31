@@ -5,7 +5,7 @@ interface SetupModalOptions {
 }
 
 interface SetupModalResult {
-  closeModal: (skipOnCloseCallback?: boolean) => void;
+  closeModal: (onCloseOverride?: () => void) => void;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -26,8 +26,7 @@ function isVisible(el: HTMLElement): boolean {
 }
 
 function getFocusableElements(el: HTMLElement): HTMLElement[] {
-  return Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter((node) => !node.hasAttribute('disabled') && node.tabIndex !== -1);
+  return Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
 }
 
 function focusInitialElement(el: HTMLElement): void {
@@ -65,16 +64,16 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
   };
 
   const deactivate = (): void => {
-    if (!isOpen || isVisible(el)) return;
+    if (!isOpen) return;
+    if (isVisible(el)) return;
     isOpen = false;
     restoreFocus(previouslyFocused);
     previouslyFocused = null;
   };
 
-  const closeModal = (skipOnCloseCallback = false): void => {
-    if (!skipOnCloseCallback) {
-      options.onClose();
-    }
+  const closeModal = (onCloseOverride?: () => void): void => {
+    if (onCloseOverride) onCloseOverride();
+    else options.onClose();
     deactivate();
   };
 
@@ -109,7 +108,6 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
 
   const onDocumentKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return;
-    if (!isOpen) activate();
     if (!isOpen) return;
     if (document.body.lastElementChild !== el) return;
     if (options.canCloseOnEscape && !options.canCloseOnEscape()) return;
