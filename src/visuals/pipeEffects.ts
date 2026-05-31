@@ -11,7 +11,7 @@
  * previous tile is complete.  One-way-blocked arms are not filled.
  */
 
-import { Direction } from '../types';
+import { Direction, DIRECTIONS } from '../types';
 import { Board, NEIGHBOUR_DELTA, posKey } from '../board';
 import { oppositeDirection } from '../tile';
 import { WATER_COLOR } from '../colors';
@@ -185,7 +185,7 @@ export function computeFillOrder(
   while (qi < queue.length) {
     const cur = queue[qi++];
 
-    for (const dir of Object.values(Direction)) {
+    for (const dir of DIRECTIONS) {
       if (!board.areMutuallyConnected(cur, dir)) continue;
       const delta = NEIGHBOUR_DELTA[dir];
       const next = { row: cur.row + delta.row, col: cur.col + delta.col };

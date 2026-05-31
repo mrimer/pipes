@@ -14,7 +14,7 @@
  */
 
 import { Board, NEIGHBOUR_DELTA } from '../board';
-import { Direction, GridPos } from '../types';
+import { Direction, DIRECTIONS, GridPos } from '../types';
 import { TILE_SIZE } from '../renderer';
 import { bfsWithDepth } from '../bfs';
 
@@ -91,7 +91,7 @@ export function computeWinTileGlows(board: Board, baseTime: number): WinTileGlow
     board.source,
     (pos: GridPos) => {
       const neighbors: GridPos[] = [];
-      for (const dir of Object.values(Direction)) {
+      for (const dir of DIRECTIONS) {
         if (!board.areMutuallyConnected(pos, dir)) continue;
         const delta = NEIGHBOUR_DELTA[dir];
         neighbors.push({ row: pos.row + delta.row, col: pos.col + delta.col });

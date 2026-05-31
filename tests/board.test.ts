@@ -941,8 +941,7 @@ describe('Level 3 (Mountain Stream)', () => {
   it('is solvable and has sufficient water when the player makes the correct placements', () => {
     const board = new Board(level.rows, level.cols, level);
     // Place Straight E-W at (0,1) from base inventory
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    board.grid[0][1].rotation = 90; // E-W
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
 
     // Container at (0,2) is now in fill path; grant = 1 GoldStraight (not Straight)
     expect(board.getContainerBonuses().get(PipeShape.GoldStraight)).toBe(1);
@@ -953,8 +952,7 @@ describe('Level 3 (Mountain Stream)', () => {
 
     // Place Tee W-N-E at (2,3) to connect (1,3) down to the row-2 pipe chain and
     // branch East into the tank at (2,4) for the water budget
-    board.placeInventoryTile({ row: 2, col: 3 }, PipeShape.Tee);
-    board.grid[2][3].rotation = 270; // W-N-E
+    board.placeInventoryTile({ row: 2, col: 3 }, PipeShape.Tee, 270);
 
     expect(board.isSolved()).toBe(true);
     expect(board.getCurrentWater()).toBeGreaterThan(0);
@@ -962,8 +960,7 @@ describe('Level 3 (Mountain Stream)', () => {
 
   it('blocks removing the connector tile when the container grant was used', () => {
     const board = new Board(level.rows, level.cols, level);
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    board.grid[0][1].rotation = 90;
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     board.placeInventoryTile({ row: 1, col: 3 }, PipeShape.GoldStraight);
 
     // Reclaiming (0,1) would disconnect the container; base GoldStraight = -1, newGrant = 0 → blocked
@@ -998,16 +995,14 @@ describe('Level 4 (The Workshop)', () => {
   it('is solvable with correct placements', () => {
     const board = new Board(level.rows, level.cols, level);
     // Place Straight E-W at (0,1) from base
-    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight);
-    board.grid[0][1].rotation = 90;
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
 
     // Container at (0,2) is now in fill path – grants GoldStraight (not Straight)
     expect(board.getContainerBonuses().get(PipeShape.GoldStraight)).toBe(1);
     expect(board.getContainerBonuses().get(PipeShape.Straight)).toBeUndefined();
 
     // Place GoldStraight E-W at (0,3) on the gold space using the grant
-    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.GoldStraight);
-    board.grid[0][3].rotation = 90;
+    board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.GoldStraight, 90);
 
     // Place Straight N-S at (3,4) to bridge from the tank at (2,4) to the dirt block at (4,4)
     board.placeInventoryTile({ row: 3, col: 4 }, PipeShape.Straight);
@@ -5974,5 +5969,83 @@ describe('Regulator chambers — stat check at connection time', () => {
     const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
     expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Pressure > 6');
+  });
+});
+
+describe('getFilledPositions cache', () => {
+  /**
+   * Build a simple connected 1×3 board: Source(0,0)→Straight(0,1)→Sink(0,2).
+   * The board is loaded from a LevelDef so the grid is deterministic.
+   */
+  function makeConnectedBoard(): Board {
+    const level = makeLevelDef({
+      rows: 1,
+      cols: 3,
+      grid: [[
+        { shape: PipeShape.Source, capacity: 5, connections: [Direction.East] },
+        { shape: PipeShape.Straight, connections: [Direction.East, Direction.West] },
+        { shape: PipeShape.Sink, connections: [Direction.West] },
+      ]],
+      inventory: [{ shape: PipeShape.Straight, count: 1 }],
+    });
+    return new Board(1, 3, level);
+  }
+
+  it('returns the same Set object on two consecutive calls without mutation', () => {
+    const board = makeConnectedBoard();
+    const first = board.getFilledPositions();
+    const second = board.getFilledPositions();
+    expect(second).toBe(first); // same reference — cache hit
+  });
+
+  it('returns a new Set after a successful tile placement', () => {
+    const level = makeLevelDef({
+      rows: 1,
+      cols: 3,
+      grid: [[
+        { shape: PipeShape.Source, capacity: 5, connections: [Direction.East] },
+        { shape: PipeShape.Empty },
+        { shape: PipeShape.Sink, connections: [Direction.West] },
+      ]],
+      inventory: [{ shape: PipeShape.Straight, count: 1 }],
+    });
+    const board = new Board(1, 3, level);
+    board.initHistory();
+
+    const before = board.getFilledPositions();
+    // Placing a Straight pipe connects source to sink — fill set must change.
+    const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+    const after = board.getFilledPositions();
+
+    expect(after).not.toBe(before); // new Set object — cache was invalidated
+    expect(before.size).toBe(1);    // only source before placement
+    expect(after.size).toBe(3);     // source + straight + sink after placement
+  });
+
+  it('returns a new Set after undoMove', () => {
+    const level = makeLevelDef({
+      rows: 1,
+      cols: 3,
+      grid: [[
+        { shape: PipeShape.Source, capacity: 5, connections: [Direction.East] },
+        { shape: PipeShape.Empty },
+        { shape: PipeShape.Sink, connections: [Direction.West] },
+      ]],
+      inventory: [{ shape: PipeShape.Straight, count: 1 }],
+    });
+    const board = new Board(1, 3, level);
+    board.initHistory();
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.recordMove();
+
+    const afterPlace = board.getFilledPositions();
+    expect(afterPlace.size).toBe(3);
+
+    board.undoMove();
+    const afterUndo = board.getFilledPositions();
+
+    expect(afterUndo).not.toBe(afterPlace); // new Set — cache invalidated by undo
+    expect(afterUndo.size).toBe(1);         // back to source-only
   });
 });

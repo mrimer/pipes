@@ -10,7 +10,7 @@
 
 import { Board, NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
 import { oppositeDirection } from '../tile';
-import { Direction, GridPos, TileDef } from '../types';
+import { Direction, DIRECTIONS, GridPos, TileDef } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
 import { tileDefConnections } from '../mapUtils';
 import { drawIdlePulseGlow } from './idlePulse';
@@ -214,7 +214,7 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
 
   // Seed: for each tile adjacent to the sink that is mutually connected to it,
   // the direction from that tile towards the sink is "good".
-  for (const dir of Object.values(Direction)) {
+  for (const dir of DIRECTIONS) {
     const delta = NEIGHBOUR_DELTA[dir];
     const neighbor: GridPos = { row: board.sink.row + delta.row, col: board.sink.col + delta.col };
     // Direction from neighbor to sink is the opposite of `dir`
@@ -245,7 +245,7 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
 
     const currentDirs = getDirs(current);
 
-    for (const dirToNeighbor of Object.values(Direction)) {
+    for (const dirToNeighbor of DIRECTIONS) {
       const delta = NEIGHBOUR_DELTA[dirToNeighbor];
       const neighbor: GridPos = { row: current.row + delta.row, col: current.col + delta.col };
 
@@ -295,7 +295,7 @@ function _forwardDirs(
   const dirs: Direction[] = [];
   const key = `${pos.row},${pos.col}`;
   const good = goodDirs !== null ? (goodDirs.get(key) ?? null) : null;
-  for (const dir of Object.values(Direction)) {
+  for (const dir of DIRECTIONS) {
     if (fromDir !== null && dir === _oppositeDir(fromDir)) continue;
     if (!board.areMutuallyConnected(pos, dir)) continue;
     if (good !== null && !good.has(dir)) continue;
@@ -510,7 +510,7 @@ export function spawnBubble(
 
   // Collect the directions that have live mutual connections from this tile.
   const connectedDirs: Direction[] = [];
-  for (const dir of Object.values(Direction)) {
+  for (const dir of DIRECTIONS) {
     if (board.areMutuallyConnected({ row, col }, dir)) {
       connectedDirs.push(dir);
     }
