@@ -12,10 +12,14 @@ const MIN_ARC_RADIUS_TILES = 5;
 const MAX_ARC_RADIUS_TILES = 10;
 const TILE_TRAVERSE_MS = 8000;
 const MIN_TILE_SIZE = 1;
+const MIN_SPAWN_COOLDOWN_MS = 5000;
+const MAX_SPAWN_COOLDOWN_MS = 10000;
 const MAX_PULSE_OFFSET_MS = 1200;
 const PULSE_MIN = 0.8;
 const PULSE_AMPLITUDE = 0.2;
 const PULSE_PERIOD_MS = 650;
+const LIFECYCLE_ALPHA_OSCILLATION_PERIOD_MS = 2000;
+const LIFECYCLE_ALPHA_OSCILLATION_AMPLITUDE = 0.1;
 const GLOW_RADIUS_MULTIPLIER = 3.5;
 const GLOW_SPRITE_DIAMETER_MULTIPLIER = 2;
 const GLOW_MID_STOP = 0.45;
@@ -47,6 +51,7 @@ export class FireflyField {
   private _tileSize = 1;
   private _targetCount = 0;
   private _fireflies: Firefly[] = [];
+  private _nextSpawnAt = 0;
 
   resetForLevel(width: number, height: number, tileSize: number, style?: LevelStyle): void {
     this._width = width;
@@ -61,9 +66,7 @@ export class FireflyField {
     }
     this._targetCount = this._computeTargetCount();
     const now = performance.now();
-    for (let i = 0; i < this._targetCount; i++) {
-      this._fireflies.push(this._spawnFirefly(now));
-    }
+    this._nextSpawnAt = now;
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {
@@ -77,8 +80,9 @@ export class FireflyField {
       }
     }
 
-    while (this._fireflies.length < this._targetCount) {
+    while (this._fireflies.length < this._targetCount && now >= this._nextSpawnAt) {
       this._fireflies.push(this._spawnFirefly(now));
+      this._nextSpawnAt = now + randRange(MIN_SPAWN_COOLDOWN_MS, MAX_SPAWN_COOLDOWN_MS);
     }
 
     for (const firefly of this._fireflies) {
@@ -181,7 +185,10 @@ export class FireflyField {
     const x = firefly.centerX + Math.cos(angle) * firefly.orbitRadiusPx;
     const y = firefly.centerY + Math.sin(angle) * firefly.orbitRadiusPx;
     const pulse = PULSE_MIN + PULSE_AMPLITUDE * ((Math.sin((ageMs + firefly.pulseOffsetMs) / PULSE_PERIOD_MS) + 1) * 0.5);
-    const alpha = lifeAlpha * pulse;
+    const lifecycleOscillation = Math.sin(((ageMs + firefly.pulseOffsetMs) / LIFECYCLE_ALPHA_OSCILLATION_PERIOD_MS) * TAU)
+      * LIFECYCLE_ALPHA_OSCILLATION_AMPLITUDE;
+    const oscillatedLifecycleAlpha = Math.max(0, Math.min(1, lifeAlpha * (1 + lifecycleOscillation)));
+    const alpha = oscillatedLifecycleAlpha * pulse;
 
     ctx.save();
     if (firefly.glowSprite) {

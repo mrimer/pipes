@@ -7,6 +7,9 @@ import { LevelDef, PipeShape, CampaignDef, Direction } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
 import { saveImportedCampaigns, loadActiveCampaignId, saveLevelWater } from '../src/persistence';
 import { sfxManager, SfxId } from '../src/sfxManager';
+import { CloudShadowField } from '../src/visuals/cloudShadows';
+import { FireflyField } from '../src/visuals/fireflyField';
+import { ButterflyField } from '../src/visuals/butterflyField';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
 jest.mock('../src/visuals/confetti', () => ({
@@ -289,6 +292,19 @@ describe('Game – playtest mode button labels', () => {
     game.exitToMenu();
 
     expect(winNextBtnEl.textContent).toBe('Continue');
+  });
+
+  it('initializes environmental effects when entering playtesting', () => {
+    const cloudSpy = jest.spyOn(CloudShadowField.prototype, 'resetForScreen');
+    const fireflySpy = jest.spyOn(FireflyField.prototype, 'resetForLevel');
+    const butterflySpy = jest.spyOn(ButterflyField.prototype, 'resetForLevel');
+    const { game } = makeGame();
+
+    gameHooks(game)._playtestLevel(LEVELS[0]);
+
+    expect(cloudSpy).toHaveBeenCalled();
+    expect(fireflySpy).toHaveBeenCalled();
+    expect(butterflySpy).toHaveBeenCalled();
   });
 });
 

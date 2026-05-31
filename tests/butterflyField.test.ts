@@ -50,15 +50,22 @@ function createMockCtx(): CanvasRenderingContext2D {
 }
 
 describe('ButterflyField', () => {
-  it('spawns one butterfly per twenty-five tiles on summer/grass levels', () => {
+  it('spawns butterflies over time on summer/grass levels up to the target count', () => {
     jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(13));
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new ButterflyField();
+    const ctx = createMockCtx();
 
     // 100x100 at 10 px per tile => 10x10 tiles => 100 / 25 => 4 butterflies.
     field.resetForLevel(100, 100, 10, 'Grass', null);
 
-    expect((field as unknown as ButterflyInternals)._butterflies).toHaveLength(4);
+    expect((field as unknown as ButterflyInternals)._butterflies).toHaveLength(0);
+    field.updateAndRender(ctx, 1000);
+    expect((field as unknown as ButterflyInternals)._butterflies).toHaveLength(1);
+    field.updateAndRender(ctx, 5999);
+    expect((field as unknown as ButterflyInternals)._butterflies).toHaveLength(1);
+    field.updateAndRender(ctx, 11000);
+    expect((field as unknown as ButterflyInternals)._butterflies.length).toBeGreaterThanOrEqual(2);
   });
 
   it('does not spawn butterflies on non-summer styles', () => {
@@ -75,6 +82,7 @@ describe('ButterflyField', () => {
       getTile: () => ({ shape: PipeShape.Granite }),
     };
     field.resetForLevel(30, 30, 10, 'Grass', board);
+    field.updateAndRender(createMockCtx(), 1000);
 
     const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
     butterfly.x = 15;
@@ -95,16 +103,17 @@ describe('ButterflyField', () => {
   });
 
   it('despawns off-grid butterflies and respawns replacements', () => {
-    jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(41));
+    jest.spyOn(Math, 'random').mockReturnValue(0);
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new ButterflyField();
     field.resetForLevel(20, 20, 10, 'Grass', null);
+    field.updateAndRender(createMockCtx(), 1000);
 
     const before = (field as unknown as ButterflyInternals)._butterflies[0];
     before.x = -1000;
     before.y = -1000;
 
-    field.updateAndRender(createMockCtx(), 1001);
+    field.updateAndRender(createMockCtx(), 6001);
 
     const after = (field as unknown as ButterflyInternals)._butterflies[0];
     expect((field as unknown as ButterflyInternals)._butterflies).toHaveLength(1);
