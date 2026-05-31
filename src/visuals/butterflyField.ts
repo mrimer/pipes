@@ -131,7 +131,7 @@ export class ButterflyField {
     const centerY = this._height * 0.5;
     const headingToCenter = Math.atan2(centerY - y, centerX - x);
     const heading = headingToCenter + randRange(-SPAWN_HEADING_JITTER_RAD, SPAWN_HEADING_JITTER_RAD);
-    const hue = Math.round(Math.random() * 360);
+    const hue = Math.floor(Math.random() * 360);
     const color = `hsl(${hue}, 95%, 56%)`;
 
     return {
@@ -234,7 +234,7 @@ export class ButterflyField {
 
   private _wingOpenness(butterfly: Butterfly, now: number): number {
     if (butterfly.isLanded) {
-      const cycleProgress = (now - butterfly.landStartTime) / LANDED_FLAP_PERIOD_MS;
+      const cycleProgress = ((now - butterfly.landStartTime) % LANDED_FLAP_PERIOD_MS) / LANDED_FLAP_PERIOD_MS;
       return MIN_WING_OPENNESS + (1 - MIN_WING_OPENNESS)
         * ((Math.sin(cycleProgress * TAU - Math.PI / 2) + 1) * 0.5);
     }
