@@ -52,6 +52,7 @@ import { PlayerProfileScreen } from './playerProfileScreen';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled, unregisterScrollingPipeBackground } from './uiBackground';
 import { isEnvironmentalEnabled, setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';
+import { FireflyField } from './visuals/fireflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -239,6 +240,8 @@ export class Game implements InputCallbacks {
   private readonly _animMgr: AnimationManager;
   /** Procedural ambient cloud-shadow overlay rendered above board visuals. */
   private readonly _cloudShadows = new CloudShadowField();
+  /** Dark-level ambient fireflies rendered above tile visuals. */
+  private readonly _fireflies = new FireflyField();
 
   /** Manages the play-screen HUD metrics, inventory bar, and best-score box. */
   private readonly _metrics: MetricsDisplay;
@@ -631,6 +634,12 @@ export class Game implements InputCallbacks {
     ));
     this.canvas.width  = this.currentLevel.cols * TILE_SIZE;
     this.canvas.height = this.currentLevel.rows * TILE_SIZE;
+    this._fireflies.resetForLevel(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      this.currentLevel.style,
+    );
   }
 
   /**
@@ -758,6 +767,12 @@ export class Game implements InputCallbacks {
         level.style,
       );
     }
+    this._fireflies.resetForLevel(
+      this.canvas.width,
+      this.canvas.height,
+      TILE_SIZE,
+      level.style,
+    );
 
     if (!this._campaign.isPlaytesting) {
       this._campaign.updateLevelHeader(levelId);
@@ -927,6 +942,7 @@ export class Game implements InputCallbacks {
 
     if (isEnvironmentalEnabled()) {
       this._cloudShadows.updateAndRender(this.ctx, now);
+      this._fireflies.updateAndRender(this.ctx, now);
     }
   }
 
