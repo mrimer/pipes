@@ -32,6 +32,10 @@ function createMockCtx(): CanvasRenderingContext2D {
 }
 
 describe('FireflyField', () => {
+  beforeEach(() => {
+    jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  });
+
   afterEach(() => {
     jest.restoreAllMocks();
   });
