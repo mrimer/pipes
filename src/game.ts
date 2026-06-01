@@ -903,12 +903,12 @@ export class Game implements InputCallbacks {
     if (this.screen === GameScreen.Play || this.screen === GameScreen.Playback) {
       this._renderBoard();
       this._animMgr.tick(this.board, this.gameState);
+      this._metrics.tickGoldenInventoryTwinkle();
       if (isEnvironmentalEnabled()) {
         const now = performance.now();
         this._fireflies.updateAndRender(this.ctx, now);
         this._butterflies.updateAndRender(this.ctx, now);
       }
-      this._metrics.tickGoldenInventoryTwinkle();
     }
     this._renderRafId = requestAnimationFrame(() => {
       if (this._destroyed) return;
