@@ -146,6 +146,42 @@ describe('ButterflyField', () => {
     },
   );
 
+  it('orients toward perch decor center and lands only after reaching it', () => {
+    jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(29));
+    jest.spyOn(performance, 'now').mockReturnValue(1000);
+    const field = new ButterflyField();
+    const board = {
+      getTile: () => ({ shape: PipeShape.Empty }),
+      ambientDecorations: new Map([['1,1', { type: 'flower' as const, offsetX: 0.8, offsetY: 0.2 }]]),
+    };
+    field.resetForLevel(30, 30, 10, 'Grass', board);
+    field.updateAndRender(createMockCtx(), 1000);
+
+    const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
+    butterfly.x = 15;
+    butterfly.y = 15;
+    butterfly.sizePx = 1;
+    butterfly.heading = 0;
+    butterfly.hasLanded = false;
+    butterfly.isLanded = false;
+    butterfly.segmentStartX = 15;
+    butterfly.segmentStartY = 15;
+    butterfly.segmentStartTime = 1000;
+    butterfly.segmentDistancePx = 0;
+
+    field.updateAndRender(createMockCtx(), 1001);
+
+    expect(butterfly.isLanded).toBe(false);
+    expect(butterfly.heading).toBeCloseTo(Math.atan2(-3, 3));
+
+    field.updateAndRender(createMockCtx(), 1251);
+
+    expect(butterfly.hasLanded).toBe(true);
+    expect(butterfly.isLanded).toBe(true);
+    expect(butterfly.x).toBeCloseTo(18);
+    expect(butterfly.y).toBeCloseTo(12);
+  });
+
   it('despawns off-grid butterflies and respawns replacements', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     jest.spyOn(performance, 'now').mockReturnValue(1000);

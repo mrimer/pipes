@@ -36,11 +36,12 @@ const BACK_WING_OUT_X_SCALE = -0.9;
 const BACK_WING_OUT_Y_SCALE = 0.28;
 const BACK_WING_INNER_CTRL_X_SCALE = -0.44;
 const BACK_WING_INNER_CTRL_Y_SCALE = 0.16;
+const PERCH_CENTERING_THRESHOLD_PX = 0.1;
 const PERCH_DECORATION_TYPES = new Set<AmbientDecorationType>(['mushroom', 'flower']);
 
 interface ButterflyBoard {
   getTile(pos: GridPos): { shape: PipeShape } | null;
-  ambientDecorations?: ReadonlyMap<string, { type: AmbientDecorationType }>;
+  ambientDecorations?: ReadonlyMap<string, { type: AmbientDecorationType; offsetX?: number; offsetY?: number }>;
 }
 
 interface Butterfly {
@@ -195,7 +196,7 @@ export class ButterflyField {
     butterfly.x = butterfly.segmentStartX + Math.cos(butterfly.heading) * butterfly.segmentDistancePx * flapProgress;
     butterfly.y = butterfly.segmentStartY + Math.sin(butterfly.heading) * butterfly.segmentDistancePx * flapProgress;
 
-    if (!butterfly.hasLanded && this._canLandOnPerchTile(butterfly)) {
+    if (!butterfly.hasLanded && this._canLandOnPerchTile(butterfly, now)) {
       butterfly.hasLanded = true;
       butterfly.isLanded = true;
       butterfly.landStartTime = now;
@@ -203,7 +204,7 @@ export class ButterflyField {
     }
   }
 
-  private _canLandOnPerchTile(butterfly: Butterfly): boolean {
+  private _canLandOnPerchTile(butterfly: Butterfly, now: number): boolean {
     if (!this._board) return false;
     if (
       butterfly.x < 0 ||
@@ -214,10 +215,29 @@ export class ButterflyField {
     const col = Math.floor(butterfly.x / this._tileSize);
     const row = Math.floor(butterfly.y / this._tileSize);
     const tile = this._board.getTile({ row, col });
-    const decorType = this._board.ambientDecorations?.get(`${row},${col}`)?.type;
+    const decor = this._board.ambientDecorations?.get(`${row},${col}`);
+    const decorType = decor?.type;
     const hasPerchDecor = decorType !== undefined && PERCH_DECORATION_TYPES.has(decorType);
     const canPerchHere = hasPerchDecor || tile?.shape === PipeShape.Granite;
     if (!canPerchHere) return false;
+    if (hasPerchDecor) {
+      const targetX = col * this._tileSize + (decor?.offsetX ?? 0.5) * this._tileSize;
+      const targetY = row * this._tileSize + (decor?.offsetY ?? 0.5) * this._tileSize;
+      const dx = targetX - butterfly.x;
+      const dy = targetY - butterfly.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > PERCH_CENTERING_THRESHOLD_PX) {
+        butterfly.heading = Math.atan2(dy, dx);
+        butterfly.segmentStartX = butterfly.x;
+        butterfly.segmentStartY = butterfly.y;
+        butterfly.segmentStartTime = now;
+        butterfly.segmentDistancePx = dist;
+        return false;
+      }
+      butterfly.x = targetX;
+      butterfly.y = targetY;
+      return true;
+    }
 
     const bodyHalfLength = butterfly.sizePx * BODY_LENGTH_SCALE * 0.5;
     const dirX = Math.cos(butterfly.heading);
