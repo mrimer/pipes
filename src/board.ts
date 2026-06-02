@@ -1938,7 +1938,8 @@ export class Board {
 
     // Validate container-grant constraints: when rotation leaves an inventory item's
     // effective count negative, block only if the rotation reduced the positive
-    // container grant for that shape.
+    // container grant for that shape by disconnecting positive grants
+    // (i.e., and not simply connecting negative grants).
     const newBonuses = this.getContainerBonuses(filled);
     for (const item of this.inventory) {
       if (item.count < 0) {
@@ -1946,7 +1947,7 @@ export class Board {
         if (item.count + bonus < 0) {
           const bonusBefore = bonusesBefore.get(item.shape) ?? 0;
           if (bonus < bonusBefore) {
-            // Invalid move: report disconnected positive item chambers
+            // Invalid move: report disconnected positive item chambers.
             const disconnectedPositions = [...filledBefore].flatMap((key) => {
               if (filled.has(key)) return [];
               const [r, c] = parseKey(key);
@@ -1961,6 +1962,11 @@ export class Board {
               }
               return [];
             });
+            if (disconnectedPositions.length === 0) {
+              // No positive grants disconnected: move is allowed.
+              // (Negative grants might have been connected, which is fine.)
+              continue;
+            }
             for (let i = 0; i < 4 - normalizedSteps; i++) {
               tile.rotate();
             }
