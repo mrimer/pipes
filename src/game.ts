@@ -1214,8 +1214,13 @@ export class Game implements InputCallbacks {
       this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
-        this.selectedShape = reclaimedShape;
-        this.pendingRotation = reclaimedRotation;
+        const inv = this.board.inventory.find((it) => it.shape === reclaimedShape);
+        const bonuses = this.board.getContainerBonuses();
+        const effectiveCount = (inv?.count ?? 0) + (bonuses.get(reclaimedShape) ?? 0);
+        if (effectiveCount > 0) {
+          this.selectedShape = reclaimedShape;
+          this.pendingRotation = reclaimedRotation;
+        }
       }
       this._refreshPlayUI();
       this._checkWinLoseAfterMove();
