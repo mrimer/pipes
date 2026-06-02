@@ -365,6 +365,11 @@ export class InputHandler {
     return false;
   }
 
+  /** True when a hovered tile exists and can be keyboard-rotated as a non-spinner pipe. */
+  private _isRotatableHoverPipeTile(tile: Tile | null | undefined): tile is Tile {
+    return !!tile && !tile.isFixed && !isEmptyFloor(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape);
+  }
+
   /**
    * If the mouse is currently hovering a rotatable non-spinner pipe tile,
    * rotate it by `steps` clockwise quarter-turns and update the UI.
@@ -373,14 +378,16 @@ export class InputHandler {
   private _tryRotateHoverPipe(steps: number): boolean {
     const board = this._cb.getBoard();
     if (!this.mouseCanvasPos || !board) return false;
-    const hPos = this._getHoverGridPos()!;
+    const hPos = this._getHoverGridPos();
+    if (!hPos) return false;
     const hTile = board.getTile(hPos);
-    if (!hTile || hTile.isFixed || isEmptyFloor(hTile.shape) || SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
-    this.hoverRotationDelta = 0;
+    if (!this._isRotatableHoverPipeTile(hTile)) return false;
     const filledBefore = board.getFilledPositions();
     const oldRotation = hTile.rotation;
     const result = board.rotateTileBy(hPos, steps);
     if (result.success) {
+      // Clear any wheel-built preview offset now that a real board rotation was committed.
+      this.hoverRotationDelta = 0;
       this._cb.afterTileRotated(filledBefore, result, { row: hPos.row, col: hPos.col, oldRotation });
       this._cb.refreshUI();
       this._cb.checkWinLose();
