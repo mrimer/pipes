@@ -825,6 +825,44 @@ describe('Game – pending rotation', () => {
     expect(hooks.pendingRotation).toBe(0);
   });
 
+  it('W key rotates the hovered pipe clockwise when no shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    expect(boardAccess.board.grid[0][1].rotation).toBe(0);
+
+    hooks.selectedShape = null;
+    hooks._input.mouseCanvasPos = { x: 96, y: 32 };
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'w' }));
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(90);
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
+  it('Q key rotates the hovered pipe counter-clockwise when no shape is selected', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    hooks.selectedShape = PipeShape.Straight;
+    hooks.pendingRotation = 0;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    expect(boardAccess.board.grid[0][1].rotation).toBe(0);
+
+    hooks.selectedShape = null;
+    hooks._input.mouseCanvasPos = { x: 96, y: 32 };
+    hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'q' }));
+
+    expect(boardAccess.board.grid[0][1].rotation).toBe(270);
+    expect(hooks.pendingRotation).toBe(0);
+  });
+
   it('wheel scroll down advances pendingRotation clockwise', () => {
     const { game } = makeGame();
     game.startLevel(1);

@@ -365,6 +365,31 @@ export class InputHandler {
     return false;
   }
 
+  /**
+   * If the mouse is currently hovering a rotatable non-spinner pipe tile,
+   * rotate it by `steps` clockwise quarter-turns and update the UI.
+   * Returns true when a rotation attempt was made.
+   */
+  private _tryRotateHoverPipe(steps: number): boolean {
+    const board = this._cb.getBoard();
+    if (!this.mouseCanvasPos || !board) return false;
+    const hPos = this._getHoverGridPos()!;
+    const hTile = board.getTile(hPos);
+    if (!hTile || hTile.isFixed || isEmptyFloor(hTile.shape) || SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
+    this.hoverRotationDelta = 0;
+    const filledBefore = board.getFilledPositions();
+    const oldRotation = hTile.rotation;
+    const result = board.rotateTileBy(hPos, steps);
+    if (result.success) {
+      this._cb.afterTileRotated(filledBefore, result, { row: hPos.row, col: hPos.col, oldRotation });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (result.error) {
+      this._cb.handleBoardError(result);
+    }
+    return true;
+  }
+
   // ── Event handlers ──────────────────────────────────────────────────────────
 
   private _handleCanvasMouseDown(e: MouseEvent): void {
@@ -687,7 +712,7 @@ export class InputHandler {
         if (this._cb.getSelectedShape() !== null) {
           this._rotatePendingCCW();
         } else {
-          this._tryAdjustHoverRotation(-1);
+          this._tryRotateHoverPipe(3);
         }
       }
       return;
@@ -700,7 +725,7 @@ export class InputHandler {
         if (this._cb.getSelectedShape() !== null) {
           this._rotatePendingCW();
         } else {
-          this._tryAdjustHoverRotation(1);
+          this._tryRotateHoverPipe(1);
         }
       }
       return;
