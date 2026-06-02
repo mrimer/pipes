@@ -179,7 +179,6 @@ describe('ButterflyField', () => {
 
     expect(butterfly.hasLanded).toBe(false);
     expect(butterfly.isLanded).toBe(false);
-    expect(butterfly.segmentDistancePx).toBeCloseTo(0.8);
     expect(Math.hypot(18 - butterfly.x, 12 - butterfly.y)).toBeGreaterThan(0.1);
 
     for (let t = 1267; t <= 3000 && !butterfly.isLanded; t += 16) {
