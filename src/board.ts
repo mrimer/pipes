@@ -1892,7 +1892,9 @@ export class Board {
     // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
     const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return { success: true };
-    // Capture the pre-rotation fill for disconnection-highlight computation and valve-gate check.
+    // Capture the pre-rotation fill and container grant bonuses
+    // for disconnection-highlight computation and valve-gate check.
+    const bonusesBefore = this.getContainerBonuses(filled);
     const filledBefore = this.getFilledPositions();
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
@@ -1935,35 +1937,36 @@ export class Board {
     }
 
     // Validate container-grant constraints: when rotation leaves an inventory item's
-    // effective count negative, block only if the rotation disconnected a positive
-    // container grant for that same shape that was previously reachable.
+    // effective count negative, block only if the rotation reduced the positive
+    // container grant for that shape.
     const newBonuses = this.getContainerBonuses(filled);
     for (const item of this.inventory) {
       if (item.count < 0) {
         const bonus = newBonuses.get(item.shape) ?? 0;
         if (item.count + bonus < 0) {
-          const disconnectedPositions = [...filledBefore].flatMap((key) => {
-            if (filled.has(key)) return [];
-            const [r, c] = parseKey(key);
-            const t = this.grid[r]?.[c];
-            if (
-              t?.shape === PipeShape.Chamber &&
-              t.chamberContent === 'item' &&
-              t.itemShape === item.shape &&
-              t.itemCount > 0
-            ) {
-              return [{ row: r, col: c } as GridPos];
+          const bonusBefore = bonusesBefore.get(item.shape) ?? 0;
+          if (bonus < bonusBefore) {
+            // Invalid move: report disconnected positive item chambers
+            const disconnectedPositions = [...filledBefore].flatMap((key) => {
+              if (filled.has(key)) return [];
+              const [r, c] = parseKey(key);
+              const t = this.grid[r]?.[c];
+              if (
+                t?.shape === PipeShape.Chamber &&
+                t.chamberContent === 'item' &&
+                t.itemShape === item.shape &&
+                t.itemCount > 0
+              ) {
+                return [{ row: r, col: c } as GridPos];
+              }
+              return [];
+            });
+            for (let i = 0; i < 4 - normalizedSteps; i++) {
+              tile.rotate();
             }
-            return [];
-          });
-          if (disconnectedPositions.length === 0) {
-            continue;
+            this._invalidateFilledCache();
+            return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
           }
-          for (let i = 0; i < 4 - normalizedSteps; i++) {
-            tile.rotate();
-          }
-          this._invalidateFilledCache();
-          return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
         }
       }
     }
