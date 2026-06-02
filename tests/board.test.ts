@@ -363,6 +363,17 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
   });
+
+  it('blocks rotation that disconnects a container when its grant is in use', () => {
+    const board = makeRotateConstraintBoard();
+    // Straight at (0,1) rotates 90°→180° (E-W → N-S), disconnecting source↔chamber.
+    // After rotation: grant = 0 → base(-1) + grant(0) = -1 < 0 → blocked.
+    const result = board.rotateTile({ row: 0, col: 1 });
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    // Tile must be restored to original rotation (90°).
+    expect(board.grid[0][1].rotation).toBe(90);
+  });
 });
 
 describe('Board.rotateTileBy (container-grant constraint)', () => {
@@ -387,6 +398,16 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(board.grid[0][1].rotation).toBe(180);
+  });
+
+  it('blocks multi-step rotation that disconnects a container when its grant is in use', () => {
+    const board = makeRotateByConstraintBoard();
+    // 1 step: 90°→180° (E-W → N-S), disconnects source↔chamber → blocked.
+    const result = board.rotateTileBy({ row: 0, col: 1 }, 1);
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    // Tile must be restored to original rotation (90°).
+    expect(board.grid[0][1].rotation).toBe(90);
   });
 });
 
