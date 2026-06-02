@@ -501,6 +501,39 @@ describe('Game – deselect when effective count drops to zero after reclaim', (
     // GoldStraight effective count is now 0 → selection must be cleared
     expect(hooks.selectedShape).toBeNull();
   });
+
+  it('does not auto-select the reclaimed shape when its effective count is <= 0 after reclaim', () => {
+    const { game } = makeGame();
+    game.startLevel(3); // Level 3: ItemContainer at (0,2) grants 1×GoldStraight when filled
+
+    const hooks = gameHooks(game);
+    const board = hooks.board as unknown as {
+      grid: Array<Array<Tile | null>>;
+      inventory: { shape: PipeShape; count: number }[];
+    };
+
+    // Directly place a GoldStraight tile at (1,3) without going through game logic.
+    // This simulates a state reachable via replaceInventoryTile's Exception 2 path, where
+    // a shape can end up on the board with effective inventory count < 0.
+    // Container is NOT connected here (no Straight at (0,1)), so bonus = 0.
+    board.grid[1][3] = new Tile(PipeShape.GoldStraight, 0, false);
+
+    // Set base count to -1 so that after reclaim (base → 0) the effective count
+    // is still 0 (base 0 + bonus 0 = 0) — not enough to place.
+    const gsItem = board.inventory.find((it) => it.shape === PipeShape.GoldStraight)!;
+    gsItem.count = -1;
+
+    // Ensure no shape is currently selected.
+    hooks.selectedShape = null;
+
+    // Right-click at (1,3) to reclaim the GoldStraight.
+    // TILE_SIZE=64: col 3 → clientX 224, row 1 → clientY 96.
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 224, clientY: 96 }));
+
+    // After reclaim, effective count = 0 (base 0, no container bonus).
+    // The fix must NOT auto-select GoldStraight, since placement is impossible.
+    expect(hooks.selectedShape).toBeNull();
+  });
 });
 
 describe('Game – inventory bar re-renders on tile rotation', () => {
