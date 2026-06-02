@@ -58,6 +58,7 @@ interface Butterfly {
   segmentStartY: number;
   segmentStartTime: number;
   segmentDistancePx: number;
+  flightFlapAnchorTime: number;
 }
 
 export class ButterflyField {
@@ -161,6 +162,7 @@ export class ButterflyField {
       segmentStartY: y,
       segmentStartTime: now,
       segmentDistancePx: this._distancePerFlapPx(),
+      flightFlapAnchorTime: now,
     };
   }
 
@@ -275,7 +277,9 @@ export class ButterflyField {
       return MIN_WING_OPENNESS + (1 - MIN_WING_OPENNESS)
         * ((Math.sin(cycleProgress * TAU - Math.PI / 2) + 1) * 0.5);
     }
-    const flapProgress = clamp((now - butterfly.segmentStartTime) / BASE_FLAP_PERIOD_MS, 0, 1);
+    const elapsedInCycle = ((now - butterfly.flightFlapAnchorTime) % BASE_FLAP_PERIOD_MS + BASE_FLAP_PERIOD_MS)
+      % BASE_FLAP_PERIOD_MS;
+    const flapProgress = elapsedInCycle / BASE_FLAP_PERIOD_MS;
     return MIN_WING_OPENNESS + (1 - MIN_WING_OPENNESS) * flapProgress;
   }
 
