@@ -1894,8 +1894,8 @@ export class Board {
     if (normalizedSteps === 0) return { success: true };
     // Capture the pre-rotation fill and container grant bonuses
     // for disconnection-highlight computation and valve-gate check.
-    const bonusesBefore = this.getContainerBonuses(filled);
     const filledBefore = this.getFilledPositions();
+    const bonusesBefore = this.getContainerBonuses(filledBefore);
     for (let i = 0; i < normalizedSteps; i++) {
       tile.rotate();
     }
