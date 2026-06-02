@@ -18,6 +18,8 @@ Provide comments that clarify design decisions and useful information not clearl
 
 Update AGENTS.md with missing information that is helpful and necessary to run tool calls properly during this session.
 
+Prefer concise progress updates instead of verbose explanations.
+
 ## Development workflow
 
 The repository is a TypeScript/Webpack single-page application. All dev tooling lives in `node_modules`; the directory is **not** present in a fresh clone and must be installed before any tool can run.
@@ -117,20 +119,23 @@ src/
 ├── sfxManager.ts                # Sound effect playback
 │
 ├── visuals/
-│   ├── idlePulse.ts             # Idle water pulse (10 s idle → BFS-layered pulse animation)
-│   ├── confetti.ts              # Win confetti particle system
-│   ├── waterParticles.ts        # Flowing water particle effects
-│   ├── pipeEffects.ts           # Pipe placement/rotation visual effects
-│   ├── ringEffect.ts            # Expanding ring burst effect
-│   ├── starSparkle.ts           # Star award sparkle effect
-│   ├── winTileEffect.ts         # Per-tile win flash
-│   ├── sinkVortex.ts            # Sink drain vortex animation
-│   ├── heatWave.ts              # Heat-wave distortion overlay
-│   ├── tileAnimation.ts         # General tile animation driver
+│   ├── butterflyField.ts        # Butterfly visual effect
 │   ├── chapterMap.ts            # Chapter map node visual helpers
 │   ├── chapterWaves.ts          # Animated waves on chapter map
+│   ├── cloudShadows.ts          # Procedural cloud-shadow overlay field for level/map screens
+│   ├── confetti.ts              # Win confetti particle system
+│   ├── fieldUtils.ts            # Unified utility helper functions
+│   ├── fireflyField.ts          # Firefly visual effect
+│   ├── heatWave.ts              # Heat-wave distortion overlay
+│   ├── idlePulse.ts             # Idle water pulse (10 s idle → BFS-layered pulse animation)
 │   ├── minimap.ts               # Minimap overlay renderer
-│   └── cloudShadows.ts          # Procedural cloud-shadow overlay field for level/map screens
+│   ├── pipeEffects.ts           # Pipe placement/rotation visual effects
+│   ├── ringEffect.ts            # Expanding ring burst effect
+│   ├── sinkVortex.ts            # Sink drain vortex animation
+│   ├── starSparkle.ts           # Star award sparkle effect
+│   ├── tileAnimation.ts         # General tile animation driver
+│   ├── waterParticles.ts        # Flowing water particle effects
+│   └── winTileEffect.ts         # Per-tile win flash
 │
 └── campaignEditor/
     ├── index.ts                 # Editor orchestrator — wires all editor sub-modules
