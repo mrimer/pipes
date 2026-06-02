@@ -342,14 +342,14 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     return board;
   }
 
-  it('allows rotation when the rotated pipe type inventory is negative', () => {
+  it('allows rotation when the rotated pipe type inventory is negative and no required grant is disconnected', () => {
     const board = makeRotateConstraintBoard();
-    // Straight at (0,1) rotates 90°→180° (E-W → N-S), disconnecting source↔chamber.
-    // Even though Straight inventory is negative, rotating an already-placed Straight is allowed.
-    const result = board.rotateTile({ row: 0, col: 1 });
+    // Straight at (0,3) rotates 90°→180° (E-W → N-S). This disconnects sink-side flow
+    // but keeps source↔chamber connected, so the required Straight grant remains covered.
+    const result = board.rotateTile({ row: 0, col: 3 });
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
-    expect(board.grid[0][1].rotation).toBe(180);
+    expect(board.grid[0][3].rotation).toBe(180);
   });
 
   it('allows rotation when no container grants have been used (count ≥ 0)', () => {
@@ -391,13 +391,13 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
     return board;
   }
 
-  it('allows multi-step rotation when the rotated pipe type inventory is negative', () => {
+  it('allows multi-step rotation when the rotated pipe type inventory is negative and no required grant is disconnected', () => {
     const board = makeRotateByConstraintBoard();
-    // 1 step: 90°→180° (E-W → N-S); rotated type is Straight with negative inventory.
-    const result = board.rotateTileBy({ row: 0, col: 1 }, 1);
+    // 1 step at (0,3): 90°→180° (E-W → N-S). Chamber grant remains connected.
+    const result = board.rotateTileBy({ row: 0, col: 3 }, 1);
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
-    expect(board.grid[0][1].rotation).toBe(180);
+    expect(board.grid[0][3].rotation).toBe(180);
   });
 
   it('blocks multi-step rotation that disconnects a container when its grant is in use', () => {

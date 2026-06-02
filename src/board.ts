@@ -1934,25 +1934,36 @@ export class Board {
       return { success: false, error: constraintError, errorTilePositions: this._computeDisconnectedConstraintPositions(filledBefore, filled, constraintPositions) };
     }
 
-    // Validate container-grant constraints: rotation may disconnect a container from
-    // the fill path, which could leave placed tiles with no covering grant (inventory < 0).
+    // Validate container-grant constraints: when rotation leaves an inventory item's
+    // effective count negative, block only if the rotation disconnected a positive
+    // container grant for that same shape that was previously reachable.
     const newBonuses = this.getContainerBonuses(filled);
     for (const item of this.inventory) {
       if (item.count < 0) {
-        if (!tile.isFixed && item.shape === tile.shape) {
-          continue;
-        }
         const bonus = newBonuses.get(item.shape) ?? 0;
         if (item.count + bonus < 0) {
+          const disconnectedPositions = [...filledBefore].flatMap((key) => {
+            if (filled.has(key)) return [];
+            const [r, c] = parseKey(key);
+            const t = this.grid[r]?.[c];
+            if (
+              t?.shape === PipeShape.Chamber &&
+              t.chamberContent === 'item' &&
+              t.itemShape === item.shape &&
+              t.itemCount > 0
+            ) {
+              return [{ row: r, col: c } as GridPos];
+            }
+            return [];
+          });
+          if (disconnectedPositions.length === 0) {
+            continue;
+          }
           for (let i = 0; i < 4 - normalizedSteps; i++) {
             tile.rotate();
           }
           this._invalidateFilledCache();
-          // After reverting the rotation the tile is back to its original state.
-          // Find item chambers granting this shape in the original (pre-rotation) fill.
-          const origFilled = this.getFilledPositions();
-          const itemPositions = this._getConnectedItemChamberPositions(item.shape, origFilled);
-          return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: itemPositions.length ? itemPositions : undefined };
+          return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
         }
       }
     }
