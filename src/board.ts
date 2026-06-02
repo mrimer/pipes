@@ -1939,6 +1939,9 @@ export class Board {
     const newBonuses = this.getContainerBonuses(filled);
     for (const item of this.inventory) {
       if (item.count < 0) {
+        if (!tile.isFixed && item.shape === tile.shape) {
+          continue;
+        }
         const bonus = newBonuses.get(item.shape) ?? 0;
         if (item.count + bonus < 0) {
           for (let i = 0; i < 4 - normalizedSteps; i++) {

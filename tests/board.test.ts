@@ -342,15 +342,14 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     return board;
   }
 
-  it('blocks rotation that disconnects a container when its grant is in use', () => {
+  it('allows rotation when the rotated pipe type inventory is negative', () => {
     const board = makeRotateConstraintBoard();
     // Straight at (0,1) rotates 90°→180° (E-W → N-S), disconnecting source↔chamber.
-    // After rotation: grant = 0 → base(-1) + grant(0) = -1 < 0 → blocked.
+    // Even though Straight inventory is negative, rotating an already-placed Straight is allowed.
     const result = board.rotateTile({ row: 0, col: 1 });
-    expect(result.success).toBe(false);
-    expect(result.error).toBeDefined();
-    // Tile must be restored to original rotation (90°).
-    expect(board.grid[0][1].rotation).toBe(90);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[0][1].rotation).toBe(180);
   });
 
   it('allows rotation when no container grants have been used (count ≥ 0)', () => {
@@ -381,14 +380,13 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
     return board;
   }
 
-  it('blocks multi-step rotation that disconnects a container when its grant is in use', () => {
+  it('allows multi-step rotation when the rotated pipe type inventory is negative', () => {
     const board = makeRotateByConstraintBoard();
-    // 1 step: 90°→180° (E-W → N-S), disconnects source↔chamber → blocked.
+    // 1 step: 90°→180° (E-W → N-S); rotated type is Straight with negative inventory.
     const result = board.rotateTileBy({ row: 0, col: 1 }, 1);
-    expect(result.success).toBe(false);
-    expect(result.error).toBeDefined();
-    // Tile must be restored to original rotation (90°).
-    expect(board.grid[0][1].rotation).toBe(90);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[0][1].rotation).toBe(180);
   });
 });
 
