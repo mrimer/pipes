@@ -167,14 +167,24 @@ describe('ButterflyField', () => {
     butterfly.segmentStartX = 15;
     butterfly.segmentStartY = 15;
     butterfly.segmentStartTime = 1000;
-    butterfly.segmentDistancePx = 0;
+    butterfly.segmentDistancePx = 0.8;
 
     field.updateAndRender(createMockCtx(), 1001);
 
     expect(butterfly.isLanded).toBe(false);
     expect(butterfly.heading).toBeCloseTo(Math.atan2(-3, 3));
+    expect(butterfly.segmentDistancePx).toBeCloseTo(0.8);
 
     field.updateAndRender(createMockCtx(), 1251);
+
+    expect(butterfly.hasLanded).toBe(false);
+    expect(butterfly.isLanded).toBe(false);
+    expect(butterfly.segmentDistancePx).toBeCloseTo(0.8);
+    expect(Math.hypot(18 - butterfly.x, 12 - butterfly.y)).toBeGreaterThan(0.1);
+
+    for (let t = 1267; t <= 3000 && !butterfly.isLanded; t += 16) {
+      field.updateAndRender(createMockCtx(), t);
+    }
 
     expect(butterfly.hasLanded).toBe(true);
     expect(butterfly.isLanded).toBe(true);

@@ -227,11 +227,12 @@ export class ButterflyField {
       const dy = targetY - butterfly.y;
       const dist = Math.hypot(dx, dy);
       if (dist > PERCH_CENTERING_THRESHOLD_PX) {
+        const approachDistancePx = butterfly.segmentDistancePx;
         butterfly.heading = Math.atan2(dy, dx);
         butterfly.segmentStartX = butterfly.x;
         butterfly.segmentStartY = butterfly.y;
         butterfly.segmentStartTime = now;
-        butterfly.segmentDistancePx = dist;
+        butterfly.segmentDistancePx = approachDistancePx;
         return false;
       }
       butterfly.x = targetX;
