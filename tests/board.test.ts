@@ -409,6 +409,25 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
     // Tile must be restored to original rotation (90°).
     expect(board.grid[0][1].rotation).toBe(90);
   });
+
+  it('allows rotation that disconnects mixed positive/negative item grants when net grant does not decrease', () => {
+    const board = new Board(1, 6);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 5 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90); // E-W; rotating disconnects the chamber chain.
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 2, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, -3, null, 'item');
+    board.grid[0][4] = new Tile(PipeShape.Straight, 90);
+    board.grid[0][5] = new Tile(PipeShape.Sink, 0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: -2 }];
+
+    const result = board.rotateTileBy({ row: 0, col: 1 }, 1);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[0][1].rotation).toBe(180);
+  });
 });
 
 // ─── New: level loading ──────────────────────────────────────────────────────
