@@ -505,7 +505,7 @@
   <!-- ── Play screen ────────────────────────────────────────────── -->
   <div id="play-screen">
     <header id="level-header" aria-live="polite" aria-atomic="true"></header>
-    <div id="hud">
+    <header id="hud" role="banner">
       <button id="undo-btn" type="button" disabled>↩ Undo</button>
       <button id="redo-btn" type="button" disabled>↪ Redo</button>
       <button id="restart-btn" type="button">↺ Restart</button>
@@ -513,12 +513,12 @@
       <button id="record-btn" type="button" title="Record play sequence" aria-label="Record">📼</button>
       <button id="playback-btn" type="button" title="View recordings" aria-label="Playback">▶️</button>
       <button id="exit-btn" type="button">← Menu</button>
-    </div>
+    </header>
     <div id="play-area">
       <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
       <div id="right-panel">
         <div id="stats-box" aria-live="polite" aria-atomic="true">
-          <div id="water-display" class="stat-row">
+          <div id="water-display" class="stat-row" aria-live="polite">
             <span class="stat-label">💧 Water</span>
             <span class="stat-value">–</span>
           </div>
