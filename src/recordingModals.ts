@@ -76,7 +76,7 @@ export function buildRecordModal(
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:8px;';
     const labelEl = document.createElement('span');
-    labelEl.style.cssText = 'min-width:80px;color:#888;';
+    labelEl.style.cssText = 'min-width:80px;color:#a0a0a0;';
     labelEl.textContent = label + ':';
     const valueEl = document.createElement('span');
     valueEl.style.cssText = 'color:#ddd;';
@@ -315,7 +315,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
 
     if (records.length === 0) {
       const emptyMsg = document.createElement('li');
-      emptyMsg.style.cssText = 'padding:16px;color:#666;text-align:center;font-size:0.9rem;';
+      emptyMsg.style.cssText = 'padding:16px;color:#a0a0a0;text-align:center;font-size:0.9rem;';
       emptyMsg.textContent = 'No recordings saved for this level.';
       listEl.appendChild(emptyMsg);
       return;

@@ -486,7 +486,7 @@ export class PlaybackScreen {
     speedSection.style.cssText = 'display:flex;align-items:center;gap:6px;';
 
     const speedLabelPrefix = document.createElement('span');
-    speedLabelPrefix.style.cssText = 'font-size:0.75rem;color:#888;white-space:nowrap;';
+    speedLabelPrefix.style.cssText = 'font-size:0.75rem;color:#a0a0a0;white-space:nowrap;';
     speedLabelPrefix.textContent = '⏱';
 
     const speedSlider = document.createElement('input');

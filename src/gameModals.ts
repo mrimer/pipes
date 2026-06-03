@@ -974,7 +974,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
         li.appendChild(detail);
       } else {
         const detail = document.createElement('span');
-        detail.style.cssText = 'color:#888;';
+        detail.style.cssText = 'color:#a0a0a0;';
         detail.textContent = isNewSlot ? ' — no campaign progress' : ' — already up to date';
         li.appendChild(detail);
       }
@@ -983,7 +983,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
     box.appendChild(ul);
   } else {
     const none = document.createElement('p');
-    none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#888;';
+    none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#a0a0a0;';
     none.textContent = isNewSlot ? 'No campaign progress found in this file.' : 'No campaign progress was merged.';
     box.appendChild(none);
   }
