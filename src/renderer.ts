@@ -655,22 +655,7 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: Le
   };
   const [leafColor, leafAltColor, outlineColor] = (style && treeColors[style]) ?? [TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_COLOR];
   const r = half * 0.75; // outer canopy radius – occupies most of the tile
-  // Cast shadow – drawn before the tree canopy, offset down-right.
-  // Skipped for Dark style (no strong light source in that style).
-  // A single circle matching the main canopy covers the full shadow area.
-  if (style !== 'Dark') {
-    const shadowOff = half * 0.18;
-    ctx.save();
-    // Clip shadow to tile boundaries so it doesn't bleed outside the tile.
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    ctx.fillStyle = TREE_SHADOW_COLOR;
-    ctx.beginPath();
-    ctx.arc(shadowOff, shadowOff, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+  _drawTreeCircleShadow(ctx, half, r, style);
   // Main canopy – large dark-green filled circle
   ctx.fillStyle = leafColor;
   ctx.beginPath();
@@ -704,6 +689,29 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: Le
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+/**
+ * Draw a clipped circular shadow for a tree canopy.
+ * Skipped for Dark style (no strong light source).
+ */
+function _drawTreeCircleShadow(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  r: number,
+  style: LevelStyle | undefined,
+): void {
+  if (style === 'Dark') return;
+  const shadowOff = half * 0.18;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-half, -half, half * 2, half * 2);
+  ctx.clip();
+  ctx.fillStyle = TREE_SHADOW_COLOR;
+  ctx.beginPath();
+  ctx.arc(shadowOff, shadowOff, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /**
@@ -875,19 +883,7 @@ export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: L
   );
 
   const r = half * 0.70;
-  // Cast shadow (skipped for Dark style)
-  if (style !== 'Dark') {
-    const shadowOff = half * 0.18;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    ctx.fillStyle = TREE_SHADOW_COLOR;
-    ctx.beginPath();
-    ctx.arc(shadowOff, shadowOff, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+  _drawTreeCircleShadow(ctx, half, r, style);
 
   // Outer ring: 8 small lobes
   ctx.fillStyle = leafColor;
