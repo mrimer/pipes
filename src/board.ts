@@ -968,6 +968,142 @@ export class Board {
   }
 
   /**
+   * Run the three-phase final constraint check used after placing or replacing a tile:
+   * regulator pre-check, general constraint validation, regulator post-turn check.
+   * Calls `rollback()` and returns a failure MoveResult on the first violation.
+   * Returns `null` if all checks pass (caller should then return success).
+   *
+   * @param filledBefore - Fill set captured before the tile was placed/replaced.
+   * @param finalFilled - Fill set after the tile is on the grid.
+   * @param rollback - Zero-arg function that reverts the board state.
+   * @param constraintErrorPositions - Optional transform applied to constraint error
+   *   positions before including them in the returned MoveResult. Used by
+   *   replaceInventoryTile to compute the disconnected-constraint intersection.
+   */
+  private _runFinalConstraintChecks(
+    filledBefore: Set<string>,
+    finalFilled: Set<string>,
+    rollback: () => void,
+    constraintErrorPositions?: (raw: GridPos[] | undefined) => GridPos[] | undefined,
+  ): MoveResult | null {
+    const { error: regError, positions: regPositions } = this._runRegulatorPreCheck(filledBefore, finalFilled);
+    if (regError) {
+      rollback();
+      return { success: false, error: regError, errorTilePositions: regPositions ?? undefined };
+    }
+
+    const { error: constraintError, positions: constraintPositions } = this._validateConstraints(finalFilled);
+    if (constraintError) {
+      rollback();
+      const errorTilePositions = constraintErrorPositions
+        ? constraintErrorPositions(constraintPositions ?? undefined)
+        : (constraintPositions ?? undefined);
+      return { success: false, error: constraintError, errorTilePositions };
+    }
+
+    const { error: postRegError, positions: postRegPositions } = this._checkRegulatorsPostTurn(filledBefore, finalFilled);
+    if (postRegError) {
+      rollback();
+      return { success: false, error: postRegError, errorTilePositions: postRegPositions ?? undefined };
+    }
+
+    return null;
+  }
+
+  /**
+   * Check that no inventory item's effective container-bonus count went negative
+   * as a result of replacing the tile at `pos`.
+   *
+   * Exception 1: if the original effective count was already negative and the
+   *   replacement did not make it more negative, the drop is allowed.
+   * Exception 2: if the effective count dropped only because the replacement
+   *   connected new negative-count containers (no previously-connected positive
+   *   container was disconnected), the drop is allowed.
+   *
+   * Returns a failure MoveResult (after calling `rollback`) if a violation is
+   * found, or `null` if all items pass.
+   *
+   * @param pos - Grid position of the replacement.
+   * @param tile - The original tile that was replaced (used to restore the grid
+   *   temporarily when lazy-computing `originalBonuses`).
+   * @param newTileRef - The new tile currently in `grid[pos.row][pos.col]`.
+   * @param savedInventory - Snapshot of inventory taken before the replacement.
+   * @param finalFilled - Fill set with the new tile in place.
+   * @param finalBonuses - Container bonuses with the new tile in place.
+   * @param rollback - Zero-arg function that reverts the board to its pre-replacement state.
+   */
+  private _checkInventoryContainerDrops(
+    pos: GridPos,
+    tile: Tile,
+    newTileRef: Tile,
+    savedInventory: Array<{ shape: PipeShape; count: number }>,
+    finalFilled: Set<string>,
+    finalBonuses: Map<PipeShape, number>,
+    rollback: () => void,
+  ): MoveResult | null {
+    let originalBonuses: Map<PipeShape, number> | undefined;
+    let originalFilled: Set<string> | undefined;
+
+    for (const item of this.inventory) {
+      const bonus = finalBonuses.get(item.shape) ?? 0;
+      const finalEffective = item.count + bonus;
+      if (finalEffective < 0) {
+        if (!originalBonuses) {
+          // Temporarily restore the old tile to compute the fill and bonuses as
+          // they were before this replacement, then put the new tile back.
+          this._invalidateFilledCache();
+          this.grid[pos.row][pos.col] = tile;
+          originalFilled = this.getFilledPositions();
+          originalBonuses = this.getContainerBonuses(originalFilled);
+          this._invalidateFilledCache();
+          this.grid[pos.row][pos.col] = newTileRef;
+        }
+        const savedItem = savedInventory.find((it) => it.shape === item.shape);
+        const originalCount = savedItem?.count ?? 0;
+        const originalEffective = originalCount + (originalBonuses.get(item.shape) ?? 0);
+        // Exception 1: was already negative and didn't get worse.
+        if (originalEffective < 0 && finalEffective >= originalEffective) {
+          continue;
+        }
+        // Exception 2: the drop is entirely due to newly-connected negative
+        // containers.  Allowed when no positive-count container for this item
+        // that was reachable with the old tile has become unreachable with the
+        // new tile.
+        const positiveContainerDisconnected = [...originalFilled!].some((key) => {
+          if (finalFilled.has(key)) return false;
+          const [r, c] = parseKey(key);
+          const t = this.grid[r]?.[c];
+          return (
+            t?.shape === PipeShape.Chamber &&
+            t.chamberContent === 'item' &&
+            t.itemShape === item.shape &&
+            t.itemCount > 0
+          );
+        });
+        if (!positiveContainerDisconnected) {
+          continue;
+        }
+        rollback();
+        const disconnectedPositions = [...(originalFilled ?? new Set<string>())].flatMap((key) => {
+          if (finalFilled.has(key)) return [];
+          const [r, c] = parseKey(key);
+          const t = this.grid[r]?.[c];
+          if (t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === item.shape && t.itemCount > 0) {
+            return [{ row: r, col: c } as GridPos];
+          }
+          return [];
+        });
+        return {
+          success: false,
+          error: ERR_CONTAINER_REPLACE,
+          errorTilePositions: disconnectedPositions.length ? disconnectedPositions : undefined,
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
    * Computes the subset of `constraintPositions` whose keys were present in
    * `prevFilled` but are absent from `newFilled` (i.e. tiles disconnected by the
    * move that are also flagged by the constraint validator).  Falls back to the
@@ -1033,26 +1169,8 @@ export class Board {
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
     const filled = this.getFilledPositions();
-    // Regulator pre-check: newly-connecting regulators against stats captured
-    // before the placement, even though the tile is already on the grid.
-    const { error: regError, positions: regPositions } = this._runRegulatorPreCheck(filledBefore, filled);
-    if (regError) {
-      rollback();
-      return { success: false, error: regError, errorTilePositions: regPositions ?? undefined };
-    }
-    const { error, positions } = this._validateConstraints(filled);
-    if (error) {
-      rollback();
-      return { success: false, error, errorTilePositions: positions ?? undefined };
-    }
-
-    // Regulator post-turn check: re-validate newly-connecting regulators using
-    // the stats that result after all tiles in this turn have resolved.
-    const { error: postRegError, positions: postRegPositions } = this._checkRegulatorsPostTurn(filledBefore, filled);
-    if (postRegError) {
-      rollback();
-      return { success: false, error: postRegError, errorTilePositions: postRegPositions ?? undefined };
-    }
+    const constraintFailure = this._runFinalConstraintChecks(filledBefore, filled, rollback);
+    if (constraintFailure) return constraintFailure;
 
     // Decrement cement setting time after successful placement.
     const cementDecrement = this._cement.applyDecrement(pos);
@@ -1161,86 +1279,23 @@ export class Board {
     const finalFilled = this.getFilledPositions();
     const finalBonuses = this.getContainerBonuses(finalFilled);
     const newTileRef = this.grid[pos.row][pos.col];
-    let originalBonuses: Map<PipeShape, number> | undefined;
-    let originalFilled: Set<string> | undefined;
-    for (const item of this.inventory) {
-      const bonus = finalBonuses.get(item.shape) ?? 0;
-      const finalEffective = item.count + bonus;
-      if (finalEffective < 0) {
-        if (!originalBonuses) {
-          // Temporarily restore the old tile to compute the fill and bonuses as
-          // they were before this replacement, then put the new tile back.
-          this._invalidateFilledCache();
-          this.grid[pos.row][pos.col] = tile;
-          originalFilled = this.getFilledPositions();
-          originalBonuses = this.getContainerBonuses(originalFilled);
-          this._invalidateFilledCache();
-          this.grid[pos.row][pos.col] = newTileRef;
-        }
-        const savedItem = savedInventory.find((it) => it.shape === item.shape);
-        const originalCount = savedItem?.count ?? 0;
-        const originalEffective = originalCount + (originalBonuses.get(item.shape) ?? 0);
-        // Exception 1: was already negative and didn't get worse.
-        if (originalEffective < 0 && finalEffective >= originalEffective) {
-          continue;
-        }
-        // Exception 2: the drop is entirely due to newly-connected negative
-        // containers.  Allowed when no positive-count container for this item
-        // that was reachable with the old tile has become unreachable with the
-        // new tile.
-        const positiveContainerDisconnected = [...originalFilled!].some((key) => {
-          if (finalFilled.has(key)) return false; // still connected
-          const [r, c] = parseKey(key);
-          const t = this.grid[r]?.[c];
-          return (
-            t?.shape === PipeShape.Chamber &&
-            t.chamberContent === 'item' &&
-            t.itemShape === item.shape &&
-            t.itemCount > 0
-          );
-        });
-        if (!positiveContainerDisconnected) {
-          continue; // drop is from newly-connected negative containers only
-        }
-        rollback();
-        const disconnectedPositions = [...(originalFilled ?? new Set<string>())].flatMap((key) => {
-          if (finalFilled.has(key)) return [];
-          const [r, c] = parseKey(key);
-          const t = this.grid[r]?.[c];
-          if (t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === item.shape && t.itemCount > 0) {
-            return [{ row: r, col: c } as GridPos];
-          }
-          return [];
-        });
-        return { success: false, error: ERR_CONTAINER_REPLACE, errorTilePositions: disconnectedPositions.length ? disconnectedPositions : undefined };
-      }
-    }
+    const containerDropFailure = this._checkInventoryContainerDrops(
+      pos, tile, newTileRef, savedInventory, finalFilled, finalBonuses, rollback,
+    );
+    if (containerDropFailure) return containerDropFailure;
 
     // Validate that no newly-connected sandstone tile has deltaDamage <= 0,
     // and that temperature/pressure don't go below 0.
-    // Regulator pre-check: newly-connecting regulators against pre-replacement stats.
-    const { error: regError2, positions: regPositions2 } = this._runRegulatorPreCheck(filledBeforeReplace, finalFilled);
-    if (regError2) {
-      rollback();
-      return { success: false, error: regError2, errorTilePositions: regPositions2 ?? undefined };
-    }
-    const { error: constraintError, positions: constraintPositions } =
-      this._validateConstraints(finalFilled);
-    if (constraintError) {
-      rollback();
-      // Compute only tiles that are both disconnected by the replacement AND in the
-      // constraint positions set.  Falls back to positions when the intersection is empty.
-      const filledWithOldTile = this.getFilledPositions();
-      return { success: false, error: constraintError, errorTilePositions: this._computeDisconnectedConstraintPositions(filledWithOldTile, finalFilled, constraintPositions) };
-    }
-
-    // Regulator post-turn check: re-validate newly-connecting regulators using
-    // the stats that result after all tiles in this turn have resolved.
-    const { error: postRegError2, positions: postRegPositions2 } = this._checkRegulatorsPostTurn(filledBeforeReplace, finalFilled);
-    if (postRegError2) {
-      rollback();
-      return { success: false, error: postRegError2, errorTilePositions: postRegPositions2 ?? undefined };
-    }
+    const constraintFailure = this._runFinalConstraintChecks(
+      filledBeforeReplace,
+      finalFilled,
+      rollback,
+      (raw) => {
+        const filledWithOldTile = this.getFilledPositions();
+        return this._computeDisconnectedConstraintPositions(filledWithOldTile, finalFilled, raw);
+      },
+    );
+    if (constraintFailure) return constraintFailure;
 
     // Decrement cement setting time after successful replace.
     const cementDecrement = this._cement.applyDecrement(pos);
