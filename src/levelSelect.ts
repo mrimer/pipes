@@ -411,7 +411,7 @@ export function renderLevelList(
       `padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:${RADIUS_MD};` +
       'border:1px solid ' + (showMastered || continueActive ? '#f0c040' : '#555') + ';' +
       'background:' + (showMastered || continueActive ? '#f0c040' : '#333') + ';' +
-      'color:' + (showMastered || continueActive ? UI_BG : '#888') + ';' +
+      'color:' + (showMastered || continueActive ? UI_BG : '#a0a0a0') + ';' +
       'cursor:' + (masteredCanOpenCampaignMap || (!showMastered && continueActive) ? 'pointer' : 'default') + ';' +
       'width:100%;';
     const withChapterSelectSfx = (cb: () => void) => () => {
@@ -545,7 +545,7 @@ export function renderLevelList(
       'width:100%;display:flex;justify-content:space-between;align-items:center;' +
       'padding:12px 16px;font-size:1rem;font-weight:bold;' +
       'background:' + headerBg + ';' +
-      'color:' + (chapterLocked ? '#777' : '#eee') + ';' +
+      'color:' + (chapterLocked ? '#a0a0a0' : '#eee') + ';' +
       'border:none;cursor:' + (chapterLocked ? 'default' : 'pointer') + ';' +
       'text-align:left;';
 
@@ -630,7 +630,7 @@ export function renderLevelList(
     resetBtn.style.cssText =
       `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${MUTED_BTN_BG};width:100%;` +
       `border-radius:${RADIUS_MD};border:1px solid ` + (hasProgress ? ERROR_COLOR : '#555') + ';' +
-      'color:' + (hasProgress ? ERROR_COLOR : '#888') + ';' +
+      'color:' + (hasProgress ? ERROR_COLOR : '#a0a0a0') + ';' +
       'cursor:' + (hasProgress ? 'pointer' : 'default') + ';';
     if (hasProgress) {
       resetBtn.addEventListener('click', () => { sfxManager.play(SfxId.ChapterSelect); onResetClick(); });
