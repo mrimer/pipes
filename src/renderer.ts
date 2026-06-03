@@ -719,6 +719,29 @@ function _treeColorTriple(
 }
 
 /**
+ * Draw a clipped elliptical shadow for a tree canopy.
+ * Skipped for Dark style (no strong light source).
+ */
+function _drawTreeEllipseShadow(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  r: number,
+  style: LevelStyle | undefined,
+): void {
+  if (style === 'Dark') return;
+  const shadowOff = half * 0.18;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-half, -half, half * 2, half * 2);
+  ctx.clip();
+  ctx.fillStyle = TREE_SHADOW_COLOR;
+  ctx.beginPath();
+  ctx.ellipse(shadowOff, shadowOff, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
  * Draw Tree 2 – a top-down tree with a bumpy rounded outline formed by 6 outer lobes
  * and a concentric inner ring pattern, giving it a layered canopy look.
  */
@@ -734,20 +757,7 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
   );
 
   const r = half * 0.72;
-  // Cast shadow (skipped for Dark style)
-  if (style !== 'Dark') {
-    const shadowOff = half * 0.18;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    ctx.fillStyle = TREE_SHADOW_COLOR;
-    // Slightly elliptical shadow to match the bumpy bounding shape
-    ctx.beginPath();
-    ctx.ellipse(shadowOff, shadowOff, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+  _drawTreeEllipseShadow(ctx, half, r, style);
 
   // Main canopy – large filled circle
   ctx.fillStyle = leafColor;
@@ -806,19 +816,7 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
   );
 
   const r = half * 0.72;
-  // Cast shadow (skipped for Dark style)
-  if (style !== 'Dark') {
-    const shadowOff = half * 0.18;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-half, -half, half * 2, half * 2);
-    ctx.clip();
-    ctx.fillStyle = TREE_SHADOW_COLOR;
-    ctx.beginPath();
-    ctx.ellipse(shadowOff, shadowOff, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+  _drawTreeEllipseShadow(ctx, half, r, style);
 
   // Main canopy – large filled circle
   ctx.fillStyle = leafColor;
