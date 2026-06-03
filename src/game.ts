@@ -326,8 +326,10 @@ export class Game implements InputCallbacks {
     this.hintBoxEl.style.cssText = HINT_BOX_CSS;
     playScreenEl.appendChild(this.hintBoxEl);
 
-    // Create the error-flash element for brief action-blocked messages
+    // Create the error-flash element for brief action-blocked messages.
+    // role="status" makes flashed error text announced by screen readers.
     this.errorFlashEl = document.createElement('div');
+    this.errorFlashEl.setAttribute('role', 'status');
     this.errorFlashEl.style.cssText = ERROR_FLASH_CSS;
     document.body.appendChild(this.errorFlashEl);
 

@@ -34,6 +34,24 @@
       border: 0;
     }
 
+    /* Skip link becomes visible when focused by keyboard. */
+    a.sr-only:focus {
+      position: static;
+      width: auto;
+      height: auto;
+      padding: 0.5em 1em;
+      margin: 0.25em auto;
+      overflow: visible;
+      clip: auto;
+      white-space: normal;
+      display: block;
+      background: #1a1a2e;
+      color: #7ed321;
+      text-decoration: underline;
+      font-size: 1rem;
+      z-index: 9999;
+    }
+
     /* ── Level-select screen ─────────────────────────────────────── */
     #level-select {
       display: flex;
@@ -458,8 +476,10 @@
   </style>
 </head>
 <body>
+  <a href="#main-content" class="sr-only">Skip to main content</a>
   <h1 class="sr-only">🔧 Cool Pipes</h1>
 
+  <main id="main-content">
   <!-- ── Level-select screen ────────────────────────────────────── -->
   <div id="level-select">
     <div id="level-list"></div>
@@ -467,7 +487,7 @@
 
   <!-- ── Play screen ────────────────────────────────────────────── -->
   <div id="play-screen">
-    <div id="level-header"></div>
+    <div id="level-header" aria-live="polite" aria-atomic="true"></div>
     <div id="hud">
       <button id="undo-btn" type="button" disabled>↩ Undo</button>
       <button id="redo-btn" type="button" disabled>↪ Redo</button>
@@ -480,7 +500,7 @@
     <div id="play-area">
       <canvas id="game-canvas" tabindex="0" aria-label="Pipes puzzle game board"></canvas>
       <div id="right-panel">
-        <div id="stats-box">
+        <div id="stats-box" aria-live="polite" aria-atomic="true">
           <div id="water-display" class="stat-row">
             <span class="stat-label">💧 Water</span>
             <span class="stat-value">–</span>
@@ -493,11 +513,12 @@
       </div>
     </div>
   </div>
+  </main>
 
       <!-- ── Win modal ──────────────────────────────────────────── -->
-  <div id="win-modal" class="modal-overlay">
+  <div id="win-modal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="win-modal-title">
     <div class="modal-box">
-      <h2>🎉 Level Complete!</h2>
+      <h2 id="win-modal-title">🎉 Level Complete!</h2>
       <p>The water reached its destination.</p>
       <p id="win-challenge" style="display:none;font-size:1.1rem;font-weight:bold;color:#e74c3c;letter-spacing:0.05em;"></p>
       <p id="win-water" style="display:none;font-size:1.1rem;font-weight:bold;color:#4fc3f7;letter-spacing:0.05em;"></p>
@@ -511,9 +532,9 @@
   </div>
 
   <!-- ── Game-over modal ────────────────────────────────────────── -->
-  <div id="gameover-modal" class="modal-overlay">
+  <div id="gameover-modal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="gameover-modal-title">
     <div class="modal-box">
-      <h2>💧 Out of Water!</h2>
+      <h2 id="gameover-modal-title">💧 Out of Water!</h2>
       <p id="gameover-msg"></p>
       <div class="modal-actions">
         <button id="gameover-undo-btn"  class="modal-btn primary"   type="button">↩ Undo Move</button>
