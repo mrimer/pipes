@@ -4,8 +4,10 @@
  * explicit data parameters and write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle, styleToFloorShape, floorShapeToStyle } from '../types';
-import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, GraniteNeighbors, drawTree, drawTree2, drawTree3, drawTree4, drawSea, SeaNeighbors, seaFillColor, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
+import type { TileDef, Direction, LevelDef, AmbientDecoration, LevelStyle} from '../types';
+import { PipeShape, styleToFloorShape, floorShapeToStyle } from '../types';
+import type { GraniteNeighbors, SeaNeighbors} from '../renderer';
+import { TILE_SIZE, scalePx as _s, drawAmbientDecoration, drawGranite, drawTree, drawTree2, drawTree3, drawTree4, drawSea, seaFillColor, drawConnectorGlow, connectorLitIndex, drawGinghamOverlay, ginghamColorsForFloor, drawPipeBody, toLocalDir, computeButtEndDirs, drawSourceOrSink } from '../renderer';
 import { drawChamberBox, drawChamberButtStubs } from '../renderer/chamberRenderers';
 import { PIPE_SHAPES, NEIGHBOUR_DELTA, isEmptyFloor, computeFloorTypesFromGrid } from '../board';
 import { oppositeDirection } from '../tile';
@@ -20,7 +22,8 @@ import {
 } from '../colors';
 import { tileDefConnections, type ViewBounds } from '../mapUtils';
 import { renderMinimap, minimapDimensions } from './minimap';
-import { FlowDrop, drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
+import type { FlowDrop} from './waterParticles';
+import { drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
 
 export type { ViewBounds };
 
@@ -680,7 +683,7 @@ function _renderChapterMapPass2NonPipeTiles(
         const isJittered = jitterCell?.row === r && jitterCell?.col === c;
         if (isJittered) {
           ctx.save();
-          ctx.translate(jitterCell!.dx, jitterCell!.dy);
+          ctx.translate(jitterCell.dx, jitterCell.dy);
         }
         const chamberInfo: MapChamberInfo = {
           label: String(levelIdx + 1),

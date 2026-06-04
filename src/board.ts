@@ -1,9 +1,11 @@
 import { Tile, oppositeDirection } from './tile';
-import { AmbientDecoration, AmbientDecorationType, Direction, DIRECTIONS, GridPos, InventoryItem, LevelDef, LevelStyle, PipeShape, Rotation, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
+import type { AmbientDecoration, AmbientDecorationType, GridPos, InventoryItem, LevelDef, LevelStyle, Rotation} from './types';
+import { Direction, DIRECTIONS, PipeShape, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
 import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
-import { TurnStateManager, TurnStateSnapshot } from './turnStateManager';
+import type { TurnStateSnapshot } from './turnStateManager';
+import { TurnStateManager } from './turnStateManager';
 
 // Re-export cost helpers so existing consumers (game.ts, renderer.ts) need no import changes.
 export { computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
@@ -573,7 +575,7 @@ export class Board {
           this.grid[r][c] = new Tile(defaultFloor, 0);
         } else if (def.shape === PipeShape.OneWay) {
           // One-way tiles are tracked separately; the cell behaves like Empty
-          const rot = (def.rotation ?? 0) as Rotation;
+          const rot = (def.rotation ?? 0);
           const owDir = ([Direction.North, Direction.East, Direction.South, Direction.West] as Direction[])[rot / 90];
           this.oneWayData.set(posKey(r, c), owDir);
           this.grid[r][c] = new Tile(defaultFloor, 0);
@@ -582,7 +584,7 @@ export class Board {
           this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
           this.grid[r][c] = new Tile(defaultFloor, 0);
         } else {
-          const rot = (def.rotation ?? 0) as Rotation;
+          const rot = (def.rotation ?? 0);
           const itemShape = def.itemShape ?? null;
           const itemCount = def.itemCount ?? 1;
           const customConnections = def.connections ? new Set(def.connections) : null;

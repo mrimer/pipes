@@ -6,8 +6,8 @@
  * independently testable.
  */
 
-import { CampaignDef } from '../types';
-import { CampaignService } from './campaignService';
+import type { CampaignDef } from '../types';
+import type { CampaignService } from './campaignService';
 import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, UI_INPUT_BORDER } from '../uiConstants';
 
 /** CSS for a button row aligned to the trailing edge (mirrors EDITOR_BTN_ROW_CSS). */

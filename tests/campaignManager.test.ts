@@ -2,9 +2,11 @@
  * @jest-environment jsdom
  */
 
-import { CampaignManager, CampaignCallbacks } from '../src/campaignManager';
-import { CampaignEditor } from '../src/campaignEditor';
-import { CampaignDef, PipeShape } from '../src/types';
+import type { CampaignCallbacks } from '../src/campaignManager';
+import { CampaignManager } from '../src/campaignManager';
+import type { CampaignEditor } from '../src/campaignEditor';
+import type { CampaignDef} from '../src/types';
+import { PipeShape } from '../src/types';
 import * as levelTransition from '../src/levelTransition';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
@@ -86,7 +88,8 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
   });
 
   it('shows "Campaign Map" and routes there when the campaign has a map', () => {
-    const callbacks = makeCallbacks();
+    const showLevelSelect = jest.fn();
+    const callbacks = makeCallbacks({ showLevelSelect });
     const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
     const managerAny = manager as unknown as {
       _activeCampaign: CampaignDef | null;
@@ -105,7 +108,7 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
     expect(button).toBeDefined();
     button!.click();
     expect(showCampaignMapSpy).toHaveBeenCalledTimes(1);
-    expect((callbacks.showLevelSelect as jest.Mock)).not.toHaveBeenCalled();
+    expect(showLevelSelect).not.toHaveBeenCalled();
   });
 
   it('keeps "Main Menu" routing when the campaign has no map', () => {

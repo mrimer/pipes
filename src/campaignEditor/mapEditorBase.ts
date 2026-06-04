@@ -18,19 +18,21 @@
  *    rendering, canvas display-size update, and tile-params panel rebuild.
  */
 
-import { TileDef, PipeShape, Direction, Rotation, LevelStyle } from '../types';
+import type { Rotation, LevelStyle } from '../types';
+import { PipeShape, Direction } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { sfxManager, SfxId } from '../sfxManager';
 import { updateUndoRedoButtonPair, showTimedMessage } from '../uiHelpers';
 import { HistoryManager } from './historyManager';
 import { MapEditorGridState } from './mapEditorGridState';
+import type {
+  EditorPalette,
+  TileParams,
+  EditorSnapshot} from './types';
 import {
   computeEditorFilledCells,
   rotateConnectionsBy90,
-  EditorPalette,
-  TileParams,
   DEFAULT_PARAMS,
-  EditorSnapshot,
   isChamberPalette,
   chamberPaletteContent,
 } from './types';
@@ -140,7 +142,7 @@ export abstract class MapEditorBase {
    *                     data object and rebuilds any style-dependent panels.
    */
   protected _applySnapshotBase(snap: EditorSnapshot, applyStyle: (style: LevelStyle | undefined) => void): void {
-    this._gridState.grid = snap.grid as (TileDef | null)[][];
+    this._gridState.grid = snap.grid;
     this._gridState.rows = snap.rows;
     this._gridState.cols = snap.cols;
     applyStyle(snap.levelStyle);
@@ -173,7 +175,7 @@ export abstract class MapEditorBase {
     const tile = this._gridState.grid[pos.row]?.[pos.col];
     if (!tile || !PIPE_SHAPES.has(tile.shape)) return;
     sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
-    const cur = (tile.rotation ?? 0) as Rotation;
+    const cur = (tile.rotation ?? 0);
     tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
     if (this._palette === tile.shape) this._params.rotation = tile.rotation;
     this._recordSnapshot();

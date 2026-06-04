@@ -1,7 +1,8 @@
 /** Helpers for rendering the inventory bar in the play screen. */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from './board';
-import { PipeShape } from './types';
+import type { Board} from './board';
+import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from './board';
+import type { PipeShape } from './types';
 import { GOLD_PIPE_COLOR, LEAKY_PIPE_COLOR } from './colors';
 import { shapeIcon } from './renderer';
 

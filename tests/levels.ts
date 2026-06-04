@@ -1,4 +1,5 @@
-import { Direction, LevelDef, ChapterDef, PipeShape } from '../src/types';
+import type { LevelDef, ChapterDef} from '../src/types';
+import { Direction, PipeShape } from '../src/types';
 
 /**
  * All game levels.

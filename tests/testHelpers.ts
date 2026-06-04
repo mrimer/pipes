@@ -2,7 +2,8 @@
  * Shared test utilities for the Pipes test suite.
  */
 
-import { CampaignDef, ChapterDef, Direction, LevelDef, PipeShape, PlaySequenceRecord } from '../src/types';
+import type { CampaignDef, ChapterDef, LevelDef, PlaySequenceRecord } from '../src/types';
+import { Direction, PipeShape } from '../src/types';
 
 /**
  * Build a minimal {@link LevelDef} with sensible defaults.

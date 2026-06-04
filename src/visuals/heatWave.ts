@@ -12,8 +12,10 @@
  */
 
 import { TILE_SIZE, scalePx as _s } from '../renderer';
-import { Board, posKey } from '../board';
-import { GridPos, PipeShape } from '../types';
+import type { Board} from '../board';
+import { posKey } from '../board';
+import type { GridPos} from '../types';
+import { PipeShape } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

@@ -7,10 +7,11 @@
  * it through the {@link CampaignCallbacks} interface.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, GameScreen } from './types';
+import type { CampaignDef, ChapterDef, LevelDef} from './types';
+import { GameScreen } from './types';
 import { ChapterMapScreen } from './chapterMapScreen';
 import { CampaignMapScreen } from './campaignMapScreen';
-import { CampaignEditor } from './campaignEditor';
+import type { CampaignEditor } from './campaignEditor';
 import {
   loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
   loadActiveCampaignId, saveActiveCampaignId, clearActiveCampaignId,

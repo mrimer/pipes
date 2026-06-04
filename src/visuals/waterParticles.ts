@@ -8,9 +8,11 @@
  *                   indicate liquid is flowing through the connected network.
  */
 
-import { Board, NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
+import type { Board} from '../board';
+import { NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
 import { oppositeDirection } from '../tile';
-import { Direction, DIRECTIONS, GridPos, TileDef } from '../types';
+import type { GridPos, TileDef } from '../types';
+import { Direction, DIRECTIONS } from '../types';
 import { TILE_SIZE, scalePx as _s } from '../renderer';
 import { tileDefConnections } from '../mapUtils';
 import { drawIdlePulseGlow } from './idlePulse';

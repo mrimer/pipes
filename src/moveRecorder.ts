@@ -13,7 +13,7 @@
  */
 
 import { Board } from './board';
-import { LevelDef, PipeShape, Rotation } from './types';
+import type { LevelDef, PipeShape, Rotation } from './types';
 
 // ─── Encoded move type union ──────────────────────────────────────────────────
 

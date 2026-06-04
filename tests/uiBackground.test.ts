@@ -30,8 +30,8 @@ describe('applyScrollingPipeBackground', () => {
     cb!(nextNowMs);
   }
 
-  it('keeps multiple backgrounds on the same shared scroll position', () => {
-    const { applyScrollingPipeBackground } = require('../src/uiBackground') as typeof import('../src/uiBackground');
+  it('keeps multiple backgrounds on the same shared scroll position', async () => {
+    const { applyScrollingPipeBackground } = await import('../src/uiBackground');
     const first = document.createElement('div');
     const second = document.createElement('div');
 

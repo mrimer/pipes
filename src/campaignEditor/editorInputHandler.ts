@@ -7,11 +7,12 @@
  * attach() / detach() as the editor screen is entered / exited.
  */
 
-import { TileDef, PipeShape, Rotation } from '../types';
+import type { TileDef, Rotation } from '../types';
+import { PipeShape } from '../types';
 import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
-import { DragState } from './renderer';
+import type { DragState } from './renderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
-import { LevelEditorState } from './levelEditorState';
+import type { LevelEditorState } from './levelEditorState';
 import { sfxManager, SfxId } from '../sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
@@ -291,7 +292,7 @@ export class EditorInputHandler {
         // Click on a placed pipe tile: rotate it (shift = counter-clockwise)
         const clockwise = !e.shiftKey;
         sfxManager.play(clockwise ? SfxId.RotateCW : SfxId.RotateCCW);
-        const cur = (tile.rotation ?? 0) as Rotation;
+        const cur = (tile.rotation ?? 0);
         tile.rotation = ((cur + (clockwise ? 90 : 270)) % 360) as Rotation;
         // Keep palette ghost in sync when the palette matches the rotated tile's shape.
         if (state.palette === tile.shape) {

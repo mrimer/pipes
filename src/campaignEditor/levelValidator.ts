@@ -1,6 +1,7 @@
 import { Board, parseKey } from '../board';
-import { LevelDef, PipeShape } from '../types';
-import { ValidationResult } from './types';
+import type { LevelDef} from '../types';
+import { PipeShape } from '../types';
+import type { ValidationResult } from './types';
 import { MULTIPLE_SINKS, MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 /**

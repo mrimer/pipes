@@ -6,8 +6,8 @@
  * editors so that fixes and future changes only need to happen in one place.
  */
 
-import { TileDef } from '../types';
-import { EditorPalette } from './types';
+import type { TileDef } from '../types';
+import type { EditorPalette } from './types';
 import { PIPE_SHAPES } from '../board';
 import { commandKeyManager } from '../commandKeyManager';
 import { RADIUS_SM, UI_BG } from '../uiConstants';

@@ -4,7 +4,6 @@
 
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove, decodeMove, replayMoves } from '../src/moveRecorder';
 import { PipeShape, Direction } from '../src/types';
-import { Board } from '../src/board';
 import { makeLevelDef } from './testHelpers';
 
 // ─── Encode / decode round-trips ─────────────────────────────────────────────

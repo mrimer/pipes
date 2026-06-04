@@ -2,9 +2,11 @@
  * @jest-environment jsdom
  */
 
-import { PlaybackScreen, PlaybackCallbacks } from '../src/playbackScreen';
-import { Board } from '../src/board';
-import { PlaySequenceRecord, LevelDef, GameState } from '../src/types';
+import type { PlaybackCallbacks } from '../src/playbackScreen';
+import { PlaybackScreen } from '../src/playbackScreen';
+import type { Board } from '../src/board';
+import type { PlaySequenceRecord, LevelDef} from '../src/types';
+import { GameState } from '../src/types';
 import * as moveRecorder from '../src/moveRecorder';
 
 function makeCallbacks(): PlaybackCallbacks {

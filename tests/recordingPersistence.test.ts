@@ -15,7 +15,7 @@ import {
   loadRecordingSettings,
   saveRecordingSettings,
 } from '../src/persistence';
-import { PlaySequenceRecord, RecordingSettings } from '../src/types';
+import type { PlaySequenceRecord} from '../src/types';
 import { hasDuplicateAutoRecording } from '../src/autoRecording';
 import { makeRecord } from './testHelpers';
 

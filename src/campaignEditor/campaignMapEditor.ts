@@ -12,14 +12,17 @@
  * rotation helpers, and reachability utilities.
  */
 
-import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction, LevelDef } from '../types';
+import type { CampaignDef, ChapterDef, TileDef, LevelDef } from '../types';
+import { PipeShape, Direction } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
-import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
-import {
+import type { HoverOverlay, DragState } from './renderer';
+import { renderEditorCanvas } from './renderer';
+import type {
   EditorPalette,
   TileParams,
-  EditorSnapshot,
+  EditorSnapshot} from './types';
+import {
   EDITOR_CANVAS_BORDER,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
@@ -309,7 +312,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const campaign = this._cbs.getActiveCampaign();
     if (!campaign) return;
     this._applySnapshotBase(snap, (style) => {
-      campaign.style = style as typeof campaign.style;
+      campaign.style = style;
     });
     document.getElementById('campaign-map-chapter-inventory')
       ?.replaceWith(this._buildChapterInventoryPanel(campaign));

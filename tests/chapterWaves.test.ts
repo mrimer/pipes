@@ -62,7 +62,7 @@ describe('_heightToRgb', () => {
     });
 
     it('returns a bright sunlit gold for the crest (h = +1)', () => {
-      const [r, g, b] = _heightToRgb(1, true);
+      const [r, g] = _heightToRgb(1, true);
       // Bright gold: high r, high g, moderate b.
       expect(r).toBeGreaterThan(200);
       expect(g).toBeGreaterThan(180);
@@ -137,7 +137,7 @@ function installRafHarness(): { flushNextFrame: (ts?: number) => boolean; clear:
 
   return {
     flushNextFrame(ts?: number): boolean {
-      const next = queue.entries().next().value as [number, FrameRequestCallback] | undefined;
+      const next = queue.entries().next().value;
       if (!next) return false;
       const [id, cb] = next;
       queue.delete(id);

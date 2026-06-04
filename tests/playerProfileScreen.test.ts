@@ -55,7 +55,7 @@ describe('PlayerProfileScreen', () => {
     screen.show();
 
     expect(overlay!.scrollTop).toBe(0);
-    const heading = overlay!.querySelector('h2') as HTMLHeadingElement | null;
+    const heading = overlay!.querySelector('h2');
     expect(overlay!.style.justifyContent).toBe('center');
     expect(heading).not.toBeNull();
     expect(heading!.style.position).toBe('absolute');
@@ -102,7 +102,7 @@ describe('PlayerProfileScreen', () => {
     screen.show();
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-    const overlay = document.getElementById('player-profile-screen') as HTMLElement | null;
+    const overlay = document.getElementById('player-profile-screen');
     expect(playSpy).toHaveBeenCalledWith(SfxId.Back);
     expect(onReturnToMenu).toHaveBeenCalledTimes(1);
     expect(overlay?.style.display).toBe('none');

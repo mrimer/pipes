@@ -1,6 +1,7 @@
 /** Tests for the heatWave visual-effect utilities. */
 
-import { HeatWave, HEAT_WAVE_DURATION_MS, HEAT_WAVE_INTERVAL_MS, tickHeatWaves, renderHeatWaves } from '../src/visuals/heatWave';
+import type { HeatWave} from '../src/visuals/heatWave';
+import { HEAT_WAVE_DURATION_MS, HEAT_WAVE_INTERVAL_MS, tickHeatWaves, renderHeatWaves } from '../src/visuals/heatWave';
 import { PipeShape } from '../src/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

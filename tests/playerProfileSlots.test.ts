@@ -10,9 +10,10 @@
  * - loadSlotStats
  */
 
+import type {
+  ProfileSlotMeta} from '../src/playerProfileSlots';
 import {
   PROFILE_SLOT_COUNT,
-  ProfileSlotMeta,
   loadSlotMeta,
   saveSlotMeta,
   deleteSlotMeta,

@@ -2,7 +2,8 @@
  * Tests for shared chapter-map BFS utility functions in chapterMapUtils.ts.
  */
 
-import { Direction, PipeShape, TileDef } from '../src/types';
+import type { TileDef } from '../src/types';
+import { Direction, PipeShape } from '../src/types';
 import {
   CHAPTER_MAP_DELTAS,
   CHAPTER_MAP_OPPOSITE,

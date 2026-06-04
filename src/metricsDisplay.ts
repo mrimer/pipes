@@ -1,12 +1,12 @@
 /** Metrics display component for the play-screen HUD stats and best-score box. */
 
-import { Board } from './board';
+import type { Board } from './board';
 import { PipeShape } from './types';
 import { WATER_COLOR, LOW_WATER_COLOR, MEDIUM_WATER_COLOR } from './colors';
 import { renderInventoryBar } from './inventoryRenderer';
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
-import { AnimSparkleCallbacks } from './animationManager';
-import { CampaignManager } from './campaignManager';
+import type { AnimSparkleCallbacks } from './animationManager';
+import type { CampaignManager } from './campaignManager';
 
 /** Sparkle color palette for metric increases (gold). */
 const METRIC_SPARKLE_GOLD: readonly string[] = ['#ffd700', '#ffe866', '#ffec8b', '#ffc200', '#fff0a0', '#f0c040'];
@@ -165,7 +165,7 @@ export class MetricsDisplay {
 
   /** Spawn a small burst of sparkle particles centered on a HUD stat value element. */
   private static _spawnMetricSparkles(rowEl: HTMLElement, colors: readonly string[]): void {
-    const valueEl = (rowEl.querySelector('.stat-value') as HTMLElement | null) ?? rowEl;
+    const valueEl = (rowEl.querySelector('.stat-value')) ?? rowEl;
     const rect = valueEl.getBoundingClientRect();
     spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 16, colors);
   }
@@ -220,7 +220,7 @@ export class MetricsDisplay {
     );
     if (this.pendingSparkleShapes.size > 0) {
       for (const shape of this.pendingSparkleShapes) {
-        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
+        const el = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"]`);
         if (el) {
           el.classList.remove('sparkle');
           void el.offsetWidth; // force reflow to restart the CSS animation
@@ -231,7 +231,7 @@ export class MetricsDisplay {
     }
     if (this.pendingRedSparkleShapes.size > 0) {
       for (const shape of this.pendingRedSparkleShapes) {
-        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
+        const el = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"]`);
         if (el) {
           el.classList.remove('sparkle-red');
           void el.offsetWidth; // force reflow to restart the CSS animation
@@ -242,7 +242,7 @@ export class MetricsDisplay {
     }
     if (this.pendingGraySparkleShapes.size > 0) {
       for (const shape of this.pendingGraySparkleShapes) {
-        const el = this.inventoryBarEl.querySelector(`[data-shape="${shape}"]`) as HTMLElement | null;
+        const el = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"]`);
         if (el) {
           el.classList.remove('sparkle-gray');
           void el.offsetWidth; // force reflow to restart the CSS animation

@@ -9,6 +9,8 @@
  *   recording merge)
  */
 
+import type {
+  PlayerProfilePayload} from '../src/playerProfile';
 import {
   computeChecksum,
   buildPlayerProfilePayload,
@@ -17,8 +19,7 @@ import {
   applyPlayerProfile,
   FILE_TYPE_PLAYER,
   FILE_TYPE_CAMPAIGN,
-  PROFILE_FORMAT_VERSION,
-  PlayerProfilePayload,
+  PROFILE_FORMAT_VERSION
 } from '../src/playerProfile';
 import {
   loadPlayerName,
@@ -41,13 +42,12 @@ import {
   saveLevelStar,
   saveLevelWater,
   markChapterCompleted,
-  markMasteredChapterShown,
   markCampaignMasteredShown,
   markCampaignCompleteShown,
   saveRecording,
   loadAllRecordings,
 } from '../src/persistence';
-import { CampaignDef, PlaySequenceRecord } from '../src/types';
+import type { CampaignDef} from '../src/types';
 import { makeCampaignDef, makeChapterDef, makeLevelDef, makeRecord } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -169,8 +169,7 @@ describe('buildPlayerFile', () => {
   it('generates a valid checksum matching the payload JSON', () => {
     const payload = buildPlayerProfilePayload([]);
     const file = buildPlayerFile(payload);
-    const { computeChecksum: cs } = require('../src/playerProfile');
-    const expected = cs(JSON.stringify(payload));
+    const expected = computeChecksum(JSON.stringify(payload));
     expect(file.checksum).toBe(expected);
   });
 
@@ -196,8 +195,7 @@ describe('parsePlayerFile', () => {
       commandKeys: null,
       campaignProgress: [],
     };
-    const { computeChecksum: cs } = require('../src/playerProfile');
-    const checksum = cs(JSON.stringify(payload));
+    const checksum = computeChecksum(JSON.stringify(payload));
     return JSON.stringify({ type: FILE_TYPE_PLAYER, version: 1, payload, checksum, ...overrides });
   }
 
@@ -247,7 +245,6 @@ describe('parsePlayerFile', () => {
   });
 
   it('returns ok:false when payload recordings have invalid shape', () => {
-    const { computeChecksum: cs } = require('../src/playerProfile');
     const payload = {
       guid: 'test-guid-bob',
       lastPlayedAt: null,
@@ -262,7 +259,7 @@ describe('parsePlayerFile', () => {
       type: FILE_TYPE_PLAYER,
       version: 1,
       payload,
-      checksum: cs(JSON.stringify(payload)),
+      checksum: computeChecksum(JSON.stringify(payload)),
     });
     const result = parsePlayerFile(json);
     expect(result.ok).toBe(false);

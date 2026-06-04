@@ -7,10 +7,12 @@
  * calls attach() / detach() as the chapter map canvas is built / torn down.
  */
 
-import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction } from '../types';
+import type { CampaignDef, ChapterDef, TileDef} from '../types';
+import { PipeShape, Direction } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
-import { DragState } from './renderer';
-import { EditorPalette, REPEATABLE_EDITOR_TILES, isPipePlacementPalette, isTreeShape } from './types';
+import type { DragState } from './renderer';
+import type { EditorPalette} from './types';
+import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette, isTreeShape } from './types';
 import { sfxManager, SfxId } from '../sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';

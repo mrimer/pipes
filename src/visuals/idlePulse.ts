@@ -16,7 +16,8 @@
  */
 
 import { Direction, DIRECTIONS } from '../types';
-import { Board, NEIGHBOUR_DELTA, posKey } from '../board';
+import type { Board} from '../board';
+import { NEIGHBOUR_DELTA, posKey } from '../board';
 import { oppositeDirection } from '../tile';
 import { GOLD_PIPE_WATER_COLOR, WATER_COLOR } from '../colors';
 import { GOLD_PIPE_SHAPES } from '../board';

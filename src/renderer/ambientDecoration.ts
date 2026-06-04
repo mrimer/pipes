@@ -6,7 +6,7 @@
  * Zero coupling to game state: decorations are purely positional.
  */
 
-import { AmbientDecoration } from '../types';
+import type { AmbientDecoration } from '../types';
 import { TILE_SIZE, _s } from './rendererState';
 
 // ─── Ambient decoration colors (local constants, not exported) ──────────────

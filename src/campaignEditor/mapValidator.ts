@@ -11,9 +11,10 @@
  *   • Optional: Sink completion threshold does not exceed entity count
  */
 
-import { TileDef, PipeShape } from '../types';
+import type { TileDef} from '../types';
+import { PipeShape } from '../types';
 import { computeMapReachable, editorTileConns } from '../mapUtils';
-import { ValidationResult } from './types';
+import type { ValidationResult } from './types';
 import { MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 /** Controls how the entity-chamber field is named and described. */

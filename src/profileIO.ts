@@ -87,7 +87,7 @@ export async function exportReplay(
   try {
     await downloadGzipJson(json, filename);
   } catch (err) {
-    alert(`Export failed: ${err}`);
+    alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -165,7 +165,7 @@ export async function exportPlayerProfile(
   try {
     await downloadGzipJson(json, filename);
   } catch (err) {
-    alert(`Export failed: ${err}`);
+    alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -204,7 +204,7 @@ export async function exportPlayerProfileWithRecordings(
   try {
     await downloadGzipJson(json, filename);
   } catch (err) {
-    alert(`Export failed: ${err}`);
+    alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

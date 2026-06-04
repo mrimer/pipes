@@ -7,7 +7,7 @@
  * fixed-position overlay that animates over ~1 second.
  */
 
-import { Board } from './board';
+import type { Board } from './board';
 import { TILE_SIZE } from './renderer';
 import { RADIUS_SM } from './uiConstants';
 

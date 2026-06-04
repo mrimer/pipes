@@ -1,6 +1,8 @@
-import { Board, MoveResult, SPIN_PIPE_SHAPES, isEmptyFloor } from './board';
-import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, PipeShape, Rotation } from './types';
+import type { Board, MoveResult} from './board';
+import { SPIN_PIPE_SHAPES, isEmptyFloor } from './board';
+import type { Tile } from './tile';
+import type { GridPos, PipeShape, Rotation } from './types';
+import { GameScreen, GameState } from './types';
 import { TILE_SIZE } from './renderer';
 import { sfxManager, SfxId } from './sfxManager';
 import { RADIUS_MD, UI_BG, UI_BORDER } from './uiConstants';
@@ -495,7 +497,7 @@ export class InputHandler {
       if (spinResult.success) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this._cb.getSelectedShape() === tile.shape) {
-          this._cb.setPendingRotation(tile.rotation as Rotation);
+          this._cb.setPendingRotation(tile.rotation);
         }
         this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
         this._cb.refreshUI();
@@ -523,7 +525,7 @@ export class InputHandler {
       if (rotResult.success) {
         // Sync the pending placement rotation so the ghost image stays aligned.
         if (this._cb.getSelectedShape() === tile.shape) {
-          this._cb.setPendingRotation(tile.rotation as Rotation);
+          this._cb.setPendingRotation(tile.rotation);
         }
         this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
         this._cb.refreshUI();
@@ -1064,7 +1066,7 @@ export class InputHandler {
         const spinResult = board.rotateTileBy(pos, 1);
         if (spinResult.success) {
           if (this._cb.getSelectedShape() === tile.shape) {
-            this._cb.setPendingRotation(tile.rotation as Rotation);
+            this._cb.setPendingRotation(tile.rotation);
           }
           this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
           this._cb.refreshUI();
@@ -1084,7 +1086,7 @@ export class InputHandler {
         const rotResult = board.rotateTile(pos);
         if (rotResult.success) {
           if (this._cb.getSelectedShape() === tile.shape) {
-            this._cb.setPendingRotation(tile.rotation as Rotation);
+            this._cb.setPendingRotation(tile.rotation);
           }
           this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
           this._cb.refreshUI();

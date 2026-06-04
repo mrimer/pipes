@@ -6,7 +6,8 @@
  * (prompt/confirm dialogs) and tells CampaignService what to do.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, Direction, LEVEL_STYLES } from '../types';
+import type { CampaignDef, ChapterDef, LevelDef, TileDef} from '../types';
+import { PipeShape, Direction, LEVEL_STYLES } from '../types';
 import {
   loadImportedCampaigns,
   saveImportedCampaigns,
@@ -357,7 +358,7 @@ export class CampaignService {
     const level = chapter.levels[levelIdx];
     if (!level) throw new Error(`Level index ${levelIdx} does not exist.`);
     const copy: LevelDef = {
-      ...(structuredClone(level) as LevelDef),
+      ...(structuredClone(level)),
       id: generateLevelId(),
       name: `${level.name} (copy)`,
     };
@@ -456,7 +457,7 @@ export class CampaignService {
    * prepend the campaign file-type identifier, and return the resulting JSON string.
    */
   exportToJson(campaign: CampaignDef): string {
-    const clean = structuredClone(campaign) as CampaignDef;
+    const clean = structuredClone(campaign);
     this.scanData(clean, false);
     // Add the type identifier AFTER scanData so it is never stripped.
     const envelope = { type: FILE_TYPE_CAMPAIGN, ...clean };

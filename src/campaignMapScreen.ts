@@ -1,6 +1,8 @@
-import { CampaignDef, ChapterDef, LevelDef, PipeShape, TileDef } from './types';
-import { ChapterMapCallbacks, ChapterMapScreen } from './chapterMapScreen';
-import { ChapterMapSnapshot } from './levelTransition';
+import type { CampaignDef, ChapterDef, LevelDef, TileDef } from './types';
+import { PipeShape } from './types';
+import type { ChapterMapCallbacks} from './chapterMapScreen';
+import { ChapterMapScreen } from './chapterMapScreen';
+import type { ChapterMapSnapshot } from './levelTransition';
 import { loadLevelStars, loadLevelWater } from './persistence';
 
 export interface CampaignMapCallbacks {

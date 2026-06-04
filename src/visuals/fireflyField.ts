@@ -1,4 +1,4 @@
-import { LevelStyle } from '../types';
+import type { LevelStyle } from '../types';
 import { randRange } from './fieldUtils';
 
 const TAU = Math.PI * 2;

@@ -3,10 +3,12 @@
  * editor.  Extracted from ChapterMapEditorSection to reduce file size.
  */
 
-import { CampaignDef, ChapterDef, TileDef, PipeShape, Direction, LevelStyle } from '../types';
-import {
+import type { CampaignDef, ChapterDef, TileDef, LevelStyle } from '../types';
+import { PipeShape, Direction } from '../types';
+import type {
   EditorPalette,
-  TileParams,
+  TileParams} from './types';
+import {
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
   PALETTE_ITEM_SELECTED_BORDER,
@@ -312,7 +314,7 @@ export class ChapterEditorUI {
       focusedTile?.shape === PipeShape.Source || focusedTile?.shape === PipeShape.Sink;
 
     if ((isFocusedLevelChamber || isFocusedSourceOrSink) && focusedPos) {
-      panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile!, chapter, campaign));
+      panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile, chapter, campaign));
       // For focused Sink tile, also show completion param editor
       if (focusedTile?.shape === PipeShape.Sink) {
         panel.appendChild(this._buildFocusedSinkCompletionWidget(panel, focusedTile, chapter, campaign));

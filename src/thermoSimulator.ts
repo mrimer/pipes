@@ -1,5 +1,6 @@
-import { Tile } from './tile';
-import { GridPos, PipeShape } from './types';
+import type { Tile } from './tile';
+import type { GridPos} from './types';
+import { PipeShape } from './types';
 import { parseKey } from './board';
 
 // ── Ice / snow / sandstone cost-calculation helpers ────────────────────────

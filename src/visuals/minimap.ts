@@ -7,7 +7,8 @@
  * has been scaled, so it remains crisp at any display size.
  */
 
-import { Direction, LevelDef, LevelStyle, PipeShape, Rotation, TileDef, styleToFloorShape } from '../types';
+import type { LevelDef, LevelStyle, Rotation, TileDef} from '../types';
+import { Direction, PipeShape, styleToFloorShape } from '../types';
 import { getConnections } from '../tile';
 import { GOLD_PIPE_SHAPES, isEmptyFloor, computeFloorTypesFromGrid, posKey } from '../board';
 import { ginghamColorsForFloor } from '../renderer';
@@ -153,7 +154,7 @@ function seaColor(floorType: PipeShape): string {
 
 /** Returns the stroke color used to draw a Chamber-item (container) tile on the minimap. */
 function containerColor(tile: TileDef): string {
-  return tile.itemShape != null && GOLD_PIPE_SHAPES.has(tile.itemShape)
+  return tile.itemShape !== null && tile.itemShape !== undefined && GOLD_PIPE_SHAPES.has(tile.itemShape)
     ? CONTAINER_COLOR : PIPE_COLOR;
 }
 
@@ -454,9 +455,9 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
       const ty = r * px;
       const floorType = floorTypes.get(posKey(r, c)) ?? defaultFloor;
       if (tile && px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape)) {
-        drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0) as Rotation);
+        drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0));
       } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay) {
-        drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0) as Rotation, ginghamShadeForCell(r, c, floorType));
+        drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0), ginghamShadeForCell(r, c, floorType));
       } else if (tile && tile.shape === PipeShape.Tree) {
         // Fill the cell with the gingham background color first, then draw a circle on top.
         ctx.fillStyle = ginghamShadeForCell(r, c, floorType);

@@ -1,11 +1,13 @@
+import type {
+  Board} from './board';
 import {
-  Board,
   PIPE_SHAPES, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_PIPE_SHAPES,
   posKey, parseKey,
   computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors,
 } from './board';
-import { Tile } from './tile';
-import { Direction, GridPos, PipeShape, GameState } from './types';
+import type { Tile } from './tile';
+import type { GridPos} from './types';
+import { Direction, PipeShape, GameState } from './types';
 import {
   WATER_COLOR, SOURCE_COLOR, SINK_COLOR, SINK_WATER_COLOR,
   SOURCE_CONNECTOR_LIT, SOURCE_WATER_CONNECTOR_LIT,
@@ -14,13 +16,15 @@ import {
   GOLD_BUBBLE_COLOR,
 } from './colors';
 import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, drawConnectorGlow, connectorLitIndex } from './renderer';
-import {
-  TileAnimation, renderAnimations, animColor, ANIM_DURATION,
+import type {
+  TileAnimation} from './visuals/tileAnimation';
+import { renderAnimations, animColor, ANIM_DURATION,
   ANIM_NEGATIVE_COLOR, ANIM_POSITIVE_COLOR, ANIM_ZERO_COLOR,
   ANIM_ITEM_COLOR, ANIM_ITEM_NEG_COLOR,
 } from './visuals/tileAnimation';
+import type {
+  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff, LeakySprayDrop, LeakySprayCandidate} from './visuals/waterParticles';
 import {
-  SourceSprayDrop, FlowDrop, BubbleParticle, DryPuff, LeakySprayDrop, LeakySprayCandidate,
   spawnSourceSprayDrop, renderSourceSpray,
   spawnDryPuff, renderDryPuffs,
   spawnFlowDrop, renderFlowDrops,
@@ -28,17 +32,22 @@ import {
   spawnLeakySprayDrop, renderLeakySpray, buildLeakySprayCandidates,
   computeFlowGoodDirs,
 } from './visuals/waterParticles';
-import { VortexParticle, spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
+import type { VortexParticle} from './visuals/sinkVortex';
+import { spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
 import { spawnRingEffect, clearRingEffects } from './visuals/ringEffect';
+import type {
+  PipeRotationAnim, PipeFillAnim} from './visuals/pipeEffects';
 import {
-  PipeRotationAnim, PipeFillAnim,
   computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
   renderFillAnims, FILL_ANIM_DURATION,
 } from './visuals/pipeEffects';
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
-import { WinTileGlow, computeWinTileGlows, renderWinTileGlows } from './visuals/winTileEffect';
-import { IdlePulse, computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
-import { HeatWave, tickHeatWaves, renderHeatWaves, collectHotPlateTiles } from './visuals/heatWave';
+import type { WinTileGlow} from './visuals/winTileEffect';
+import { computeWinTileGlows, renderWinTileGlows } from './visuals/winTileEffect';
+import type { IdlePulse} from './visuals/idlePulse';
+import { computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
+import type { HeatWave} from './visuals/heatWave';
+import { tickHeatWaves, renderHeatWaves, collectHotPlateTiles } from './visuals/heatWave';
 import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */

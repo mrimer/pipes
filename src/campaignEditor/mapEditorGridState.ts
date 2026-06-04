@@ -7,7 +7,8 @@
  * editors delegate to, eliminating duplicated transform logic.
  */
 
-import { TileDef, PipeShape, Direction } from '../types';
+import type { TileDef} from '../types';
+import { PipeShape, Direction } from '../types';
 import {
   rotateGridBy90,
   rotatePositionBy90,

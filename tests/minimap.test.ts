@@ -11,7 +11,7 @@
  */
 
 import { PipeShape } from '../src/types';
-import { LevelDef } from '../src/types';
+import type { LevelDef } from '../src/types';
 import { renderMinimap } from '../src/visuals/minimap';
 
 // ─── Canvas mock setup ────────────────────────────────────────────────────────

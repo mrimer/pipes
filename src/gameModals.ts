@@ -1,6 +1,7 @@
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
-import { CommandAction, COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
+import type { CommandAction} from './commandKeyManager';
+import { COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
 import type { CampaignImportOutcome } from './playerProfile';
 import { setupModal } from './modalUtils';
 /**

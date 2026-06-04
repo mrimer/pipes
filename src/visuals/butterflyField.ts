@@ -1,4 +1,5 @@
-import { AmbientDecorationType, GridPos, LevelStyle, PipeShape } from '../types';
+import type { AmbientDecorationType, GridPos, LevelStyle} from '../types';
+import { PipeShape } from '../types';
 import { clamp, randRange } from './fieldUtils';
 
 const TAU = Math.PI * 2;

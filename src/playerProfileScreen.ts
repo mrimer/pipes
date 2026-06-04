@@ -11,10 +11,11 @@
  * level-select screen).
  */
 
+import type {
+  ProfileSlotMeta,
+  ProfileSlotStats} from './playerProfileSlots';
 import {
   PROFILE_SLOT_COUNT,
-  ProfileSlotMeta,
-  ProfileSlotStats,
   saveSlotMeta,
   deleteSlotMeta,
   loadAllSlotMetas,

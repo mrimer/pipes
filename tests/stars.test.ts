@@ -7,7 +7,7 @@
 import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
 import { sfxManager, SfxId } from '../src/sfxManager';
-import { TileDef } from '../src/types';
+import type { TileDef } from '../src/types';
 import { makeLevelDef } from './testHelpers';
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
@@ -779,7 +779,7 @@ describe('renderLevelList – chapter box color coding', () => {
   });
 
   function getChapterBox(): HTMLElement | null {
-    return container.querySelector('.chapter-box') as HTMLElement | null;
+    return container.querySelector('.chapter-box');
   }
 
   it('shows gold border when all levels and all stars are completed', () => {

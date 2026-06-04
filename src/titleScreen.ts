@@ -1,6 +1,7 @@
 import { drawPipeBody } from './renderer';
 import { BG_COLOR, LABEL_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
-import { Direction, PipeShape, Rotation } from './types';
+import type { Rotation } from './types';
+import { Direction, PipeShape } from './types';
 import { oppositeDirection } from './tile';
 import { sfxManager, SfxId } from './sfxManager';
 import { getActiveSlotIndex } from './activeProfile';

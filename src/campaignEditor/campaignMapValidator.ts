@@ -1,5 +1,5 @@
-import { CampaignDef, TileDef } from '../types';
-import { ValidationResult } from './types';
+import type { CampaignDef, TileDef } from '../types';
+import type { ValidationResult } from './types';
 import { validateMapGrid } from './mapValidator';
 
 export function validateCampaignMap(
