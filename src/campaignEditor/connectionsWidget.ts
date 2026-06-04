@@ -6,6 +6,7 @@
 
 import { Direction } from '../types';
 import { EDITOR_INPUT_BG, RADIUS_SM } from '../uiConstants';
+import { t } from '../i18n';
 
 // Button dimensions for the compass layout.
 // W/E buttons are wider; N/S buttons are taller, giving more surface area for
@@ -58,7 +59,7 @@ export function buildCompassConnectionsWidget(
 
   const connLbl = document.createElement('div');
   connLbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-  connLbl.textContent = 'Connections';
+  connLbl.textContent = t('editor.params.connections');
   connWrap.appendChild(connLbl);
 
   const connGrid = document.createElement('div');
@@ -81,7 +82,7 @@ export function buildCompassConnectionsWidget(
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
-    b.title = `Toggle ${label} connection`;
+    b.title = t('editor.params.toggleConnection', { direction: label });
     b.style.cssText =
       `width:${btnW}px;height:${btnH}px;font-size:0.75rem;display:flex;align-items:center;justify-content:center;` +
       'position:relative;' +
@@ -110,7 +111,7 @@ export function buildCompassConnectionsWidget(
         `border:1.5px solid #555;border-radius:4px;` +
         `background:${firstActive ? '#cc0000' : 'transparent'};` +
         'pointer-events:all;cursor:pointer;box-sizing:border-box;';
-      indicator.title = `Toggle ${label} as valve (first connection)`;
+      indicator.title = t('editor.params.toggleValveConnection', { direction: label });
       indicator.addEventListener('click', (e) => {
         e.stopPropagation(); // prevent toggling the connection button
         onFirstToggle(dir);

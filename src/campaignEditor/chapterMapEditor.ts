@@ -33,6 +33,7 @@ import {
 import { handleMapEditorKeyDown, applyMapValidationState } from './mapEditorSectionUtils';
 import { MapEditorBase } from './mapEditorBase';
 import { saveChapterEditorMapBoxCollapsed } from '../persistence';
+import { t } from '../i18n';
 
 // ─── Callback interface ────────────────────────────────────────────────────────
 
@@ -213,13 +214,13 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const sectionHeader = document.createElement('div');
     sectionHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const sectionTitle = document.createElement('h3');
-    sectionTitle.textContent = '🗺️ Chapter Map';
+    sectionTitle.textContent = t('editor.chapterMap.title');
     sectionTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     sectionHeader.appendChild(sectionTitle);
 
     // Validation warning icon – stays in the header so it is visible even when the box is collapsed.
     const validationWarningIcon = document.createElement('span');
-    validationWarningIcon.title = 'Chapter map has validation errors – click Validate for details';
+    validationWarningIcon.title = t('editor.chapterMap.validationErrors');
     validationWarningIcon.style.cssText = 'display:none;font-size:1rem;cursor:default;';
     validationWarningIcon.textContent = '⚠️';
     sectionHeader.appendChild(validationWarningIcon);
@@ -230,12 +231,12 @@ export class ChapterMapEditorSection extends MapEditorBase {
     if (this._mapBoxCollapsed) body.style.display = 'none';
 
     const toggleBtn = this._callbacks.buildBtn(
-      this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse',
+      this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse'),
       MUTED_BTN_BG, '#aaa',
       () => {
         this._mapBoxCollapsed = !this._mapBoxCollapsed;
         saveChapterEditorMapBoxCollapsed(this._mapBoxCollapsed);
-        toggleBtn.textContent = this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse';
+        toggleBtn.textContent = this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse');
         body.style.display = this._mapBoxCollapsed ? 'none' : '';
         if (!this._mapBoxCollapsed) {
           requestAnimationFrame(() => {
@@ -252,7 +253,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
     if (isOfficial) {
       const readonlyMsg = document.createElement('p');
       readonlyMsg.style.cssText = 'color:#888;font-size:0.85rem;';
-      readonlyMsg.textContent = 'Chapter map is read-only for official campaigns.';
+      readonlyMsg.textContent = t('editor.chapterMap.readOnly');
       body.appendChild(readonlyMsg);
       // Still render the canvas in read-only mode
       const canvas = this._buildChapterMapCanvas(campaign, chapter, true);
@@ -281,10 +282,10 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const midToolbar = document.createElement('div');
     midToolbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
-    const undoBtn = this._callbacks.buildBtn('↩ Undo', MUTED_BTN_BG, '#aaa', () => this._doUndo(), true);
+    const undoBtn = this._callbacks.buildBtn(t('editor.common.undo'), MUTED_BTN_BG, '#aaa', () => this._doUndo(), true);
     undoBtn.id = 'chapter-undo-btn';
     midToolbar.appendChild(undoBtn);
-    const redoBtn = this._callbacks.buildBtn('↪ Redo', MUTED_BTN_BG, '#aaa', () => this._doRedo(), true);
+    const redoBtn = this._callbacks.buildBtn(t('editor.common.redo'), MUTED_BTN_BG, '#aaa', () => this._doRedo(), true);
     redoBtn.id = 'chapter-redo-btn';
     midToolbar.appendChild(redoBtn);
 
@@ -292,12 +293,12 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const applyValidationState = (ok: boolean) =>
       applyMapValidationState(validateBtn, validationWarningIcon, ok);
 
-    const validateBtn = this._callbacks.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
+    const validateBtn = this._callbacks.buildBtn(t('editor.common.validateOk'), UI_BG, '#7ed321', () => {
       const result = validateChapterMap(
         this._gridState.grid, this._gridState.rows, this._gridState.cols, chapter,
       );
       const icon = result.ok ? '✅' : '❌';
-      alert(`${icon} Chapter Map Validation\n\n${result.messages.join('\n')}`);
+      this._showValidationModal(t('editor.chapterMap.validationTitle'), icon, result.messages);
       applyValidationState(result.ok);
     });
     midToolbar.appendChild(validateBtn);
@@ -416,6 +417,32 @@ export class ChapterMapEditorSection extends MapEditorBase {
     }
 
     return canvas;
+  }
+
+  /** Update the chapter canvas display size and intrinsic tile size to fill the available space. */
+  private _showValidationModal(title: string, icon: string, messages: string[]): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:1000;';
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:#111827;border:1px solid #4a90d9;border-radius:8px;padding:16px;max-width:560px;width:90%;color:#eee;';
+    const heading = document.createElement('div');
+    heading.style.cssText = 'font-weight:bold;margin-bottom:8px;color:#7ed321;';
+    heading.textContent = `${icon} ${title}`;
+    const body = document.createElement('pre');
+    body.style.cssText = 'white-space:pre-wrap;margin:0 0 12px 0;font-family:inherit;font-size:0.9rem;';
+    body.textContent = messages.join('\n');
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = t('editor.common.ok');
+    close.style.cssText = 'padding:6px 12px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer;';
+    close.addEventListener('click', () => overlay.remove());
+    dialog.appendChild(heading);
+    dialog.appendChild(body);
+    dialog.appendChild(close);
+    overlay.appendChild(dialog);
+    (this._canvas?.ownerDocument.body ?? document.body).appendChild(overlay);
   }
 
   /** Update the chapter canvas display size and intrinsic tile size to fill the available space. */

@@ -202,7 +202,7 @@ Don't localize:
 - Validation error keys (keep them symbolic; localize the displayed value)
 - User-generated content (campaign names, level names)
 
-Migration status: HUD chrome, win/game-over modal labels, game modal builders, recording modals, profile modals, and validation message values are localized. Level-select and much of the editor UI still remain hardcoded and should migrate incrementally.
+Migration status: All user-facing strings are localized via `t()`. New strings must add keys to `src/i18n/en.ts`. CI guards against missing keys and warns on hardcoded `textContent`.
 
 Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and `initLocale(['en'])` before any UI renders. Adding a locale requires updating this bootstrap.
 

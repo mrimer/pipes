@@ -9,6 +9,7 @@
 import type { CampaignDef } from '../types';
 import { ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG } from '../uiConstants';
 import { setupModal } from '../modalUtils';
+import { t } from '../i18n';
 
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 export const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -33,7 +34,7 @@ export class EditorDialogs {
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
-    title.textContent = '✅ Same Version';
+    title.textContent = t('editor.dialog.importSameVersion.title');
     const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
 
     const msg = document.createElement('div');
@@ -44,21 +45,21 @@ export class EditorDialogs {
     const sameVersionTs = document.createElement('em');
     sameVersionTs.textContent = this._formatTimestamp(ts);
     msg.appendChild(campaignName);
-    msg.appendChild(document.createTextNode(' is already up to date.'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importSameVersion.upToDateSuffix')));
     msg.appendChild(document.createElement('br'));
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('The imported campaign has the same version as your local copy'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importSameVersion.sameVersionLine')));
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('(last updated: '));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importSameVersion.lastUpdatedPrefix')));
     msg.appendChild(sameVersionTs);
-    msg.appendChild(document.createTextNode(').'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importSameVersion.lastUpdatedSuffix')));
     msg.appendChild(document.createElement('br'));
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('The campaign will not be updated.'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importSameVersion.noUpdateLine')));
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
-    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => closeModal()));
+    btnRow.appendChild(this._btn(t('editor.common.ok'), '#4a90d9', '#fff', () => closeModal()));
 
     dialog.appendChild(title);
     dialog.appendChild(msg);
@@ -83,7 +84,7 @@ export class EditorDialogs {
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
-    title.textContent = isNewer ? '⏩ Import Newer Version?' : '⏪ Import Older Version?';
+    title.textContent = isNewer ? t('editor.dialog.importConflict.newerTitle') : t('editor.dialog.importConflict.olderTitle');
     const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
 
     const msg = document.createElement('div');
@@ -96,31 +97,31 @@ export class EditorDialogs {
     const importedTs = document.createElement('em');
     importedTs.textContent = this._formatTimestamp(imported.lastUpdated);
     msg.appendChild(importedName);
-    msg.appendChild(document.createTextNode(' already exists locally.'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importConflict.existsLocallySuffix')));
     msg.appendChild(document.createElement('br'));
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('Local version: '));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importConflict.localVersion')));
     msg.appendChild(localTs);
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('Imported version: '));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importConflict.importedVersion')));
     msg.appendChild(importedTs);
-    msg.appendChild(document.createTextNode(` (${isNewer ? 'newer' : 'older'})`));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importConflict.versionAge', { age: isNewer ? t('editor.common.newer') : t('editor.common.older') })));
     msg.appendChild(document.createElement('br'));
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('Importing will replace all chapters and levels in the local campaign.'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importConflict.replaceLine')));
     msg.appendChild(document.createElement('br'));
-    msg.appendChild(document.createTextNode('Player progress will be retained.'));
+    msg.appendChild(document.createTextNode(t('editor.dialog.importConflict.progressRetainedLine')));
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
 
-    const confirmLabel = isNewer ? '⏩ Import newer version' : '⏪ Overwrite with older version';
+    const confirmLabel = isNewer ? t('editor.dialog.importConflict.newerButton') : t('editor.dialog.importConflict.olderButton');
     const confirmColor = isNewer ? '#27ae60' : '#e67e22';
     const confirmBtn = this._btn(confirmLabel, confirmColor, '#fff', () => {
       closeModal();
       onConfirm();
     });
-    const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => closeModal());
+    const cancelBtn = this._btn(t('modal.common.cancel'), MUTED_BTN_BG, '#aaa', () => closeModal());
 
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(confirmBtn);
@@ -139,26 +140,66 @@ export class EditorDialogs {
 
     const msg = document.createElement('div');
     msg.style.cssText = 'font-size:1rem;color:#eee;line-height:1.5;';
-    msg.textContent = 'You have unsaved changes. Would you like to save before leaving?';
+    msg.textContent = t('editor.dialog.unsaved.message');
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
 
-    const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
+    const saveBtn = this._btn(t('editor.toolbar.save'), '#27ae60', '#fff', () => {
       closeModal();
       onSave();
     });
-    const discardBtn = this._btn('🗑 Discard', ERROR_DARK, '#fff', () => {
+    const discardBtn = this._btn(t('editor.dialog.unsaved.discard'), ERROR_DARK, '#fff', () => {
       closeModal();
       onDiscard();
     });
-    const cancelBtn = this._btn('Cancel', MUTED_BTN_BG, '#aaa', () => {
+    const cancelBtn = this._btn(t('modal.common.cancel'), MUTED_BTN_BG, '#aaa', () => {
       closeModal();
     });
 
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(discardBtn);
     btnRow.appendChild(saveBtn);
+    dialog.appendChild(msg);
+    dialog.appendChild(btnRow);
+  }
+
+  showMessage(titleText: string, messageText: string, color = '#4a90d9'): void {
+    const { overlay, dialog } = this._createOverlay('460px');
+    const title = document.createElement('div');
+    title.style.cssText = `font-size:1.1rem;font-weight:bold;color:${color};`;
+    title.textContent = titleText;
+    const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;white-space:pre-wrap;';
+    msg.textContent = messageText;
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
+    btnRow.appendChild(this._btn(t('editor.common.ok'), '#4a90d9', '#fff', () => closeModal()));
+
+    dialog.appendChild(title);
+    dialog.appendChild(msg);
+    dialog.appendChild(btnRow);
+  }
+
+  showConfirm(messageText: string, onConfirm: () => void, confirmLabel: string, danger = false): void {
+    const { overlay, dialog } = this._createOverlay('460px');
+    const { closeModal } = setupModal(overlay, { onClose: () => { overlay.remove(); } });
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;white-space:pre-wrap;';
+    msg.textContent = messageText;
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS;
+    btnRow.appendChild(this._btn(t('modal.common.cancel'), MUTED_BTN_BG, '#aaa', () => closeModal()));
+    btnRow.appendChild(this._btn(confirmLabel, danger ? ERROR_DARK : '#27ae60', '#fff', () => {
+      closeModal();
+      onConfirm();
+    }));
+
     dialog.appendChild(msg);
     dialog.appendChild(btnRow);
   }
@@ -185,7 +226,7 @@ export class EditorDialogs {
 
   /** Format an ISO timestamp for display, or return a fallback string if absent. */
   private _formatTimestamp(ts: string | undefined): string {
-    if (!ts) return 'unknown';
+    if (!ts) return t('editor.common.unknown');
     const d = new Date(ts);
     if (isNaN(d.getTime())) return ts;
     return d.toLocaleString();

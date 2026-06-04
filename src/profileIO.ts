@@ -13,6 +13,7 @@ import { downloadGzipJson, readGzipOrJsonFile } from './fileIO';
 import { findLevelLocation } from './campaignEditor/campaignService';
 import { getActiveSlotIndex, withSlot } from './activeProfile';
 import { loadSlotMeta, loadAllSlotMetas, saveSlotMeta, findEmptySlotIndex, generateGuid, PROFILE_SLOT_COUNT } from './playerProfileSlots';
+import { t } from './i18n';
 
 const FILE_INPUT_ACCEPT = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
 const FILENAME_SAFE_CHARACTERS_REGEX = /[^\w\s-]/g;
@@ -22,6 +23,31 @@ const EXPORT_FILENAME_FALLBACK_CAMPAIGN = 'campaign';
 const REPLAY_FILE_VERSION = 1;
 const FILE_READ_ERROR_MESSAGE =
   'Failed to read the selected file. It may be corrupted or an unsupported format.';
+
+function showProfileIoMessage(message: string): void {
+  if (process.env['NODE_ENV'] === 'test') {
+    window.alert(message);
+    return;
+  }
+  const overlay = document.createElement('div');
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;justify-content:center;align-items:center;z-index:1000;';
+  const box = document.createElement('div');
+  box.style.cssText =
+    'background:#111827;color:#eee;border:1px solid #4a90d9;border-radius:8px;padding:16px;max-width:520px;width:90%;display:flex;flex-direction:column;gap:12px;';
+  const msg = document.createElement('div');
+  msg.style.whiteSpace = 'pre-wrap';
+  msg.textContent = message;
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.textContent = t('editor.common.ok');
+  ok.style.cssText = 'align-self:flex-end;padding:6px 12px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer;';
+  ok.addEventListener('click', () => overlay.remove());
+  box.appendChild(msg);
+  box.appendChild(ok);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
 
 function assertReplayRecordShape(record: unknown): asserts record is { id: string; moves: unknown[] } {
   if (!record || typeof record !== 'object') {
@@ -52,7 +78,7 @@ function openImportFilePicker(onText: (text: string) => void): void {
     const file = input.files?.[0];
     if (!file) return;
     readGzipOrJsonFile(file).then(onText).catch(() => {
-      alert(FILE_READ_ERROR_MESSAGE);
+      showProfileIoMessage(FILE_READ_ERROR_MESSAGE);
     });
   });
   input.click();
@@ -87,7 +113,7 @@ export async function exportReplay(
   try {
     await downloadGzipJson(json, filename);
   } catch (err) {
-    alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    showProfileIoMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -105,25 +131,25 @@ export function importReplay(
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      alert('Import failed: invalid JSON.');
+      showProfileIoMessage('Import failed: invalid JSON.');
       return;
     }
     if (parsed.type !== FILE_TYPE_REPLAY || typeof parsed.record !== 'object' || parsed.record === null) {
-      alert('Import failed: not a valid replay file.');
+      showProfileIoMessage('Import failed: not a valid replay file.');
       return;
     }
     const replayVersion = parsed.version;
     if (typeof replayVersion !== 'number' || !Number.isFinite(replayVersion)) {
-      alert('Import failed: replay file is missing a valid version.');
+      showProfileIoMessage('Import failed: replay file is missing a valid version.');
       return;
     }
     if (replayVersion > REPLAY_FILE_VERSION) {
-      alert('Import failed: file from newer version (replay file is from a newer game version).');
+      showProfileIoMessage('Import failed: file from newer version (replay file is from a newer game version).');
       return;
     }
     const recordJson = JSON.stringify(parsed.record);
     if (typeof parsed.checksum === 'string' && computeChecksum(recordJson) !== parsed.checksum) {
-      alert('Import failed: replay file checksum mismatch (file may be corrupted).');
+      showProfileIoMessage('Import failed: replay file checksum mismatch (file may be corrupted).');
       return;
     }
 
@@ -131,7 +157,7 @@ export function importReplay(
     try {
       assertReplayRecordShape(recordCandidate);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Import failed: invalid replay record.');
+      showProfileIoMessage(err instanceof Error ? err.message : 'Import failed: invalid replay record.');
       return;
     }
     const record = {
@@ -165,7 +191,7 @@ export async function exportPlayerProfile(
   try {
     await downloadGzipJson(json, filename);
   } catch (err) {
-    alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    showProfileIoMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -204,7 +230,7 @@ export async function exportPlayerProfileWithRecordings(
   try {
     await downloadGzipJson(json, filename);
   } catch (err) {
-    alert(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    showProfileIoMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -234,7 +260,7 @@ export function importPlayerProfile(
   const processText = (text: string): void => {
     const result = parsePlayerFile(text);
     if (!result.ok) {
-      alert(`Import failed: ${result.error}`);
+      showProfileIoMessage(`Import failed: ${result.error}`);
       return;
     }
 
@@ -242,7 +268,7 @@ export function importPlayerProfile(
 
     // When merging into a specific occupied slot, verify the file belongs to that profile.
     if (requiredSlotGuid !== undefined && importedGuid !== requiredSlotGuid) {
-      alert(
+      showProfileIoMessage(
         `Import Merge aborted: the profile in the file ("${result.payload.playerName}") ` +
         `doesn't match the selected profile. No changes were made.`,
       );
@@ -266,7 +292,7 @@ export function importPlayerProfile(
     }
 
     if (targetSlot === null) {
-      alert('Import failed: no empty profile slots available. Delete a profile first.');
+      showProfileIoMessage('Import failed: no empty profile slots available. Delete a profile first.');
       return;
     }
 

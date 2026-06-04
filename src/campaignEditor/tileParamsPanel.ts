@@ -34,6 +34,7 @@ import { drawEditorTile } from './renderer';
 import { sfxManager, SfxId } from '../sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER } from '../uiConstants';
+import { t } from '../i18n';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -68,18 +69,18 @@ interface ChamberParamDescriptor {
  * selector in addition to a numeric count field).
  */
 const CHAMBER_PARAM_DESCRIPTORS: Partial<Record<ChamberContent, ChamberParamDescriptor[]>> = {
-  dirt:      [{ label: 'Mass',      field: 'cost' }],
-  heater:    [{ label: 'Temp',      field: 'temperature' }],
-  ice:       [{ label: 'Temp °',    field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
-  snow:      [{ label: 'Temp °',    field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
+  dirt:      [{ label: 'editor.params.mass',      field: 'cost' }],
+  heater:    [{ label: 'editor.params.temp',      field: 'temperature' }],
+  ice:       [{ label: 'editor.params.tempDeg',    field: 'temperature', clampMin: 0 }, { label: 'editor.params.mass', field: 'cost', clampMin: 0 }],
+  snow:      [{ label: 'editor.params.tempDeg',    field: 'temperature', clampMin: 0 }, { label: 'editor.params.mass', field: 'cost', clampMin: 0 }],
   sandstone: [
-    { label: 'Temp °',   field: 'temperature', clampMin: 0 },
-    { label: 'Mass',     field: 'cost',        clampMin: 0 },
-    { label: 'Hardness', field: 'hardness',    clampMin: 0 },
-    { label: 'Shatter',  field: 'shatter',     clampMin: 0 },
+    { label: 'editor.params.tempDeg',   field: 'temperature', clampMin: 0 },
+    { label: 'editor.params.mass',     field: 'cost',        clampMin: 0 },
+    { label: 'editor.params.hardness', field: 'hardness',    clampMin: 0 },
+    { label: 'editor.params.shatter',  field: 'shatter',     clampMin: 0 },
   ],
-  pump:      [{ label: 'Pressure',  field: 'pressure' }],
-  hot_plate: [{ label: 'Boiling °', field: 'temperature', clampMin: 0 }, { label: 'Mass', field: 'cost', clampMin: 0 }],
+  pump:      [{ label: 'editor.params.pressure',  field: 'pressure' }],
+  hot_plate: [{ label: 'editor.params.boilingDeg', field: 'temperature', clampMin: 0 }, { label: 'editor.params.mass', field: 'cost', clampMin: 0 }],
 };
 
 // ─── Palette item arrays ──────────────────────────────────────────────────────
@@ -189,7 +190,7 @@ export function buildStyleSectionPanel(
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
-  toggle.textContent = (expanded ? '▾' : '▸') + ' Style - ' + resolvedStyle;
+  toggle.textContent = `${expanded ? '▾' : '▸'} ${t('editor.style.label', { style: resolvedStyle })}`;
   toggle.style.cssText =
     `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
     'border:1px solid #7a5a2a;background:#1a1208;color:#c8a060;font-weight:bold;margin-top:2px;';
@@ -274,7 +275,7 @@ export class TileParamsPanel {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'TILE PALETTE';
+    title.textContent = t('editor.palette.title');
     panel.appendChild(title);
 
     const isGoldSelected = GOLD_PALETTE_ITEMS.some(i => i.palette === state.palette);
@@ -333,32 +334,32 @@ export class TileParamsPanel {
 
     // Collapsible sections: Floor, Pipes, Spin, Gold, Leaky, Blocks (chambers)
     this._buildCollapsibleSection(
-      panel, 'Floor', this.floorSectionExpanded,
+      panel, t('editor.palette.section.floor'), this.floorSectionExpanded,
       () => { this.floorSectionExpanded = !this.floorSectionExpanded; panel.replaceWith(this.buildPalette()); },
       '#888', '#1a1a1a', '#ccc', FLOOR_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
-      panel, 'Pipes', this.pipesSectionExpanded,
+      panel, t('editor.palette.section.pipes'), this.pipesSectionExpanded,
       () => { this.pipesSectionExpanded = !this.pipesSectionExpanded; panel.replaceWith(this.buildPalette()); },
       '#4a90d9', '#0a1520', '#4a90d9', PIPES_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
-      panel, 'Spin', this.spinSectionExpanded,
+      panel, t('editor.palette.section.spin'), this.spinSectionExpanded,
       () => { this.spinSectionExpanded = !this.spinSectionExpanded; panel.replaceWith(this.buildPalette()); },
       '#5a7fbf', '#0a1528', '#7090c0', SPIN_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
-      panel, 'Gold', this.goldSectionExpanded,
+      panel, t('editor.palette.section.gold'), this.goldSectionExpanded,
       () => { this.goldSectionExpanded = !this.goldSectionExpanded; panel.replaceWith(this.buildPalette()); },
       '#b8860b', '#1a1400', '#ffd700', GOLD_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
-      panel, 'Leaky', this.leakySectionExpanded,
+      panel, t('editor.palette.section.leaky'), this.leakySectionExpanded,
       () => { this.leakySectionExpanded = !this.leakySectionExpanded; panel.replaceWith(this.buildPalette()); },
       '#7a2c10', '#1a0c08', '#b07840', LEAKY_PALETTE_ITEMS, makeItemBtn,
     );
     this._buildCollapsibleSection(
-      panel, 'Blocks', this.chamberSectionExpanded,
+      panel, t('editor.palette.section.blocks'), this.chamberSectionExpanded,
       () => { this.chamberSectionExpanded = !this.chamberSectionExpanded; panel.replaceWith(this.buildPalette()); },
       '#74b9ff', '#0a1520', '#74b9ff', CHAMBER_PALETTE_ITEMS, makeItemBtn,
     );
@@ -379,7 +380,7 @@ export class TileParamsPanel {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS;
-    title.textContent = 'TILE PARAMS';
+    title.textContent = t('editor.params.title');
     panel.appendChild(title);
 
     const p = state.palette;
@@ -393,7 +394,7 @@ export class TileParamsPanel {
         || p === PipeShape.OneWay || isParamFreePipe) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
-      none.textContent = 'No parameters';
+      none.textContent = t('editor.params.none');
       panel.appendChild(none);
       return panel;
     }
@@ -401,7 +402,7 @@ export class TileParamsPanel {
     // Cement: show only Drying Time input.
     // Spin-cement tiles: show Drying Time; rotation is adjusted via wheel/Q/W in the editor.
     if (p === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(p as PipeShape)) {
-      panel.appendChild(this.labeledInput('Drying Time', String(state.params.dryingTime), (v) => {
+      panel.appendChild(this.labeledInput(t('editor.params.dryingTime'), String(state.params.dryingTime), (v) => {
         state.params.dryingTime = Math.max(0, parseInt(v) || 0);
         state.applyParamsToLinkedTile();
         this._cb.updateUndoRedoButtons();
@@ -413,7 +414,7 @@ export class TileParamsPanel {
     // Source/Chamber(tank): capacity
     const cc = isChm ? chamberPaletteContent(p) : null;
     if (p === PipeShape.Source || cc === 'tank') {
-      panel.appendChild(this.labeledInput('Capacity', String(state.params.capacity), (v) => {
+      panel.appendChild(this.labeledInput(t('editor.params.capacity'), String(state.params.capacity), (v) => {
         state.params.capacity = Math.max(0, parseInt(v) || 0);
         state.applyParamsToLinkedTile();
         this._cb.updateUndoRedoButtons();
@@ -423,13 +424,13 @@ export class TileParamsPanel {
 
     // Source: temperature and pressure
     if (p === PipeShape.Source) {
-      panel.appendChild(this.labeledInput('Base Temp', String(state.params.temperature), (v) => {
+      panel.appendChild(this.labeledInput(t('editor.params.baseTemp'), String(state.params.temperature), (v) => {
         state.params.temperature = Math.max(0, parseInt(v) || 0);
         state.applyParamsToLinkedTile();
         this._cb.updateUndoRedoButtons();
         this._cb.renderCanvas();
       }, 'number', '90px'));
-      panel.appendChild(this.labeledInput('Base Pressure', String(state.params.pressure), (v) => {
+      panel.appendChild(this.labeledInput(t('editor.params.basePressure'), String(state.params.pressure), (v) => {
         state.params.pressure = Math.max(0, parseInt(v) || 0);
         state.applyParamsToLinkedTile();
         this._cb.updateUndoRedoButtons();
@@ -534,9 +535,19 @@ export class TileParamsPanel {
       'padding:5px 8px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     const CHAMBER_DISPLAY_NAMES: Record<string, string> = {
-      tank: 'Tank', dirt: 'Dirt', item: 'Item', heater: 'Heater',
-      ice: 'Ice', pump: 'Pump', snow: 'Snow', sandstone: 'Sandstone', hot_plate: 'Hot Plate',
-      gel: 'Gel', siphon: 'Siphon', regulator: 'Regulator', star: 'Star',
+      tank: t('editor.params.content.tank'),
+      dirt: t('editor.params.content.dirt'),
+      item: t('editor.params.content.item'),
+      heater: t('editor.params.content.heater'),
+      ice: t('editor.params.content.ice'),
+      pump: t('editor.params.content.pump'),
+      snow: t('editor.params.content.snow'),
+      sandstone: t('editor.params.content.sandstone'),
+      hot_plate: t('editor.params.content.hotPlate'),
+      gel: t('editor.params.content.gel'),
+      siphon: t('editor.params.content.siphon'),
+      regulator: t('editor.params.content.regulator'),
+      star: t('editor.params.content.star'),
     };
     for (const opt of ['tank', 'dirt', 'item', 'heater', 'ice', 'pump', 'snow', 'sandstone', 'hot_plate', 'gel', 'siphon', 'regulator', 'star']) {
       const o = document.createElement('option');
@@ -561,7 +572,7 @@ export class TileParamsPanel {
     selWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const selLbl = document.createElement('span');
     selLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-    selLbl.textContent = 'Content:';
+    selLbl.textContent = t('editor.params.contentLabel');
     selWrap.appendChild(selLbl);
     selWrap.appendChild(sel);
     return selWrap;
@@ -577,7 +588,7 @@ export class TileParamsPanel {
     const descriptors = CHAMBER_PARAM_DESCRIPTORS[cc];
     if (descriptors) {
       for (const { label, field, clampMin } of descriptors) {
-        parent.appendChild(this.labeledInput(label, String(state.params[field]), (v) => {
+        parent.appendChild(this.labeledInput(t(label), String(state.params[field]), (v) => {
           const parsed = parseInt(v) || 0;
           state.params[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
           state.applyParamsToLinkedTile();
@@ -588,7 +599,7 @@ export class TileParamsPanel {
     }
     if (cc === 'item') {
       parent.appendChild(this._buildItemShapeSelector());
-      parent.appendChild(this.labeledInput('Count', String(state.params.itemCount), (v) => {
+      parent.appendChild(this.labeledInput(t('editor.params.count'), String(state.params.itemCount), (v) => {
         const parsed = parseInt(v);
         state.params.itemCount = isNaN(parsed) ? 1 : parsed;
         state.applyParamsToLinkedTile();
@@ -599,7 +610,7 @@ export class TileParamsPanel {
     if (cc === 'regulator') {
       parent.appendChild(this._buildRegulatorStatSelector());
       parent.appendChild(this._buildRegulatorOperatorSelector());
-      parent.appendChild(this.labeledInput('Threshold', String(state.params.cost), (v) => {
+      parent.appendChild(this.labeledInput(t('editor.params.threshold'), String(state.params.cost), (v) => {
         const parsed = parseInt(v) || 0;
         state.params.cost = parsed;
         state.applyParamsToLinkedTile();
@@ -638,7 +649,7 @@ export class TileParamsPanel {
     itemSelWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const itemLbl = document.createElement('span');
     itemLbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-    itemLbl.textContent = 'Shape:';
+    itemLbl.textContent = t('editor.params.shape');
     itemSelWrap.appendChild(itemLbl);
     itemSelWrap.appendChild(itemSel);
     return itemSelWrap;
@@ -655,10 +666,10 @@ export class TileParamsPanel {
       'padding:5px 8px;font-size:0.85rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
       `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
     const options: Array<{ value: RegulatorStat; label: string }> = [
-      { value: 'water',       label: 'Water' },
-      { value: 'frozen',      label: 'Frozen' },
-      { value: 'temperature', label: 'Temperature' },
-      { value: 'pressure',    label: 'Pressure' },
+      { value: 'water',       label: t('editor.params.stat.water') },
+      { value: 'frozen',      label: t('editor.params.stat.frozen') },
+      { value: 'temperature', label: t('editor.params.stat.temperature') },
+      { value: 'pressure',    label: t('editor.params.stat.pressure') },
     ];
     for (const { value, label } of options) {
       const o = document.createElement('option');
@@ -677,7 +688,7 @@ export class TileParamsPanel {
     wrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const lbl = document.createElement('span');
     lbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-    lbl.textContent = 'Stat:';
+    lbl.textContent = t('editor.params.stat');
     wrap.appendChild(lbl);
     wrap.appendChild(sel);
     return wrap;
@@ -711,7 +722,7 @@ export class TileParamsPanel {
     wrap.style.cssText = EDITOR_FLEX_ROW_CSS;
     const lbl = document.createElement('span');
     lbl.style.cssText = 'font-size:0.78rem;color:#aaa;min-width:56px;';
-    lbl.textContent = 'Operator:';
+    lbl.textContent = t('editor.params.operator');
     wrap.appendChild(lbl);
     wrap.appendChild(sel);
     return wrap;

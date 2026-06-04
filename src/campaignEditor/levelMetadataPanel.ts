@@ -17,6 +17,7 @@ import {
 import type { LevelEditorState } from './levelEditorState';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from '../uiConstants';
+import { t } from '../i18n';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ export class LevelMetadataPanel {
       const nameWrap = document.createElement('div');
       nameWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
       const nameLbl = document.createElement('label');
-      nameLbl.textContent = 'Level Name:';
+      nameLbl.textContent = t('editor.level.name');
       nameLbl.style.cssText = 'font-size:0.85rem;color:#aaa;';
       const nameInp = document.createElement('input');
       nameInp.type = 'text';
@@ -85,11 +86,11 @@ export class LevelMetadataPanel {
     const noteWrap = document.createElement('div');
     noteWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
     const noteLbl = document.createElement('label');
-    noteLbl.textContent = 'Note (shown beneath the grid while playing):';
+    noteLbl.textContent = t('editor.level.note');
     noteLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
     const noteInp = document.createElement('textarea');
     noteInp.value = state.levelNote;
-    noteInp.placeholder = 'Optional – displayed in a box below the puzzle grid.';
+    noteInp.placeholder = t('editor.level.notePlaceholder');
     noteInp.style.cssText = textareaStyle;
     noteInp.addEventListener('input', () => { state.levelNote = noteInp.value; });
     noteWrap.appendChild(noteLbl);
@@ -99,7 +100,7 @@ export class LevelMetadataPanel {
     const hintWrap = document.createElement('div');
     hintWrap.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
     const hintLbl = document.createElement('label');
-    hintLbl.textContent = 'Hints (collapsible, revealed in sequence while playing):';
+    hintLbl.textContent = t('editor.level.hints');
     hintLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
     hintWrap.appendChild(hintLbl);
 
@@ -114,14 +115,14 @@ export class LevelMetadataPanel {
         const inp = document.createElement('textarea');
         inp.value = hint;
         inp.placeholder = idx === 0
-          ? 'Hint 1 – hidden until the player clicks "Show Hint".'
-          : `Hint ${idx + 1} – revealed after expanding the previous hint.`;
+          ? t('editor.level.hintPlaceholderFirst')
+          : t('editor.level.hintPlaceholderNext', { index: idx + 1 });
         inp.style.cssText = textareaStyle + 'border-color:#f0c040;flex:1;';
         inp.addEventListener('input', () => { state.levelHints[idx] = inp.value; });
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.textContent = '✕';
-        removeBtn.title = 'Remove this hint';
+        removeBtn.title = t('editor.level.removeHint');
         removeBtn.style.cssText =
           'padding:4px 7px;font-size:0.8rem;background:#2c1a00;color:#f0c040;' +
           `border:1px solid ${UI_GOLD};border-radius:${RADIUS_SM};cursor:pointer;flex-shrink:0;`;
@@ -141,7 +142,7 @@ export class LevelMetadataPanel {
 
     const addHintBtn = document.createElement('button');
     addHintBtn.type = 'button';
-    addHintBtn.textContent = '+ Add Hint';
+    addHintBtn.textContent = t('editor.level.addHint');
     addHintBtn.style.cssText =
       'align-self:flex-start;padding:4px 10px;font-size:0.8rem;background:#1a1400;color:#f0c040;' +
       `border:1px solid ${UI_GOLD};border-radius:${RADIUS_SM};cursor:pointer;`;
@@ -162,7 +163,7 @@ export class LevelMetadataPanel {
     challengeChk.addEventListener('change', () => { state.levelChallenge = challengeChk.checked; });
     const challengeLbl = document.createElement('label');
     challengeLbl.htmlFor = 'editor-challenge-chk';
-    challengeLbl.textContent = '💀 Challenge level (optional – not required to unlock next chapter)';
+    challengeLbl.textContent = t('editor.level.challengeOptional');
     challengeLbl.style.cssText = 'font-size:0.8rem;color:#aaa;cursor:pointer;';
     challengeWrap.appendChild(challengeChk);
     challengeWrap.appendChild(challengeLbl);
@@ -208,7 +209,7 @@ export class LevelMetadataPanel {
       this._btn.bind(this),
       {
         panelId: 'editor-grid-size-panel',
-        title: 'GRID SIZE',
+        title: t('editor.level.gridSize'),
         inputWidth: '60px',
         inputRowStyle: 'gap:6px;font-size:0.85rem;',
         requireOneAxisAbove1: true,
@@ -231,7 +232,7 @@ export class LevelMetadataPanel {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'PLAYER INVENTORY';
+    title.textContent = t('editor.level.playerInventory');
     panel.appendChild(title);
 
     for (let i = 0; i < state.inventory.length; i++) {
@@ -257,7 +258,7 @@ export class LevelMetadataPanel {
     }
 
     addRow.appendChild(shapeSel);
-    addRow.appendChild(this._btn('+ Add', UI_BG, '#7ed321', () => {
+    addRow.appendChild(this._btn(t('editor.level.addInventoryItem'), UI_BG, '#7ed321', () => {
       const shp = shapeSel.value as PipeShape;
       const existing = state.inventory.find((it) => it.shape === shp);
       if (existing) {
@@ -366,7 +367,7 @@ export function buildSlideAndRotateControls(
 
   const slideTitle = document.createElement('div');
   slideTitle.style.cssText = 'font-size:0.75rem;color:#aaa;';
-  slideTitle.textContent = 'Slide tiles:';
+  slideTitle.textContent = t('editor.level.slideTiles');
   leftCol.appendChild(slideTitle);
 
   const compass = document.createElement('div');
@@ -376,7 +377,15 @@ export function buildSlideAndRotateControls(
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = icon;
-    b.title = `Slide all tiles ${dir === 'N' ? 'North (up)' : dir === 'E' ? 'East (right)' : dir === 'S' ? 'South (down)' : 'West (left)'}`;
+    b.title = t(
+      dir === 'N'
+        ? 'editor.level.slideNorth'
+        : dir === 'E'
+          ? 'editor.level.slideEast'
+          : dir === 'S'
+            ? 'editor.level.slideSouth'
+            : 'editor.level.slideWest',
+    );
     b.style.cssText = arrowBtnStyle;
     b.addEventListener('click', () => onSlide(dir));
     return b;
@@ -407,7 +416,7 @@ export function buildSlideAndRotateControls(
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = icon;
-    b.title = clockwise ? 'Rotate board 90° clockwise' : 'Rotate board 90° counter-clockwise';
+    b.title = clockwise ? t('editor.level.rotateCw') : t('editor.level.rotateCcw');
     b.style.cssText = arrowBtnStyle;
     b.addEventListener('click', () => onRotate(clockwise));
     return b;
@@ -417,7 +426,7 @@ export function buildSlideAndRotateControls(
 
   const rotateTitle = document.createElement('div');
   rotateTitle.style.cssText = 'font-size:0.75rem;color:#aaa;';
-  rotateTitle.textContent = 'Rotate board:';
+  rotateTitle.textContent = t('editor.level.rotateBoard');
   rightCol.appendChild(rotateTitle);
 
   const rotateRow = document.createElement('div');
@@ -430,7 +439,7 @@ export function buildSlideAndRotateControls(
 
   const reflectTitle = document.createElement('div');
   reflectTitle.style.cssText = 'font-size:0.75rem;color:#aaa;';
-  reflectTitle.textContent = 'Reflect board:';
+  reflectTitle.textContent = t('editor.level.reflectBoard');
   rightCol.appendChild(reflectTitle);
 
   const reflectRow = document.createElement('div');
@@ -439,7 +448,7 @@ export function buildSlideAndRotateControls(
   const reflectBtn = document.createElement('button');
   reflectBtn.type = 'button';
   reflectBtn.textContent = '⤢';
-  reflectBtn.title = 'Reflect board about the diagonal (transpose)';
+  reflectBtn.title = t('editor.level.reflectDiagonal');
   reflectBtn.style.cssText = arrowBtnStyle;
   reflectBtn.addEventListener('click', () => onReflect());
   reflectRow.appendChild(reflectBtn);
@@ -447,7 +456,7 @@ export function buildSlideAndRotateControls(
   const flipHBtn = document.createElement('button');
   flipHBtn.type = 'button';
   flipHBtn.textContent = '↔';
-  flipHBtn.title = 'Flip board horizontally (left–right)';
+  flipHBtn.title = t('editor.level.flipHorizontal');
   flipHBtn.style.cssText = arrowBtnStyle;
   flipHBtn.addEventListener('click', () => onFlipH());
   reflectRow.appendChild(flipHBtn);
@@ -455,7 +464,7 @@ export function buildSlideAndRotateControls(
   const flipVBtn = document.createElement('button');
   flipVBtn.type = 'button';
   flipVBtn.textContent = '↕';
-  flipVBtn.title = 'Flip board vertically (top–bottom)';
+  flipVBtn.title = t('editor.level.flipVertical');
   flipVBtn.style.cssText = arrowBtnStyle;
   flipVBtn.addEventListener('click', () => onFlipV());
   reflectRow.appendChild(flipVBtn);
