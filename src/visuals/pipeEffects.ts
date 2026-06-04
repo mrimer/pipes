@@ -11,8 +11,10 @@
  * previous tile is complete.  One-way-blocked arms are not filled.
  */
 
-import { Direction, DIRECTIONS } from '../types';
-import { Board, NEIGHBOUR_DELTA, posKey } from '../board';
+import type { Direction} from '../types';
+import { DIRECTIONS } from '../types';
+import type { Board} from '../board';
+import { NEIGHBOUR_DELTA, posKey } from '../board';
 import { oppositeDirection } from '../tile';
 import { WATER_COLOR } from '../colors';
 import { TILE_SIZE } from '../renderer';

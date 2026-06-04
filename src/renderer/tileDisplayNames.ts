@@ -3,7 +3,7 @@
  * rendering state dependencies.
  */
 
-import { Tile } from '../tile';
+import type { Tile } from '../tile';
 import { PipeShape } from '../types';
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */

@@ -32,7 +32,7 @@ import {
   savePlayerName,
   saveTouchUiEnabled,
 } from '../src/persistence';
-import { CampaignDef } from '../src/types';
+import type { CampaignDef } from '../src/types';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
 beforeEach(() => {

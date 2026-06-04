@@ -7,13 +7,15 @@
  * the level editor when visual updates are needed.
  */
 
-import { PipeShape, TEMP_CHAMBER_CONTENTS, LevelStyle, Direction, RegulatorStat, RegulatorOperator } from '../types';
+import type { LevelStyle, Direction, RegulatorStat, RegulatorOperator } from '../types';
+import { PipeShape, TEMP_CHAMBER_CONTENTS } from '../types';
 import { PIPE_SHAPES, SPIN_CEMENT_SHAPES } from '../board';
-import {
+import type {
   EditorPalette,
   ChamberPalette,
   ChamberContent,
-  TileParams,
+  TileParams} from './types';
+import {
   isChamberPalette,
   chamberPaletteContent,
   PALETTE_ITEM_SELECTED_BORDER,
@@ -26,7 +28,7 @@ import {
   EDITOR_PANEL_TITLE_CSS,
   EDITOR_FLEX_ROW_CSS,
 } from './types';
-import { LevelEditorState } from './levelEditorState';
+import type { LevelEditorState } from './levelEditorState';
 import { TILE_SIZE } from '../renderer';
 import { drawEditorTile } from './renderer';
 import { sfxManager, SfxId } from '../sfxManager';
@@ -409,7 +411,7 @@ export class TileParamsPanel {
     }
 
     // Source/Chamber(tank): capacity
-    const cc = isChm ? chamberPaletteContent(p as ChamberPalette) : null;
+    const cc = isChm ? chamberPaletteContent(p) : null;
     if (p === PipeShape.Source || cc === 'tank') {
       panel.appendChild(this.labeledInput('Capacity', String(state.params.capacity), (v) => {
         state.params.capacity = Math.max(0, parseInt(v) || 0);
@@ -440,7 +442,7 @@ export class TileParamsPanel {
       panel.appendChild(this._buildChamberContentSelector(panel));
     }
     if (isChm) {
-      this._buildChamberContentParams(panel, chamberPaletteContent(p as ChamberPalette));
+      this._buildChamberContentParams(panel, chamberPaletteContent(p));
     }
 
     // Connections (Source, Sink, Chamber) – positional compass layout

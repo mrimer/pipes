@@ -1,5 +1,6 @@
 import { validateMapGrid } from '../src/campaignEditor/mapValidator';
-import { PipeShape, TileDef } from '../src/types';
+import type { TileDef } from '../src/types';
+import { PipeShape } from '../src/types';
 
 describe('validateMapGrid', () => {
   it('flags entity chambers that are missing their index field', () => {

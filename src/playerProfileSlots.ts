@@ -68,7 +68,7 @@ function normalizeSlotMeta(raw: unknown): ProfileSlotMeta | null {
   return {
     guid: candidate.guid,
     name: candidate.name,
-    lastPlayedAt: candidate.lastPlayedAt as string | null,
+    lastPlayedAt: candidate.lastPlayedAt,
     formatVersion: typeof candidate.formatVersion === 'number'
       ? candidate.formatVersion
       : PROFILE_SLOT_META_FORMAT_VERSION,

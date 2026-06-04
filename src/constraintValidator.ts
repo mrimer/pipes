@@ -1,7 +1,8 @@
-import { Tile } from './tile';
-import { GridPos, PipeShape } from './types';
+import type { Tile } from './tile';
+import type { GridPos} from './types';
+import { PipeShape } from './types';
 import { parseKey } from './board';
-import { ThermoSimulator } from './thermoSimulator';
+import type { ThermoSimulator } from './thermoSimulator';
 
 /**
  * Prefix of the error message emitted when a sandstone tile's pressure is too

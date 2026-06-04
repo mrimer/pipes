@@ -3,7 +3,8 @@
  */
 
 import { Game } from '../src/game';
-import { LevelDef, PipeShape, CampaignDef, Direction } from '../src/types';
+import type { LevelDef, CampaignDef} from '../src/types';
+import { PipeShape, Direction } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
 import { saveImportedCampaigns, loadActiveCampaignId, saveLevelWater } from '../src/persistence';
 import { sfxManager, SfxId } from '../src/sfxManager';
@@ -745,7 +746,7 @@ describe('Game – reset progress', () => {
 
     const modal = hooks.resetConfirmModalEl;
     const cancelBtn = Array.from(modal.querySelectorAll('button'))
-      .find((b) => b.textContent === 'Cancel')! as HTMLButtonElement;
+      .find((b) => b.textContent === 'Cancel')!;
     cancelBtn.click();
 
     expect(modal.style.display).toBe('none');
@@ -766,7 +767,7 @@ describe('Game – reset progress', () => {
 
     const modal = hooks.resetConfirmModalEl;
     const confirmBtn = Array.from(modal.querySelectorAll('button'))
-      .find((b) => b.textContent === 'Reset')! as HTMLButtonElement;
+      .find((b) => b.textContent === 'Reset')!;
     confirmBtn.click();
 
     // Campaign progress should be cleared
@@ -1896,7 +1897,7 @@ describe('Game – disconnection animations after reclaimTile', () => {
     const boardAccess = game as unknown as { board: Board };
 
     // Manually place a Straight at (2,1) – not reachable from source
-    const { Tile } = jest.requireActual('../src/tile') as typeof import('../src/tile');
+    const { Tile } = jest.requireActual('../src/tile');
     boardAccess.board.grid[2][1] = new Tile(PipeShape.Straight, 90);
     // Add it back to inventory so reclaimTile constraint passes
     boardAccess.board.inventory.push({ shape: PipeShape.Straight, count: 1 });
@@ -2078,7 +2079,6 @@ describe('Game – Ctrl-Z / Ctrl-Y keyboard shortcuts', () => {
     const { game } = makeGame();
     game.startLevel(1);
     const hooks = gameHooks(game);
-    const boardAccess = game as unknown as { board: Board; gameState: GameState };
 
     // Place a tile so there is something to undo
     hooks.selectedShape = PipeShape.Straight;

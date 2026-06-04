@@ -7,14 +7,15 @@
  * re-renders.
  */
 
-import { TileDef, InventoryItem, PipeShape, Direction, Rotation, LevelDef, LevelStyle } from '../types';
+import type { TileDef, InventoryItem, Rotation, LevelDef, LevelStyle } from '../types';
+import { PipeShape, Direction } from '../types';
 import { SPIN_CEMENT_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
-import {
+import type {
   EditorPalette,
   EditorSnapshot,
-  TileParams,
+  TileParams} from './types';
+import {
   DEFAULT_PARAMS,
-  ChamberPalette,
   isChamberPalette,
   chamberPaletteContent,
   rotateGridBy90,
@@ -397,7 +398,7 @@ export class LevelEditorState {
       if (p.temperature !== 0) def.temperature = p.temperature;
       if (p.pressure !== 0) def.pressure = p.pressure;
     } else if (isChm) {
-      const cc = chamberPaletteContent(palette as ChamberPalette);
+      const cc = chamberPaletteContent(palette);
       def.chamberContent = cc;
       if (cc === 'tank') def.capacity = p.capacity;
       if (cc === 'dirt') def.cost = p.cost;
@@ -425,7 +426,7 @@ export class LevelEditorState {
       this.palette = def.shape; // PipeShape.Empty, EmptyFall, EmptyDark, EmptyWinter, or EmptySpring
     } else if (def.shape === PipeShape.Chamber) {
       const cc = def.chamberContent ?? 'tank';
-      this.palette = `chamber:${cc}` as ChamberPalette;
+      this.palette = `chamber:${cc}`;
     } else {
       this.palette = def.shape;
     }
@@ -577,10 +578,10 @@ export class LevelEditorState {
    * so the snapshot is independent of the stored history entries.
    */
   private _restoreFromSnapshot(snapshot: EditorSnapshot): void {
-    this.grid = snapshot.grid as (TileDef | null)[][];
+    this.grid = snapshot.grid;
     this.rows = snapshot.rows;
     this.cols = snapshot.cols;
-    this.inventory = snapshot.inventory as InventoryItem[];
+    this.inventory = snapshot.inventory;
     this.levelStyle = snapshot.levelStyle;
     this._linkedTilePos = null;
     this._linkedTileDirty = false;

@@ -101,7 +101,7 @@ function _tick(): void {
     _animId = requestAnimationFrame(_tick);
   } else {
     _animId = null;
-    if (_ctx) _ctx.clearRect(0, 0, _canvas!.width, _canvas!.height);
+    if (_ctx) _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
   }
 }
 

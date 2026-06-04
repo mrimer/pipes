@@ -1,5 +1,5 @@
-import { ChapterDef, TileDef } from '../types';
-import { ValidationResult } from './types';
+import type { ChapterDef, TileDef } from '../types';
+import type { ValidationResult } from './types';
 import { validateMapGrid } from './mapValidator';
 
 export function validateChapterMap(

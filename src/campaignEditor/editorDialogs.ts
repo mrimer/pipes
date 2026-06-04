@@ -6,7 +6,7 @@
  * returns actions via callbacks.
  */
 
-import { CampaignDef } from '../types';
+import type { CampaignDef } from '../types';
 import { ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG } from '../uiConstants';
 import { setupModal } from '../modalUtils';
 

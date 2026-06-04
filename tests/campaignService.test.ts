@@ -7,8 +7,10 @@
  */
 
 import { saveImportedCampaigns, loadImportedCampaigns } from '../src/persistence';
-import { CampaignService, ImportResult } from '../src/campaignEditor';
-import { CampaignDef, LevelDef, PipeShape, TileDef } from '../src/types';
+import type { ImportResult } from '../src/campaignEditor';
+import { CampaignService } from '../src/campaignEditor';
+import type { CampaignDef, LevelDef, TileDef } from '../src/types';
+import { PipeShape } from '../src/types';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -678,7 +680,7 @@ describe('CampaignService – saveLevel', () => {
     const svc = makeService([campaign]);
     const before = Date.now();
     svc.saveLevel(campaign, 0, 0, campaign.chapters[0].levels[0]);
-    expect(new Date(campaign.lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
+    expect(new Date(campaign.lastUpdated).getTime()).toBeGreaterThanOrEqual(before);
   });
 
   it('persists the change', () => {
@@ -1030,6 +1032,6 @@ describe('CampaignService – scanData', () => {
 
     // non-dry-run: capacity should be stripped from the tile
     svc.scanData(campaign, false);
-    expect((campaign.chapters[0].grid![0][0] as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
+    expect((campaign.chapters[0].grid[0][0] as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
   });
 });

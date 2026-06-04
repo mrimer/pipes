@@ -1,7 +1,10 @@
-import { Board, MoveResult, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, ERR_REGULATOR_CHECK_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
-import { Tile } from './tile';
-import { GameScreen, GameState, GridPos, InventoryItem, LevelDef, PipeShape, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
-import { InputCallbacks, InputHandler } from './inputHandler';
+import type { MoveResult} from './board';
+import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, ERR_REGULATOR_CHECK_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
+import type { Tile } from './tile';
+import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
+import { GameScreen, GameState, PipeShape } from './types';
+import type { InputCallbacks} from './inputHandler';
+import { InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
 import {
   loadPlayerName,
@@ -21,17 +24,20 @@ import {
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
-import { CampaignManager, CampaignCallbacks } from './campaignManager';
+import type { CampaignCallbacks } from './campaignManager';
+import { CampaignManager } from './campaignManager';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
 import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
+import type { ResetProgressInfo} from './gameModals';
 import {
-  buildResetModal, ResetProgressInfo,
+  buildResetModal,
   buildExitConfirmModal, buildUnplayableModal,
   buildSettingsModal,
 } from './gameModals';
+import type { RecordModalInfo} from './recordingModals';
 import {
-  buildRecordModal, RecordModalInfo,
+  buildRecordModal,
   buildPlaybackListModal,
   showReplayImportSuccessModal,
 } from './recordingModals';
@@ -44,7 +50,8 @@ import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_OVERLAY_BG, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
-import { PlaybackScreen, PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
+import type { PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
+import { PlaybackScreen } from './playbackScreen';
 import { exportReplay, importReplay } from './profileIO';
 import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
@@ -1487,7 +1494,7 @@ export class Game implements InputCallbacks {
    */
   private _playLeakSfxIfNeeded(board: Board, changes: Array<{ row: number; col: number; delta: number }>): void {
     const hasLeak = changes.some(({ row, col }) =>
-      LEAKY_PIPE_SHAPES.has(board.grid[row]?.[col]?.shape as PipeShape),
+      LEAKY_PIPE_SHAPES.has(board.grid[row]?.[col]?.shape),
     );
     if (hasLeak) sfxManager.play(SfxId.Leak);
   }
@@ -1944,7 +1951,7 @@ export class Game implements InputCallbacks {
       this.screen = GameScreen.ChapterMap;
 
       // Compute the minimap screen rect for the current level (uses chapter-map TILE_SIZE).
-      const chapterMapScreen = this._campaign.chapterMapScreen!;
+      const chapterMapScreen = this._campaign.chapterMapScreen;
       const minimapRect = this.currentLevel
         ? chapterMapScreen.getMinimapScreenRect(this.currentLevel)
         : null;

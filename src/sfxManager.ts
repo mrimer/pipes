@@ -336,7 +336,7 @@ class SfxManager {
     if (this._getContext()) {
       // Collect every unique URL across all effects and decode them all.
       const urls = new Set<string>();
-      for (const files of Object.values(SFX_FILES) as string[][]) {
+      for (const files of Object.values(SFX_FILES)) {
         for (const url of files) urls.add(url);
       }
       for (const url of urls) {
@@ -344,7 +344,7 @@ class SfxManager {
       }
     } else if (typeof Audio !== 'undefined') {
       // Web Audio unavailable – fall back to HTMLAudioElement preloading.
-      for (const files of Object.values(SFX_FILES) as string[][]) {
+      for (const files of Object.values(SFX_FILES)) {
         for (const url of files) {
           const audio = new Audio(url);
           audio.preload = 'auto';

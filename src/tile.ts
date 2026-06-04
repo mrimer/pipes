@@ -1,4 +1,5 @@
-import { Direction, PipeShape, Rotation, ConnectionSet, ChamberContent, TileDef, RegulatorStat, RegulatorOperator } from './types';
+import type { Rotation, ConnectionSet, ChamberContent, TileDef, RegulatorStat, RegulatorOperator } from './types';
+import { Direction, PipeShape } from './types';
 import { bfs } from './bfs';
 
 /** Base connections for each pipe shape (at 0° rotation). */
@@ -278,7 +279,7 @@ export function isTileConnectedToSource(
    */
   function getTileDefConnections(tile: TileDef): ConnectionSet {
     if (tile.connections && tile.connections.length > 0) return new Set(tile.connections);
-    return getConnections(tile.shape, (tile.rotation ?? 0) as Rotation);
+    return getConnections(tile.shape, (tile.rotation ?? 0));
   }
 
   const reached = bfs(sourcePos, (current) => {

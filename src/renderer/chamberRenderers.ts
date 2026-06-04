@@ -4,7 +4,7 @@
  */
 
 import { GOLD_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from '../board';
-import { Tile } from '../tile';
+import type { Tile } from '../tile';
 import { PipeShape, Direction } from '../types';
 import {
   TANK_COLOR, TANK_WATER_COLOR,

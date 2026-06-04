@@ -2,10 +2,13 @@
  * Board rendering helpers – draw the game board canvas and individual pipe tiles.
  */
 
-import { Board, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
+import type { Board} from './board';
+import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
 import { Tile, oppositeDirection } from './tile';
-import { GridPos, PipeShape, Direction, COLD_CHAMBER_CONTENTS, LevelStyle, floorShapeToStyle } from './types';
-import { PipeFillAnim, FILL_ANIM_DURATION } from './visuals/pipeEffects';
+import type { GridPos, LevelStyle} from './types';
+import { PipeShape, Direction, COLD_CHAMBER_CONTENTS, floorShapeToStyle } from './types';
+import type { PipeFillAnim} from './visuals/pipeEffects';
+import { FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState, drawChamberValveIcons } from './renderer/chamberRenderers';
 import { drawAmbientDecoration } from './renderer/ambientDecoration';
 export { drawAmbientDecoration };
@@ -2296,7 +2299,7 @@ function _renderPass1Backgrounds(
         const ginghamColor = paritySum === 0 ? gc_light : paritySum === 2 ? gc_dark : gc_mid;
         ctx.fillStyle = ginghamColor;
         ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-        drawOneWayArrow(ctx, x, y, oneWayDir!);
+        drawOneWayArrow(ctx, x, y, oneWayDir);
       } else if (isCementCell) {
         // Cement cell: always show cement background regardless of tile on top
         const dryingTime = board.cementData.get(posKey(r, c)) as number;

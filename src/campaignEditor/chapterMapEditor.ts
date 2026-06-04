@@ -6,17 +6,22 @@
  * rotation helpers, and reachability utilities.
  */
 
-import { CampaignDef, ChapterDef, LevelDef, TileDef, PipeShape, LevelStyle } from '../types';
+import type { CampaignDef, ChapterDef, LevelDef, TileDef, LevelStyle } from '../types';
+import { PipeShape } from '../types';
 import { isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
-import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
+import type { HoverOverlay, DragState } from './renderer';
+import { renderEditorCanvas } from './renderer';
+import type {
+  EditorSnapshot} from './types';
 import {
-  EditorSnapshot,
   EDITOR_CANVAS_BORDER,
   buildMapTileDef,
 } from './types';
-import { ChapterEditorUI, ChapterEditorUICallbacks } from './chapterEditorUI';
-import { ChapterMapInput, ChapterMapInputCallbacks } from './chapterMapInput';
+import type { ChapterEditorUICallbacks } from './chapterEditorUI';
+import { ChapterEditorUI } from './chapterEditorUI';
+import type { ChapterMapInputCallbacks } from './chapterMapInput';
+import { ChapterMapInput } from './chapterMapInput';
 import { validateChapterMap } from './chapterMapValidator';
 import { hasShapeElsewhere } from './gridUtils';
 import { EDITOR_INPUT_BG, MUTED_BTN_BG, RADIUS_SM, UI_BG } from '../uiConstants';
@@ -171,7 +176,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const campaign = this._callbacks.getActiveCampaign();
     const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
     this._applySnapshotBase(snap, (style) => {
-      if (chapter) chapter.style = style as typeof chapter.style;
+      if (chapter) chapter.style = style;
     });
     if (this._ui && campaign && chapter) {
       this._ui.rebuildLevelInventory(chapter, campaign);
@@ -338,7 +343,7 @@ export class ChapterMapEditorSection extends MapEditorBase {
         this._saveGrid();
         this._renderCanvas();
       },
-      recordSnapshot: (...args) => this._recordSnapshot(args[1] as boolean | undefined),
+      recordSnapshot: (...args) => this._recordSnapshot(args[1]),
       saveGridState:  () => this._saveGrid(),
       resizeGrid: (r, c) => this._resizeGrid(r, c),
       slideGrid:  (d)    => this._slideGrid(d),

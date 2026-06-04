@@ -2,7 +2,7 @@
 
 import { bfs, bfsWithDepth } from '../src/bfs';
 import { posKey } from '../src/board';
-import { GridPos } from '../src/types';
+import type { GridPos } from '../src/types';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 

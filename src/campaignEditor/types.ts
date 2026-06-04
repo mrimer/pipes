@@ -3,7 +3,8 @@
  * Campaign Editor. Kept separate to reduce the size of campaignEditor.ts.
  */
 
-import { PipeShape, TileDef, InventoryItem, Rotation, ChamberContent, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction, LevelStyle, RegulatorStat, RegulatorOperator } from '../types';
+import type { TileDef, InventoryItem, Rotation, ChamberContent, LevelStyle, RegulatorStat, RegulatorOperator } from '../types';
+import { PipeShape, COST_CHAMBER_CONTENTS, TEMP_RELEVANT_CONTENTS, Direction } from '../types';
 import { PIPE_SHAPES } from '../board';
 import { DIRT_COLOR, ICE_COLOR, REGULATOR_COLOR } from '../colors';
 import { UI_BG, UI_BORDER, UI_INPUT_BORDER } from '../uiConstants';
@@ -243,7 +244,7 @@ export function buildMapTileDef(palette: EditorPalette, params: TileParams): Til
     // but this branch is reached for the hover-ghost when the chamber palette is
     // active without a pending chapter/level selection.  Return a valid TileDef
     // so the ghost renders as a chamber instead of a fallback tile.
-    const chamberContent = chamberPaletteContent(palette as ChamberPalette);
+    const chamberContent = chamberPaletteContent(palette);
     const connDirs: Direction[] = [];
     if (params.connections.N) connDirs.push(Direction.North);
     if (params.connections.E) connDirs.push(Direction.East);

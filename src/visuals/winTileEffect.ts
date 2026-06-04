@@ -13,8 +13,10 @@
  * triggered.
  */
 
-import { Board, NEIGHBOUR_DELTA } from '../board';
-import { DIRECTIONS, GridPos } from '../types';
+import type { Board} from '../board';
+import { NEIGHBOUR_DELTA } from '../board';
+import type { GridPos } from '../types';
+import { DIRECTIONS } from '../types';
 import { TILE_SIZE } from '../renderer';
 import { bfsWithDepth } from '../bfs';
 

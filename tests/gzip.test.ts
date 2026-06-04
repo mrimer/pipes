@@ -6,17 +6,21 @@
  */
 
 import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from '../src/campaignEditor/types';
+import {
+  CompressionStream,
+  DecompressionStream,
+} from 'node:stream/web';
+import {
+  TextEncoder as NodeTextEncoder,
+  TextDecoder as NodeTextDecoder,
+} from 'node:util';
 
 describe('gzip helpers', () => {
   beforeAll(() => {
     // Polyfill Compression/DecompressionStream for jsdom / older Node environments
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-    const webStreams = require('node:stream/web') as any;
     const g = globalThis as Record<string, unknown>;
-    if (!g.CompressionStream) g.CompressionStream = webStreams.CompressionStream;
-    if (!g.DecompressionStream) g.DecompressionStream = webStreams.DecompressionStream;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-    const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('node:util') as any;
+    if (!g.CompressionStream) g.CompressionStream = CompressionStream;
+    if (!g.DecompressionStream) g.DecompressionStream = DecompressionStream;
     if (!g.TextEncoder) g.TextEncoder = NodeTextEncoder;
     if (!g.TextDecoder) g.TextDecoder = NodeTextDecoder;
   });
@@ -90,4 +94,3 @@ describe('gzip helpers', () => {
     });
   });
 });
-

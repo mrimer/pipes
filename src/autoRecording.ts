@@ -1,4 +1,4 @@
-import { PlaySequenceRecord } from './types';
+import type { PlaySequenceRecord } from './types';
 
 /** Returns true when an identical auto-recorded move sequence already exists. */
 export function hasDuplicateAutoRecording(existingRecords: PlaySequenceRecord[], moves: string[]): boolean {

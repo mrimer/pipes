@@ -18,8 +18,11 @@ import {
   savePlayerName,
 } from '../src/persistence';
 import { CampaignEditor } from '../src/campaignEditor';
-import { CampaignDef, LevelDef, PipeShape } from '../src/types';
-import { TileParams } from '../src/campaignEditor/types';
+import type { CampaignDef, LevelDef} from '../src/types';
+import { PipeShape } from '../src/types';
+import type { TileParams } from '../src/campaignEditor/types';
+import { DecompressionStream } from 'node:stream/web';
+import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
 
 // Keep TILE_SIZE at 64 for all tests by simulating a small viewport.
 let originalInnerWidth: PropertyDescriptor | undefined;
@@ -264,14 +267,14 @@ function makeEditor(userCampaigns: CampaignDef[] = []): CampaignEditor {
  * Note: JSDOM normalizes CSS hex colors to rgb(), so we can't use style attribute selectors.
  */
 function getFirstButtonTextForCampaign(name: string): string | null {
-  const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
+  const nameDivs = Array.from(document.querySelectorAll('div'));
   for (const div of nameDivs) {
     // Find name divs that contain exactly the campaign name
     if (div.style.fontWeight === 'bold' && div.textContent?.startsWith(name)) {
       // Walk up to the row container and find the first button
-      const row = div.closest('div[style*="border-radius"]') as HTMLElement | null;
+      const row = div.closest('div[style*="border-radius"]');
       if (row) {
-        const btn = row.querySelector('button') as HTMLButtonElement | null;
+        const btn = row.querySelector('button');
         return btn ? btn.textContent : null;
       }
     }
@@ -280,12 +283,12 @@ function getFirstButtonTextForCampaign(name: string): string | null {
 }
 
 function isFirstButtonDisabledForCampaign(name: string): boolean {
-  const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
+  const nameDivs = Array.from(document.querySelectorAll('div'));
   for (const div of nameDivs) {
     if (div.style.fontWeight === 'bold' && div.textContent?.startsWith(name)) {
-      const row = div.closest('div[style*="border-radius"]') as HTMLElement | null;
+      const row = div.closest('div[style*="border-radius"]');
       if (row) {
-        const btn = row.querySelector('button') as HTMLButtonElement | null;
+        const btn = row.querySelector('button');
         return btn ? btn.disabled : false;
       }
     }
@@ -516,8 +519,8 @@ describe('CampaignEditor – note and hint in level definitions', () => {
 // ─── gzip export ─────────────────────────────────────────────────────────────
 
 describe('CampaignEditor – _exportCampaign', () => {
-  let originalCreateObjectURL: typeof URL.createObjectURL | undefined;
-  let originalRevokeObjectURL: typeof URL.revokeObjectURL | undefined;
+  let originalCreateObjectURL: ((obj: Blob | MediaSource) => string) | undefined;
+  let originalRevokeObjectURL: ((url: string) => void) | undefined;
 
   const waitFor = async (predicate: () => boolean, maxTicks = 10): Promise<void> => {
     for (let i = 0; i < maxTicks; i += 1) {
@@ -530,8 +533,8 @@ describe('CampaignEditor – _exportCampaign', () => {
   beforeEach(() => {
     localStorage.clear();
     document.body.innerHTML = '';
-    originalCreateObjectURL = URL.createObjectURL;
-    originalRevokeObjectURL = URL.revokeObjectURL;
+    originalCreateObjectURL = URL.createObjectURL?.bind(URL);
+    originalRevokeObjectURL = URL.revokeObjectURL?.bind(URL);
     if (!URL.createObjectURL) URL.createObjectURL = () => 'blob:fake';
     if (!URL.revokeObjectURL) URL.revokeObjectURL = () => undefined;
   });
@@ -581,7 +584,7 @@ describe('CampaignEditor – _exportCampaign', () => {
 
     const fakeUrl = 'blob:fake-url';
     jest.spyOn(URL, 'createObjectURL').mockReturnValue(fakeUrl);
-    jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const revokeSpy = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
 
     const origCreate = document.createElement.bind(document);
     jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -607,11 +610,11 @@ describe('CampaignEditor – _exportCampaign', () => {
     expect(appendedAnchors[0]).toBe(clickedAnchors[0]);
 
     // revokeObjectURL should not have been called yet (deferred via setTimeout).
-    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(revokeSpy).not.toHaveBeenCalled();
 
     // After advancing timers the URL should be revoked.
     jest.runAllTimers();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith(fakeUrl);
+    expect(revokeSpy).toHaveBeenCalledWith(fakeUrl);
   });
 
   it('sets the download filename from the campaign name', async () => {
@@ -658,12 +661,8 @@ describe('CampaignEditor – gzip import', () => {
     document.body.innerHTML = '';
     // Polyfill DecompressionStream / TextEncoder / TextDecoder
     // from Node.js built-ins because jsdom does not implement them.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-    const webStreams = require('node:stream/web') as any;
     const g = globalThis as Record<string, unknown>;
-    if (!g.DecompressionStream) g.DecompressionStream = webStreams.DecompressionStream;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-    const { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextDecoder } = require('node:util') as any;
+    if (!g.DecompressionStream) g.DecompressionStream = DecompressionStream;
     if (!g.TextEncoder) g.TextEncoder = NodeTextEncoder;
     if (!g.TextDecoder) g.TextDecoder = NodeTextDecoder;
   });
@@ -1588,8 +1587,8 @@ describe('CampaignEditor – canvas display size and _canvasPos calibration', ()
   /** Get the "↔ Resize" button and both number inputs from the grid-size panel. */
   function getResizeControls(panel: HTMLElement) {
     const inputs = Array.from(panel.querySelectorAll<HTMLInputElement>('input[type="number"]'));
-    const rowsInp = inputs[0]!;
-    const colsInp = inputs[1]!;
+    const rowsInp = inputs[0];
+    const colsInp = inputs[1];
     const resizeBtn = Array.from(panel.querySelectorAll('button'))
       .find((b) => b.textContent?.includes('Resize'))!;
     const errorDiv = Array.from(panel.querySelectorAll('div'))
@@ -2625,7 +2624,7 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
     editor.show();
 
     // Check that name shows lock icon
-    const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
+    const nameDivs = Array.from(document.querySelectorAll('div'));
     const nameDiv = nameDivs.find((d) => d.textContent === 'Locked Pack 🔒');
     expect(nameDiv).toBeDefined();
 
@@ -2639,10 +2638,10 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
     editor.show();
 
     // Find the campaign row and check no delete button
-    const nameDivs = Array.from(document.querySelectorAll('div')) as HTMLDivElement[];
+    const nameDivs = Array.from(document.querySelectorAll('div'));
     for (const div of nameDivs) {
       if (div.style.fontWeight === 'bold' && div.textContent?.startsWith('Protected Pack')) {
-        const row = div.closest('div[style*="border-radius"]') as HTMLElement | null;
+        const row = div.closest('div[style*="border-radius"]');
         if (row) {
           const buttons = Array.from(row.querySelectorAll('button'));
           const hasDelete = buttons.some((b) => b.textContent?.includes('Delete'));
@@ -2930,7 +2929,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
 // ─── Data validation ──────────────────────────────────────────────────────────
 
 import { getValidTileDefKeys } from '../src/campaignEditor/types';
-import { TileDef } from '../src/types';
+import type { TileDef } from '../src/types';
 
 describe('getValidTileDefKeys', () => {
   it('Empty tile: only shape is valid', () => {
@@ -3350,8 +3349,8 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
   it('strips rotation from GoldSpace tile when saving', () => {
     const tile: TileDef = { shape: PipeShape.GoldSpace };
     (tile as unknown as Record<string, unknown>)['rotation'] = 0;
-    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
-    const def = buildCurrentLevelDef();
+    const editor = makeEditorWithGrid([[tile]]);
+    const def = editor.buildCurrentLevelDef();
     const savedTile = def.grid[0][0];
     expect(savedTile).not.toBeNull();
     expect('rotation' in (savedTile as object)).toBe(false);
@@ -3360,8 +3359,8 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
   it('strips rotation from Granite tile when saving', () => {
     const tile: TileDef = { shape: PipeShape.Granite };
     (tile as unknown as Record<string, unknown>)['rotation'] = 90;
-    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
-    const def = buildCurrentLevelDef();
+    const editor = makeEditorWithGrid([[tile]]);
+    const def = editor.buildCurrentLevelDef();
     const savedTile = def.grid[0][0];
     expect(savedTile).not.toBeNull();
     expect('rotation' in (savedTile as object)).toBe(false);
@@ -3370,8 +3369,8 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
   it('strips rotation from Tree tile when saving', () => {
     const tile: TileDef = { shape: PipeShape.Tree };
     (tile as unknown as Record<string, unknown>)['rotation'] = 90;
-    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
-    const def = buildCurrentLevelDef();
+    const editor = makeEditorWithGrid([[tile]]);
+    const def = editor.buildCurrentLevelDef();
     const savedTile = def.grid[0][0];
     expect(savedTile).not.toBeNull();
     expect('rotation' in (savedTile as object)).toBe(false);
@@ -3379,8 +3378,8 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
 
   it('preserves rotation on Straight tile when saving', () => {
     const tile: TileDef = { shape: PipeShape.Straight, rotation: 90 };
-    const { buildCurrentLevelDef } = makeEditorWithGrid([[tile]]);
-    const def = buildCurrentLevelDef();
+    const editor = makeEditorWithGrid([[tile]]);
+    const def = editor.buildCurrentLevelDef();
     const savedTile = def.grid[0][0];
     expect(savedTile).not.toBeNull();
     expect((savedTile as TileDef).rotation).toBe(90);

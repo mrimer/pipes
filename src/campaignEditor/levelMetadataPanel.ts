@@ -7,13 +7,14 @@
  * the level editor when visual updates are needed.
  */
 
-import { InventoryItem, PipeShape } from '../types';
+import type { InventoryItem} from '../types';
+import { PipeShape } from '../types';
 import {
   EDITOR_FLEX_ROW_CSS,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
 } from './types';
-import { LevelEditorState } from './levelEditorState';
+import type { LevelEditorState } from './levelEditorState';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from '../uiConstants';
 

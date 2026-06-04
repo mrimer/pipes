@@ -1,9 +1,10 @@
 /** Tests for tileAnimation utilities. */
 
+import type {
+  TileAnimation} from '../src/visuals/tileAnimation';
 import {
   animColor,
   renderAnimations,
-  TileAnimation,
   ANIM_POSITIVE_COLOR,
   ANIM_NEGATIVE_COLOR,
   ANIM_ZERO_COLOR,
@@ -46,12 +47,13 @@ describe('ANIM_ITEM_COLOR', () => {
 // ─── renderAnimations ─────────────────────────────────────────────────────────
 
 /** Minimal canvas context stub for testing. */
-const makeCtx = () => {
+const makeCtx = (): CanvasRenderingContext2D & { alphaWrites: number[]; fillTextMock: jest.Mock } => {
   const alphaWrites: number[] = [];
+  const fillTextMock = jest.fn();
   const ctx = {
     save:         jest.fn(),
     restore:      jest.fn(),
-    fillText:     jest.fn(),
+    fillText:     fillTextMock,
     strokeText:   jest.fn(),
     font:         '',
     textAlign:    '',
@@ -60,6 +62,7 @@ const makeCtx = () => {
     strokeStyle:  '',
     lineWidth:    0,
     alphaWrites,
+    fillTextMock,
   };
   let alpha = 1;
   Object.defineProperty(ctx, 'globalAlpha', {
@@ -70,7 +73,7 @@ const makeCtx = () => {
       alphaWrites.push(value);
     },
   });
-  return ctx as unknown as CanvasRenderingContext2D & { alphaWrites: number[] };
+  return ctx as unknown as CanvasRenderingContext2D & { alphaWrites: number[]; fillTextMock: jest.Mock };
 };
 
 describe('renderAnimations', () => {
@@ -90,7 +93,7 @@ describe('renderAnimations', () => {
       { x: 100, y: 50, text: '-1', color: ANIM_NEGATIVE_COLOR, startTime: FIXED_NOW - 100, duration: 900 },
     ];
     renderAnimations(ctx, anims);
-    expect((ctx.fillText as jest.Mock).mock.calls[0]).toEqual(['-1', 100, expect.any(Number)]);
+    expect(ctx.fillTextMock.mock.calls[0]).toEqual(['-1', 100, expect.any(Number)]);
     expect(anims).toHaveLength(1); // still active
   });
 
@@ -102,7 +105,7 @@ describe('renderAnimations', () => {
     ];
     renderAnimations(ctx, anims);
     expect(anims).toHaveLength(0); // expired → removed
-    expect((ctx.fillText as jest.Mock)).not.toHaveBeenCalled();
+    expect(ctx.fillTextMock).not.toHaveBeenCalled();
   });
 
   it('applies partial alpha for a mid-animation frame', () => {
@@ -113,13 +116,13 @@ describe('renderAnimations', () => {
     ];
     renderAnimations(ctx, anims);
     // Just after 50% elapsed, fade-out must be active (alpha < 1).
-    expect((ctx.fillText as jest.Mock)).toHaveBeenCalled();
+    expect(ctx.fillTextMock).toHaveBeenCalled();
     expect(ctx.alphaWrites.length).toBeGreaterThan(0);
     const appliedAlpha = ctx.alphaWrites[ctx.alphaWrites.length - 1];
     expect(appliedAlpha).toBeGreaterThan(0);
     expect(appliedAlpha).toBeLessThan(1);
     // Y position should be shifted upward
-    const [, , y] = (ctx.fillText as jest.Mock).mock.calls[0] as [string, number, number];
+    const [, , y] = ctx.fillTextMock.mock.calls[0] as [string, number, number];
     expect(y).toBeLessThan(32); // started at 32, shifted up
     expect(y).toBeGreaterThan(32 - ANIM_RISE_PX); // within bounds
   });

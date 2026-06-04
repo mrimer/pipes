@@ -1,7 +1,8 @@
-import { Tile } from './tile';
-import { GridPos, PipeShape, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS, ENV_MODIFIER_CONTENTS, GEL_SIPHON_CONTENTS } from './types';
+import type { Tile } from './tile';
+import type { GridPos} from './types';
+import { PipeShape, COLD_CHAMBER_CONTENTS, TEMP_CHAMBER_CONTENTS, ENV_MODIFIER_CONTENTS, GEL_SIPHON_CONTENTS } from './types';
 import { parseKey, posKey, LEAKY_PIPE_SHAPES, PIPE_SHAPES } from './board';
-import { ThermoSimulator } from './thermoSimulator';
+import type { ThermoSimulator } from './thermoSimulator';
 
 /** Per-turn state captured for undo/redo snapshots. */
 export type TurnStateSnapshot = {

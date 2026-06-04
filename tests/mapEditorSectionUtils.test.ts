@@ -6,7 +6,8 @@
  * Unit tests for the mapEditorSectionUtils.ts keyboard handler.
  */
 
-import { handleMapEditorKeyDown, MapEditorKeydownCallbacks } from '../src/campaignEditor/mapEditorSectionUtils';
+import type { MapEditorKeydownCallbacks } from '../src/campaignEditor/mapEditorSectionUtils';
+import { handleMapEditorKeyDown } from '../src/campaignEditor/mapEditorSectionUtils';
 import { commandKeyManager } from '../src/commandKeyManager';
 import { PipeShape } from '../src/types';
 import type { TileDef } from '../src/types';

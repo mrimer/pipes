@@ -7,10 +7,10 @@
  * ChapterMapCallbacks interface to the abstract methods.
  */
 
-import { ChapterDef, CampaignDef, LevelDef, TileDef } from './types';
+import type { ChapterDef, CampaignDef, LevelDef, TileDef } from './types';
 import { loadLevelStars, loadLevelWater } from './persistence';
 import { MapScreenBase } from './mapScreenBase';
-import { CloudShadowPreset } from './visuals/cloudShadows';
+import type { CloudShadowPreset } from './visuals/cloudShadows';
 
 export { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from './mapScreenBase';
 

@@ -5,7 +5,8 @@ import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
 import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
-import { CommandAction, CommandKeyManager, commandKeyManager } from './commandKeyManager';
+import type { CommandAction, CommandKeyManager} from './commandKeyManager';
+import { commandKeyManager } from './commandKeyManager';
 import { setupModal } from './modalUtils';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,

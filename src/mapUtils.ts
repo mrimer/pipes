@@ -2,7 +2,8 @@
  * Shared utilities for BFS traversal of chapter/campaign map grids.
  */
 
-import { Direction, TileDef, Rotation, PipeShape } from './types';
+import type { TileDef } from './types';
+import { Direction, PipeShape } from './types';
 import { Tile } from './tile';
 import { PIPE_SHAPES } from './board';
 import { bfs } from './bfs';
@@ -85,7 +86,7 @@ export function tileDefConnections(def: TileDef): Set<Direction> {
     return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
   }
   if (PIPE_SHAPES.has(shape)) {
-    const rot = (def.rotation ?? 0) as Rotation;
+    const rot = (def.rotation ?? 0);
     const t = new Tile(shape, rot, true, 0, 0, null, 1, null, null, 0, 0, 0, 0);
     return t.connections;
   }

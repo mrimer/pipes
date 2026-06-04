@@ -4,14 +4,17 @@
  * write only to the supplied CanvasRenderingContext2D.
  */
 
-import { PipeShape, TileDef, Direction, LevelDef, Rotation, LevelStyle } from '../types';
-import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, SeaNeighbors, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree, drawTree2, drawTree3, drawTree4 } from '../renderer';
+import type { TileDef, LevelDef, Rotation, LevelStyle } from '../types';
+import { PipeShape, Direction } from '../types';
+import type { SeaNeighbors} from '../renderer';
+import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree, drawTree2, drawTree3, drawTree4 } from '../renderer';
 import { Tile, rotateDirection } from '../tile';
 import { EDITOR_COLORS, chamberColor } from './types';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, LEAKY_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
 import { COOLER_COLOR, VACUUM_COLOR, SOURCE_COLOR, SINK_COLOR, CEMENT_COLOR, CEMENT_FILL_COLOR, ONE_WAY_BG_COLOR,
   WATER_COLOR, PIPE_COLOR, FIXED_PIPE_BODY_COLOR, FIXED_PIPE_WATER_COLOR, GOLD_PIPE_COLOR, GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR, LEAKY_PIPE_WATER_COLOR } from '../colors';
-import { drawLevelChamberTile, LevelProgressMap, computeChapterButtEndDirs, type ViewBounds } from '../visuals/chapterMap';
+import type { LevelProgressMap} from '../visuals/chapterMap';
+import { drawLevelChamberTile, computeChapterButtEndDirs, type ViewBounds } from '../visuals/chapterMap';
 import { tileDefConnections } from '../mapUtils';
 
 export type { LevelProgressMap };
@@ -528,7 +531,7 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
 
   // Draw the tile as a Tile object using existing drawTile infrastructure
   // We construct a temporary Tile to render it
-  const rot = (def.rotation ?? 0) as Rotation;
+  const rot = (def.rotation ?? 0);
   const customConns = def.connections ? new Set(def.connections) : null;
   const firstConns = (def.firstConnections && def.firstConnections.length > 0) ? new Set(def.firstConnections) : null;
   const tile = new Tile(
@@ -802,7 +805,7 @@ function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, t
       else if (cc === 'pump') strokeFillText(ctx, `${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + _s(8));
       else if (cc === 'snow') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
       else if (cc === 'hot_plate') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
-      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape != null ? ITEM_SHAPE_LABEL[tile.itemShape] : '?'}×${tile.itemCount}`, cx, cy + _s(8));
+      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape !== null && tile.itemShape !== undefined ? ITEM_SHAPE_LABEL[tile.itemShape] : '?'}×${tile.itemCount}`, cx, cy + _s(8));
     }
     drawConnectionLines(ctx, x, y, tile);
     // Valve indicator: draw a small green ring with black outline along each

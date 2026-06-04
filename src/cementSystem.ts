@@ -1,5 +1,5 @@
-import { Tile } from './tile';
-import { GridPos } from './types';
+import type { Tile } from './tile';
+import type { GridPos } from './types';
 import { PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey } from './board';
 
 /**
@@ -53,7 +53,7 @@ export class CementSystem {
   ): { blocked: false } | { blocked: true; error: string; positions: GridPos[] } {
     const key = posKey(pos.row, pos.col);
     if (!this.data.has(key)) return { blocked: false };
-    if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
+    if (tile !== null && tile !== undefined && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
       return { blocked: false };
     }
     if (this.data.get(key)! === 0) {
@@ -78,7 +78,7 @@ export class CementSystem {
   applyDecrement(pos: GridPos, tile?: Tile | null): GridPos | undefined {
     const key = posKey(pos.row, pos.col);
     if (!this.data.has(key)) return undefined;
-    if (tile != null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
+    if (tile !== null && tile !== undefined && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
       return undefined;
     }
     const dryingTime = this.data.get(key)!;

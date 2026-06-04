@@ -1,6 +1,6 @@
 /** Helpers for rendering the level-selection screen. */
 
-import { ChapterDef } from './types';
+import type { ChapterDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from './uiConstants';

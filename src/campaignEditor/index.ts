@@ -9,7 +9,8 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import { CampaignDef, LevelDef, TileDef, PipeShape } from '../types';
+import type { CampaignDef, LevelDef, TileDef} from '../types';
+import { PipeShape } from '../types';
 import {
   loadCampaignProgress,
   computeCampaignCompletionPct,
@@ -20,9 +21,12 @@ import {
 } from '../persistence';
 import { getActiveSlotIndex } from '../activeProfile';
 import { loadSlotMeta, loadAllSlotMetas } from '../playerProfileSlots';
-import { ChapterMapEditorSection, ChapterMapEditorCallbacks } from './chapterMapEditor';
-import { CampaignMapEditorSection, CampaignMapEditorCallbacks } from './campaignMapEditor';
-import { CampaignService, ImportResult } from './campaignService';
+import type { ChapterMapEditorCallbacks } from './chapterMapEditor';
+import { ChapterMapEditorSection } from './chapterMapEditor';
+import type { CampaignMapEditorCallbacks } from './campaignMapEditor';
+import { CampaignMapEditorSection } from './campaignMapEditor';
+import type { ImportResult } from './campaignService';
+import { CampaignService } from './campaignService';
 import { LevelEditorState } from './levelEditorState';
 import { TileParamsPanel } from './tileParamsPanel';
 import { LevelMetadataPanel } from './levelMetadataPanel';
@@ -34,7 +38,8 @@ import {
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
 } from './types';
-import { renderEditorCanvas, HoverOverlay, DragState } from './renderer';
+import type { HoverOverlay, DragState } from './renderer';
+import { renderEditorCanvas } from './renderer';
 import { EditorInputHandler } from './editorInputHandler';
 import { DataValidationDialog } from './dataValidationDialog';
 import { EditorDialogs } from './editorDialogs';
@@ -1069,9 +1074,9 @@ export class CampaignEditor {
     rightCol.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:180px;';
 
     if (!readOnly) {
-      rightCol.appendChild(this._metadataPanel!.buildInventoryEditor());
+      rightCol.appendChild(this._metadataPanel.buildInventoryEditor());
       rightCol.appendChild(this._paramsPanel.buildParamPanel());
-      rightCol.appendChild(this._metadataPanel!.buildGridSizePanel());
+      rightCol.appendChild(this._metadataPanel.buildGridSizePanel());
     } else {
       rightCol.appendChild(this._buildInventoryReadonly());
     }

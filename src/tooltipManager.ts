@@ -1,5 +1,6 @@
-import { Board, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
-import { Tile } from './tile';
+import type { Board} from './board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import type { Tile } from './tile';
 import { GameScreen, PipeShape, COLD_CHAMBER_CONTENTS } from './types';
 import { TILE_SIZE, getTileDisplayName } from './renderer';
 import { RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';

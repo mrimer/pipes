@@ -14,10 +14,12 @@
  *  - Restore the original game state on exit.
  */
 
-import { Board, MoveResult } from './board';
-import { LevelDef, GameScreen, GameState, PlaySequenceRecord, AmbientDecoration } from './types';
-import { DecodedMove, decodeMove, replayMoves } from './moveRecorder';
-import { Tile } from './tile';
+import type { Board, MoveResult } from './board';
+import type { LevelDef, GameState, PlaySequenceRecord, AmbientDecoration } from './types';
+import { GameScreen } from './types';
+import type { DecodedMove} from './moveRecorder';
+import { decodeMove, replayMoves } from './moveRecorder';
+import type { Tile } from './tile';
 import { saveRecording } from './persistence';
 import { MUTED_BTN_BG } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';

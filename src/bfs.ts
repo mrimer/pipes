@@ -10,7 +10,7 @@
  * `Array.prototype.shift`.
  */
 
-import { GridPos } from './types';
+import type { GridPos } from './types';
 
 /** @internal Produce the canonical string key for a grid position. */
 function _key(pos: GridPos): string {

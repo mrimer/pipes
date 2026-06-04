@@ -4,7 +4,7 @@
  * parameters and return new values without mutating the inputs.
  */
 
-import { TileDef, PipeShape } from '../types';
+import type { TileDef, PipeShape } from '../types';
 
 /**
  * Build a resized copy of `grid`, preserving tiles that still fit within the

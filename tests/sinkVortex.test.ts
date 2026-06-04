@@ -1,8 +1,9 @@
 /** Tests for the sinkVortex visual-effect utilities. */
 
+import type {
+  VortexParticle} from '../src/visuals/sinkVortex';
 import {
   VORTEX_MAX_PARTICLES,
-  VortexParticle,
   spawnVortexParticle,
   renderVortex,
 } from '../src/visuals/sinkVortex';
@@ -99,7 +100,7 @@ describe('spawnVortexParticle', () => {
 // ─── renderVortex ─────────────────────────────────────────────────────────────
 
 describe('renderVortex', () => {
-  let now = 5_000;
+  const now = 5_000;
 
   beforeEach(() => {
     jest.spyOn(performance, 'now').mockImplementation(() => now);

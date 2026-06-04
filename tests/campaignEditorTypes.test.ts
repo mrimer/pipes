@@ -614,7 +614,7 @@ describe('buildMapTileDef', () => {
 // ─── rotateConnectionsBy90 ────────────────────────────────────────────────────
 
 import { rotateConnectionsBy90, computeEditorFilledCells } from '../src/campaignEditor/types';
-import { TileDef } from '../src/types';
+import type { TileDef } from '../src/types';
 
 describe('rotateConnectionsBy90', () => {
   it('rotates [East] clockwise to [South]', () => {

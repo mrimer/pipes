@@ -1,6 +1,6 @@
 /** Helpers for persisting long-term player progress in localStorage. */
 
-import { CampaignDef, PlaySequenceRecord, RecordingSettings } from './types';
+import type { CampaignDef, PlaySequenceRecord, RecordingSettings } from './types';
 import { getActiveSlotPrefix } from './activeProfile';
 
 /**
@@ -51,7 +51,7 @@ export function migrateCampaign(campaign: CampaignDef): CampaignDef {
 
       // Migrate deprecated single-string `hint` to the `hints` array.
       if (typeof levelRec['hint'] === 'string') {
-        const hintStr = levelRec['hint'] as string;
+        const hintStr = levelRec['hint'];
         if (!level.hints?.length && hintStr.trim()) {
           level.hints = [hintStr];
         }
@@ -634,7 +634,7 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
           || !Array.isArray(moves)
           || !moves.every((move) => typeof move === 'string')
           || typeof candidate['outcome'] !== 'string'
-          || !['success', 'failure', 'partial'].includes(candidate['outcome'] as string)
+          || !['success', 'failure', 'partial'].includes(candidate['outcome'])
           || typeof candidate['autoRecorded'] !== 'boolean'
           || typeof candidate['timestamp'] !== 'number'
           || typeof candidate['playerName'] !== 'string'
@@ -650,15 +650,15 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
           return [];
         }
         return [{
-          id: candidate['id'] as string,
-          campaignId: candidate['campaignId'] as string,
-          levelId: candidate['levelId'] as number,
+          id: candidate['id'],
+          campaignId: candidate['campaignId'],
+          levelId: candidate['levelId'],
           moves: candidate['moves'] as string[],
           outcome: candidate['outcome'] as 'success' | 'failure' | 'partial',
-          autoRecorded: candidate['autoRecorded'] as boolean,
-          timestamp: candidate['timestamp'] as number,
-          playerName: candidate['playerName'] as string,
-          corrupted: candidate['corrupted'] as boolean,
+          autoRecorded: candidate['autoRecorded'],
+          timestamp: candidate['timestamp'],
+          playerName: candidate['playerName'],
+          corrupted: candidate['corrupted'],
           formatVersion,
           playerGuid: typeof candidate['playerGuid'] === 'string' ? candidate['playerGuid'] : undefined,
           waterScore: typeof candidate['waterScore'] === 'number' ? candidate['waterScore'] : undefined,

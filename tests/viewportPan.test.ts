@@ -7,8 +7,9 @@
  */
 
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../src/chapterMapScreen';
-import { GRID_MAX_DIM, CAMPAIGN_MAP_MAX_DIM, GRID_MIN_DIM } from '../src/campaignEditor/types';
-import { buildGridSizePanel, GridSizePanelCallbacks } from '../src/campaignEditor/gridSizePanel';
+import { GRID_MAX_DIM, CAMPAIGN_MAP_MAX_DIM } from '../src/campaignEditor/types';
+import type { GridSizePanelCallbacks } from '../src/campaignEditor/gridSizePanel';
+import { buildGridSizePanel } from '../src/campaignEditor/gridSizePanel';
 import {
   CAMPAIGN_MAP_ZOOM_MAX_SCALE,
   CAMPAIGN_MAP_ZOOM_MIN_SCALE,

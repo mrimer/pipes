@@ -6,7 +6,8 @@
  *  - chapterHasUncompletedChallenge
  */
 
-import { CampaignDef, ChapterDef, PipeShape, TileDef } from '../src/types';
+import type { CampaignDef, ChapterDef, TileDef } from '../src/types';
+import { PipeShape } from '../src/types';
 import { CampaignMapScreen, augmentChapterLevelWater, chapterHasUncompletedChallenge } from '../src/campaignMapScreen';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
