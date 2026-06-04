@@ -1,11 +1,19 @@
 import type { TranslationTable } from '../i18nTypes';
 
 export const en: TranslationTable = {
+  'app.title': 'Cool Pipes',
+  'a11y.skipToGame': 'Skip to game',
+  'a11y.appName': '🔧 Cool Pipes',
+  'a11y.gameBoard': 'Pipes puzzle game board',
+
   'validation.noSource': 'No Source tile found.',
   'validation.noSink': 'No Sink tile found.',
   'validation.onlyOneSource': 'Only one source tile is allowed.',
   'validation.multipleSources': 'Multiple Source tiles found.',
   'validation.multipleSinks': 'Multiple Sink tiles found.',
+
+  'stats.water': '💧 Water',
+  'stats.bestScore': 'Best Score',
 
   'hud.undo': '↩ Undo',
   'hud.redo': '↪ Redo',
