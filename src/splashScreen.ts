@@ -11,6 +11,7 @@
 import { sfxManager, SfxId } from './sfxManager';
 import { BG_COLOR } from './colors';
 import { UI_GOLD } from './uiConstants';
+import { t } from './i18n';
 import logoUrl from '../data/images/CaravelLogo_RectBlack.png';
 
 // ─── Timing ────────────────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ export function showSplashScreen(): Promise<void> {
     // ── Play button ───────────────────────────────────────────────────────────
     const playBtn = document.createElement('button');
     playBtn.type = 'button';
-    playBtn.textContent = '▶  Play';
+    playBtn.textContent = t('splash.play');
     playBtn.style.cssText = [
       'margin-top:32px',
       'padding:14px 56px',

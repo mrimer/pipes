@@ -1,7 +1,7 @@
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { createButton } from './uiHelpers';
 import type { CommandAction} from './commandKeyManager';
-import { COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
+import { commandKeyManager, isPureModifierKey } from './commandKeyManager';
 import type { CampaignImportOutcome } from './playerProfile';
 import { t } from './i18n';
 import type { RecordingSettings } from './types';
@@ -320,7 +320,7 @@ export function buildSettingsModal(
   box.style.minWidth = '300px';
 
   const title = document.createElement('h2');
-  title.textContent = '⚙️ Settings';
+  title.textContent = t('settings.title');
   box.appendChild(title);
 
   // ── Sound Effects row ────────────────────────────────────────────────────
@@ -335,7 +335,7 @@ export function buildSettingsModal(
     : `settings-sfx-slider-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   const sfxLabelText = document.createElement('label');
   sfxLabelText.htmlFor = sliderId;
-  sfxLabelText.textContent = '🔊 Sound Effects';
+  sfxLabelText.textContent = t('settings.soundEffects');
 
   const sfxValueEl = document.createElement('span');
   sfxValueEl.style.cssText = 'font-size:0.9rem;color:#aaa;';
@@ -372,10 +372,10 @@ export function buildSettingsModal(
 
   const touchRow = document.createElement('label');
   touchRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;';
-  touchRow.title = 'Enables touch-optimized UI behavior (larger tap-friendly interactions). Disable this on touchscreen laptops to keep desktop-style hover controls.';
+  touchRow.title = t('settings.touchDevice.help');
 
   const touchLabelText = document.createElement('span');
-  touchLabelText.textContent = '📱 Touch Device';
+  touchLabelText.textContent = t('settings.touchDevice');
 
   const touchToggle = document.createElement('input');
   touchToggle.type = 'checkbox';
@@ -398,13 +398,15 @@ export function buildSettingsModal(
 
   const commandsHeader = document.createElement('div');
   commandsHeader.style.cssText = 'font-weight:bold;color:#7ed321;margin-top:4px;';
-  commandsHeader.textContent = '⌨️ Command Keys';
+  commandsHeader.textContent = t('settings.commands.title');
   commandsSection.appendChild(commandsHeader);
 
   const commandActions: CommandAction[] = ['rotateCW', 'rotateCCW', 'restartLevel', 'undo', 'redo'];
   const rowMap = new Map<CommandAction, { valueEl: HTMLElement; buttonEl: HTMLButtonElement }>();
   let capturing: CommandAction | null = null;
   let captureListenerAttached = false;
+
+  const commandLabel = (action: CommandAction): string => t(`settings.commands.action.${action}` as const);
 
   const onDocKeyDown = (e: KeyboardEvent) => {
     if (capturing === null) return;
@@ -418,7 +420,7 @@ export function buildSettingsModal(
     if (isPureModifierKey(e.key)) return;
     const result = commandKeyManager.assignFromEvent(capturing, e);
     if (!result.ok) {
-      window.alert(result.error ?? 'Could not assign that key.');
+      window.alert(result.error ?? t('settings.commands.assignError'));
       return;
     }
     capturing = null;
@@ -441,14 +443,14 @@ export function buildSettingsModal(
       const row = rowMap.get(action);
       if (!row) continue;
       row.valueEl.textContent = capturing === action
-        ? 'Press keys...'
+        ? t('settings.commands.capturePrompt')
         : commandKeyManager.getBindingDisplay(action);
       row.buttonEl.textContent = capturing === action ? '✖️' : '⌨️';
       row.buttonEl.setAttribute(
         'aria-label',
         capturing === action
-          ? `Cancel key reassignment for ${COMMAND_LABELS[action]}`
-          : `Reassign key for ${COMMAND_LABELS[action]}`,
+          ? t('settings.commands.reassignCancelAria', { action: commandLabel(action) })
+          : t('settings.commands.reassignAria', { action: commandLabel(action) }),
       );
     }
     syncCaptureListener();
@@ -459,7 +461,7 @@ export function buildSettingsModal(
     row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;';
 
     const label = document.createElement('span');
-    label.textContent = COMMAND_LABELS[action];
+    label.textContent = commandLabel(action);
     label.style.cssText = 'color:#eee;font-size:0.9rem;';
 
     const right = document.createElement('div');
@@ -471,8 +473,8 @@ export function buildSettingsModal(
 
     const assignBtn = document.createElement('button');
     assignBtn.type = 'button';
-    assignBtn.title = `Reassign ${COMMAND_LABELS[action]}`;
-    assignBtn.setAttribute('aria-label', `Reassign key for ${COMMAND_LABELS[action]}`);
+    assignBtn.title = t('settings.commands.reassignTitle', { action: commandLabel(action) });
+    assignBtn.setAttribute('aria-label', t('settings.commands.reassignAria', { action: commandLabel(action) }));
     assignBtn.style.cssText =
       `padding:4px 8px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #555;border-radius:4px;cursor:pointer;`;
     assignBtn.addEventListener('click', () => {
@@ -490,11 +492,11 @@ export function buildSettingsModal(
 
   const resetCommandsBtn = document.createElement('button');
   resetCommandsBtn.type = 'button';
-  resetCommandsBtn.textContent = 'Reset Commands';
+  resetCommandsBtn.textContent = t('settings.commands.reset');
   resetCommandsBtn.style.cssText =
     `padding:8px 12px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:center;`;
   resetCommandsBtn.addEventListener('click', () => {
-    const confirmed = window.confirm('Reset all command key assignments to defaults?');
+    const confirmed = window.confirm(t('settings.commands.resetConfirm'));
     if (!confirmed) return;
     commandKeyManager.resetToDefaults();
     capturing = null;
@@ -511,7 +513,7 @@ export function buildSettingsModal(
 
   const recordingHeader = document.createElement('div');
   recordingHeader.style.cssText = 'font-weight:bold;color:#7ed321;margin-top:4px;';
-  recordingHeader.textContent = '📼 Recording';
+  recordingHeader.textContent = t('settings.recording.title');
   recordingSection.appendChild(recordingHeader);
 
   const initialRecordingSettings = getRecordingSettings ? getRecordingSettings() : { recordSuccesses: true, recordFailures: false };
@@ -536,8 +538,16 @@ export function buildSettingsModal(
     return toggle;
   };
 
-  makeRecordingToggleRow('✅ Record Successes', 'recordSuccesses', initialRecordingSettings.recordSuccesses);
-  makeRecordingToggleRow('Record Failures', 'recordFailures', initialRecordingSettings.recordFailures);
+  makeRecordingToggleRow(
+    t('settings.recording.recordSuccesses'),
+    'recordSuccesses',
+    initialRecordingSettings.recordSuccesses,
+  );
+  makeRecordingToggleRow(
+    t('settings.recording.recordFailures'),
+    'recordFailures',
+    initialRecordingSettings.recordFailures,
+  );
 
   box.appendChild(recordingSection);
 
@@ -547,7 +557,7 @@ export function buildSettingsModal(
 
   const graphicsHeader = document.createElement('div');
   graphicsHeader.style.cssText = 'font-weight:bold;color:#7ed321;margin-top:4px;';
-  graphicsHeader.textContent = '🖼️ Graphics';
+  graphicsHeader.textContent = t('settings.graphics.title');
   graphicsSection.appendChild(graphicsHeader);
 
   const makeGraphicsToggleRow = (
@@ -574,8 +584,8 @@ export function buildSettingsModal(
     return toggle;
   };
 
-  makeGraphicsToggleRow('Background', 'graphicsBackground', initialBackgroundEnabled, onBackgroundChange);
-  makeGraphicsToggleRow('Environmental', 'graphicsEnvironmental', initialEnvironmentalEnabled, onEnvironmentalChange);
+  makeGraphicsToggleRow(t('settings.graphics.background'), 'graphicsBackground', initialBackgroundEnabled, onBackgroundChange);
+  makeGraphicsToggleRow(t('settings.graphics.environmental'), 'graphicsEnvironmental', initialEnvironmentalEnabled, onEnvironmentalChange);
 
   box.appendChild(graphicsSection);
 
@@ -584,7 +594,7 @@ export function buildSettingsModal(
   actions.className = 'modal-actions';
 
   const confirmBtn = document.createElement('button');
-  confirmBtn.textContent = 'Confirm';
+  confirmBtn.textContent = t('settings.confirm');
   confirmBtn.className = 'modal-btn primary';
   confirmBtn.type = 'button';
   confirmBtn.addEventListener('click', () => {

@@ -5,6 +5,7 @@ import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from './uiConstants';
 import { createButton } from './uiHelpers';
+import { t } from './i18n';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -213,11 +214,11 @@ export function renderLevelList(
     const msg = document.createElement('p');
     msg.style.cssText =
       'font-size:0.95rem;color:#aaa;text-align:center;margin:16px 0;';
-    msg.textContent = 'Click Campaign Editor to import or create levels.';
+    msg.textContent = t('levelSelect.noCampaign');
     levelListEl.appendChild(msg);
   } else {
     const h2 = document.createElement('h2');
-    h2.textContent = 'Select a Level';
+    h2.textContent = t('levelSelect.heading');
     h2.style.textAlign = 'center';
 
     if (onSettingsClick) {
@@ -229,8 +230,8 @@ export function renderLevelList(
 
       const gearBtn = document.createElement('button');
       gearBtn.type = 'button';
-      gearBtn.title = 'Settings';
-      gearBtn.setAttribute('aria-label', 'Settings');
+      gearBtn.title = t('levelSelect.settings');
+      gearBtn.setAttribute('aria-label', t('levelSelect.settings'));
       gearBtn.textContent = '⚙️';
       gearBtn.style.cssText =
         'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
@@ -243,8 +244,10 @@ export function renderLevelList(
       if (onPlayerProfileClick) {
         const profileBtn = document.createElement('button');
         profileBtn.type = 'button';
-        profileBtn.title = playerName ? `Player: ${playerName}` : 'Switch Player';
-        profileBtn.setAttribute('aria-label', 'Player profile');
+        profileBtn.title = playerName
+          ? t('levelSelect.player.title', { playerName })
+          : t('levelSelect.player.switch');
+        profileBtn.setAttribute('aria-label', t('levelSelect.player.ariaLabel'));
         profileBtn.textContent = '👤';
         profileBtn.style.cssText =
           'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
@@ -264,7 +267,7 @@ export function renderLevelList(
       if (playerName) {
         const welcomeEl = document.createElement('div');
         welcomeEl.style.cssText = 'font-size:0.8rem;color:#aabbcc;text-align:center;margin-top:-6px;';
-        welcomeEl.textContent = `Welcome, ${playerName}`;
+        welcomeEl.textContent = t('levelSelect.welcome', { playerName });
         levelListEl.appendChild(welcomeEl);
       }
     } else {
@@ -301,17 +304,17 @@ export function renderLevelList(
 
     const titleEl = document.createElement('div');
     titleEl.style.cssText = 'font-size:1.05rem;font-weight:bold;color:' + headerAccentColor + ';';
-    titleEl.textContent = `🎯 ${activeCampaign.name}`;
+    titleEl.textContent = t('levelSelect.activeCampaign.title', { campaignName: activeCampaign.name });
 
     const metaEl = document.createElement('div');
     metaEl.style.cssText = 'font-size:0.8rem;color:#aaa;';
-    metaEl.textContent = `By ${activeCampaign.author}`;
+    metaEl.textContent = t('levelSelect.activeCampaign.byAuthor', { author: activeCampaign.author });
 
     const progressRow = document.createElement('div');
     progressRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
     const progressLabel = document.createElement('span');
     progressLabel.style.cssText = 'font-size:0.85rem;color:#7ed321;white-space:nowrap;';
-    progressLabel.textContent = `Progress: ${activeCampaign.completionPct}%`;
+    progressLabel.textContent = t('levelSelect.activeCampaign.progress', { percent: activeCampaign.completionPct });
     const progressBar = document.createElement('div');
     progressBar.style.cssText =
       `flex:1;height:8px;background:${EDITOR_INPUT_BG};border-radius:${RADIUS_SM};overflow:hidden;`;
@@ -382,12 +385,14 @@ export function renderLevelList(
     const continueActive = continueChapterIdx !== null || continueId !== null;
     const continueBtn = document.createElement('button');
     if (showMastered) {
-      continueBtn.textContent = '🏆 Mastered!';
+      continueBtn.textContent = t('levelSelect.continue.mastered');
     } else if (campaignHasMap) {
-      continueBtn.textContent = '▶ Campaign Map';
+      continueBtn.textContent = t('levelSelect.continue.campaignMap');
     } else if (continueChapterIdx !== null) {
       const noProgress = completedLevels.size === 0 && (!completedChapters || completedChapters.size === 0);
-      continueBtn.textContent = noProgress ? '▶ Start' : `▶ Chapter ${continueChapterIdx + 1}`;
+      continueBtn.textContent = noProgress
+        ? t('levelSelect.continue.start')
+        : t('levelSelect.continue.chapter', { chapter: continueChapterIdx + 1 });
     } else {
       // Find the chapter and level number (1-based) for the level-based continue target.
       let continueChapterNum: number | null = null;
@@ -404,7 +409,7 @@ export function renderLevelList(
       }
       const continueLoc = (continueChapterNum !== null && continueLevelNum !== null)
         ? ` (${continueChapterNum}-${continueLevelNum})` : '';
-      continueBtn.textContent = `▶ Continue${continueLoc}`;
+      continueBtn.textContent = t('levelSelect.continue.default', { location: continueLoc });
     }
     continueBtn.disabled = !showMastered && !continueActive;
     continueBtn.style.cssText =
@@ -450,7 +455,7 @@ export function renderLevelList(
       `padding:8px 12px;font-size:0.9rem;font-weight:bold;border-radius:${RADIUS_MD};` +
       `border:1px solid ${UI_GOLD};background:${UI_BG};color:${UI_GOLD};cursor:pointer;width:100%;`;
     let chaptersExpanded = false;
-    chapterToggleBtn.textContent = '▶ Show Chapters';
+    chapterToggleBtn.textContent = t('levelSelect.chapterToggle.show');
 
     const chapterListWrap = document.createElement('div');
     chapterListWrap.style.cssText = 'display:none;flex-direction:column;gap:8px;padding-top:4px;';
@@ -458,7 +463,9 @@ export function renderLevelList(
     chapterToggleBtn.addEventListener('click', () => {
       chaptersExpanded = !chaptersExpanded;
       chapterListWrap.style.display = chaptersExpanded ? 'flex' : 'none';
-      chapterToggleBtn.textContent = chaptersExpanded ? '▼ Hide Chapters' : '▶ Show Chapters';
+      chapterToggleBtn.textContent = chaptersExpanded
+        ? t('levelSelect.chapterToggle.hide')
+        : t('levelSelect.chapterToggle.show');
     });
 
     header.appendChild(chapterToggleBtn);
@@ -566,7 +573,12 @@ export function renderLevelList(
       ? ` (${completedInChapter}/${nonChallengeInChapter}${doneIcon})${chapterWaterText}${chapterStarText}${chapterSkullText}`
       : '';
     const chapterTitle = document.createElement('span');
-    chapterTitle.textContent = `Chapter ${ci + 1}: ${chapter.name}${lockIcon}${progressText}`;
+    chapterTitle.textContent = t('levelSelect.chapter.title', {
+      chapter: ci + 1,
+      chapterName: chapter.name,
+      lockIcon,
+      progressText,
+    });
 
     chapterHeader.appendChild(chapterTitle);
 
@@ -581,7 +593,7 @@ export function renderLevelList(
         noMapError.classList.add('chapter-no-map-error');
         noMapError.style.cssText =
           'color:' + ERROR_COLOR + ';font-size:0.85rem;padding:4px 16px;margin:0;display:none;';
-        noMapError.textContent = 'Error: This chapter has no map.';
+        noMapError.textContent = t('levelSelect.chapter.noMapError');
         let noMapErrorTimeout: ReturnType<typeof setTimeout> | null = null;
         chapterHeader.addEventListener('click', () => {
           noMapError.style.display = '';
@@ -605,7 +617,7 @@ export function renderLevelList(
 
   // Campaign Editor button at the top of the controls
   const campaignEditorBtn = createButton(
-    '🗺️ Select Campaign', UI_BG, UI_GOLD,
+    t('levelSelect.selectCampaign'), UI_BG, UI_GOLD,
     () => { sfxManager.play(SfxId.ChapterSelect); onCampaignEditorClick(); },
     'margin-top:8px;padding:10px 20px;width:100%;',
   );
@@ -613,7 +625,7 @@ export function renderLevelList(
 
   // Game Rules button above the reset button
   const rulesBtn = createButton(
-    '📋 Game Rules', UI_BG, '#7ed321',
+    t('levelSelect.rules'), UI_BG, '#7ed321',
     () => { sfxManager.play(SfxId.ChapterSelect); onRulesClick(); },
     'margin-top:8px;padding:10px 20px;width:100%;',
   );
@@ -626,7 +638,7 @@ export function renderLevelList(
       completedLevels.size > 0 ||
       Object.values(levelStars).some((s) => s > 0);
     const resetBtn = document.createElement('button');
-    resetBtn.textContent = '🔄 Reset Progress';
+    resetBtn.textContent = t('levelSelect.resetProgress');
     resetBtn.disabled = !hasProgress;
     resetBtn.style.cssText =
       `margin-top:8px;padding:10px 20px;font-size:0.9rem;background:${MUTED_BTN_BG};width:100%;` +
@@ -641,7 +653,7 @@ export function renderLevelList(
 
   // Dev cheat button: mark all levels completed and unlock all chapters/levels
   const unlockAllBtn = createButton(
-    '🛠️ [Dev] Unlock All', MUTED_BTN_BG, '#f39c12',
+    t('levelSelect.devUnlockAll'), MUTED_BTN_BG, '#f39c12',
     () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); },
     'margin-top:8px;padding:10px 20px;width:100%;',
   );
