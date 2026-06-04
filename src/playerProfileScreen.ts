@@ -31,6 +31,7 @@ import { sfxManager, SfxId } from './sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from './deviceUtils';
 import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profileIO';
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from './gameModals';
+import { t } from './i18n';
 import { attachHoverWaveAnimation } from './visuals/chapterWaves';
 import type { CampaignDef } from './types';
 import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from './uiBackground';
@@ -78,11 +79,11 @@ function btn(
 }
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return 'Never';
+  if (!iso) return t('profile.dateNever');
   try {
     return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
-    return 'Unknown';
+    return t('profile.dateUnknown');
   }
 }
 
@@ -137,7 +138,7 @@ export class PlayerProfileScreen {
 
     // Title
     const titleEl = document.createElement('h2');
-    titleEl.textContent = '👤 Select Player';
+    titleEl.textContent = t('profile.title');
     titleEl.style.cssText =
       'position:absolute;top:24px;left:0;right:0;z-index:1;' +
       'color:#eee;font-size:1.6rem;margin:0;text-align:center;';
@@ -200,19 +201,19 @@ export class PlayerProfileScreen {
     const card = this._card(slotIndex, false);
 
     const emptyLabel = document.createElement('div');
-    emptyLabel.textContent = 'Empty';
+    emptyLabel.textContent = t('profile.empty');
     emptyLabel.style.cssText = `color:${TEXT_MUTED};font-size:1rem;flex:1;display:flex;align-items:center;justify-content:center;`;
     card.appendChild(emptyLabel);
 
     const actions = this._actionsRow();
 
-    actions.appendChild(btn('➕ New Player', BTN_PRIMARY_BG, BTN_PRIMARY_BORDER, () => {
-      buildNewPlayerModal('Player', (name) => {
+    actions.appendChild(btn(t('profile.newPlayer'), BTN_PRIMARY_BG, BTN_PRIMARY_BORDER, () => {
+      buildNewPlayerModal(t('profile.defaultName'), (name) => {
         this._createProfile(slotIndex, name);
       }, () => { /* cancelled */ });
     }));
 
-    actions.appendChild(btn('📥 Import', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
+    actions.appendChild(btn(t('profile.import'), BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
       this._importIntoSlot(slotIndex);
     }));
 
@@ -252,8 +253,8 @@ export class PlayerProfileScreen {
     const pencilBtn = document.createElement('button');
     pencilBtn.type = 'button';
     pencilBtn.textContent = '✏️';
-    pencilBtn.title = 'Edit player name';
-    pencilBtn.setAttribute('aria-label', 'Edit name');
+    pencilBtn.title = t('profile.editName');
+    pencilBtn.setAttribute('aria-label', t('profile.editNameShort'));
     pencilBtn.style.cssText =
       'background:none;border:none;cursor:pointer;font-size:0.9rem;padding:0 0 0 4px;line-height:1;vertical-align:middle;opacity:0.7;';
     pencilBtn.addEventListener('click', (e) => {
@@ -274,7 +275,7 @@ export class PlayerProfileScreen {
 
     // Last played
     const lastPlayedEl = document.createElement('div');
-    lastPlayedEl.textContent = `Last played: ${formatDate(meta.lastPlayedAt)}`;
+    lastPlayedEl.textContent = t('profile.lastPlayed', { date: formatDate(meta.lastPlayedAt) });
     lastPlayedEl.style.cssText = `font-size:0.8rem;color:${TEXT_MUTED};text-align:center;`;
     card.appendChild(lastPlayedEl);
 
@@ -290,7 +291,7 @@ export class PlayerProfileScreen {
     if (isActive) {
       const badge = document.createElement('div');
       badge.className = 'player-profile-active-badge';
-      badge.textContent = '✅ Active';
+      badge.textContent = t('profile.active');
       badge.style.cssText = 'font-size:0.8rem;color:#7ed321;font-weight:bold;text-align:center;';
       card.appendChild(badge);
     }
@@ -299,20 +300,20 @@ export class PlayerProfileScreen {
     const actions = this._actionsRow();
 
     if (!isActive) {
-      actions.appendChild(btn('▶ Select', BTN_PRIMARY_BG, BTN_PRIMARY_BORDER, () => {
+      actions.appendChild(btn(t('profile.select'), BTN_PRIMARY_BG, BTN_PRIMARY_BORDER, () => {
         this._selectSlot(slotIndex, meta);
       }));
     }
 
-    actions.appendChild(btn('📤 Export', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
+    actions.appendChild(btn(t('profile.export'), BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
       this._exportSlot(slotIndex);
     }));
 
-    actions.appendChild(btn('📤 Export + Recordings', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
+    actions.appendChild(btn(t('profile.exportWithRecordings'), BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
       this._exportSlotWithRecordings(slotIndex);
     }));
 
-    actions.appendChild(btn('📥 Import Merge', BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
+    actions.appendChild(btn(t('profile.importMerge'), BTN_MUTED_BG, BTN_MUTED_BORDER, () => {
       this._importIntoSlot(slotIndex);
     }));
 
@@ -322,9 +323,9 @@ export class PlayerProfileScreen {
     const deleteRow = this._actionsRow();
     deleteRow.style.marginTop = '8px';
 
-    deleteRow.appendChild(btn('🗑 Delete', BTN_DANGER_BG, BTN_DANGER_BORDER, () => {
+    deleteRow.appendChild(btn(t('profile.delete'), BTN_DANGER_BG, BTN_DANGER_BORDER, () => {
       buildConfirmModal(
-        `Delete profile "${meta.name}"? All progress for this profile will be lost.`,
+        t('profile.deleteMessage', { name: meta.name }),
         () => { this._deleteSlot(slotIndex); },
         () => { /* cancelled */ },
       );
@@ -346,36 +347,36 @@ export class PlayerProfileScreen {
       const campaign = this._campaigns.find((c) => c.id === stats.activeCampaignId);
       if (campaign) {
         const campaignEl = document.createElement('div');
-        campaignEl.textContent = `📋 ${campaign.name}`;
+        campaignEl.textContent = t('profile.campaign', { name: campaign.name });
         campaignEl.style.color = TEXT_ACCENT;
         container.appendChild(campaignEl);
       }
 
       if (stats.levelsCompleted > 0) {
         const levelsEl = document.createElement('div');
-        levelsEl.textContent = `✅ ${stats.levelsCompleted} levels`;
+        levelsEl.textContent = t('profile.levelsCompleted', { count: stats.levelsCompleted });
         container.appendChild(levelsEl);
       }
       if (stats.chaptersCompleted > 0) {
         const chapEl = document.createElement('div');
-        chapEl.textContent = `📖 ${stats.chaptersCompleted} chapters`;
+        chapEl.textContent = t('profile.chaptersCompleted', { count: stats.chaptersCompleted });
         container.appendChild(chapEl);
       }
       if (stats.starsCollected > 0) {
         const starEl = document.createElement('div');
-        starEl.textContent = `⭐ ${stats.starsCollected} stars`;
+        starEl.textContent = t('profile.starsCollected', { count: stats.starsCollected });
         container.appendChild(starEl);
       }
       if (stats.waterTotal > 0) {
         const waterEl = document.createElement('div');
-        waterEl.textContent = `💧 ${stats.waterTotal} water`;
+        waterEl.textContent = t('profile.waterTotal', { count: stats.waterTotal });
         container.appendChild(waterEl);
       }
     }
 
     if (container.children.length === 0) {
       const empty = document.createElement('div');
-      empty.textContent = 'No campaign progress';
+      empty.textContent = t('profile.noCampaignProgress');
       container.appendChild(empty);
     }
   }
@@ -407,7 +408,7 @@ export class PlayerProfileScreen {
   private _createProfile(slotIndex: number, name: string): void {
     const meta: ProfileSlotMeta = {
       guid:         generateGuid(),
-      name:         name.trim() || 'Player',
+      name:         name.trim() || t('profile.defaultName'),
       lastPlayedAt: null,
     };
     saveSlotMeta(slotIndex, meta);

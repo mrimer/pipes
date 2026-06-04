@@ -3,6 +3,7 @@ import { createButton } from './uiHelpers';
 import type { CommandAction} from './commandKeyManager';
 import { COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
 import type { CampaignImportOutcome } from './playerProfile';
+import { t } from './i18n';
 import type { RecordingSettings } from './types';
 import { setupModal } from './modalUtils';
 /**
@@ -98,7 +99,7 @@ export function buildResetModal(
     'padding:32px 40px;text-align:center;display:flex;flex-direction:column;' +
     'gap:16px;min-width:280px;max-width:420px;';
   const title = document.createElement('h2');
-  title.textContent = '⚠️ Reset Progress?';
+  title.textContent = t('modal.reset.title');
 
   const campaignNameEl = document.createElement('p');
   campaignNameEl.style.cssText = 'font-size:1rem;font-weight:bold;color:#74b9ff;margin:0;';
@@ -108,17 +109,17 @@ export function buildResetModal(
 
   const msg = document.createElement('p');
   msg.style.cssText = 'font-size:0.95rem;color:#aaa;';
-  msg.textContent = 'This will remove all level completion data. Are you sure?';
+  msg.textContent = t('modal.reset.message');
   const actions = document.createElement('div');
   actions.style.cssText = 'display:flex;gap:12px;justify-content:center;';
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('modal.common.cancel');
   cancelBtn.style.cssText =
     'padding:10px 24px;font-size:1rem;background:' + MUTED_BTN_BG + ';color:#aaa;' +
     `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
   cancelBtn.addEventListener('click', () => onCancel());
   const confirmBtn = document.createElement('button');
-  confirmBtn.textContent = 'Reset';
+  confirmBtn.textContent = t('modal.reset.button');
   confirmBtn.style.cssText =
     'padding:10px 24px;font-size:1rem;background:' + ERROR_COLOR + ';color:#fff;' +
     `border:none;border-radius:${RADIUS_MD};cursor:pointer;`;
@@ -143,17 +144,29 @@ export function buildResetModal(
     campaignNameEl.textContent = info.campaignName;
     const parts: string[] = [];
     if (info.chaptersTotal > 0) {
-      parts.push(`${info.chaptersCompleted}/${info.chaptersTotal} chapters`);
+      parts.push(t('modal.progress.chapters', {
+        completed: info.chaptersCompleted,
+        total: info.chaptersTotal,
+      }));
     }
-    parts.push(`${info.levelsCompleted}/${info.levelsTotal} levels`);
+    parts.push(t('modal.progress.levels', {
+      completed: info.levelsCompleted,
+      total: info.levelsTotal,
+    }));
     if (info.challengesTotal > 0) {
-      parts.push(`${info.challengesCompleted}/${info.challengesTotal} challenges`);
+      parts.push(t('modal.progress.challenges', {
+        completed: info.challengesCompleted,
+        total: info.challengesTotal,
+      }));
     }
     if (info.starsTotal > 0) {
-      parts.push(`⭐ ${info.starsCollected}/${info.starsTotal}`);
+      parts.push(t('modal.progress.stars', {
+        collected: info.starsCollected,
+        total: info.starsTotal,
+      }));
     }
     if (info.waterScore > 0) {
-      parts.push(`💧 ${info.waterScore}`);
+      parts.push(t('modal.progress.water', { score: info.waterScore }));
     }
     progressEl.textContent = parts.join('  ·  ');
   }
@@ -171,7 +184,7 @@ export function buildResetModal(
 export function buildNewChapterModal(
   onStart: () => void,
 ): { el: HTMLElement; numberEl: HTMLElement; nameEl: HTMLElement } {
-  const { el, box, actionsEl } = buildModalShell('✨ New Chapter');
+  const { el, box, actionsEl } = buildModalShell(t('modal.newChapter.title'));
   const titleEl = box.querySelector('h2');
   const numberEl = document.createElement('p');
   numberEl.style.cssText = 'font-size:1.2rem;font-weight:bold;color:#74b9ff;';
@@ -180,7 +193,7 @@ export function buildNewChapterModal(
   box.insertBefore(numberEl, actionsEl);
   box.insertBefore(nameEl, actionsEl);
   const startBtn = document.createElement('button');
-  startBtn.textContent = 'Start Level';
+  startBtn.textContent = t('modal.newChapter.start');
   startBtn.className = 'modal-btn primary';
   startBtn.type = 'button';
   startBtn.addEventListener('click', () => onStart());
@@ -211,20 +224,20 @@ export function buildChallengeModal(
   onPlay: () => void,
   onSkip: () => void,
 ): { el: HTMLElement; msgEl: HTMLElement; playBtnEl: HTMLButtonElement; skipBtnEl: HTMLButtonElement } {
-  const { el, box, actionsEl } = buildModalShell('☠️ Challenge Level ☠️');
+  const { el, box, actionsEl } = buildModalShell(t('modal.challenge.title'));
   const titleEl = box.querySelector('h2');
   const msgEl = document.createElement('p');
   msgEl.style.cssText = 'font-size:0.95rem;color:#aaa;';
-  msgEl.textContent = 'This is an optional challenge level. You may skip it without affecting your progress.';
+  msgEl.textContent = t('modal.challenge.message');
   box.insertBefore(msgEl, actionsEl);
   const playBtnEl = document.createElement('button');
-  playBtnEl.textContent = 'Play Level';
+  playBtnEl.textContent = t('modal.challenge.play');
   playBtnEl.className = 'modal-btn';
   playBtnEl.type = 'button';
   playBtnEl.addEventListener('click', () => onPlay());
   actionsEl.appendChild(playBtnEl);
   const skipBtnEl = document.createElement('button');
-  skipBtnEl.textContent = 'Skip Level';
+  skipBtnEl.textContent = t('modal.challenge.skip');
   skipBtnEl.className = 'modal-btn secondary';
   skipBtnEl.type = 'button';
   skipBtnEl.addEventListener('click', () => onSkip());
@@ -251,18 +264,18 @@ export function buildExitConfirmModal(
   onExit: () => void,
   onContinue: () => void,
 ): HTMLElement {
-  const { el, box, actionsEl } = buildModalShell('🚪 Abandon Level?');
+  const { el, box, actionsEl } = buildModalShell(t('modal.exit.title'));
   const titleEl = box.querySelector('h2');
   const msgEl = document.createElement('p');
-  msgEl.textContent = 'Your progress on this level will be lost.';
+  msgEl.textContent = t('modal.exit.message');
   box.insertBefore(msgEl, actionsEl);
   const exitBtn = document.createElement('button');
-  exitBtn.textContent = 'Exit Level';
+  exitBtn.textContent = t('modal.exit.button');
   exitBtn.className = 'modal-btn primary';
   exitBtn.type = 'button';
   exitBtn.addEventListener('click', () => onExit());
   const continueBtn = document.createElement('button');
-  continueBtn.textContent = 'Continue';
+  continueBtn.textContent = t('modal.exit.continue');
   continueBtn.className = 'modal-btn secondary';
   continueBtn.type = 'button';
   continueBtn.addEventListener('click', () => onContinue());
@@ -623,7 +636,7 @@ export function buildCampaignMasteredModal(
   box.appendChild(iconEl);
 
   const titleEl = document.createElement('h2');
-  titleEl.textContent = 'Campaign Mastered!';
+  titleEl.textContent = t('modal.campaignMastered.title');
   titleEl.style.cssText = 'color:#f0c040;margin:0 0 10px;font-size:1.5rem;';
   box.appendChild(titleEl);
 
@@ -633,11 +646,17 @@ export function buildCampaignMasteredModal(
   box.appendChild(nameEl);
 
   const msgEl = document.createElement('p');
-  msgEl.textContent = 'All areas complete!';
+  msgEl.textContent = t('modal.campaignMastered.message');
   msgEl.style.cssText = 'color:#eee;font-size:1rem;margin:0 0 20px;';
   box.appendChild(msgEl);
 
-  const kudosBtn = createButton('Kudos!', '#1a3a10', '#f0c040', () => onKudos(), 'padding:10px 28px;font-size:1rem;');
+  const kudosBtn = createButton(
+    t('modal.campaignMastered.button'),
+    '#1a3a10',
+    '#f0c040',
+    () => onKudos(),
+    'padding:10px 28px;font-size:1rem;',
+  );
   box.appendChild(kudosBtn);
 
   el.appendChild(box);
@@ -654,13 +673,13 @@ export function buildCampaignMasteredModal(
  *                 modal then exit to the menu).
  */
 export function buildUnplayableModal(onExit: () => void): HTMLElement {
-  const { el, box, actionsEl } = buildModalShell('⚠️ Level Unplayable');
+  const { el, box, actionsEl } = buildModalShell(t('modal.unplayable.title'));
   const titleEl = box.querySelector('h2');
   const msgEl = document.createElement('p');
-  msgEl.textContent = 'This level starts in a losing position and cannot be played.';
+  msgEl.textContent = t('modal.unplayable.message');
   box.insertBefore(msgEl, actionsEl);
   const exitBtn = document.createElement('button');
-  exitBtn.textContent = 'Exit Level';
+  exitBtn.textContent = t('modal.exit.button');
   exitBtn.className = 'modal-btn primary';
   exitBtn.type = 'button';
   exitBtn.addEventListener('click', () => onExit());
@@ -697,11 +716,11 @@ export function buildEditPlayerNameModal(
 
   const title = document.createElement('h2');
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#74b9ff;';
-  title.textContent = '✏️ Edit Player Name';
+  title.textContent = t('modal.editPlayerName.title');
   box.appendChild(title);
 
   const label = document.createElement('label');
-  label.textContent = 'Player name:';
+  label.textContent = t('modal.editPlayerName.label');
   label.style.cssText = 'color:#eee;font-size:0.95rem;';
 
   const input = document.createElement('input');
@@ -720,14 +739,14 @@ export function buildEditPlayerNameModal(
   actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('modal.common.cancel');
   cancelBtn.type = 'button';
   cancelBtn.style.cssText =
     `padding:8px 20px;font-size:0.95rem;background:${MUTED_BTN_BG};color:#aaa;` +
     `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
 
   const okBtn = document.createElement('button');
-  okBtn.textContent = 'OK';
+  okBtn.textContent = t('modal.editPlayerName.ok');
   okBtn.type = 'button';
   okBtn.style.cssText =
     `padding:8px 20px;font-size:0.95rem;background:#1a4a9a;color:#fff;` +
@@ -780,11 +799,11 @@ export function buildNewPlayerModal(
 
   const title = document.createElement('h2');
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#74b9ff;';
-  title.textContent = '👤 New Player';
+  title.textContent = t('modal.newPlayer.title');
   box.appendChild(title);
 
   const label = document.createElement('label');
-  label.textContent = 'Player name:';
+  label.textContent = t('modal.newPlayer.label');
   label.style.cssText = 'color:#eee;font-size:0.95rem;';
 
   const input = document.createElement('input');
@@ -803,14 +822,14 @@ export function buildNewPlayerModal(
   actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('modal.common.cancel');
   cancelBtn.type = 'button';
   cancelBtn.style.cssText =
     `padding:8px 20px;font-size:0.95rem;background:${MUTED_BTN_BG};color:#aaa;` +
     `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
 
   const okBtn = document.createElement('button');
-  okBtn.textContent = 'Create';
+  okBtn.textContent = t('modal.newPlayer.create');
   okBtn.type = 'button';
   okBtn.style.cssText =
     `padding:8px 20px;font-size:0.95rem;background:#1a4a9a;color:#fff;` +
@@ -868,14 +887,14 @@ export function buildConfirmModal(
   actions.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('modal.common.cancel');
   cancelBtn.type = 'button';
   cancelBtn.style.cssText =
     `padding:8px 18px;font-size:0.95rem;background:${MUTED_BTN_BG};color:#aaa;` +
     `border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;`;
 
   const confirmBtn = document.createElement('button');
-  confirmBtn.textContent = 'Confirm';
+  confirmBtn.textContent = t('modal.common.confirm');
   confirmBtn.type = 'button';
   confirmBtn.style.cssText =
     `padding:8px 18px;font-size:0.95rem;background:${ERROR_COLOR};color:#fff;` +
