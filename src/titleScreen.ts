@@ -7,6 +7,7 @@ import { sfxManager, SfxId } from './sfxManager';
 import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta } from './playerProfileSlots';
 import { loadSfxVolume } from './persistence';
+import { t } from './i18n';
 
 type TitleLetter = 'C' | 'O' | 'L' | 'P' | 'I' | 'E' | 'S';
 
@@ -687,7 +688,7 @@ export function showIntroTitleScreen(): Promise<void> {
         ctx.font = `${PRESS_PROMPT_FONT_WEIGHT} ${fontSize}px ${PRESS_PROMPT_FONT_FAMILY}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText('Press any key', Math.floor(width / 2), originY + titleHeight + Math.floor(tileSize * 1.6));
+        ctx.fillText(t('title.pressAnyKey'), Math.floor(width / 2), originY + titleHeight + Math.floor(tileSize * 1.6));
         ctx.restore();
       }
 

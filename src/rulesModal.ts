@@ -8,6 +8,7 @@ import { createButton } from './uiHelpers';
 import type { CommandAction, CommandKeyManager} from './commandKeyManager';
 import { commandKeyManager } from './commandKeyManager';
 import { setupModal } from './modalUtils';
+import { t } from './i18n';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -145,173 +146,177 @@ function leakyPipeSwatch(): string {
 /** Controls reference table rows. */
 function getControlRows(manager: CommandKeyManager): ControlRow[] {
   return [
-    { input: 'Left Click',         action: 'Place selected pipe on an empty cell, or rotate an existing pipe.' },
-    { input: 'Shift + Left Click', action: 'Rotate a placed pipe counter-clockwise.' },
-    { input: 'Right Click',        action: 'Remove a placed pipe and return it to the inventory. Right-clicking a selected inventory tile deselects it.' },
-    { input: 'Scroll Wheel',       action: 'Rotate the selected (pending) pipe piece before placing.' },
-    { input: 'Hover + Scroll Wheel', action: 'Queue a placed pipe for rotation when no inventory item is selected.' },
-    { input: manager.getBindingDisplay('rotateCCW'), action: 'Rotate the selected pipe piece counter-clockwise.', commandAction: 'rotateCCW' },
-    { input: manager.getBindingDisplay('rotateCW'), action: 'Rotate the selected pipe piece clockwise.', commandAction: 'rotateCW' },
-    { input: manager.getBindingDisplay('restartLevel'), action: 'Retry the current level from scratch.', commandAction: 'restartLevel' },
-    { input: manager.getBindingDisplay('undo'), action: 'Undo the last move.', commandAction: 'undo' },
-    { input: manager.getBindingDisplay('redo'), action: 'Redo the last undone move.', commandAction: 'redo' },
-    { input: 'Shift',              action: 'Selects the next inventory piece.' },
-    { input: 'Shift (hold)',       action: 'Show raw (unadjusted) ice/snow/sandstone tile values: raw temperature threshold and unmodified cost.' },
-    { input: 'Ctrl + Hover',       action: 'Show a tooltip with tile details at the cursor position.' },
-    { input: 'Escape',             action: 'Return to the level-select screen.' },
+    { input: t('rules.controls.input.leftClick'), action: t('rules.controls.action.leftClick') },
+    { input: t('rules.controls.input.shiftLeftClick'), action: t('rules.controls.action.shiftLeftClick') },
+    { input: t('rules.controls.input.rightClick'), action: t('rules.controls.action.rightClick') },
+    { input: t('rules.controls.input.scrollWheel'), action: t('rules.controls.action.scrollWheel') },
+    { input: t('rules.controls.input.hoverScrollWheel'), action: t('rules.controls.action.hoverScrollWheel') },
+    { input: manager.getBindingDisplay('rotateCCW'), action: t('rules.controls.action.rotateCCW'), commandAction: 'rotateCCW' },
+    { input: manager.getBindingDisplay('rotateCW'), action: t('rules.controls.action.rotateCW'), commandAction: 'rotateCW' },
+    { input: manager.getBindingDisplay('restartLevel'), action: t('rules.controls.action.restartLevel'), commandAction: 'restartLevel' },
+    { input: manager.getBindingDisplay('undo'), action: t('rules.controls.action.undo'), commandAction: 'undo' },
+    { input: manager.getBindingDisplay('redo'), action: t('rules.controls.action.redo'), commandAction: 'redo' },
+    { input: t('rules.controls.input.shift'), action: t('rules.controls.action.shift') },
+    { input: t('rules.controls.input.shiftHold'), action: t('rules.controls.action.shiftHold') },
+    { input: t('rules.controls.input.ctrlHover'), action: t('rules.controls.action.ctrlHover') },
+    { input: t('rules.controls.input.escape'), action: t('rules.controls.action.escape') },
   ];
 }
 
 /** Controls reference table rows for touch / mobile devices. */
-const TOUCH_CONTROL_ROWS: ControlRow[] = [
-  { input: 'Tap',                    action: 'Place the selected pipe on an empty cell, or rotate an existing pipe.' },
-  { input: 'Tap inventory item',     action: 'Select that pipe piece. Tap it again to deselect.' },
-  { input: 'Drag from inventory',    action: 'Drag a pipe from the inventory bar and drop it onto a grid cell to place it.' },
-  { input: 'Swipe left on tile',     action: 'Rotate a placed pipe counter-clockwise.' },
-  { input: 'Swipe right on tile',    action: 'Rotate a placed pipe clockwise.' },
-  { input: 'Long-press placed pipe', action: 'Remove the pipe and return it to the inventory.' },
-  { input: 'Two-finger tap',         action: 'Deselect the currently selected inventory piece.' },
-  { input: 'Long-press map tile',    action: 'Show level name tooltip on the chapter map.' },
-];
+function getTouchControlRows(): ControlRow[] {
+  return [
+    { input: t('rules.touchControls.input.tap'), action: t('rules.touchControls.action.tap') },
+    { input: t('rules.touchControls.input.tapInventoryItem'), action: t('rules.touchControls.action.tapInventoryItem') },
+    { input: t('rules.touchControls.input.dragFromInventory'), action: t('rules.touchControls.action.dragFromInventory') },
+    { input: t('rules.touchControls.input.swipeLeftOnTile'), action: t('rules.touchControls.action.swipeLeftOnTile') },
+    { input: t('rules.touchControls.input.swipeRightOnTile'), action: t('rules.touchControls.action.swipeRightOnTile') },
+    { input: t('rules.touchControls.input.longPressPlacedPipe'), action: t('rules.touchControls.action.longPressPlacedPipe') },
+    { input: t('rules.touchControls.input.twoFingerTap'), action: t('rules.touchControls.action.twoFingerTap') },
+    { input: t('rules.touchControls.input.longPressMapTile'), action: t('rules.touchControls.action.longPressMapTile') },
+  ];
+}
 
 /** Legend rows covering every tile type players will encounter. */
-const LEGEND_ROWS: LegendRow[] = [
+function getLegendRows(): LegendRow[] {
+  return [
   {
     iconHtml: colorCircle(SOURCE_COLOR),
-    name: 'Source',
-    description: 'Starting point of water flow. The number shows how much water is available.',
+    name: t('rules.legend.source.name'),
+    description: t('rules.legend.source.description'),
   },
   {
     iconHtml: colorCircle(SINK_COLOR),
-    name: 'Sink',
-    description: 'Water destination — connect this tile with water remaining to win the level.',
+    name: t('rules.legend.sink.name'),
+    description: t('rules.legend.sink.description'),
   },
   {
     iconHtml: colorSwatch(EMPTY_COLOR),
-    name: 'Empty Cell',
-    description: 'Select a pipe from your inventory, then click here to place it.',
+    name: t('rules.legend.emptyCell.name'),
+    description: t('rules.legend.emptyCell.description'),
   },
   {
     iconHtml: shapeIcon(PipeShape.Straight, PIPE_COLOR),
-    name: 'Straight Pipe',
-    description: 'Connects two opposite sides (North–South or East–West).',
+    name: t('rules.legend.straightPipe.name'),
+    description: t('rules.legend.straightPipe.description'),
   },
   {
     iconHtml: shapeIcon(PipeShape.Elbow, PIPE_COLOR),
-    name: 'Elbow Pipe',
-    description: 'Connects two adjacent sides. Rotate to point in the right direction.',
+    name: t('rules.legend.elbowPipe.name'),
+    description: t('rules.legend.elbowPipe.description'),
   },
   {
     iconHtml: shapeIcon(PipeShape.Tee, PIPE_COLOR),
-    name: 'T-Junction',
-    description: 'Connects three sides — useful at branch points.',
+    name: t('rules.legend.tJunction.name'),
+    description: t('rules.legend.tJunction.description'),
   },
   {
     iconHtml: shapeIcon(PipeShape.Cross, PIPE_COLOR),
-    name: 'Cross Junction',
-    description: 'Connects all four sides.',
+    name: t('rules.legend.crossJunction.name'),
+    description: t('rules.legend.crossJunction.description'),
   },
   {
     iconHtml: cementSwatch(),
-    name: 'Cement',
-    description: 'Open background tile. Any pipe may be placed here. When Drying Time (T) = 0, placed pipes are hardened in cement and may not be removed or rotated. When T > 0, adjustments are allowed but decrement T by 1.',
+    name: t('rules.legend.cement.name'),
+    description: t('rules.legend.cement.description'),
   },
   {
     iconHtml: oneWaySwatch(),
-    name: 'One-Way',
-    description: 'Open background tile — any pipe may be placed on it. Water cannot flow into or out of a pipe on this tile in the direction opposite the arrow. Perpendicular flow (sideways) is always permitted. Blocked pipe arms are displayed without water even when connected.',
+    name: t('rules.legend.oneWay.name'),
+    description: t('rules.legend.oneWay.description'),
   },
   {
     iconHtml: graniteSwatch(),
-    name: 'Granite Block',
-    description: 'Impassable obstacle — water cannot flow through and it cannot be moved.',
+    name: t('rules.legend.graniteBlock.name'),
+    description: t('rules.legend.graniteBlock.description'),
   },
   {
     iconHtml: treeSwatch(),
-    name: 'Tree',
-    description: 'Impassable obstacle — water cannot flow through and it cannot be moved.',
+    name: t('rules.legend.tree.name'),
+    description: t('rules.legend.tree.description'),
   },
   {
     iconHtml: colorSwatch(GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR),
-    name: 'Gold Space',
-    description: 'Special background tile — only gold pipe pieces may be placed here.',
+    name: t('rules.legend.goldSpace.name'),
+    description: t('rules.legend.goldSpace.description'),
   },
   {
     iconHtml: shapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
-    name: 'Gold Pipe',
-    description: 'Behaves like a normal pipe and can be placed on gold spaces.',
+    name: t('rules.legend.goldPipe.name'),
+    description: t('rules.legend.goldPipe.description'),
   },
   {
     iconHtml: leakyPipeSwatch(),
-    name: 'Leaky Pipe',
-    description: 'Behaves like a normal pipe but has corroded spots. On the first turn connected it costs 1 water like a standard pipe. On every subsequent turn it remains connected, it loses 1 additional water (permanently — this water is not returned when the pipe is disconnected). An animated drip shows water escaping from the rusty spots.',
+    name: t('rules.legend.leakyPipe.name'),
+    description: t('rules.legend.leakyPipe.description'),
   },
   {
     iconHtml: chamberSwatch(TANK_COLOR, '~'),
-    name: 'Tank',
-    description: 'Contains extra water. Adds to your supply when connected to it.',
+    name: t('rules.legend.tank.name'),
+    description: t('rules.legend.tank.description'),
   },
   {
     iconHtml: chamberSwatch(DIRT_COST_COLOR, '−'),
-    name: 'Dirt',
-    description: 'Wastes water when filled. The number shows how much water is consumed.',
+    name: t('rules.legend.dirt.name'),
+    description: t('rules.legend.dirt.description'),
   },
   {
     iconHtml: chamberSwatch(PIPE_COLOR, '+'),
-    name: 'Item',
-    description: 'Grants bonus pipe pieces from your inventory when water flows through it.',
+    name: t('rules.legend.item.name'),
+    description: t('rules.legend.item.description'),
   },
   {
     iconHtml: chamberSwatch(HEATER_COLOR, '+°'),
-    name: 'Heater',
-    description: 'Raises the water temperature by the shown amount (°) when connected. Higher temperature reduces ice block costs.',
+    name: t('rules.legend.heater.name'),
+    description: t('rules.legend.heater.description'),
   },
   {
     iconHtml: chamberSwatch(ICE_COLOR, '❄'),
-    name: 'Ice',
-    description: 'Reduces water capacity by cost × max(0, threshold° − current temp°). Costs nothing when temperature meets or exceeds the threshold.',
+    name: t('rules.legend.ice.name'),
+    description: t('rules.legend.ice.description'),
   },
   {
     iconHtml: chamberSwatch(PUMP_COLOR, '+P'),
-    name: 'Pump',
-    description: 'Increases the game Pressure variable by the shown amount (+P) when connected. Higher Pressure reduces the cost of Snow blocks.',
+    name: t('rules.legend.pump.name'),
+    description: t('rules.legend.pump.description'),
   },
   {
     iconHtml: chamberSwatch(SNOW_COLOR, '❄'),
-    name: 'Snow',
-    description: 'Like Ice, but its effective cost is ⌈cost÷Pressure⌉ × max(0, threshold° − current temp°). Higher Pressure lowers the cost.',
+    name: t('rules.legend.snow.name'),
+    description: t('rules.legend.snow.description'),
   },
   {
     iconHtml: chamberSwatch(SANDSTONE_COLOR, '≈'),
-    name: 'Sandstone',
-    description: 'Like Snow, but uses deltaDamage (Pressure − Hardness) as the cost divisor: ⌈cost÷deltaDamage⌉ × max(0, threshold° − temp°). Connecting is blocked when Pressure ≤ Hardness. When a Shatter value (> Hardness) is set and Pressure ≥ Shatter, the tile has no cost.',
+    name: t('rules.legend.sandstone.name'),
+    description: t('rules.legend.sandstone.description'),
   },
   {
     iconHtml: chamberSwatch(HOT_PLATE_COLOR, 'HP'),
-    name: 'Hot Plate',
-    description: 'Consumes water based on mass and temperature. Effective cost = mass × (boiling temp° − current temp°). First drains frozen water (restoring it to liquid); remaining cost draws from regular water. Boiling temp is displayed as temp°.',
+    name: t('rules.legend.hotPlate.name'),
+    description: t('rules.legend.hotPlate.description'),
   },
   {
     iconHtml: chamberSwatch(REGULATOR_COLOR, '>N\u2026'),
-    name: 'Regulator',
-    description: 'Blocks tile connection unless the specified stat check passes. The check compares the player\'s stat (Water, Frozen, Temperature, or Pressure) to a threshold value using <, >, or =. Checked both before and after other tiles resolve on the same turn. If either check fails, the move is rejected.',
+    name: t('rules.legend.regulator.name'),
+    description: t('rules.legend.regulator.description'),
   },
   {
     iconHtml: chamberSwatch(STAR_COLOR, '★'),
-    name: 'Star',
-    description: 'A bonus collectible. Connect it to the water path before winning to count it as a collected star for the level. Stars are tracked per-level and shown on the level select screen.',
+    name: t('rules.legend.star.name'),
+    description: t('rules.legend.star.description'),
   },
   {
     iconHtml: chamberSwatch(GEL_COLOR, '\u00BD'),
-    name: 'Gel',
-    description: 'Halves the current water total (rounded down) when connected. Applied after all cost chambers resolve.',
+    name: t('rules.legend.gel.name'),
+    description: t('rules.legend.gel.description'),
   },
   {
     iconHtml: chamberSwatch(SIPHON_COLOR, '\u00D72'),
-    name: 'Siphon',
-    description: 'Doubles the current water total when connected. Applied before Gel chambers.',
+    name: t('rules.legend.siphon.name'),
+    description: t('rules.legend.siphon.description'),
   },
-];
+  ];
+}
 
 /**
  * Create the game-rules modal element and append it to the document body.
@@ -333,10 +338,10 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   // ── Title ──────────────────────────────────────────────────────────────────
   const title = document.createElement('h2');
   title.style.cssText = 'font-size:1.5rem;text-align:center;';
-  title.textContent = '📋 Game Rules';
+  title.textContent = t('rules.title');
   const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.style.display = 'none'; } });
   const createCloseButton = (): HTMLButtonElement => createButton(
-    'Close',
+    t('rules.close'),
     UI_BORDER,
     '#fff',
     () => { closeModal(); },
@@ -346,40 +351,27 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   // ── Summary ────────────────────────────────────────────────────────────────
   const summary = document.createElement('p');
   summary.style.cssText = 'font-size:0.95rem;color:#ccc;line-height:1.5;';
-  summary.textContent =
-    'Connect pipes from the Source to the Sink before the water runs out. ' +
-    'Each pipe you connect costs one unit of water — plan your route wisely!';
+  summary.textContent = t('rules.summary');
 
   // ── Play loop ──────────────────────────────────────────────────────────────
   const playLoop = document.createElement('p');
   playLoop.style.cssText = 'font-size:0.9rem;color:#aaa;line-height:1.5;';
   if (isTouchDevice()) {
-    playLoop.textContent =
-      'Select a pipe from the inventory bar, then tap an empty cell to place it. ' +
-      'You can also drag a pipe from the inventory directly to a grid cell. ' +
-      'Swipe left or right on a placed pipe to rotate it. ' +
-      'Water flows automatically once a complete path exists. ' +
-      'Long-press a placed pipe to remove it and return it to your inventory.';
+    playLoop.textContent = t('rules.playLoop.touch');
   } else {
-    playLoop.textContent =
-      'Select a pipe piece from the inventory panel, then click an empty cell to place it. ' +
-      'Scroll the mouse wheel to rotate the piece before placing. ' +
-      'Rotate placed pipes to update your route. ' +
-      'Water flows automatically once a complete path exists. ' +
-      'Some chambers add water, waste it, or grant extra pieces when reached. ' +
-      'Removing pieces returns water and reverts connections to their original state.';
+    playLoop.textContent = t('rules.playLoop.desktop');
   }
 
   // ── Controls header ────────────────────────────────────────────────────────
   const controlsHeader = document.createElement('h3');
   controlsHeader.style.cssText = 'font-size:1rem;color:#7ed321;margin-bottom:4px;';
-  controlsHeader.textContent = 'Controls';
+  controlsHeader.textContent = t('rules.controls.title');
 
   // ── Controls table ─────────────────────────────────────────────────────────
   const controlsTable = document.createElement('table');
   controlsTable.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.88rem;';
 
-  const activeControlRows = isTouchDevice() ? TOUCH_CONTROL_ROWS : getControlRows(manager);
+  const activeControlRows = isTouchDevice() ? getTouchControlRows() : getControlRows(manager);
   for (const row of activeControlRows) {
     const tr = document.createElement('tr');
     tr.style.cssText = `border-bottom:1px solid ${UI_INPUT_BORDER};`;
@@ -402,14 +394,14 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   // ── Legend header ──────────────────────────────────────────────────────────
   const legendHeader = document.createElement('h3');
   legendHeader.style.cssText = 'font-size:1rem;color:#7ed321;margin-bottom:4px;';
-  legendHeader.textContent = 'Tile Legend';
+  legendHeader.textContent = t('rules.legend.title');
 
   // ── Legend table ──────────────────────────────────────────────────────────
   const table = document.createElement('table');
   table.style.cssText =
     'width:100%;border-collapse:collapse;font-size:0.88rem;';
 
-  for (const row of LEGEND_ROWS) {
+  for (const row of getLegendRows()) {
     const tr = document.createElement('tr');
     tr.style.cssText = `border-bottom:1px solid ${UI_INPUT_BORDER};`;
 
