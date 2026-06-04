@@ -7,9 +7,11 @@ import { PlayerProfileScreen } from '../src/playerProfileScreen';
 import { registerTranslations, resetI18n, setLocale } from '../src/i18n';
 
 describe('i18n DOM integration', () => {
-  afterEach(() => {
+  afterEach(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     resetI18n();
     document.body.innerHTML = '';
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
   it('renders translated recording modal labels', () => {

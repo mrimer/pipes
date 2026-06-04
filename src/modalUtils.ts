@@ -39,6 +39,7 @@ function restoreFocus(target: HTMLElement | null): void {
 }
 
 export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupModalResult {
+  const ownerDocument = el.ownerDocument;
   el.setAttribute('role', 'dialog');
   el.setAttribute('aria-modal', 'true');
 
@@ -109,7 +110,7 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
   const onDocumentKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return;
     if (!isOpen) return;
-    if (document.body.lastElementChild !== el) return;
+    if (ownerDocument.body.lastElementChild !== el) return;
     if (options.canCloseOnEscape && !options.canCloseOnEscape()) return;
     event.preventDefault();
     event.stopPropagation();
@@ -117,7 +118,7 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
   };
 
   el.addEventListener('keydown', onKeyDown);
-  document.addEventListener('keydown', onDocumentKeyDown);
+  ownerDocument.addEventListener('keydown', onDocumentKeyDown);
 
   const visibilityObserver = new MutationObserver(() => {
     activate();
@@ -136,11 +137,11 @@ export function setupModal(el: HTMLElement, options: SetupModalOptions): SetupMo
       previouslyFocused = null;
     }
     el.removeEventListener('keydown', onKeyDown);
-    document.removeEventListener('keydown', onDocumentKeyDown);
+    ownerDocument.removeEventListener('keydown', onDocumentKeyDown);
     visibilityObserver.disconnect();
     connectionObserver.disconnect();
   });
-  connectionObserver.observe(document.body, { childList: true, subtree: true });
+  connectionObserver.observe(ownerDocument.body, { childList: true, subtree: true });
 
   activate();
 

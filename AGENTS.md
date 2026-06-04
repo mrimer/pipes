@@ -115,6 +115,9 @@ src/
 ├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
+├── i18n.ts                      # Lightweight locale registry, fallback, and string interpolation
+├── i18nCatalog.ts               # English translation key catalog for the current proof-of-concept
+├── i18nTypes.ts                 # Shared i18n type definitions
 ├── modalUtils.ts                # Modal a11y helper — setupModal provides role=dialog, aria-modal, focus trap, focus restoration, Esc handling; all modal builders use this
 ├── commandKeyManager.ts         # Keyboard shortcut registry
 ├── deviceUtils.ts               # Touch/mobile detection helpers
@@ -228,6 +231,7 @@ src/
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
 | Menu/settings/profile background pattern | `uiBackground.ts` |
+| Localization helper and catalog | `i18n.ts`, `i18nCatalog.ts` |
 | Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Auto-recording dedup | `autoRecording.ts` |

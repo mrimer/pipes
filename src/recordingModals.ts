@@ -429,8 +429,8 @@ export function showReplayImportSuccessModal(
 
   const infoEl = document.createElement('p');
   infoEl.style.cssText = 'font-size:0.95rem;color:#ddd;margin:0;';
-  const chapterStr = chapterNumber !== null ? `Chapter ${chapterNumber}` : 'Unknown chapter';
-  const levelStr   = levelNumber   !== null ? `Level ${levelNumber}` : 'Unknown level';
+  const chapterStr = chapterNumber !== null ? `Chapter ${chapterNumber}` : t('recording.import.unknownChapter');
+  const levelStr   = levelNumber   !== null ? `Level ${levelNumber}` : t('recording.import.unknownLevel');
   infoEl.textContent = t('recording.import.info', {
     campaignName,
     chapterLabel: chapterStr,

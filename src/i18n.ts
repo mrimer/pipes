@@ -1,12 +1,7 @@
 import { EN_TRANSLATIONS } from './i18nCatalog';
+import type { Locale, TranslationParams, TranslationTable } from './i18nTypes';
 
-/** Locale code (e.g. 'en', 'es', 'fr'). */
-export type Locale = string;
-
-/** Translation table: key → string, possibly with {placeholder} interpolation. */
-export type TranslationTable = Record<string, string>;
-
-export type TranslationParams = Record<string, string | number>;
+export type { Locale, TranslationParams, TranslationTable } from './i18nTypes';
 
 const DEFAULT_LOCALE = 'en';
 const tables = new Map<Locale, TranslationTable>([[DEFAULT_LOCALE, EN_TRANSLATIONS]]);
