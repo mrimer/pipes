@@ -47,6 +47,7 @@ import { isTextEntryShortcutTarget } from './mapEditorSectionUtils';
 import { renderMinimap } from '../visuals/minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
+import { t } from '../i18n';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';

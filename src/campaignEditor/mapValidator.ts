@@ -16,7 +16,7 @@ import { PipeShape } from '../types';
 import { computeMapReachable, editorTileConns } from '../mapUtils';
 import type { ValidationResult } from './types';
 import { t } from '../i18n';
-import { MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
+import { MULTIPLE_SOURCES } from './validationMessages';
 
 /** Controls how the entity-chamber field is named and described. */
 export interface MapEntityConfig {
@@ -97,8 +97,8 @@ export function validateMapGrid(
     }
   }
 
-  if (!sourcePos) { msgs.push(t('validation.map.noSource', { message: t(NO_SOURCE) })); ok = false; }
-  if (!sinkPos)   { msgs.push(t('validation.map.noSink', { message: t(NO_SINK) })); ok = false; }
+  if (!sourcePos) { msgs.push(t('validation.map.noSourceError')); ok = false; }
+  if (!sinkPos)   { msgs.push(t('validation.map.noSinkError')); ok = false; }
 
   // Check sink completion threshold
   if (sinkPos && config.sinkCompletionMax !== undefined) {
