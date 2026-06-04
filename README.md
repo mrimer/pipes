@@ -1,4 +1,45 @@
-# pipes
-A puzzle game about getting water to flow through pipe segments from the source to a goal.
-The game incorporates a variant of Magic Tower elements into the puzzle design.
-A campaign editor is supported and an official level set is in development.
+# Pipes
+
+A tile-based puzzle game about getting water to flow through pipes.
+Browser-based, built with TypeScript + Webpack + Canvas.
+
+## Quick start
+
+```bash
+npm install
+npm run dev     # dev server at http://localhost:8080
+npm test        # jest test suite (1489 tests)
+npm run build   # production bundle → dist/
+npm run lint    # type-aware lint check (no auto-fix)
+npm run lint:fix  # apply auto-fixes
+```
+
+## Project layout
+
+See AGENTS.md for the full architectural overview, module map, and contributor invariants.
+
+Top-level directories:
+- src/ — game source (TypeScript)
+- tests/ — Jest test suite
+- data/ — sound + image assets
+- .github/workflows/ — CI/CD (GitHub Pages deploy)
+
+## Deployment
+
+Pushes to main deploy to GitHub Pages via .github/workflows/deploy.yml. Build artifact lives in dist/.
+
+## Dependencies
+
+- TypeScript 5.4+ / Webpack 5
+- ESLint 8 with type-aware rules
+- Jest 29 (Node default; jsdom opt-in per test file via @jest-environment jsdom)
+- See package.json for the full list. overrides block forces uuid ^11.1.1 to clear a transitive vuln.
+
+## Contributing
+
+Read AGENTS.md first — it documents architectural invariants (save-data versioning, memory teardown discipline, validation patterns, perf cache). Tests + lint + build
+must all stay green:
+
+```bash
+npm run lint && npm test && npm run build
+```
