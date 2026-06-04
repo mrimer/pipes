@@ -31,7 +31,7 @@ cd /path/to/pipes   # or just run from the repo root
 npm install
 ```
 
-- Use absolute paths for all repository file tool calls, rooted at the current session's clone path (for this task: `/tmp/workspace/mrimer/pipes`).
+- Use absolute paths for all repository file tool calls, rooted at the current session's clone path (e.g., `/tmp/workspace/mrimer/pipes`).
 
 ### Available commands
 
