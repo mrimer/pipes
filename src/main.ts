@@ -66,6 +66,13 @@ function localizeStaticChrome(): void {
     if (el) el.setAttribute(attr, t(key));
   };
 
+  document.title = t('app.title');
+  setText('skip-to-game-link', 'a11y.skipToGame');
+  setText('sr-app-title', 'a11y.appName');
+  setAttr('game-canvas', 'aria-label', 'a11y.gameBoard');
+  setText('stats-water-label', 'stats.water');
+  setText('best-score-title', 'stats.bestScore');
+
   setText('undo-btn', 'hud.undo');
   setText('redo-btn', 'hud.redo');
   setText('restart-btn', 'hud.restart');

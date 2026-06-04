@@ -493,8 +493,8 @@
   </style>
 </head>
 <body>
-  <a href="#play-screen" class="sr-only-focusable">Skip to game</a>
-  <h1 class="sr-only">🔧 Cool Pipes</h1>
+  <a id="skip-to-game-link" href="#play-screen" class="sr-only-focusable">Skip to game</a>
+  <h1 id="sr-app-title" class="sr-only">🔧 Cool Pipes</h1>
 
   <main id="main-content">
   <!-- ── Level-select screen ────────────────────────────────────── -->
@@ -519,7 +519,7 @@
       <div id="right-panel">
         <div id="stats-box" aria-live="polite" aria-atomic="true">
           <div id="water-display" class="stat-row" aria-live="polite">
-            <span class="stat-label">💧 Water</span>
+            <span id="stats-water-label" class="stat-label">💧 Water</span>
             <span class="stat-value">–</span>
           </div>
         </div>

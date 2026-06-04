@@ -16,7 +16,7 @@ Last audited: 2026-06-04
 |---|---|---|
 | i18n foundation (`i18n.ts`, `en.ts`, bootstrap) | MIGRATED | `/tmp/workspace/mrimer/pipes/src/i18n.ts`, `/tmp/workspace/mrimer/pipes/src/i18n/en.ts`, `/tmp/workspace/mrimer/pipes/src/main.ts:109-112` |
 | HUD + win/lose modal baseline chrome | MIGRATED | `/tmp/workspace/mrimer/pipes/src/main.ts:69-89`, `/tmp/workspace/mrimer/pipes/src/game.ts:623-626` |
-| index.html static labels | PARTIAL | Hardcoded labels remain (`#best-score-title`, stats label text, canvas aria-label) in `/tmp/workspace/mrimer/pipes/index.html:518,522,528` |
+| index.html static labels | MIGRATED | Localized via `/tmp/workspace/mrimer/pipes/src/main.ts:69-77` using keys added in `/tmp/workspace/mrimer/pipes/src/i18n/en.ts` for `document.title`, skip link, sr-only app title, canvas aria-label, stats water label, and best score title. |
 | Splash screen + title screen | NOT MIGRATED | Hardcoded play CTA in `/tmp/workspace/mrimer/pipes/src/splashScreen.ts:79`; title/splash text still literal-driven |
 | Level select screen | NOT MIGRATED | Multiple literals in `/tmp/workspace/mrimer/pipes/src/levelSelect.ts` (e.g., lines 216, 220, 629) |
 | Settings modal (`gameModals.ts`) | PARTIAL | Reset/challenge/exit/player-name paths use `t()`, but settings/import-result sections still literal-heavy (e.g., lines 323, 338, 947) |
