@@ -15,6 +15,7 @@ import type { TileDef} from '../types';
 import { PipeShape } from '../types';
 import { computeMapReachable, editorTileConns } from '../mapUtils';
 import type { ValidationResult } from './types';
+import { t } from '../i18n';
 import { MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 /** Controls how the entity-chamber field is named and described. */
@@ -56,11 +57,11 @@ export function validateMapGrid(
       const def = grid[r]?.[c];
       if (!def) continue;
       if (def.shape === PipeShape.Source) {
-        if (sourcePos) { msgs.push(MULTIPLE_SOURCES); ok = false; }
+        if (sourcePos) { msgs.push(t(MULTIPLE_SOURCES)); ok = false; }
         else sourcePos = { row: r, col: c };
       }
       if (def.shape === PipeShape.Sink) {
-        if (sinkPos) msgs.push('⚠️ Multiple Sink tiles found – only first is checked.');
+        if (sinkPos) msgs.push(t('validation.map.multipleSinksOnlyFirstChecked'));
         else sinkPos = { row: r, col: c };
       }
       if (
@@ -70,12 +71,23 @@ export function validateMapGrid(
         const idx = def[config.entityIdxField as keyof TileDef] as number | undefined;
         if (idx === undefined) {
           msgs.push(
-            `❌ ${config.chamberContent} chamber at (${r},${c}) is missing ${config.entityIdxField}.`,
+            t('validation.map.entityChamberMissingIndex', {
+              chamberContent: config.chamberContent,
+              row: r,
+              col: c,
+              entityIdxField: config.entityIdxField,
+            }),
           );
           ok = false;
         } else if (idx < 0 || idx >= config.entityCount) {
           msgs.push(
-            `❌ ${config.chamberContent} chamber at (${r},${c}) has invalid ${config.entityIdxField} (${idx}).`,
+            t('validation.map.entityChamberInvalidIndex', {
+              chamberContent: config.chamberContent,
+              row: r,
+              col: c,
+              entityIdxField: config.entityIdxField,
+              idx,
+            }),
           );
           ok = false;
         } else {
@@ -85,8 +97,8 @@ export function validateMapGrid(
     }
   }
 
-  if (!sourcePos) { msgs.push(`❌ ${NO_SOURCE}`); ok = false; }
-  if (!sinkPos)   { msgs.push(`❌ ${NO_SINK}`);   ok = false; }
+  if (!sourcePos) { msgs.push(t('validation.map.noSource', { message: t(NO_SOURCE) })); ok = false; }
+  if (!sinkPos)   { msgs.push(t('validation.map.noSink', { message: t(NO_SINK) })); ok = false; }
 
   // Check sink completion threshold
   if (sinkPos && config.sinkCompletionMax !== undefined) {
@@ -94,8 +106,10 @@ export function validateMapGrid(
     const completion = sinkDef?.completion ?? 0;
     if (completion > config.sinkCompletionMax) {
       msgs.push(
-        `⚠️ Sink completion threshold (${completion}) exceeds the number of ` +
-        `entities in this map (${config.sinkCompletionMax}).`,
+        t('validation.map.sinkCompletionExceedsEntityCount', {
+          completion,
+          sinkCompletionMax: config.sinkCompletionMax,
+        }),
       );
       ok = false;
     }
@@ -104,7 +118,7 @@ export function validateMapGrid(
   // Check all entities are placed
   for (let i = 0; i < config.entityCount; i++) {
     if (!placedEntityIdxs.has(i)) {
-      msgs.push(`❌ ${config.entityName(i)} is not placed on the map.`);
+      msgs.push(t('validation.map.entityNotPlaced', { entityName: config.entityName(i) }));
       ok = false;
     }
   }
@@ -119,7 +133,7 @@ export function validateMapGrid(
 
   // Sink reachable?
   if (!reached.has(`${sinkPos.row},${sinkPos.col}`)) {
-    msgs.push('❌ Sink is not reachable from the Source through connections.');
+    msgs.push(t('validation.map.sinkNotReachableFromSource'));
     ok = false;
   }
 
@@ -134,7 +148,11 @@ export function validateMapGrid(
         const idx = def[config.entityIdxField as keyof TileDef] as number | undefined;
         if (idx !== undefined && !reached.has(`${r},${c}`)) {
           msgs.push(
-            `❌ ${config.entityName(idx)} chamber at (${r},${c}) is not reachable from the Source.`,
+            t('validation.map.entityChamberNotReachable', {
+              entityName: config.entityName(idx),
+              row: r,
+              col: c,
+            }),
           );
           ok = false;
         }
@@ -142,6 +160,6 @@ export function validateMapGrid(
     }
   }
 
-  if (msgs.length === 0 && ok) msgs.push('✅ Map structure looks valid.');
+  if (msgs.length === 0 && ok) msgs.push(t('validation.map.structureValid'));
   return { ok, messages: msgs };
 }

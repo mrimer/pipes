@@ -1,6 +1,7 @@
 import type { ChapterDef, TileDef } from '../types';
 import type { ValidationResult } from './types';
 import { validateMapGrid } from './mapValidator';
+import { t } from '../i18n';
 
 export function validateChapterMap(
   grid: (TileDef | null)[][],
@@ -12,8 +13,10 @@ export function validateChapterMap(
     chamberContent: 'level',
     entityIdxField: 'levelIdx',
     entityCount: chapter.levels.length,
-    entityName: (i) => `Level ${i + 1} (${chapter.levels[i]?.name ?? '?'})`,
+    entityName: (i) => t('validation.map.levelEntityName', {
+      number: i + 1,
+      name: chapter.levels[i]?.name ?? '?',
+    }),
     sinkCompletionMax: chapter.levels.length,
   });
 }
-

@@ -2,6 +2,7 @@ import { Board, parseKey } from '../board';
 import type { LevelDef} from '../types';
 import { PipeShape } from '../types';
 import type { ValidationResult } from './types';
+import { t } from '../i18n';
 import { MULTIPLE_SINKS, MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 /**
@@ -20,21 +21,21 @@ export function validateLevel(levelDef: LevelDef): ValidationResult {
       const def = levelDef.grid[r]?.[c];
       if (!def) continue;
       if (def.shape === PipeShape.Source) {
-        if (sourcePos) { msgs.push(MULTIPLE_SOURCES); ok = false; }
+        if (sourcePos) { msgs.push(t(MULTIPLE_SOURCES)); ok = false; }
         else { sourcePos = { row: r, col: c }; }
       }
       if (def.shape === PipeShape.Sink) sinkPositions.push({ row: r, col: c });
     }
   }
 
-  if (!sourcePos) { msgs.push(NO_SOURCE); ok = false; }
-  if (sinkPositions.length === 0) { msgs.push(NO_SINK); ok = false; }
-  if (sinkPositions.length > 1) { msgs.push(MULTIPLE_SINKS); ok = false; }
+  if (!sourcePos) { msgs.push(t(NO_SOURCE)); ok = false; }
+  if (sinkPositions.length === 0) { msgs.push(t(NO_SINK)); ok = false; }
+  if (sinkPositions.length > 1) { msgs.push(t(MULTIPLE_SINKS)); ok = false; }
   if (!ok) return { ok, messages: msgs };
 
   // Check that inventory has at least one item (otherwise level may be impossible)
   const hasInventory = levelDef.inventory.some((it) => it.count > 0);
-  if (!hasInventory) msgs.push('⚠️ Inventory is empty – the player has no tiles to place.');
+  if (!hasInventory) msgs.push(t('validation.level.inventoryEmpty'));
 
   // Try to create a Board and check if the level has a valid layout
   try {
@@ -53,8 +54,12 @@ export function validateLevel(levelDef: LevelDef): ValidationResult {
         const deltaDamage = initialPressure - tile.hardness;
         if (deltaDamage <= 0) {
           msgs.push(
-            `❌ Sandstone at (${r},${c}) is immediately connected but its hardness (${tile.hardness}) ` +
-            `≥ initial pressure (${initialPressure}) — the level starts in a failure state.`,
+            t('validation.level.sandstoneInitialFailure', {
+              row: r,
+              col: c,
+              hardness: tile.hardness,
+              initialPressure,
+            }),
           );
           ok = false;
         }
@@ -63,23 +68,23 @@ export function validateLevel(levelDef: LevelDef): ValidationResult {
 
     // Check if the initial state already has zero or negative water (immediate game over).
     if (ok && board.getCurrentWater() <= 0) {
-      msgs.push('❌ Level starts with zero or negative water – adjust the source capacity or tile costs.');
+      msgs.push(t('validation.level.nonPositiveWaterStart'));
       ok = false;
     }
 
     // If source is directly connected to sink (pre-solved), warn
     if (ok) {
       if (board.isSolved()) {
-        msgs.push('⚠️ Level is already solved without placing any tiles.');
+        msgs.push(t('validation.level.alreadySolved'));
       } else {
-        msgs.push('✅ Level structure looks valid.');
+        msgs.push(t('validation.level.structureValid'));
       }
     }
   } catch {
-    msgs.push('❌ Level structure error – check tile configurations.');
+    msgs.push(t('validation.level.structureError'));
     ok = false;
   }
 
-  if (msgs.length === 0) msgs.push('✅ All checks passed!');
+  if (msgs.length === 0) msgs.push(t('validation.level.allChecksPassed'));
   return { ok, messages: msgs };
 }
