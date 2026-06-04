@@ -27,11 +27,11 @@ The repository is a TypeScript/Webpack single-page application. All dev tooling 
 ### First step in every session
 
 ```bash
-cd /home/runner/work/pipes/pipes
+cd /path/to/pipes   # or just run from the repo root
 npm install
 ```
 
-- Use absolute paths for all repository file tool calls (root: `/home/runner/work/pipes/pipes`).
+- Use absolute paths for all repository file tool calls, rooted at the current session's clone path (for this task: `/tmp/workspace/mrimer/pipes`).
 
 ### Available commands
 
@@ -100,6 +100,7 @@ src/
 ├── levelTransition.ts           # Zoom/transition animations between screens
 │
 ├── moveRecorder.ts              # Move encoding P/R/D strings, replayMoves()
+├── autoRecording.ts             # Auto-recording dedup helper
 ├── playbackScreen.ts            # Transport-controls HUD for step-by-step replay
 ├── profileIO.ts                 # Export/import orchestration for replays and player profiles
 ├── playerProfile.ts             # Pure data: build/parse/apply/checksum player profile payloads
@@ -114,6 +115,7 @@ src/
 ├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
+├── modalUtils.ts                # Modal a11y helper — setupModal provides role=dialog, aria-modal, focus trap, focus restoration, Esc handling; all modal builders use this
 ├── commandKeyManager.ts         # Keyboard shortcut registry
 ├── deviceUtils.ts               # Touch/mobile detection helpers
 ├── sfxManager.ts                # Sound effect playback
@@ -161,11 +163,10 @@ src/
     ├── gridUtils.ts             # Editor grid manipulation utilities
     ├── mapEditorGridState.ts    # Editor grid state model
     ├── mapEditorSectionUtils.ts # Shared section rendering helpers
-    ├── mapEditorBase.ts         # Abstract base: undo/redo, grid ops
     ├── canvasUtils.ts           # Editor canvas helpers
     ├── gridSizePanel.ts         # Grid-size control panel
     ├── renderer.ts              # Editor-specific canvas renderer
-    └── types.ts                 # Editor-local types (gzip utilities re-exported to src/fileIO.ts)
+    └── types.ts                 # Editor-local types
 ```
 
 ---
@@ -190,6 +191,26 @@ src/
 
 **`bfs.ts` is domain-free.** `bfs(start, getNeighbors)` and `bfsWithDepth` accept generic node types. All domain-specific BFS (water flow on the game board, reachability on the map screen) lives in its caller, not in `bfs.ts`.
 
+### Architecture invariants
+
+- **Validate all external data before mutation.** Per the Task 1 audit, treat `localStorage` payloads and imported files as untrusted: `playerProfile.ts` uses `hasValidPayloadShape()` before applying imported profile payloads, and `profileIO.ts` uses `assertReplayRecordShape()` before saving replay imports. New external-data entry points should follow the same shape-check-before-mutate pattern.
+
+- **Save-data versions are explicit compatibility gates.** `PROFILE_FORMAT_VERSION = 3` in `playerProfile.ts`; `REPLAY_FILE_VERSION = 1` in `profileIO.ts`; `PlaySequenceRecord.formatVersion` is version 1 by default in `types.ts`, set in `game.ts`, validated in `persistence.ts`, and enforced again in `playbackScreen.ts`. Bump the relevant version whenever a schema change is backward-incompatible, and reject newer-than-supported data on load/import.
+
+- **Listener teardown must mirror setup.** `Game.destroy()` sets `_destroyed`, removes the resize listener, and cancels the active render RAF; `unregisterScrollingPipeBackground(target)` must be called on screen exit to free `uiBackground.ts` bookkeeping maps; `CampaignEditor.hide()` and `destroy()` both call `_detachKeydownHandler()`. Pattern: long-lived components register listeners in `show()`/`attach()` and unregister them symmetrically in `hide()`/`detach()`/`destroy()`.
+
+- **Board fill-state cache must be invalidated on every grid mutation.** `Board` caches `getFilledPositions()` in `_filledPositionsCache`, and any path that mutates `board.grid` must call `_invalidateFilledCache()`. Existing mutation sites include `placeInventoryTile()`, `replaceInventoryTile()`, `reclaimTile()`, `rotateTileBy()`, and `_restoreSnapshot()`; keep that list current if new mutation paths land.
+
+- **Prefer private-by-default module visibility.** Do not export a symbol unless a cross-module caller exists. Recent cleanup demoted 24+ symbols from `export` and deleted 8 unused ones entirely; when adding new helpers, start unexported and promote them only once a second file genuinely needs the import.
+
+### UI / accessibility notes
+
+- **Skip links use `.sr-only-focusable`.** The class in `index.html` implements the standard visually-hidden-until-focused pattern; use it for keyboard-only shortcuts such as "Skip to game".
+
+- **Keyboard focus uses the global `:focus-visible` outline rule.** Preserve the shared gold focus ring and the paired `:focus:not(:focus-visible)` suppression so pointer users do not see duplicate outlines.
+
+- **All modals go through `setupModal()`.** `modalUtils.ts` owns modal accessibility plumbing (`role="dialog"`, `aria-modal`, focus trap, focus restoration, Escape handling). Do not hand-roll modal a11y behavior in individual modal builders.
+
 ---
 
 ## Navigation tips
@@ -202,12 +223,14 @@ src/
 | Chamber node drawing | `renderer/chamberRenderers.ts` |
 | Ambient grass/rocks | `renderer/ambientDecoration.ts` |
 | Modal dialogs (game) | `gameModals.ts`, `recordingModals.ts`, `rulesModal.ts` |
+| Modal accessibility plumbing | `modalUtils.ts` |
 | Keyboard shortcuts | `commandKeyManager.ts` |
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
 | Menu/settings/profile background pattern | `uiBackground.ts` |
 | Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
+| Auto-recording dedup | `autoRecording.ts` |
 | Player profile schema | `playerProfile.ts` |
 | Splash screen (Caravel Games logo) | `splashScreen.ts` |
 | Title intro animation (COOL PIPES glyphs) | `titleScreen.ts` |
