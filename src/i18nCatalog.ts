@@ -1,4 +1,4 @@
-import type { TranslationTable } from './i18n';
+import type { TranslationTable } from './i18nTypes';
 
 export const EN_TRANSLATIONS: TranslationTable = {
   'validation.noSource': 'No Source tile found.',
@@ -26,6 +26,8 @@ export const EN_TRANSLATIONS: TranslationTable = {
   'recording.list.empty': 'No recordings saved for this level.',
   'recording.import.title': '📥 Recording Imported',
   'recording.import.info': 'Campaign: {campaignName}\n{chapterLabel} · {levelLabel}',
+  'recording.import.unknownChapter': 'Unknown chapter',
+  'recording.import.unknownLevel': 'Unknown level',
   'recording.import.close': 'OK',
 
   'profile.title': '👤 Select Player',
