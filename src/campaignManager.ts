@@ -26,6 +26,7 @@ import {
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
+import type { ResetProgressInfo } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
 import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScreenTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
@@ -81,7 +82,7 @@ export interface CampaignCallbacks {
   readonly gameoverMenuBtnEl: HTMLButtonElement;
 
   /** Show the reset-progress confirmation modal with the given progress info. */
-  showResetConfirmModal(info: import('./gameModals').ResetProgressInfo | null): void;
+  showResetConfirmModal(info: ResetProgressInfo | null): void;
   /** Show the game-rules modal overlay. */
   showRules(): void;
   /** Show the settings modal overlay. */
@@ -922,7 +923,7 @@ export class CampaignManager {
     progress: Set<number>,
     levelStars: Record<number, number>,
     levelWater: Record<number, number>,
-  ): import('./gameModals').ResetProgressInfo {
+  ): ResetProgressInfo {
     const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
     const levelsCompleted = allLevels.filter(l => progress.has(l.id)).length;
     const levelsTotal = allLevels.length;

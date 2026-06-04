@@ -1,6 +1,6 @@
 /** Helpers for rendering the level-selection screen. */
 
-import type { ChapterDef } from './types';
+import type { ChapterDef, LevelDef } from './types';
 import { attachChapterWaveAnimation } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from './uiConstants';
@@ -26,7 +26,7 @@ export interface ActiveCampaignInfo {
  * locked in the level list (same locking logic used by renderLevelList).
  */
 function findContinueLevelId(
-  chapters: import('./types').ChapterDef[],
+  chapters: ChapterDef[],
   completedLevels: Set<number>,
   levelStars: Record<number, number> = {},
   completedChapters?: ReadonlySet<number>,
@@ -92,7 +92,7 @@ function findContinueLevelId(
  * Returns the 0-based chapter index, or `null` if no such chapter is accessible.
  */
 function findContinueChapterIdx(
-  chapters: import('./types').ChapterDef[],
+  chapters: ChapterDef[],
   completedLevels: Set<number>,
   completedChapters?: ReadonlySet<number>,
 ): number | null {
@@ -123,7 +123,7 @@ function findContinueChapterIdx(
 
 /** Compute the total stars available and collected across a set of levels. */
 function chapterStarTotals(
-  levels: import('./types').LevelDef[],
+  levels: LevelDef[],
   levelStars: Record<number, number>,
 ): { total: number; collected: number } {
   let total = 0;
@@ -140,7 +140,7 @@ function chapterStarTotals(
 
 /** Compute the sum of water remaining across all completed levels in a set. */
 function chapterWaterTotal(
-  levels: import('./types').LevelDef[],
+  levels: LevelDef[],
   completedLevels: Set<number>,
   levelWater: Record<number, number>,
 ): number {

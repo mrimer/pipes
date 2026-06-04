@@ -11,8 +11,9 @@
  */
 
 import { PipeShape } from '../src/types';
-import type { LevelDef } from '../src/types';
+import type { LevelDef, TileDef } from '../src/types';
 import { renderMinimap } from '../src/visuals/minimap';
+import type * as Colors from '../src/colors';
 
 // ─── Canvas mock setup ────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ afterEach(() => {
 function makeLevel(
   rows: number,
   cols: number,
-  grid: (import('../src/types').TileDef | null)[][],
+  grid: (TileDef | null)[][],
 ): LevelDef {
   return { id: 1, name: 'test', rows, cols, grid, inventory: [] };
 }
@@ -192,7 +193,7 @@ describe('renderMinimap: tileColor coverage via fills', () => {
   });
 
   it('draws chamber item tiles as a hollow rounded rectangle (stroke)', () => {
-    const { CHAMBER_FILL_COLOR } = jest.requireActual<typeof import('../src/colors')>('../src/colors');
+    const { CHAMBER_FILL_COLOR } = jest.requireActual<typeof Colors>('../src/colors');
     const ctx = installCanvasMock();
     const level = makeLevel(1, 1, [[
       { shape: PipeShape.Chamber, chamberContent: 'item' },
@@ -205,7 +206,7 @@ describe('renderMinimap: tileColor coverage via fills', () => {
   });
 
   it('uses CONTAINER_COLOR for gold item containers and PIPE_COLOR for regular ones', () => {
-    const { CONTAINER_COLOR, PIPE_COLOR } = jest.requireActual<typeof import('../src/colors')>('../src/colors');
+    const { CONTAINER_COLOR, PIPE_COLOR } = jest.requireActual<typeof Colors>('../src/colors');
 
     const ctxGold = installCanvasMock();
     const levelGold = makeLevel(1, 1, [[

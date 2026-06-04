@@ -18,9 +18,9 @@ import {
   savePlayerName,
 } from '../src/persistence';
 import { CampaignEditor } from '../src/campaignEditor';
-import type { CampaignDef, LevelDef} from '../src/types';
+import type { CampaignDef, LevelDef, TileDef, InventoryItem, ChapterDef } from '../src/types';
 import { PipeShape } from '../src/types';
-import type { TileParams } from '../src/campaignEditor/types';
+import type { TileParams, EditorPalette, EditorSnapshot } from '../src/campaignEditor/types';
 import { DecompressionStream } from 'node:stream/web';
 import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
 
@@ -349,8 +349,8 @@ describe('CampaignEditor – note and hint in level definitions', () => {
         levelName: string;
         rows: number;
         cols: number;
-        grid: (import('../src/types').TileDef | null)[][];
-        inventory: import('../src/types').InventoryItem[];
+        grid: (TileDef | null)[][];
+        inventory: InventoryItem[];
       };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
@@ -979,8 +979,8 @@ describe('CampaignEditor – import version comparison', () => {
         levelChallenge: boolean;
         rows: number;
         cols: number;
-        grid: (import('../src/types').TileDef | null)[][];
-        inventory: import('../src/types').InventoryItem[];
+        grid: (TileDef | null)[][];
+        inventory: InventoryItem[];
       };
       _service: { campaigns: readonly CampaignDef[] };
       _activeCampaignId: string | null;
@@ -1156,8 +1156,8 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
         levelHints: string[];
         rows: number;
         cols: number;
-        grid: (import('../src/types').TileDef | null)[][];
-        inventory: import('../src/types').InventoryItem[];
+        grid: (TileDef | null)[][];
+        inventory: InventoryItem[];
       };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
@@ -1414,7 +1414,7 @@ describe('CampaignEditor – Source tile parameter validation', () => {
       _state: {
         params: TileParams;
         palette: PipeShape | string;
-        buildTileDef(): import('../src/types').TileDef;
+        buildTileDef(): TileDef;
       };
     };
     state._state.palette = 'chamber:hot_plate';
@@ -1706,11 +1706,11 @@ describe('CampaignEditor – paint-drag undo snapshot is recorded on mouseup', (
     _state: {
       rows: number;
       cols: number;
-      grid: (import('../src/types').TileDef | null)[][];
-      palette: import('../src/campaignEditor/types').EditorPalette;
+      grid: (TileDef | null)[][];
+      palette: EditorPalette;
       historyLength: number;
       historyIndex: number;
-      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
+      historyEntryAt(index: number): EditorSnapshot;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -1850,11 +1850,11 @@ describe('CampaignEditor – right-drag erase snapshot is recorded on mouseup', 
     _state: {
       rows: number;
       cols: number;
-      grid: (import('../src/types').TileDef | null)[][];
-      palette: import('../src/campaignEditor/types').EditorPalette;
+      grid: (TileDef | null)[][];
+      palette: EditorPalette;
       historyLength: number;
       historyIndex: number;
-      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
+      historyEntryAt(index: number): EditorSnapshot;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -2041,11 +2041,11 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     _state: {
       rows: number;
       cols: number;
-      grid: (import('../src/types').TileDef | null)[][];
-      palette: import('../src/campaignEditor/types').EditorPalette;
+      grid: (TileDef | null)[][];
+      palette: EditorPalette;
       historyLength: number;
       historyIndex: number;
-      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
+      historyEntryAt(index: number): EditorSnapshot;
       _linkedTilePos: { row: number; col: number } | null;
     };
     _activeCampaignId: string | null;
@@ -2106,7 +2106,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     const historyLenBefore = state._state.historyLength;
 
     // Place a container tile (Chamber with chamberContent='item') by single-click on empty cell.
-    state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
+    state._state.palette = 'chamber:item' as EditorPalette;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0
 
     // Exactly one new snapshot should have been added.
@@ -2150,7 +2150,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     // Capture the pre-placement state from history.
     const prePlacementSnapshot = JSON.stringify(state._state.historyEntryAt(state._state.historyIndex).grid);
 
-    state._state.palette = 'chamber:item' as import('../src/campaignEditor/types').EditorPalette;
+    state._state.palette = 'chamber:item' as EditorPalette;
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
 
     // The snapshot before the latest must still reflect the empty pre-placement grid.
@@ -2248,11 +2248,11 @@ describe('CampaignEditor – context-menu right-click erase snapshot is recorded
     _state: {
       rows: number;
       cols: number;
-      grid: (import('../src/types').TileDef | null)[][];
-      palette: import('../src/campaignEditor/types').EditorPalette;
+      grid: (TileDef | null)[][];
+      palette: EditorPalette;
       historyLength: number;
       historyIndex: number;
-      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
+      historyEntryAt(index: number): EditorSnapshot;
       recordSnapshot(): void;
       undo(): boolean;
       redo(): boolean;
@@ -2401,11 +2401,11 @@ describe('CampaignEditor – Source tile placement constraint', () => {
     _state: {
       rows: number;
       cols: number;
-      grid: (import('../src/types').TileDef | null)[][];
-      palette: import('../src/campaignEditor/types').EditorPalette;
+      grid: (TileDef | null)[][];
+      palette: EditorPalette;
       historyLength: number;
       historyIndex: number;
-      historyEntryAt(index: number): import('../src/campaignEditor/types').EditorSnapshot;
+      historyEntryAt(index: number): EditorSnapshot;
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -2787,7 +2787,7 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
       params: TileParams;
       hover: { row: number; col: number } | null;
       _linkedTilePos: { row: number; col: number } | null;
-      grid: (import('../src/types').TileDef | null)[][];
+      grid: (TileDef | null)[][];
     };
     _activeCampaignId: string | null;
     _activeChapterIdx: number;
@@ -2929,7 +2929,6 @@ describe('CampaignEditor – wheel scroll only rotates linked tile when cursor i
 // ─── Data validation ──────────────────────────────────────────────────────────
 
 import { getValidTileDefKeys } from '../src/campaignEditor/types';
-import type { TileDef } from '../src/types';
 
 describe('getValidTileDefKeys', () => {
   it('Empty tile: only shape is valid', () => {
@@ -3267,13 +3266,13 @@ describe('CampaignEditor – _buildTileDef omits rotation for non-rotatable shap
     document.body.innerHTML = '';
   });
 
-  function editorBuildTileDef(palette: PipeShape | string): import('../src/types').TileDef {
+  function editorBuildTileDef(palette: PipeShape | string): TileDef {
     const editor = makeEditor();
     const state = editor as unknown as {
       _state: {
         params: TileParams;
         palette: PipeShape | string;
-        buildTileDef(): import('../src/types').TileDef;
+        buildTileDef(): TileDef;
       };
     };
     state._state.params.rotation = 90; // non-zero rotation to detect if it leaks
@@ -3326,7 +3325,7 @@ describe('CampaignEditor – _buildCurrentLevelDef strips unsupported tile field
         rows: number;
         cols: number;
         grid: (TileDef | null)[][];
-        inventory: import('../src/types').InventoryItem[];
+        inventory: InventoryItem[];
       };
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
@@ -3444,8 +3443,8 @@ describe('CampaignEditor – save then undo/redo marks unsaved changes', () => {
     _state: {
       rows: number;
       cols: number;
-      grid: (import('../src/types').TileDef | null)[][];
-      palette: import('../src/campaignEditor/types').EditorPalette;
+      grid: (TileDef | null)[][];
+      palette: EditorPalette;
       hasUnsavedChanges: boolean;
     };
     _activeCampaignId: string | null;
@@ -3974,7 +3973,7 @@ describe('CampaignEditor – tree overwrite on map editors', () => {
       _activeCampaignId: string | null;
       _showCampaignDetail(): void;
       _campaignMapEditor: {
-        _palette: import('../src/campaignEditor/types').EditorPalette;
+        _palette: EditorPalette;
         _gridState: { grid: (TileDef | null)[][] };
       };
     };
@@ -4017,7 +4016,7 @@ describe('CampaignEditor – tree overwrite on map editors', () => {
       _activeChapterIdx: number;
       _showChapterDetail(chapterIdx: number): void;
       _chapterMapEditor: {
-        _palette: import('../src/campaignEditor/types').EditorPalette;
+        _palette: EditorPalette;
         _gridState: { grid: (TileDef | null)[][] };
       };
     };
@@ -4080,7 +4079,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
       handleChapterEditorKeyDown(e: KeyboardEvent): void;
       _chapterHist: { canUndo: boolean; canRedo: boolean };
       _gridState: { grid: (TileDef | null)[][] };
-      _recordChapterSnapshot(chapter: import('../src/types').ChapterDef): void;
+      _recordChapterSnapshot(chapter: ChapterDef): void;
     };
     _showChapterDetail(chapterIdx: number): void;
     _service: { campaigns: readonly CampaignDef[] };

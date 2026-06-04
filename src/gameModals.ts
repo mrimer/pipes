@@ -3,6 +3,7 @@ import { createButton } from './uiHelpers';
 import type { CommandAction} from './commandKeyManager';
 import { COMMAND_LABELS, commandKeyManager, isPureModifierKey } from './commandKeyManager';
 import type { CampaignImportOutcome } from './playerProfile';
+import type { RecordingSettings } from './types';
 import { setupModal } from './modalUtils';
 /**
  * Factory functions for building the game's modal overlay elements.
@@ -293,7 +294,7 @@ export function buildSettingsModal(
   isTouchUiToggleEnabled: () => boolean,
   onTouchUiChange: (enabled: boolean) => void,
   onConfirm: (el: HTMLElement) => void,
-  getRecordingSettings?: () => import('./types').RecordingSettings,
+  getRecordingSettings?: () => RecordingSettings,
   initialBackgroundEnabled = true,
   onBackgroundChange?: (enabled: boolean) => void,
   initialEnvironmentalEnabled = true,

@@ -984,7 +984,7 @@ describe('CampaignService – scanData', () => {
   it('detects unrecognized tile fields on level grid tiles', () => {
     const campaign = campaignWithChapter();
     const tile = { shape: PipeShape.Straight, unknownTileField: 'oops' };
-    campaign.chapters[0].levels[0].grid[0][0] = tile as unknown as import('../src/types').TileDef;
+    campaign.chapters[0].levels[0].grid[0][0] = tile as unknown as TileDef;
     const svc = new CampaignService([campaign]);
     const issues = svc.scanData(campaign, true);
     expect(issues.get('Tile')?.has('unknownTileField')).toBe(true);

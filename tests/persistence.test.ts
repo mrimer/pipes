@@ -32,7 +32,7 @@ import {
   savePlayerName,
   saveTouchUiEnabled,
 } from '../src/persistence';
-import type { CampaignDef } from '../src/types';
+import type { CampaignDef, TileDef } from '../src/types';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
 beforeEach(() => {
@@ -256,7 +256,7 @@ describe('migrateCampaign', () => {
           name: 'Level 1',
           rows: 1,
           cols: grid[0]?.length ?? 1,
-          grid: grid as (import('../src/types').TileDef | null)[][],
+          grid: grid as (TileDef | null)[][],
           inventory: [],
         }],
         rows: 1,

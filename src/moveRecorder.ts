@@ -13,7 +13,7 @@
  */
 
 import { Board } from './board';
-import type { LevelDef, PipeShape, Rotation } from './types';
+import type { AmbientDecoration, LevelDef, PipeShape, Rotation } from './types';
 
 // ─── Encoded move type union ──────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ export type ReplayResult = {
 export function replayMoves(
   level: LevelDef,
   moves: string[],
-  existingDecorations?: ReadonlyMap<string, import('./types').AmbientDecoration>,
+  existingDecorations?: ReadonlyMap<string, AmbientDecoration>,
 ): ReplayResult {
   const board = new Board(level.rows, level.cols, level, existingDecorations);
   board.initHistory();

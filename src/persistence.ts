@@ -167,7 +167,7 @@ export function clearCampaignProgress(campaignId: string, progress: Set<number>)
  * Compute the completion percentage (0–100) for a campaign.
  * Returns 0 if the campaign has no levels.
  */
-export function computeCampaignCompletionPct(campaign: import('./types').CampaignDef, progress: Set<number>): number {
+export function computeCampaignCompletionPct(campaign: CampaignDef, progress: Set<number>): number {
   const total = campaign.chapters.reduce((n, ch) => n + ch.levels.length, 0);
   if (total === 0) return 0;
   const done = campaign.chapters.reduce(
