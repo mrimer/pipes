@@ -135,7 +135,7 @@ Representative editor strings:
 This task migrates a small foundation subset rather than the entire app:
 
 - `src/i18n.ts` lightweight helper
-- `src/i18nCatalog.ts` English key catalog
+- `src/i18n/en.ts` English key catalog
 - `src/campaignEditor/validationMessages.ts`
 - `src/recordingModals.ts`
 - `src/playerProfileScreen.ts`
