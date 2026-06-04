@@ -1,6 +1,7 @@
 # Pipes
 
 A tile-based puzzle game about getting water to flow through pipes.
+It incorporates Magic Tower elements and a campaign editor.
 Browser-based, built with TypeScript + Webpack + Canvas.
 
 ## Quick start
