@@ -37,7 +37,7 @@ Pushes to main deploy to GitHub Pages via .github/workflows/deploy.yml. Build ar
 
 ## Contributing
 
-Read AGENTS.md first — it documents architectural invariants (save-data versioning, memory teardown discipline, validation patterns, perf cache). Tests + lint + build must all stay green:
+Read AGENTS.md first — it documents architectural invariants (save-data versioning, memory teardown discipline, validation patterns, performance caching). Tests + lint + build must all stay green:
 
 ```bash
 npm run lint && npm test && npm run build
