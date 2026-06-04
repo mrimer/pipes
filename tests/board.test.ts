@@ -1,5 +1,6 @@
 import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_VALVE, ERR_REGULATOR_CHECK_PREFIX, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
+import type { AmbientDecoration } from '../src/types';
 import { Tile } from '../src/tile';
 import { LEVELS } from './levels';
 import { makeLevelDef } from './testHelpers';
@@ -3867,7 +3868,7 @@ describe('Board ambientDecorations', () => {
 
   it('each decoration has valid fields', () => {
     // Build boards until we get at least one decoration
-    let decorations: ReadonlyMap<string, import('../src/types').AmbientDecoration> = new Map();
+    let decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
     for (let i = 0; i < 30; i++) {
       const level = LEVELS[0];
       const board = new Board(level.rows, level.cols, level);
@@ -3900,7 +3901,7 @@ describe('Board ambientDecorations', () => {
 
   it('crystal decorations have count 1 or 2', () => {
     // Build many boards to ensure we encounter at least one crystal decoration
-    const crystals: import('../src/types').AmbientDecoration[] = [];
+    const crystals: AmbientDecoration[] = [];
     for (let i = 0; i < 100 && crystals.length < 5; i++) {
       const level = LEVELS[0];
       const board = new Board(level.rows, level.cols, level);

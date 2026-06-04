@@ -3,6 +3,7 @@
  */
 
 import { PipeShape, Direction } from '../src/types';
+import type { TileDef } from '../src/types';
 import {
   getValidTileDefKeys,
   getValidChapterMapTileDefKeys,
@@ -489,7 +490,7 @@ describe('reflectTileDefAboutDiagonal', () => {
 
 describe('reflectGridAboutDiagonal', () => {
   it('swaps rows and cols (transposes)', () => {
-    const grid: (import('../src/types').TileDef | null)[][] = [
+    const grid: (TileDef | null)[][] = [
       [{ shape: PipeShape.Straight, rotation: 0 }, null, null],
       [null, null, { shape: PipeShape.Elbow, rotation: 90 }],
     ];
@@ -506,7 +507,7 @@ describe('reflectGridAboutDiagonal', () => {
 
   it('applying reflect twice returns original grid layout', () => {
     const tile = { shape: PipeShape.Tee, rotation: 0 as const };
-    const grid: (import('../src/types').TileDef | null)[][] = [
+    const grid: (TileDef | null)[][] = [
       [tile, null],
       [null, null],
       [null, { shape: PipeShape.Elbow, rotation: 90 as const }],
@@ -614,7 +615,6 @@ describe('buildMapTileDef', () => {
 // ─── rotateConnectionsBy90 ────────────────────────────────────────────────────
 
 import { rotateConnectionsBy90, computeEditorFilledCells } from '../src/campaignEditor/types';
-import type { TileDef } from '../src/types';
 
 describe('rotateConnectionsBy90', () => {
   it('rotates [East] clockwise to [South]', () => {
