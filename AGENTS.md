@@ -115,8 +115,9 @@ src/
 ├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
-├── i18n.ts                      # Lightweight locale registry, fallback, and string interpolation
-├── i18nCatalog.ts               # English translation key catalog for the current proof-of-concept
+├── i18n.ts                      # Lightweight locale registry, locale bootstrap, fallback, and string interpolation
+├── i18n/
+│   └── en.ts                    # English translation catalog (canonical fallback locale)
 ├── i18nTypes.ts                 # Shared i18n type definitions
 ├── modalUtils.ts                # Modal a11y helper — setupModal provides role=dialog, aria-modal, focus trap, focus restoration, Esc handling; all modal builders use this
 ├── commandKeyManager.ts         # Keyboard shortcut registry
@@ -171,6 +172,39 @@ src/
     ├── renderer.ts              # Editor-specific canvas renderer
     └── types.ts                 # Editor-local types
 ```
+
+---
+
+## Internationalization (i18n)
+
+User-facing strings go through `src/i18n.ts`:
+
+```ts
+import { t } from './i18n';
+el.textContent = t('hud.undo');
+el.textContent = t('levelSelect.stars', { count: 3 });
+```
+
+Source tables live in `src/i18n/<locale>.ts`. English (`en.ts`) is canonical and the fallback.
+
+To add a new string:
+1. Add the key + English value to `src/i18n/en.ts`.
+2. Use `t('your.key')` at the call site.
+
+To add a new locale:
+1. Create `src/i18n/<locale>.ts` exporting a `TranslationTable`.
+2. Register in `src/main.ts`: `registerTranslations('<locale>', table)`.
+3. Add to the supported list in the `initLocale([...])` call.
+
+Don't localize:
+- `console.warn` / `console.error` (developer-facing)
+- Test strings (Jest descriptions, assertions)
+- Validation error keys (keep them symbolic; localize the displayed value)
+- User-generated content (campaign names, level names)
+
+Migration status: HUD chrome, win/game-over modal labels, game modal builders, recording modals, profile modals, and validation message values are localized. Level-select and much of the editor UI still remain hardcoded and should migrate incrementally.
+
+Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and `initLocale(['en'])` before any UI renders. Adding a locale requires updating this bootstrap.
 
 ---
 
@@ -231,7 +265,7 @@ src/
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
 | Menu/settings/profile background pattern | `uiBackground.ts` |
-| Localization helper and catalog | `i18n.ts`, `i18nCatalog.ts` |
+| Localization helper and catalogs | `i18n.ts`, `i18n/en.ts` |
 | Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Auto-recording dedup | `autoRecording.ts` |

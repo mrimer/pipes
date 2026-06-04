@@ -34,6 +34,7 @@ Pushes to main deploy to GitHub Pages via .github/workflows/deploy.yml. Build ar
 - TypeScript 5.4+ / Webpack 5
 - ESLint 8 with type-aware rules
 - Jest 29 (Node default; jsdom opt-in per test file via @jest-environment jsdom)
+- `src/i18n.ts` + `src/i18n/<locale>.ts` — translation helper and locale catalogs. See AGENTS.md for the pattern.
 - See package.json for the full list. Overrides block forces uuid ^11.1.1 to clear a transitive vuln.
 
 ## Contributing

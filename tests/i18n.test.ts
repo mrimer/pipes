@@ -31,4 +31,18 @@ describe('i18n', () => {
     expect(getLocale()).toBe('en');
     expect(t('profile.title')).toBe('👤 Select Player');
   });
+
+  it('coerces numeric params to string', () => {
+    registerTranslations('en', { 'count': '{n} items' });
+    setLocale('en');
+
+    expect(t('count', { n: 5 })).toBe('5 items');
+  });
+
+  it('coerces zero numeric params to string', () => {
+    registerTranslations('en', { 'count': '{n} items' });
+    setLocale('en');
+
+    expect(t('count', { n: 0 })).toBe('0 items');
+  });
 });

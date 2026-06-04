@@ -1,11 +1,36 @@
-import type { TranslationTable } from './i18nTypes';
+import type { TranslationTable } from '../i18nTypes';
 
-export const EN_TRANSLATIONS: TranslationTable = {
+export const en: TranslationTable = {
   'validation.noSource': 'No Source tile found.',
   'validation.noSink': 'No Sink tile found.',
   'validation.onlyOneSource': 'Only one source tile is allowed.',
   'validation.multipleSources': 'Multiple Source tiles found.',
   'validation.multipleSinks': 'Multiple Sink tiles found.',
+
+  'hud.undo': '↩ Undo',
+  'hud.redo': '↪ Redo',
+  'hud.restart': '↺ Restart',
+  'hud.rules': '📋 Rules',
+  'hud.record.title': 'Record play sequence',
+  'hud.record.ariaLabel': 'Record',
+  'hud.playback.title': 'View recordings',
+  'hud.playback.ariaLabel': 'Playback',
+  'hud.exit.menu': '← Menu',
+  'hud.exit.editor': '← Edit',
+
+  'modal.win.title': '🎉 Level Complete!',
+  'modal.win.subtitle': 'The water reached its destination.',
+  'modal.win.continue': 'Continue',
+  'modal.win.undoMove': '↩ Undo Move',
+  'modal.win.retry': 'Retry',
+  'modal.win.returnToEditor': '↩ Return to Editor',
+
+  'modal.gameover.title': '💧 Out of Water!',
+  'modal.gameover.undoMove': '↩ Undo Move',
+  'modal.gameover.retry': 'Retry',
+  'modal.gameover.menu': 'Level Select',
+  'modal.gameover.returnToEditor': '↩ Return to Editor',
+  'modal.gameover.message.tankDry': 'The tank ran dry! Undo the last move, reset the level, or return to the map.',
 
   'recording.record.title': '📼 Record Play Sequence',
   'recording.record.outcome': 'Outcome',

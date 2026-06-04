@@ -1,10 +1,11 @@
-import { EN_TRANSLATIONS } from './i18nCatalog';
+import { en } from './i18n/en';
 import type { Locale, TranslationParams, TranslationTable } from './i18nTypes';
+import { loadLocale } from './persistence';
 
 export type { Locale, TranslationParams, TranslationTable } from './i18nTypes';
 
 const DEFAULT_LOCALE = 'en';
-const tables = new Map<Locale, TranslationTable>([[DEFAULT_LOCALE, EN_TRANSLATIONS]]);
+const tables = new Map<Locale, TranslationTable>([[DEFAULT_LOCALE, en]]);
 let currentLocale: Locale = DEFAULT_LOCALE;
 
 function interpolate(message: string, params?: TranslationParams): string {
@@ -30,7 +31,25 @@ export function getLocale(): Locale {
 export function resetI18n(): void {
   currentLocale = DEFAULT_LOCALE;
   tables.clear();
-  tables.set(DEFAULT_LOCALE, EN_TRANSLATIONS);
+  tables.set(DEFAULT_LOCALE, en);
+}
+
+/**
+ * Initialize the active locale.
+ * Reads localStorage 'pipes_locale' first, else uses the browser default if supported,
+ * else uses fallback locale.
+ */
+export function initLocale(supportedLocales: readonly Locale[]): void {
+  const saved = loadLocale();
+  if (saved !== null && supportedLocales.includes(saved)) {
+    setLocale(saved);
+    return;
+  }
+
+  const browserLang = (typeof navigator !== 'undefined' ? navigator.language : DEFAULT_LOCALE).split('-')[0];
+  if (supportedLocales.includes(browserLang)) {
+    setLocale(browserLang);
+  }
 }
 
 export function t(key: string, params?: TranslationParams): string {
