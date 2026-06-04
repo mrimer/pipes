@@ -223,7 +223,7 @@ export class ChapterMapInput {
         this._cb.getEditGrid()[pos.row][pos.col] = {
           shape: PipeShape.Chamber,
           chamberContent: 'level',
-        levelIdx: this._cb.getSelectedLevelIdx()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- checked non-null on line 220
+          levelIdx: this._cb.getSelectedLevelIdx()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- checked non-null on line 220
           connections: [Direction.East, Direction.West],
         };
         this._cb.setSelectedLevelIdx(null);
