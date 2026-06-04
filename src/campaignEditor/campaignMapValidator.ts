@@ -1,6 +1,7 @@
 import type { CampaignDef, TileDef } from '../types';
 import type { ValidationResult } from './types';
 import { validateMapGrid } from './mapValidator';
+import { t } from '../i18n';
 
 export function validateCampaignMap(
   grid: (TileDef | null)[][],
@@ -12,7 +13,9 @@ export function validateCampaignMap(
     chamberContent: 'chapter',
     entityIdxField: 'chapterIdx',
     entityCount: campaign.chapters.length,
-    entityName: (i) => `Chapter ${i + 1} (${campaign.chapters[i]?.name ?? '?'})`,
+    entityName: (i) => t('validation.map.chapterEntityName', {
+      number: i + 1,
+      name: campaign.chapters[i]?.name ?? '?',
+    }),
   });
 }
-
