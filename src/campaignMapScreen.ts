@@ -221,6 +221,7 @@ export class CampaignMapScreen {
       };
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- campaign.grid is always set before _buildPseudoChapter is called on a campaign with a map
     const grid = campaign.grid!.map((row) => row.map((tile): TileDef | null => {
       if (!tile) return null;
       if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter') {

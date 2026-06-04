@@ -334,6 +334,7 @@ export class InputHandler {
   private _tryAdjustHoverRotation(steps: 1 | -1): boolean {
     const board = this._cb.getBoard();
     if (!this.mouseCanvasPos || !board) return false;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mouseCanvasPos guard above ensures _getHoverGridPos returns non-null
     const hPos = this._getHoverGridPos()!;
     const hTile = board.getTile(hPos);
     if (!hTile || hTile.isFixed || isEmptyFloor(hTile.shape) || SPIN_PIPE_SHAPES.has(hTile.shape)) {
@@ -350,6 +351,7 @@ export class InputHandler {
   private _tryRotateHoverSpinner(steps: number): boolean {
     const board = this._cb.getBoard();
     if (!this.mouseCanvasPos || !board) return false;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mouseCanvasPos guard above ensures _getHoverGridPos returns non-null
     const hPos = this._getHoverGridPos()!;
     const hTile = board.getTile(hPos);
     if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
@@ -579,6 +581,7 @@ export class InputHandler {
     const rect = this._canvas.getBoundingClientRect();
     const prevPos = this._getHoverGridPos();
     this.mouseCanvasPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mouseCanvasPos is set on the previous line so _getHoverGridPos always returns a value
     const newPos = this._getHoverGridPos()!;
     if (newPos.row !== prevPos?.row || newPos.col !== prevPos?.col) {
       this.hoverRotationDelta = 0;
@@ -623,6 +626,7 @@ export class InputHandler {
     if (this._cb.getGameState() !== GameState.Playing) return;
     const board = this._cb.getBoard();
     if (this.mouseCanvasPos && board) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mouseCanvasPos check above ensures _getHoverGridPos returns non-null
       const hPos = this._getHoverGridPos()!;
       const hTile = board.getTile(hPos);
       if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {

@@ -559,8 +559,8 @@ export class CampaignService {
     const issues = new Map<string, Map<string, number>>();
 
     const tally = (recordType: string, field: string): void => {
-      if (!issues.has(recordType)) issues.set(recordType, new Map());
-      const m = issues.get(recordType)!;
+      let m = issues.get(recordType);
+      if (!m) { m = new Map(); issues.set(recordType, m); }
       m.set(field, (m.get(field) ?? 0) + 1);
     };
 

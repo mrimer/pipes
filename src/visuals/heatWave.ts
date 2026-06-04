@@ -86,7 +86,7 @@ export function tickHeatWaves(
       const stagger = ((r * 3 + c * 7) * 1137) % HEAT_WAVE_INTERVAL_MS;
       lastSpawnTimes.set(key, now - stagger);
     }
-    const last = lastSpawnTimes.get(key)!;
+    const last = lastSpawnTimes.get(key) ?? now;
     if (now - last >= HEAT_WAVE_INTERVAL_MS) {
       waves.push({ row: r, col: c, startTime: now });
       lastSpawnTimes.set(key, now);

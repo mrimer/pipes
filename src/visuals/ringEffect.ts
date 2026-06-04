@@ -55,6 +55,7 @@ function _ensureCanvas(): void {
   _canvas = document.createElement('canvas');
   _canvas.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:9997;';
   document.body.appendChild(_canvas);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always non-null on a freshly created HTMLCanvasElement in a browser context
   _ctx = _canvas.getContext('2d')!;
   _resizeCanvas();
   if (!_resizeListenerAdded) {

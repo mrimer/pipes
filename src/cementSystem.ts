@@ -32,7 +32,7 @@ export class CementSystem {
   getDryingTime(pos: GridPos): number | null {
     const key = posKey(pos.row, pos.col);
     const val = this.data.get(key);
-    return val !== undefined ? val : null;
+    return val ?? null;
   }
 
   /**
@@ -56,7 +56,7 @@ export class CementSystem {
     if (tile !== null && tile !== undefined && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
       return { blocked: false };
     }
-    if (this.data.get(key)! === 0) {
+    if (this.data.get(key) === 0) {
       return {
         blocked: true,
         error: 'Items placed in hardened cement may not be adjusted.',
@@ -81,7 +81,7 @@ export class CementSystem {
     if (tile !== null && tile !== undefined && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
       return undefined;
     }
-    const dryingTime = this.data.get(key)!;
+    const dryingTime = this.data.get(key) ?? 0;
     if (dryingTime > 0) {
       this.data.set(key, dryingTime - 1);
       return { row: pos.row, col: pos.col };

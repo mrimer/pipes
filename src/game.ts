@@ -310,10 +310,12 @@ export class Game implements InputCallbacks {
     this.undoBtnEl = undoBtnEl;
     this.redoBtnEl = redoBtnEl;
     this.exitBtnEl = exitBtnEl;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- win-next-btn is always present in the win modal HTML
     this.winNextBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-next-btn')!;
     this.winChallengeEl = winModalEl.querySelector<HTMLElement>('#win-challenge');
     this.winWaterEl = winModalEl.querySelector<HTMLElement>('#win-water');
     this.winStarsEl = winModalEl.querySelector<HTMLElement>('#win-stars');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- gameover-menu-btn is always present in the gameover modal HTML
     this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
 
     // Create the tooltip manager for Ctrl+hover grid coordinates
@@ -690,6 +692,7 @@ export class Game implements InputCallbacks {
    * visual effects leftover from any previous level.
    */
   private _enterPlayScreenState(level: LevelDef): void {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- board is always set before _enterPlayScreenState is called
     this.board!.initHistory();
     this.gameState = GameState.Playing;
     this.selectedShape = null;
@@ -952,12 +955,14 @@ export class Game implements InputCallbacks {
       () => {
         this._animMgr.renderWinTileGlowsOverlay(now);
         if (this.gameState === GameState.GameOver) {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- board is always set during play state
           this._animMgr.renderDrySourcePulseOverlay(this.board!, now);
         }
       },
       // Vortex callback: rendered inside drawSourceOrSink after the outer circle
       // but before the connector arms, so particles appear above the sink backdrop
       // and underneath the arms.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- board is always set during play state
       () => this._animMgr.tickVortex(this.board!),
     );
 
@@ -1919,6 +1924,7 @@ export class Game implements InputCallbacks {
   /** Exit to the level-selection screen. */
   exitToMenu(): void {
     if (this._campaign.isPlaytesting) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- takePlaytestCallback is always set when isPlaytesting is true
       const cb = this._campaign.takePlaytestCallback()!;
       this._showLevelSelect();
       cb(); // re-open the campaign editor

@@ -991,6 +991,7 @@ export abstract class MapScreenBase {
       // Update native title for non-Ctrl hover and custom tooltip for Ctrl+hover
       const pos = this._canvasPos(e, chapter);
       if (pos) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- grid is verified to exist before the mouse-event handler is active
         const def = chapter.grid![pos.row]?.[pos.col];
         const displayProgress = this._getDisplayProgress();
         if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
@@ -1521,6 +1522,7 @@ export abstract class MapScreenBase {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- grid is verified to exist before _updateStatus is called for chapter map
     const grid = chapter.grid!;
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;

@@ -207,8 +207,9 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
 
   function getDirs(pos: GridPos): Set<Direction> {
     const key = `${pos.row},${pos.col}`;
-    if (!goodDirs.has(key)) goodDirs.set(key, new Set());
-    return goodDirs.get(key)!;
+    let dirs = goodDirs.get(key);
+    if (!dirs) { dirs = new Set(); goodDirs.set(key, dirs); }
+    return dirs;
   }
 
   const queue: GridPos[] = [];
@@ -611,6 +612,7 @@ export function spawnChapterMapBubble(
 
   const key = candidates[Math.floor(Math.random() * candidates.length)];
   const [row, col] = parseKey(key);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- candidate keys are extracted from non-null grid cells
   const def = grid[row][col]!;
 
   // Collect directions with mutual connections to a filled neighbor.

@@ -1071,6 +1071,7 @@ export class Board {
         // containers.  Allowed when no positive-count container for this item
         // that was reachable with the old tile has become unreachable with the
         // new tile.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- originalFilled is set unconditionally in the block above (lines 1056-1061) before this point
         const positiveContainerDisconnected = [...originalFilled!].some((key) => {
           if (finalFilled.has(key)) return false;
           const [r, c] = parseKey(key);
@@ -1371,6 +1372,7 @@ export class Board {
   private _hasAnyTileWithContents(contents: ReadonlySet<string>): boolean {
     for (const row of this.grid) {
       for (const tile of row) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- chamberContent is always set when shape === Chamber
         if (tile.shape === PipeShape.Chamber && contents.has(tile.chamberContent!)) {
           return true;
         }
