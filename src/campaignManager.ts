@@ -740,11 +740,10 @@ export class CampaignManager {
   loadBestWater(levelId: number): number | null {
     const record = loadLevelWater(this._activeCampaign?.id);
     const val = record[levelId];
-    return val !== undefined ? val : null;
+    return val ?? null;
   }
 
   /**
-   * Load the best star record for all levels.
    * Returns a map of levelId → star count.
    */
   loadBestStars(): Record<number, number> {
