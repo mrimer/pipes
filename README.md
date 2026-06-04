@@ -1,4 +1,4 @@
-# Pipes
+# Cool Pipes
 
 A tile-based puzzle game about getting water to flow through pipes.
 It incorporates Magic Tower elements and a campaign editor.
