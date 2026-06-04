@@ -24,6 +24,7 @@ import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
 import { buildPaletteSubSection } from './mapEditorSectionUtils';
+import { t } from '../i18n';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -46,7 +47,7 @@ export function buildCompletionInputWidget(
   wrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:4px;';
   const lbl = document.createElement('div');
   lbl.style.cssText = 'font-size:0.78rem;color:#aaa;';
-  lbl.textContent = 'Completion';
+  lbl.textContent = t('editor.params.completion');
   wrap.appendChild(lbl);
   const inp = document.createElement('input');
   inp.type = 'number';
@@ -142,7 +143,7 @@ export class ChapterEditorUI {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'TILE PALETTE';
+    title.textContent = t('editor.palette.title');
     panel.appendChild(title);
 
     const FLOOR_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -210,14 +211,14 @@ export class ChapterEditorUI {
 
     // Collapsible Floor sub-menu
     buildPaletteSubSection(
-      panel, 'Floor', this.floorSectionExpanded,
+      panel, t('editor.palette.section.floor'), this.floorSectionExpanded,
       () => { this.floorSectionExpanded = !this.floorSectionExpanded; panel.replaceWith(this.buildPalettePanel(chapter, campaign)); },
       '#888', '#1a1a1a', '#ccc', FLOOR_ITEMS, makeItemBtn,
     );
 
     // Collapsible Pipes sub-menu
     buildPaletteSubSection(
-      panel, 'Pipes', this.pipesSectionExpanded,
+      panel, t('editor.palette.section.pipes'), this.pipesSectionExpanded,
       () => { this.pipesSectionExpanded = !this.pipesSectionExpanded; panel.replaceWith(this.buildPalettePanel(chapter, campaign)); },
       '#4a90d9', '#0a1520', '#4a90d9', PIPES_ITEMS, makeItemBtn,
     );
@@ -236,13 +237,13 @@ export class ChapterEditorUI {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'LEVELS';
+    title.textContent = t('editor.chapter.levels');
     panel.appendChild(title);
 
     if (chapter.levels.length === 0) {
       const msg = document.createElement('div');
       msg.style.cssText = 'font-size:0.8rem;color:#555;';
-      msg.textContent = 'Add levels below to place them on the map.';
+      msg.textContent = t('editor.chapter.addLevelsHint');
       panel.appendChild(msg);
       return panel;
     }
@@ -265,7 +266,7 @@ export class ChapterEditorUI {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = `L-${li + 1}: ${level.name}${level.challenge ? ' ☠' : ''}${isPlaced ? ' ✓' : ''}`;
-      btn.title = isPlaced ? 'Already placed on the map' : `Select to place L-${li + 1}`;
+      btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.chapter.selectToPlaceLevel', { index: li + 1 });
       btn.disabled = isPlaced;
       btn.style.cssText =
         `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};` +
@@ -301,7 +302,7 @@ export class ChapterEditorUI {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'TILE PARAMS';
+    title.textContent = t('editor.params.title');
     panel.appendChild(title);
 
     const focusedPos = this._cb.getChapterFocusedTilePos();
@@ -328,7 +329,7 @@ export class ChapterEditorUI {
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';
-      note.textContent = 'No params for this tile.';
+      note.textContent = t('editor.params.noneForTile');
       panel.appendChild(note);
     }
 
@@ -351,7 +352,7 @@ export class ChapterEditorUI {
       (l, bg, fg, cb) => this._cb.buildBtn(l, bg, fg, cb),
       {
         panelId: 'chapter-grid-size-panel',
-        title: 'MAP SIZE',
+        title: t('editor.map.size'),
         inputWidth: '52px',
         inputRowStyle: 'gap:4px;font-size:0.8rem;',
         minWidth: '210px',

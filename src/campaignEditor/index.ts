@@ -331,7 +331,7 @@ export class CampaignEditor {
       'box-sizing:border-box;position:sticky;top:0;z-index:10;';
 
     if (onBack) {
-      const backBtn = this._btn('← Back', MUTED_BTN_BG, '#aaa', () => {
+      const backBtn = this._btn(t('editor.toolbar.back'), MUTED_BTN_BG, '#aaa', () => {
         sfxManager.play(SfxId.Back);
         onBack();
       }, '', true);
@@ -478,7 +478,7 @@ export class CampaignEditor {
     this._screen = EditorScreen.List;
     this._el.innerHTML = '';
 
-    const toolbar = this._buildToolbar('🗺️ Select Campaign', () => {
+    const toolbar = this._buildToolbar(t('editor.screen.selectCampaign'), () => {
       this.hide();
       this._onClose();
     });
@@ -496,9 +496,7 @@ export class CampaignEditor {
       notice.style.cssText =
         `background:#2a1a00;border:1px solid #ffa500;border-radius:${RADIUS_MD};padding:12px 16px;` +
         'color:#ffa500;font-size:0.9rem;line-height:1.5;';
-      notice.textContent =
-        '⚠️ The Campaign Editor is designed for desktop use and may be difficult to operate on touch devices. ' +
-        'For the best experience, use a mouse and keyboard.';
+      notice.textContent = t('editor.touchNotice');
       content.appendChild(notice);
     }
 
@@ -506,10 +504,10 @@ export class CampaignEditor {
     const actionBar = document.createElement('div');
     actionBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;';
     actionBar.appendChild(
-      this._btn('➕ New Campaign', UI_BG, '#7ed321', () => this._createCampaign()),
+      this._btn(t('editor.toolbar.newCampaign'), UI_BG, '#7ed321', () => this._createCampaign()),
     );
     actionBar.appendChild(
-      this._btn('📥 Import', UI_BG, '#4a90d9', () => this._importCampaign()),
+      this._btn(t('editor.toolbar.import'), UI_BG, '#4a90d9', () => this._importCampaign()),
     );
     content.appendChild(actionBar);
 
@@ -548,22 +546,29 @@ export class CampaignEditor {
     if (!isOfficial && levelCount > 0) {
       const progress = loadCampaignProgress(campaign.id);
       const pct = computeCampaignCompletionPct(campaign, progress);
-      progressText = `  ·  ${pct}% complete`;
+      progressText = `  ·  ${t('editor.campaign.progressComplete', { percent: pct })}`;
     }
 
-    const chapterWord = campaign.chapters.length === 1 ? 'chapter' : 'chapters';
-    const levelWord = levelCount === 1 ? 'level' : 'levels';
-    meta.textContent = `By ${campaign.author}  ·  ${campaign.chapters.length} ${chapterWord}  ·  ${levelCount} ${levelWord}${progressText}`;
+    const chapterWord = campaign.chapters.length === 1 ? t('editor.common.chapterSingular') : t('editor.common.chapterPlural');
+    const levelWord = levelCount === 1 ? t('editor.common.levelSingular') : t('editor.common.levelPlural');
+    meta.textContent = t('editor.campaign.meta', {
+      author: campaign.author,
+      chapterCount: campaign.chapters.length,
+      chapterWord,
+      levelCount,
+      levelWord,
+      progressText,
+    });
     info.appendChild(name);
     info.appendChild(meta);
 
     // Play or Active button (shared for both official and user campaigns)
     if (isActive) {
-      const activeBtn = this._btn('Active', UI_BG, '#888', () => {}, 'cursor:default;');
+      const activeBtn = this._btn(t('editor.campaign.active'), UI_BG, '#888', () => {}, 'cursor:default;');
       activeBtn.disabled = true;
       btns.appendChild(activeBtn);
     } else {
-      btns.appendChild(this._btn('▶ Play', UI_BG, '#7ed321', () => {
+      btns.appendChild(this._btn(t('editor.toolbar.play'), UI_BG, '#7ed321', () => {
         sfxManager.play(SfxId.ChapterSelect);
         this.hide();
         this._onPlayCampaign(campaign);
@@ -571,7 +576,7 @@ export class CampaignEditor {
     }
 
     if (!isOfficial) {
-      const editBtn = this._btn('✏️ Edit', UI_BG, canEdit ? '#f0c040' : '#666', () => {
+      const editBtn = this._btn(t('editor.toolbar.edit'), UI_BG, canEdit ? '#f0c040' : '#666', () => {
         if (!canEdit) return;
         sfxManager.play(SfxId.ChapterSelect);
         this._activeCampaignId = campaign.id;
@@ -579,32 +584,32 @@ export class CampaignEditor {
       });
       if (!canEdit) {
         editBtn.disabled = true;
-        editBtn.title = 'You are not the author of this campaign';
+        editBtn.title = t('editor.campaign.notAuthor');
         editBtn.style.opacity = '0.5';
         editBtn.style.cursor = 'not-allowed';
       }
       btns.appendChild(editBtn);
     } else {
-      btns.appendChild(this._btn('👁 View', UI_BG, '#aaa', () => {
+      btns.appendChild(this._btn(t('editor.toolbar.view'), UI_BG, '#aaa', () => {
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
       }));
     }
 
-    const exportBtn = this._btn('📤 Export', UI_BG, canEdit ? '#4a90d9' : '#444', () => {
+    const exportBtn = this._btn(t('editor.toolbar.export'), UI_BG, canEdit ? '#4a90d9' : '#444', () => {
       if (!canEdit) return;
       this._exportCampaign(campaign);
     });
     if (!isOfficial && !canEdit) {
       exportBtn.disabled = true;
-      exportBtn.title = 'You are not the author of this campaign';
+      exportBtn.title = t('editor.campaign.notAuthor');
       exportBtn.style.opacity = '0.5';
       exportBtn.style.cursor = 'not-allowed';
     }
     btns.appendChild(exportBtn);
 
     if (!isOfficial) {
-      btns.appendChild(this._btn('🗑 Delete', UI_BG, ERROR_COLOR, () => {
+      btns.appendChild(this._btn(t('editor.toolbar.delete'), UI_BG, ERROR_COLOR, () => {
         this._deleteCampaign(campaign.id);
       }));
     }
@@ -635,12 +640,14 @@ export class CampaignEditor {
     this._campaignMapEditor.setMapBoxCollapsed(loadCampaignEditorMapBoxCollapsed());
 
     const toolbar = this._buildToolbar(
-      isOfficial ? `📋 ${campaign.name} (read-only)` : `✏️ Edit Campaign: ${campaign.name}`,
+      isOfficial
+        ? t('editor.campaign.readOnlyTitle', { name: campaign.name })
+        : t('editor.campaign.editTitle', { name: campaign.name }),
       () => this._showCampaignList(),
     );
     if (!isOfficial) {
-      toolbar.appendChild(this._btn('📤 Export', UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
-      toolbar.appendChild(this._btn('🔍 Dev – Validate data', UI_BG, '#f0c040', () => {
+      toolbar.appendChild(this._btn(t('editor.toolbar.export'), UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
+      toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => {
         // If no authorGuid is set, try to match by author name across all profiles.
         if (!campaign.authorGuid) {
           const allMetas = loadAllSlotMetas();
@@ -675,7 +682,7 @@ export class CampaignEditor {
       const officialLbl = document.createElement('label');
       officialLbl.htmlFor = 'official-toggle';
       officialLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
-      officialLbl.textContent = 'Dev – Official Campaign';
+      officialLbl.textContent = t('editor.campaign.officialToggle');
       officialCb.addEventListener('change', () => {
         this._service.updateCampaignField(campaign, 'official', officialCb.checked);
         // Re-render to update read-only state
@@ -696,7 +703,7 @@ export class CampaignEditor {
       const anyoneEditLbl = document.createElement('label');
       anyoneEditLbl.htmlFor = 'anyone-edit-toggle';
       anyoneEditLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
-      anyoneEditLbl.textContent = 'Anyone can edit';
+      anyoneEditLbl.textContent = t('editor.campaign.anyoneEdit');
       anyoneEditCb.addEventListener('change', () => {
         this._service.updateCampaignField(campaign, 'anyoneEdit', anyoneEditCb.checked);
       });
@@ -716,7 +723,7 @@ export class CampaignEditor {
         `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
         'display:flex;flex-direction:column;gap:10px;';
 
-      fields.appendChild(this._labeledInput('Name', campaign.name, (v) => {
+      fields.appendChild(this._labeledInput(t('editor.metadata.name'), campaign.name, (v) => {
         this._service.updateCampaignField(campaign, 'name', v);
       }));
 
@@ -725,10 +732,10 @@ export class CampaignEditor {
       authorRow.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.9rem;';
       const authorLbl = document.createElement('span');
       authorLbl.style.cssText = 'color:#aaa;min-width:80px;';
-      authorLbl.textContent = 'Author';
+      authorLbl.textContent = t('editor.metadata.author');
       const authorVal = document.createElement('span');
       authorVal.style.cssText = 'color:#eee;';
-      authorVal.textContent = campaign.author || '(none)';
+      authorVal.textContent = campaign.author || t('editor.common.noneParen');
       authorRow.appendChild(authorLbl);
       authorRow.appendChild(authorVal);
       fields.appendChild(authorRow);
@@ -743,12 +750,12 @@ export class CampaignEditor {
     const chaptersHeader = document.createElement('div');
     chaptersHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const chapTitle = document.createElement('h3');
-    chapTitle.textContent = 'Chapters';
+    chapTitle.textContent = t('editor.campaign.chapters');
     chapTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     chaptersHeader.appendChild(chapTitle);
 
     if (!isOfficial) {
-      chaptersHeader.appendChild(this._btn('➕ Add Chapter', UI_BG, '#7ed321', () => {
+      chaptersHeader.appendChild(this._btn(t('editor.toolbar.addChapter'), UI_BG, '#7ed321', () => {
         sfxManager.play(SfxId.ChapterSelect);
         this._addChapter(campaign);
       }));
@@ -762,7 +769,7 @@ export class CampaignEditor {
     if (campaign.chapters.length === 0) {
       const empty = document.createElement('p');
       empty.style.cssText = 'color:#777;font-size:0.85rem;';
-      empty.textContent = 'No chapters yet – click "Add Chapter" to get started.';
+      empty.textContent = t('editor.campaign.noChapters');
       content.appendChild(empty);
     }
 
@@ -784,12 +791,12 @@ export class CampaignEditor {
 
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
-    name.textContent = `Chapter ${chapterIdx + 1}: ${chapter.name}`;
+    name.textContent = t('editor.chapter.rowTitle', { index: chapterIdx + 1, name: chapter.name });
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:3px;';
     const totalStars = chapter.levels.reduce((s, l) => s + (l.starCount ?? 0), 0);
     const challengeCount = chapter.levels.filter(l => l.challenge).length;
-    const metaParts = [`${chapter.levels.length} ${chapter.levels.length === 1 ? 'level' : 'levels'}`];
+    const metaParts = [`${chapter.levels.length} ${chapter.levels.length === 1 ? t('editor.common.levelSingular') : t('editor.common.levelPlural')}`];
     if (totalStars > 0) metaParts.push(`⭐\u202f×\u202f${totalStars}`);
     if (challengeCount > 0) metaParts.push(`💀\u202f×\u202f${challengeCount}`);
     meta.textContent = metaParts.join('  ');
@@ -814,7 +821,7 @@ export class CampaignEditor {
       info.appendChild(minimap);
     }
 
-    const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
+    const editOrViewLabel = readOnly ? t('editor.toolbar.view') : t('editor.toolbar.edit');
     btns.appendChild(this._btn(editOrViewLabel, UI_BG, '#f0c040', () => {
       this._activeChapterIdx = chapterIdx;
       this._showChapterDetail();
@@ -823,11 +830,16 @@ export class CampaignEditor {
     if (!readOnly) {
       this._appendReorderButtons(btns, campaign.chapters, chapterIdx, campaign, () => this._showCampaignDetail(),
         (fromIdx, toIdx) => this._service.reorderChapters(campaign, fromIdx, toIdx));
-      btns.appendChild(this._btn('🗑', UI_BG, ERROR_COLOR, () => {
-        if (confirm(`Delete chapter "${chapter.name}" and all its levels?`)) {
+      btns.appendChild(this._btn(t('editor.toolbar.deleteIcon'), UI_BG, ERROR_COLOR, () => {
+        this._dialogs.showConfirm(
+          t('editor.chapter.deleteConfirm', { name: chapter.name }),
+          () => {
           this._service.deleteChapter(campaign, chapterIdx);
           this._showCampaignDetail();
-        }
+          },
+          t('editor.toolbar.delete'),
+          true,
+        );
       }));
     }
 
@@ -855,7 +867,11 @@ export class CampaignEditor {
     this._chapterMapEditor.setMapBoxCollapsed(loadChapterEditorMapBoxCollapsed());
 
     const toolbar = this._buildToolbar(
-      `${isOfficial ? '📋' : '✏️'} Chapter ${this._activeChapterIdx + 1}: ${chapter.name}`,
+      t('editor.chapter.title', {
+        icon: isOfficial ? '📋' : '✏️',
+        index: this._activeChapterIdx + 1,
+        name: chapter.name,
+      }),
       () => this._showCampaignDetail(),
     );
     this._el.appendChild(toolbar);
@@ -870,7 +886,7 @@ export class CampaignEditor {
       const nameWrap = document.createElement('div');
       nameWrap.style.cssText =
         `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;`;
-      nameWrap.appendChild(this._labeledInput('Chapter Name', chapter.name, (v) => {
+      nameWrap.appendChild(this._labeledInput(t('editor.chapter.name'), chapter.name, (v) => {
         this._service.renameChapter(campaign, this._activeChapterIdx, v);
       }));
       content.appendChild(nameWrap);
@@ -883,12 +899,12 @@ export class CampaignEditor {
     const levelsHeader = document.createElement('div');
     levelsHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const lvlTitle = document.createElement('h3');
-    lvlTitle.textContent = 'Levels';
+    lvlTitle.textContent = t('editor.chapter.levels');
     lvlTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     levelsHeader.appendChild(lvlTitle);
 
     if (!isOfficial) {
-      levelsHeader.appendChild(this._btn('➕ Add Level', UI_BG, '#7ed321', () => {
+      levelsHeader.appendChild(this._btn(t('editor.toolbar.addLevel'), UI_BG, '#7ed321', () => {
         this._addLevel(campaign, this._activeChapterIdx);
       }));
     }
@@ -901,7 +917,7 @@ export class CampaignEditor {
     if (chapter.levels.length === 0) {
       const empty = document.createElement('p');
       empty.style.cssText = 'color:#777;font-size:0.85rem;';
-      empty.textContent = 'No levels yet – click "Add Level" to get started.';
+      empty.textContent = t('editor.chapter.noLevels');
       content.appendChild(empty);
     }
 
@@ -930,7 +946,12 @@ export class CampaignEditor {
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
     const starSuffix = (level.starCount ?? 0) > 0 ? ` ⭐×${level.starCount}` : '';
-    name.textContent = `Level ${levelIdx + 1}: ${level.name}${level.challenge ? ' 💀' : ''}${starSuffix}`;
+    name.textContent = t('editor.level.rowTitle', {
+      index: levelIdx + 1,
+      name: level.name,
+      challenge: level.challenge ? ' 💀' : '',
+      stars: starSuffix,
+    });
     const minimap = renderMinimap(level);
     minimap.style.cssText = 'display:block;margin-top:4px;image-rendering:pixelated;cursor:pointer;border:2px solid white;';
     minimap.addEventListener('click', () => {
@@ -940,25 +961,30 @@ export class CampaignEditor {
     info.appendChild(name);
     info.appendChild(minimap);
 
-    const editOrViewLabel = readOnly ? '👁 View' : '✏️ Edit';
+    const editOrViewLabel = readOnly ? t('editor.toolbar.view') : t('editor.toolbar.edit');
     btns.appendChild(this._btn(editOrViewLabel, UI_BG, '#f0c040', () => {
       this._activeLevelIdx = levelIdx;
       this._openLevelEditor(level, readOnly);
     }));
 
     if (!readOnly) {
-      btns.appendChild(this._btn('📋 Duplicate', UI_BG, '#aaa', () => {
+      btns.appendChild(this._btn(t('editor.toolbar.duplicate'), UI_BG, '#aaa', () => {
         this._service.duplicateLevel(campaign, chapterIdx, levelIdx);
         this._showChapterDetail();
       }));
 
       this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail(),
         (fromIdx, toIdx) => this._service.reorderLevels(campaign, chapterIdx, fromIdx, toIdx));
-      btns.appendChild(this._btn('🗑', UI_BG, ERROR_COLOR, () => {
-        if (confirm(`Delete level "${level.name}"?`)) {
+      btns.appendChild(this._btn(t('editor.toolbar.deleteIcon'), UI_BG, ERROR_COLOR, () => {
+        this._dialogs.showConfirm(
+          t('editor.level.deleteConfirm', { name: level.name }),
+          () => {
           this._service.deleteLevel(campaign, chapterIdx, levelIdx);
           this._showChapterDetail();
-        }
+          },
+          t('editor.toolbar.delete'),
+          true,
+        );
       }));
 
       if (campaign.chapters.length > 1) {
@@ -968,7 +994,7 @@ export class CampaignEditor {
           `border-radius:${RADIUS_MD};padding:6px 8px;font-size:0.85rem;cursor:pointer;`;
         const placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = '↪ Move to…';
+        placeholder.textContent = t('editor.level.moveTo');
         placeholder.disabled = true;
         placeholder.selected = true;
         sel.appendChild(placeholder);
@@ -976,7 +1002,7 @@ export class CampaignEditor {
           if (ci !== chapterIdx) {
             const opt = document.createElement('option');
             opt.value = String(ci);
-            opt.textContent = `Ch ${ci + 1}: ${ch.name}`;
+            opt.textContent = t('editor.level.moveToChapter', { index: ci + 1, name: ch.name });
             sel.appendChild(opt);
           }
         });
@@ -1117,27 +1143,27 @@ export class CampaignEditor {
     if (readOnly) return;
 
     // Undo/redo
-    const undoBtn = this._btn('↩ Undo', MUTED_BTN_BG, '#aaa', () => this._editorUndo(), '', true);
+    const undoBtn = this._btn(t('editor.common.undo'), MUTED_BTN_BG, '#aaa', () => this._editorUndo(), '', true);
     undoBtn.id = 'editor-undo-btn';
     toolbar.appendChild(undoBtn);
-    const redoBtn = this._btn('↪ Redo', MUTED_BTN_BG, '#aaa', () => this._editorRedo(), '', true);
+    const redoBtn = this._btn(t('editor.common.redo'), MUTED_BTN_BG, '#aaa', () => this._editorRedo(), '', true);
     redoBtn.id = 'editor-redo-btn';
     toolbar.appendChild(redoBtn);
 
     // Validate
-    toolbar.appendChild(this._btn('✔ Validate', UI_BG, '#7ed321', () => {
+    toolbar.appendChild(this._btn(t('editor.common.validateOk'), UI_BG, '#7ed321', () => {
       const levelDef = this._buildCurrentLevelDef();
       const result = this._validateLevel(levelDef);
       const icon = result.ok ? '✅' : '❌';
-      alert(`${icon} Validation\n\n${result.messages.join('\n')}`);
+      this._dialogs.showMessage(t('editor.level.validationTitle'), `${icon}\n\n${result.messages.join('\n')}`);
     }));
 
     // Playtest
-    toolbar.appendChild(this._btn('▶ Playtest', UI_BG, '#f0c040', () => {
+    toolbar.appendChild(this._btn(t('editor.toolbar.playtest'), UI_BG, '#f0c040', () => {
       const levelDef = this._buildCurrentLevelDef();
       const result = this._validateLevel(levelDef);
       if (!result.ok) {
-        alert(`❌ Validation\n\n${result.messages.join('\n')}`);
+        this._dialogs.showMessage(t('editor.level.validationTitle'), `❌\n\n${result.messages.join('\n')}`, ERROR_COLOR);
         return;
       }
       // Save the current level so it persists, but do NOT wipe star/water
@@ -1150,7 +1176,7 @@ export class CampaignEditor {
     }));
 
     // Save
-    const saveBtn = this._btn('💾 Save', '#27ae60', '#fff', () => {
+    const saveBtn = this._btn(t('editor.toolbar.save'), '#27ae60', '#fff', () => {
       this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
     });
     saveBtn.id = 'editor-save-btn';
@@ -1228,13 +1254,13 @@ export class CampaignEditor {
 
     const title = document.createElement('div');
     title.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    title.textContent = 'PLAYER INVENTORY';
+    title.textContent = t('editor.level.playerInventory');
     panel.appendChild(title);
 
     if (this._state.inventory.length === 0) {
       const none = document.createElement('div');
       none.style.cssText = 'font-size:0.8rem;color:#555;';
-      none.textContent = 'None';
+      none.textContent = t('editor.common.none');
       panel.appendChild(none);
     }
     for (const item of this._state.inventory) {
@@ -1281,7 +1307,7 @@ export class CampaignEditor {
   private _showSinkError(): void {
     const el = this._editorSourceErrorEl;
     if (!el) return;
-    showTimedMessage(el, 'Only one sink tile is allowed.');
+    showTimedMessage(el, t('editor.level.onlyOneSink'));
   }
 
   /** Rebuild and replace the palette and param panels in the DOM. */
@@ -1497,12 +1523,12 @@ export class CampaignEditor {
     // Visual confirmation on the Save button
     const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
     if (saveBtn) {
-      saveBtn.textContent = '✅ Saved!';
+      saveBtn.textContent = t('editor.toolbar.saved');
       this._clearSaveFeedbackTimer();
       this._saveFeedbackResetTimer = window.setTimeout(() => {
         this._saveFeedbackResetTimer = null;
         const activeSaveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
-        if (activeSaveBtn) activeSaveBtn.textContent = '💾 Save';
+        if (activeSaveBtn) activeSaveBtn.textContent = t('editor.toolbar.save');
       }, 1500);
     }
   }
@@ -1510,7 +1536,7 @@ export class CampaignEditor {
   // ─── Campaign management ───────────────────────────────────────────────────
 
   private _createCampaign(): void {
-    const name = prompt('Campaign name:');
+    const name = prompt(t('editor.prompt.campaignName'));
     if (!name?.trim()) return;
     const author = loadPlayerName();
     const activeSlot = getActiveSlotIndex();
@@ -1520,7 +1546,7 @@ export class CampaignEditor {
   }
 
   private _addChapter(campaign: CampaignDef): void {
-    const name = prompt('Chapter name:');
+    const name = prompt(t('editor.prompt.chapterName'));
     if (!name?.trim()) return;
     this._service.addChapter(campaign, name.trim());
     this._activeChapterIdx = campaign.chapters.length - 1;
@@ -1530,7 +1556,7 @@ export class CampaignEditor {
   private _addLevel(campaign: CampaignDef, chapterIdx: number): void {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
-    const name = prompt('Level name:', 'New Level');
+    const name = prompt(t('editor.prompt.levelName'), t('editor.prompt.newLevelDefault'));
     if (!name?.trim()) return;
     const newLevel = this._service.addLevel(campaign, chapterIdx, name.trim());
     // Open the level editor immediately
@@ -1541,9 +1567,15 @@ export class CampaignEditor {
   private _deleteCampaign(campaignId: string): void {
     const campaign = this._service.getCampaign(campaignId);
     if (!campaign) return;
-    if (!confirm(`Delete campaign "${campaign.name}"? This cannot be undone.`)) return;
-    this._service.deleteCampaign(campaignId);
-    this._showCampaignList();
+    this._dialogs.showConfirm(
+      t('editor.campaign.deleteConfirm', { name: campaign.name }),
+      () => {
+        this._service.deleteCampaign(campaignId);
+        this._showCampaignList();
+      },
+      t('editor.toolbar.delete'),
+      true,
+    );
   }
 
   // ─── Dev: Data validation ─────────────────────────────────────────────────
@@ -1603,7 +1635,7 @@ export class CampaignEditor {
       'padding:10px 14px;border-radius:8px;border:1px solid #4a90d9;' +
       'box-shadow:0 4px 20px rgba(0,0,0,.6);max-height:50vh;overflow-y:auto;';
     const title = document.createElement('div');
-    title.textContent = '📤 Export log';
+    title.textContent = t('editor.exportLog.title');
     title.style.cssText = 'font-weight:bold;color:#4a90d9;margin-bottom:6px;';
     overlay.appendChild(title);
 
@@ -1621,7 +1653,7 @@ export class CampaignEditor {
         if (ok) {
           return;
         }
-        title.textContent = '📤 Export log ❌ Failed (click to dismiss)';
+        title.textContent = t('editor.exportLog.failedTitle');
         title.style.color = ERROR_COLOR;
         overlay.style.cursor = 'pointer';
         overlay.addEventListener('click', () => { overlay.remove(); }, { once: true });
@@ -1644,7 +1676,7 @@ export class CampaignEditor {
         try {
           result = this._service.parseImport(text);
         } catch {
-          alert('Failed to parse campaign file. Please check the format.');
+          this._dialogs.showMessage(t('editor.import.errorTitle'), t('editor.import.parseError'), ERROR_COLOR);
           return;
         }
 
@@ -1658,7 +1690,10 @@ export class CampaignEditor {
           this._dialogs.showImportVersionConflict(result.campaign, result.existing!, result.isNewer!, () => {
             // Replace the campaign record while retaining player progress (keyed by ID).
             this._service.acceptImport(result);
-            alert(`Campaign "${result.campaign.name}" imported successfully.`);
+            this._dialogs.showMessage(
+              t('editor.import.successTitle'),
+              t('editor.import.successMessage', { name: result.campaign.name }),
+            );
             this.hide();
             this._onPlayCampaign(result.campaign);
           });
@@ -1667,13 +1702,16 @@ export class CampaignEditor {
 
         // No conflict – add the new campaign directly.
         this._service.acceptImport(result);
-        alert(`Campaign "${result.campaign.name}" imported successfully.`);
+        this._dialogs.showMessage(
+          t('editor.import.successTitle'),
+          t('editor.import.successMessage', { name: result.campaign.name }),
+        );
         this.hide();
         this._onPlayCampaign(result.campaign);
       };
 
       readGzipOrJsonFile(file).then(processText).catch(() => {
-        alert('Failed to read campaign file. The file may be corrupted or invalid.');
+        this._dialogs.showMessage(t('editor.import.errorTitle'), t('editor.import.readError'), ERROR_COLOR);
       });
     });
     input.click();

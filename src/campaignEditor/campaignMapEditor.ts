@@ -57,6 +57,7 @@ import { handleMapEditorKeyDown, applyMapValidationState, buildPaletteSubSection
 import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
 import { computeViewBounds } from '../mapUtils';
 import { MapEditorBase } from './mapEditorBase';
+import { t } from '../i18n';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
 const CHAPTER_CHAMBER_PALETTE: EditorPalette = 'chamber:chapter';
@@ -343,13 +344,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const title = document.createElement('h3');
-    title.textContent = '🗺️ Campaign Map';
+    title.textContent = t('editor.campaignMap.title');
     title.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     header.appendChild(title);
 
     // Validation warning icon – stays in the header so it is visible even when the box is collapsed.
     const validationWarningIcon = document.createElement('span');
-    validationWarningIcon.title = 'Campaign map has validation errors – click Validate for details';
+    validationWarningIcon.title = t('editor.campaignMap.validationErrors');
     validationWarningIcon.style.cssText = 'display:none;font-size:1rem;cursor:default;';
     validationWarningIcon.textContent = '⚠️';
     header.appendChild(validationWarningIcon);
@@ -360,12 +361,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (this._mapBoxCollapsed) body.style.display = 'none';
 
     const toggleBtn = this._cbs.buildBtn(
-      this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse',
+      this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse'),
       MUTED_BTN_BG, '#aaa',
       () => {
         this._mapBoxCollapsed = !this._mapBoxCollapsed;
         saveCampaignEditorMapBoxCollapsed(this._mapBoxCollapsed);
-        toggleBtn.textContent = this._mapBoxCollapsed ? '▶ Expand' : '▼ Collapse';
+        toggleBtn.textContent = this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse');
         body.style.display = this._mapBoxCollapsed ? 'none' : '';
         if (!this._mapBoxCollapsed) {
           requestAnimationFrame(() => {
@@ -382,7 +383,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (isOfficial) {
       const msg = document.createElement('p');
       msg.style.cssText = 'color:#888;font-size:0.85rem;';
-      msg.textContent = 'Campaign map is read-only for official campaigns.';
+      msg.textContent = t('editor.campaignMap.readOnly');
       body.appendChild(msg);
       body.appendChild(this._buildCanvas(campaign, true));
       section.appendChild(body);
@@ -407,11 +408,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const toolbar = document.createElement('div');
     toolbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
 
-    const undoBtn = this._cbs.buildBtn('↩ Undo', MUTED_BTN_BG, '#aaa', () => this._doUndo(), true);
+    const undoBtn = this._cbs.buildBtn(t('editor.common.undo'), MUTED_BTN_BG, '#aaa', () => this._doUndo(), true);
     undoBtn.id = 'campaign-map-undo-btn';
     toolbar.appendChild(undoBtn);
 
-    const redoBtn = this._cbs.buildBtn('↪ Redo', MUTED_BTN_BG, '#aaa', () => this._doRedo(), true);
+    const redoBtn = this._cbs.buildBtn(t('editor.common.redo'), MUTED_BTN_BG, '#aaa', () => this._doRedo(), true);
     redoBtn.id = 'campaign-map-redo-btn';
     toolbar.appendChild(redoBtn);
 
@@ -419,12 +420,12 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const applyValidationState = (ok: boolean) =>
       applyMapValidationState(validateBtn, validationWarningIcon, ok);
 
-    const validateBtn = this._cbs.buildBtn('✔ Validate', UI_BG, '#7ed321', () => {
+    const validateBtn = this._cbs.buildBtn(t('editor.common.validateOk'), UI_BG, '#7ed321', () => {
       const c = this._cbs.getActiveCampaign();
       if (!c) return;
       const result = validateCampaignMap(this._gridState.grid, this._gridState.rows, this._gridState.cols, c);
       const icon = result.ok ? '✅' : '❌';
-      alert(`${icon} Campaign Map Validation\n\n${result.messages.join('\n')}`);
+      this._showValidationModal(t('editor.campaignMap.validationTitle'), icon, result.messages);
       applyValidationState(result.ok);
     });
     toolbar.appendChild(validateBtn);
@@ -478,7 +479,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     const titleEl = document.createElement('div');
     titleEl.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    titleEl.textContent = 'TILE PALETTE';
+    titleEl.textContent = t('editor.palette.title');
     panel.appendChild(titleEl);
 
     const FLOOR_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
@@ -545,14 +546,14 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     // Collapsible Floor sub-menu
     buildPaletteSubSection(
-      panel, 'Floor', this._floorSectionExpanded,
+      panel, t('editor.palette.section.floor'), this._floorSectionExpanded,
       () => { this._floorSectionExpanded = !this._floorSectionExpanded; panel.replaceWith(this._buildPalettePanel(campaign)); },
       '#888', '#1a1a1a', '#ccc', FLOOR_ITEMS, makeItemBtn,
     );
 
     // Collapsible Pipes sub-menu
     buildPaletteSubSection(
-      panel, 'Pipes', this._pipesSectionExpanded,
+      panel, t('editor.palette.section.pipes'), this._pipesSectionExpanded,
       () => { this._pipesSectionExpanded = !this._pipesSectionExpanded; panel.replaceWith(this._buildPalettePanel(campaign)); },
       '#4a90d9', '#0a1520', '#4a90d9', PIPES_ITEMS, makeItemBtn,
     );
@@ -567,13 +568,13 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     const titleEl = document.createElement('div');
     titleEl.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    titleEl.textContent = 'CHAPTERS';
+    titleEl.textContent = t('editor.campaignMap.chapters');
     panel.appendChild(titleEl);
 
     if (campaign.chapters.length === 0) {
       const msg = document.createElement('div');
       msg.style.cssText = 'font-size:0.8rem;color:#555;';
-      msg.textContent = 'Add chapters to place them on the map.';
+      msg.textContent = t('editor.campaignMap.addChaptersHint');
       panel.appendChild(msg);
       return panel;
     }
@@ -595,7 +596,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = `Ch-${ci + 1}: ${chapter.name}${isPlaced ? ' ✓' : ''}`;
-      btn.title = isPlaced ? 'Already placed on the map' : `Select to place Ch-${ci + 1}`;
+      btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.campaignMap.selectToPlaceChapter', { index: ci + 1 });
       btn.disabled = isPlaced;
       btn.style.cssText =
         `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};` +
@@ -634,7 +635,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
     const titleEl = document.createElement('div');
     titleEl.style.cssText = EDITOR_PANEL_TITLE_CSS + 'margin-bottom:4px;';
-    titleEl.textContent = 'TILE PARAMS';
+    titleEl.textContent = t('editor.params.title');
     panel.appendChild(titleEl);
 
     const focusedTile = this._gridState.focusedTilePos
@@ -658,7 +659,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';
-      note.textContent = 'No params for this tile.';
+      note.textContent = t('editor.params.noneForTile');
       panel.appendChild(note);
     }
 
@@ -684,7 +685,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       (l, bg, fg, cb) => this._cbs.buildBtn(l, bg, fg, cb),
       {
         panelId: 'campaign-map-grid-size-panel',
-        title: 'MAP SIZE',
+        title: t('editor.map.size'),
         inputWidth: '52px',
         inputRowStyle: 'gap:4px;font-size:0.8rem;',
         minWidth: '210px',
@@ -731,7 +732,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
         container.appendChild(wrapper);
         const panHint = document.createElement('p');
         panHint.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:4px 0 0;';
-        panHint.textContent = 'Hold Shift and drag with the left mouse button to pan the map.';
+        panHint.textContent = t('editor.map.panHint');
         container.appendChild(panHint);
         return container;
       }
@@ -740,6 +741,31 @@ export class CampaignMapEditorSection extends MapEditorBase {
     }
 
     return canvas;
+  }
+
+  private _showValidationModal(title: string, icon: string, messages: string[]): void {
+    const overlay = document.createElement('div');
+    overlay.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:1000;';
+    const dialog = document.createElement('div');
+    dialog.style.cssText =
+      'background:#111827;border:1px solid #4a90d9;border-radius:8px;padding:16px;max-width:560px;width:90%;color:#eee;';
+    const heading = document.createElement('div');
+    heading.style.cssText = 'font-weight:bold;margin-bottom:8px;color:#7ed321;';
+    heading.textContent = `${icon} ${title}`;
+    const body = document.createElement('pre');
+    body.style.cssText = 'white-space:pre-wrap;margin:0 0 12px 0;font-family:inherit;font-size:0.9rem;';
+    body.textContent = messages.join('\n');
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = t('editor.common.ok');
+    close.style.cssText = 'padding:6px 12px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer;';
+    close.addEventListener('click', () => overlay.remove());
+    dialog.appendChild(heading);
+    dialog.appendChild(body);
+    dialog.appendChild(close);
+    overlay.appendChild(dialog);
+    (this._canvas?.ownerDocument.body ?? document.body).appendChild(overlay);
   }
 
   /** Clamp pan to valid bounds (edge clamping only, no source-connectivity restriction). */

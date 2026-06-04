@@ -35,6 +35,7 @@ Pushes to main deploy to GitHub Pages via .github/workflows/deploy.yml. Build ar
 - ESLint 8 with type-aware rules
 - Jest 29 (Node default; jsdom opt-in per test file via @jest-environment jsdom)
 - `src/i18n.ts` + `src/i18n/<locale>.ts` — translation helper and locale catalogs. See AGENTS.md for the pattern.
+- i18n coverage tests (`tests/i18nCoverage.test.ts`) enforce defined/used translation keys.
 - See package.json for the full list. Overrides block forces uuid ^11.1.1 to clear a transitive vuln.
 
 ## Contributing

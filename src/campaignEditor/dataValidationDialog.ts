@@ -9,6 +9,7 @@
 import type { CampaignDef } from '../types';
 import type { CampaignService } from './campaignService';
 import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, UI_INPUT_BORDER } from '../uiConstants';
+import { t } from '../i18n';
 
 /** CSS for a button row aligned to the trailing edge (mirrors EDITOR_BTN_ROW_CSS). */
 const BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -48,7 +49,7 @@ export class DataValidationDialog {
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    for (const [label, align] of [['Record Type', 'left'], ['Field Name', 'left'], ['Count', 'right']] as const) {
+    for (const [label, align] of [[t('editor.dataValidation.recordType'), 'left'], [t('editor.dataValidation.fieldName'), 'left'], [t('editor.dataValidation.count'), 'right']] as const) {
       const th = document.createElement('th');
       th.style.cssText = `text-align:${align};padding:4px 8px;color:#aaa;border-bottom:1px solid ${UI_INPUT_BORDER};`;
       th.textContent = label;
@@ -95,7 +96,7 @@ export class DataValidationDialog {
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#f0c040;';
-    title.textContent = cleanupDone ? '🧹 Cleanup Complete' : '🔍 Dev – Validate Data';
+    title.textContent = cleanupDone ? t('editor.dataValidation.cleanupComplete') : t('editor.toolbar.validateData');
     dialog.appendChild(title);
 
     const body = document.createElement('div');
@@ -106,15 +107,15 @@ export class DataValidationDialog {
       const p = document.createElement('p');
       p.style.margin = '0';
       p.textContent = cleanupDone
-        ? 'Cleanup complete. No issues were found.'
-        : 'Data validation complete. No issues found.';
+        ? t('editor.dataValidation.cleanupNoIssues')
+        : t('editor.dataValidation.noIssues');
       body.appendChild(p);
     } else {
       const intro = document.createElement('p');
       intro.style.margin = '0 0 8px 0';
       intro.textContent = cleanupDone
-        ? 'The following unrecognized fields were removed:'
-        : 'The following unrecognized fields were found:';
+        ? t('editor.dataValidation.removedFields')
+        : t('editor.dataValidation.foundFields');
       body.appendChild(intro);
       body.appendChild(issuesTable);
     }
@@ -124,7 +125,7 @@ export class DataValidationDialog {
     btnRow.style.cssText = BTN_ROW_CSS;
 
     if (totalIssues > 0 && !cleanupDone) {
-      const cleanupBtn = this._btn('🧹 Clean Up', '#e67e22', '#fff', () => {
+      const cleanupBtn = this._btn(t('editor.dataValidation.cleanUp'), '#e67e22', '#fff', () => {
         const cleanIssues = this._service.scanData(campaign, false);
         this._service.touch(campaign);
         this._service.save();
@@ -133,7 +134,7 @@ export class DataValidationDialog {
       btnRow.appendChild(cleanupBtn);
     }
 
-    btnRow.appendChild(this._btn('OK', '#4a90d9', '#fff', () => overlay.remove()));
+    btnRow.appendChild(this._btn(t('editor.common.ok'), '#4a90d9', '#fff', () => overlay.remove()));
     dialog.appendChild(btnRow);
     overlay.appendChild(dialog);
   }

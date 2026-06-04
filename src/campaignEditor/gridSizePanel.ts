@@ -13,6 +13,7 @@ import {
 import { buildSlideAndRotateControls } from './levelMetadataPanel';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BG, UI_BORDER } from '../uiConstants';
 import { showTimedMessage } from '../uiHelpers';
+import { t } from '../i18n';
 
 // ─── Public interfaces ────────────────────────────────────────────────────────
 
@@ -112,9 +113,9 @@ export function buildGridSizePanel(
 
   const inputRow = document.createElement('div');
   inputRow.style.cssText = 'display:flex;align-items:center;' + inputRowStyle;
-  inputRow.appendChild(document.createTextNode('Rows:'));
+  inputRow.appendChild(document.createTextNode(t('editor.grid.rows')));
   inputRow.appendChild(rowsInp);
-  inputRow.appendChild(document.createTextNode('Cols:'));
+  inputRow.appendChild(document.createTextNode(t('editor.grid.cols')));
   inputRow.appendChild(colsInp);
   panel.appendChild(inputRow);
 
@@ -126,7 +127,7 @@ export function buildGridSizePanel(
     showTimedMessage(errDiv, msg);
   };
 
-  panel.appendChild(btnFactory('↔ Resize', UI_BG, '#f0c040', () => {
+  panel.appendChild(btnFactory(t('editor.grid.resize'), UI_BG, '#f0c040', () => {
     const rVal = parseInt(rowsInp.value);
     const cVal = parseInt(colsInp.value);
     let outOfRange = false;
@@ -143,11 +144,11 @@ export function buildGridSizePanel(
       outOfRange = true;
     }
     if (outOfRange) {
-      showErr(`Value out of range (${GRID_MIN_DIM}–${maxDim})`);
+      showErr(t('editor.grid.rangeError', { min: GRID_MIN_DIM, max: maxDim }));
       return;
     }
     if (requireOneAxisAbove1 && rVal <= 1 && cVal <= 1) {
-      showErr('At least one dimension (rows or cols) must be > 1');
+      showErr(t('editor.grid.oneAxisError'));
       return;
     }
     callbacks.resize(rVal, cVal);

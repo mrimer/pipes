@@ -11,6 +11,7 @@ import type { EditorPalette } from './types';
 import { PIPE_SHAPES } from '../board';
 import { commandKeyManager } from '../commandKeyManager';
 import { RADIUS_SM, UI_BG } from '../uiConstants';
+import { t } from '../i18n';
 
 // ─── Keyboard handler ──────────────────────────────────────────────────────────
 
@@ -105,13 +106,13 @@ export function applyMapValidationState(
   ok: boolean,
 ): void {
   if (ok) {
-    validateBtn.textContent = '✔ Validate';
+    validateBtn.textContent = t('editor.common.validateOk');
     validateBtn.style.color = '#7ed321';
     validateBtn.style.borderColor = '#7ed321';
     validateBtn.style.background = UI_BG;
     warningIcon.style.display = 'none';
   } else {
-    validateBtn.textContent = '✗ Validate';
+    validateBtn.textContent = t('editor.common.validateFail');
     validateBtn.style.color = '#ff8c00';
     validateBtn.style.borderColor = '#ff8c00';
     validateBtn.style.background = UI_BG;

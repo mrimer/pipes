@@ -420,7 +420,7 @@ export function buildSettingsModal(
     if (isPureModifierKey(e.key)) return;
     const result = commandKeyManager.assignFromEvent(capturing, e);
     if (!result.ok) {
-      window.alert(result.error ?? t('settings.commands.assignError'));
+      buildInfoModal(result.error ?? t('settings.commands.assignError'));
       return;
     }
     capturing = null;
@@ -496,11 +496,15 @@ export function buildSettingsModal(
   resetCommandsBtn.style.cssText =
     `padding:8px 12px;font-size:0.9rem;background:${MUTED_BTN_BG};color:#ddd;border:1px solid #666;border-radius:6px;cursor:pointer;align-self:center;`;
   resetCommandsBtn.addEventListener('click', () => {
-    const confirmed = window.confirm(t('settings.commands.resetConfirm'));
-    if (!confirmed) return;
-    commandKeyManager.resetToDefaults();
-    capturing = null;
-    renderCommandRows();
+    buildConfirmModal(
+      t('settings.commands.resetConfirm'),
+      () => {
+        commandKeyManager.resetToDefaults();
+        capturing = null;
+        renderCommandRows();
+      },
+      () => { /* cancelled */ },
+    );
   });
   commandsSection.appendChild(resetCommandsBtn);
   box.appendChild(commandsSection);
@@ -916,6 +920,34 @@ export function buildConfirmModal(
 
   actions.appendChild(cancelBtn);
   actions.appendChild(confirmBtn);
+  box.appendChild(actions);
+  el.appendChild(box);
+  document.body.appendChild(el);
+  el.style.display = 'flex';
+}
+
+export function buildInfoModal(message: string): void {
+  const el = createModalOverlay(0.7);
+  const box = document.createElement('div');
+  box.style.cssText =
+    `background:${UI_BG};border:2px solid #4a90d9;border-radius:${RADIUS_LG};` +
+    'padding:24px 32px;display:flex;flex-direction:column;gap:16px;' +
+    'min-width:260px;max-width:420px;';
+  const msg = document.createElement('p');
+  msg.style.cssText = 'margin:0;color:#eee;font-size:0.95rem;';
+  msg.textContent = message;
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;justify-content:flex-end;';
+  const okBtn = document.createElement('button');
+  okBtn.type = 'button';
+  okBtn.textContent = t('modal.editPlayerName.ok');
+  okBtn.style.cssText =
+    `padding:8px 18px;font-size:0.95rem;background:#4a90d9;color:#fff;` +
+    `border:none;border-radius:${RADIUS_MD};cursor:pointer;`;
+  const { closeModal } = setupModal(el, { titleEl: null, onClose: () => { el.remove(); } });
+  okBtn.addEventListener('click', () => closeModal());
+  actions.appendChild(okBtn);
+  box.appendChild(msg);
   box.appendChild(actions);
   el.appendChild(box);
   document.body.appendChild(el);
