@@ -1165,11 +1165,14 @@ export class CampaignEditor {
   private _buildLevelEditorMidCol(readOnly: boolean): HTMLElement {
     const midCol = document.createElement('div');
     midCol.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _metadataPanel is always set before level editor methods are called
     midCol.appendChild(this._metadataPanel!.buildNameSection(readOnly));
     midCol.appendChild(this._buildEditorCanvasSection(readOnly));
     if (!readOnly) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _metadataPanel is always set before level editor methods are called
       midCol.appendChild(this._metadataPanel!.buildTextFieldsSection());
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _metadataPanel is always set before level editor methods are called
       midCol.appendChild(this._metadataPanel!.buildReadOnlyMetaSection());
     }
     return midCol;
@@ -1323,6 +1326,7 @@ export class CampaignEditor {
   private _onStateRestored(): void {
     this._updateCanvasDisplaySize();
     const invPanel = document.getElementById('editor-inventory-panel');
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _metadataPanel is always set before _onStateRestored is called
     if (invPanel) invPanel.replaceWith(this._metadataPanel!.buildInventoryEditor());
     this._metadataPanel?.rebuildGridSizePanel();
     this._paramsPanel.refreshStylePanel();
@@ -1649,6 +1653,7 @@ export class CampaignEditor {
         }
 
         if (result.conflict === 'version_conflict') {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- result.existing and result.isNewer are always set when result.conflict === 'version_conflict'
           this._dialogs.showImportVersionConflict(result.campaign, result.existing!, result.isNewer!, () => {
             // Replace the campaign record while retaining player progress (keyed by ID).
             this._service.acceptImport(result);

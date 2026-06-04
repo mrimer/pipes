@@ -106,7 +106,7 @@ export class TurnStateManager {
   getLockedWaterImpact(pos: GridPos): number | null {
     const key = posKey(pos.row, pos.col);
     const val = this._lockedWaterImpact.get(key);
-    return val !== undefined ? val : null;
+    return val ?? null;
   }
 
   /**
@@ -116,7 +116,7 @@ export class TurnStateManager {
   getLockedHotPlateGain(pos: GridPos): number | null {
     const key = posKey(pos.row, pos.col);
     const val = this._hotPlateWaterGain.get(key);
-    return val !== undefined ? val : null;
+    return val ?? null;
   }
 
   /** Return a snapshot copy of the hot-plate water-gain map, for use before applyTurnDelta clears disconnected entries. */
@@ -131,7 +131,7 @@ export class TurnStateManager {
   getLockedConnectTemp(pos: GridPos): number | null {
     const key = posKey(pos.row, pos.col);
     const val = this._lockedConnectTemp.get(key);
-    return val !== undefined ? val : null;
+    return val ?? null;
   }
 
   /**
@@ -141,7 +141,7 @@ export class TurnStateManager {
   getLockedConnectPressure(pos: GridPos): number | null {
     const key = posKey(pos.row, pos.col);
     const val = this._lockedConnectPressure.get(key);
-    return val !== undefined ? val : null;
+    return val ?? null;
   }
 
   /**
@@ -279,6 +279,7 @@ export class TurnStateManager {
     let minTurn: number | null = null;
     for (const key of this._lockedWaterImpact.keys()) {
       if (filled.has(key)) continue;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live key from this._lockedWaterImpact.keys()
       const impact = this._lockedWaterImpact.get(key)!;
       if (impact >= 0) continue; // Only care about tiles that froze water (negative impact).
       const [r, c] = parseKey(key);
@@ -351,6 +352,7 @@ export class TurnStateManager {
       const tile = this.grid[r]?.[c];
       if (!tile) continue;
 
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live candidate key guaranteed in this._lockedWaterImpact
       const oldImpact = this._lockedWaterImpact.get(key)!;
 
       // Reuse the historically-locked connect temperature; only the frozen supply changed.
@@ -380,6 +382,7 @@ export class TurnStateManager {
   private _cleanupDisconnectedTiles(filled: Set<string>): void {
     for (const key of this._lockedWaterImpact.keys()) {
       if (!filled.has(key)) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live key from this._lockedWaterImpact.keys()
         const impact = this._lockedWaterImpact.get(key)!;
         const [r, c] = parseKey(key);
         const tile = this.grid[r]?.[c];
@@ -434,6 +437,7 @@ export class TurnStateManager {
       const effectivePressure = this.thermo.computePressure(
         filled, this._connectionTurn, tileConnectedTurn,
       );
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live candidate key guaranteed in this._lockedWaterImpact
       const oldImpact = this._lockedWaterImpact.get(key)!;
 
       if (tile.chamberContent === 'hot_plate') {
@@ -583,6 +587,7 @@ export class TurnStateManager {
       let runningTotal = this.getSourceCapacity() - this.leakyPermanentLoss;
       for (const key of filled) {
         if (!this._lockedWaterImpact.has(key)) continue;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is from filled set filtered by has() on this._lockedWaterImpact
         runningTotal += this._lockedWaterImpact.get(key)!;
       }
       // Process newly-connecting Siphons first (double), then Gels (halve).

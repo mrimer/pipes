@@ -378,11 +378,11 @@ export class ChapterMapEditorSection extends MapEditorBase {
       recordSnapshot:       () => this._recordSnapshot(),
       saveGridState:        () => this._saveGrid(),
       renderCanvas:         () => this._renderCanvas(),
-      rebuildPalette:       (ch, camp) => this._ui!.rebuildPalette(ch, camp),
-      rebuildLevelInventory: (ch, camp) => this._ui!.rebuildLevelInventory(ch, camp),
+      rebuildPalette:       (ch, camp) => this._ui!.rebuildPalette(ch, camp), // eslint-disable-line @typescript-eslint/no-non-null-assertion -- _ui is always set before input callbacks fire
+      rebuildLevelInventory: (ch, camp) => this._ui!.rebuildLevelInventory(ch, camp), // eslint-disable-line @typescript-eslint/no-non-null-assertion -- _ui is always set before input callbacks fire
       rebuildTileParamsPanel: (ch, camp) => {
         const el = document.getElementById('chapter-tile-params-panel');
-        if (el) el.replaceWith(this._ui!.buildTileParamsPanel(ch, camp));
+        if (el) el.replaceWith(this._ui!.buildTileParamsPanel(ch, camp)); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- _ui is always set before input callbacks fire
       },
       clearFocusIfAt:       (pos) => this._gridState.clearFocusIfAt(pos),
       getActiveCampaign:    () => this._callbacks.getActiveCampaign(),

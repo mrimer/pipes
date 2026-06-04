@@ -422,6 +422,7 @@ export function renderLevelList(
       ? withChapterSelectSfx(onCampaignMapClick)
       : undefined;
     if (masteredCanOpenCampaignMap) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- masteredCanOpenCampaignMap is only true when onCampaignMapClick is set, so openCampaignMap is non-null
       continueBtn.addEventListener('click', openCampaignMap!);
     } else if (!showMastered) {
       if (campaignHasMap && openCampaignMap) {

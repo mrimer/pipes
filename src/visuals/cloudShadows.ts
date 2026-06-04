@@ -899,6 +899,7 @@ export class CampaignBirdFlockField {
     }
     this._birdCacheHalfSize = halfSize;
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always non-null on a freshly created OffscreenCanvas
     const bCtx = this._birdCache.getContext('2d')!;
     bCtx.clearRect(0, 0, canvasSize, canvasSize);
     bCtx.strokeStyle = BIRD_COLOR;
@@ -941,6 +942,7 @@ export class CampaignBirdFlockField {
       : 0;
 
     this._updateBirdCache(flock, flapPhase);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _updateBirdCache always initializes _birdCache
     const birdCanvas = this._birdCache!;
 
     ctx.save();

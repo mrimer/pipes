@@ -39,6 +39,7 @@ function _ensureCanvas(): void {
   _canvas = document.createElement('canvas');
   _canvas.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:9999;';
   document.body.appendChild(_canvas);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always non-null on a freshly created HTMLCanvasElement in a browser context
   _ctx = _canvas.getContext('2d')!;
   _resizeCanvas();
   if (!_resizeListenerAdded) {
@@ -51,6 +52,7 @@ function _ensureCanvas(): void {
 export function spawnConfetti(onComplete?: () => void): void {
   _ensureCanvas();
   _onComplete = onComplete ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _ensureCanvas() always initializes _canvas
   const w = _canvas!.width;
   const now = performance.now();
   const count = 90;
