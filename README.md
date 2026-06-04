@@ -33,12 +33,11 @@ Pushes to main deploy to GitHub Pages via .github/workflows/deploy.yml. Build ar
 - TypeScript 5.4+ / Webpack 5
 - ESLint 8 with type-aware rules
 - Jest 29 (Node default; jsdom opt-in per test file via @jest-environment jsdom)
-- See package.json for the full list. overrides block forces uuid ^11.1.1 to clear a transitive vuln.
+- See package.json for the full list. Overrides block forces uuid ^11.1.1 to clear a transitive vuln.
 
 ## Contributing
 
-Read AGENTS.md first — it documents architectural invariants (save-data versioning, memory teardown discipline, validation patterns, perf cache). Tests + lint + build
-must all stay green:
+Read AGENTS.md first — it documents architectural invariants (save-data versioning, memory teardown discipline, validation patterns, perf cache). Tests + lint + build must all stay green:
 
 ```bash
 npm run lint && npm test && npm run build
