@@ -7,7 +7,7 @@
     "dev": "webpack serve --mode development --open",
     "build": "webpack --mode production",
     "test": "jest",
-    "lint": "eslint \"{src,tests}/**/*.ts\"",
+    "lint": "eslint \"{src,tests}/**/*.ts\" --max-warnings=0",
     "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix"
   },
   "devDependencies": {
