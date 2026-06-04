@@ -10,6 +10,7 @@
 
 import { EDITOR_INPUT_BG, RADIUS_LG, UI_BG, UI_INPUT_BORDER } from './uiConstants';
 import { createModalOverlay } from './gameModals';
+import { t } from './i18n';
 import type { PlaySequenceRecord } from './types';
 import { setupModal } from './modalUtils';
 
@@ -52,7 +53,7 @@ export function buildRecordModal(
   box.style.maxWidth = '480px';
 
   const title = document.createElement('h2');
-  title.textContent = '📼 Record Play Sequence';
+  title.textContent = t('recording.record.title');
   box.appendChild(title);
   const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
@@ -64,13 +65,13 @@ export function buildRecordModal(
   const outcomeLabel = info.outcome === 'success' ? '✅ Success'
     : info.outcome === 'failure' ? '❌ Failure' : '⏸ Partial';
   const rows: [string, string][] = [
-    ['Outcome', outcomeLabel],
-    ['Moves', String(info.moveCount)],
-    ['Player', info.playerName],
-    ['Time', new Date(info.timestamp).toLocaleString()],
+    [t('recording.record.outcome'), outcomeLabel],
+    [t('recording.record.moves'), String(info.moveCount)],
+    [t('recording.record.player'), info.playerName],
+    [t('recording.record.time'), new Date(info.timestamp).toLocaleString()],
   ];
-  if (info.waterScore !== undefined) rows.push(['💧 Water', String(info.waterScore)]);
-  if (info.stars !== undefined && info.stars > 0) rows.push(['⭐ Stars', String(info.stars)]);
+  if (info.waterScore !== undefined) rows.push([t('recording.record.water'), String(info.waterScore)]);
+  if (info.stars !== undefined && info.stars > 0) rows.push([t('recording.record.stars'), String(info.stars)]);
 
   for (const [label, value] of rows) {
     const row = document.createElement('div');
@@ -90,12 +91,12 @@ export function buildRecordModal(
   // Annotation input
   const annotationLabel = document.createElement('label');
   annotationLabel.style.cssText = 'font-size:0.9rem;color:#aaa;text-align:left;';
-  annotationLabel.textContent = 'Annotation (optional):';
+  annotationLabel.textContent = t('recording.record.annotationLabel');
   box.appendChild(annotationLabel);
 
   const annotationInput = document.createElement('textarea');
   annotationInput.rows = 3;
-  annotationInput.placeholder = 'Add a note about this recording…';
+  annotationInput.placeholder = t('recording.record.annotationPlaceholder');
   annotationInput.style.cssText =
     'width:100%;box-sizing:border-box;padding:8px 10px;font-size:0.9rem;' +
     `background:${EDITOR_INPUT_BG};color:#eee;border:1px solid ${UI_INPUT_BORDER};border-radius:6px;resize:vertical;font-family:inherit;`;
@@ -106,7 +107,7 @@ export function buildRecordModal(
   actionsEl.className = 'modal-actions';
 
   const recordBtn = document.createElement('button');
-  recordBtn.textContent = 'Record';
+  recordBtn.textContent = t('recording.record.confirm');
   recordBtn.className = 'modal-btn primary';
   recordBtn.type = 'button';
   recordBtn.addEventListener('click', () => {
@@ -115,7 +116,7 @@ export function buildRecordModal(
   });
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('recording.record.cancel');
   cancelBtn.className = 'modal-btn secondary';
   cancelBtn.type = 'button';
   cancelBtn.addEventListener('click', () => {
@@ -150,20 +151,20 @@ function _showConfirmDeleteDialog(record: PlaySequenceRecord, onConfirm: () => v
   box.style.maxWidth = '420px';
 
   const title = document.createElement('h2');
-  title.textContent = '🗑️ Delete Recording?';
+  title.textContent = t('recording.delete.title');
   box.appendChild(title);
   const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
   const msg = document.createElement('p');
   msg.style.cssText = 'font-size:0.9rem;color:#ddd;margin:0;';
-  msg.textContent = `Delete this recording by ${record.playerName}? This cannot be undone.`;
+  msg.textContent = t('recording.delete.message', { playerName: record.playerName });
   box.appendChild(msg);
 
   const actionsEl = document.createElement('div');
   actionsEl.className = 'modal-actions';
 
   const confirmBtn = document.createElement('button');
-  confirmBtn.textContent = 'Delete';
+  confirmBtn.textContent = t('recording.delete.confirm');
   confirmBtn.className = 'modal-btn secondary';
   confirmBtn.type = 'button';
   confirmBtn.style.cssText += 'color:#f66;border-color:#a33;';
@@ -173,7 +174,7 @@ function _showConfirmDeleteDialog(record: PlaySequenceRecord, onConfirm: () => v
   });
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('recording.delete.cancel');
   cancelBtn.className = 'modal-btn primary';
   cancelBtn.type = 'button';
   cancelBtn.addEventListener('click', () => { closeModal(); });
@@ -242,7 +243,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
     'min-width:min(560px,calc(100vw - 32px));max-width:min(720px,calc(100vw - 32px));';
 
   const title = document.createElement('h2');
-  title.textContent = '▶️ Saved Recordings';
+  title.textContent = t('recording.list.title');
   box.appendChild(title);
   let closeModal: (onCloseOverride?: () => void) => void = () => {
     el.remove();
@@ -316,7 +317,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
     if (records.length === 0) {
       const emptyMsg = document.createElement('li');
       emptyMsg.style.cssText = 'padding:16px;color:#a0a0a0;text-align:center;font-size:0.9rem;';
-      emptyMsg.textContent = 'No recordings saved for this level.';
+      emptyMsg.textContent = t('recording.list.empty');
       listEl.appendChild(emptyMsg);
       return;
     }
@@ -422,7 +423,7 @@ export function showReplayImportSuccessModal(
 
   const title = document.createElement('h2');
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#4a90d9;';
-  title.textContent = '📥 Recording Imported';
+  title.textContent = t('recording.import.title');
   box.appendChild(title);
   const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
 
@@ -430,12 +431,16 @@ export function showReplayImportSuccessModal(
   infoEl.style.cssText = 'font-size:0.95rem;color:#ddd;margin:0;';
   const chapterStr = chapterNumber !== null ? `Chapter ${chapterNumber}` : 'Unknown chapter';
   const levelStr   = levelNumber   !== null ? `Level ${levelNumber}` : 'Unknown level';
-  infoEl.textContent = `Campaign: ${campaignName}\n${chapterStr} · ${levelStr}`;
+  infoEl.textContent = t('recording.import.info', {
+    campaignName,
+    chapterLabel: chapterStr,
+    levelLabel: levelStr,
+  });
   infoEl.style.whiteSpace = 'pre-line';
   box.appendChild(infoEl);
 
   const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'OK';
+  closeBtn.textContent = t('recording.import.close');
   closeBtn.className = 'modal-btn primary';
   closeBtn.type = 'button';
   closeBtn.addEventListener('click', () => { closeModal(); });
