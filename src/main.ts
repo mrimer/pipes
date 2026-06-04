@@ -11,6 +11,8 @@ import { setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSetting
 import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
 import { showIntroTitleScreen } from './titleScreen';
 import { showSplashScreen } from './splashScreen';
+import { initLocale, registerTranslations, t } from './i18n';
+import { en } from './i18n/en';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
@@ -54,6 +56,38 @@ function getEl<T extends HTMLElement>(id: string): T {
   return el;
 }
 
+function localizeStaticChrome(): void {
+  const setText = (id: string, key: string): void => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = t(key);
+  };
+  const setAttr = (id: string, attr: 'aria-label' | 'title', key: string): void => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute(attr, t(key));
+  };
+
+  setText('undo-btn', 'hud.undo');
+  setText('redo-btn', 'hud.redo');
+  setText('restart-btn', 'hud.restart');
+  setText('rules-btn', 'hud.rules');
+  setAttr('record-btn', 'title', 'hud.record.title');
+  setAttr('record-btn', 'aria-label', 'hud.record.ariaLabel');
+  setAttr('playback-btn', 'title', 'hud.playback.title');
+  setAttr('playback-btn', 'aria-label', 'hud.playback.ariaLabel');
+  setText('exit-btn', 'hud.exit.menu');
+
+  setText('win-modal-title', 'modal.win.title');
+  setText('win-modal-subtitle', 'modal.win.subtitle');
+  setText('win-next-btn', 'modal.win.continue');
+  setText('win-undo-btn', 'modal.win.undoMove');
+  setText('win-retry-btn', 'modal.win.retry');
+
+  setText('gameover-modal-title', 'modal.gameover.title');
+  setText('gameover-undo-btn', 'modal.gameover.undoMove');
+  setText('gameover-retry-btn', 'modal.gameover.retry');
+  setText('gameover-menu-btn', 'modal.gameover.menu');
+}
+
 const canvas         = getEl<HTMLCanvasElement>('game-canvas');
 const levelSelectEl  = getEl('level-select');
 const levelListEl    = getEl('level-list');
@@ -72,6 +106,10 @@ const exitBtnEl      = getEl<HTMLButtonElement>('exit-btn');
 const rulesBtnEl     = getEl<HTMLButtonElement>('rules-btn');
 
 async function bootstrap(): Promise<void> {
+  registerTranslations('en', en);
+  initLocale(['en']);
+  localizeStaticChrome();
+
   await showSplashScreen();
   await showIntroTitleScreen();
 

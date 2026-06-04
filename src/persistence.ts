@@ -464,11 +464,21 @@ export function clearCampaignCompleteShown(campaignId: string): void {
 
 // ─── Settings persistence ─────────────────────────────────────────────────────
 
+const LOCALE_KEY = 'pipes_locale';
 const SFX_VOLUME_KEY      = (): string => `pipes_${p()}sfx_volume`;
 const COMMAND_KEYS_KEY     = (): string => `pipes_${p()}command_keys`;
 const TOUCH_UI_ENABLED_KEY = (): string => `pipes_${p()}touch_ui_enabled`;
 const PLAYER_NAME_KEY      = (): string => `pipes_${p()}player_name`;
 const DEFAULT_PLAYER_NAME = 'Player';
+
+/** Load the persisted locale preference. */
+export function loadLocale(): string | null {
+  try {
+    return localStorage.getItem(LOCALE_KEY);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Load the persisted SFX volume setting.

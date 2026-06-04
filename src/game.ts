@@ -62,6 +62,7 @@ import { CloudShadowField } from './visuals/cloudShadows';
 import { FireflyField } from './visuals/fireflyField';
 import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
+import { t } from './i18n';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 2000;
@@ -619,10 +620,10 @@ export class Game implements InputCallbacks {
     // Clear particle arrays so stale drops don't persist on the level-select screen.
     this._animMgr.clearAll();
     // Reset modal button labels in case they were changed for playtesting.
-    this.winNextBtnEl.textContent = 'Continue';
-    this.gameoverMenuBtnEl.textContent = 'Level Select';
+    this.winNextBtnEl.textContent = t('modal.win.continue');
+    this.gameoverMenuBtnEl.textContent = t('modal.gameover.menu');
     // Reset HUD exit button label in case it was changed for playtesting.
-    this.exitBtnEl.textContent = '← Menu';
+    this.exitBtnEl.textContent = t('hud.exit.menu');
     this._campaign.renderLevelList();
     // Scroll the active level's row into view near the center of the viewport.
     if (scrollToLevelId !== null) {
@@ -1115,7 +1116,7 @@ export class Game implements InputCallbacks {
   /** Transition the game to the GameOver state and show the gameover modal. */
   private _showGameOver(): void {
     this.gameState = GameState.GameOver;
-    this.gameoverMsgEl.textContent = 'The tank ran dry! Undo the last move, reset the level, or return to the map.';
+    this.gameoverMsgEl.textContent = t('modal.gameover.message.tankDry');
     sfxManager.play(SfxId.Dry);
     this._showModalWithAnimation(this.gameoverModalEl, 'sparkle-red');
 

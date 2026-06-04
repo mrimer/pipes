@@ -31,6 +31,7 @@ import type { ChapterMapSnapshot } from './levelTransition';
 import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScreenTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
 import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
+import { t } from './i18n';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
 const NO_OP = (): void => {};
@@ -848,9 +849,9 @@ export class CampaignManager {
       this._callbacks.setLevelSelectVisible(false);
       this._campaignEditor.showAndRestore();
     };
-    this._callbacks.winNextBtnEl.textContent = '↩ Return to Editor';
-    this._callbacks.gameoverMenuBtnEl.textContent = '↩ Return to Editor';
-    this._callbacks.exitBtnEl.textContent = '← Edit';
+    this._callbacks.winNextBtnEl.textContent = t('modal.win.returnToEditor');
+    this._callbacks.gameoverMenuBtnEl.textContent = t('modal.gameover.returnToEditor');
+    this._callbacks.exitBtnEl.textContent = t('hud.exit.editor');
     this._callbacks.startLevelDef(level);
   }
 
