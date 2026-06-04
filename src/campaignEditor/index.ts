@@ -1273,7 +1273,7 @@ export class CampaignEditor {
   private _showSourceError(): void {
     const el = this._editorSourceErrorEl;
     if (!el) return;
-    showTimedMessage(el, ONLY_ONE_SOURCE);
+    showTimedMessage(el, t(ONLY_ONE_SOURCE));
   }
 
   /** Flashes an error message below the canvas when the Sink placement constraint is violated. */
