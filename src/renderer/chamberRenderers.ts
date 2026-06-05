@@ -267,6 +267,7 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
   } else {
     const xMid = 0;
     const xQuart = lineSpan / 4;
+    const yWaveAmplitude = _s(2.5);
     if (isWater) {
       // Animated: wavy heat lines scroll upwards and wrap vertically within the region.
       const HEATER_SCROLL_MS = 1500;
@@ -282,19 +283,19 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
         const lineY = topY + k * lineSpacing - offset;
         ctx.beginPath();
         ctx.moveTo(lineLeft, lineY);
-        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - _s(2.5), xMid, lineY);
-        ctx.quadraticCurveTo(xMid + xQuart, lineY + _s(2.5), lineRight, lineY);
+        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - yWaveAmplitude, xMid, lineY);
+        ctx.quadraticCurveTo(xMid + xQuart, lineY + yWaveAmplitude, lineRight, lineY);
         ctx.stroke();
       }
       ctx.restore();
     } else {
-      // Static: 3 short, thin wavy heat lines near the top
+      // Static: 3 thin wavy heat lines near the top
       for (let i = 0; i < numLines; i++) {
-        const lineY = topY + i * lineSpacing;
+        const lineY = topY + yWaveAmplitude + i * lineSpacing;
         ctx.beginPath();
         ctx.moveTo(lineLeft, lineY);
-        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - _s(2.5), xMid, lineY);
-        ctx.quadraticCurveTo(xMid + xQuart, lineY + _s(2.5), lineRight, lineY);
+        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - yWaveAmplitude, xMid, lineY);
+        ctx.quadraticCurveTo(xMid + xQuart, lineY + yWaveAmplitude, lineRight, lineY);
         ctx.stroke();
       }
     }
