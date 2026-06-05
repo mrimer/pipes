@@ -1955,6 +1955,28 @@ describe('Board.replaceInventoryTile', () => {
     expect(board.grid[1][1].rotation).toBe(0);
   });
 
+  it('allows replacement when new-shape affordability drops to zero only from a newly connected negative chamber', () => {
+    const board = new Board(2, 4);
+    board.source = { row: 1, col: 0 };
+    board.sink = { row: 1, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 2, null, 'item');
+    board.grid[0][1] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][2] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][3] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][0] = new Tile(PipeShape.Source, 0, true, 5);
+    board.grid[1][1] = new Tile(PipeShape.Elbow, 0); // unconnected from source (no west connection)
+    board.grid[1][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, -2, null, 'item');
+    board.grid[1][3] = new Tile(PipeShape.Sink, 0, true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }, { shape: PipeShape.Elbow, count: 0 }];
+
+    const result = board.replaceInventoryTile({ row: 1, col: 1 }, PipeShape.Straight, 90);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[1][1].shape).toBe(PipeShape.Straight);
+    expect(board.grid[1][1].rotation).toBe(90);
+  });
+
   it('still blocks replacement that disconnects a positive container even when a new negative one is connected', () => {
     // Source(0,0) → Straight(0,1,R=90,E-W) → Chamber(0,2, +3 Straights) → Sink(0,3)
     //                        ↑
