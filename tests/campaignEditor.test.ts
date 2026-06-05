@@ -2222,7 +2222,8 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
     state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32));
 
-    const lastCall = renderSpy.mock.calls.at(-1);
+    expect(renderSpy).toHaveBeenCalled();
+    const lastCall = renderSpy.mock.calls[renderSpy.mock.calls.length - 1];
     expect(lastCall).toBeDefined();
     expect(lastCall?.[5]).toMatchObject({ toPos: { row: 0, col: 1 } });
     expect(lastCall?.[6]).toEqual({ row: 0, col: 1 });

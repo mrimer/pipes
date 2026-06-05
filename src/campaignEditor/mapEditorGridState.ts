@@ -68,7 +68,10 @@ export class MapEditorGridState {
         { length: this.rows },
         (_, r) => Array.from(
           { length: this.cols },
-          (_, c) => savedGrid[r]?.[c] ?? null,
+          (_, c) => {
+            const cell = savedGrid[r]?.[c] ?? null;
+            return cell ? structuredClone(cell) : null;
+          },
         ),
       );
     } else {
