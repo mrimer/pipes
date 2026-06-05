@@ -31,8 +31,10 @@ import {
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
 
-const GOLD_ITEM_SHINE_PERIOD_MS = 12_000;
-const GOLD_ITEM_SHINE_DURATION_MS = 500;
+// Long idle between short highlights gives a periodic "metallic" glint without
+// constantly brightening all connected gold-item chambers.
+const GOLD_ITEM_SHINE_CYCLE_MS = 12_000;
+const GOLD_ITEM_SHINE_ACTIVE_WINDOW_MS = 500;
 
 type StarBurstParticle = {
   x: number;
@@ -54,7 +56,20 @@ type StarBurstState = {
 };
 
 const STAR_BURST_PARTICLES_PER_SECOND = 30;
+// 30 particles/s with a maximum 950ms lifetime yields up to ~29 active particles;
+// 42 leaves visual headroom while still providing a strict upper bound.
 const STAR_BURST_MAX_PARTICLES = 42;
+const STAR_PARTICLE_MIN_SPEED_FACTOR = 0.9;
+const STAR_PARTICLE_SPEED_RANGE_FACTOR = 0.8;
+const STAR_PARTICLE_MIN_SIZE = 1.4;
+const STAR_PARTICLE_SIZE_RANGE = 2.0;
+const STAR_PARTICLE_MIN_LIFETIME_MS = 500;
+const STAR_PARTICLE_LIFETIME_RANGE_MS = 450;
+const STAR_PARTICLE_MAX_SPIN_RATE = 8;
+const STAR_INNER_RADIUS_RATIO = 0.45;
+const STAR_BURST_MAX_FRAME_TIME_MS = 100;
+const STAR_BURST_CHAMBER_MARGIN = 2;
+const STAR_BURST_MIN_RADIUS = 1;
 const _starBurstStates = new WeakMap<Tile, StarBurstState>();
 
 // ---------------------------------------------------------------------------
@@ -719,21 +734,21 @@ function _drawChamberStarContent(ctx: CanvasRenderingContext2D, isWater: boolean
 }
 
 function _drawGoldItemShine(ctx: CanvasRenderingContext2D, bw: number, bh: number, br: number): void {
-  const cycleTime = Date.now() % GOLD_ITEM_SHINE_PERIOD_MS;
-  if (cycleTime >= GOLD_ITEM_SHINE_DURATION_MS) return;
+  const cycleTime = Date.now() % GOLD_ITEM_SHINE_CYCLE_MS;
+  if (cycleTime >= GOLD_ITEM_SHINE_ACTIVE_WINDOW_MS) return;
 
-  const travelProgress = cycleTime / GOLD_ITEM_SHINE_DURATION_MS;
+  const travelProgress = cycleTime / GOLD_ITEM_SHINE_ACTIVE_WINDOW_MS;
   const shineHalfWidth = Math.max(_s(5), Math.min(bw, bh) * 0.45);
   const startCenterX = bw + shineHalfWidth;
   const endCenterX = -bw - shineHalfWidth;
   const centerX = startCenterX + (endCenterX - startCenterX) * travelProgress;
-  const unit45 = Math.SQRT1_2;
+  const cos45 = Math.SQRT1_2;
 
   const grad = ctx.createLinearGradient(
-    centerX - unit45 * shineHalfWidth,
-    -unit45 * shineHalfWidth,
-    centerX + unit45 * shineHalfWidth,
-    unit45 * shineHalfWidth,
+    centerX - cos45 * shineHalfWidth,
+    -cos45 * shineHalfWidth,
+    centerX + cos45 * shineHalfWidth,
+    cos45 * shineHalfWidth,
   );
   grad.addColorStop(0, 'rgba(255, 235, 120, 0)');
   grad.addColorStop(0.35, 'rgba(255, 240, 140, 0.05)');
@@ -751,23 +766,23 @@ function _drawGoldItemShine(ctx: CanvasRenderingContext2D, bw: number, bh: numbe
 
 function _spawnStarBurstParticle(half: number): StarBurstParticle {
   const angle = Math.random() * Math.PI * 2;
-  const speed = half * (0.9 + Math.random() * 0.8);
+  const speed = half * (STAR_PARTICLE_MIN_SPEED_FACTOR + Math.random() * STAR_PARTICLE_SPEED_RANGE_FACTOR);
   return {
     x: 0,
     y: 0,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
-    size: _s(1.4) + Math.random() * _s(2.0),
+    size: _s(STAR_PARTICLE_MIN_SIZE) + Math.random() * _s(STAR_PARTICLE_SIZE_RANGE),
     hue: Math.floor(Math.random() * 360),
     ageMs: 0,
-    lifetimeMs: 500 + Math.random() * 450,
+    lifetimeMs: STAR_PARTICLE_MIN_LIFETIME_MS + Math.random() * STAR_PARTICLE_LIFETIME_RANGE_MS,
     rotation: Math.random() * Math.PI * 2,
-    spin: (Math.random() - 0.5) * 8,
+    spin: (Math.random() - 0.5) * STAR_PARTICLE_MAX_SPIN_RATE,
   };
 }
 
 function _drawTinyParticleStar(ctx: CanvasRenderingContext2D, x: number, y: number, outerR: number, rotation: number): void {
-  const innerR = outerR * 0.45;
+  const innerR = outerR * STAR_INNER_RADIUS_RATIO;
   ctx.beginPath();
   for (let i = 0; i < 10; i++) {
     const angle = rotation + (Math.PI / 5) * i - Math.PI / 2;
@@ -793,7 +808,7 @@ function _drawConnectedStarBurst(ctx: CanvasRenderingContext2D, tile: Tile, half
     _starBurstStates.set(tile, state);
   }
 
-  const dtMs = Math.min(Math.max(now - state.lastUpdateMs, 0), 100);
+  const dtMs = Math.min(Math.max(now - state.lastUpdateMs, 0), STAR_BURST_MAX_FRAME_TIME_MS);
   state.lastUpdateMs = now;
 
   state.spawnCarry += dtMs * STAR_BURST_PARTICLES_PER_SECOND / 1000;
@@ -805,7 +820,7 @@ function _drawConnectedStarBurst(ctx: CanvasRenderingContext2D, tile: Tile, half
   }
 
   const dtSec = dtMs / 1000;
-  const maxRadius = Math.max(half - _s(2), 1);
+  const maxRadius = Math.max(half - _s(STAR_BURST_CHAMBER_MARGIN), STAR_BURST_MIN_RADIUS);
   for (const particle of state.particles) {
     particle.x += particle.vx * dtSec;
     particle.y += particle.vy * dtSec;
