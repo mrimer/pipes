@@ -738,7 +738,7 @@ function _drawGoldItemShine(ctx: CanvasRenderingContext2D, bw: number, bh: numbe
   if (cycleTime >= GOLD_ITEM_SHINE_ACTIVE_WINDOW_MS) return;
 
   const travelProgress = cycleTime / GOLD_ITEM_SHINE_ACTIVE_WINDOW_MS;
-  const shineHalfWidth = Math.max(_s(5), Math.min(bw, bh) * 0.45);
+  const shineHalfWidth = Math.max(_s(5), Math.min(bw, bh) * 0.5);
   const startCenterX = bw + shineHalfWidth;
   const endCenterX = -bw - shineHalfWidth;
   const centerX = startCenterX + (endCenterX - startCenterX) * travelProgress;
