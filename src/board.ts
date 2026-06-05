@@ -1096,10 +1096,14 @@ export class Board {
           }
           return [];
         });
+        if (disconnectedPositions.length === 0) {
+          // No positive item chambers were actually disconnected by this replacement.
+          continue;
+        }
         return {
           success: false,
           error: ERR_CONTAINER_REPLACE,
-          errorTilePositions: disconnectedPositions.length ? disconnectedPositions : undefined,
+          errorTilePositions: disconnectedPositions,
         };
       }
     }
