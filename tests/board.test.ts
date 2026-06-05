@@ -992,6 +992,26 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(0);
   });
 
+  it('blocks reclaiming when the reclaimed tile still leaves the disconnected grant in use', () => {
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 4 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0,  true);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0,  true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Straight, 90);
+    board.grid[0][4] = new Tile(PipeShape.Sink,    0,  true);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: -2 }];
+
+    const result = board.reclaimTile({ row: 0, col: 1 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(-2);
+  });
+
   it('highlights only positive item chambers for disconnect grant errors', () => {
     const board = makeMixedGrantDisconnectBoard(-1);
 

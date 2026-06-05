@@ -1084,6 +1084,11 @@ export class Board {
   /**
    * Returns the disconnected positive-count item chambers for the first shape
    * whose effective inventory count drops below zero in a blocked way.
+   *
+   * `phase = 'disconnectionsOnly'` validates only the intermediate state after
+   * applying disconnected item chambers. `phase = 'twoPhase'` falls through to
+   * the full final-state reconciliation when that intermediate state is still
+   * negative.
    */
   private _getBlockedNegativeContainerDropPositions(
     originalInventory: Array<{ shape: PipeShape; count: number }>,
@@ -1108,9 +1113,10 @@ export class Board {
         originalFilled,
         finalFilled,
       );
-      const disconnectionOnlyBonus = (originalBonuses.get(shape) ?? 0) - (disconnectedBonuses.get(shape) ?? 0);
+      const remainingBonusAfterDisconnections =
+        (originalBonuses.get(shape) ?? 0) - (disconnectedBonuses.get(shape) ?? 0);
       const finalCount = finalInventory.find((item) => item.shape === shape)?.count ?? 0;
-      const disconnectionOnlyEffective = finalCount + disconnectionOnlyBonus;
+      const disconnectionOnlyEffective = finalCount + remainingBonusAfterDisconnections;
       if (disconnectionOnlyEffective >= 0) continue;
       if (phase === 'disconnectionsOnly') {
         if (disconnectedPositions.length > 0) return disconnectedPositions;
