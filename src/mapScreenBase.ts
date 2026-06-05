@@ -31,6 +31,7 @@ import { RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 import { createButton } from './uiHelpers';
 import type { CloudShadowPreset } from './visuals/cloudShadows';
 import { CampaignBirdFlockField, CloudShadowField } from './visuals/cloudShadows';
+import { t } from './i18n';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -993,30 +994,7 @@ export abstract class MapScreenBase {
       if (pos) {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- grid is verified to exist before the mouse-event handler is active
         const def = chapter.grid![pos.row]?.[pos.col];
-        const displayProgress = this._getDisplayProgress();
-        if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-          const filledKeys = this._computeFilledCells();
-          const isFilled = filledKeys.has(`${pos.row},${pos.col}`);
-          const entityDefs = this._getEntityDefs();
-          const entity = entityDefs[def.levelIdx];
-          canvas.title = isFilled && entity ? `${def.levelIdx + 1}: ${entity.name}` : '???';
-        } else if (def?.shape === PipeShape.Source) {
-          const entityDefs = this._getEntityDefs();
-          const completedCount = entityDefs.filter(l => displayProgress.has(l.id)).length;
-          canvas.title = `${completedCount} completed level${completedCount === 1 ? '' : 's'}`;
-        } else if (def?.shape === PipeShape.Sink) {
-          const filledKeys = this._computeFilledCells();
-          const remaining = this._sinkRemaining(def, chapter, displayProgress);
-          if (remaining > 0) {
-            canvas.title = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
-          } else if (filledKeys.has(`${pos.row},${pos.col}`)) {
-            canvas.title = 'Chapter Complete!';
-          } else {
-            canvas.title = '';
-          }
-        } else {
-          canvas.title = '';
-        }
+        canvas.title = this._chapterNodeTooltip(chapter, def, pos.row, pos.col);
       } else {
         canvas.title = '';
       }
@@ -1171,51 +1149,44 @@ export abstract class MapScreenBase {
     return Math.max(0, (def.completion ?? 0) - completedEntityCount);
   }
 
+  /**
+   * Compute the tooltip text for a chapter-map node at (row, col).
+   * Returns an empty string when no tooltip is applicable.
+   */
+  private _chapterNodeTooltip(chapter: ChapterDef, def: TileDef | null | undefined, row: number, col: number): string {
+    const displayProgress = this._getDisplayProgress();
+    const filledKeys = this._computeFilledCells();
+    if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+      const isFilled = filledKeys.has(`${row},${col}`);
+      const entity = this._getEntityDefs()[def.levelIdx];
+      return isFilled && entity ? `${def.levelIdx + 1}: ${entity.name}` : t('map.tooltip.locked');
+    }
+    if (def?.shape === PipeShape.Source) {
+      const count = this._getEntityDefs().filter(l => displayProgress.has(l.id)).length;
+      return t(count === 1 ? 'map.tooltip.completed.one' : 'map.tooltip.completed.other', { count });
+    }
+    if (def?.shape === PipeShape.Sink) {
+      const remaining = this._sinkRemaining(def, chapter, displayProgress);
+      if (remaining > 0) return t(remaining === 1 ? 'map.tooltip.remaining.one' : 'map.tooltip.remaining.other', { count: remaining });
+      if (filledKeys.has(`${row},${col}`)) return t('map.tooltip.chapterComplete');
+    }
+    return '';
+  }
+
   private _showTooltip(clientX: number, clientY: number): void {
     const chapter = this._chapter;
     if (!chapter?.grid || !this._hover) { this._hideTooltip(); return; }
     const { row, col } = this._hover;
     const def = chapter.grid[row]?.[col];
-    const displayProgress = this._getDisplayProgress();
-    const filledKeys = this._computeFilledCells();
-
-    if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-      const isFilled = filledKeys.has(`${row},${col}`);
-      if (!isFilled) {
-        this._tooltipEl.textContent = '???';
-        this._tooltipEl.style.display = 'block';
-        this._tooltipEl.style.left = `${clientX + 12}px`;
-        this._tooltipEl.style.top  = `${clientY + 12}px`;
-        return;
-      }
-      const entity = this._getEntityDefs()[def.levelIdx];
-      if (entity) {
-        this._tooltipEl.textContent = `${def.levelIdx + 1}: ${entity.name}`;
-        this._tooltipEl.style.display = 'block';
-        this._tooltipEl.style.left = `${clientX + 12}px`;
-        this._tooltipEl.style.top  = `${clientY + 12}px`;
-        return;
-      }
-    } else if (def?.shape === PipeShape.Source) {
-      const entityDefs = this._getEntityDefs();
-      const completedCount = entityDefs.filter(l => displayProgress.has(l.id)).length;
-      this._tooltipEl.textContent = `${completedCount} completed level${completedCount === 1 ? '' : 's'}`;
+    const text = this._chapterNodeTooltip(chapter, def, row, col);
+    if (text) {
+      this._tooltipEl.textContent = text;
       this._tooltipEl.style.display = 'block';
       this._tooltipEl.style.left = `${clientX + 12}px`;
       this._tooltipEl.style.top  = `${clientY + 12}px`;
-      return;
-    } else if (def?.shape === PipeShape.Sink) {
-      const remaining = this._sinkRemaining(def, chapter, displayProgress);
-      if (remaining > 0) {
-        const text = `${remaining} level${remaining === 1 ? '' : 's'} remaining to complete chapter`;
-        this._tooltipEl.textContent = text;
-        this._tooltipEl.style.display = 'block';
-        this._tooltipEl.style.left = `${clientX + 12}px`;
-        this._tooltipEl.style.top  = `${clientY + 12}px`;
-        return;
-      }
+    } else {
+      this._hideTooltip();
     }
-    this._hideTooltip();
   }
 
   private _hideTooltip(): void {

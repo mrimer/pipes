@@ -30,6 +30,7 @@ import {
   lighten, darken,
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
+import { t } from '../i18n';
 
 // Long idle between short highlights gives a periodic "metallic" glint without
 // constantly brightening all connected gold-item chambers.
@@ -537,7 +538,7 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
     if (shatterActive) {
       const displayCost = shatterOverride ? 0 : sandstoneCost;
       ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(shatterOverride ? 'WEAK' : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
+      ctx.fillText(shatterOverride ? t('tile.sandstone.weak') : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
       ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
       ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY + _s(7));
     } else {

@@ -237,6 +237,27 @@ export const en: TranslationTable = {
   'import.skippedCampaigns': '⚠️ Campaigns not found locally (skipped)',
   'inventory.none': 'None',
   'map.unknownLevel': '?',
+  'map.tooltip.locked': '???',
+  'map.tooltip.completed.one': '{count} completed level',
+  'map.tooltip.completed.other': '{count} completed levels',
+  'map.tooltip.remaining.one': '{count} level remaining to complete chapter',
+  'map.tooltip.remaining.other': '{count} levels remaining to complete chapter',
+  'map.tooltip.chapterComplete': 'Chapter Complete!',
+  'map.noLevelDef': 'LEVEL',
+
+  'campaign.chapterComplete.title': '🎉 Chapter Complete!',
+  'campaign.chapterMastered.title': '🏆 Chapter Mastered!',
+
+  'playback.control.play': 'Play',
+  'playback.control.pause': 'Pause',
+  'playback.control.speed': 'Playback speed (seconds per move)',
+  'playback.control.scrub': 'Scrub to any move',
+
+  'recording.item.hint': 'Click to select · Double-click to replay',
+
+  'editor.chapterMap.levelFallback': 'Level {number}',
+
+  'tile.sandstone.weak': 'WEAK',
   'rules.summary': 'Connect pipes from the Source to the Sink before the water runs out. Each pipe you connect costs one unit of water — plan your route wisely!',
   'rules.playLoop.touch': 'Select a pipe from the inventory bar, then tap an empty cell to place it. You can also drag a pipe from the inventory directly to a grid cell. Swipe left or right on a placed pipe to rotate it. Water flows automatically once a complete path exists. Long-press a placed pipe to remove it and return it to your inventory.',
   'rules.playLoop.desktop': 'Select a pipe piece from the inventory panel, then click an empty cell to place it. Scroll the mouse wheel to rotate the piece before placing. Rotate placed pipes to update your route. Water flows automatically once a complete path exists. Some chambers add water, waste it, or grant extra pieces when reached. Removing pieces returns water and reverts connections to their original state.',
