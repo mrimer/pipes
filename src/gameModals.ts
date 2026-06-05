@@ -986,13 +986,13 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
 
   const title = document.createElement('h2');
   title.style.cssText = 'margin:0;font-size:1.2rem;color:#4a90d9;';
-  title.textContent = '📥 Import Complete';
+  title.textContent = t('import.complete.title');
   box.appendChild(title);
 
   if (isNewSlot && importedPlayerName) {
     const nameEl = document.createElement('p');
     nameEl.style.cssText = 'margin:2px 0;font-size:0.9rem;color:#eee;';
-    nameEl.textContent = `Player: ${importedPlayerName}`;
+    nameEl.textContent = t('import.complete.player', { name: importedPlayerName });
     box.appendChild(nameEl);
   }
 
@@ -1047,14 +1047,14 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   } else {
     const none = document.createElement('p');
     none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#a0a0a0;';
-    none.textContent = isNewSlot ? 'No campaign progress found in this file.' : 'No campaign progress was merged.';
+    none.textContent = isNewSlot ? t('import.noProgress') : t('import.noneMerged');
     box.appendChild(none);
   }
 
   if (ignored.length > 0) {
     const ignoredHeader = document.createElement('h3');
     ignoredHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#f0c040;';
-    ignoredHeader.textContent = '⚠️ Campaigns not found locally (skipped)';
+    ignoredHeader.textContent = t('import.skippedCampaigns');
     box.appendChild(ignoredHeader);
     const ul = document.createElement('ul');
     ul.style.cssText = 'margin:4px 0 0 16px;padding:0;';
@@ -1075,7 +1075,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   box.appendChild(note);
 
   const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'Close';
+  closeBtn.textContent = t('common.close');
   closeBtn.style.cssText =
     `align-self:flex-end;padding:8px 24px;font-size:0.95rem;background:${MUTED_BTN_BG};` +
     `color:#eee;border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;margin-top:4px;`;

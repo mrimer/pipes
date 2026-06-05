@@ -305,7 +305,7 @@ export class CampaignManager {
         },
         onLevelSelected: (levelDef) => {
           this._winFromChapterMap = true;
-          this._callbacks.exitBtnEl.textContent = '← Chapter Map';
+          this._callbacks.exitBtnEl.textContent = t('campaign.nav.chapterMap');
 
           // Capture minimap screen rect AND a canvas snapshot BEFORE startLevel
           // hides the chapter map or changes TILE_SIZE.  The snapshot is used to
@@ -960,7 +960,7 @@ export class CampaignManager {
   }
 
   private _showNewChapterModal(chapterIdx: number, chapter: ChapterDef): void {
-    this._newChapterNumberEl.textContent = `Chapter ${chapterIdx + 1}`;
+    this._newChapterNumberEl.textContent = t('campaign.chapterLabel', { number: chapterIdx + 1 });
     this._newChapterNameEl.textContent = chapter.name;
     this._newChapterModalEl.style.display = 'flex';
     sfxManager.play(SfxId.NewChapter);
@@ -1099,7 +1099,7 @@ export class CampaignManager {
       const box = document.createElement('div');
       box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:430px;width:90%;text-align:center;';
       const titleEl = document.createElement('h2');
-      titleEl.textContent = '🎉 Campaign Complete!';
+      titleEl.textContent = t('campaign.complete.title');
       titleEl.style.cssText = 'color:#7ed321;margin:0 0 16px;font-size:1.5rem;';
       box.appendChild(titleEl);
 
@@ -1117,11 +1117,11 @@ export class CampaignManager {
       const btnRow = document.createElement('div');
       btnRow.style.cssText = 'display:flex;justify-content:center;gap:8px;flex-wrap:wrap;';
       const remainBtn = document.createElement('button');
-      remainBtn.textContent = 'Remain here';
+      remainBtn.textContent = t('campaign.complete.remainHere');
       remainBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#7ed321;`;
       remainBtn.addEventListener('click', () => modal.remove());
       const menuBtn = document.createElement('button');
-      menuBtn.textContent = 'Main Menu';
+      menuBtn.textContent = t('campaign.complete.mainMenu');
       menuBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#aaa;`;
       menuBtn.addEventListener('click', () => { modal.remove(); this._callbacks.showLevelSelect(); });
       btnRow.appendChild(menuBtn);
@@ -1182,17 +1182,17 @@ export class CampaignManager {
     box.appendChild(iconEl);
 
     const titleEl = document.createElement('h2');
-    titleEl.textContent = 'Level mastered!';
+    titleEl.textContent = t('campaign.chapterMastery.title');
     titleEl.style.cssText = 'color:#f0c040;margin:0 0 10px;font-size:1.5rem;';
     box.appendChild(titleEl);
 
     const msgEl = document.createElement('p');
-    msgEl.textContent = 'This chapter is 100% complete!';
+    msgEl.textContent = t('campaign.chapterMastery.message');
     msgEl.style.cssText = 'color:#eee;font-size:1rem;margin:0 0 20px;';
     box.appendChild(msgEl);
 
     const congratsBtn = document.createElement('button');
-    congratsBtn.textContent = 'Congrats!';
+    congratsBtn.textContent = t('campaign.chapterMastery.button');
     congratsBtn.style.cssText =
       `padding:10px 28px;font-size:1rem;border-radius:${RADIUS_MD};cursor:pointer;` +
       'background:#1a3a10;border:1px solid #f0c040;color:#f0c040;';
@@ -1298,13 +1298,13 @@ export class CampaignManager {
     const btnStyle = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid;margin:4px;`;
 
     const remainBtn = document.createElement('button');
-    remainBtn.textContent = 'Remain here';
+    remainBtn.textContent = t('campaign.complete.remainHere');
     remainBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#7ed321;`;
     remainBtn.addEventListener('click', () => { modal.remove(); });
 
     const menuBtn = document.createElement('button');
     const hasCampaignMap = !!campaign.grid;
-    menuBtn.textContent = hasCampaignMap ? 'Campaign Map' : 'Main Menu';
+    menuBtn.textContent = hasCampaignMap ? t('campaign.complete.campaignMap') : t('campaign.complete.mainMenu');
     menuBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#aaa;`;
     menuBtn.addEventListener('click', () => {
       modal.remove();
@@ -1320,7 +1320,7 @@ export class CampaignManager {
 
     if (nextChapter) {
       const nextBtn = document.createElement('button');
-      nextBtn.textContent = 'Next Chapter →';
+      nextBtn.textContent = t('campaign.complete.nextChapter');
       nextBtn.style.cssText = btnStyle + 'background:#1a3a10;border-color:#7ed321;color:#7ed321;';
       nextBtn.addEventListener('click', () => {
         modal.remove();
