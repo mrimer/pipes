@@ -287,7 +287,7 @@ export interface TileDef {
  * Visual style for a level or chapter map, controlling the default empty floor
  * tile type (and associated tree colors).
  * - 'Grass'  → green (default)
- * - 'Fall'   → warm autumn brown (formerly 'Dirt')
+ * - 'Fall'   → warm autumn brown
  * - 'Dark'   → dark blue-green
  * - 'Winter' → off-white snowy
  * - 'Spring' → pale chartreuse/green spring
