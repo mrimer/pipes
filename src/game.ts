@@ -65,7 +65,7 @@ import { hasDuplicateAutoRecording } from './autoRecording';
 import { t } from './i18n';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
-const ERROR_DISPLAY_MS = 2000;
+const ERROR_DISPLAY_MS = 3000;
 /** Delay (ms) after the win-level sfx before playing the star sfx and sparkles. */
 const STAR_SFX_DELAY_MS = 500;
 /** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
