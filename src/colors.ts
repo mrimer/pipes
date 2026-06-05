@@ -42,11 +42,11 @@ export const CHAMBER_FILL_COLOR      = '#1c2e3a';
 export const CHAMBER_FILL_WATER_COLOR = '#2a3f4f';
 export const GRANITE_COLOR           = '#9ca3af';
 export const GRANITE_FILL_COLOR      = '#374151';
-/** Border/line color for Tree tiles (dark green outline) — Grass style. */
+/** Border/line color for Tree tiles (dark green outline) — Summer style. */
 export const TREE_COLOR              = '#2d6e1a';
-/** Leaf canopy fill color for Tree tiles (medium green) — Grass style. */
+/** Leaf canopy fill color for Tree tiles (medium green) — Summer style. */
 export const TREE_LEAF_COLOR         = '#3a8c24';
-/** Secondary leaf cluster color for Tree tiles (lighter green) — Grass style. */
+/** Secondary leaf cluster color for Tree tiles (lighter green) — Summer style. */
 export const TREE_LEAF_ALT_COLOR     = '#56b03a';
 /** Trunk color for Tree tiles (warm brown). */
 export const TREE_TRUNK_COLOR        = '#6b3a2a';
@@ -79,11 +79,11 @@ export const TREE_SHADOW_COLOR       = 'rgba(0,0,0,0.22)';
 
 // ─── Tree 2 colors ────────────────────────────────────────────────────────────
 
-/** Border/line color for Tree 2 tiles — Grass/Summer style (dark warm pink). */
+/** Border/line color for Tree 2 tiles — Summer style (dark warm pink). */
 export const TREE2_COLOR              = '#901030';
-/** Leaf canopy fill color for Tree 2 tiles — Grass/Summer style (hot pink). */
+/** Leaf canopy fill color for Tree 2 tiles — Summer style (hot pink). */
 export const TREE2_LEAF_COLOR         = '#d84060';
-/** Secondary leaf cluster color for Tree 2 tiles — Grass/Summer style (bright pink). */
+/** Secondary leaf cluster color for Tree 2 tiles — Summer style (bright pink). */
 export const TREE2_LEAF_ALT_COLOR     = '#f06080';
 /** Border/line color for Tree 2 tiles — Fall style (dark gold). */
 export const TREE2_FALL_COLOR         = '#806010';
@@ -112,11 +112,11 @@ export const TREE2_SPRING_LEAF_ALT_COLOR = '#70c050';
 
 // ─── Tree 3 colors ────────────────────────────────────────────────────────────
 
-/** Border/line color for Tree 3 tiles — Grass/Summer style (dark purple). */
+/** Border/line color for Tree 3 tiles — Summer style (dark purple). */
 export const TREE3_COLOR              = '#502080';
-/** Leaf canopy fill color for Tree 3 tiles — Grass/Summer style (purple). */
+/** Leaf canopy fill color for Tree 3 tiles — Summer style (purple). */
 export const TREE3_LEAF_COLOR         = '#8840c0';
-/** Secondary leaf cluster color for Tree 3 tiles — Grass/Summer style (bright purple). */
+/** Secondary leaf cluster color for Tree 3 tiles — Summer style (bright purple). */
 export const TREE3_LEAF_ALT_COLOR     = '#b060e0';
 /** Border/line color for Tree 3 tiles — Fall style (dark orange-brown). */
 export const TREE3_FALL_COLOR         = '#803010';
@@ -145,11 +145,11 @@ export const TREE3_SPRING_LEAF_ALT_COLOR = '#e0c8f8';
 
 // ─── Tree 4 colors ────────────────────────────────────────────────────────────
 
-/** Border/line color for Tree 4 tiles — Grass/Summer style (dark gold). */
+/** Border/line color for Tree 4 tiles — Summer style (dark gold). */
 export const TREE4_COLOR              = '#806000';
-/** Leaf canopy fill color for Tree 4 tiles — Grass/Summer style (yellow). */
+/** Leaf canopy fill color for Tree 4 tiles — Summer style (yellow). */
 export const TREE4_LEAF_COLOR         = '#d4b820';
-/** Secondary leaf cluster color for Tree 4 tiles — Grass/Summer style (bright yellow). */
+/** Secondary leaf cluster color for Tree 4 tiles — Summer style (bright yellow). */
 export const TREE4_LEAF_ALT_COLOR     = '#f0d040';
 /** Border/line color for Tree 4 tiles — Fall style (dark red). */
 export const TREE4_FALL_COLOR         = '#600808';
