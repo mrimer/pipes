@@ -21,6 +21,7 @@ import { CampaignEditor } from '../src/campaignEditor';
 import type { CampaignDef, LevelDef, TileDef, InventoryItem, ChapterDef } from '../src/types';
 import { PipeShape } from '../src/types';
 import type { TileParams, EditorPalette, EditorSnapshot } from '../src/campaignEditor/types';
+import * as editorRenderer from '../src/campaignEditor/renderer';
 import { DecompressionStream } from 'node:stream/web';
 import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
 
@@ -2210,6 +2211,23 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     // Tile moved from (0,0) to (0,1).
     expect(newSnapshot.grid[0][0]).toBeNull();
     expect(newSnapshot.grid[0][1]?.shape).toBe(PipeShape.Straight);
+  });
+
+  it('renders linked-tile highlight at drag destination while dragging linked tiles', () => {
+    const renderSpy = jest.spyOn(editorRenderer, 'renderEditorCanvas');
+    const state = makePlaceEditor(makeLevel(4, 4));
+    state._state.grid[0][0] = { shape: PipeShape.Chamber, chamberContent: 'item' };
+    state._state._linkedTilePos = { row: 0, col: 0 };
+
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32));
+
+    const lastCall = renderSpy.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    expect(lastCall?.[5]).toMatchObject({ toPos: { row: 0, col: 1 } });
+    expect(lastCall?.[6]).toEqual({ row: 0, col: 1 });
+
+    renderSpy.mockRestore();
   });
 });
 

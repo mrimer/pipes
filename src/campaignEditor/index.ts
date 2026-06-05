@@ -1284,6 +1284,12 @@ export class CampaignEditor {
 
     let overlay: HoverOverlay | null = null;
     const drag: DragState | null = this._editorInput?.dragState ?? null;
+    const linkedTilePos = drag &&
+      this._state.linkedTilePos &&
+      this._state.linkedTilePos.row === drag.fromPos.row &&
+      this._state.linkedTilePos.col === drag.fromPos.col
+      ? drag.toPos
+      : this._state.linkedTilePos;
 
     if (!drag && this._state.hover) {
       if (this._state.palette === 'erase') {
@@ -1295,7 +1301,7 @@ export class CampaignEditor {
       }
     }
 
-    renderEditorCanvas(ctx, this._state.grid, this._state.rows, this._state.cols, overlay, drag, this._state.linkedTilePos, undefined, undefined, undefined, this._state.levelStyle);
+    renderEditorCanvas(ctx, this._state.grid, this._state.rows, this._state.cols, overlay, drag, linkedTilePos, undefined, undefined, undefined, this._state.levelStyle);
   }
 
   // ─── Editor canvas mouse events ────────────────────────────────────────────

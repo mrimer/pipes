@@ -62,6 +62,35 @@ describe('MapEditorGridState.init', () => {
     expect(s.grid[0][0]?.shape).toBe(PipeShape.Granite);
   });
 
+  it('infers rows/cols from saved grid when dimensions are missing', () => {
+    const s = makeState();
+    const g: (TileDef | null)[][] = [
+      [tile(PipeShape.Source), null, tile(PipeShape.Sink)],
+      [null, tile(PipeShape.Granite), null],
+    ];
+    s.init(undefined, undefined, g);
+    expect(s.rows).toBe(2);
+    expect(s.cols).toBe(3);
+    expect(s.grid[0][0]?.shape).toBe(PipeShape.Source);
+    expect(s.grid[0][2]?.shape).toBe(PipeShape.Sink);
+    expect(s.grid[1][1]?.shape).toBe(PipeShape.Granite);
+  });
+
+  it('pads jagged saved rows with nulls when inferring dimensions', () => {
+    const s = makeState();
+    const g: (TileDef | null)[][] = [
+      [tile(PipeShape.Source)],
+      [null, tile(PipeShape.Sink), null],
+    ];
+    s.init(undefined, undefined, g);
+    expect(s.rows).toBe(2);
+    expect(s.cols).toBe(3);
+    expect(s.grid[0][0]?.shape).toBe(PipeShape.Source);
+    expect(s.grid[0][1]).toBeNull();
+    expect(s.grid[0][2]).toBeNull();
+    expect(s.grid[1][1]?.shape).toBe(PipeShape.Sink);
+  });
+
   it('resets focusedTilePos on re-init', () => {
     const s = makeState();
     s.init(undefined, undefined, undefined);
