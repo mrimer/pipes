@@ -2258,12 +2258,21 @@ export function renderContainerFillAnims(
       }
     }
 
+    // Compute butt-end cap directions the same way the static board render does so
+    // disconnected chamber connector nubs look identical during the animation and after.
+    // Chambers always receive a defined Set (possibly empty) so that arms pointing at
+    // open floor tiles trigger _drawChamberDisconnectedStubs; other container shapes
+    // (Source) use the same nullable result as the normal render path.
+    const buttEndDirs = tile.shape === PipeShape.Chamber
+      ? (_computeButtEndDirs(board, row, col) ?? new Set<Direction>())
+      : _computeButtEndDirs(board, row, col);
+
     ctx.save();
     ctx.beginPath();
     ctx.rect(clipX, clipY, clipW, clipH);
     ctx.clip();
     // Draw the tile in its connected (water) state within the clip region.
-    drawTile(ctx, x, y, tile, true, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain);
+    drawTile(ctx, x, y, tile, true, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
     ctx.restore();
   }
 }
