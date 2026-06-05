@@ -39,6 +39,13 @@ const BACK_WING_INNER_CTRL_X_SCALE = -0.44;
 const BACK_WING_INNER_CTRL_Y_SCALE = 0.16;
 const PERCH_CENTERING_THRESHOLD_PX = 0.1;
 const PERCH_DECORATION_TYPES = new Set<AmbientDecorationType>(['mushroom', 'flower']);
+const EMPTY_PERCH_TILE_SHAPES = new Set<PipeShape>([
+  PipeShape.Empty,
+  PipeShape.EmptyFall,
+  PipeShape.EmptyDark,
+  PipeShape.EmptyWinter,
+  PipeShape.EmptySpring,
+]);
 
 interface ButterflyBoard {
   getTile(pos: GridPos): { shape: PipeShape } | null;
@@ -221,7 +228,10 @@ export class ButterflyField {
     const tile = this._board.getTile({ row, col });
     const decor = this._board.ambientDecorations?.get(`${row},${col}`);
     const decorType = decor?.type;
-    const hasPerchDecor = decorType !== undefined && PERCH_DECORATION_TYPES.has(decorType);
+    const hasPerchDecor = decorType !== undefined
+      && PERCH_DECORATION_TYPES.has(decorType)
+      && tile !== null
+      && EMPTY_PERCH_TILE_SHAPES.has(tile.shape);
     const canPerchHere = hasPerchDecor || tile?.shape === PipeShape.Granite;
     if (!canPerchHere) return false;
     if (hasPerchDecor) {

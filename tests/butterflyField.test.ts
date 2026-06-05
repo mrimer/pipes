@@ -146,6 +146,38 @@ describe('ButterflyField', () => {
     },
   );
 
+  it.each(['flower', 'mushroom'] as const)(
+    'does not land on %s ambient decor when tile is non-empty',
+    (decorType) => {
+      jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(29));
+      jest.spyOn(performance, 'now').mockReturnValue(1000);
+      const field = new ButterflyField();
+      const board = {
+        getTile: () => ({ shape: PipeShape.Straight }),
+        ambientDecorations: new Map([['1,1', { type: decorType }]]),
+      };
+      field.resetForLevel(30, 30, 10, 'Summer', board);
+      field.updateAndRender(createMockCtx(), 1000);
+
+      const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
+      butterfly.x = 15;
+      butterfly.y = 15;
+      butterfly.sizePx = 1;
+      butterfly.heading = 0;
+      butterfly.hasLanded = false;
+      butterfly.isLanded = false;
+      butterfly.segmentStartX = 15;
+      butterfly.segmentStartY = 15;
+      butterfly.segmentStartTime = 1000;
+      butterfly.segmentDistancePx = 0;
+
+      field.updateAndRender(createMockCtx(), 1001);
+
+      expect(butterfly.hasLanded).toBe(false);
+      expect(butterfly.isLanded).toBe(false);
+    },
+  );
+
   it('orients toward perch decor center and lands only after reaching it', () => {
     jest.spyOn(Math, 'random').mockImplementation(createLCGPRNG(29));
     jest.spyOn(performance, 'now').mockReturnValue(1000);
