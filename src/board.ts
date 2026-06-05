@@ -880,26 +880,34 @@ export class Board {
 
     // ── Container-grant constraint check ─────────────────────────────────────
     // Simulate tile removal and verify no inventory count would go below zero.
-    const currentBonuses = this.getContainerBonuses();
+    const filledBefore = this.getFilledPositions();
+    const currentBonuses = this.getContainerBonuses(filledBefore);
+    const projectedInventory = this.inventory.map((item) => ({ ...item }));
+    const projectedIndex = projectedInventory.findIndex((item) => item.shape === tile.shape);
+    if (projectedIndex !== -1) {
+      projectedInventory[projectedIndex].count++;
+    } else {
+      projectedInventory.push({ shape: tile.shape, count: 1 });
+    }
     const savedTile = this.grid[pos.row][pos.col];
     this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+    const filledAfter = this.getFilledPositions();
     const newBonuses = this.getContainerBonuses();
     this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = savedTile; // restore
 
-    for (const [shape, currentBonus] of currentBonuses) {
-      const newBonus = newBonuses.get(shape) ?? 0;
-      if (newBonus < currentBonus) {
-        // `baseCount` may be negative when the player has used more items than were in the
-        // base inventory (drawing on container grants).  After this removal the new effective
-        // count would be `baseCount + newBonus`; block if that would go below zero.
-        const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
-        if (baseCount + newBonus < 0) {
-          const itemPositions = this._getConnectedPositiveItemChamberPositions(shape);
-          return { success: false, error: ERR_CONTAINER_REMOVE, errorTilePositions: itemPositions.length ? itemPositions : undefined };
-        }
-      }
+    const disconnectedPositions = this._getBlockedNegativeContainerDropPositions(
+      this.inventory,
+      projectedInventory,
+      filledBefore,
+      currentBonuses,
+      filledAfter,
+      newBonuses,
+      'disconnectionsOnly',
+    );
+    if (disconnectedPositions) {
+      return { success: false, error: ERR_CONTAINER_REMOVE, errorTilePositions: disconnectedPositions };
     }
 
     // ── Sandstone constraint check ───────────────────────────────────────────
@@ -1084,7 +1092,9 @@ export class Board {
     originalBonuses: Map<PipeShape, number>,
     finalFilled: Set<string>,
     finalBonuses: Map<PipeShape, number>,
+    phase: 'disconnectionsOnly' | 'twoPhase' = 'twoPhase',
   ): GridPos[] | null {
+    const disconnectedBonuses = this._getDisconnectedItemChamberBonuses(originalFilled, finalFilled);
     const shapes = new Set<PipeShape>([
       ...originalInventory.map((item) => item.shape),
       ...finalInventory.map((item) => item.shape),
@@ -1093,17 +1103,23 @@ export class Board {
     ]);
 
     for (const shape of shapes) {
-      const finalCount = finalInventory.find((item) => item.shape === shape)?.count ?? 0;
-      const finalEffective = finalCount + (finalBonuses.get(shape) ?? 0);
-      if (finalEffective >= 0) continue;
-
-      const originalCount = originalInventory.find((item) => item.shape === shape)?.count ?? 0;
-      const originalEffective = originalCount + (originalBonuses.get(shape) ?? 0);
       const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
         shape,
         originalFilled,
         finalFilled,
       );
+      const disconnectionOnlyBonus = (originalBonuses.get(shape) ?? 0) - (disconnectedBonuses.get(shape) ?? 0);
+      const finalCount = finalInventory.find((item) => item.shape === shape)?.count ?? 0;
+      const disconnectionOnlyEffective = finalCount + disconnectionOnlyBonus;
+      if (disconnectionOnlyEffective >= 0) continue;
+      if (phase === 'disconnectionsOnly') {
+        if (disconnectedPositions.length > 0) return disconnectedPositions;
+        continue;
+      }
+
+      const finalEffective = finalCount + (finalBonuses.get(shape) ?? 0);
+      const originalCount = originalInventory.find((item) => item.shape === shape)?.count ?? 0;
+      const originalEffective = originalCount + (originalBonuses.get(shape) ?? 0);
       if (this._isBlockedNegativeContainerDrop(originalEffective, finalEffective, disconnectedPositions)) {
         return disconnectedPositions;
       }
@@ -1136,6 +1152,26 @@ export class Board {
       }
     }
     return disconnectedPositions;
+  }
+
+  /**
+   * Returns the per-shape item bonuses contributed by item chambers that were in
+   * `beforeFilled` but are absent from `afterFilled`.
+   */
+  private _getDisconnectedItemChamberBonuses(
+    beforeFilled: Set<string>,
+    afterFilled: Set<string>,
+  ): Map<PipeShape, number> {
+    const bonuses = new Map<PipeShape, number>();
+    for (const key of beforeFilled) {
+      if (afterFilled.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null) {
+        bonuses.set(tile.itemShape, (bonuses.get(tile.itemShape) ?? 0) + tile.itemCount);
+      }
+    }
+    return bonuses;
   }
 
   /**
@@ -1381,29 +1417,6 @@ export class Board {
       }
     }
     return bonuses;
-  }
-
-  /**
-   * Return the grid positions of connected item-chamber tiles that grant the given shape.
-   * @param shape  - The inventory shape to look for.
-   * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
-   */
-  private _getConnectedPositiveItemChamberPositions(shape: PipeShape, filled?: Set<string>): GridPos[] {
-    const filledSet = filled ?? this.getFilledPositions();
-    const positions: GridPos[] = [];
-    for (const key of filledSet) {
-      const [r, c] = parseKey(key);
-      const t = this.grid[r]?.[c];
-      if (
-        t?.shape === PipeShape.Chamber &&
-        t.chamberContent === 'item' &&
-        t.itemShape === shape &&
-        t.itemCount > 0
-      ) {
-        positions.push({ row: r, col: c });
-      }
-    }
-    return positions;
   }
 
   /**

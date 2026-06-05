@@ -455,6 +455,29 @@ describe('Board.rotateTileBy (container-grant constraint)', () => {
     expect(result.error).toBeUndefined();
     expect(board.grid[0][1].rotation).toBe(180);
   });
+
+  it('allows rotation when disconnected bonuses stay non-negative before a new negative chamber connects', () => {
+    const board = new Board(3, 3);
+    board.source = { row: 1, col: 0 };
+    board.sink = { row: 2, col: 1 };
+    board.grid[0][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, -1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[1][1] = new Tile(PipeShape.Tee, 90); // W-E-S; CW rotation disconnects east and connects north.
+    board.grid[1][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[2][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[2][1] = new Tile(PipeShape.Sink, 0, true);
+    board.grid[2][2] = new Tile(PipeShape.Empty, 0);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
+
+    const result = board.rotateTile({ row: 1, col: 1 });
+
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[1][1].rotation).toBe(180);
+  });
 });
 
 // ─── New: level loading ──────────────────────────────────────────────────────
@@ -2005,6 +2028,29 @@ describe('Board.replaceInventoryTile', () => {
     expect(result.error).toBeUndefined();
     expect(board.grid[1][1].shape).toBe(PipeShape.Elbow);
     expect(board.grid[1][1].rotation).toBe(0);
+  });
+
+  it('allows replacement when disconnected bonuses stay non-negative before a new negative chamber connects', () => {
+    const board = new Board(2, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 5);
+    board.grid[0][1] = new Tile(PipeShape.Straight, 90);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true);
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, -1, null, 'item');
+    board.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][3] = new Tile(PipeShape.Empty, 0);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: -1 }, { shape: PipeShape.Elbow, count: 1 }];
+
+    const result = board.replaceInventoryTile({ row: 0, col: 1 }, PipeShape.Elbow, 180);
+
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[0][1].shape).toBe(PipeShape.Elbow);
+    expect(board.grid[0][1].rotation).toBe(180);
   });
 
   it('allows replacement when new-shape affordability drops to zero only from a newly connected negative chamber', () => {
