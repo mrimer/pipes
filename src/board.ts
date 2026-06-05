@@ -1062,51 +1062,63 @@ export class Board {
         const savedItem = savedInventory.find((it) => it.shape === item.shape);
         const originalCount = savedItem?.count ?? 0;
         const originalEffective = originalCount + (originalBonuses.get(item.shape) ?? 0);
-        // Exception 1: was already negative and didn't get worse.
-        if (originalEffective < 0 && finalEffective >= originalEffective) {
-          continue;
+        const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
+          item.shape,
+          originalFilled ?? new Set<string>(),
+          finalFilled,
+        );
+        if (this._isBlockedNegativeContainerDrop(originalEffective, finalEffective, disconnectedPositions)) {
+          rollback();
+          return {
+            success: false,
+            error: ERR_CONTAINER_REPLACE,
+            errorTilePositions: disconnectedPositions,
+          };
         }
-        // Exception 2: the drop is entirely due to newly-connected negative
-        // containers.  Allowed when no positive-count container for this item
-        // that was reachable with the old tile has become unreachable with the
-        // new tile.
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- originalFilled is set unconditionally in the block above (lines 1056-1061) before this point
-        const positiveContainerDisconnected = [...originalFilled!].some((key) => {
-          if (finalFilled.has(key)) return false;
-          const [r, c] = parseKey(key);
-          const t = this.grid[r]?.[c];
-          return (
-            t?.shape === PipeShape.Chamber &&
-            t.chamberContent === 'item' &&
-            t.itemShape === item.shape &&
-            t.itemCount > 0
-          );
-        });
-        if (!positiveContainerDisconnected) {
-          continue;
-        }
-        rollback();
-        const disconnectedPositions = [...(originalFilled ?? new Set<string>())].flatMap((key) => {
-          if (finalFilled.has(key)) return [];
-          const [r, c] = parseKey(key);
-          const t = this.grid[r]?.[c];
-          if (t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === item.shape && t.itemCount > 0) {
-            return [{ row: r, col: c } as GridPos];
-          }
-          return [];
-        });
-        if (disconnectedPositions.length === 0) {
-          // No positive item chambers were actually disconnected by this replacement.
-          continue;
-        }
-        return {
-          success: false,
-          error: ERR_CONTAINER_REPLACE,
-          errorTilePositions: disconnectedPositions,
-        };
       }
     }
     return null;
+  }
+
+  /**
+   * Returns connected positive item-chamber tiles for `shape` that were present
+   * in `beforeFilled` but are absent in `afterFilled`.
+   */
+  private _getDisconnectedPositiveItemChamberPositions(
+    shape: PipeShape,
+    beforeFilled: Set<string>,
+    afterFilled: Set<string>,
+  ): GridPos[] {
+    const disconnectedPositions: GridPos[] = [];
+    for (const key of beforeFilled) {
+      if (afterFilled.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const t = this.grid[r]?.[c];
+      if (
+        t?.shape === PipeShape.Chamber &&
+        t.chamberContent === 'item' &&
+        t.itemShape === shape &&
+        t.itemCount > 0
+      ) {
+        disconnectedPositions.push({ row: r, col: c });
+      }
+    }
+    return disconnectedPositions;
+  }
+
+  /**
+   * Returns true when a negative effective-count drop must be blocked.
+   * A drop is allowed if it was already negative and did not become worse, or
+   * if no positive-count item chamber for that shape was disconnected.
+   */
+  private _isBlockedNegativeContainerDrop(
+    originalEffective: number,
+    finalEffective: number,
+    disconnectedPositivePositions: GridPos[],
+  ): boolean {
+    if (finalEffective >= 0) return false;
+    if (originalEffective < 0 && finalEffective >= originalEffective) return false;
+    return disconnectedPositivePositions.length > 0;
   }
 
   /**
@@ -1241,24 +1253,33 @@ export class Board {
     const filledBeforeReplace = this.getFilledPositions();
     this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
-    const bonuses = this.getContainerBonuses();
+    const filledWithNewTile = this.getFilledPositions();
+    const bonuses = this.getContainerBonuses(filledWithNewTile);
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
 
     if (effectiveCount <= 0) {
       // Check whether the new shape was available before the replacement (with the old tile
-      // in place).  If it was, the replacement itself is disconnecting the container that
-      // grants the new shape – report that as a user-visible error.
-      this._invalidateFilledCache();
-      this.grid[pos.row][pos.col] = tile; // temporarily restore old tile for bonus check
-      const originalBonuses = this.getContainerBonuses();
+      // in place). If it was, block only when the replacement disconnected positive grants
+      // for that shape; connecting new negative grants is allowed.
+      const originalBonuses = this.getContainerBonuses(filledBeforeReplace);
       const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
-      const errorMsg = originalEffective > 0 ? ERR_CONTAINER_DISCONNECT : undefined;
-      const errorPositions = originalEffective > 0
-        ? this._getConnectedItemChamberPositions(newShape)
-        : undefined;
-      this.inventory = savedInventory;
-      // grid[pos.row][pos.col] is already restored to the old tile above
-      return { success: false, error: errorMsg, errorTilePositions: errorPositions?.length ? errorPositions : undefined };
+      if (originalEffective <= 0) {
+        this.inventory = savedInventory;
+        this._invalidateFilledCache();
+        this.grid[pos.row][pos.col] = tile;
+        return { success: false };
+      }
+      const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
+        newShape,
+        filledBeforeReplace,
+        filledWithNewTile,
+      );
+      if (disconnectedPositions.length > 0) {
+        this.inventory = savedInventory;
+        this._invalidateFilledCache();
+        this.grid[pos.row][pos.col] = tile;
+        return { success: false, error: ERR_CONTAINER_DISCONNECT, errorTilePositions: disconnectedPositions };
+      }
     }
 
     this._spendInventory(newShape);
@@ -2011,29 +2032,16 @@ export class Board {
     for (const item of this.inventory) {
       if (item.count < 0) {
         const bonus = newBonuses.get(item.shape) ?? 0;
-        if (item.count + bonus < 0) {
+        const finalEffective = item.count + bonus;
+        if (finalEffective < 0) {
           const bonusBefore = bonusesBefore.get(item.shape) ?? 0;
-          if (bonus < bonusBefore) {
-            // Invalid move: report disconnected positive item chambers.
-            const disconnectedPositions = [...filledBefore].flatMap((key) => {
-              if (filled.has(key)) return [];
-              const [r, c] = parseKey(key);
-              const t = this.grid[r]?.[c];
-              if (
-                t?.shape === PipeShape.Chamber &&
-                t.chamberContent === 'item' &&
-                t.itemShape === item.shape &&
-                t.itemCount > 0
-              ) {
-                return [{ row: r, col: c } as GridPos];
-              }
-              return [];
-            });
-            if (disconnectedPositions.length === 0) {
-              // No positive grants disconnected: move is allowed.
-              // (Negative grants might have been connected, which is fine.)
-              continue;
-            }
+          const originalEffective = item.count + bonusBefore;
+          const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
+            item.shape,
+            filledBefore,
+            filled,
+          );
+          if (this._isBlockedNegativeContainerDrop(originalEffective, finalEffective, disconnectedPositions)) {
             for (let i = 0; i < 4 - normalizedSteps; i++) {
               tile.rotate();
             }
