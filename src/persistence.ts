@@ -22,16 +22,19 @@ const CAMPAIGNS_STORAGE_KEY = 'pipes_campaigns';
  *   - level.hint → level.hints            (deprecated single-string field folded into array)
  *   - tile shape 'EMPTY_DIRT' → 'EMPTY_FALL'  (renamed in the v2026-04 refactor)
  *   - style 'Dirt' → 'Fall'               (renamed in the v2026-04 refactor)
+ *   - style 'Grass' → 'Summer'            (renamed in the v2026-06 refactor)
  */
 export function migrateCampaign(campaign: CampaignDef): CampaignDef {
   // Migrate campaign-level style
   const campaignRec = campaign as unknown as Record<string, unknown>;
   if (campaignRec['style'] === 'Dirt') campaignRec['style'] = 'Fall';
+  if (campaignRec['style'] === 'Grass') campaignRec['style'] = 'Summer';
 
   for (const chapter of campaign.chapters) {
     // Migrate chapter-level style
     const chapterRec = chapter as unknown as Record<string, unknown>;
     if (chapterRec['style'] === 'Dirt') chapterRec['style'] = 'Fall';
+    if (chapterRec['style'] === 'Grass') chapterRec['style'] = 'Summer';
 
     // Migrate chapter map grid tile shapes
     if (chapter.grid) {
@@ -48,6 +51,7 @@ export function migrateCampaign(campaign: CampaignDef): CampaignDef {
       // Migrate level-level style
       const levelRec = level as unknown as Record<string, unknown>;
       if (levelRec['style'] === 'Dirt') levelRec['style'] = 'Fall';
+      if (levelRec['style'] === 'Grass') levelRec['style'] = 'Summer';
 
       // Migrate deprecated single-string `hint` to the `hints` array.
       if (typeof levelRec['hint'] === 'string') {

@@ -60,7 +60,7 @@ describe('FireflyField', () => {
 
   it('does not spawn fireflies on non-dark levels', () => {
     const field = new FireflyField();
-    field.resetForLevel(20, 10, 1, 'Grass');
+    field.resetForLevel(20, 10, 1, 'Summer');
     expect((field as unknown as FireflyInternals)._fireflies).toHaveLength(0);
   });
 

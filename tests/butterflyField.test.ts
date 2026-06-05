@@ -69,7 +69,7 @@ describe('ButterflyField', () => {
     const ctx = createMockCtx();
 
     // 100x100 at 10 px per tile => 10x10 tiles => 100 / 25 => 4 butterflies.
-    field.resetForLevel(100, 100, 10, 'Grass', null);
+    field.resetForLevel(100, 100, 10, 'Summer', null);
 
     expect((field as unknown as ButterflyInternals)._butterflies).toHaveLength(0);
     field.updateAndRender(ctx, 1000);
@@ -93,7 +93,7 @@ describe('ButterflyField', () => {
     const board = {
       getTile: () => ({ shape: PipeShape.Granite }),
     };
-    field.resetForLevel(30, 30, 10, 'Grass', board);
+    field.resetForLevel(30, 30, 10, 'Summer', board);
     field.updateAndRender(createMockCtx(), 1000);
 
     const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
@@ -124,7 +124,7 @@ describe('ButterflyField', () => {
         getTile: () => ({ shape: PipeShape.Empty }),
         ambientDecorations: new Map([['1,1', { type: decorType }]]),
       };
-      field.resetForLevel(30, 30, 10, 'Grass', board);
+      field.resetForLevel(30, 30, 10, 'Summer', board);
       field.updateAndRender(createMockCtx(), 1000);
 
       const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
@@ -154,7 +154,7 @@ describe('ButterflyField', () => {
       getTile: () => ({ shape: PipeShape.Empty }),
       ambientDecorations: new Map([['1,1', { type: 'flower' as const, offsetX: 0.8, offsetY: 0.2 }]]),
     };
-    field.resetForLevel(30, 30, 10, 'Grass', board);
+    field.resetForLevel(30, 30, 10, 'Summer', board);
     field.updateAndRender(createMockCtx(), 1000);
 
     const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
@@ -199,7 +199,7 @@ describe('ButterflyField', () => {
       getTile: () => ({ shape: PipeShape.Empty }),
       ambientDecorations: new Map([['1,1', { type: 'flower' as const, offsetX: 0.8, offsetY: 0.2 }]]),
     };
-    field.resetForLevel(30, 30, 10, 'Grass', board);
+    field.resetForLevel(30, 30, 10, 'Summer', board);
     field.updateAndRender(createMockCtx(), 1000);
 
     const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
@@ -232,7 +232,7 @@ describe('ButterflyField', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new ButterflyField();
-    field.resetForLevel(20, 20, 10, 'Grass', null);
+    field.resetForLevel(20, 20, 10, 'Summer', null);
     field.updateAndRender(createMockCtx(), 1000);
 
     const before = (field as unknown as ButterflyInternals)._butterflies[0];
@@ -250,7 +250,7 @@ describe('ButterflyField', () => {
     jest.spyOn(Math, 'random').mockImplementation(createSequencePRNG([0, 0.01, 0.5, 1, 0, 1, 0, 0.5, 0.5]));
     jest.spyOn(performance, 'now').mockReturnValue(1000);
     const field = new ButterflyField();
-    field.resetForLevel(20, 20, 10, 'Grass', null);
+    field.resetForLevel(20, 20, 10, 'Summer', null);
     field.updateAndRender(createMockCtx(), 1000);
 
     const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];
@@ -285,7 +285,7 @@ describe('ButterflyField', () => {
           0.5,
         ]));
         const field = new ButterflyField();
-        field.resetForLevel(20, 20, 10, 'Grass', null);
+        field.resetForLevel(20, 20, 10, 'Summer', null);
         field.updateAndRender(createMockCtx(), 1000);
 
         const butterfly = (field as unknown as ButterflyInternals)._butterflies[0];

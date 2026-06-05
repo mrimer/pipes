@@ -648,6 +648,10 @@ export class CampaignEditor {
     if (!isOfficial) {
       toolbar.appendChild(this._btn(t('editor.toolbar.export'), UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
       toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => {
+        if (this._service.remapLegacyGrassStyles(campaign)) {
+          this._service.touch(campaign);
+          this._service.save();
+        }
         // If no authorGuid is set, try to match by author name across all profiles.
         if (!campaign.authorGuid) {
           const allMetas = loadAllSlotMetas();

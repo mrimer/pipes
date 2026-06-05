@@ -115,7 +115,7 @@ export const EMPTY_FLOOR_SHAPES: readonly PipeShape[] = [
 ];
 
 /**
- * Returns true when shape is any empty floor type (Grass, Fall, Dark, Winter, or Spring).
+ * Returns true when shape is any empty floor type (Summer, Fall, Dark, Winter, or Spring).
  * Use this instead of `=== PipeShape.Empty` for all game-rule checks so that
  * future empty floor types require no additional code changes.
  */
@@ -302,7 +302,7 @@ const DECORATION_DENSITY = 0.30;
 /**
  * Return the decoration types appropriate for the given empty floor type.
  *
- * - **Grass** (Empty):     flowers, grass tufts, mushrooms — organic surface.
+ * - **Summer** (Empty):    flowers, grass tufts, mushrooms — organic surface.
  * - **Fall** (EmptyFall):  grass tufts, pebbles, dandelions, sunflowers, leaves — warm autumn surface.
  * - **Dark** (EmptyDark):  pebbles only — stone-like surface.
  * - **Winter** (EmptyWinter): pebbles and crystals — icy, snow-covered surface.
@@ -318,7 +318,7 @@ function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] 
     case PipeShape.EmptyDark:   return ['mushroom', 'crystal', 'pebbles'];
     case PipeShape.EmptyWinter: return ['pebbles', 'crystal'];
     case PipeShape.EmptySpring: return ['flower', 'grass'];
-    default:                  return ['flower', 'grass', 'mushroom'];  // Empty / grass
+    default:                  return ['flower', 'grass', 'mushroom'];  // Empty / Summer
   }
 }
 
@@ -330,7 +330,7 @@ function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] 
  *
  * @param getFloorType - Optional callback that returns the floor type for a cell.
  *   When provided, only decoration types appropriate for that floor type are
- *   generated (see {@link decorationTypesForFloor}).  Defaults to grass (Empty)
+ *   generated (see {@link decorationTypesForFloor}).  Defaults to Summer (Empty)
  *   for every cell when omitted.
  */
 export function generateAmbientDecorations(

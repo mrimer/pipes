@@ -985,7 +985,7 @@ function _seaParseHex(hex: string): [number, number, number] {
  * @param neighbors Which adjacent cells are also sea tiles (or outside the grid).
  * @param fillColor Optional base fill color (hex '#rrggbb') for the style-specific water tint.
  *                  When provided the oscillation is centered on this color; when absent the
- *                  default Grass-style blue is used.
+ *                  default Summer-style blue is used.
  */
 export function drawSea(
   ctx: CanvasRenderingContext2D,
@@ -2437,7 +2437,7 @@ function _renderPass2NonPipeTiles(
 
       // Derive the per-tile level style from the inferred floor shape for tiles that
       // render style-dependent visuals (e.g. Tree leaf colors).  Falls back to the
-      // overall board style when the inferred floor shape is the default (Empty/Grass).
+      // overall board style when the inferred floor shape is the default (Empty/Summer).
       const tileStyle = (inferredFloorShape !== undefined ? floorShapeToStyle(inferredFloorShape) : undefined) ?? board.style;
 
       // For the sink tile, build an overlay callback that renders the vortex effect

@@ -287,7 +287,7 @@ export class ChapterMapInput {
         this._cb.clearFocusIfAt(pos);
         this._cb.rebuildLevelInventory(chapter, campaign);
       } else if (palette === PipeShape.Empty) {
-        // Empty-Grass palette: clear to null
+        // Empty-Summer palette: clear to null
         if (existingTile !== null) sfxManager.play(SfxId.Delete);
         this._cb.getEditGrid()[pos.row][pos.col] = null;
         this._cb.clearFocusIfAt(pos);
