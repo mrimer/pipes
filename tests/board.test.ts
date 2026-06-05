@@ -343,6 +343,21 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     return board;
   }
 
+  function makeMixedGrantRotateBoard(baseCount: number): Board {
+    const board = new Board(2, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 1, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Tee, 90); // W-E-S; CW rotation disconnects only the east chamber.
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 2, null, 'item');
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, -1, null, 'item');
+    board.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: baseCount }];
+    return board;
+  }
+
   it('allows rotation when the rotated pipe type inventory is negative and no required grant is disconnected', () => {
     const board = makeRotateConstraintBoard();
     // Straight at (0,3) rotates 90°→180° (E-W → N-S). This disconnects sink-side flow
@@ -355,7 +370,7 @@ describe('Board.rotateTile (container-grant constraint)', () => {
 
   it('allows rotation when no container grants have been used (count ≥ 0)', () => {
     // Same board structure but inventory count is 0 (no overdraft from grants).
-    // The container-grant guard only fires for item.count < 0, so this rotation is allowed.
+    // Disconnecting the chamber still leaves the effective count non-negative, so the rotation is allowed.
     const board = makeRotateConstraintBoard();
     board.inventory = [{ shape: PipeShape.Straight, count: 0 }];
     // Rotating Straight(0,1) E-W → N-S disconnects the container, but since
@@ -373,6 +388,17 @@ describe('Board.rotateTile (container-grant constraint)', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBeDefined();
     // Tile must be restored to original rotation (90°).
+    expect(board.grid[0][1].rotation).toBe(90);
+  });
+
+  it('blocks rotation when disconnecting a positive grant makes a previously non-negative count go negative', () => {
+    const board = makeMixedGrantRotateBoard(0);
+
+    const result = board.rotateTile({ row: 0, col: 1 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
     expect(board.grid[0][1].rotation).toBe(90);
   });
 });
@@ -876,6 +902,21 @@ describe('Board.placeInventoryTile (with container grants)', () => {
 // ─── New: reclaimTile inventory constraint ────────────────────────────────────
 
 describe('Board.reclaimTile (inventory constraint)', () => {
+  function makeMixedGrantDisconnectBoard(baseCount: number): Board {
+    const board = new Board(2, 3);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 1, col: 2 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true);
+    board.grid[0][1] = new Tile(PipeShape.Tee, 90); // W-E-S
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 2, null, 'item');
+    board.grid[1][0] = new Tile(PipeShape.Empty, 0);
+    board.grid[1][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, -1, null, 'item');
+    board.grid[1][2] = new Tile(PipeShape.Empty, 0);
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: baseCount }];
+    return board;
+  }
+
   /**
    * Build a 1×4 board: Source(0) → Chamber(1, item, grants 1 Straight) → Empty(2) → Sink(3).
    * Chamber is connected from the start, so the player can use the grant immediately.
@@ -925,6 +966,17 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     expect(result.error).toBeDefined();
     // The tile must still be in place
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+  });
+
+  it('highlights only positive item chambers for disconnect grant errors', () => {
+    const board = makeMixedGrantDisconnectBoard(-1);
+
+    const result = board.reclaimTile({ row: 0, col: 1 });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
+    expect(board.grid[0][1].shape).toBe(PipeShape.Tee);
   });
 
   it('allows reclaiming the piece that used the grant (chamber remains connected)', () => {

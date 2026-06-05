@@ -896,7 +896,7 @@ export class Board {
         // count would be `baseCount + newBonus`; block if that would go below zero.
         const baseCount = this.inventory.find((it) => it.shape === shape)?.count ?? 0;
         if (baseCount + newBonus < 0) {
-          const itemPositions = this._getConnectedItemChamberPositions(shape);
+          const itemPositions = this._getConnectedPositiveItemChamberPositions(shape);
           return { success: false, error: ERR_CONTAINER_REMOVE, errorTilePositions: itemPositions.length ? itemPositions : undefined };
         }
       }
@@ -1042,41 +1042,73 @@ export class Board {
     finalBonuses: Map<PipeShape, number>,
     rollback: () => void,
   ): MoveResult | null {
-    let originalBonuses: Map<PipeShape, number> | undefined;
-    let originalFilled: Set<string> | undefined;
+    const hasNegativeEffectiveCount = this.inventory.some((item) => item.count + (finalBonuses.get(item.shape) ?? 0) < 0);
+    if (!hasNegativeEffectiveCount) return null;
 
-    for (const item of this.inventory) {
-      const bonus = finalBonuses.get(item.shape) ?? 0;
-      const finalEffective = item.count + bonus;
-      if (finalEffective < 0) {
-        if (!originalBonuses) {
-          // Temporarily restore the old tile to compute the fill and bonuses as
-          // they were before this replacement, then put the new tile back.
-          this._invalidateFilledCache();
-          this.grid[pos.row][pos.col] = tile;
-          originalFilled = this.getFilledPositions();
-          originalBonuses = this.getContainerBonuses(originalFilled);
-          this._invalidateFilledCache();
-          this.grid[pos.row][pos.col] = newTileRef;
-        }
-        const savedItem = savedInventory.find((it) => it.shape === item.shape);
-        const originalCount = savedItem?.count ?? 0;
-        const originalEffective = originalCount + (originalBonuses.get(item.shape) ?? 0);
-        const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
-          item.shape,
-          originalFilled ?? new Set<string>(),
-          finalFilled,
-        );
-        if (this._isBlockedNegativeContainerDrop(originalEffective, finalEffective, disconnectedPositions)) {
-          rollback();
-          return {
-            success: false,
-            error: ERR_CONTAINER_REPLACE,
-            errorTilePositions: disconnectedPositions,
-          };
-        }
+    // Temporarily restore the old tile to compute the fill and bonuses as
+    // they were before this replacement, then put the new tile back.
+    this._invalidateFilledCache();
+    this.grid[pos.row][pos.col] = tile;
+    const originalFilled = this.getFilledPositions();
+    const originalBonuses = this.getContainerBonuses(originalFilled);
+    this._invalidateFilledCache();
+    this.grid[pos.row][pos.col] = newTileRef;
+
+    const disconnectedPositions = this._getBlockedNegativeContainerDropPositions(
+      savedInventory,
+      this.inventory,
+      originalFilled,
+      originalBonuses,
+      finalFilled,
+      finalBonuses,
+    );
+    if (disconnectedPositions) {
+      rollback();
+      return {
+        success: false,
+        error: ERR_CONTAINER_REPLACE,
+        errorTilePositions: disconnectedPositions,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Returns the disconnected positive-count item chambers for the first shape
+   * whose effective inventory count drops below zero in a blocked way.
+   */
+  private _getBlockedNegativeContainerDropPositions(
+    originalInventory: Array<{ shape: PipeShape; count: number }>,
+    finalInventory: Array<{ shape: PipeShape; count: number }>,
+    originalFilled: Set<string>,
+    originalBonuses: Map<PipeShape, number>,
+    finalFilled: Set<string>,
+    finalBonuses: Map<PipeShape, number>,
+  ): GridPos[] | null {
+    const shapes = new Set<PipeShape>([
+      ...originalInventory.map((item) => item.shape),
+      ...finalInventory.map((item) => item.shape),
+      ...originalBonuses.keys(),
+      ...finalBonuses.keys(),
+    ]);
+
+    for (const shape of shapes) {
+      const finalCount = finalInventory.find((item) => item.shape === shape)?.count ?? 0;
+      const finalEffective = finalCount + (finalBonuses.get(shape) ?? 0);
+      if (finalEffective >= 0) continue;
+
+      const originalCount = originalInventory.find((item) => item.shape === shape)?.count ?? 0;
+      const originalEffective = originalCount + (originalBonuses.get(shape) ?? 0);
+      const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
+        shape,
+        originalFilled,
+        finalFilled,
+      );
+      if (this._isBlockedNegativeContainerDrop(originalEffective, finalEffective, disconnectedPositions)) {
+        return disconnectedPositions;
       }
     }
+
     return null;
   }
 
@@ -1356,13 +1388,18 @@ export class Board {
    * @param shape  - The inventory shape to look for.
    * @param filled - Optional pre-computed fill set (avoids a second flood-fill).
    */
-  private _getConnectedItemChamberPositions(shape: PipeShape, filled?: Set<string>): GridPos[] {
+  private _getConnectedPositiveItemChamberPositions(shape: PipeShape, filled?: Set<string>): GridPos[] {
     const filledSet = filled ?? this.getFilledPositions();
     const positions: GridPos[] = [];
     for (const key of filledSet) {
       const [r, c] = parseKey(key);
       const t = this.grid[r]?.[c];
-      if (t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === shape) {
+      if (
+        t?.shape === PipeShape.Chamber &&
+        t.chamberContent === 'item' &&
+        t.itemShape === shape &&
+        t.itemCount > 0
+      ) {
         positions.push({ row: r, col: c });
       }
     }
@@ -2029,27 +2066,20 @@ export class Board {
     // container grant for that shape by disconnecting positive grants
     // (i.e., and not simply connecting negative grants).
     const newBonuses = this.getContainerBonuses(filled);
-    for (const item of this.inventory) {
-      if (item.count < 0) {
-        const bonus = newBonuses.get(item.shape) ?? 0;
-        const finalEffective = item.count + bonus;
-        if (finalEffective < 0) {
-          const bonusBefore = bonusesBefore.get(item.shape) ?? 0;
-          const originalEffective = item.count + bonusBefore;
-          const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
-            item.shape,
-            filledBefore,
-            filled,
-          );
-          if (this._isBlockedNegativeContainerDrop(originalEffective, finalEffective, disconnectedPositions)) {
-            for (let i = 0; i < 4 - normalizedSteps; i++) {
-              tile.rotate();
-            }
-            this._invalidateFilledCache();
-            return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
-          }
-        }
+    const disconnectedPositions = this._getBlockedNegativeContainerDropPositions(
+      this.inventory,
+      this.inventory,
+      filledBefore,
+      bonusesBefore,
+      filled,
+      newBonuses,
+    );
+    if (disconnectedPositions) {
+      for (let i = 0; i < 4 - normalizedSteps; i++) {
+        tile.rotate();
       }
+      this._invalidateFilledCache();
+      return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
     }
 
     // Regulator post-turn check: re-validate newly-connecting regulators using
