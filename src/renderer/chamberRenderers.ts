@@ -232,7 +232,7 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
       const offset = (Date.now() % HEATER_SCROLL_MS) / HEATER_SCROLL_MS * lineSpacing;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(lineLeft, topY - _s(3), lineSpan, numLines * lineSpacing + _s(3));
+      ctx.rect(lineLeft, topY, lineSpan, numLines * lineSpacing);
       ctx.clip();
       // Draw numLines+3 lines: k=-1 starts one lineSpacing above topY so the
       // exiting sliver at the clip top is always present throughout the cycle
