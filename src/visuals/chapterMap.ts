@@ -24,6 +24,7 @@ import { tileDefConnections, type ViewBounds } from '../mapUtils';
 import { renderMinimap, minimapDimensions } from './minimap';
 import type { FlowDrop} from './waterParticles';
 import { drawFlowDrop, FLOW_DROP_SPEED } from './waterParticles';
+import { t } from '../i18n';
 
 export type { ViewBounds };
 
@@ -355,7 +356,7 @@ export function drawLevelChamberTile(
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#888';
-      ctx.fillText('?', cx, contentY + contentH / 2);
+      ctx.fillText(t('map.unknownLevel'), cx, contentY + contentH / 2);
       ctx.restore();
     }
   } else {

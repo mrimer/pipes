@@ -1,5 +1,5 @@
 import type { MoveResult} from './board';
-import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD_PREFIX, ERR_REGULATOR_CHECK_PREFIX, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
+import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
 import type { Tile } from './tile';
 import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
 import { GameScreen, GameState, PipeShape } from './types';
@@ -852,7 +852,7 @@ export class Game implements InputCallbacks {
     hints.forEach((hint, idx) => {
       const toggleBtn = document.createElement('button');
       toggleBtn.type = 'button';
-      toggleBtn.textContent = idx === 0 ? '💡 Show Hint' : '💡 Show Next Hint';
+      toggleBtn.textContent = idx === 0 ? t('game.hint.show') : t('game.hint.showNext');
       toggleBtn.style.cssText = HINT_TOGGLE_BTN_STYLE;
 
       const textEl = document.createElement('div');
@@ -863,9 +863,9 @@ export class Game implements InputCallbacks {
         const isHidden = textEl.style.display === 'none';
         textEl.style.display = isHidden ? 'block' : 'none';
         if (idx === 0) {
-          toggleBtn.textContent = isHidden ? '💡 Hide Hint' : '💡 Show Hint';
+          toggleBtn.textContent = isHidden ? t('game.hint.hide') : t('game.hint.show');
         } else {
-          toggleBtn.textContent = isHidden ? '💡 Hide Next Hint' : '💡 Show Next Hint';
+          toggleBtn.textContent = isHidden ? t('game.hint.hideNext') : t('game.hint.showNext');
         }
       });
 
@@ -1147,7 +1147,7 @@ export class Game implements InputCallbacks {
     // Show challenge skull icon on win modal when the completed level is a challenge level
     if (this.winChallengeEl) {
       if (isChallenge) {
-        this.winChallengeEl.textContent = '💀 Challenge level completed!';
+        this.winChallengeEl.textContent = t('game.win.challengeComplete');
         this.winChallengeEl.style.display = 'block';
       } else {
         this.winChallengeEl.style.display = 'none';
@@ -1156,13 +1156,16 @@ export class Game implements InputCallbacks {
     // Show water retained on win modal (always show since water is the core resource)
     if (this.winWaterEl) {
       const isNewBest = previousBest !== undefined && waterRemaining > previousBest;
-      this.winWaterEl.textContent = `💧 ${waterRemaining} water retained${isNewBest ? ' (New Best!)' : ''}`;
+      this.winWaterEl.textContent = t('game.win.waterRetained', {
+        count: waterRemaining,
+        newBest: isNewBest ? ` ${t('game.win.newBest')}` : '',
+      });
       this.winWaterEl.style.display = 'block';
     }
     // Show star count on win modal when at least one star was connected
     if (this.winStarsEl) {
       if (starsCollected > 0) {
-        this.winStarsEl.textContent = `⭐ × ${starsCollected}`;
+        this.winStarsEl.textContent = t('game.win.starCount', { count: starsCollected });
         this.winStarsEl.style.display = 'block';
       } else {
         this.winStarsEl.style.display = 'none';
@@ -1551,15 +1554,15 @@ export class Game implements InputCallbacks {
    */
   handleBoardError(result: MoveResult): void {
     if (!result.error) return;
-    this._showErrorFlash(result.error);
+    this._showErrorFlash(t(result.error, result.errorParams));
     if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       this._startErrorHighlight(result.errorTilePositions);
     }
     if (result.error === ERR_GOLD_SPACE) {
       sfxManager.play(SfxId.Locked);
-    } else if (result.error.startsWith(ERR_SANDSTONE_TOO_HARD_PREFIX)) {
+    } else if (result.error === ERR_SANDSTONE_TOO_HARD) {
       sfxManager.play(SfxId.SandstoneHard);
-    } else if (result.error.startsWith(ERR_REGULATOR_CHECK_PREFIX)) {
+    } else if (result.error === ERR_REGULATOR_CHECK) {
       sfxManager.play(SfxId.BadConnection);
     } else if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       sfxManager.play(SfxId.BadConnection);
@@ -2230,7 +2233,7 @@ export class Game implements InputCallbacks {
     this.levelHeaderEl.innerHTML = '';
     const ptLine1 = document.createElement('div');
     ptLine1.style.cssText = 'font-size:0.9rem;color:#aaa;';
-    ptLine1.textContent = '▶ Playtesting';
+    ptLine1.textContent = t('game.playtesting');
     this.levelHeaderEl.appendChild(ptLine1);
     const ptLine2 = document.createElement('div');
     ptLine2.style.cssText = 'font-size:1rem;color:#f0c040;';

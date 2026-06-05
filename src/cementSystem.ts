@@ -1,6 +1,7 @@
 import type { Tile } from './tile';
 import type { GridPos } from './types';
 import { PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey } from './board';
+import type { TranslationParams } from './i18nTypes';
 
 /**
  * Manages cement-cell state: setting times and the hardening/decrement rules.
@@ -50,7 +51,7 @@ export class CementSystem {
   isHardened(
     pos: GridPos,
     tile?: Tile | null,
-  ): { blocked: false } | { blocked: true; error: string; positions: GridPos[] } {
+  ): { blocked: false } | { blocked: true; error: string; params?: TranslationParams; positions: GridPos[] } {
     const key = posKey(pos.row, pos.col);
     if (!this.data.has(key)) return { blocked: false };
     if (tile !== null && tile !== undefined && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape)) {
@@ -59,7 +60,7 @@ export class CementSystem {
     if (this.data.get(key) === 0) {
       return {
         blocked: true,
-        error: 'Items placed in hardened cement may not be adjusted.',
+        error: 'error.board.cementHardened',
         positions: [pos],
       };
     }

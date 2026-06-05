@@ -5,6 +5,7 @@ import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from './board';
 import type { PipeShape } from './types';
 import { GOLD_PIPE_COLOR, LEAKY_PIPE_COLOR } from './colors';
 import { shapeIcon } from './renderer';
+import { t } from './i18n';
 
 /**
  * Re-render the inventory bar element.
@@ -103,7 +104,7 @@ export function renderInventoryBar(
   if (renderedCount === 0) {
     const noneEl = document.createElement('p');
     noneEl.classList.add('inv-none');
-    noneEl.textContent = 'None';
+    noneEl.textContent = t('inventory.none');
     inventoryBarEl.appendChild(noneEl);
   }
 }

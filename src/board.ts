@@ -6,10 +6,12 @@ import { CementSystem } from './cementSystem';
 import { ConstraintValidator } from './constraintValidator';
 import type { TurnStateSnapshot } from './turnStateManager';
 import { TurnStateManager } from './turnStateManager';
+import type { TranslationParams } from './i18nTypes';
+import { t } from './i18n';
 
 // Re-export cost helpers so existing consumers (game.ts, renderer.ts) need no import changes.
 export { computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
-export { ERR_SANDSTONE_TOO_HARD_PREFIX } from './constraintValidator';
+export { ERR_SANDSTONE_TOO_HARD } from './constraintValidator';
 
 /**
  * Encode a grid row/col pair into the canonical string key used by all internal
@@ -224,41 +226,36 @@ export function computeFloorTypesFromGrid(
 // the same strings without hard-coding them again.
 
 /** Error shown when a non-gold pipe is placed on a gold space. */
-export const ERR_GOLD_SPACE = 'Only gold pipes may be placed on a gold space.';
+export const ERR_GOLD_SPACE = 'error.board.goldSpace';
 
 /** Error shown when removing a tile would disconnect a container and reduce an inventory count below zero. */
 const ERR_CONTAINER_REMOVE =
-  'Cannot remove: disconnecting an item container would reduce an inventory count below 0. ' +
-  'Reconfigure the path first.';
+  'error.board.containerRemove';
 
 /** Error shown when a replacement would disconnect the container that grants the new shape. */
 const ERR_CONTAINER_DISCONNECT =
-  'Cannot replace: placing this pipe would disconnect a container that grants it. ' +
-  'Reconfigure the path first.';
+  'error.board.containerDisconnect';
 
 /** Error shown when replacing a tile would leave placed tiles without covering container grants. */
 const ERR_CONTAINER_REPLACE =
-  'Cannot replace: you have used items granted by a connected container. ' +
-  'Reconfigure the path first.';
+  'error.board.containerReplace';
 
 /** Error shown when rotating a tile would leave placed tiles without covering container grants. */
 const ERR_CONTAINER_ROTATE =
-  'Cannot rotate: you have used items granted by a connected container. ' +
-  'Reconfigure the path first.';
+  'error.board.containerRotate';
 
 /**
  * Error shown when a move would connect to a non-valve side of a chamber
  * before its valve side has been satisfied.
  */
 export const ERR_VALVE =
-  'First connect this tile to the source by its valve';
+  'error.board.valve';
 
 /**
- * Prefix of the error message emitted when a Regulator tile's stat check
- * fails at connection time.  Exported so callers can identify this specific
- * error type without fragile full-string comparisons.
+ * Error key emitted when a Regulator tile's stat check fails at connection
+ * time. Exported so callers can identify this specific error type by equality.
  */
-export const ERR_REGULATOR_CHECK_PREFIX = 'Regulator check failed: ';
+export const ERR_REGULATOR_CHECK = 'error.board.regulatorCheck';
 
 /** Snapshot of the board state (grid + inventory) used for undo/redo. */
 type Snapshot = {
@@ -284,8 +281,10 @@ type Snapshot = {
 export type MoveResult = {
   /** Whether the operation succeeded. */
   success: boolean;
-  /** Human-readable error message when `success` is false, if applicable. */
+  /** Error i18n key when `success` is false, if applicable. */
   error?: string;
+  /** Optional interpolation params for the error i18n key. */
+  errorParams?: TranslationParams;
   /** Grid positions of the tiles that caused the error, if any. */
   errorTilePositions?: GridPos[];
   /**
@@ -876,7 +875,7 @@ export class Board {
     // ── Cement constraint check ───────────────────────────────────────────────
     const cementCheck = this._cement.isHardened(pos);
     if (cementCheck.blocked) {
-      return { success: false, error: cementCheck.error, errorTilePositions: cementCheck.positions };
+      return { success: false, error: cementCheck.error, errorParams: cementCheck.params, errorTilePositions: cementCheck.positions };
     }
 
     // ── Container-grant constraint check ─────────────────────────────────────
@@ -911,7 +910,7 @@ export class Board {
       this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
       const filledAfter = this.getFilledPositions();
-      const { error, positions } = this._validateConstraints(filledAfter);
+      const { error, params, positions } = this._validateConstraints(filledAfter);
       this._invalidateFilledCache();
       this.grid[pos.row][pos.col] = savedTile; // restore regardless
       if (error) {
@@ -928,7 +927,7 @@ export class Board {
             disconnected.push({ row: r, col: c });
           }
         }
-        return { success: false, error, errorTilePositions: disconnected.length ? disconnected : positions ?? undefined };
+        return { success: false, error, errorParams: params ?? undefined, errorTilePositions: disconnected.length ? disconnected : positions ?? undefined };
       }
     }
 
@@ -958,7 +957,7 @@ export class Board {
   private _runRegulatorPreCheck(
     filledBefore: Set<string>,
     filled: Set<string>,
-  ): { error: string | null; positions: GridPos[] | null } {
+  ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     return this._checkRegulators(
       filledBefore,
       filled,
@@ -988,25 +987,25 @@ export class Board {
     rollback: () => void,
     constraintErrorPositions?: (raw: GridPos[] | undefined) => GridPos[] | undefined,
   ): MoveResult | null {
-    const { error: regError, positions: regPositions } = this._runRegulatorPreCheck(filledBefore, finalFilled);
+    const { error: regError, params: regParams, positions: regPositions } = this._runRegulatorPreCheck(filledBefore, finalFilled);
     if (regError) {
       rollback();
-      return { success: false, error: regError, errorTilePositions: regPositions ?? undefined };
+      return { success: false, error: regError, errorParams: regParams ?? undefined, errorTilePositions: regPositions ?? undefined };
     }
 
-    const { error: constraintError, positions: constraintPositions } = this._validateConstraints(finalFilled);
+    const { error: constraintError, params: constraintParams, positions: constraintPositions } = this._validateConstraints(finalFilled);
     if (constraintError) {
       rollback();
       const errorTilePositions = constraintErrorPositions
         ? constraintErrorPositions(constraintPositions ?? undefined)
         : (constraintPositions ?? undefined);
-      return { success: false, error: constraintError, errorTilePositions };
+      return { success: false, error: constraintError, errorParams: constraintParams ?? undefined, errorTilePositions };
     }
 
-    const { error: postRegError, positions: postRegPositions } = this._checkRegulatorsPostTurn(filledBefore, finalFilled);
+    const { error: postRegError, params: postRegParams, positions: postRegPositions } = this._checkRegulatorsPostTurn(filledBefore, finalFilled);
     if (postRegError) {
       rollback();
-      return { success: false, error: postRegError, errorTilePositions: postRegPositions ?? undefined };
+      return { success: false, error: postRegError, errorParams: postRegParams ?? undefined, errorTilePositions: postRegPositions ?? undefined };
     }
 
     return null;
@@ -1210,7 +1209,7 @@ export class Board {
     // ── Cement constraint check ───────────────────────────────────────────────
     const cementCheck = this._cement.isHardened(pos);
     if (cementCheck.blocked) {
-      return { success: false, error: cementCheck.error, errorTilePositions: cementCheck.positions };
+      return { success: false, error: cementCheck.error, errorParams: cementCheck.params, errorTilePositions: cementCheck.positions };
     }
 
     // Gold-space / gold-pipe constraint for the incoming shape
@@ -1581,7 +1580,7 @@ export class Board {
    * @param filled - Current fill set (after the board mutation).
    * @returns The first error message found, or `null` if all constraints pass.
    */
-  private _validateConstraints(filled: Set<string>): { error: string | null; positions: GridPos[] | null } {
+  private _validateConstraints(filled: Set<string>): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     return this._validator.validate(
       filled,
       this._turnState.lockedWaterImpact,
@@ -1616,7 +1615,7 @@ export class Board {
     temperature: number,
     pressure: number,
     frozen: number,
-  ): { error: string | null; positions: GridPos[] | null } {
+  ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     for (const key of newFilled) {
       if (preFilled.has(key)) continue; // skip previously-connected tiles
       const [r, c] = parseKey(key);
@@ -1643,14 +1642,14 @@ export class Board {
       }
 
       if (!passes) {
-        const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
         return {
-          error: `${ERR_REGULATOR_CHECK_PREFIX}${statLabel} ${op} ${threshold}`,
+          error: ERR_REGULATOR_CHECK,
+          params: { stat: t(`stat.${stat}`), op, threshold },
           positions: [{ row: r, col: c }],
         };
       }
     }
-    return { error: null, positions: null };
+    return { error: null, params: null, positions: null };
   }
 
   /**
@@ -1683,7 +1682,7 @@ export class Board {
   private _checkRegulatorsPostTurn(
     preFilled: Set<string>,
     newFilled: Set<string>,
-  ): { error: string | null; positions: GridPos[] | null } {
+  ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     const savedTurnState = this._turnState.captureSnapshot();
     this.applyTurnDelta();
     const result = this._checkRegulators(
@@ -1770,7 +1769,7 @@ export class Board {
    * Call this after {@link initHistory} to detect design-time errors.
    * @returns `{ error, positions }` where `error` is null if the state is valid.
    */
-  checkInitialStateErrors(): { error: string | null; positions: GridPos[] | null } {
+  checkInitialStateErrors(): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     const filled = this.getFilledPositions();
     return this._validator.validate(
       filled,
@@ -1949,7 +1948,7 @@ export class Board {
     // ── Cement constraint check (for player-placed pipe tiles only) ───────────
     const cementCheck = this._cement.isHardened(pos, tile);
     if (cementCheck.blocked) {
-      return { success: false, error: cementCheck.error, errorTilePositions: cementCheck.positions };
+      return { success: false, error: cementCheck.error, errorParams: cementCheck.params, errorTilePositions: cementCheck.positions };
     }
 
     // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
@@ -1978,15 +1977,15 @@ export class Board {
     // Validate the final state.
     const filled = this.getFilledPositions();
     // Regulator pre-check: newly-connecting regulators against pre-rotation stats.
-    const { error: regError3, positions: regPositions3 } = this._runRegulatorPreCheck(filledBefore, filled);
+    const { error: regError3, params: regParams3, positions: regPositions3 } = this._runRegulatorPreCheck(filledBefore, filled);
     if (regError3) {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
       this._invalidateFilledCache();
-      return { success: false, error: regError3, errorTilePositions: regPositions3 ?? undefined };
+      return { success: false, error: regError3, errorParams: regParams3 ?? undefined, errorTilePositions: regPositions3 ?? undefined };
     }
-    const { error: constraintError, positions: constraintPositions } = this._validateConstraints(filled);
+    const { error: constraintError, params: constraintParams, positions: constraintPositions } = this._validateConstraints(filled);
     if (constraintError) {
       // Revert by rotating the remaining steps to complete a full 360°.
       for (let i = 0; i < 4 - normalizedSteps; i++) {
@@ -1996,7 +1995,12 @@ export class Board {
       // Highlight only tiles that are both disconnected by the rotation AND
       // in the constraint-violating positions set.  Falls back to positions
       // when the intersection is empty.
-      return { success: false, error: constraintError, errorTilePositions: this._computeDisconnectedConstraintPositions(filledBefore, filled, constraintPositions) };
+      return {
+        success: false,
+        error: constraintError,
+        errorParams: constraintParams ?? undefined,
+        errorTilePositions: this._computeDisconnectedConstraintPositions(filledBefore, filled, constraintPositions),
+      };
     }
 
     // Validate container-grant constraints: when rotation leaves an inventory item's
@@ -2042,13 +2046,13 @@ export class Board {
 
     // Regulator post-turn check: re-validate newly-connecting regulators using
     // the stats that result after all tiles in this turn have resolved.
-    const { error: postRegError3, positions: postRegPositions3 } = this._checkRegulatorsPostTurn(filledBefore, filled);
+    const { error: postRegError3, params: postRegParams3, positions: postRegPositions3 } = this._checkRegulatorsPostTurn(filledBefore, filled);
     if (postRegError3) {
       for (let i = 0; i < 4 - normalizedSteps; i++) {
         tile.rotate();
       }
       this._invalidateFilledCache();
-      return { success: false, error: postRegError3, errorTilePositions: postRegPositions3 ?? undefined };
+      return { success: false, error: postRegError3, errorParams: postRegParams3 ?? undefined, errorTilePositions: postRegPositions3 ?? undefined };
     }
 
     // Decrement cement setting time after successful rotation.

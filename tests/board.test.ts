@@ -1,4 +1,4 @@
-import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_VALVE, ERR_REGULATOR_CHECK_PREFIX, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
+import { Board, SPIN_PIPE_SHAPES, ERR_GOLD_SPACE, ERR_VALVE, ERR_REGULATOR_CHECK, ERR_SANDSTONE_TOO_HARD, PIPE_SHAPES, LEAKY_PIPE_SHAPES, CROSS_PIPE_SHAPES, posKey } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
 import type { AmbientDecoration } from '../src/types';
 import { Tile } from '../src/tile';
@@ -3395,7 +3395,8 @@ describe('Chamber tile (sandstone content)', () => {
 
     const result = b.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Pressure must exceed Sandstone hardness/);
+    expect(result.error).toBe(ERR_SANDSTONE_TOO_HARD);
+    expect(result.errorParams).toEqual({ pressure: 1, hardness: 2 });
     expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
     // Rollback: inventory and grid unchanged
     expect(b.inventory[0].count).toBe(2);
@@ -4272,7 +4273,8 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
     // Rotation 90 = East-West Straight
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/temperature below 0/i);
+    expect(result.error).toBe('error.constraint.statBelowZero');
+    expect(result.errorParams).toEqual({ constraint: 'Cooler', stat: 'Temperature', value: -5 });
   });
 
   it('placeInventoryTile allows move that connects a Cooler when temp stays >= 0', () => {
@@ -4319,7 +4321,8 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
     // Remove (0,2): positive heater disconnects, temp = 5 + (-10) = -5 < 0 → BLOCKED
     const result = board.reclaimTile({ row: 0, col: 2 });
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/temperature below 0/i);
+    expect(result.error).toBe('error.constraint.statBelowZero');
+    expect(result.errorParams).toEqual({ constraint: 'Cooler', stat: 'Temperature', value: -5 });
   });
 
   it('checkInitialStateErrors returns an error when pre-connected cooler causes temp < 0', () => {
@@ -4327,7 +4330,8 @@ describe('Board heater constraint: negative temperature (Cooler)', () => {
     board.initHistory();
     const error = board.checkInitialStateErrors();
     expect(error.error).not.toBeNull();
-    expect(error.error).toMatch(/temperature below 0/i);
+    expect(error.error).toBe('error.constraint.statBelowZero');
+    expect(error.params).toEqual({ constraint: 'Cooler', stat: 'Temperature', value: -5 });
   });
 
   it('checkInitialStateErrors returns null when initial temperature is valid', () => {
@@ -4393,7 +4397,8 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
     // Rotation 90 = East-West Straight
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/pressure below 0/i);
+    expect(result.error).toBe('error.constraint.statBelowZero');
+    expect(result.errorParams).toEqual({ constraint: 'Vacuum', stat: 'Pressure', value: -5 });
   });
 
   it('placeInventoryTile allows move that connects a Vacuum when pressure stays >= 0', () => {
@@ -4440,7 +4445,8 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
     // Remove (0,2): positive pump disconnects, pressure = 5 + (-10) = -5 < 0 → BLOCKED
     const result = board.reclaimTile({ row: 0, col: 2 });
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/pressure below 0/i);
+    expect(result.error).toBe('error.constraint.statBelowZero');
+    expect(result.errorParams).toEqual({ constraint: 'Vacuum', stat: 'Pressure', value: -5 });
   });
 
   it('checkInitialStateErrors returns an error when pre-connected vacuum causes pressure < 0', () => {
@@ -4448,7 +4454,8 @@ describe('Board pump constraint: negative pressure (Vacuum)', () => {
     board.initHistory();
     const error = board.checkInitialStateErrors();
     expect(error.error).not.toBeNull();
-    expect(error.error).toMatch(/pressure below 0/i);
+    expect(error.error).toBe('error.constraint.statBelowZero');
+    expect(error.params).toEqual({ constraint: 'Vacuum', stat: 'Pressure', value: -5 });
   });
 
   it('checkInitialStateErrors returns null when initial pressure is valid', () => {
@@ -5137,7 +5144,7 @@ describe('Cement tile constraints', () => {
     board.applyTurnDelta(); board.recordMove();
     const removed = board.reclaimTile({ row: 0, col: 1 });
     expect(removed.success).toBe(false);
-    expect(removed.error).toContain('hardened cement');
+    expect(removed.error).toBe('error.board.cementHardened');
     expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
 
@@ -5147,7 +5154,7 @@ describe('Cement tile constraints', () => {
     board.applyTurnDelta(); board.recordMove();
     const rotated = board.rotateTile({ row: 0, col: 1 });
     expect(rotated.success).toBe(false);
-    expect(rotated.error).toContain('hardened cement');
+    expect(rotated.error).toBe('error.board.cementHardened');
   });
 
   it('allows removal when T > 0 without decrementing', () => {
@@ -5834,7 +5841,8 @@ describe('Regulator chambers — stat check at connection time', () => {
     // Pre-placement water = 3 − 1 = 2; 2 > 5 → fails
     const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water > 5');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Water', op: '>', threshold: 5 });
     expect(result.errorTilePositions).toEqual([{ row: 0, col: 3 }]);
   });
 
@@ -5850,7 +5858,8 @@ describe('Regulator chambers — stat check at connection time', () => {
     // Pre-placement water = 9; 9 < 5 → fails
     const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water < 5');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Water', op: '<', threshold: 5 });
   });
 
   it('passes when temperature = threshold (= operator — stat unaffected by pipe cost)', () => {
@@ -5867,7 +5876,8 @@ describe('Regulator chambers — stat check at connection time', () => {
     // Pre-placement water = 9; 9 ≠ 5 → fails
     const result = board.placeInventoryTile({ row: 0, col: 2 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water = 5');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Water', op: '=', threshold: 5 });
   });
 
   // ── rollback on failure ──
@@ -5905,7 +5915,8 @@ describe('Regulator chambers — stat check at connection time', () => {
 
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Water > 3');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Water', op: '>', threshold: 3 });
   });
 
   it('pre-check rejects when a heater connecting in the same turn would satisfy the threshold but pre-stats do not', () => {
@@ -5931,7 +5942,8 @@ describe('Regulator chambers — stat check at connection time', () => {
 
     const result = board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Temperature > 5');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Temperature', op: '>', threshold: 5 });
   });
 
   // ── temperature stat ──
@@ -5981,7 +5993,8 @@ describe('Regulator chambers — stat check at connection time', () => {
     const board = makeTemperatureRegulatorBoard(8, 5, '>', 15);
     const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Temperature > 15');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Temperature', op: '>', threshold: 15 });
   });
 
   // ── pressure stat ──
@@ -6031,7 +6044,8 @@ describe('Regulator chambers — stat check at connection time', () => {
     const board = makePressureRegulatorBoard(2, 3, '>', 6);
     const result = board.placeInventoryTile({ row: 0, col: 3 }, PipeShape.Straight, 90);
     expect(result.success).toBe(false);
-    expect(result.error).toBe(ERR_REGULATOR_CHECK_PREFIX + 'Pressure > 6');
+    expect(result.error).toBe(ERR_REGULATOR_CHECK);
+    expect(result.errorParams).toEqual({ stat: 'Pressure', op: '>', threshold: 6 });
   });
 });
 

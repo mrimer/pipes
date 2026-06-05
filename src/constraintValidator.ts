@@ -3,13 +3,14 @@ import type { GridPos} from './types';
 import { PipeShape } from './types';
 import { parseKey } from './board';
 import type { ThermoSimulator } from './thermoSimulator';
+import type { TranslationParams } from './i18nTypes';
+import { t } from './i18n';
 
 /**
- * Prefix of the error message emitted when a sandstone tile's pressure is too
- * low to connect.  Exported so callers can identify this specific error type
- * without fragile string equality checks on the full dynamic message.
+ * Error key emitted when a sandstone tile's pressure is too low to connect.
+ * Exported so callers can identify this specific error type by equality check.
  */
-export const ERR_SANDSTONE_TOO_HARD_PREFIX = 'Pressure must exceed Sandstone hardness to connect.';
+export const ERR_SANDSTONE_TOO_HARD = 'error.constraint.sandstoneTooHard';
 
 /**
  * Validates board constraints that prevent illegal game states.
@@ -46,14 +47,14 @@ export class ConstraintValidator {
     lockedWaterImpact: ReadonlyMap<string, number>,
     connectionTurn: ReadonlyMap<string, number>,
     turnNumber: number,
-  ): { error: string | null; positions: GridPos[] | null } {
+  ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     const sandstone = this._checkSandstone(filled, lockedWaterImpact, connectionTurn, turnNumber);
     if (sandstone.error) return sandstone;
 
-    const heater = this._checkEnvStat(filled, 'heater', connectionTurn, 'Cooler', 'Temperature');
+    const heater = this._checkEnvStat(filled, 'heater', connectionTurn, 'constraint.cooler', 'stat.temperature');
     if (heater.error) return heater;
 
-    return this._checkEnvStat(filled, 'pump', connectionTurn, 'Vacuum', 'Pressure');
+    return this._checkEnvStat(filled, 'pump', connectionTurn, 'constraint.vacuum', 'stat.pressure');
   }
 
   /**
@@ -66,7 +67,7 @@ export class ConstraintValidator {
     lockedWaterImpact: ReadonlyMap<string, number>,
     connectionTurn: ReadonlyMap<string, number>,
     turnNumber: number,
-  ): { error: string | null; positions: GridPos[] | null } {
+  ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     const currentPressure = this.thermo.computePressure(filled, connectionTurn);
     const violating: GridPos[] = [];
     const violatingHistoricalLock: GridPos[] = [];
@@ -96,7 +97,8 @@ export class ConstraintValidator {
 
     if (violatingHistoricalLock.length > 0) {
       return {
-        error: 'Cannot disconnect pressure tiles that were necessary in connecting these sandstone blocks.',
+        error: 'error.constraint.sandstoneDisconnectLocked',
+        params: null,
         positions: violatingHistoricalLock,
       };
     }
@@ -104,11 +106,12 @@ export class ConstraintValidator {
       const tile = this.grid[violating[0].row]?.[violating[0].col];
       const hardnessForMsg = tile?.hardness ?? 0;
       return {
-        error: `Pressure must exceed Sandstone hardness to connect. (Pressure: ${currentPressure}, Hardness: ${hardnessForMsg})`,
+        error: ERR_SANDSTONE_TOO_HARD,
+        params: { pressure: currentPressure, hardness: hardnessForMsg },
         positions: violating,
       };
     }
-    return { error: null, positions: null };
+    return { error: null, params: null, positions: null };
   }
 
   /**
@@ -120,21 +123,21 @@ export class ConstraintValidator {
    * (i.e. the tiles actually responsible for the negative value).
    *
    * @param content         - Chamber content type to blame: `'heater'` or `'pump'`.
-   * @param constraintName  - Human-readable name of the negative variant (e.g. `'Cooler'`).
-   * @param statLabel       - Human-readable stat label for the error message (e.g. `'Temperature'`).
+   * @param constraintKey   - i18n key for the negative variant (e.g. `'constraint.cooler'`).
+   * @param statKey         - i18n key for the stat label (e.g. `'stat.temperature'`).
    */
   private _checkEnvStat(
     filled: Set<string>,
     content: 'heater' | 'pump',
     connectionTurn: ReadonlyMap<string, number>,
-    constraintName: string,
-    statLabel: string,
-  ): { error: string | null; positions: GridPos[] | null } {
+    constraintKey: string,
+    statKey: string,
+  ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     const currentValue = content === 'heater'
       ? this.thermo.computeTemperature(filled, connectionTurn)
       : this.thermo.computePressure(filled, connectionTurn);
 
-    if (currentValue >= 0) return { error: null, positions: null };
+    if (currentValue >= 0) return { error: null, params: null, positions: null };
 
     const isTemp = content === 'heater';
     const violating: GridPos[] = [];
@@ -148,7 +151,12 @@ export class ConstraintValidator {
     }
 
     return {
-      error: `Connecting this ${constraintName} would reduce ${statLabel.toLowerCase()} below 0. (${statLabel}: ${currentValue})`,
+      error: 'error.constraint.statBelowZero',
+      params: {
+        constraint: t(constraintKey),
+        stat: t(statKey),
+        value: currentValue,
+      },
       positions: violating.length > 0 ? violating : null,
     };
   }
