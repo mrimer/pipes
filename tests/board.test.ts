@@ -3498,7 +3498,7 @@ describe('Chamber tile (sandstone content)', () => {
     // Step 3: Try to reclaim pump connector → pressure drops to 1, deltaDamage=0 → blocked
     const result = b.reclaimTile({ row: 1, col: 0 });
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
+    expect(result.error).toBe('error.constraint.sandstoneDisconnectLocked');
     expect(result.errorTilePositions).toEqual([{ row: 0, col: 2 }]);
     expect(b.grid[1][0].shape).toBe(PipeShape.Straight);
   });
@@ -3600,7 +3600,7 @@ describe('Chamber tile (sandstone content)', () => {
     // effectivePressure=1 (source only), deltaDamage=1-2=-1 ≤ 0 → must be blocked.
     const result = b.reclaimTile({ row: 1, col: 2 });
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
+    expect(result.error).toBe('error.constraint.sandstoneDisconnectLocked');
     expect(result.errorTilePositions).toEqual([{ row: 0, col: 4 }]);
     // Tile should be restored
     expect(b.grid[1][2].shape).toBe(PipeShape.Straight);
@@ -3801,7 +3801,7 @@ describe('Chamber tile (sandstone shatter)', () => {
     // Attempt reclaim (1,0): historical pressure → 1, deltaDamage=1-1=0 → blocked
     const result = b.reclaimTile({ row: 1, col: 0 });
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Cannot disconnect pressure tiles/);
+    expect(result.error).toBe('error.constraint.sandstoneDisconnectLocked');
     expect(b.getLockedWaterImpact({ row: 0, col: 2 })).toBe(0);
   });
 
