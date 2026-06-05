@@ -79,11 +79,12 @@ export class ButterflyField {
     style: LevelStyle | undefined,
     board: ButterflyBoard | null,
   ): void {
+    const resolvedStyle: LevelStyle = style ?? 'Grass';
     this._width = width;
     this._height = height;
     this._tileSize = Math.max(MIN_TILE_SIZE, tileSize);
     this._board = board;
-    this._enabled = style === 'Grass' && width > 0 && height > 0;
+    this._enabled = resolvedStyle === 'Grass' && width > 0 && height > 0;
     this._butterflies = [];
     if (!this._enabled) {
       this._targetCount = 0;
