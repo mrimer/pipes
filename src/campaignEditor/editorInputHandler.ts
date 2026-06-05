@@ -138,7 +138,7 @@ export class EditorInputHandler {
 
   private _paintCell(pos: { row: number; col: number }): void {
     const state = this._cb.getState();
-    // Empty-Grass palette: clear to null (grass)
+    // Empty-Summer palette: clear to null (summer)
     if (state.palette === PipeShape.Empty) {
       state.grid[pos.row][pos.col] = null;
       return;
@@ -226,7 +226,7 @@ export class EditorInputHandler {
         // Clear the link if the erased tile was linked
         state.clearLinkAt(pos);
       } else if (state.palette === PipeShape.Empty) {
-        // Empty-Grass palette: clear to floor-type-aware null
+        // Empty-Summer palette: clear to floor-type-aware null
         if (state.grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
         state.grid[pos.row][pos.col] = null;
         state.clearLinkAt(pos);

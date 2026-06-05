@@ -998,6 +998,26 @@ describe('CampaignService – scanData', () => {
     expect(issues.get('Level')?.has('style') ?? false).toBe(false);
   });
 
+  it('migrates legacy Grass style values to Summer when dryRun=false', () => {
+    const campaign = campaignWithChapter();
+    const chapter = campaign.chapters[0];
+    const level = chapter.levels[0];
+    (campaign as unknown as Record<string, unknown>)['style'] = 'Grass';
+    (chapter as unknown as Record<string, unknown>)['style'] = 'Grass';
+    (level as unknown as Record<string, unknown>)['style'] = 'Grass';
+    const svc = new CampaignService([campaign]);
+
+    const dryRunIssues = svc.scanData(campaign, true);
+    expect(dryRunIssues.get('Campaign')?.has('style:Grass→Summer')).toBe(true);
+    expect(dryRunIssues.get('Chapter')?.has('style:Grass→Summer')).toBe(true);
+    expect(dryRunIssues.get('Level')?.has('style:Grass→Summer')).toBe(true);
+
+    svc.scanData(campaign, false);
+    expect(campaign.style).toBe('Summer');
+    expect(chapter.style).toBe('Summer');
+    expect(level.style).toBe('Summer');
+  });
+
   it('does not flag campaign map Source.capacity or map pipe rotation as unrecognized', () => {
     const campaign = campaignWithChapter();
     campaign.rows = 1;

@@ -543,10 +543,36 @@ export class CampaignService {
   // ── Data validation ──────────────────────────────────────────────────────────
 
   /**
+   * Remap legacy 'Grass' style values to 'Summer' across campaign, chapter,
+   * and level style fields.
+   *
+   * @returns true when at least one style value was remapped.
+   */
+  remapLegacyGrassStyles(campaign: CampaignDef): boolean {
+    let changed = false;
+    const remapStyle = (obj: Record<string, unknown>): void => {
+      if (obj['style'] === 'Grass') {
+        obj['style'] = 'Summer';
+        changed = true;
+      }
+    };
+    remapStyle(campaign as unknown as Record<string, unknown>);
+    for (const chapter of campaign.chapters) {
+      remapStyle(chapter as unknown as Record<string, unknown>);
+      for (const level of chapter.levels) {
+        remapStyle(level as unknown as Record<string, unknown>);
+      }
+    }
+    return changed;
+  }
+
+  /**
    * Scan a campaign for unrecognized field names, optionally removing them
    * in place (clean-up pass when `dryRun` is false).
-   * Also corrects any legacy 'Dirt' style values to 'Fall' and 'EMPTY_DIRT'
-   * tile shape values to 'EMPTY_FALL'.
+   * Also corrects legacy style/tile values:
+   *   - style 'Grass' → 'Summer'
+   *   - style 'Dirt' → 'Fall'
+   *   - tile shape 'EMPTY_DIRT' → 'EMPTY_FALL'
    *
    * @param campaign  The campaign to scan (mutated when `dryRun` is false).
    * @param dryRun    When true, only tallies issues without modifying data.
@@ -581,7 +607,10 @@ export class CampaignService {
     const checkStyle = (obj: Record<string, unknown>, recordType: string): void => {
       const style = obj['style'];
       if (style === undefined) return;
-      if (style === 'Dirt') {
+      if (style === 'Grass') {
+        tally(recordType, 'style:Grass→Summer');
+        if (!dryRun) obj['style'] = 'Summer';
+      } else if (style === 'Dirt') {
         tally(recordType, 'style:Dirt→Fall');
         if (!dryRun) obj['style'] = 'Fall';
       } else if (typeof style === 'string' && !LEVEL_STYLES.has(style as never)) {

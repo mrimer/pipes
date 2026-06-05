@@ -157,7 +157,7 @@ const FLOOR_PALETTE_ITEMS: Array<{ palette: EditorPalette; label: string }> = [
 
 /** Label/emoji for each LevelStyle option. */
 export const STYLE_OPTION_LABELS: Array<{ value: LevelStyle; label: string }> = [
-  { value: 'Grass',  label: '🟩 Summer' },
+  { value: 'Summer', label: '🟩 Summer' },
   { value: 'Fall',   label: '🍂 Fall' },
   { value: 'Dark',   label: '⬛ Dark' },
   { value: 'Winter', label: '⬜ Winter' },
@@ -170,7 +170,7 @@ export const STYLE_OPTION_LABELS: Array<{ value: LevelStyle; label: string }> = 
  *
  * @param panelId     The element id to assign (e.g. 'editor-style-panel').
  * @param expanded    Whether the section is currently expanded.
- * @param currentStyle The currently selected style (undefined → 'Grass').
+ * @param currentStyle The currently selected style (undefined → 'Summer').
  * @param onToggle    Called when the toggle button is clicked (should flip `expanded`
  *                    and replace the panel by calling this function again).
  * @param onSelect    Called when a style option is selected.  Responsible for
@@ -183,7 +183,7 @@ export function buildStyleSectionPanel(
   onToggle: () => void,
   onSelect: (style: LevelStyle) => void,
 ): HTMLElement {
-  const resolvedStyle: LevelStyle = currentStyle ?? 'Grass';
+  const resolvedStyle: LevelStyle = currentStyle ?? 'Summer';
   const panel = document.createElement('div');
   panel.id = panelId;
   panel.style.cssText = EDITOR_PANEL_BASE_CSS + 'display:flex;flex-direction:column;gap:4px;';

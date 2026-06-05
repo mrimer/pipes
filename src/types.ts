@@ -286,16 +286,16 @@ export interface TileDef {
 /**
  * Visual style for a level or chapter map, controlling the default empty floor
  * tile type (and associated tree colors).
- * - 'Grass'  → green (default)
+ * - 'Summer' → green (default)
  * - 'Fall'   → warm autumn brown
  * - 'Dark'   → dark blue-green
  * - 'Winter' → off-white snowy
  * - 'Spring' → pale chartreuse/green spring
  */
-export type LevelStyle = 'Grass' | 'Fall' | 'Dark' | 'Winter' | 'Spring';
+export type LevelStyle = 'Summer' | 'Fall' | 'Dark' | 'Winter' | 'Spring';
 
 /** Valid LevelStyle values for runtime validation. */
-export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Grass', 'Fall', 'Dark', 'Winter', 'Spring']);
+export const LEVEL_STYLES: ReadonlySet<LevelStyle> = new Set(['Summer', 'Fall', 'Dark', 'Winter', 'Spring']);
 
 /** Map a LevelStyle to its corresponding empty-floor PipeShape. */
 export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
@@ -308,7 +308,7 @@ export function styleToFloorShape(style: LevelStyle | undefined): PipeShape {
 
 /**
  * Map an empty-floor PipeShape back to its corresponding LevelStyle.
- * Returns `undefined` for {@link PipeShape.Empty} (the default Grass style)
+ * Returns `undefined` for {@link PipeShape.Empty} (the default Summer style)
  * so callers can fall back to a board-level default when the inferred floor
  * type is the generic empty shape.
  */
@@ -351,7 +351,7 @@ export interface LevelDef {
   challenge?: boolean;
   /**
    * Visual style for this level, controlling the default empty floor tile type
-   * and tree rendering colors.  Defaults to 'Grass' when absent or invalid.
+   * and tree rendering colors.  Defaults to 'Summer' when absent or invalid.
    */
   style?: LevelStyle;
 }
@@ -403,7 +403,7 @@ export interface ChapterDef {
   grid?: (TileDef | null)[][];
   /**
    * Visual style for this chapter map, controlling the default empty floor tile
-   * type and tree rendering colors.  Defaults to 'Grass' when absent or invalid.
+   * type and tree rendering colors.  Defaults to 'Summer' when absent or invalid.
    */
   style?: LevelStyle;
 }
@@ -452,7 +452,7 @@ export interface CampaignDef {
   grid?: (TileDef | null)[][];
   /**
    * Visual style for this campaign map, controlling the default empty floor tile
-   * type and tree rendering colors. Defaults to 'Grass' when absent or invalid.
+   * type and tree rendering colors. Defaults to 'Summer' when absent or invalid.
    */
   style?: LevelStyle;
 }

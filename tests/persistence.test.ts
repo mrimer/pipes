@@ -299,6 +299,21 @@ describe('migrateCampaign', () => {
     expect(asRecord(level)['hint']).toBeUndefined();
   });
 
+  it('migrates legacy "Grass" styles to "Summer" on campaign, chapter, and level', () => {
+    const campaign = makeCampaignWithGrid([[null]]);
+    const chapter = campaign.chapters[0];
+    const level = chapter.levels[0];
+    asRecord(campaign)['style'] = 'Grass';
+    asRecord(chapter)['style'] = 'Grass';
+    asRecord(level)['style'] = 'Grass';
+
+    migrateCampaign(campaign);
+
+    expect(campaign.style).toBe('Summer');
+    expect(chapter.style).toBe('Summer');
+    expect(level.style).toBe('Summer');
+  });
+
   it('does not overwrite an existing hints array with the deprecated hint', () => {
     const campaign = makeCampaignWithGrid([[null]]);
     const level = campaign.chapters[0].levels[0];
