@@ -31,6 +31,32 @@ import {
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
 
+const GOLD_ITEM_SHINE_PERIOD_MS = 12_000;
+const GOLD_ITEM_SHINE_DURATION_MS = 500;
+
+type StarBurstParticle = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  hue: number;
+  ageMs: number;
+  lifetimeMs: number;
+  rotation: number;
+  spin: number;
+};
+
+type StarBurstState = {
+  particles: StarBurstParticle[];
+  lastUpdateMs: number;
+  spawnCarry: number;
+};
+
+const STAR_BURST_PARTICLES_PER_SECOND = 30;
+const STAR_BURST_MAX_PARTICLES = 42;
+const _starBurstStates = new WeakMap<Tile, StarBurstState>();
+
 // ---------------------------------------------------------------------------
 // Internal content drawers (not exported)
 // ---------------------------------------------------------------------------
@@ -692,6 +718,116 @@ function _drawChamberStarContent(ctx: CanvasRenderingContext2D, isWater: boolean
   ctx.fill();
 }
 
+function _drawGoldItemShine(ctx: CanvasRenderingContext2D, bw: number, bh: number, br: number): void {
+  const cycleTime = Date.now() % GOLD_ITEM_SHINE_PERIOD_MS;
+  if (cycleTime >= GOLD_ITEM_SHINE_DURATION_MS) return;
+
+  const travelProgress = cycleTime / GOLD_ITEM_SHINE_DURATION_MS;
+  const shineHalfWidth = Math.max(_s(5), Math.min(bw, bh) * 0.45);
+  const startCenterX = bw + shineHalfWidth;
+  const endCenterX = -bw - shineHalfWidth;
+  const centerX = startCenterX + (endCenterX - startCenterX) * travelProgress;
+  const unit45 = Math.SQRT1_2;
+
+  const grad = ctx.createLinearGradient(
+    centerX - unit45 * shineHalfWidth,
+    -unit45 * shineHalfWidth,
+    centerX + unit45 * shineHalfWidth,
+    unit45 * shineHalfWidth,
+  );
+  grad.addColorStop(0, 'rgba(255, 235, 120, 0)');
+  grad.addColorStop(0.35, 'rgba(255, 240, 140, 0.05)');
+  grad.addColorStop(0.5, 'rgba(255, 250, 190, 0.80)');
+  grad.addColorStop(0.65, 'rgba(255, 240, 140, 0.05)');
+  grad.addColorStop(1, 'rgba(255, 235, 120, 0)');
+
+  // Render only on the chamber rectangle stroke, not in the chamber interior.
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = _s(6);
+  ctx.beginPath();
+  ctx.roundRect(-bw, -bh, bw * 2, bh * 2, br);
+  ctx.stroke();
+}
+
+function _spawnStarBurstParticle(half: number): StarBurstParticle {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = half * (0.9 + Math.random() * 0.8);
+  return {
+    x: 0,
+    y: 0,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    size: _s(1.4) + Math.random() * _s(2.0),
+    hue: Math.floor(Math.random() * 360),
+    ageMs: 0,
+    lifetimeMs: 500 + Math.random() * 450,
+    rotation: Math.random() * Math.PI * 2,
+    spin: (Math.random() - 0.5) * 8,
+  };
+}
+
+function _drawTinyParticleStar(ctx: CanvasRenderingContext2D, x: number, y: number, outerR: number, rotation: number): void {
+  const innerR = outerR * 0.45;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = rotation + (Math.PI / 5) * i - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    const px = x + Math.cos(angle) * r;
+    const py = y + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function _drawConnectedStarBurst(ctx: CanvasRenderingContext2D, tile: Tile, half: number): void {
+  const now = Date.now();
+  let state = _starBurstStates.get(tile);
+  if (state === undefined) {
+    state = {
+      particles: [],
+      lastUpdateMs: now,
+      spawnCarry: 0,
+    };
+    _starBurstStates.set(tile, state);
+  }
+
+  const dtMs = Math.min(Math.max(now - state.lastUpdateMs, 0), 100);
+  state.lastUpdateMs = now;
+
+  state.spawnCarry += dtMs * STAR_BURST_PARTICLES_PER_SECOND / 1000;
+  let spawnCount = Math.floor(state.spawnCarry);
+  state.spawnCarry -= spawnCount;
+  while (spawnCount > 0 && state.particles.length < STAR_BURST_MAX_PARTICLES) {
+    state.particles.push(_spawnStarBurstParticle(half));
+    spawnCount--;
+  }
+
+  const dtSec = dtMs / 1000;
+  const maxRadius = Math.max(half - _s(2), 1);
+  for (const particle of state.particles) {
+    particle.x += particle.vx * dtSec;
+    particle.y += particle.vy * dtSec;
+    particle.rotation += particle.spin * dtSec;
+    particle.ageMs += dtMs;
+  }
+  state.particles = state.particles.filter((particle) => {
+    const dist = Math.hypot(particle.x, particle.y);
+    return particle.ageMs < particle.lifetimeMs && dist < maxRadius;
+  });
+
+  for (const particle of state.particles) {
+    const dist = Math.hypot(particle.x, particle.y);
+    const edgeFade = Math.max(0, 1 - dist / maxRadius);
+    const lifeFade = Math.max(0, 1 - particle.ageMs / particle.lifetimeMs);
+    const alpha = edgeFade * lifeFade;
+    if (alpha <= 0) continue;
+    ctx.fillStyle = `hsla(${particle.hue},100%,70%,${alpha})`;
+    _drawTinyParticleStar(ctx, particle.x, particle.y, particle.size, particle.rotation);
+  }
+}
+
 function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null, lockedGain: number | null): void {
   // Draw a small flame icon in the top-right inside corner
   const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
@@ -933,6 +1069,9 @@ export function drawChamber(
   ctx.rect(-half, -half, half * 2, half * 2);
   ctx.clip();
   drawChamberBox(ctx, bw, bh, br, isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR, color);
+  if (isWater && tile.chamberContent === 'item' && tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape)) {
+    _drawGoldItemShine(ctx, bw, bh, br);
+  }
   // Draw inner content based on chamberContent
   const { chamberContent } = tile;
   // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
@@ -964,6 +1103,11 @@ export function drawChamber(
     _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
   } else if (chamberContent === 'star') {
     _drawChamberStarContent(ctx, isWater, half);
+    if (isWater) {
+      _drawConnectedStarBurst(ctx, tile, half);
+    } else {
+      _starBurstStates.delete(tile);
+    }
   } else if (chamberContent === 'regulator') {
     _drawChamberRegulatorContent(ctx, tile, isWater);
   } else if (chamberContent === 'gel') {
