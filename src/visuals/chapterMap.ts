@@ -366,7 +366,7 @@ export function drawLevelChamberTile(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#888';
-    ctx.fillText('LEVEL', cx, contentY + contentH / 2);
+    ctx.fillText(t('map.noLevelDef'), cx, contentY + contentH / 2);
     ctx.restore();
   }
 

@@ -1269,7 +1269,7 @@ export class CampaignManager {
     box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:400px;width:90%;text-align:center;';
 
     const titleEl = document.createElement('h2');
-    titleEl.textContent = isMastered ? '🏆 Chapter Mastered!' : '🎉 Chapter Complete!';
+    titleEl.textContent = isMastered ? t('campaign.chapterMastered.title') : t('campaign.chapterComplete.title');
     titleEl.style.cssText = 'color:' + (isMastered ? '#f0c040' : '#7ed321') + ';margin:0 0 16px;font-size:1.5rem;';
     box.appendChild(titleEl);
 

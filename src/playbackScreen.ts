@@ -23,6 +23,7 @@ import type { Tile } from './tile';
 import { saveRecording } from './persistence';
 import { MUTED_BTN_BG } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
+import { t } from './i18n';
 
 /** Default playback interval between moves (ms). */
 const DEFAULT_SPEED_MS = 500;
@@ -408,7 +409,7 @@ export class PlaybackScreen {
   private _updatePlayPauseIcon(): void {
     if (this._playPauseBtn) {
       this._playPauseBtn.textContent = this._playing ? '⏸' : '▶';
-      this._playPauseBtn.title = this._playing ? 'Pause' : 'Play';
+      this._playPauseBtn.title = t(this._playing ? 'playback.control.pause' : 'playback.control.play');
     }
   }
 
@@ -471,7 +472,7 @@ export class PlaybackScreen {
     }));
 
     // ▶/⏸ Play/Pause
-    const playPauseBtn = makeBtn('▶', 'Play', () => this.togglePlay());
+    const playPauseBtn = makeBtn('▶', t('playback.control.play'), () => this.togglePlay());
     this._playPauseBtn = playPauseBtn;
     overlay.appendChild(playPauseBtn);
 
@@ -498,7 +499,7 @@ export class PlaybackScreen {
     speedSlider.step = '100';
     speedSlider.value = String(DEFAULT_SPEED_MS);
     speedSlider.style.cssText = 'width:90px;cursor:pointer;';
-    speedSlider.title = 'Playback speed (seconds per move)';
+    speedSlider.title = t('playback.control.speed');
     speedSlider.addEventListener('input', () => {
       this.setSpeedMs(Number(speedSlider.value));
     });
@@ -523,7 +524,7 @@ export class PlaybackScreen {
     scrubBar.max = String(this._stepLimit);
     scrubBar.value = '0';
     scrubBar.style.cssText = 'width:110px;cursor:pointer;';
-    scrubBar.title = 'Scrub to any move';
+    scrubBar.title = t('playback.control.scrub');
     this._scrubBar = scrubBar;
     scrubBar.addEventListener('input', () => {
       this._stopTimer();

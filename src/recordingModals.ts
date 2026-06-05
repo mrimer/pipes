@@ -328,7 +328,7 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
         'padding:10px 14px;border-bottom:1px solid #1a2a40;cursor:pointer;font-size:0.82rem;' +
         'color:#ccc;white-space:pre-wrap;word-break:break-word;transition:background 0.1s;';
       li.textContent = formatRecordSummary(record);
-      li.title = 'Click to select · Double-click to replay';
+      li.title = t('recording.item.hint');
 
       li.addEventListener('click', () => {
         // Deselect all
