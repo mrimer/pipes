@@ -967,7 +967,7 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     expect(reclaimResult.error).toBeUndefined();
   });
 
-  it('blocks reclaiming when it would remove a chamber from the fill path and inventory would go below 0', () => {
+  it('allows reclaiming when the reclaimed tile offsets the disconnected chamber grant', () => {
     // Board: Source(0) → Straight E-W(1) → Chamber(2, item) → Straight E-W(3) → Sink(4)
     // Straight(1) is a player-placed tile; if removed, Chamber(2) leaves the fill path.
     // We simulate the state after the player used the chamber grant: base Straight count = -1.
@@ -983,12 +983,13 @@ describe('Board.reclaimTile (inventory constraint)', () => {
     // Two Straights placed: 1 from base (depleted) + 1 from grant → base count = -1
     board.inventory = [{ shape: PipeShape.Straight, count: -1 }];
 
-    // Try to reclaim col 1: this would disconnect the chamber → base(-1) + newGrant(0) = -1 < 0
+    // Reclaiming col 1 disconnects the chamber, but the reclaimed Straight raises the base
+    // count from -1 to 0 first, so the disconnection-only state stays non-negative.
     const result = board.reclaimTile({ row: 0, col: 1 });
-    expect(result.success).toBe(false);
-    expect(result.error).toBeDefined();
-    // The tile must still be in place
-    expect(board.grid[0][1].shape).toBe(PipeShape.Straight);
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(board.grid[0][1].shape).toBe(PipeShape.Empty);
+    expect(board.inventory.find((i) => i.shape === PipeShape.Straight)!.count).toBe(0);
   });
 
   it('highlights only positive item chambers for disconnect grant errors', () => {
