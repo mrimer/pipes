@@ -2044,6 +2044,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
       cols: number;
       grid: (TileDef | null)[][];
       palette: EditorPalette;
+      params: TileParams;
       historyLength: number;
       historyIndex: number;
       historyEntryAt(index: number): EditorSnapshot;
@@ -2175,6 +2176,51 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
     expect(state._state.historyLength).toBe(historyLenBefore + 1);
     const newSnapshot = state._state.historyEntryAt(state._state.historyIndex);
     expect(newSnapshot.grid[0][0]?.shape).toBe(PipeShape.Tee);
+  });
+
+  it('drag pickup binds Tile Params to grabbed chamber tile', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    state._state.grid[0][0] = {
+      shape: PipeShape.Chamber,
+      chamberContent: 'item',
+      itemCount: 3,
+      rotation: 180,
+    };
+    state._state.palette = PipeShape.Straight;
+    state._state._linkedTilePos = null;
+
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+
+    expect(state._state.palette).toBe('chamber:item');
+    expect(state._state.params.itemCount).toBe(3);
+    expect(state._state.params.rotation).toBe(180);
+    expect(state._state._linkedTilePos).toEqual({ row: 0, col: 0 });
+  });
+
+  it('drag pickup with ctrl held does not rebind palette/params', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    state._state.grid[0][0] = { shape: PipeShape.Chamber, chamberContent: 'tank', capacity: 9 };
+    state._state.palette = PipeShape.Tee;
+    state._state.params.capacity = 1;
+    state._state._linkedTilePos = null;
+
+    state._editorInput!.onMouseDown(ctrlLeftMouseEvent('mousedown', 32, 32));
+
+    expect(state._state.palette).toBe(PipeShape.Tee);
+    expect(state._state.params.capacity).toBe(1);
+    expect(state._state._linkedTilePos).toBeNull();
+  });
+
+  it('drag-move keeps linked tile position synced to destination for chamber tiles', () => {
+    const state = makePlaceEditor(makeLevel(4, 4));
+    state._state.grid[0][0] = { shape: PipeShape.Chamber, chamberContent: 'tank', capacity: 7 };
+    state._state.palette = PipeShape.Straight;
+
+    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseMove(leftMouseEvent('mousemove', 96, 32));
+    state._editorInput!.onMouseUp(leftMouseEvent('mouseup', 96, 32));
+
+    expect(state._state._linkedTilePos).toEqual({ row: 0, col: 1 });
   });
 
   it('click on placed pipe rotates it clockwise', () => {

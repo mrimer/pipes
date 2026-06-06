@@ -204,8 +204,14 @@ export class EditorInputHandler {
     }
 
     if (existingTile !== null && !existingIsEmpty && state.palette !== 'erase') {
-      // Start a drag: track the tile but don't modify the grid yet
+      // Start a drag: track the tile but don't modify the grid yet.
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+      // Bind Tile Params to the grabbed tile (full select + live-edit link where applicable).
+      // Skip when ctrl is held so ctrl+click overwrite behavior remains unchanged.
+      if (!e.ctrlKey) {
+        state.selectTileFromDef(existingTile, pos);
+        this._cb.refreshPaletteUI();
+      }
       this._cb.renderCanvas();
     } else {
       // Guard: only one Source tile is allowed per level.
@@ -286,6 +292,7 @@ export class EditorInputHandler {
       }
       state.recordSnapshot();
       this._cb.updateUndoRedoButtons();
+      this._cb.refreshPaletteUI();
     } else {
       // It was a click on a non-empty tile (no movement occurred)
       if (!e.ctrlKey && PIPE_SHAPES.has(tile.shape)) {
