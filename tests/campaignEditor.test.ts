@@ -2170,7 +2170,7 @@ describe('CampaignEditor – single-click placement snapshot is recorded after p
 
     // Mousedown registers a drag-state (tile exists), then ctrl+mouseup overwrites.
     state._state.palette = PipeShape.Tee;
-    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32));
+    state._editorInput!.onMouseDown(ctrlLeftMouseEvent('mousedown', 32, 32));
     state._editorInput!.onMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(state._state.historyLength).toBe(historyLenBefore + 1);
@@ -2559,7 +2559,7 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
     // Ctrl+click on (0,0) with Source palette: should be blocked
     state._state.palette = PipeShape.Source;
-    state._editorInput!.onMouseDown(leftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
+    state._editorInput!.onMouseDown(ctrlLeftMouseEvent('mousedown', 32, 32)); // row 0, col 0 (occupied)
     state._editorInput!.onMouseUp(ctrlLeftMouseEvent('mouseup', 32, 32));
 
     expect(state._editorSourceErrorEl?.style.display).toBe('block');
