@@ -687,12 +687,12 @@ function _drawChamberSiphonContent(ctx: CanvasRenderingContext2D, bw: number, bh
   ctx.font = `bold ${_s(14)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (isWater && lockedGain !== null) {
-    // Connected: show the actual water gained as a positive value, like other gain containers.
+  if (lockedGain !== null) {
+    // Show the frozen gain (+N) once it has been set, connected or not.
     ctx.fillStyle = siphonDecorColor;
     ctx.fillText(`+${lockedGain}`, 0, 0);
   } else {
-    // Unconnected: show the "×2" formula label.
+    // No frozen gain yet: show the "×2" formula label.
     ctx.fillStyle = siphonDecorColor;
     ctx.fillText('\u00D72', 0, 0); // ×2
   }

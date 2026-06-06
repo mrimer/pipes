@@ -1592,6 +1592,16 @@ export class Board {
   }
 
   /**
+   * Return the frozen gain stored for the siphon tile at the given position,
+   * or `null` if that siphon has never connected.  The value is set on first
+   * connection and survives disconnection; used by the UI to display the frozen
+   * gain on the tile regardless of connected state.
+   */
+  getSiphonLockedGain(pos: GridPos): number | null {
+    return this._turnState.getSiphonLockedGain(pos);
+  }
+
+  /**
    * Return the locked water impact for the tile at the given position, or
    * `null` if that tile has not yet been evaluated by {@link applyTurnDelta}.
    * A negative return value represents a water cost; positive represents a gain.

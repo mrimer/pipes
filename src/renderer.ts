@@ -2245,8 +2245,7 @@ export function renderContainerFillAnims(
         const impact = board.getLockedWaterImpact({ row, col });
         if (impact !== null) lockedCost = Math.abs(impact);
       } else if (tile.chamberContent === 'siphon') {
-        const impact = board.getLockedWaterImpact({ row, col });
-        if (impact !== null) lockedGain = impact;
+        lockedGain = board.getSiphonLockedGain({ row, col });
       } else if (tile.chamberContent === 'hot_plate') {
         const impact = board.getLockedWaterImpact({ row, col });
         const gain = board.getLockedHotPlateGain({ row, col });
@@ -2385,16 +2384,16 @@ function _renderPass2NonPipeTiles(
       // For connected ice/snow/sandstone tiles, pass the locked effective cost so
       // the tile can display the single locked-in value instead of the live formula.
       // For connected hot_plate tiles, pass both the locked gain (from frozen) and locked loss.
+      // For siphon tiles, pass the frozen gain regardless of connection state (displayed always).
       let lockedCost: number | null = null;
       let lockedGain: number | null = null;
-      if (isWater && tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
+      if (tile.shape === PipeShape.Chamber) {
+        if (isWater && tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
           const impact = board.getLockedWaterImpact({ row: r, col: c });
           if (impact !== null) lockedCost = Math.abs(impact);
         } else if (tile.chamberContent === 'siphon') {
-          const impact = board.getLockedWaterImpact({ row: r, col: c });
-          if (impact !== null) lockedGain = impact;
-        } else if (tile.chamberContent === 'hot_plate') {
+          lockedGain = board.getSiphonLockedGain({ row: r, col: c });
+        } else if (isWater && tile.chamberContent === 'hot_plate') {
           const impact = board.getLockedWaterImpact({ row: r, col: c });
           const gain = board.getLockedHotPlateGain({ row: r, col: c });
           if (impact !== null && gain !== null) {

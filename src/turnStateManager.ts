@@ -14,6 +14,7 @@ export type TurnStateSnapshot = {
   lockedConnectTemp: Map<string, number>;
   lockedConnectPressure: Map<string, number>;
   leakyPermanentLoss: number;
+  siphonLockedGain: Map<string, number>;
 };
 
 /**
@@ -22,7 +23,8 @@ export type TurnStateSnapshot = {
  * Responsibilities:
  *  - Own all turn-tracking maps and counters (`_lockedWaterImpact`,
  *    `_connectionTurn`, `_hotPlateWaterGain`, `_lockedConnectTemp`,
- *    `_lockedConnectPressure`, `frozen`, `leakyPermanentLoss`, `_turnNumber`).
+ *    `_lockedConnectPressure`, `_siphonLockedGain`, `frozen`,
+ *    `leakyPermanentLoss`, `_turnNumber`).
  *  - Orchestrate `applyTurnDelta` and its five private sub-steps in the
  *    correct order:
  *      1. detect whether a beneficial tile disconnected
@@ -44,6 +46,14 @@ export class TurnStateManager {
   private _hotPlateWaterGain: Map<string, number> = new Map();
   private _lockedConnectTemp: Map<string, number> = new Map();
   private _lockedConnectPressure: Map<string, number> = new Map();
+
+  /**
+   * Persistent store of the water gain frozen onto each siphon tile at its
+   * first connection.  Survives disconnection so that re-connecting the siphon
+   * restores exactly the same flat gain (no re-doubling).  Cleared by `reset()`
+   * and kept in undo/redo snapshots.
+   */
+  private _siphonLockedGain: Map<string, number> = new Map();
 
   /**
    * Total water units frozen by ice blocks during play.
@@ -96,6 +106,7 @@ export class TurnStateManager {
     this._lockedConnectTemp = new Map();
     this._lockedConnectPressure = new Map();
     this.leakyPermanentLoss = 0;
+    this._siphonLockedGain = new Map();
   }
 
   /**
@@ -106,6 +117,18 @@ export class TurnStateManager {
   getLockedWaterImpact(pos: GridPos): number | null {
     const key = posKey(pos.row, pos.col);
     const val = this._lockedWaterImpact.get(key);
+    return val ?? null;
+  }
+
+  /**
+   * Return the frozen gain stored for the siphon tile at the given position,
+   * or `null` if that siphon has never connected.  The frozen gain is set on
+   * first connection and survives disconnection; it is the flat amount re-added
+   * whenever the siphon reconnects.
+   */
+  getSiphonLockedGain(pos: GridPos): number | null {
+    const key = posKey(pos.row, pos.col);
+    const val = this._siphonLockedGain.get(key);
     return val ?? null;
   }
 
@@ -204,6 +227,7 @@ export class TurnStateManager {
       lockedConnectTemp: new Map(this._lockedConnectTemp),
       lockedConnectPressure: new Map(this._lockedConnectPressure),
       leakyPermanentLoss: this.leakyPermanentLoss,
+      siphonLockedGain: new Map(this._siphonLockedGain),
     };
   }
 
@@ -217,6 +241,7 @@ export class TurnStateManager {
     this._lockedConnectTemp = new Map(snap.lockedConnectTemp);
     this._lockedConnectPressure = new Map(snap.lockedConnectPressure);
     this.leakyPermanentLoss = snap.leakyPermanentLoss;
+    this._siphonLockedGain = new Map(snap.siphonLockedGain);
   }
 
   // ── Private orchestration methods ────────────────────────────────────────
@@ -590,15 +615,23 @@ export class TurnStateManager {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is from filled set filtered by has() on this._lockedWaterImpact
         runningTotal += this._lockedWaterImpact.get(key)!;
       }
-      // Process newly-connecting Siphons first (double), then Gels (halve).
+      // Process newly-connecting Siphons first (double or flat-add), then Gels (halve).
       const newGelKeys: string[] = [];
       for (const key of newGelSiphonKeys) {
         const [r, c] = parseKey(key);
         const t = this.grid[r]?.[c];
         if (t?.chamberContent === 'siphon') {
-          // Animation delta = water gained (runningTotal, since it doubles).
-          this._recordLockedTileState(key, runningTotal, currentTemp, currentPressure);
-          runningTotal *= 2;
+          const frozenGain = this._siphonLockedGain.get(key);
+          if (frozenGain !== undefined) {
+            // Reconnect: apply the previously-frozen flat gain; do NOT re-double.
+            this._recordLockedTileState(key, frozenGain, currentTemp, currentPressure);
+            runningTotal += frozenGain;
+          } else {
+            // First connect: double the running total and freeze that gain on the tile.
+            this._siphonLockedGain.set(key, runningTotal);
+            this._recordLockedTileState(key, runningTotal, currentTemp, currentPressure);
+            runningTotal *= 2;
+          }
         } else {
           newGelKeys.push(key);
         }

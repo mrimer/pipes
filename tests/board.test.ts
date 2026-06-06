@@ -5932,6 +5932,158 @@ describe('Gel and Siphon chambers — getCurrentWater (incremental path via appl
     board.redoMove();
     expect(board.getCurrentWater()).toBe(18);
   });
+
+  it('Siphon reconnect applies frozen flat gain — no re-doubling', () => {
+    // Board: Source(0,0) → [Empty(0,1)] → Siphon(0,2) → Sink(0,3)
+    // Source = 10; pipe costs 1; first connect: base=9 → ×2=18, frozenGain=9
+    // Reclaim pipe → siphon disconnects
+    // Re-place pipe → siphon reconnects with flat +9, not re-doubling
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: place pipe, connect siphon
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(18); // 10 - 1 = 9, ×2 = 18, lockedImpact=9
+
+    // Frozen gain should equal 9 after first connect
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(9);
+
+    // Turn 2: reclaim the pipe — siphon disconnects
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(10); // back to source only
+
+    // Frozen gain persists through disconnect
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(9);
+
+    // Turn 3: re-place pipe — siphon reconnects with flat gain (not re-double)
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    // base = 10 - 1 (pipe) = 9; siphon applies flat +9 → 18
+    // If it re-doubled it would be 9×2=18 too in this case, but the lockedImpact stays 9
+    expect(board.getCurrentWater()).toBe(18);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(9); // same frozen gain, not re-doubled
+  });
+
+  it('Siphon reconnect applies original frozen gain when base total has changed', () => {
+    // Board: Source → [Gap] → Siphon → Sink
+    // First connect with source=10 → frozenGain=9.
+    // Increase source capacity to 14 while siphon is disconnected, then reconnect.
+    // With flat add: locked=9, water=14-1+9=22.
+    // With re-double: locked=13, water=14-1+13=26.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: connect siphon. base=10-1=9 → frozenGain=9, water=18
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(18);
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(9);
+
+    // Turn 2: disconnect siphon
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(10);
+
+    // Increase source capacity so base at reconnect (14-1=13) ≠ frozenGain (9)
+    board.sourceCapacity = 14;
+
+    // Turn 3: reconnect siphon — flat add frozenGain=9, NOT re-double of 13
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(9);  // frozen, not 13
+    expect(board.getCurrentWater()).toBe(22); // 14 - 1 + 9 = 22; re-double would give 26
+  });
+
+  it('Siphon frozen gain survives undo/redo of disconnect', () => {
+    // Board: Source → [Empty] → Siphon → Sink
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 10, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 10;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Turn 1: connect siphon
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(18);
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(9);
+
+    // Turn 2: disconnect siphon
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getCurrentWater()).toBe(10);
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(9);
+
+    // Undo disconnect — siphon reconnects; frozen gain remains 9
+    board.undoMove();
+    expect(board.getCurrentWater()).toBe(18);
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(9);
+
+    // Undo first connect — frozen gain removed (snapshot before first connect has null)
+    board.undoMove();
+    expect(board.getCurrentWater()).toBe(10);
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBeNull();
+  });
+
+  it('getSiphonLockedGain returns null before first connect and the frozen gain after', () => {
+    // Board: Source → [Empty] → Siphon → Sink
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 6, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 6;
+    board.inventory = [{ shape: PipeShape.Straight, count: 2 }];
+    board.initHistory();
+
+    // Before connect: null
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBeNull();
+
+    // After first connect: 6 - 1 = 5 → frozen = 5
+    board.placeInventoryTile({ row: 0, col: 1 }, PipeShape.Straight, 90);
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(5);
+
+    // After disconnect: still 5
+    board.reclaimTile({ row: 0, col: 1 });
+    board.applyTurnDelta();
+    board.recordMove();
+    expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(5);
+  });
 });
 
 // ─── Regulator chambers ───────────────────────────────────────────────────────

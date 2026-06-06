@@ -231,8 +231,14 @@ export class TooltipManager {
       const pos = { row, col };
       if (isConnected) {
         tooltipText = this._tooltipForConnectedChamber(tooltipText, tile, pos, lockedImpact, board);
+      } else if (tile.chamberContent === 'siphon') {
+        // Disconnected siphon: show frozen gain if set, else no cost preview.
+        const frozenGain = board.getSiphonLockedGain({ row, col });
+        if (frozenGain !== null) {
+          tooltipText += `\ngain: ${frozenGain}`;
+        }
       } else if (tile.cost > 0) {
-        // Gel/siphon have no fixed cost to predict before connection.
+        // Gel has no fixed cost to predict before connection.
         tooltipText = this._tooltipForUnconnectedChamber(tooltipText, tile, board);
       }
     }
