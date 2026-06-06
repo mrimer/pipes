@@ -4262,8 +4262,10 @@ describe('CampaignMapEditorSection – campaign-map canvas context is wired afte
     localStorage.clear();
     document.body.innerHTML = '';
     // Reset all spy call histories before each test.
-    (Object.values(MOCK_CTX) as jest.Mock[]).forEach(v => {
-      if (v && typeof v.mockClear === 'function') v.mockClear();
+    Object.values(MOCK_CTX).forEach(v => {
+      if (v !== null && typeof v === 'function' && 'mockClear' in v) {
+        (v as jest.Mock).mockClear();
+      }
     });
   });
 
@@ -4324,9 +4326,12 @@ describe('CampaignMapEditorSection – campaign-map canvas context is wired afte
     const campaign = makeCampaign();
     section.init(campaign);
     section.buildSection(campaign, false);
-    for (const [x, y] of MOCK_CTX.translate.mock.calls as [number, number][]) {
-      expect(Number.isFinite(x)).toBe(true);
-      expect(Number.isFinite(y)).toBe(true);
+    for (const call of MOCK_CTX.translate.mock.calls) {
+      const [x, y] = call as unknown[];
+      expect(typeof x).toBe('number');
+      expect(typeof y).toBe('number');
+      expect(Number.isFinite(x as number)).toBe(true);
+      expect(Number.isFinite(y as number)).toBe(true);
     }
   });
 });
