@@ -51,6 +51,24 @@ npm install
 - Tests that touch `document`/DOM APIs (modal builders, keyboard events, etc.) must also have `@jest-environment jsdom`.
 - Wait for `npm install` to finish before running lint/build/test commands; running them in parallel with install can fail with missing tool errors.
 
+### Runtime canvas harness (`tools/e2e/`)
+
+`tools/e2e/campaign_editor_harness.py` is a Playwright-based end-to-end harness that catches canvas-render bugs invisible to Jest (jsdom's `getContext('2d')` returns `null`, so every `if (!ctx) return` guard is silently skipped). It drives a real Chromium browser, navigates to the campaign-map editor, and captures console logs + a screenshot.
+
+**Prerequisites:**
+```bash
+pip install playwright && python -m playwright install chromium
+```
+
+**Running the harness** (server must be running first):
+```bash
+npm run build                        # ensure dist/ is up to date
+npx webpack serve --mode development --port 8080 &   # or npm run dev
+PYTHONIOENCODING=utf-8 python tools/e2e/campaign_editor_harness.py --shot /tmp/cme.png
+```
+
+Pass = no `PAGEERROR` in console output and the screenshot shows the SOURCE + SINK tiles on the map (not a blank rectangle).
+
 ---
 
 ## Project layout
@@ -171,6 +189,14 @@ src/
     ├── gridSizePanel.ts         # Grid-size control panel
     ├── renderer.ts              # Editor-specific canvas renderer
     └── types.ts                 # Editor-local types
+```
+
+Other top-level directories:
+```
+tests/                           # Jest test suite (TypeScript, jsdom opt-in per file)
+tools/
+└── e2e/
+    └── campaign_editor_harness.py  # Playwright runtime harness — canvas render regression guard
 ```
 
 ---

@@ -18,6 +18,10 @@ import {
   savePlayerName,
 } from '../src/persistence';
 import { CampaignEditor } from '../src/campaignEditor';
+import {
+  CampaignMapEditorSection,
+  type CampaignMapEditorCallbacks,
+} from '../src/campaignEditor/campaignMapEditor';
 import type { CampaignDef, LevelDef, TileDef, InventoryItem, ChapterDef } from '../src/types';
 import { PipeShape } from '../src/types';
 import type { TileParams, EditorPalette, EditorSnapshot } from '../src/campaignEditor/types';
@@ -4220,6 +4224,110 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
         new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }),
       );
     }).not.toThrow();
+  });
+});
+
+// ─── CampaignMapEditorSection – canvas context wiring ────────────────────────
+//
+// Regression guard for the blank-map bug: jsdom returns null from getContext,
+// so Jest silently skips every `if (!ctx) return` render path. By stubbing
+// getContext we force the real code path and can assert the invariant that was
+// broken: _ctx must be non-null after buildSection.
+
+describe('CampaignMapEditorSection – campaign-map canvas context is wired after buildSection', () => {
+  const MOCK_CTX = {
+    fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', font: '',
+    textAlign: '', textBaseline: '', globalAlpha: 1,
+    fillRect: jest.fn(), strokeRect: jest.fn(), clearRect: jest.fn(),
+    beginPath: jest.fn(), moveTo: jest.fn(), lineTo: jest.fn(),
+    stroke: jest.fn(), fill: jest.fn(), arc: jest.fn(), ellipse: jest.fn(),
+    translate: jest.fn(), rotate: jest.fn(), restore: jest.fn(), save: jest.fn(),
+    scale: jest.fn(), setTransform: jest.fn(), drawImage: jest.fn(),
+    closePath: jest.fn(), clip: jest.fn(), rect: jest.fn(),
+    setLineDash: jest.fn(),
+    measureText: jest.fn(() => ({ width: 0 })),
+    fillText: jest.fn(), strokeText: jest.fn(),
+    createLinearGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+    createRadialGradient: jest.fn(() => ({ addColorStop: jest.fn() })),
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value: () => MOCK_CTX,
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    // Reset all spy call histories before each test.
+    (Object.values(MOCK_CTX) as jest.Mock[]).forEach(v => {
+      if (v && typeof v.mockClear === 'function') v.mockClear();
+    });
+  });
+
+  /** Construct a CampaignMapEditorSection with minimal no-op callbacks. */
+  function makeSection(): CampaignMapEditorSection {
+    const noop = () => {};
+    const cbs: CampaignMapEditorCallbacks = {
+      buildBtn: (_l, _bg, _c, onClick) => {
+        const btn = document.createElement('button');
+        btn.addEventListener('click', onClick);
+        return btn;
+      },
+      getActiveCampaign: () => null,
+      touchCampaign: noop,
+      saveCampaigns: noop,
+      openChapterEditor: noop,
+    };
+    return new CampaignMapEditorSection(cbs);
+  }
+
+  /** Minimal campaign with an explicit 3×6 map grid. */
+  function makeCampaign(): CampaignDef {
+    return {
+      id: 'ctx_test_cmp',
+      name: 'Ctx Test Campaign',
+      author: 'Tester',
+      chapters: [{ id: 1, name: 'Ch 1', levels: [] }],
+      rows: 3,
+      cols: 6,
+    };
+  }
+
+  it('_ctx is non-null after buildSection (regression: was null when ctx was grabbed before _attachInput)', () => {
+    const section = makeSection();
+    const campaign = makeCampaign();
+    section.init(campaign);
+    section.buildSection(campaign, false);
+    // The bug: _detachInput (called inside _attachInput) was nulling _ctx, and
+    // _buildCanvas was grabbing the context BEFORE calling _attachInput, so _ctx
+    // ended up null and the map rendered blank.
+    expect(section['_ctx']).not.toBeNull();
+  });
+
+  it('render calls at least one drawing primitive after buildSection', () => {
+    const section = makeSection();
+    const campaign = makeCampaign();
+    section.init(campaign);
+    section.buildSection(campaign, false);
+    const drawCalls =
+      MOCK_CTX.fillRect.mock.calls.length +
+      MOCK_CTX.stroke.mock.calls.length +
+      MOCK_CTX.strokeRect.mock.calls.length;
+    expect(drawCalls).toBeGreaterThan(0);
+  });
+
+  it('translate (when called) receives finite numeric arguments', () => {
+    const section = makeSection();
+    const campaign = makeCampaign();
+    section.init(campaign);
+    section.buildSection(campaign, false);
+    for (const [x, y] of MOCK_CTX.translate.mock.calls as [number, number][]) {
+      expect(Number.isFinite(x)).toBe(true);
+      expect(Number.isFinite(y)).toBe(true);
+    }
   });
 });
 
