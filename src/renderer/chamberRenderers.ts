@@ -3,7 +3,7 @@
  * the main renderer module stays focused on board/tile orchestration.
  */
 
-import { GOLD_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from '../board';
+import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from '../board';
 import type { Tile } from '../tile';
 import { PipeShape, Direction } from '../types';
 import {
@@ -162,8 +162,9 @@ function _drawChamberDirtContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
 function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
   // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
   const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
-  const itemColor = isGoldItem
-    ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
+  const isLeakyItem = itemShape !== null && LEAKY_PIPE_SHAPES.has(itemShape);
+  const itemColor = isGoldItem ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
+    : isLeakyItem ? (isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
     : (isWater ? WATER_COLOR : PIPE_COLOR);
   if (itemShape !== null) {
     let drawShape = itemShape;
