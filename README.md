@@ -23,6 +23,7 @@ Top-level directories:
 - src/ — game source (TypeScript)
 - tests/ — Jest test suite
 - data/ — sound + image assets
+- tools/e2e/ — Playwright-based runtime harness (`campaign_editor_harness.py`) for canvas-render tests that Jest cannot exercise (jsdom returns `null` from `getContext`)
 - .github/workflows/ — CI/CD (GitHub Pages deploy)
 
 ## Deployment

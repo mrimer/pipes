@@ -62,33 +62,33 @@ describe('MapEditorGridState.init', () => {
     expect(s.grid[0][0]?.shape).toBe(PipeShape.Granite);
   });
 
-  it('infers rows/cols from saved grid when dimensions are missing', () => {
+  it('falls back to defaults when rows/cols are missing even if a grid is provided', () => {
+    // The inference path (rows/cols inferred from grid) was removed because
+    // _saveGrid always writes explicit rows/cols alongside the grid, so the
+    // "grid present but dimensions undefined" shape never occurs in practice.
+    // When dimensions are missing the editor resets to a fresh default grid.
     const s = makeState();
     const g: (TileDef | null)[][] = [
       [tile(PipeShape.Source), null, tile(PipeShape.Sink)],
       [null, tile(PipeShape.Granite), null],
     ];
     s.init(undefined, undefined, g);
-    expect(s.rows).toBe(2);
-    expect(s.cols).toBe(3);
-    expect(s.grid[0][0]?.shape).toBe(PipeShape.Source);
-    expect(s.grid[0][2]?.shape).toBe(PipeShape.Sink);
-    expect(s.grid[1][1]?.shape).toBe(PipeShape.Granite);
+    // Falls back to the 3×6 defaults — the provided grid is ignored.
+    expect(s.rows).toBe(3);
+    expect(s.cols).toBe(6);
+    expect(s.grid[1][0]?.shape).toBe(PipeShape.Source);
+    expect(s.grid[1][5]?.shape).toBe(PipeShape.Sink);
   });
 
-  it('pads jagged saved rows with nulls when inferring dimensions', () => {
+  it('falls back to defaults when only cols is missing', () => {
+    // If either dimension is missing the editor resets to defaults.
     const s = makeState();
     const g: (TileDef | null)[][] = [
-      [tile(PipeShape.Source)],
-      [null, tile(PipeShape.Sink), null],
+      [tile(PipeShape.Source), null, tile(PipeShape.Sink)],
     ];
-    s.init(undefined, undefined, g);
-    expect(s.rows).toBe(2);
-    expect(s.cols).toBe(3);
-    expect(s.grid[0][0]?.shape).toBe(PipeShape.Source);
-    expect(s.grid[0][1]).toBeNull();
-    expect(s.grid[0][2]).toBeNull();
-    expect(s.grid[1][1]?.shape).toBe(PipeShape.Sink);
+    s.init(1, undefined, g);
+    expect(s.rows).toBe(3);
+    expect(s.cols).toBe(6);
   });
 
   it('resets focusedTilePos on re-init', () => {

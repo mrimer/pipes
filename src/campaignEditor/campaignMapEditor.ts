@@ -197,6 +197,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
   init(campaign: CampaignDef): void {
     this.stopSeaAnimationLoop();
     this._detachInput();
+    // Canvas/ctx teardown belongs here (editor close/re-open), not inside
+    // _detachInput, which is also called by _attachInput and must only manage
+    // event-listener lifecycle.
+    this._canvas = null;
+    this._ctx = null;
     this._panPixelX = 0;
     this._panPixelY = 0;
     this._initGridState(campaign);
@@ -719,8 +724,9 @@ export class CampaignMapEditorSection extends MapEditorBase {
       this._attachInput(canvas, campaign);
     }
 
-    // Acquire the 2D context AFTER _attachInput: _attachInput → _detachInput nulls
-    // this._ctx, so grabbing it earlier would be wiped out (leaving the canvas blank).
+    // Acquire the 2D context AFTER _attachInput as defense-in-depth: _detachInput
+    // no longer nulls _ctx, but keeping this order makes the code robust to any
+    // future reordering that might otherwise reintroduce a blank-canvas regression.
     const ctx = canvas.getContext('2d');
     if (ctx) this._ctx = ctx;
     
@@ -963,8 +969,9 @@ export class CampaignMapEditorSection extends MapEditorBase {
       window.removeEventListener('mouseup', this._windowMouseUpHandler);
       this._windowMouseUpHandler = null;
     }
-    this._canvas = null;
-    this._ctx = null;
+    // Note: _canvas and _ctx are NOT nulled here — _detachInput only removes
+    // event listeners. Canvas/ctx teardown is handled by the caller (init) so
+    // that _attachInput → _detachInput does not wipe out the canvas reference.
   }
 
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {

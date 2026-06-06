@@ -48,32 +48,15 @@ export class MapEditorGridState {
     savedCols: number | undefined,
     savedGrid: (TileDef | null)[][] | undefined,
   ): void {
-    const hasSavedGrid = Array.isArray(savedGrid) && savedGrid.length > 0;
-    const inferredRows =
-      typeof savedRows === 'number' && savedRows > 0
-        ? savedRows
-        : (hasSavedGrid ? savedGrid.length : 0);
-    const inferredColsFromGrid = hasSavedGrid
-      ? savedGrid.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0)
-      : 0;
-    const inferredCols =
-      typeof savedCols === 'number' && savedCols > 0
-        ? savedCols
-        : inferredColsFromGrid;
-
-    if (hasSavedGrid && inferredRows > 0 && inferredCols > 0) {
-      this.rows = inferredRows;
-      this.cols = inferredCols;
-      this.grid = Array.from(
-        { length: this.rows },
-        (_, r) => Array.from(
-          { length: this.cols },
-          (_, c) => {
-            const cell = savedGrid[r]?.[c] ?? null;
-            return cell ? structuredClone(cell) : null;
-          },
-        ),
-      );
+    if (
+      typeof savedRows === 'number' && savedRows > 0 &&
+      typeof savedCols === 'number' && savedCols > 0 &&
+      Array.isArray(savedGrid) && savedGrid.length > 0
+    ) {
+      this.rows = savedRows;
+      this.cols = savedCols;
+      // Deep-clone to prevent shared-ref mutation of the saved campaign data.
+      this.grid = structuredClone(savedGrid);
     } else {
       this.rows = this._defaultRows;
       this.cols = this._defaultCols;
