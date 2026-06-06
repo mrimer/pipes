@@ -84,4 +84,23 @@ describe('drawChamber visual effects', () => {
 
     expect(ctx.fillStyles.some((style) => style.startsWith('hsla('))).toBe(false);
   });
+
+  it.each([
+    [PipeShape.Straight, PipeShape.LeakyStraight],
+    [PipeShape.Elbow, PipeShape.LeakyElbow],
+    [PipeShape.Tee, PipeShape.LeakyTee],
+    [PipeShape.Cross, PipeShape.LeakyCross],
+  ])('renders %s item chambers like %s', (baseShape, leakyShape) => {
+    const baseCtx = createMockCtx();
+    const leakyCtx = createMockCtx();
+    const baseTile = new Tile(PipeShape.Chamber, 0, false, 0, 0, baseShape, 1, null, 'item');
+    const leakyTile = new Tile(PipeShape.Chamber, 0, false, 0, 0, leakyShape, 1, null, 'item');
+
+    drawChamber(baseCtx, baseTile, '#88ccff', false, 32, false, 0, 0, null, null);
+    drawChamber(leakyCtx, leakyTile, '#88ccff', false, 32, false, 0, 0, null, null);
+
+    expect((leakyCtx.stroke as jest.Mock).mock.calls).toHaveLength((baseCtx.stroke as jest.Mock).mock.calls.length);
+    expect((leakyCtx.moveTo as jest.Mock).mock.calls).toHaveLength((baseCtx.moveTo as jest.Mock).mock.calls.length);
+    expect((leakyCtx.lineTo as jest.Mock).mock.calls).toHaveLength((baseCtx.lineTo as jest.Mock).mock.calls.length);
+  });
 });

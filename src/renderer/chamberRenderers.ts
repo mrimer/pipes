@@ -171,6 +171,10 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
     else if (itemShape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
     else if (itemShape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
     else if (itemShape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
+    else if (itemShape === PipeShape.LeakyStraight) drawShape = PipeShape.Straight;
+    else if (itemShape === PipeShape.LeakyElbow) drawShape = PipeShape.Elbow;
+    else if (itemShape === PipeShape.LeakyTee) drawShape = PipeShape.Tee;
+    else if (itemShape === PipeShape.LeakyCross) drawShape = PipeShape.Cross;
     ctx.save();
     // Clip to the inner box so the pipe image never bleeds onto the connection stubs
     ctx.beginPath();
