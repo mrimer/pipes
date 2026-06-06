@@ -714,13 +714,16 @@ export class CampaignMapEditorSection extends MapEditorBase {
       'cursor:' + (readOnly ? 'default' : 'crosshair') + ';display:block;';
     this._canvas = canvas;
     this._updateCanvasDisplaySize();
-    const ctx = canvas.getContext('2d');
-    if (ctx) this._ctx = ctx;
 
     if (!readOnly) {
       this._attachInput(canvas, campaign);
     }
 
+    // Acquire the 2D context AFTER _attachInput: _attachInput → _detachInput nulls
+    // this._ctx, so grabbing it earlier would be wiped out (leaving the canvas blank).
+    const ctx = canvas.getContext('2d');
+    if (ctx) this._ctx = ctx;
+    
     this._renderCanvas();
 
     if (!readOnly) {
