@@ -353,9 +353,9 @@ export const en: TranslationTable = {
   'rules.legend.star.name': 'Star',
   'rules.legend.star.description': 'A bonus collectible. Connect it to the water path before winning to count it as a collected star for the level. Stars are tracked per-level and shown on the level select screen.',
   'rules.legend.gel.name': 'Gel',
-  'rules.legend.gel.description': 'Halves the current water total (rounded down) when connected. Applied after all cost chambers resolve.',
+  'rules.legend.gel.description': 'Halves the current water total (result rounded down) when connected. Applied after all cost chambers resolve.',
   'rules.legend.siphon.name': 'Siphon',
-  'rules.legend.siphon.description': 'Doubles the current water total when connected. Applied before Gel chambers.',
+  'rules.legend.siphon.description': 'Doubles the current water total the first time it connects. That gained amount is permanently locked to this siphon. Applied before Gel chambers.',
 
   'editor.screen.selectCampaign': '🗺️ Select Campaign',
   'editor.touchNotice': '⚠️ The Campaign Editor is designed for desktop use and may be difficult to operate on touch devices. For the best experience, use a mouse and keyboard.',
