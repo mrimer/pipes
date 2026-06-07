@@ -217,11 +217,7 @@ export class TooltipManager {
       tooltipText += ' (fixed)';
     }
     if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'regulator') {
-      // Regulator: always show the check parameters regardless of connected state.
-      const stat = tile.regulatorStat ?? 'water';
-      const op   = tile.regulatorOperator ?? '>';
-      const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
-      tooltipText += `\nRegulator: ${statLabel} ${op} ${tile.cost}`;
+      // Regulator parameters are already part of the tile display name above.
     } else if (tile.shape === PipeShape.Chamber && (tile.cost > 0 || tile.chamberContent === 'gel' || tile.chamberContent === 'siphon')) {
       // Only show a predicted cost for tiles that are NOT yet in the fill path.
       // Once a tile is connected its cost is already reflected in the water display;
