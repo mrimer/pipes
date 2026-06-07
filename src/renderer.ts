@@ -1824,6 +1824,12 @@ function _resolveTileColor(
     if (chamberContent === 'hot_plate') {
       return isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
     }
+    if (chamberContent === 'gel') {
+      return isWater ? GEL_WATER_COLOR : GEL_COLOR;
+    }
+    if (chamberContent === 'siphon') {
+      return isWater ? SIPHON_WATER_COLOR : SIPHON_COLOR;
+    }
     if (chamberContent === 'regulator') {
       return isWater ? REGULATOR_WATER_COLOR : REGULATOR_COLOR;
     }
