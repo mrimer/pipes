@@ -529,13 +529,17 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
     // Unconnected and pressure <= hardness: show hardness/H and "temperature x cost"
     ctx.font = `bold ${_s(14)}px Arial`;
     ctx.fillText(`${tile.hardness}H`, 0, textCenterY - _s(4));
-    ctx.font = (tile.temperature < 10 && tile.cost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
-    ctx.fillText(`-${Math.abs(tile.temperature)}° x ${tile.cost}`, 0, textCenterY + _s(10));
+    // When shift is held, show the raw (unadjusted) temperature.
+    const sandstoneTemp = shiftHeld
+      ? tile.temperature
+      : computeDeltaTemp(tile.temperature, currentTemp);
+    ctx.font = (sandstoneTemp < 10 && tile.cost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+    ctx.fillText(`-${sandstoneTemp}° x ${tile.cost}`, 0, textCenterY + _s(10));
   } else {
     // Unconnected: show cost display.
     // deltaDamage = Pressure − Hardness is used as the cost divisor.
     // When shift is held, show the raw (unadjusted) values.
-    const sandstoneThreshold = shiftHeld
+    const sandstoneTemp = shiftHeld
       ? tile.temperature
       : computeDeltaTemp(tile.temperature, currentTemp);
     const sandstoneCost = shiftHeld
@@ -545,11 +549,11 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
       const displayCost = shatterOverride ? 0 : sandstoneCost;
       ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
       ctx.fillText(shatterOverride ? t('tile.sandstone.weak') : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
-      ctx.font = (sandstoneThreshold < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(`-${sandstoneThreshold}° x ${displayCost}`, 0, textCenterY + _s(7));
+      ctx.font = (sandstoneTemp < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+      ctx.fillText(`-${sandstoneTemp}° x ${displayCost}`, 0, textCenterY + _s(7));
     } else {
       ctx.font = `bold ${_s(14)}px Arial`;
-      ctx.fillText(`-${sandstoneThreshold}°`, 0, textCenterY - _s(5));
+      ctx.fillText(`-${sandstoneTemp}°`, 0, textCenterY - _s(5));
       ctx.font = `bold ${_s(9)}px Arial`;
       ctx.fillText('x', 0, textCenterY + _s(4));
       ctx.font = `bold ${_s(14)}px Arial`;
