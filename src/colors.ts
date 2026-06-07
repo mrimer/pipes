@@ -233,14 +233,14 @@ export const STAR_COLOR       = '#f0c040';
 export const REGULATOR_COLOR       = '#4a7a6a';
 /** Regulator chamber tile color when water is flowing through it (more saturated green). */
 export const REGULATOR_WATER_COLOR = '#5da87a';
-/** Gel chamber tile color (dark navy blue). */
-export const GEL_COLOR        = '#1a3a7a';
-/** Gel chamber tile color when water is flowing through it (slightly lighter dark blue). */
-export const GEL_WATER_COLOR  = '#2a50a8';
-/** Siphon chamber tile color (bright cyan-blue). */
-export const SIPHON_COLOR       = '#40c4ff';
-/** Siphon chamber tile color when water is flowing through it (even brighter). */
-export const SIPHON_WATER_COLOR = '#80d8ff';
+/** Gel chamber tile color (dark blue). */
+export const GEL_COLOR        = '#16346b';
+/** Gel chamber tile color when water is flowing through it (medium blue, still darker than tank). */
+export const GEL_WATER_COLOR  = '#2b5db8';
+/** Siphon chamber tile color (light cyan). */
+export const SIPHON_COLOR       = '#a6ecff';
+/** Siphon chamber tile color when water is flowing through it (more saturated cyan). */
+export const SIPHON_WATER_COLOR = '#42d9ff';
 /** Hot plate chamber tile color (warm orange-red). */
 export const HOT_PLATE_COLOR       = '#e44';
 /** Hot plate chamber tile color when water is flowing through it. */
