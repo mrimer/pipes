@@ -27,6 +27,7 @@ import {
   GEL_COLOR, GEL_WATER_COLOR,
   SIPHON_COLOR, SIPHON_WATER_COLOR,
   CHAMBER_FILL_COLOR, CHAMBER_FILL_WATER_COLOR,
+  LEAKY_PIPE_WATER_COLOR, LEAKY_PIPE_COLOR,
   lighten, darken,
 } from '../colors';
 import { LINE_WIDTH, _s } from './rendererState';
