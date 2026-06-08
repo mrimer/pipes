@@ -4,7 +4,7 @@ import type { Board} from './board';
 import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES } from './board';
 import type { PipeShape } from './types';
 import { GOLD_PIPE_COLOR, LEAKY_PIPE_COLOR } from './colors';
-import { shapeIcon } from './renderer';
+import { buildShapeIcon } from './renderer';
 import { t } from './i18n';
 
 /**
@@ -26,9 +26,12 @@ export function renderInventoryBar(
   onItemTouch?: (el: HTMLElement, shape: PipeShape, effectiveCount: number) => void,
 ): void {
   // Preserve any canvas children (e.g. the wave animation overlay) so that
-  // the wave animation loop is not interrupted by the innerHTML replacement.
+  // the wave animation loop is not interrupted by DOM replacement.
   const savedCanvases = Array.from(inventoryBarEl.querySelectorAll<HTMLCanvasElement>(':scope > canvas'));
-  inventoryBarEl.innerHTML = '<h3 class="inv-title">Inventory</h3>';
+  const title = document.createElement('h3');
+  title.className = 'inv-title';
+  title.textContent = 'Inventory';
+  inventoryBarEl.replaceChildren(title);
   for (const cv of savedCanvases) inventoryBarEl.appendChild(cv);
 
   const bonuses = board.getContainerBonuses();
@@ -52,10 +55,13 @@ export function renderInventoryBar(
     else if (effectiveCount < 0) el.classList.add('negative');
 
     const iconColor = isGold ? GOLD_PIPE_COLOR : isLeaky ? LEAKY_PIPE_COLOR : '#4a90d9';
-    const icon = shapeIcon(item.shape, iconColor);
-    el.innerHTML =
-      `<span class="inv-shape">${icon}</span>` +
-      `<span class="inv-count">×${effectiveCount}</span>`;
+    const shapeSpan = document.createElement('span');
+    shapeSpan.className = 'inv-shape';
+    shapeSpan.appendChild(buildShapeIcon(item.shape, iconColor));
+    const countSpan = document.createElement('span');
+    countSpan.className = 'inv-count';
+    countSpan.textContent = `×${effectiveCount}`;
+    el.replaceChildren(shapeSpan, countSpan);
 
     el.dataset['shape'] = item.shape;
     el.addEventListener('click', () => onItemClick(item.shape, effectiveCount));
@@ -85,10 +91,13 @@ export function renderInventoryBar(
     else if (bonusCount < 0) el.classList.add('negative');
 
     const iconColor = isGold ? GOLD_PIPE_COLOR : isLeaky ? LEAKY_PIPE_COLOR : '#4a90d9';
-    const icon = shapeIcon(bonusShape, iconColor);
-    el.innerHTML =
-      `<span class="inv-shape">${icon}</span>` +
-      `<span class="inv-count">×${bonusCount}</span>`;
+    const shapeSpan = document.createElement('span');
+    shapeSpan.className = 'inv-shape';
+    shapeSpan.appendChild(buildShapeIcon(bonusShape, iconColor));
+    const countSpan = document.createElement('span');
+    countSpan.className = 'inv-count';
+    countSpan.textContent = `×${bonusCount}`;
+    el.replaceChildren(shapeSpan, countSpan);
 
     el.dataset['shape'] = bonusShape;
     el.addEventListener('click', () => onItemClick(bonusShape, bonusCount));

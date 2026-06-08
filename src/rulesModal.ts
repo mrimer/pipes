@@ -1,6 +1,6 @@
 /** Builds and manages the "Game Rules" modal overlay. */
 
-import { shapeIcon } from './renderer';
+import { buildShapeIcon } from './renderer';
 import { PipeShape } from './types';
 import { isTouchDevice } from './deviceUtils';
 import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
@@ -24,11 +24,12 @@ import {
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_RUST_COLOR,
 } from './colors';
+import { svgEl, svgRoot } from './svgUtils';
 
 /** A single row in the tile legend. */
 interface LegendRow {
-  /** Inline HTML for the icon cell. */
-  iconHtml: string;
+  /** Icon element factory for the icon cell. */
+  iconEl: () => SVGElement;
   /** Display name of the tile. */
   name: string;
   /** Brief description of the tile's role. */
@@ -45,102 +46,98 @@ interface ControlRow {
   commandAction?: CommandAction;
 }
 
-/** Return a small colored square as an inline HTML string. */
-function colorSwatch(fill: string, border = fill): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<rect x="2" y="2" width="24" height="24" rx="4" ry="4" ` +
-    `fill="${fill}" stroke="${border}" stroke-width="2"/>` +
-    `</svg>`
-  );
+/** Return a small colored square swatch. */
+function colorSwatch(fill: string, border = fill): SVGSVGElement {
+  return svgRoot(28, [
+    svgEl('rect', { x: 2, y: 2, width: 24, height: 24, rx: 4, ry: 4, fill, stroke: border, 'stroke-width': 2 }),
+  ]);
 }
 
-/** Return a small granite block icon (fill + crack lines) as an inline HTML string. */
-function graniteSwatch(): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<rect x="2" y="2" width="24" height="24" rx="2" ry="2" fill="${GRANITE_FILL_COLOR}" stroke="${GRANITE_COLOR}" stroke-width="2"/>` +
-    `<line x1="4" y1="9" x2="20" y2="11" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
-    `<line x1="5" y1="15" x2="21" y2="17" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
-    `<line x1="4" y1="21" x2="20" y2="23" stroke="${GRANITE_COLOR}" stroke-width="1.5" stroke-linecap="round"/>` +
-    `</svg>`
-  );
+/** Return a small granite block icon (fill + crack lines). */
+function graniteSwatch(): SVGSVGElement {
+  return svgRoot(28, [
+    svgEl('rect', {
+      x: 2, y: 2, width: 24, height: 24, rx: 2, ry: 2,
+      fill: GRANITE_FILL_COLOR, stroke: GRANITE_COLOR, 'stroke-width': 2,
+    }),
+    svgEl('line', { x1: 4, y1: 9, x2: 20, y2: 11, stroke: GRANITE_COLOR, 'stroke-width': 1.5, 'stroke-linecap': 'round' }),
+    svgEl('line', { x1: 5, y1: 15, x2: 21, y2: 17, stroke: GRANITE_COLOR, 'stroke-width': 1.5, 'stroke-linecap': 'round' }),
+    svgEl('line', { x1: 4, y1: 21, x2: 20, y2: 23, stroke: GRANITE_COLOR, 'stroke-width': 1.5, 'stroke-linecap': 'round' }),
+  ]);
 }
 
-/** Return a small tree icon (top-down canopy view) as an inline HTML string. */
-function treeSwatch(): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<rect x="0" y="0" width="28" height="28" fill="#1a4a0e"/>` +
-    `<circle cx="14" cy="14" r="10" fill="${TREE_LEAF_COLOR}"/>` +
-    `<circle cx="14" cy="5"  r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
-    `<circle cx="23" cy="14" r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
-    `<circle cx="14" cy="23" r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
-    `<circle cx="5"  cy="14" r="5" fill="${TREE_LEAF_ALT_COLOR}"/>` +
-    `<circle cx="14" cy="14" r="2" fill="${TREE_TRUNK_COLOR}"/>` +
-    `<circle cx="14" cy="14" r="10" fill="none" stroke="${TREE_COLOR}" stroke-width="1.5"/>` +
-    `</svg>`
-  );
+/** Return a small tree icon (top-down canopy view). */
+function treeSwatch(): SVGSVGElement {
+  return svgRoot(28, [
+    svgEl('rect', { x: 0, y: 0, width: 28, height: 28, fill: '#1a4a0e' }),
+    svgEl('circle', { cx: 14, cy: 14, r: 10, fill: TREE_LEAF_COLOR }),
+    svgEl('circle', { cx: 14, cy: 5, r: 5, fill: TREE_LEAF_ALT_COLOR }),
+    svgEl('circle', { cx: 23, cy: 14, r: 5, fill: TREE_LEAF_ALT_COLOR }),
+    svgEl('circle', { cx: 14, cy: 23, r: 5, fill: TREE_LEAF_ALT_COLOR }),
+    svgEl('circle', { cx: 5, cy: 14, r: 5, fill: TREE_LEAF_ALT_COLOR }),
+    svgEl('circle', { cx: 14, cy: 14, r: 2, fill: TREE_TRUNK_COLOR }),
+    svgEl('circle', { cx: 14, cy: 14, r: 10, fill: 'none', stroke: TREE_COLOR, 'stroke-width': 1.5 }),
+  ]);
 }
 
-/** Return a cement tile icon (light-gray background + three diagonal wavy lines) as an inline HTML string. */
-function cementSwatch(): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<rect x="2" y="2" width="24" height="24" rx="2" ry="2" fill="${CEMENT_FILL_COLOR}" stroke="${CEMENT_COLOR}" stroke-width="2"/>` +
-    `<path d="M 4 22 Q 14 14 24 6" stroke="${CEMENT_COLOR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
-    `<path d="M 2 28 Q 14 18 26 10" stroke="${CEMENT_COLOR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
-    `<path d="M 6 16 Q 16 8 26 2" stroke="${CEMENT_COLOR}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
-    `</svg>`
-  );
+/** Return a cement tile icon (light-gray background + three diagonal wavy lines). */
+function cementSwatch(): SVGSVGElement {
+  return svgRoot(28, [
+    svgEl('rect', {
+      x: 2, y: 2, width: 24, height: 24, rx: 2, ry: 2,
+      fill: CEMENT_FILL_COLOR, stroke: CEMENT_COLOR, 'stroke-width': 2,
+    }),
+    svgEl('path', { d: 'M 4 22 Q 14 14 24 6', stroke: CEMENT_COLOR, 'stroke-width': 1.5, fill: 'none', 'stroke-linecap': 'round' }),
+    svgEl('path', { d: 'M 2 28 Q 14 18 26 10', stroke: CEMENT_COLOR, 'stroke-width': 1.5, fill: 'none', 'stroke-linecap': 'round' }),
+    svgEl('path', { d: 'M 6 16 Q 16 8 26 2', stroke: CEMENT_COLOR, 'stroke-width': 1.5, fill: 'none', 'stroke-linecap': 'round' }),
+  ]);
 }
 
-/** Return a small colored square with a text label overlaid, as an inline HTML string. */
-function chamberSwatch(fill: string, label: string, border = fill): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<rect x="2" y="2" width="24" height="24" rx="4" ry="4" ` +
-    `fill="${fill}" stroke="${border}" stroke-width="2"/>` +
-    `<text x="14" y="19" text-anchor="middle" font-family="Arial" ` +
-    `font-weight="bold" font-size="11" fill="white">${label}</text>` +
-    `</svg>`
-  );
+/** Return a small colored square with a text label overlaid. */
+function chamberSwatch(fill: string, label: string, border = fill): SVGSVGElement {
+  const text = svgEl('text', {
+    x: 14, y: 19, 'text-anchor': 'middle', 'font-family': 'Arial',
+    'font-weight': 'bold', 'font-size': 11, fill: 'white',
+  });
+  text.textContent = label;
+  return svgRoot(28, [
+    svgEl('rect', { x: 2, y: 2, width: 24, height: 24, rx: 4, ry: 4, fill, stroke: border, 'stroke-width': 2 }),
+    text,
+  ]);
 }
 
-/** Return a small colored circle as an inline HTML string. */
-function colorCircle(fill: string): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<circle cx="14" cy="14" r="11" fill="${fill}"/>` +
-    `</svg>`
-  );
+/** Return a small colored circle. */
+function colorCircle(fill: string): SVGSVGElement {
+  return svgRoot(28, [svgEl('circle', { cx: 14, cy: 14, r: 11, fill })]);
 }
 
-/** Return a one-way tile icon (dark-red background with a red upward arrow) as an inline HTML string. */
-function oneWaySwatch(): string {
-  return (
-    `<svg width="28" height="28" viewBox="0 0 28 28">` +
-    `<rect x="2" y="2" width="24" height="24" rx="2" ry="2" fill="${ONE_WAY_BG_COLOR}" stroke="${ONE_WAY_ARROW_BORDER}" stroke-width="1.5"/>` +
-    `<polygon points="14,4 24,14 19,14 19,24 9,24 9,14 4,14" fill="${ONE_WAY_ARROW_COLOR}" stroke="${ONE_WAY_ARROW_BORDER}" stroke-width="1" stroke-linejoin="round"/>` +
-    `</svg>`
-  );
+/** Return a one-way tile icon (dark-red background with a red upward arrow). */
+function oneWaySwatch(): SVGSVGElement {
+  return svgRoot(28, [
+    svgEl('rect', {
+      x: 2, y: 2, width: 24, height: 24, rx: 2, ry: 2,
+      fill: ONE_WAY_BG_COLOR, stroke: ONE_WAY_ARROW_BORDER, 'stroke-width': 1.5,
+    }),
+    svgEl('polygon', {
+      points: '14,4 24,14 19,14 19,24 9,24 9,14 4,14',
+      fill: ONE_WAY_ARROW_COLOR,
+      stroke: ONE_WAY_ARROW_BORDER,
+      'stroke-width': 1,
+      'stroke-linejoin': 'round',
+    }),
+  ]);
 }
 
-/** Return a leaky pipe tile icon (rust-brown pipe with rust spots) as an inline HTML string. */
-function leakyPipeSwatch(): string {
+/** Return a leaky pipe tile icon (rust-brown pipe with rust spots). */
+function leakyPipeSwatch(): SVGSVGElement {
   const S = 28;
   const H = S / 2;
   const sw = 4;
-  // Pipe body: a simple straight pipe icon
-  const pipeStroke = LEAKY_PIPE_COLOR;
-  const rustFill = LEAKY_RUST_COLOR;
-  return (
-    `<svg width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">` +
-    `<line x1="${H}" y1="0" x2="${H}" y2="${S}" stroke="${pipeStroke}" stroke-width="${sw}" stroke-linecap="round"/>` +
-    `<circle cx="${H}" cy="${H * 0.5}" r="3" fill="${rustFill}" opacity="0.85"/>` +
-    `<circle cx="${H}" cy="${H * 1.5}" r="3" fill="${rustFill}" opacity="0.85"/>` +
-    `</svg>`
-  );
+  return svgRoot(S, [
+    svgEl('line', { x1: H, y1: 0, x2: H, y2: S, stroke: LEAKY_PIPE_COLOR, 'stroke-width': sw, 'stroke-linecap': 'round' }),
+    svgEl('circle', { cx: H, cy: H * 0.5, r: 3, fill: LEAKY_RUST_COLOR, opacity: 0.85 }),
+    svgEl('circle', { cx: H, cy: H * 1.5, r: 3, fill: LEAKY_RUST_COLOR, opacity: 0.85 }),
+  ]);
 }
 
 /** Controls reference table rows. */
@@ -181,137 +178,137 @@ function getTouchControlRows(): ControlRow[] {
 function getLegendRows(): LegendRow[] {
   return [
   {
-    iconHtml: colorCircle(SOURCE_COLOR),
+    iconEl: () => colorCircle(SOURCE_COLOR),
     name: t('rules.legend.source.name'),
     description: t('rules.legend.source.description'),
   },
   {
-    iconHtml: colorCircle(SINK_COLOR),
+    iconEl: () => colorCircle(SINK_COLOR),
     name: t('rules.legend.sink.name'),
     description: t('rules.legend.sink.description'),
   },
   {
-    iconHtml: colorSwatch(EMPTY_COLOR),
+    iconEl: () => colorSwatch(EMPTY_COLOR),
     name: t('rules.legend.emptyCell.name'),
     description: t('rules.legend.emptyCell.description'),
   },
   {
-    iconHtml: shapeIcon(PipeShape.Straight, PIPE_COLOR),
+    iconEl: () => buildShapeIcon(PipeShape.Straight, PIPE_COLOR),
     name: t('rules.legend.straightPipe.name'),
     description: t('rules.legend.straightPipe.description'),
   },
   {
-    iconHtml: shapeIcon(PipeShape.Elbow, PIPE_COLOR),
+    iconEl: () => buildShapeIcon(PipeShape.Elbow, PIPE_COLOR),
     name: t('rules.legend.elbowPipe.name'),
     description: t('rules.legend.elbowPipe.description'),
   },
   {
-    iconHtml: shapeIcon(PipeShape.Tee, PIPE_COLOR),
+    iconEl: () => buildShapeIcon(PipeShape.Tee, PIPE_COLOR),
     name: t('rules.legend.tJunction.name'),
     description: t('rules.legend.tJunction.description'),
   },
   {
-    iconHtml: shapeIcon(PipeShape.Cross, PIPE_COLOR),
+    iconEl: () => buildShapeIcon(PipeShape.Cross, PIPE_COLOR),
     name: t('rules.legend.crossJunction.name'),
     description: t('rules.legend.crossJunction.description'),
   },
   {
-    iconHtml: cementSwatch(),
+    iconEl: () => cementSwatch(),
     name: t('rules.legend.cement.name'),
     description: t('rules.legend.cement.description'),
   },
   {
-    iconHtml: oneWaySwatch(),
+    iconEl: () => oneWaySwatch(),
     name: t('rules.legend.oneWay.name'),
     description: t('rules.legend.oneWay.description'),
   },
   {
-    iconHtml: graniteSwatch(),
+    iconEl: () => graniteSwatch(),
     name: t('rules.legend.graniteBlock.name'),
     description: t('rules.legend.graniteBlock.description'),
   },
   {
-    iconHtml: treeSwatch(),
+    iconEl: () => treeSwatch(),
     name: t('rules.legend.tree.name'),
     description: t('rules.legend.tree.description'),
   },
   {
-    iconHtml: colorSwatch(GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR),
+    iconEl: () => colorSwatch(GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR),
     name: t('rules.legend.goldSpace.name'),
     description: t('rules.legend.goldSpace.description'),
   },
   {
-    iconHtml: shapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
+    iconEl: () => buildShapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
     name: t('rules.legend.goldPipe.name'),
     description: t('rules.legend.goldPipe.description'),
   },
   {
-    iconHtml: leakyPipeSwatch(),
+    iconEl: () => leakyPipeSwatch(),
     name: t('rules.legend.leakyPipe.name'),
     description: t('rules.legend.leakyPipe.description'),
   },
   {
-    iconHtml: chamberSwatch(TANK_COLOR, '~'),
+    iconEl: () => chamberSwatch(TANK_COLOR, '~'),
     name: t('rules.legend.tank.name'),
     description: t('rules.legend.tank.description'),
   },
   {
-    iconHtml: chamberSwatch(DIRT_COST_COLOR, '−'),
+    iconEl: () => chamberSwatch(DIRT_COST_COLOR, '−'),
     name: t('rules.legend.dirt.name'),
     description: t('rules.legend.dirt.description'),
   },
   {
-    iconHtml: chamberSwatch(PIPE_COLOR, '+'),
+    iconEl: () => chamberSwatch(PIPE_COLOR, '+'),
     name: t('rules.legend.item.name'),
     description: t('rules.legend.item.description'),
   },
   {
-    iconHtml: chamberSwatch(HEATER_COLOR, '+°'),
+    iconEl: () => chamberSwatch(HEATER_COLOR, '+°'),
     name: t('rules.legend.heater.name'),
     description: t('rules.legend.heater.description'),
   },
   {
-    iconHtml: chamberSwatch(ICE_COLOR, '❄'),
+    iconEl: () => chamberSwatch(ICE_COLOR, '❄'),
     name: t('rules.legend.ice.name'),
     description: t('rules.legend.ice.description'),
   },
   {
-    iconHtml: chamberSwatch(PUMP_COLOR, '+P'),
+    iconEl: () => chamberSwatch(PUMP_COLOR, '+P'),
     name: t('rules.legend.pump.name'),
     description: t('rules.legend.pump.description'),
   },
   {
-    iconHtml: chamberSwatch(SNOW_COLOR, '❄'),
+    iconEl: () => chamberSwatch(SNOW_COLOR, '❄'),
     name: t('rules.legend.snow.name'),
     description: t('rules.legend.snow.description'),
   },
   {
-    iconHtml: chamberSwatch(SANDSTONE_COLOR, '≈'),
+    iconEl: () => chamberSwatch(SANDSTONE_COLOR, '≈'),
     name: t('rules.legend.sandstone.name'),
     description: t('rules.legend.sandstone.description'),
   },
   {
-    iconHtml: chamberSwatch(HOT_PLATE_COLOR, 'HP'),
+    iconEl: () => chamberSwatch(HOT_PLATE_COLOR, 'HP'),
     name: t('rules.legend.hotPlate.name'),
     description: t('rules.legend.hotPlate.description'),
   },
   {
-    iconHtml: chamberSwatch(REGULATOR_COLOR, '>N\u2026'),
+    iconEl: () => chamberSwatch(REGULATOR_COLOR, '>N\u2026'),
     name: t('rules.legend.regulator.name'),
     description: t('rules.legend.regulator.description'),
   },
   {
-    iconHtml: chamberSwatch(STAR_COLOR, '★'),
+    iconEl: () => chamberSwatch(STAR_COLOR, '★'),
     name: t('rules.legend.star.name'),
     description: t('rules.legend.star.description'),
   },
   {
-    iconHtml: chamberSwatch(GEL_COLOR, '\u00BD'),
+    iconEl: () => chamberSwatch(GEL_COLOR, '\u00BD'),
     name: t('rules.legend.gel.name'),
     description: t('rules.legend.gel.description'),
   },
   {
-    iconHtml: chamberSwatch(SIPHON_COLOR, '\u00D72'),
+    iconEl: () => chamberSwatch(SIPHON_COLOR, '\u00D72'),
     name: t('rules.legend.siphon.name'),
     description: t('rules.legend.siphon.description'),
   },
@@ -408,7 +405,7 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     const tdIcon = document.createElement('td');
     tdIcon.style.cssText =
       'padding:6px 10px 6px 0;width:36px;text-align:center;vertical-align:middle;';
-    tdIcon.innerHTML = row.iconHtml;
+    tdIcon.replaceChildren(row.iconEl());
 
     const tdName = document.createElement('td');
     tdName.style.cssText =

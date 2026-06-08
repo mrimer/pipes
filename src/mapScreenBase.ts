@@ -1520,8 +1520,12 @@ export abstract class MapScreenBase {
       if (isAlreadyCompleted) {
         this._statusEl.innerHTML = ''; // "Complete"/"Mastered!" is already shown in the stats bar
       } else {
-        this._statusEl.innerHTML =
-          `<span style="color:${SUCCESS_COLOR};font-size:1rem;font-weight:bold;">✅ Level Complete!</span>`;
+        const complete = document.createElement('span');
+        complete.style.color = SUCCESS_COLOR;
+        complete.style.fontSize = '1rem';
+        complete.style.fontWeight = 'bold';
+        complete.textContent = '✅ Level Complete!';
+        this._statusEl.replaceChildren(complete);
       }
     } else {
       this._statusEl.innerHTML = '';

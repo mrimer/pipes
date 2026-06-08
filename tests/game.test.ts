@@ -1369,6 +1369,7 @@ describe('renderInventoryBar – bonus shapes not in inventory', () => {
     const items = container.querySelectorAll<HTMLElement>('.inv-item');
     expect(items.length).toBe(1);
     expect(items[0].dataset['shape']).toBe(PipeShape.Elbow);
+    expect(items[0].querySelector('svg')).not.toBeNull();
     expect(items[0].querySelector('.inv-count')?.textContent).toBe('×2');
   });
 
@@ -1389,6 +1390,7 @@ describe('renderInventoryBar – bonus shapes not in inventory', () => {
     // Only one Straight row – bonus merged into the existing entry (1 base + 1 bonus = ×2)
     const straightItems = container.querySelectorAll<HTMLElement>('[data-shape="STRAIGHT"]');
     expect(straightItems.length).toBe(1);
+    expect(straightItems[0].querySelector('svg')).not.toBeNull();
     expect(straightItems[0].querySelector('.inv-count')?.textContent).toBe('×2');
   });
 

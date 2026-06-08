@@ -782,7 +782,7 @@ export class InputHandler {
         `background:${UI_BG};border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
         'padding:6px 8px;opacity:0.85;font-size:1rem;color:#eee;white-space:nowrap;' +
         `left:${touch.clientX + 12}px;top:${touch.clientY + 12}px;`;
-      ghostEl.innerHTML = el.innerHTML;
+      ghostEl.replaceChildren(...Array.from(el.childNodes, (n) => n.cloneNode(true)));
       document.body.appendChild(ghostEl);
       dragActive = true;
     };

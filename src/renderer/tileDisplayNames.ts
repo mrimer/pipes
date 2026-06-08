@@ -5,6 +5,7 @@
 
 import type { Tile } from '../tile';
 import { PipeShape } from '../types';
+import { svgEl, svgRoot } from '../svgUtils';
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
@@ -22,14 +23,13 @@ export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
   [PipeShape.LeakyCross]:    'Cr',
 };
 
-/** Return an inline SVG icon for the given pipe shape. */
-export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
+/** Build an SVG icon for the given pipe shape. */
+export function buildShapeIcon(shape: PipeShape, color = '#4a90d9'): SVGSVGElement {
   const S = 32;
   const H = S / 2;
   const sw = 5;
-  const base = `width="${S}" height="${S}" viewBox="0 0 ${S} ${S}"`;
   const line = (x1: number, y1: number, x2: number, y2: number) =>
-    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
+    svgEl('line', { x1, y1, x2, y2, stroke: color, 'stroke-width': sw, 'stroke-linecap': 'round' });
   // Normalize gold, spin, and leaky variants to their base shape for icon rendering
   const SHAPE_ICON_BASE: Partial<Record<PipeShape, PipeShape>> = {
     [PipeShape.GoldStraight]:  PipeShape.Straight,
@@ -50,15 +50,22 @@ export function shapeIcon(shape: PipeShape, color = '#4a90d9'): string {
   const drawShape = SHAPE_ICON_BASE[shape] ?? shape;
   switch (drawShape) {
     case PipeShape.Straight:
-      return `<svg ${base}>${line(H, 0, H, S)}</svg>`;
+      return svgRoot(S, [line(H, 0, H, S)]);
     case PipeShape.Elbow:
-      return `<svg ${base}><polyline points="${H},0 ${H},${H} ${S},${H}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      return svgRoot(S, [svgEl('polyline', {
+        points: `${H},0 ${H},${H} ${S},${H}`,
+        fill: 'none',
+        stroke: color,
+        'stroke-width': sw,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+      })]);
     case PipeShape.Tee:
-      return `<svg ${base}>${line(H, 0, H, S)}${line(H, H, S, H)}</svg>`;
+      return svgRoot(S, [line(H, 0, H, S), line(H, H, S, H)]);
     case PipeShape.Cross:
-      return `<svg ${base}>${line(H, 0, H, S)}${line(0, H, S, H)}</svg>`;
+      return svgRoot(S, [line(H, 0, H, S), line(0, H, S, H)]);
     default:
-      return '';
+      return svgRoot(S, []);
   }
 }
 
