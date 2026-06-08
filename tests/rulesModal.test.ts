@@ -63,6 +63,12 @@ describe('createGameRulesModal', () => {
     expect(rows.length).toBeGreaterThanOrEqual(10);
   });
 
+  it('renders svg elements in legend icon cells', () => {
+    createGameRulesModal();
+    const legendIconCell = document.body.querySelector('td[style*="width:36px"]');
+    expect(legendIconCell?.querySelector('svg')).not.toBeNull();
+  });
+
   it('contains a Close button that hides the modal when clicked', () => {
     const modal = createGameRulesModal();
     modal.style.display = 'flex';
