@@ -6084,6 +6084,78 @@ describe('Gel and Siphon chambers — getCurrentWater (incremental path via appl
     board.recordMove();
     expect(board.getSiphonLockedGain({ row: 0, col: 2 })).toBe(5);
   });
+
+  it('three siphons cannot be pumped by detach/reattach rotation', () => {
+    // Linear chain — Source(0,0) → c(0,1) → S1(0,2) → c(0,3) → S2(0,4) → c(0,5) → S3(0,6) → Sink(0,7)
+    // The c() cells are player-placed connector pipes; reclaiming one disconnects the
+    // siphons downstream of it. Connecting all three in sequence reaches base·2^3.
+    // The frozen-gain rule must make every detach/reattach exactly reversible, so no
+    // rotation can ever raise water above the all-connected maximum (the money pump).
+    const board = new Board(1, 8);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 7 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 8, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][3] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][4] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][5] = new Tile(PipeShape.Empty,   0, false);
+    board.grid[0][6] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'siphon');
+    board.grid[0][7] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 8;
+    board.inventory = [{ shape: PipeShape.Straight, count: 3 }];
+    board.initHistory();
+
+    const connectors = [1, 3, 5]; // S1, S2, S3 connector columns
+    const place = (col: number) => {
+      board.placeInventoryTile({ row: 0, col }, PipeShape.Straight, 90);
+      board.applyTurnDelta();
+      board.recordMove();
+    };
+    const detach = (col: number) => {
+      board.reclaimTile({ row: 0, col });
+      board.applyTurnDelta();
+      board.recordMove();
+    };
+
+    // Connect all three in sequence: each siphon first-attaches at a rising total.
+    for (const col of connectors) place(col);
+    const maxWater = board.getCurrentWater();
+    // Sanity: doublings actually happened (well above the bare source capacity).
+    expect(maxWater).toBeGreaterThan(board.sourceCapacity);
+
+    // Frozen gains are now fixed constants on each siphon.
+    const frozen = [2, 4, 6].map((c) => board.getSiphonLockedGain({ row: 0, col: c }));
+    expect(frozen.every((g) => g !== null)).toBe(true);
+
+    // Rotate detach/reattach in sequence, every order, many times. Water must never
+    // exceed the all-connected maximum, and must return to it exactly when whole.
+    let observedMax = maxWater;
+    const cycle = (order: number[]) => {
+      for (const col of order) {
+        detach(col);
+        observedMax = Math.max(observedMax, board.getCurrentWater());
+      }
+      // Reattach in the reverse order (innermost-first), restoring full connection.
+      for (const col of [...order].reverse()) {
+        place(col);
+        observedMax = Math.max(observedMax, board.getCurrentWater());
+      }
+      expect(board.getCurrentWater()).toBe(maxWater);
+    };
+
+    // Tail-first, head-first, and middle-out rotations — the classic pump attempts.
+    cycle([5, 3, 1]);
+    cycle([1, 3, 5]);
+    cycle([3, 5, 1]);
+    cycle([5, 1, 3]);
+
+    // No rotation ever banked extra water beyond the honest maximum.
+    expect(observedMax).toBe(maxWater);
+
+    // Frozen gains are unchanged by all the rotation (never re-doubled or re-frozen).
+    expect([2, 4, 6].map((c) => board.getSiphonLockedGain({ row: 0, col: c }))).toEqual(frozen);
+  });
 });
 
 // ─── Regulator chambers ───────────────────────────────────────────────────────
