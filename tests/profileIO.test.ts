@@ -81,4 +81,22 @@ describe('importReplay', () => {
     expect(saveSpy).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
   });
+
+  it('surfaces readGzipOrJsonFile error details to the user', async () => {
+    const fileIo = await import('../src/fileIO');
+    (fileIo.readGzipOrJsonFile as jest.Mock).mockRejectedValue(
+      new Error('File "too-big.json" is too large (6000000 bytes; limit 5242880).'),
+    );
+
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const onSuccess = jest.fn();
+    mockFilePicker();
+
+    importReplay([], onSuccess);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('too large'));
+    expect(onSuccess).not.toHaveBeenCalled();
+  });
 });

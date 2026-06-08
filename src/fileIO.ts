@@ -2,6 +2,10 @@ import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from './campaignEdi
 
 /** Delay (ms) before revoking the object URL after triggering a file download. */
 const DOWNLOAD_URL_REVOKE_DELAY_MS = 10_000;
+/** Reject pathologically large imports (raw bytes) — self-inflicted DoS guard. */
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+/** Reject decompression bombs — cap the decoded text length. */
+const MAX_DECODED_TEXT_CHARS = 20 * 1024 * 1024;
 
 function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -37,12 +41,16 @@ export async function downloadGzipJson(json: string, filename: string): Promise<
 
 /** Read a File and return text, automatically decompressing gzip inputs. */
 export async function readGzipOrJsonFile(file: File): Promise<string> {
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error(`File "${file.name}" is too large (${file.size} bytes; limit ${MAX_IMPORT_FILE_BYTES}).`);
+  }
   try {
     const bytes = await blobToBytes(file);
-    if (isGzipBytes(bytes)) {
-      return await ungzipBytes(bytes);
+    const text = isGzipBytes(bytes) ? await ungzipBytes(bytes) : new TextDecoder().decode(bytes);
+    if (text.length > MAX_DECODED_TEXT_CHARS) {
+      throw new Error(`File "${file.name}" expands too large (${text.length} chars; limit ${MAX_DECODED_TEXT_CHARS}).`);
     }
-    return new TextDecoder().decode(bytes);
+    return text;
   } catch (err) {
     throw new Error(`Failed to read file "${file.name}": ${describeError(err)}`);
   }
