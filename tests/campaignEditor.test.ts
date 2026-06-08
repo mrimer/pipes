@@ -4336,6 +4336,48 @@ describe('CampaignMapEditorSection – campaign-map canvas context is wired afte
   });
 });
 
+describe('CampaignEditor import read errors', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('shows detailed read errors when the selected file is too large', async () => {
+    const oversized = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'too-big.pipes.json');
+    const origCreate = document.createElement.bind(document) as (tag: string) => HTMLElement;
+    const createSpy = jest.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === 'input') {
+        const input = el as HTMLInputElement;
+        Object.defineProperty(input, 'click', {
+          value: () => {
+            Object.defineProperty(input, 'files', { value: [oversized], configurable: true });
+            input.dispatchEvent(new Event('change'));
+          },
+          writable: true,
+        });
+      }
+      return el;
+    });
+
+    try {
+      const editor = makeEditor();
+      (editor as unknown as { _importCampaign(): void })._importCampaign();
+    } finally {
+      createSpy.mockRestore();
+    }
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.body.textContent).toContain('too large');
+  });
+});
+
 // ─── updateUndoRedoButtonPair ─────────────────────────────────────────────────
 
 import { updateUndoRedoButtonPair } from '../src/uiHelpers';

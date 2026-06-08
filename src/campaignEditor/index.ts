@@ -1720,8 +1720,13 @@ export class CampaignEditor {
         this._onPlayCampaign(result.campaign);
       };
 
-      readGzipOrJsonFile(file).then(processText).catch(() => {
-        this._dialogs.showMessage(t('editor.import.errorTitle'), t('editor.import.readError'), ERROR_COLOR);
+      readGzipOrJsonFile(file).then(processText).catch((err: unknown) => {
+        const details = err instanceof Error ? err.message : String(err);
+        this._dialogs.showMessage(
+          t('editor.import.errorTitle'),
+          `${t('editor.import.readError')}\n${details}`,
+          ERROR_COLOR,
+        );
       });
     });
     input.click();

@@ -77,8 +77,9 @@ function openImportFilePicker(onText: (text: string) => void): void {
   input.addEventListener('change', () => {
     const file = input.files?.[0];
     if (!file) return;
-    readGzipOrJsonFile(file).then(onText).catch(() => {
-      showProfileIoMessage(FILE_READ_ERROR_MESSAGE);
+    readGzipOrJsonFile(file).then(onText).catch((err: unknown) => {
+      const details = err instanceof Error ? err.message : String(err);
+      showProfileIoMessage(`${FILE_READ_ERROR_MESSAGE}\n${details}`);
     });
   });
   input.click();
