@@ -16,6 +16,7 @@ import {
   loadCampaignMasteredShown,
   loadCampaignCompleteShown,
   loadSfxVolume,
+  loadMusicVolume,
   loadTouchUiEnabled,
   loadPlayerName,
   loadCommandKeyAssignments,
@@ -30,6 +31,7 @@ import {
   markCampaignMasteredShown,
   markCampaignCompleteShown,
   saveSfxVolume,
+  saveMusicVolume,
   saveTouchUiEnabled,
   savePlayerName,
   saveCommandKeyAssignments,
@@ -99,6 +101,11 @@ export interface PlayerProfilePayload {
   lastPlayedAt: string | null;
   playerName: string;
   sfxVolume: number;
+  /**
+   * Music volume in [0, 100]. Optional for back-compat: older exports lack this
+   * field and import as the default value of 50.
+   */
+  musicVolume?: number;
   touchUiEnabled: boolean | null;
   commandKeys: Record<string, string> | null;
   /**
@@ -210,6 +217,7 @@ export function buildPlayerProfilePayload(
     lastPlayedAt:        lastPlayedAt ?? null,
     playerName:          loadPlayerName(),
     sfxVolume:           loadSfxVolume(),
+    musicVolume:         loadMusicVolume(),
     touchUiEnabled:      loadTouchUiEnabled(),
     commandKeys:         loadCommandKeyAssignments(),
     activeCampaignId:    loadActiveCampaignId(),
@@ -298,6 +306,8 @@ function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
   if (!Array.isArray(payload['campaignProgress'])) return false;
   if ('activeCampaignId' in payload && payload['activeCampaignId'] !== null && typeof payload['activeCampaignId'] !== 'string') return false;
   if ('recordings' in payload && !hasValidRecordingsShape(payload['recordings'])) return false;
+  // musicVolume is optional for back-compat; reject only if present but not a number
+  if ('musicVolume' in payload && typeof payload['musicVolume'] !== 'number') return false;
   return true;
 }
 
@@ -462,6 +472,8 @@ export function applyPlayerProfile(
   // ── Settings ───────────────────────────────────────────────────────────────
   savePlayerName(payload.playerName);
   saveSfxVolume(payload.sfxVolume);
+  // musicVolume is optional for back-compat; default to 50 when absent
+  saveMusicVolume(payload.musicVolume ?? 50);
   if (payload.touchUiEnabled !== null) {
     saveTouchUiEnabled(payload.touchUiEnabled);
   }

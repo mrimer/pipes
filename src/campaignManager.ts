@@ -7,7 +7,7 @@
  * it through the {@link CampaignCallbacks} interface.
  */
 
-import type { CampaignDef, ChapterDef, LevelDef} from './types';
+import type { CampaignDef, ChapterDef, LevelDef, LevelStyle } from './types';
 import { GameScreen } from './types';
 import { ChapterMapScreen } from './chapterMapScreen';
 import { CampaignMapScreen } from './campaignMapScreen';
@@ -92,6 +92,16 @@ export interface CampaignCallbacks {
   showPlayerProfile(): void;
   /** Return the display name of the currently active player, or null. */
   getPlayerName(): string | null;
+
+  /**
+   * Called when entering a chapter or campaign map for the first time
+   * (not when returning from a level via {@link reshowChapterMap} /
+   * {@link reshowCampaignMap}).  The game uses this to start the appropriate
+   * background music group.
+   *
+   * Optional – callers that do not implement music can omit it.
+   */
+  onMapScreenEntered?: (style: LevelStyle | undefined) => void;
 }
 
 // ─── Module-level helper ──────────────────────────────────────────────────────
@@ -351,6 +361,7 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
+    this._callbacks.onMapScreenEntered?.(chapter.style);
 
     // If the chapter is no longer complete (e.g. levels were added/edited), remove any
     // stale completion and mastery records so that progress stays in sync.
@@ -401,6 +412,7 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
+    this._callbacks.onMapScreenEntered?.(campaign.style);
     if (this._campaignCompleteShown && !campaignMapScreen.isCampaignComplete()) {
       clearCampaignCompleteShown(campaign.id);
       this._campaignCompleteShown = false;

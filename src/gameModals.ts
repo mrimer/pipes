@@ -303,6 +303,9 @@ export function buildSettingsModal(
   getVolume: () => number,
   onVolumeChange: (v: number) => void,
   onVolumePreview: () => void,
+  getMusicVolume: () => number,
+  onMusicVolumeChange: (v: number) => void,
+  onMusicVolumePreview: () => void,
   getTouchUiEnabled: () => boolean,
   isTouchUiToggleEnabled: () => boolean,
   onTouchUiChange: (enabled: boolean) => void,
@@ -365,6 +368,49 @@ export function buildSettingsModal(
   sfxSection.appendChild(sfxLabel);
   sfxSection.appendChild(slider);
   box.appendChild(sfxSection);
+
+  // ── Music row ────────────────────────────────────────────────────────────
+  const musicSection = document.createElement('div');
+  musicSection.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;';
+
+  const musicLabel = document.createElement('div');
+  musicLabel.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+
+  const musicSliderId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? `settings-music-slider-${crypto.randomUUID()}`
+    : `settings-music-slider-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const musicLabelText = document.createElement('label');
+  musicLabelText.htmlFor = musicSliderId;
+  musicLabelText.textContent = t('settings.music');
+
+  const musicValueEl = document.createElement('span');
+  musicValueEl.style.cssText = 'font-size:0.9rem;color:#aaa;';
+  musicValueEl.dataset.musicValue = '1';
+  musicValueEl.textContent = String(getMusicVolume());
+
+  musicLabel.appendChild(musicLabelText);
+  musicLabel.appendChild(musicValueEl);
+
+  const musicSlider = document.createElement('input');
+  musicSlider.type = 'range';
+  musicSlider.id = musicSliderId;
+  musicSlider.min = '0';
+  musicSlider.max = '100';
+  musicSlider.value = String(getMusicVolume());
+  musicSlider.dataset.musicSlider = '1';
+  musicSlider.style.cssText = 'width:100%;cursor:pointer;';
+  musicSlider.addEventListener('input', () => {
+    const v = Number(musicSlider.value);
+    musicValueEl.textContent = String(v);
+    onMusicVolumeChange(v);
+  });
+  musicSlider.addEventListener('mouseup', () => {
+    onMusicVolumePreview();
+  });
+
+  musicSection.appendChild(musicLabel);
+  musicSection.appendChild(musicSlider);
+  box.appendChild(musicSection);
 
   // ── Touch Device row ─────────────────────────────────────────────────────
   const touchSection = document.createElement('div');
