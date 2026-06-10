@@ -506,6 +506,30 @@ export function saveSfxVolume(volume: number): void {
   } catch { /* ignore */ }
 }
 
+const MUSIC_VOLUME_KEY = (): string => `pipes_${p()}music_volume`;
+
+/**
+ * Load the persisted music volume setting.
+ * @returns An integer in [0, 100]; defaults to 50 when not yet set.
+ */
+export function loadMusicVolume(): number {
+  try {
+    const raw = localStorage.getItem(MUSIC_VOLUME_KEY());
+    if (raw !== null) {
+      const v = Number(raw);
+      if (!isNaN(v) && v >= 0 && v <= 100) return Math.round(v);
+    }
+  } catch { /* ignore */ }
+  return 50;
+}
+
+/** Persist the music volume setting. @param volume - Integer in [0, 100]. */
+export function saveMusicVolume(volume: number): void {
+  try {
+    localStorage.setItem(MUSIC_VOLUME_KEY(), String(Math.round(Math.max(0, Math.min(100, volume)))));
+  } catch { /* ignore */ }
+}
+
 /**
  * Load the persisted Touch UI setting.
  * @returns

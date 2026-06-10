@@ -9,8 +9,10 @@ import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer
 import {
   loadPlayerName,
   loadSfxVolume,
+  loadMusicVolume,
   loadTouchUiEnabled,
   saveSfxVolume,
+  saveMusicVolume,
   saveTouchUiEnabled,
   loadRecordingsForLevel,
   saveRecording,
@@ -46,6 +48,7 @@ import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
 import { sfxManager, SfxId } from './sfxManager';
+import { musicManager, selectGroupForContext } from './musicManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_OVERLAY_BG, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
@@ -365,11 +368,14 @@ export class Game implements InputCallbacks {
       () => { this._closeModal(this._unplayableModalEl); this.exitToMenu(); },
     );
 
-    // Create the settings modal (SFX volume control, etc.)
+    // Create the settings modal (SFX/music volume control, etc.)
     this._settingsModalEl = buildSettingsModal(
       () => sfxManager.getVolume(),
       (v) => { sfxManager.setVolume(v); },
       () => { sfxManager.play(SfxId.PipePlacement); },
+      () => musicManager.getVolume(),
+      (v) => { musicManager.setVolume(v); },
+      () => { /* no audio ping for music preview */ },
       () => isTouchDevice(),
       () => hasTouchUiSupport(),
       (enabled) => {
@@ -383,6 +389,7 @@ export class Game implements InputCallbacks {
         const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
         sfxManager.play(SfxId.Click);
         saveSfxVolume(sfxManager.getVolume());
+        saveMusicVolume(musicManager.getVolume());
         saveTouchUiEnabled(isTouchDevice());
         saveRecordingSettings({
           recordSuccesses: recordSuccessesToggle?.checked ?? true,
@@ -423,6 +430,7 @@ export class Game implements InputCallbacks {
     this._profileScreen.onProfileSelected = (slotIndex) => {
       // Update settings that depend on the newly active slot.
       sfxManager.setVolume(loadSfxVolume());
+      musicManager.setVolume(loadMusicVolume());
       saveActiveSlotIndex(slotIndex);
       // Restore the active campaign from the new slot's persisted state, then
       // show the level-select screen.
@@ -483,15 +491,20 @@ export class Game implements InputCallbacks {
       showSettings: () => {
         // Sync slider, toggles to current persisted values before showing.
         const v = sfxManager.getVolume();
+        const mv = musicManager.getVolume();
         const savedTouchUiEnabled = loadTouchUiEnabled();
         const effectiveTouchEnabled = hasTouchUiSupport() ? (savedTouchUiEnabled ?? isTouchDevice()) : false;
         const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
         const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
+        const musicSlider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-slider]');
+        const musicValueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-music-value]');
         const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
         const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
         const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
         if (slider) slider.value = String(v);
         if (valueEl) valueEl.textContent = String(v);
+        if (musicSlider) musicSlider.value = String(mv);
+        if (musicValueEl) musicValueEl.textContent = String(mv);
         if (touchToggle) {
           touchToggle.checked = effectiveTouchEnabled;
           touchToggle.disabled = !hasTouchUiSupport();
@@ -504,6 +517,9 @@ export class Game implements InputCallbacks {
       getPlayerName: () => {
         const idx = getActiveSlotIndex();
         return idx !== null ? (loadSlotMeta(idx)?.name ?? null) : null;
+      },
+      onMapScreenEntered: (style) => {
+        musicManager.playGroup(selectGroupForContext({ style }));
       },
     };
     this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
@@ -521,6 +537,9 @@ export class Game implements InputCallbacks {
       }, 100);
     };
     window.addEventListener('resize', this._resizeHandler);
+
+    // Initialize music volume from persistence.
+    musicManager.setVolume(loadMusicVolume());
 
     // Show the level-select screen or, if no profile slot is active, show the
     // profile screen so the player can choose or create a profile first.
@@ -596,6 +615,8 @@ export class Game implements InputCallbacks {
     this._cancelPendingRings();
     // Stop any sounds still playing from the previous screen (skip when exiting editor screens).
     if (stopAudio) sfxManager.stopAll();
+    // Switch to main-menu music (gesture-gated on first call).
+    musicManager.playGroup('menu');
     // Remember the last played level ID for the scroll below, then clear currentLevel
     // so that re-entering the same level via the level-select screen will be treated
     // as a new entry (showing the ring effect again).
@@ -780,6 +801,9 @@ export class Game implements InputCallbacks {
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
     this._animMgr.resetIdleTimer();
+
+    // Switch to music appropriate for this level's style/challenge flag.
+    musicManager.playGroup(selectGroupForContext({ isChallenge: level.challenge, style: level.style }));
     const isNewLevelStart = !isUserRestart && !isResumingSameLevel;
     if (isNewLevelStart) {
       this._cloudShadows.resetForScreen(
@@ -2209,6 +2233,9 @@ export class Game implements InputCallbacks {
     this.currentLevel = level;
     this.board = new Board(level.rows, level.cols, level);
     this._enterPlayScreenState(level);
+
+    // Switch to music appropriate for this level's style/challenge flag.
+    musicManager.playGroup(selectGroupForContext({ isChallenge: level.challenge, style: level.style }));
     this._cloudShadows.resetForScreen(
       this.canvas.width,
       this.canvas.height,
