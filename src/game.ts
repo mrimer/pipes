@@ -27,6 +27,7 @@ import {
   saveMusicMuteOnFocusLoss,
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
+import { createCreditsModal } from './creditsModal';
 import { CampaignEditor } from './campaignEditor';
 import type { CampaignCallbacks } from './campaignManager';
 import { CampaignManager } from './campaignManager';
@@ -243,6 +244,8 @@ export class Game implements InputCallbacks {
 
   /** Modal overlay showing game rules and tile legend. */
   private readonly _rulesModalEl: HTMLElement;
+  /** Modal overlay showing the game credits. */
+  private readonly _creditsModalEl: HTMLElement;
 
   /** Campaign editor overlay (manages its own DOM). */
   private readonly campaignEditor: CampaignEditor;
@@ -358,6 +361,7 @@ export class Game implements InputCallbacks {
 
     // Create the game-rules modal (appends itself to document.body)
     this._rulesModalEl = createGameRulesModal();
+    this._creditsModalEl = createCreditsModal();
 
     // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
     this._exitConfirmModalEl = buildExitConfirmModal(
@@ -501,6 +505,7 @@ export class Game implements InputCallbacks {
         this.resetConfirmModalEl.style.display = 'flex';
       },
       showRules: () => this.showRules(),
+      showCredits: () => this.showCredits(),
       showSettings: () => {
         // Sync slider, toggles to current persisted values before showing.
         const v = sfxManager.getVolume();
@@ -1778,6 +1783,9 @@ export class Game implements InputCallbacks {
   handleEscapeKey(): void {
     if (this._settingsModalEl.style.display !== 'none') {
       this._cancelSettingsModal();
+    } else if (this._creditsModalEl.style.display !== 'none') {
+      this._creditsModalEl.style.display = 'none';
+      this.canvas.focus();
     } else if (this._rulesModalEl.style.display !== 'none') {
       this._rulesModalEl.style.display = 'none';
       this.canvas.focus();
@@ -2047,6 +2055,11 @@ export class Game implements InputCallbacks {
   showRules(): void {
     refreshGameRulesModalCommands(this._rulesModalEl);
     this._rulesModalEl.style.display = 'flex';
+  }
+
+  /** Show the game-credits modal overlay. */
+  showCredits(): void {
+    this._creditsModalEl.style.display = 'flex';
   }
 
   /**

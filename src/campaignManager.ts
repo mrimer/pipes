@@ -86,6 +86,8 @@ export interface CampaignCallbacks {
   showResetConfirmModal(info: ResetProgressInfo | null): void;
   /** Show the game-rules modal overlay. */
   showRules(): void;
+  /** Show the credits modal overlay. */
+  showCredits(): void;
   /** Show the settings modal overlay. */
   showSettings(): void;
   /** Open the player-profile selection screen. */
@@ -787,9 +789,14 @@ export class CampaignManager {
   /** Dev cheat: mark all levels completed and refresh the level list. */
   unlockAll(): void {
     if (this._activeCampaign) {
-      const allIds = this._activeCampaign.chapters.flatMap((ch) => ch.levels.map((l) => l.id));
-      for (const id of allIds) {
-        markCampaignLevelCompleted(this._activeCampaign.id, id, this._activeCampaignProgress);
+      for (const chapter of this._activeCampaign.chapters) {
+        for (const level of chapter.levels) {
+          markCampaignLevelCompleted(this._activeCampaign.id, level.id, this._activeCampaignProgress);
+          if ((level.starCount ?? 0) > 0) {
+            saveLevelStar(level.id, level.starCount ?? 0, this._activeCampaign.id);
+          }
+        }
+        markChapterCompleted(this._activeCampaign.id, chapter.id, this._activeCampaignCompletedChapters);
       }
     }
     this.renderLevelList();
@@ -846,6 +853,7 @@ export class CampaignManager {
       () => this.showCampaignMap(true),
       () => this._callbacks.showPlayerProfile(),
       this._callbacks.getPlayerName() ?? undefined,
+      () => this._callbacks.showCredits(),
     );
   }
 

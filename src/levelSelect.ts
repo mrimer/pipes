@@ -1,7 +1,7 @@
 /** Helpers for rendering the level-selection screen. */
 
 import type { ChapterDef, LevelDef } from './types';
-import { attachChapterWaveAnimation } from './visuals/chapterWaves';
+import { attachChapterWaveAnimation, CHAPTER_WAVE_REDRAW_EVENT } from './visuals/chapterWaves';
 import { sfxManager, SfxId } from './sfxManager';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from './uiConstants';
 import { createButton } from './uiHelpers';
@@ -201,6 +201,7 @@ export function renderLevelList(
   onCampaignMapClick?: () => void,
   onPlayerProfileClick?: () => void,
   playerName?: string,
+  onCreditsClick?: () => void,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -466,6 +467,13 @@ export function renderLevelList(
       chapterToggleBtn.textContent = chaptersExpanded
         ? t('levelSelect.chapterToggle.hide')
         : t('levelSelect.chapterToggle.show');
+      if (chaptersExpanded) {
+        requestAnimationFrame(() => {
+          chapterListWrap.querySelectorAll<HTMLElement>('.chapter-header').forEach((header) => {
+            header.dispatchEvent(new Event(CHAPTER_WAVE_REDRAW_EVENT));
+          });
+        });
+      }
     });
 
     header.appendChild(chapterToggleBtn);
@@ -630,6 +638,15 @@ export function renderLevelList(
     'margin-top:8px;padding:10px 20px;width:100%;',
   );
   levelListEl.appendChild(rulesBtn);
+
+  if (onCreditsClick) {
+    const creditsBtn = createButton(
+      t('levelSelect.credits'), UI_BG, '#74b9ff',
+      () => { sfxManager.play(SfxId.ChapterSelect); onCreditsClick(); },
+      'margin-top:8px;padding:10px 20px;width:100%;',
+    );
+    levelListEl.appendChild(creditsBtn);
+  }
 
   // Reset-progress button: hidden when no campaign is active; disabled when there is no
   // recorded progress (no completed levels and no collected stars) so it cannot be clicked.

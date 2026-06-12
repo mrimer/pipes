@@ -1046,8 +1046,11 @@ export class CampaignEditor {
     this._screen = EditorScreen.LevelEditor;
     this._el.innerHTML = '';
 
-    // Play music matching the level's style (Summer is the default for no style).
-    musicManager.playGroup(selectGroupForContext({ style: this._state.levelStyle }));
+    // Play music matching the level's style/challenge flag (Summer is the default for no style).
+    musicManager.playGroup(selectGroupForContext({
+      isChallenge: this._state.levelChallenge,
+      style: this._state.levelStyle,
+    }));
 
     const campaign = this._getActiveCampaign();
     if (!campaign) { this._showCampaignList(); return; }
@@ -1065,6 +1068,12 @@ export class CampaignEditor {
         reflectGrid: () => this._reflectGrid(),
         flipGridHorizontal: () => this._flipGridHorizontal(),
         flipGridVertical:   () => this._flipGridVertical(),
+        onChallengeChange: (isChallenge) => {
+          musicManager.playGroup(selectGroupForContext({
+            isChallenge,
+            style: this._state.levelStyle,
+          }));
+        },
       },
       this._btn.bind(this),
     );

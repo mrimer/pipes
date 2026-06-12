@@ -7,6 +7,14 @@ import { CampaignManager } from '../src/campaignManager';
 import type { CampaignEditor } from '../src/campaignEditor';
 import type { CampaignDef} from '../src/types';
 import { PipeShape } from '../src/types';
+import { setActiveSlotIndex } from '../src/activeProfile';
+import {
+  loadCampaignProgress,
+  loadCompletedChapters,
+  loadLevelStars,
+  markCampaignLevelCompleted,
+  saveLevelStar,
+} from '../src/persistence';
 import * as levelTransition from '../src/levelTransition';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 
@@ -46,6 +54,7 @@ function makeCallbacks(overrides: Partial<CampaignCallbacks> = {}): CampaignCall
     gameoverMenuBtnEl,
     showResetConfirmModal: () => {},
     showRules: () => {},
+    showCredits: () => {},
     showSettings: () => {},
     showPlayerProfile: () => {},
     getPlayerName: () => null,
@@ -140,6 +149,7 @@ describe('CampaignManager campaign-map exit transition', () => {
   beforeEach(() => {
     localStorage.clear();
     document.body.innerHTML = '';
+    setActiveSlotIndex(0);
     jest.restoreAllMocks();
   });
 
@@ -196,6 +206,74 @@ describe('CampaignManager campaign-map exit transition', () => {
 
     expect(swirlSpy).toHaveBeenCalledTimes(1);
     expect(showLevelSelect).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CampaignManager profile-scoped progress actions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    setActiveSlotIndex(0);
+  });
+
+  it('unlockAll marks the current campaign completed and mastered for only the active profile', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaignDef({
+      id: 'cmp-profile-unlock',
+      name: 'Profile Unlock',
+      chapters: [
+        makeChapterDef({
+          id: 10,
+          name: 'Chapter 1',
+          levels: [
+            makeLevelDef({ id: 101, starCount: 2 }),
+            makeLevelDef({ id: 102, challenge: true, starCount: 1 }),
+          ],
+        }),
+        makeChapterDef({
+          id: 11,
+          name: 'Chapter 2',
+          levels: [makeLevelDef({ id: 103, starCount: 3 })],
+        }),
+      ],
+    });
+
+    manager.activate(campaign);
+    manager.unlockAll();
+
+    expect(loadCampaignProgress(campaign.id)).toEqual(new Set<number>([101, 102, 103]));
+    expect(loadCompletedChapters(campaign.id)).toEqual(new Set<number>([10, 11]));
+    expect(loadLevelStars(campaign.id)).toEqual({ 101: 2, 102: 1, 103: 3 });
+
+    setActiveSlotIndex(1);
+    expect(loadCampaignProgress(campaign.id)).toEqual(new Set<number>());
+    expect(loadCompletedChapters(campaign.id)).toEqual(new Set<number>());
+    expect(loadLevelStars(campaign.id)).toEqual({});
+  });
+
+  it('resetProgress clears only the active profile progress for the current campaign', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(false);
+
+    setActiveSlotIndex(0);
+    manager.activate(campaign);
+    markCampaignLevelCompleted(campaign.id, 1, loadCampaignProgress(campaign.id));
+    saveLevelStar(1, 2, campaign.id);
+
+    setActiveSlotIndex(1);
+    markCampaignLevelCompleted(campaign.id, 1, loadCampaignProgress(campaign.id));
+    saveLevelStar(1, 3, campaign.id);
+
+    setActiveSlotIndex(0);
+    manager.activate(campaign);
+    manager.resetProgress();
+
+    expect(loadCampaignProgress(campaign.id)).toEqual(new Set<number>());
+    expect(loadLevelStars(campaign.id)).toEqual({});
+
+    setActiveSlotIndex(1);
+    expect(loadCampaignProgress(campaign.id)).toEqual(new Set<number>([1]));
+    expect(loadLevelStars(campaign.id)).toEqual({ 1: 3 });
   });
 });
 

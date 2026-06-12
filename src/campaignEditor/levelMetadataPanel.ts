@@ -31,6 +31,7 @@ export interface LevelMetadataPanelCallbacks {
   reflectGrid(): void;
   flipGridHorizontal(): void;
   flipGridVertical(): void;
+  onChallengeChange?(isChallenge: boolean): void;
 }
 
 // ─── LevelMetadataPanel class ─────────────────────────────────────────────────
@@ -160,7 +161,10 @@ export class LevelMetadataPanel {
     challengeChk.type = 'checkbox';
     challengeChk.id = 'editor-challenge-chk';
     challengeChk.checked = state.levelChallenge;
-    challengeChk.addEventListener('change', () => { state.levelChallenge = challengeChk.checked; });
+    challengeChk.addEventListener('change', () => {
+      state.levelChallenge = challengeChk.checked;
+      this._cb.onChallengeChange?.(challengeChk.checked);
+    });
     const challengeLbl = document.createElement('label');
     challengeLbl.htmlFor = 'editor-challenge-chk';
     challengeLbl.textContent = t('editor.level.challengeOptional');
