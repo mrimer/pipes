@@ -22,24 +22,24 @@ import overworldUrl from '../data/music/mysterious-guitar.ogg';
 import happinessUrl    from '../data/music/Happiness.ogg';
 
 // Summer tracks
-import summerUrl    from '../data/music/summer.ogg';
+import alanWalkerPracticeUrl  from '../data/music/Alan_Walker_Practice.ogg';
 
 // Fall tracks
-import fallUrl      from '../data/music/fall.ogg';
-
-// Dark tracks
-import darkUrl      from '../data/music/dark.ogg';
+import reminiscenceUrl        from '../data/music/Reminiscence.ogg';
 
 // Winter tracks
-import winterUrl    from '../data/music/winter.ogg';
+import reverentReflectionsUrl from '../data/music/Reverent Reflections.ogg';
+
+// Dark tracks
+import centerOfTheEarthUrl    from '../data/music/Center of the Earth.ogg';
 
 // Challenge tracks
-import challengeUrl from '../data/music/challenge.ogg';
+import eightBitEDMUrl from '../data/music/8-bit EDM.ogg';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Identifies a background music group. Mirrors the LevelStyle values plus 'menu' and 'challenge'. */
-export type MusicGroupId = 'menu' | 'overworld' | 'Summer' | 'Fall' | 'Dark' | 'Winter' | 'Spring' | 'challenge';
+export type MusicGroupId = 'menu' | 'overworld' | 'Spring' | 'Summer' | 'Fall' | 'Winter' | 'Dark' | 'challenge';
 
 /** A single track entry in the music registry. */
 export interface TrackEntry {
@@ -79,12 +79,12 @@ export interface SelectGroupArgs {
 export const MUSIC_REGISTRY: Record<MusicGroupId, TrackEntry[]> = {
   menu:      [{ id: 'menu',      url: menuUrl }],
   overworld: [{ id: 'overworld', url: overworldUrl }],
-  Summer:    [{ id: 'summer',    url: summerUrl }],
-  Fall:      [{ id: 'fall',      url: fallUrl }],
-  Dark:      [{ id: 'dark',      url: darkUrl }],
-  Winter:    [{ id: 'winter',    url: winterUrl }],
   Spring:    [{ id: 'spring',    url: happinessUrl }],
-  challenge: [{ id: 'challenge', url: challengeUrl }],
+  Summer:    [{ id: 'summer',    url: alanWalkerPracticeUrl }],
+  Fall:      [{ id: 'fall',      url: reminiscenceUrl }],
+  Winter:    [{ id: 'winter',    url: reverentReflectionsUrl }],
+  Dark:      [{ id: 'dark',      url: centerOfTheEarthUrl }],
+  challenge: [{ id: 'challenge', url: eightBitEDMUrl }],
 };
 
 /** Set of valid group IDs for runtime membership checks. */
