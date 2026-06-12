@@ -17,11 +17,23 @@
 
 import menuUrl      from '../data/music/mainmenu-waterpipes.ogg';
 import overworldUrl from '../data/music/mysterious-guitar.ogg';
+
+// Spring tracks
+import happinessUrl    from '../data/music/Happiness.ogg';
+
+// Summer tracks
 import summerUrl    from '../data/music/summer.ogg';
+
+// Fall tracks
 import fallUrl      from '../data/music/fall.ogg';
+
+// Dark tracks
 import darkUrl      from '../data/music/dark.ogg';
+
+// Winter tracks
 import winterUrl    from '../data/music/winter.ogg';
-import springUrl    from '../data/music/spring.ogg';
+
+// Challenge tracks
 import challengeUrl from '../data/music/challenge.ogg';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -69,7 +81,7 @@ export const MUSIC_REGISTRY: Record<MusicGroupId, TrackEntry[]> = {
   Fall:      [{ id: 'fall',      url: fallUrl }],
   Dark:      [{ id: 'dark',      url: darkUrl }],
   Winter:    [{ id: 'winter',    url: winterUrl }],
-  Spring:    [{ id: 'spring',    url: springUrl }],
+  Spring:    [{ id: 'spring',    url: happinessUrl }],
   challenge: [{ id: 'challenge', url: challengeUrl }],
 };
 
