@@ -1211,7 +1211,17 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
 
   it('switches level-editor music when the challenge toggle changes', () => {
     const playGroupSpy = jest.spyOn(musicManager, 'playGroup').mockImplementation(() => {});
-    const editor = makeEditor();
+    const campaign: CampaignDef = {
+      id: 'cmp_music_toggle',
+      name: 'Music Toggle Campaign',
+      author: 'Tester',
+      chapters: [{
+        id: 1,
+        name: 'Chapter 1',
+        levels: [],
+      }],
+    };
+    const editor = makeEditor([campaign]);
     const state = editorState(editor);
     const level: LevelDef = {
       id: 99012,
@@ -1223,6 +1233,9 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
       style: 'Winter',
     };
 
+    state._activeCampaignId = campaign.id;
+    state._activeChapterIdx = 0;
+    state._activeLevelIdx = 0;
     state._openLevelEditor(level, false);
     playGroupSpy.mockClear();
 
