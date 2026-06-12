@@ -42,6 +42,8 @@ export interface TileParamsPanelCallbacks {
   getState(): LevelEditorState;
   renderCanvas(): void;
   updateUndoRedoButtons(): void;
+  /** Called after the level style is changed via the style picker. */
+  onStyleChange?(style: LevelStyle | undefined): void;
 }
 
 // ─── Chamber parameter descriptors ───────────────────────────────────────────
@@ -250,6 +252,7 @@ export class TileParamsPanel {
           state.recordSnapshot();
           this._cb.updateUndoRedoButtons();
           this._cb.renderCanvas();
+          this._cb.onStyleChange?.(style);
         }
         document.getElementById('editor-style-panel')?.replaceWith(this.buildStylePanel());
       },

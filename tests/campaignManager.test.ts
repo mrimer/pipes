@@ -198,3 +198,40 @@ describe('CampaignManager campaign-map exit transition', () => {
     expect(showLevelSelect).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('CampaignManager reshowCampaignMap', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    jest.restoreAllMocks();
+  });
+
+  it('fires onMapScreenEntered with isCampaignMap=true when reshowing campaign map', () => {
+    const onMapScreenEntered = jest.fn();
+    const callbacks = makeCallbacks({ onMapScreenEntered });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+
+    manager.activate(campaign);
+    manager.showCampaignMap();
+    onMapScreenEntered.mockClear();
+
+    manager.reshowCampaignMap();
+
+    expect(onMapScreenEntered).toHaveBeenCalledTimes(1);
+    expect(onMapScreenEntered).toHaveBeenCalledWith(campaign.style, true);
+  });
+
+  it('does not fire onMapScreenEntered when reshowing without an active campaign map', () => {
+    const onMapScreenEntered = jest.fn();
+    const callbacks = makeCallbacks({ onMapScreenEntered });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    // Campaign without a map grid — reshowCampaignMap should be a no-op.
+    const campaign = makeCampaign(false);
+    manager.activate(campaign);
+
+    manager.reshowCampaignMap();
+
+    expect(onMapScreenEntered).not.toHaveBeenCalled();
+  });
+});

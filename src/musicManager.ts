@@ -64,6 +64,12 @@ class MusicManager {
   /** Whether there is a track currently playing (or fading in). */
   private _isPlaying = false;
 
+  /** Whether music should be muted when the document loses visibility. */
+  private _muteOnFocusLoss = true;
+
+  /** Whether music is currently suppressed due to focus-loss muting. */
+  private _focusMuted = false;
+
   /**
    * Group requested before a user gesture was available.
    * Flushed on the first pointerdown/keydown that arrives.
@@ -79,10 +85,23 @@ class MusicManager {
   /** Bound handlers (kept for later removeEventListener calls). */
   private readonly _onGesture = (): void => { this._flushPendingGroup(); };
   private readonly _onVisibilityChange = (): void => {
-    if (typeof document === 'undefined' || document.hidden) return;
+    if (typeof document === 'undefined') return;
     const ctx = this._ctx;
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {/* silently ignore */});
+    if (document.hidden) {
+      // Tab/window lost focus: mute if setting is enabled.
+      if (this._muteOnFocusLoss && this._masterGain && !this._focusMuted) {
+        this._masterGain.gain.value = 0;
+        this._focusMuted = true;
+      }
+    } else {
+      // Tab/window regained focus: resume context and restore volume.
+      if (this._focusMuted) {
+        this._focusMuted = false;
+        if (this._masterGain) this._masterGain.gain.value = this._volume;
+      }
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {/* silently ignore */});
+      }
     }
   };
 
@@ -94,7 +113,8 @@ class MusicManager {
    */
   setVolume(volume: number): void {
     this._volume = Math.max(0, Math.min(100, volume)) / 100;
-    if (this._masterGain) {
+    // Don't restore gain while focus-muted; it will be restored on tab re-focus.
+    if (this._masterGain && !this._focusMuted) {
       this._masterGain.gain.value = this._volume;
     }
   }
@@ -102,6 +122,20 @@ class MusicManager {
   /** Return the current music volume as an integer in [0, 100]. */
   getVolume(): number {
     return Math.round(this._volume * 100);
+  }
+
+  /**
+   * Enable or disable automatic muting when the document loses visibility.
+   * When enabled (the default), the master gain is set to 0 on `visibilitychange`
+   * (tab hidden) and restored when the tab becomes visible again.
+   */
+  setMuteOnFocusLoss(enabled: boolean): void {
+    this._muteOnFocusLoss = enabled;
+    // If disabling while currently focus-muted, restore volume immediately.
+    if (!enabled && this._focusMuted) {
+      this._focusMuted = false;
+      if (this._masterGain) this._masterGain.gain.value = this._volume;
+    }
   }
 
   /**

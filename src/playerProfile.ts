@@ -41,6 +41,8 @@ import {
   saveBackgroundEnabled,
   loadEnvironmentalEnabled,
   saveEnvironmentalEnabled,
+  loadMusicMuteOnFocusLoss,
+  saveMusicMuteOnFocusLoss,
 } from './persistence';
 import type { CampaignDef, PlaySequenceRecord } from './types';
 
@@ -124,6 +126,11 @@ export interface PlayerProfilePayload {
    * Defaults to true when absent (older profiles).
    */
   environmentalEnabled?: boolean;
+  /**
+   * Whether music is muted when the app tab/window loses focus.
+   * Defaults to true when absent (older profiles).
+   */
+  musicMuteOnFocusLoss?: boolean;
   campaignProgress: CampaignProgressBlock[];
   /**
    * Playback recordings belonging to this profile.
@@ -223,6 +230,7 @@ export function buildPlayerProfilePayload(
     activeCampaignId:    loadActiveCampaignId(),
     backgroundEnabled:   loadBackgroundEnabled(),
     environmentalEnabled: loadEnvironmentalEnabled(),
+    musicMuteOnFocusLoss: loadMusicMuteOnFocusLoss(),
     campaignProgress,
   };
   if (recordings !== undefined) {
@@ -308,6 +316,8 @@ function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
   if ('recordings' in payload && !hasValidRecordingsShape(payload['recordings'])) return false;
   // musicVolume is optional for back-compat; reject only if present but not a number
   if ('musicVolume' in payload && typeof payload['musicVolume'] !== 'number') return false;
+  // musicMuteOnFocusLoss is optional for back-compat; reject only if present but not a boolean
+  if ('musicMuteOnFocusLoss' in payload && typeof payload['musicMuteOnFocusLoss'] !== 'boolean') return false;
   return true;
 }
 
@@ -486,6 +496,8 @@ export function applyPlayerProfile(
   if (payload.environmentalEnabled !== undefined) {
     saveEnvironmentalEnabled(payload.environmentalEnabled);
   }
+  // musicMuteOnFocusLoss is optional for back-compat; default to true when absent
+  saveMusicMuteOnFocusLoss(payload.musicMuteOnFocusLoss ?? true);
 
   // ── Per-campaign progress ──────────────────────────────────────────────────
   const localById  = new Map(localCampaigns.map((c) => [c.id, c]));

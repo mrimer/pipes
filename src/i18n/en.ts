@@ -196,6 +196,7 @@ export const en: TranslationTable = {
   'settings.title': '⚙️ Settings',
   'settings.soundEffects': '🔊 Sound Effects',
   'settings.music': '🎵 Music',
+  'settings.music.muteOnFocusLoss': 'Mute music when app loses focus',
   'settings.touchDevice': '📱 Touch Device',
   'settings.touchDevice.help': 'Enables touch-optimized UI behavior (larger tap-friendly interactions). Disable this on touchscreen laptops to keep desktop-style hover controls.',
   'settings.commands.title': '⌨️ Command Keys',
