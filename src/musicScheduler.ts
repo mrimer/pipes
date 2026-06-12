@@ -15,7 +15,8 @@
  *  3. Add the group id to {@link MusicGroupId} and the URLs to {@link MUSIC_REGISTRY}.
  */
 
-import menuUrl      from '../data/music/menu.ogg';
+import menuUrl      from '../data/music/mainmenu-waterpipes.ogg';
+import overworldUrl from '../data/music/mysterious-guitar.ogg';
 import summerUrl    from '../data/music/summer.ogg';
 import fallUrl      from '../data/music/fall.ogg';
 import darkUrl      from '../data/music/dark.ogg';
@@ -26,7 +27,7 @@ import challengeUrl from '../data/music/challenge.ogg';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** Identifies a background music group. Mirrors the LevelStyle values plus 'menu' and 'challenge'. */
-export type MusicGroupId = 'menu' | 'Summer' | 'Fall' | 'Dark' | 'Winter' | 'Spring' | 'challenge';
+export type MusicGroupId = 'menu' | 'overworld' | 'Summer' | 'Fall' | 'Dark' | 'Winter' | 'Spring' | 'challenge';
 
 /** A single track entry in the music registry. */
 export interface TrackEntry {
@@ -63,6 +64,7 @@ export interface SelectGroupArgs {
 /** The canonical music track registry, one array of tracks per group. */
 export const MUSIC_REGISTRY: Record<MusicGroupId, TrackEntry[]> = {
   menu:      [{ id: 'menu',      url: menuUrl }],
+  overworld: [{ id: 'overworld', url: overworldUrl }],
   Summer:    [{ id: 'summer',    url: summerUrl }],
   Fall:      [{ id: 'fall',      url: fallUrl }],
   Dark:      [{ id: 'dark',      url: darkUrl }],
@@ -73,7 +75,7 @@ export const MUSIC_REGISTRY: Record<MusicGroupId, TrackEntry[]> = {
 
 /** Set of valid group IDs for runtime membership checks. */
 const VALID_GROUP_IDS = new Set<string>([
-  'menu', 'Summer', 'Fall', 'Dark', 'Winter', 'Spring', 'challenge',
+  'menu', 'overworld', 'Summer', 'Fall', 'Dark', 'Winter', 'Spring', 'challenge',
 ]);
 
 // ─── Group selection ──────────────────────────────────────────────────────────
