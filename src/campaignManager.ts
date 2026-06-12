@@ -99,9 +99,13 @@ export interface CampaignCallbacks {
    * {@link reshowCampaignMap}).  The game uses this to start the appropriate
    * background music group.
    *
+   * `isCampaignMap` is true when entering the campaign-overview map (which uses
+   * the 'overworld' music group) and false when entering a chapter map (which
+   * uses the chapter's style group).
+   *
    * Optional – callers that do not implement music can omit it.
    */
-  onMapScreenEntered?: (style: LevelStyle | undefined) => void;
+  onMapScreenEntered?: (style: LevelStyle | undefined, isCampaignMap: boolean) => void;
 }
 
 // ─── Module-level helper ──────────────────────────────────────────────────────
@@ -361,7 +365,7 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
-    this._callbacks.onMapScreenEntered?.(chapter.style);
+    this._callbacks.onMapScreenEntered?.(chapter.style, false);
 
     // If the chapter is no longer complete (e.g. levels were added/edited), remove any
     // stale completion and mastery records so that progress stays in sync.
@@ -412,7 +416,7 @@ export class CampaignManager {
     this._callbacks.setLevelSelectVisible(false);
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
-    this._callbacks.onMapScreenEntered?.(campaign.style);
+    this._callbacks.onMapScreenEntered?.(campaign.style, true);
     if (this._campaignCompleteShown && !campaignMapScreen.isCampaignComplete()) {
       clearCampaignCompleteShown(campaign.id);
       this._campaignCompleteShown = false;

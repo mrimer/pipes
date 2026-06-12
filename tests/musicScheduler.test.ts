@@ -17,6 +17,7 @@ import { buildPlayerProfilePayload, applyPlayerProfile } from '../src/playerProf
 function makeSingleTrackRegistry(): Record<MusicGroupId, TrackEntry[]> {
   return {
     menu:      [{ id: 'menu',      url: 'menu.ogg' }],
+    overworld: [{ id: 'overworld', url: 'overworld.ogg' }],
     Summer:    [{ id: 'summer',    url: 'summer.ogg' }],
     Fall:      [{ id: 'fall',      url: 'fall.ogg' }],
     Dark:      [{ id: 'dark',      url: 'dark.ogg' }],
@@ -30,6 +31,7 @@ function makeSingleTrackRegistry(): Record<MusicGroupId, TrackEntry[]> {
 function makeSummerTwoTrackRegistry(): Record<MusicGroupId, TrackEntry[]> {
   return {
     menu:      [{ id: 'menu',      url: 'menu.ogg' }],
+    overworld: [{ id: 'overworld', url: 'overworld.ogg' }],
     Summer:    [{ id: 'a', url: 'a.ogg' }, { id: 'b', url: 'b.ogg' }],
     Fall:      [{ id: 'fall',      url: 'fall.ogg' }],
     Dark:      [{ id: 'dark',      url: 'dark.ogg' }],
@@ -43,6 +45,7 @@ function makeSummerTwoTrackRegistry(): Record<MusicGroupId, TrackEntry[]> {
 function makeSummerThreeTrackRegistry(): Record<MusicGroupId, TrackEntry[]> {
   return {
     menu:      [{ id: 'menu',      url: 'menu.ogg' }],
+    overworld: [{ id: 'overworld', url: 'overworld.ogg' }],
     Summer:    [{ id: 'a', url: 'a.ogg' }, { id: 'b', url: 'b.ogg' }, { id: 'c', url: 'c.ogg' }],
     Fall:      [{ id: 'fall',      url: 'fall.ogg' }],
     Dark:      [{ id: 'dark',      url: 'dark.ogg' }],
@@ -67,6 +70,16 @@ describe('selectGroupForContext', () => {
 
   test('challenge flag with no style → returns challenge', () => {
     expect(selectGroupForContext({ isChallenge: true })).toBe('challenge');
+  });
+
+  test('isCampaignMap overrides style and challenge → returns overworld', () => {
+    expect(selectGroupForContext({ isCampaignMap: true })).toBe('overworld');
+    expect(selectGroupForContext({ isCampaignMap: true, style: 'Summer' })).toBe('overworld');
+    expect(selectGroupForContext({ isCampaignMap: true, isChallenge: true })).toBe('overworld');
+  });
+
+  test('isCampaignMap false with style → uses style group (chapter map logic)', () => {
+    expect(selectGroupForContext({ isCampaignMap: false, style: 'Summer' })).toBe('Summer');
   });
 
   test('each LevelStyle maps to its own group', () => {
@@ -219,7 +232,7 @@ describe('MusicScheduler.reset', () => {
 
 describe('MUSIC_REGISTRY', () => {
   test('all groups have at least one track', () => {
-    const groupIds: MusicGroupId[] = ['menu', 'Summer', 'Fall', 'Dark', 'Winter', 'Spring', 'challenge'];
+    const groupIds: MusicGroupId[] = ['menu', 'overworld', 'Summer', 'Fall', 'Dark', 'Winter', 'Spring', 'challenge'];
     for (const id of groupIds) {
       expect(MUSIC_REGISTRY[id].length).toBeGreaterThanOrEqual(1);
     }
@@ -256,6 +269,11 @@ describe('music volume persistence', () => {
   test('rounds fractional values', () => {
     saveMusicVolume(42.7);
     expect(loadMusicVolume()).toBe(43);
+  });
+
+  test('volume 0 is a valid silent-music setting', () => {
+    saveMusicVolume(0);
+    expect(loadMusicVolume()).toBe(0);
   });
 });
 
