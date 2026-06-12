@@ -769,6 +769,48 @@ describe('renderLevelList – Reset Progress button', () => {
   });
 });
 
+describe('renderLevelList – Credits button', () => {
+  let container: HTMLElement;
+  const campaign = { name: 'C', author: 'A', completionPct: 0 };
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    container = makeLevelListEl();
+  });
+
+  it('renders a Credits button when a credits callback is provided', () => {
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, [], {}, {}, undefined, undefined, undefined, undefined, false,
+      undefined, undefined, undefined, () => {},
+    );
+
+    const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b.textContent?.includes('Credits'));
+    expect(btn).not.toBeNull();
+  });
+
+  it('invokes onCreditsClick when the Credits button is clicked', () => {
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
+    const onCreditsClick = jest.fn();
+    renderLevelList(
+      container, new Set<number>(),
+      () => {}, () => {}, () => {}, () => {}, () => {},
+      campaign, [], {}, {}, undefined, undefined, undefined, undefined, false,
+      undefined, undefined, undefined, onCreditsClick,
+    );
+
+    const btn = Array.from(container.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b.textContent?.includes('Credits'));
+    expect(btn).not.toBeNull();
+    btn!.click();
+
+    expect(onCreditsClick).toHaveBeenCalledTimes(1);
+    expect(playSpy).toHaveBeenCalledWith(SfxId.ChapterSelect);
+  });
+});
+
 // ─── renderLevelList – chapter box color coding ───────────────────────────────
 
 describe('renderLevelList – chapter box color coding', () => {

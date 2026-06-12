@@ -26,6 +26,7 @@ import type { CampaignDef, LevelDef, TileDef, InventoryItem, ChapterDef } from '
 import { PipeShape } from '../src/types';
 import type { TileParams, EditorPalette, EditorSnapshot } from '../src/campaignEditor/types';
 import * as editorRenderer from '../src/campaignEditor/renderer';
+import { musicManager } from '../src/musicManager';
 import { DecompressionStream } from 'node:stream/web';
 import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
 
@@ -1206,6 +1207,35 @@ describe('CampaignEditor – challenge flag in level definitions', () => {
     };
     state._openLevelEditor(level, true);
     expect(state._state.levelChallenge).toBe(false);
+  });
+
+  it('switches level-editor music when the challenge toggle changes', () => {
+    const playGroupSpy = jest.spyOn(musicManager, 'playGroup').mockImplementation(() => {});
+    const editor = makeEditor();
+    const state = editorState(editor);
+    const level: LevelDef = {
+      id: 99012,
+      name: 'Music Level',
+      rows: 2,
+      cols: 2,
+      grid: Array.from({ length: 2 }, () => Array(2).fill(null) as null[]),
+      inventory: [],
+      style: 'Winter',
+    };
+
+    state._openLevelEditor(level, false);
+    playGroupSpy.mockClear();
+
+    const checkbox = document.getElementById('editor-challenge-chk') as HTMLInputElement | null;
+    expect(checkbox).not.toBeNull();
+
+    checkbox!.checked = true;
+    checkbox!.dispatchEvent(new Event('change'));
+    expect(playGroupSpy).toHaveBeenLastCalledWith('challenge');
+
+    checkbox!.checked = false;
+    checkbox!.dispatchEvent(new Event('change'));
+    expect(playGroupSpy).toHaveBeenLastCalledWith('Winter');
   });
 
   it('_buildCurrentLevelDef omits challenge when false', () => {

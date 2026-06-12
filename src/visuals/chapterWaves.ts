@@ -1,4 +1,7 @@
 import { UI_BG } from '../uiConstants';
+
+/** Custom event used to force an idle wave-canvas repaint after hidden content becomes visible. */
+export const CHAPTER_WAVE_REDRAW_EVENT = 'chapter-wave:redraw';
 /**
  * Water-wave ripple animation for chapter-box headers on the level-select screen.
  *
@@ -315,6 +318,7 @@ export function attachChapterWaveAnimation(headerEl: HTMLElement, isGold: boolea
 
   // Paint the static background after the first layout pass.
   requestAnimationFrame(_drawStatic);
+  headerEl.addEventListener(CHAPTER_WAVE_REDRAW_EVENT, _drawStatic);
 
   const loop = _createWaveLoop(canvas, headerEl, isGold);
 
