@@ -109,10 +109,12 @@ class MusicManager {
    *
    * Fires immediately if the AudioContext is running, or queues the group until
    * the first user gesture if the context is still suspended (autoplay policy).
-   * A no-op when the requested group is already playing.
+   * A no-op when the requested group is already playing, or when the current
+   * music volume is 0.
    */
   playGroup(groupId: MusicGroupId): void {
     if (!_hasAudioSupport()) return;
+    if (this._volume === 0) return;
 
     const ctx = this._getContext();
     if (!ctx || ctx.state === 'suspended') {

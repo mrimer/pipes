@@ -518,8 +518,8 @@ export class Game implements InputCallbacks {
         const idx = getActiveSlotIndex();
         return idx !== null ? (loadSlotMeta(idx)?.name ?? null) : null;
       },
-      onMapScreenEntered: (style) => {
-        musicManager.playGroup(selectGroupForContext({ style }));
+      onMapScreenEntered: (style, isCampaignMap) => {
+        musicManager.playGroup(selectGroupForContext({ style, isCampaignMap }));
       },
     };
     this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);

@@ -69,6 +69,8 @@ export interface SelectGroupArgs {
   isChallenge?: boolean;
   /** Visual style of the current level, chapter, or campaign map. */
   style?: string;
+  /** When true the context is the campaign-overview map, which always maps to 'overworld'. */
+  isCampaignMap?: boolean;
 }
 
 // ─── Registry ────────────────────────────────────────────────────────────────
@@ -96,11 +98,13 @@ const VALID_GROUP_IDS = new Set<string>([
  * Determine the music group appropriate for the current game context.
  *
  * Priority (highest first):
- * 1. {@link SelectGroupArgs.isChallenge} is true → 'challenge'
- * 2. {@link SelectGroupArgs.style} is a valid LevelStyle → that style's group
- * 3. Otherwise → 'menu'
+ * 1. {@link SelectGroupArgs.isCampaignMap} is true → 'overworld'
+ * 2. {@link SelectGroupArgs.isChallenge} is true → 'challenge'
+ * 3. {@link SelectGroupArgs.style} is a valid LevelStyle → that style's group
+ * 4. Otherwise → 'menu'
  */
 export function selectGroupForContext(args: SelectGroupArgs): MusicGroupId {
+  if (args.isCampaignMap) return 'overworld';
   if (args.isChallenge) return 'challenge';
   if (args.style && VALID_GROUP_IDS.has(args.style)) {
     return args.style as MusicGroupId;
