@@ -23,6 +23,8 @@ import {
   saveBackgroundEnabled,
   loadEnvironmentalEnabled,
   saveEnvironmentalEnabled,
+  loadMusicMuteOnFocusLoss,
+  saveMusicMuteOnFocusLoss,
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { CampaignEditor } from './campaignEditor';
@@ -374,7 +376,12 @@ export class Game implements InputCallbacks {
       (v) => { sfxManager.setVolume(v); },
       () => { sfxManager.play(SfxId.PipePlacement); },
       () => musicManager.getVolume(),
-      (v) => { musicManager.setVolume(v); },
+      (v) => {
+        const wasMuted = musicManager.getVolume() === 0;
+        musicManager.setVolume(v);
+        // Start playing the menu track when the player raises volume from 0.
+        if (wasMuted && v > 0) musicManager.playGroup('menu');
+      },
       () => { /* no audio ping for music preview */ },
       () => isTouchDevice(),
       () => hasTouchUiSupport(),
@@ -387,6 +394,7 @@ export class Game implements InputCallbacks {
         const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
         const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
         const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+        const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
         sfxManager.play(SfxId.Click);
         saveSfxVolume(sfxManager.getVolume());
         saveMusicVolume(musicManager.getVolume());
@@ -397,6 +405,7 @@ export class Game implements InputCallbacks {
         });
         saveBackgroundEnabled(bgToggle?.checked ?? true);
         saveEnvironmentalEnabled(envToggle?.checked ?? true);
+        saveMusicMuteOnFocusLoss(muteOnFocusLossToggle?.checked ?? true);
         el.style.display = 'none';
       },
       () => loadRecordingSettings(),
@@ -410,8 +419,11 @@ export class Game implements InputCallbacks {
       loadEnvironmentalEnabled(),
       // live environmental toggle: update in-memory flag immediately
       (enabled) => { setEnvironmentalEnabled(enabled); },
-      // Esc cancels: revert live graphics changes and hide modal
+      // Esc cancels: revert live changes and hide modal
       () => { this._cancelSettingsModal(); },
+      // Mute on focus loss: initial value and live toggle
+      loadMusicMuteOnFocusLoss(),
+      (enabled) => { musicManager.setMuteOnFocusLoss(enabled); },
     );
     applyScrollingPipeBackground(this._settingsModalEl, {
       baseColor: UI_OVERLAY_BG,
@@ -431,6 +443,7 @@ export class Game implements InputCallbacks {
       // Update settings that depend on the newly active slot.
       sfxManager.setVolume(loadSfxVolume());
       musicManager.setVolume(loadMusicVolume());
+      musicManager.setMuteOnFocusLoss(loadMusicMuteOnFocusLoss());
       saveActiveSlotIndex(slotIndex);
       // Restore the active campaign from the new slot's persisted state, then
       // show the level-select screen.
@@ -501,6 +514,7 @@ export class Game implements InputCallbacks {
         const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
         const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
         const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+        const muteOnFocusLossToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
         if (slider) slider.value = String(v);
         if (valueEl) valueEl.textContent = String(v);
         if (musicSlider) musicSlider.value = String(mv);
@@ -511,6 +525,7 @@ export class Game implements InputCallbacks {
         }
         if (bgToggle)  bgToggle.checked  = loadBackgroundEnabled();
         if (envToggle) envToggle.checked = loadEnvironmentalEnabled();
+        if (muteOnFocusLossToggle) muteOnFocusLossToggle.checked = loadMusicMuteOnFocusLoss();
         this._settingsModalEl.style.display = 'flex';
       },
       showPlayerProfile: () => this._showPlayerProfileScreen(),
@@ -538,8 +553,9 @@ export class Game implements InputCallbacks {
     };
     window.addEventListener('resize', this._resizeHandler);
 
-    // Initialize music volume from persistence.
+    // Initialize music volume and focus-loss mute setting from persistence.
     musicManager.setVolume(loadMusicVolume());
+    musicManager.setMuteOnFocusLoss(loadMusicMuteOnFocusLoss());
 
     // Show the level-select screen or, if no profile slot is active, show the
     // profile screen so the player can choose or create a profile first.
@@ -2208,14 +2224,18 @@ export class Game implements InputCallbacks {
   private _cancelSettingsModal(): void {
     const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
     const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+    const muteOnFocusLossToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
     sfxManager.play(SfxId.Back);
     const persistedBg  = loadBackgroundEnabled();
     const persistedEnv = loadEnvironmentalEnabled();
+    const persistedMuteOnFocusLoss = loadMusicMuteOnFocusLoss();
     if (bgToggle) bgToggle.checked = persistedBg;
     if (envToggle) envToggle.checked = persistedEnv;
+    if (muteOnFocusLossToggle) muteOnFocusLossToggle.checked = persistedMuteOnFocusLoss;
     setBackgroundEnabled(persistedBg);
     setGlobalBackgroundPatternEnabled(persistedBg);
     setEnvironmentalEnabled(persistedEnv);
+    musicManager.setMuteOnFocusLoss(persistedMuteOnFocusLoss);
     this._settingsModalEl.style.display = 'none';
   }
 

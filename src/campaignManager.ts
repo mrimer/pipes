@@ -431,6 +431,7 @@ export class CampaignManager {
       this._callbacks.setLevelSelectVisible(false);
       this._callbacks.setPlayScreenVisible(false);
       this._callbacks.setScreen(GameScreen.ChapterMap);
+      this._callbacks.onMapScreenEntered?.(this._activeCampaign.style, true);
       this._checkAutoCompleteCampaign();
     }
   }

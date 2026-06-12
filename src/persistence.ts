@@ -530,6 +530,30 @@ export function saveMusicVolume(volume: number): void {
   } catch { /* ignore */ }
 }
 
+const MUSIC_MUTE_ON_FOCUS_LOSS_KEY = (): string => `pipes_${p()}music_mute_on_focus_loss`;
+
+/**
+ * Load the persisted "Mute music when app loses focus" setting.
+ * @returns true when enabled (the default), false when explicitly disabled.
+ */
+export function loadMusicMuteOnFocusLoss(): boolean {
+  try {
+    if (localStorage.getItem(MUSIC_MUTE_ON_FOCUS_LOSS_KEY()) === '0') return false;
+  } catch { /* ignore */ }
+  return true;
+}
+
+/** Persist the "Mute music when app loses focus" setting. */
+export function saveMusicMuteOnFocusLoss(enabled: boolean): void {
+  try {
+    if (!enabled) {
+      localStorage.setItem(MUSIC_MUTE_ON_FOCUS_LOSS_KEY(), '0');
+    } else {
+      localStorage.removeItem(MUSIC_MUTE_ON_FOCUS_LOSS_KEY());
+    }
+  } catch { /* ignore */ }
+}
+
 /**
  * Load the persisted Touch UI setting.
  * @returns

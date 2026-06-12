@@ -46,6 +46,7 @@ import {
   markCampaignCompleteShown,
   saveRecording,
   loadAllRecordings,
+  loadMusicMuteOnFocusLoss,
 } from '../src/persistence';
 import type { CampaignDef} from '../src/types';
 import { makeCampaignDef, makeChapterDef, makeLevelDef, makeRecord } from './testHelpers';
@@ -321,6 +322,16 @@ describe('applyPlayerProfile – settings', () => {
     saveCommandKeyAssignments({ shoot: 'x' });
     applyPlayerProfile(makePayload({ commandKeys: null }), []);
     expect(loadCommandKeyAssignments()).toEqual({ shoot: 'x' });
+  });
+
+  it('restores musicMuteOnFocusLoss when present', () => {
+    applyPlayerProfile(makePayload({ musicMuteOnFocusLoss: false }), []);
+    expect(loadMusicMuteOnFocusLoss()).toBe(false);
+  });
+
+  it('defaults musicMuteOnFocusLoss to true when absent', () => {
+    applyPlayerProfile(makePayload(), []);
+    expect(loadMusicMuteOnFocusLoss()).toBe(true);
   });
 });
 

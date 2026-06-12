@@ -47,6 +47,7 @@ import { isTextEntryShortcutTarget } from './mapEditorSectionUtils';
 import { renderMinimap } from '../visuals/minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../sfxManager';
+import { musicManager, selectGroupForContext } from '../musicManager';
 import { t } from '../i18n';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
@@ -160,6 +161,9 @@ export class CampaignEditor {
       getState: () => this._state,
       renderCanvas: () => this._renderEditorCanvas(),
       updateUndoRedoButtons: () => this._updateEditorUndoRedoButtons(),
+      onStyleChange: (style) => {
+        musicManager.playGroup(selectGroupForContext({ style }));
+      },
     });
 
     this._el = document.createElement('div');
@@ -1041,6 +1045,9 @@ export class CampaignEditor {
     this._editorInput = null;
     this._screen = EditorScreen.LevelEditor;
     this._el.innerHTML = '';
+
+    // Play music matching the level's style (Summer is the default for no style).
+    musicManager.playGroup(selectGroupForContext({ style: this._state.levelStyle }));
 
     const campaign = this._getActiveCampaign();
     if (!campaign) { this._showCampaignList(); return; }

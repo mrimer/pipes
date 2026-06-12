@@ -316,6 +316,8 @@ export function buildSettingsModal(
   initialEnvironmentalEnabled = true,
   onEnvironmentalChange?: (enabled: boolean) => void,
   onCancel?: (el: HTMLElement) => void,
+  initialMusicMuteOnFocusLoss = true,
+  onMusicMuteOnFocusLossChange?: (enabled: boolean) => void,
 ): HTMLElement {
   const el = createModalOverlay(0.5);
   const box = document.createElement('div');
@@ -411,6 +413,28 @@ export function buildSettingsModal(
   musicSection.appendChild(musicLabel);
   musicSection.appendChild(musicSlider);
   box.appendChild(musicSection);
+
+  // ── Mute on focus loss toggle ────────────────────────────────────────────
+  const muteOnFocusLossRow = document.createElement('label');
+  muteOnFocusLossRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;';
+
+  const muteOnFocusLossLabelText = document.createElement('span');
+  muteOnFocusLossLabelText.textContent = t('settings.music.muteOnFocusLoss');
+  muteOnFocusLossLabelText.style.cssText = 'color:#eee;font-size:0.9rem;';
+
+  const muteOnFocusLossToggle = document.createElement('input');
+  muteOnFocusLossToggle.type = 'checkbox';
+  muteOnFocusLossToggle.dataset.musicMuteOnFocusLoss = '1';
+  muteOnFocusLossToggle.checked = initialMusicMuteOnFocusLoss;
+  if (onMusicMuteOnFocusLossChange) {
+    muteOnFocusLossToggle.addEventListener('change', () => {
+      onMusicMuteOnFocusLossChange(muteOnFocusLossToggle.checked);
+    });
+  }
+
+  muteOnFocusLossRow.appendChild(muteOnFocusLossLabelText);
+  muteOnFocusLossRow.appendChild(muteOnFocusLossToggle);
+  box.appendChild(muteOnFocusLossRow);
 
   // ── Touch Device row ─────────────────────────────────────────────────────
   const touchSection = document.createElement('div');

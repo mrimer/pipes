@@ -90,16 +90,16 @@ describe('selectGroupForContext', () => {
     expect(selectGroupForContext({ style: 'Spring' })).toBe('Spring');
   });
 
-  test('undefined style → menu', () => {
-    expect(selectGroupForContext({ style: undefined })).toBe('menu');
+  test('undefined style → Summer', () => {
+    expect(selectGroupForContext({ style: undefined })).toBe('Summer');
   });
 
-  test('empty args → menu', () => {
-    expect(selectGroupForContext({})).toBe('menu');
+  test('empty args → Summer', () => {
+    expect(selectGroupForContext({})).toBe('Summer');
   });
 
-  test('unknown style string → menu', () => {
-    expect(selectGroupForContext({ style: 'unknown-style' })).toBe('menu');
+  test('unknown style string → Summer', () => {
+    expect(selectGroupForContext({ style: 'unknown-style' })).toBe('Summer');
   });
 
   test('isChallenge false with style → uses style group', () => {

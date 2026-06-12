@@ -101,7 +101,7 @@ const VALID_GROUP_IDS = new Set<string>([
  * 1. {@link SelectGroupArgs.isCampaignMap} is true → 'overworld'
  * 2. {@link SelectGroupArgs.isChallenge} is true → 'challenge'
  * 3. {@link SelectGroupArgs.style} is a valid LevelStyle → that style's group
- * 4. Otherwise → 'menu'
+ * 4. Otherwise → 'Summer' (default style for levels and chapter maps)
  */
 export function selectGroupForContext(args: SelectGroupArgs): MusicGroupId {
   if (args.isCampaignMap) return 'overworld';
@@ -109,7 +109,7 @@ export function selectGroupForContext(args: SelectGroupArgs): MusicGroupId {
   if (args.style && VALID_GROUP_IDS.has(args.style)) {
     return args.style as MusicGroupId;
   }
-  return 'menu';
+  return 'Summer';
 }
 
 // ─── Scheduler class ─────────────────────────────────────────────────────────
