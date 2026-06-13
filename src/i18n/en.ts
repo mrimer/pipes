@@ -143,7 +143,7 @@ export const en: TranslationTable = {
   'campaign.complete.mainMenu': 'Main Menu',
   'campaign.complete.campaignMap': 'Campaign Map',
   'campaign.complete.nextChapter': 'Next Chapter →',
-  'campaign.chapterMastery.title': 'Level mastered!',
+  'campaign.chapterMastery.title': 'Chapter mastered!',
   'campaign.chapterMastery.message': 'This chapter is 100% complete!',
   'campaign.chapterMastery.button': 'Congrats!',
   'modal.challenge.title': '☠️ Challenge Level ☠️',
