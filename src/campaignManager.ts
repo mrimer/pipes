@@ -18,6 +18,7 @@ import {
   computeCampaignCompletionPct,
   loadLevelStars, saveLevelStar, clearLevelStars,
   loadLevelWater, saveLevelWater, clearLevelWater,
+  getPartialProgressFor,
   loadCompletedChapters, markChapterCompleted, clearCompletedChapters, removeChapterCompleted,
   loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown, removeMasteredChapterShown,
    loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
@@ -1008,6 +1009,14 @@ export class CampaignManager {
 
   private _showChallengeLevelModal(canSkip: boolean): void {
     this._cancelChallengeAutoPlay();
+    const pendingLevelId = this._pendingLevelId;
+    if (pendingLevelId !== null) {
+      const partial = getPartialProgressFor(this._activeCampaign?.id ?? '', pendingLevelId);
+      if (partial && partial.moves.length > 0) {
+        this.playChallengeLevel();
+        return;
+      }
+    }
     // canSkip=true (sequential): show the message and both action buttons so the
     // player must click to proceed.  canSkip=false (directly selected): hide
     // them all and let the auto-fade sequence advance to the level.
