@@ -1,6 +1,6 @@
 /** Helpers for persisting long-term player progress in localStorage. */
 
-import type { CampaignDef, PlaySequenceRecord, RecordingSettings } from './types';
+import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord, RecordingSettings } from './types';
 import { getActiveSlotPrefix } from './activeProfile';
 
 /**
@@ -856,6 +856,110 @@ export function saveEnvironmentalEnabled(enabled: boolean): void {
       localStorage.setItem(ENVIRONMENTAL_ENABLED_KEY(), '0');
     } else {
       localStorage.removeItem(ENVIRONMENTAL_ENABLED_KEY());
+    }
+  } catch { /* ignore */ }
+}
+// ─── Partial-progress persistence ────────────────────────────────────────────
+
+/** Storage key for the partial-progress array (one JSON array per profile slot). */
+const PARTIAL_PROGRESS_KEY = (): string => `pipes_${p()}partial_progress`;
+
+/**
+ * Storage key for the "Don't show save-progress notice again" preference.
+ * Defaults to false (show the notice) when absent.
+ */
+const SAVE_NOTICE_SUPPRESSED_KEY = (): string => `pipes_${p()}save_notice_suppressed`;
+
+/**
+ * Load all saved {@link PartialPlayProgress} entries for the active profile slot.
+ * Returns an empty array on missing or corrupt data; never throws.
+ */
+export function loadPartialProgress(): PartialPlayProgress[] {
+  try {
+    const raw = localStorage.getItem(PARTIAL_PROGRESS_KEY());
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((e): e is PartialPlayProgress =>
+      e !== null &&
+      typeof e === 'object' &&
+      typeof e['campaignId'] === 'string' &&
+      typeof e['levelId'] === 'number' &&
+      Array.isArray(e['moves']) &&
+      typeof e['timestamp'] === 'number',
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Persist a partial-progress entry, replacing any prior entry for the same
+ * (campaignId, levelId) pair.
+ */
+export function savePartialProgressEntry(entry: PartialPlayProgress): void {
+  try {
+    const all = loadPartialProgress().filter(
+      (e) => !(e.campaignId === entry.campaignId && e.levelId === entry.levelId),
+    );
+    all.push(entry);
+    localStorage.setItem(PARTIAL_PROGRESS_KEY(), JSON.stringify(all));
+  } catch { /* ignore */ }
+}
+
+/** Remove the partial-progress entry for a specific (campaignId, levelId) pair. */
+export function deletePartialProgress(campaignId: string, levelId: number): void {
+  try {
+    const filtered = loadPartialProgress().filter(
+      (e) => !(e.campaignId === campaignId && e.levelId === levelId),
+    );
+    localStorage.setItem(PARTIAL_PROGRESS_KEY(), JSON.stringify(filtered));
+  } catch { /* ignore */ }
+}
+
+/** Return the saved partial-progress entry for a specific (campaignId, levelId) pair, or null. */
+export function getPartialProgressFor(campaignId: string, levelId: number): PartialPlayProgress | null {
+  return loadPartialProgress().find(
+    (e) => e.campaignId === campaignId && e.levelId === levelId,
+  ) ?? null;
+}
+
+/**
+ * Return the most recently saved partial-progress entry across all campaigns,
+ * or null when none exist.
+ */
+export function getMostRecentPartialProgress(): PartialPlayProgress | null {
+  const all = loadPartialProgress();
+  if (all.length === 0) return null;
+  return all.reduce((best, e) => (e.timestamp > best.timestamp ? e : best));
+}
+
+/**
+ * Replace the entire partial-progress array with the provided entries.
+ * Used by profile import.
+ */
+export function replaceAllPartialProgress(entries: PartialPlayProgress[]): void {
+  try {
+    localStorage.setItem(PARTIAL_PROGRESS_KEY(), JSON.stringify(entries));
+  } catch { /* ignore */ }
+}
+
+/** Return true if the "Don't show save-progress notice" preference is set for the active slot. */
+export function loadSaveNoticeSuppressed(): boolean {
+  try {
+    return localStorage.getItem(SAVE_NOTICE_SUPPRESSED_KEY()) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the "Don't show save-progress notice" preference for the active slot. */
+export function saveSaveNoticeSuppressed(value: boolean): void {
+  try {
+    if (value) {
+      localStorage.setItem(SAVE_NOTICE_SUPPRESSED_KEY(), '1');
+    } else {
+      localStorage.removeItem(SAVE_NOTICE_SUPPRESSED_KEY());
     }
   } catch { /* ignore */ }
 }

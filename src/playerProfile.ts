@@ -43,8 +43,12 @@ import {
   saveEnvironmentalEnabled,
   loadMusicMuteOnFocusLoss,
   saveMusicMuteOnFocusLoss,
+  loadPartialProgress,
+  replaceAllPartialProgress,
+  loadSaveNoticeSuppressed,
+  saveSaveNoticeSuppressed,
 } from './persistence';
-import type { CampaignDef, PlaySequenceRecord } from './types';
+import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord } from './types';
 
 // ─── File type constants ──────────────────────────────────────────────────────
 
@@ -138,6 +142,16 @@ export interface PlayerProfilePayload {
    * standard profile exports.  Optional so that v1/v2 files parse correctly.
    */
   recordings?: PlaySequenceRecord[];
+  /**
+   * In-progress level state snapshots for levels the player was mid-way through.
+   * Optional for back-compat; absent in older profiles.
+   */
+  partialProgress?: PartialPlayProgress[];
+  /**
+   * Whether the save-progress notice modal has been permanently suppressed.
+   * Optional for back-compat; defaults to false when absent.
+   */
+  saveNoticeSuppressed?: boolean;
 }
 
 /** The complete serialized player-profile file. */
@@ -232,6 +246,8 @@ export function buildPlayerProfilePayload(
     environmentalEnabled: loadEnvironmentalEnabled(),
     musicMuteOnFocusLoss: loadMusicMuteOnFocusLoss(),
     campaignProgress,
+    partialProgress:     loadPartialProgress(),
+    saveNoticeSuppressed: loadSaveNoticeSuppressed(),
   };
   if (recordings !== undefined) {
     payload.recordings = recordings;
@@ -318,6 +334,20 @@ function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
   if ('musicVolume' in payload && typeof payload['musicVolume'] !== 'number') return false;
   // musicMuteOnFocusLoss is optional for back-compat; reject only if present but not a boolean
   if ('musicMuteOnFocusLoss' in payload && typeof payload['musicMuteOnFocusLoss'] !== 'boolean') return false;
+  // partialProgress is optional for back-compat; reject only if present and malformed
+  if ('partialProgress' in payload) {
+    const pp = payload['partialProgress'];
+    if (!Array.isArray(pp)) return false;
+    for (const e of pp) {
+      if (e === null || typeof e !== 'object') return false;
+      if (typeof e['campaignId'] !== 'string') return false;
+      if (typeof e['levelId'] !== 'number') return false;
+      if (!Array.isArray(e['moves'])) return false;
+      if (typeof e['timestamp'] !== 'number') return false;
+    }
+  }
+  // saveNoticeSuppressed is optional for back-compat; reject only if present but not a boolean
+  if ('saveNoticeSuppressed' in payload && typeof payload['saveNoticeSuppressed'] !== 'boolean') return false;
   return true;
 }
 
@@ -498,6 +528,23 @@ export function applyPlayerProfile(
   }
   // musicMuteOnFocusLoss is optional for back-compat; default to true when absent
   saveMusicMuteOnFocusLoss(payload.musicMuteOnFocusLoss ?? true);
+  // saveNoticeSuppressed is optional for back-compat; default to false when absent
+  saveSaveNoticeSuppressed(payload.saveNoticeSuppressed ?? false);
+
+  // ── Partial progress ───────────────────────────────────────────────────────
+  if (payload.partialProgress) {
+    // Build set of all valid level IDs across all known local campaigns.
+    const allLevelIds = new Set<number>();
+    for (const c of localCampaigns) {
+      for (const ch of c.chapters) {
+        for (const l of ch.levels) {
+          allLevelIds.add(l.id);
+        }
+      }
+    }
+    const validEntries = payload.partialProgress.filter((e) => allLevelIds.has(e.levelId));
+    replaceAllPartialProgress(validEntries);
+  }
 
   // ── Per-campaign progress ──────────────────────────────────────────────────
   const localById  = new Map(localCampaigns.map((c) => [c.id, c]));

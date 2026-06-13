@@ -89,6 +89,21 @@ function findContinueLevelId(
 }
 
 /**
+ * Resolve a level ID to its 1-based chapter and level numbers within `chapters`.
+ * Returns `null` if the level is not found in any chapter.
+ */
+export function levelIdToChapterLevel(
+  chapters: ChapterDef[],
+  levelId: number,
+): { chapter: number; level: number } | null {
+  for (let ci = 0; ci < chapters.length; ci++) {
+    const idx = chapters[ci].levels.findIndex((l) => l.id === levelId);
+    if (idx !== -1) return { chapter: ci + 1, level: idx + 1 };
+  }
+  return null;
+}
+
+/**
  * Find the index of the latest unlocked chapter that has a chapter map (grid).
  * Returns the 0-based chapter index, or `null` if no such chapter is accessible.
  */
@@ -202,6 +217,8 @@ export function renderLevelList(
   onPlayerProfileClick?: () => void,
   playerName?: string,
   onCreditsClick?: () => void,
+  onContinuePartial?: (levelId: number) => void,
+  partialLevelId?: number | null,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -440,6 +457,24 @@ export function renderLevelList(
       }
     }
     header.appendChild(continueBtn);
+
+    // ── Continue at X-Y button (partial-progress resume shortcut) ──────────
+    if (partialLevelId != null && onContinuePartial) {
+      const loc = levelIdToChapterLevel(chapters, partialLevelId);
+      if (loc) {
+        const partialBtn = document.createElement('button');
+        partialBtn.type = 'button';
+        partialBtn.textContent = t('button.continueAt', { chapter: String(loc.chapter), level: String(loc.level) });
+        partialBtn.style.cssText =
+          `padding:8px 16px;font-size:0.95rem;font-weight:bold;border-radius:${RADIUS_MD};` +
+          `border:1px solid ${UI_GOLD};background:${UI_GOLD};color:${UI_BG};cursor:pointer;width:100%;`;
+        partialBtn.addEventListener('click', () => {
+          sfxManager.play(SfxId.ChapterSelect);
+          onContinuePartial(partialLevelId);
+        });
+        header.appendChild(partialBtn);
+      }
+    }
 
     // Notify the caller the first time the mastered state is rendered so it
     // can fire the congratulatory sequence (confetti + modal) exactly once.

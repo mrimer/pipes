@@ -1633,11 +1633,14 @@ describe('Game – Escape key returns to level select', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
+    // Make a move so canUndo() is true — the modal is shown only when there is progress to save.
+    gameHooks(game).board!.recordMove();
+
     const exitSpy = jest.spyOn(game, 'exitToMenu');
     const hooks = gameHooks(game);
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
 
-    // Esc during active play now shows the confirm modal; exitToMenu is NOT called immediately.
+    // Esc during active play with progress shows the save-progress notice; exitToMenu is NOT called immediately.
     expect(exitSpy).not.toHaveBeenCalled();
     expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
   });
@@ -1646,14 +1649,20 @@ describe('Game – Escape key returns to level select', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
+    // Make a move so canUndo() is true.
+    gameHooks(game).board!.recordMove();
+
     const hooks = gameHooks(game);
     // First Esc: show modal
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
 
-    // Second Esc: hide modal
+    // Second Esc while modal is open: modal's own onClose fires (exits without closing via Esc guard).
+    // The modal stays open until its OK button or onClose is invoked through setupModal.
+    // Verify modal is still showing (our handleEscapeKey returns early when modal is open).
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(hooks._exitConfirmModalEl.style.display).toBe('none');
+    // Modal remains open (Esc while open is a no-op at the handleEscapeKey level; setupModal handles it).
+    expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
   });
 
   it('closes the rules modal via _handleDocKeyDown when the modal is open', () => {

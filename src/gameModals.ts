@@ -252,36 +252,45 @@ export function buildChallengeModal(
 }
 
 /**
- * Build and attach the exit-confirmation modal (shown when the player presses
- * Esc mid-level to abandon the current level).
+ * Build and attach the save-progress notice modal (shown when the player exits
+ * a level mid-game).  The modal is purely informational: progress will be
+ * saved, and there is no "Stay" option — exiting is always lossless.
  *
- * @param onExit     - Called when the player confirms leaving (should dismiss the
- *                     modal then exit to the menu).
- * @param onContinue - Called when the player chooses to stay (should dismiss the
- *                     modal then return focus to the canvas).
+ * @param onOk - Called with `dontShowAgain` flag when the player clicks OK (or
+ *               dismisses via Escape/backdrop).
  */
-export function buildExitConfirmModal(
-  onExit: () => void,
-  onContinue: () => void,
+export function buildSaveProgressNoticeModal(
+  onOk: (dontShowAgain: boolean) => void,
 ): HTMLElement {
-  const { el, box, actionsEl } = buildModalShell(t('modal.exit.title'));
+  const { el, box, actionsEl } = buildModalShell(t('modal.saveProgress.title'));
   const titleEl = box.querySelector('h2');
+
   const msgEl = document.createElement('p');
-  msgEl.textContent = t('modal.exit.message');
+  msgEl.textContent = t('modal.saveProgress.message');
   box.insertBefore(msgEl, actionsEl);
-  const exitBtn = document.createElement('button');
-  exitBtn.textContent = t('modal.exit.button');
-  exitBtn.className = 'modal-btn primary';
-  exitBtn.type = 'button';
-  exitBtn.addEventListener('click', () => onExit());
-  const continueBtn = document.createElement('button');
-  continueBtn.textContent = t('modal.exit.continue');
-  continueBtn.className = 'modal-btn secondary';
-  continueBtn.type = 'button';
-  continueBtn.addEventListener('click', () => onContinue());
-  actionsEl.appendChild(exitBtn);
-  actionsEl.appendChild(continueBtn);
-  setupModal(el, { titleEl, onClose: onContinue });
+
+  // "Don't show again" checkbox row
+  const checkboxRow = document.createElement('label');
+  checkboxRow.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.9rem;cursor:pointer;margin-bottom:4px;';
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.id = 'save-notice-suppress-cb';
+  checkbox.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+  const checkboxLabel = document.createElement('span');
+  checkboxLabel.textContent = t('modal.saveProgress.dontShowAgain');
+  checkboxRow.appendChild(checkbox);
+  checkboxRow.appendChild(checkboxLabel);
+  box.insertBefore(checkboxRow, actionsEl);
+
+  const okBtn = document.createElement('button');
+  okBtn.textContent = t('modal.saveProgress.ok');
+  okBtn.className = 'modal-btn primary';
+  okBtn.type = 'button';
+  okBtn.addEventListener('click', () => onOk(checkbox.checked));
+  actionsEl.appendChild(okBtn);
+
+  // Esc / backdrop also confirms exit (no "stay" option)
+  setupModal(el, { titleEl, onClose: () => onOk(checkbox.checked) });
   return el;
 }
 
@@ -763,7 +772,7 @@ export function buildUnplayableModal(onExit: () => void): HTMLElement {
   msgEl.textContent = t('modal.unplayable.message');
   box.insertBefore(msgEl, actionsEl);
   const exitBtn = document.createElement('button');
-  exitBtn.textContent = t('modal.exit.button');
+  exitBtn.textContent = t('modal.unplayable.button');
   exitBtn.className = 'modal-btn primary';
   exitBtn.type = 'button';
   exitBtn.addEventListener('click', () => onExit());

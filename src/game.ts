@@ -25,6 +25,12 @@ import {
   saveEnvironmentalEnabled,
   loadMusicMuteOnFocusLoss,
   saveMusicMuteOnFocusLoss,
+  savePartialProgressEntry,
+  deletePartialProgress,
+  getPartialProgressFor,
+  getMostRecentPartialProgress,
+  loadSaveNoticeSuppressed,
+  saveSaveNoticeSuppressed,
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
 import { createCreditsModal } from './creditsModal';
@@ -37,7 +43,7 @@ import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
 import type { ResetProgressInfo} from './gameModals';
 import {
   buildResetModal,
-  buildExitConfirmModal, buildUnplayableModal,
+  buildSaveProgressNoticeModal, buildUnplayableModal,
   buildSettingsModal,
 } from './gameModals';
 import type { RecordModalInfo} from './recordingModals';
@@ -69,6 +75,7 @@ import { FireflyField } from './visuals/fireflyField';
 import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
 import { t } from './i18n';
+import { ResumePlayer } from './resumePlayer';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 3000;
@@ -237,6 +244,9 @@ export class Game implements InputCallbacks {
   /** Timer ID for auto-hiding the error flash message. */
   private _errorFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** Active resume-player driver, or null when no resume is in progress. */
+  private _resumePlayer: ResumePlayer | null = null;
+
   /** Set of "row,col" keys for sandstone tiles currently highlighted due to a validation error. */
   private _errorHighlightKeys: Set<string> = new Set();
   /** Timer ID for clearing the sandstone highlight. */
@@ -276,7 +286,7 @@ export class Game implements InputCallbacks {
   /** Updater function for the reset-progress confirmation modal content. */
   private readonly _updateResetModalInfo: (info: ResetProgressInfo | null) => void;
 
-  /** Modal overlay shown when the player presses Esc to confirm abandoning the level. */
+  /** Modal overlay shown when the player exits a level mid-game (save-progress notice). */
   private readonly _exitConfirmModalEl: HTMLElement;
 
   /** Modal overlay shown when a level starts in an already-lost state (unplayable). */
@@ -363,10 +373,13 @@ export class Game implements InputCallbacks {
     this._rulesModalEl = createGameRulesModal();
     this._creditsModalEl = createCreditsModal();
 
-    // Create the exit-confirmation modal (shown when the player presses Esc mid-level)
-    this._exitConfirmModalEl = buildExitConfirmModal(
-      () => { this._closeModal(this._exitConfirmModalEl); this.exitToMenu(); },
-      () => { this._closeModal(this._exitConfirmModalEl); this.canvas.focus(); },
+    // Create the save-progress notice modal (shown when the player exits a level mid-game)
+    this._exitConfirmModalEl = buildSaveProgressNoticeModal(
+      (dontShowAgain) => {
+        if (dontShowAgain) saveSaveNoticeSuppressed(true);
+        this._closeModal(this._exitConfirmModalEl);
+        this.exitToMenu();
+      },
     );
 
     // Create the unplayable-level modal (shown when a level starts already lost)
@@ -537,6 +550,18 @@ export class Game implements InputCallbacks {
       getPlayerName: () => {
         const idx = getActiveSlotIndex();
         return idx !== null ? (loadSlotMeta(idx)?.name ?? null) : null;
+      },
+      getPartialLevelId: () => {
+        const recent = getMostRecentPartialProgress();
+        if (!recent) return null;
+        // Only surface partials that belong to the currently active campaign.
+        if (this._campaign.activeCampaign && recent.campaignId !== this._campaign.activeCampaign.id) {
+          return null;
+        }
+        return recent.levelId;
+      },
+      startLevelFromPartial: (levelId: number) => {
+        this.startLevel(levelId);
       },
       onMapScreenEntered: (style, isCampaignMap) => {
         musicManager.playGroup(selectGroupForContext({ style, isCampaignMap }));
@@ -864,6 +889,19 @@ export class Game implements InputCallbacks {
     // If the level starts already in a losing state, show the unplayable modal.
     if (this.board.getCurrentWater() <= 0) {
       this._showModalWithAnimation(this._unplayableModalEl, 'sparkle-red');
+      return;
+    }
+
+    // Trigger resume-replay driver when a partial-progress entry exists for this level
+    // (but not during restarts or editor playtests).
+    if (!isUserRestart && !this._campaign.isPlaytesting) {
+      const campaignId = this._campaign.activeCampaign?.id ?? '';
+      const partial = getPartialProgressFor(campaignId, levelId);
+      if (partial && partial.moves.length > 0) {
+        this._resumePlayer?.cancel();
+        this._resumePlayer = new ResumePlayer(this, this.board, partial.moves, this.errorFlashEl);
+        this._resumePlayer.start();
+      }
     }
   }
 
@@ -1778,6 +1816,9 @@ export class Game implements InputCallbacks {
     this._renderInventoryBar();
   }
 
+  /** Returns true while a resume-replay is replaying saved moves. */
+  isResuming(): boolean { return this._resumePlayer?.isActive() ?? false; }
+
   /**
    * Handle the Escape key: close the rules modal if open, toggle the exit-
    * confirm modal during play, or exit to the menu otherwise.
@@ -1793,10 +1834,10 @@ export class Game implements InputCallbacks {
       this.canvas.focus();
     } else if (this.screen === GameScreen.Play && this.gameState === GameState.Playing) {
       if (this._exitConfirmModalEl.style.display !== 'none') {
-        this._exitConfirmModalEl.style.display = 'none';
-        this.canvas.focus();
+        // Modal already open: the modal's own Esc/onClose handler will dismiss it.
+        return;
       } else {
-        this._exitConfirmModalEl.style.display = 'flex';
+        this.requestExitLevel();
       }
     } else {
       this.exitToMenu();
@@ -1804,6 +1845,40 @@ export class Game implements InputCallbacks {
   }
 
   checkWinLose(): void { this._checkWinLoseAfterMove(); }
+  updateUndoRedoButtons(): void { this._updateUndoRedoButtons(); }
+
+  /** Spawn board animations for a single replayed move and refresh the play UI. */
+  spawnMoveAnimations(board: Board, info: MoveAnimationInfo): void {
+    this._animMgr.completeAnims();
+    this._animMgr.resetIdleTimer();
+    const sparkle = this._metrics.sparkleCallbacks();
+    if (info.rotationInfo) {
+      const tile = board.getTile(info.rotationInfo);
+      this._animMgr.spawnRotationAnim(
+        info.rotationInfo.row, info.rotationInfo.col,
+        info.rotationInfo.oldRotation,
+        tile?.rotation ?? info.rotationInfo.oldRotation,
+      );
+    }
+    this._animMgr.spawnConnectionAnimations(board, info.filledBefore, sparkle);
+    if (info.decodedMove.type === 'delete') {
+      this._animMgr.spawnDisconnectionAnimations(
+        board, info.filledBefore, sparkle,
+        info.reclaimedTile, info.decodedMove.row, info.decodedMove.col,
+        info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
+      );
+    } else {
+      this._animMgr.spawnDisconnectionAnimations(
+        board, info.filledBefore, sparkle, undefined, undefined, undefined,
+        info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
+      );
+    }
+    const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
+    this._animMgr.spawnFillAnims(board, info.filledBefore, fillDelay);
+    this._animMgr.spawnLockedCostChangeAnimations(info.turnChanges);
+    this._animMgr.spawnCementDecrementAnimation(info.moveResult.cementDecrement);
+    this._refreshPlayUI();
+  }
 
   // ─── Public API called by main.ts button handlers ─────────────────────────
 
@@ -1975,8 +2050,57 @@ export class Game implements InputCallbacks {
     this.performUndo();
   }
 
+  /**
+   * Save or delete the partial-progress entry for the current level on exit.
+   *
+   * - Won levels: delete the partial (no longer needed).
+   * - No moves yet (pristine): delete any stale partial.
+   * - Mid-game exit with moves: save the current move sequence.
+   * - Editor playtests: never touch storage.
+   */
+  private _persistPartialProgressOnExit(): void {
+    if (!this.currentLevel || !this.board) return;
+    if (this._campaign.isPlaytesting) return;
+
+    const campaignId = this._campaign.activeCampaign?.id ?? '';
+    const levelId = this.currentLevel.id;
+    const moves = this.board.getMoveSequence();
+
+    if (this.gameState === GameState.Won || moves.length === 0) {
+      deletePartialProgress(campaignId, levelId);
+    } else {
+      savePartialProgressEntry({ campaignId, levelId, moves, timestamp: Date.now(), formatVersion: 1 });
+    }
+  }
+
+  /**
+   * Request an exit from the current level to the level-select menu.
+   *
+   * When the player is mid-game (Playing state with moves on the board) and
+   * the save-progress notice has not been suppressed, show the notice modal
+   * first.  In all other cases exit immediately.
+   */
+  requestExitLevel(): void {
+    if (this.screen !== GameScreen.Play || this.gameState !== GameState.Playing) {
+      this.exitToMenu();
+      return;
+    }
+    if (!this.board?.canUndo()) {
+      // No moves yet — nothing to save; skip the notice.
+      this.exitToMenu();
+      return;
+    }
+    if (loadSaveNoticeSuppressed()) {
+      // Player has suppressed the notice; save silently via exitToMenu hook.
+      this.exitToMenu();
+      return;
+    }
+    this._exitConfirmModalEl.style.display = 'flex';
+  }
+
   /** Exit to the level-selection screen. */
   exitToMenu(): void {
+    this._persistPartialProgressOnExit();
     if (this._campaign.isPlaytesting) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- takePlaytestCallback is always set when isPlaytesting is true
       const cb = this._campaign.takePlaytestCallback()!;

@@ -150,15 +150,16 @@ export const en: TranslationTable = {
   'modal.challenge.message': 'This is an optional challenge level. You may skip it without affecting your progress.',
   'modal.challenge.play': 'Play Level',
   'modal.challenge.skip': 'Skip Level',
-  'modal.exit.title': '🚪 Abandon Level?',
-  'modal.exit.message': 'Your progress on this level will be lost.',
-  'modal.exit.button': 'Exit Level',
-  'modal.exit.continue': 'Continue',
+  'modal.saveProgress.title': '💾 Saving Progress',
+  'modal.saveProgress.message': 'Your progress will be saved. You can resume this level later.',
+  'modal.saveProgress.dontShowAgain': "Don't show this again",
+  'modal.saveProgress.ok': 'OK',
   'modal.campaignMastered.title': 'Campaign Mastered!',
   'modal.campaignMastered.message': 'All areas complete!',
   'modal.campaignMastered.button': 'Kudos!',
   'modal.unplayable.title': '⚠️ Level Unplayable',
   'modal.unplayable.message': 'This level starts in a losing position and cannot be played.',
+  'modal.unplayable.button': 'Exit Level',
   'modal.editPlayerName.title': '✏️ Edit Player Name',
   'modal.editPlayerName.label': 'Player name:',
   'modal.editPlayerName.ok': 'OK',
@@ -578,5 +579,10 @@ export const en: TranslationTable = {
   'editor.prompt.campaignName': 'Campaign name:',
   'editor.prompt.chapterName': 'Chapter name:',
   'editor.prompt.levelName': 'Level name:',
-  'editor.prompt.newLevelDefault': 'New Level'
+  'editor.prompt.newLevelDefault': 'New Level',
+
+  'resume.flash.resuming': 'Resuming play from last session.',
+  'resume.flash.invalid': 'Invalid move encountered. Resuming play at last valid move.',
+
+  'button.continueAt': '▶ Continue at {chapter}-{level}'
 };
