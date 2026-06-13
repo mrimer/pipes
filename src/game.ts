@@ -2060,17 +2060,34 @@ export class Game implements InputCallbacks {
    */
   private _persistPartialProgressOnExit(): void {
     if (!this.currentLevel || !this.board) return;
-    if (this._campaign.isPlaytesting) return;
 
     const campaignId = this._campaign.activeCampaign?.id ?? '';
     const levelId = this.currentLevel.id;
-    const moves = this.board.getMoveSequence();
 
-    if (this.gameState === GameState.Won || moves.length === 0) {
-      deletePartialProgress(campaignId, levelId);
-    } else {
+    if (this._hasSaveableProgress()) {
+      const moves = this.board.getMoveSequence();
       savePartialProgressEntry({ campaignId, levelId, moves, timestamp: Date.now(), formatVersion: 1 });
+    } else {
+      deletePartialProgress(campaignId, levelId);
     }
+  }
+
+  /**
+   * Returns true when there is meaningful progress worth saving on exit:
+   *  - not playtesting (playtest sessions are never persisted),
+   *  - game is not yet won (won state is persisted via the win flow, not here),
+   *  - the current-session move sequence is non-empty.
+   *
+   * Using getMoveSequence() (rather than canUndo()) ensures the gate matches
+   * exactly the data that would be persisted, so "modal shown" ⟺ "something
+   * will be saved" by construction.  After a retryLevel(), pre-restart moves
+   * remain in the undo history but getMoveSequence() returns only post-restart
+   * moves, so a retry with no subsequent moves correctly reports no progress.
+   */
+  private _hasSaveableProgress(): boolean {
+    return !this._campaign.isPlaytesting
+      && this.gameState !== GameState.Won
+      && (this.board?.getMoveSequence().length ?? 0) > 0;
   }
 
   /**
@@ -2085,8 +2102,8 @@ export class Game implements InputCallbacks {
       this.exitToMenu();
       return;
     }
-    if (!this.board?.canUndo()) {
-      // No moves yet — nothing to save; skip the notice.
+    if (!this._hasSaveableProgress()) {
+      // No post-restart moves — nothing to save; skip the notice.
       this.exitToMenu();
       return;
     }
