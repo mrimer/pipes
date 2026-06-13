@@ -158,7 +158,7 @@ async function bootstrap(): Promise<void> {
 
   // Exit to menu button on play screen
   exitBtnEl.addEventListener('click', () => {
-    game.exitToMenu();
+    game.requestExitLevel();
     sfxManager.play(SfxId.Back);
   });
 

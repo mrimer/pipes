@@ -77,6 +77,11 @@ export interface InputCallbacks {
   handleEscapeKey(): void;
   /** Flash a red "unavailable" sparkle on the given inventory item. */
   flashInventoryItemError(shape: PipeShape): void;
+  /**
+   * Returns true while a resume-replay is replaying saved moves.
+   * The input handler ignores player gestures during this window.
+   */
+  isResuming(): boolean;
 }
 
 /**
@@ -230,6 +235,7 @@ export class InputHandler {
    * re-renders the inventory bar.
    */
   handleInventoryClick(shape: PipeShape, count: number): void {
+    if (this._isInputLocked()) return;
     if (this._cb.getGameState() !== GameState.Playing) return;
     if (count < 0) {
       // Flash a red sparkle to signal the item is locked/not selectable.
@@ -403,7 +409,13 @@ export class InputHandler {
 
   // ── Event handlers ──────────────────────────────────────────────────────────
 
+  /** Returns true when player input should be blocked (resume replay in progress). */
+  private _isInputLocked(): boolean {
+    return this._cb.isResuming();
+  }
+
   private _handleCanvasMouseDown(e: MouseEvent): void {
+    if (this._isInputLocked()) return;
     if (e.button === 2) {
       if (this._cb.getScreen() !== GameScreen.Play) return;
       if (this._cb.getGameState() !== GameState.Playing) return;
@@ -426,6 +438,7 @@ export class InputHandler {
   }
 
   private _handleCanvasMouseUp(e: MouseEvent): void {
+    if (this._isInputLocked()) { this._cancelDrag(); this._cancelRightDrag(); return; }
     if (e.button === 2) {
       if (!this._isRightDragging) return;
       // Remove the tile at the final (current) position and suppress the contextmenu event.
@@ -473,6 +486,7 @@ export class InputHandler {
   }
 
   private _handleCanvasClick(e: MouseEvent): void {
+    if (this._isInputLocked()) return;
     if (this._cb.getScreen() !== GameScreen.Play) return;
     if (this._cb.getGameState() !== GameState.Playing) return;
     const board = this._cb.getBoard();
@@ -713,6 +727,7 @@ export class InputHandler {
   }
 
   private _handleKey(e: KeyboardEvent): void {
+    if (this._isInputLocked()) return;
     if (this._cb.getScreen() !== GameScreen.Play) return;
     const board = this._cb.getBoard();
     if (!board) return;
@@ -882,6 +897,7 @@ export class InputHandler {
   // ── Touch event handlers ─────────────────────────────────────────────────
 
   private _handleCanvasTouchStart(e: TouchEvent): void {
+    if (this._isInputLocked()) return;
     if (this._cb.getScreen() !== GameScreen.Play) return;
     if (this._cb.getGameState() !== GameState.Playing) return;
 

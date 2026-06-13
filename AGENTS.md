@@ -119,6 +119,7 @@ src/
 │
 ├── moveRecorder.ts              # Move encoding P/R/D strings, replayMoves()
 ├── autoRecording.ts             # Auto-recording dedup helper
+├── resumePlayer.ts              # Save-and-resume replay driver (125 ms per-move chain)
 ├── playbackScreen.ts            # Transport-controls HUD for step-by-step replay
 ├── profileIO.ts                 # Export/import orchestration for replays and player profiles
 ├── playerProfile.ts             # Pure data: build/parse/apply/checksum player profile payloads

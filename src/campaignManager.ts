@@ -94,6 +94,18 @@ export interface CampaignCallbacks {
   showPlayerProfile(): void;
   /** Return the display name of the currently active player, or null. */
   getPlayerName(): string | null;
+  /**
+   * Return the level ID of the most recently saved partial progress for the
+   * active campaign, or null when none exists.
+   * Optional – callers that do not implement partial-progress can omit it.
+   */
+  getPartialLevelId?(): number | null;
+  /**
+   * Start the given level and let the resume driver pick up saved progress.
+   * Equivalent to `startLevel(levelId)` but semantically scoped to resume.
+   * Optional – callers that do not implement partial-progress can omit it.
+   */
+  startLevelFromPartial?(levelId: number): void;
 
   /**
    * Called when entering a chapter or campaign map for the first time
@@ -854,6 +866,8 @@ export class CampaignManager {
       () => this._callbacks.showPlayerProfile(),
       this._callbacks.getPlayerName() ?? undefined,
       () => this._callbacks.showCredits(),
+      this._callbacks.startLevelFromPartial ? (id: number) => this._callbacks.startLevelFromPartial!(id) : undefined,
+      this._callbacks.getPartialLevelId?.() ?? null,
     );
   }
 

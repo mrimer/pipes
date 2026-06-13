@@ -457,6 +457,32 @@ export interface CampaignDef {
   style?: LevelStyle;
 }
 
+// ─── Partial-progress types ───────────────────────────────────────────────────
+
+/**
+ * Snapshot of a player's in-progress level state, saved on exit so the session
+ * can be resumed later.
+ *
+ * One entry per (campaignId, levelId) pair is kept per profile slot. The full
+ * move sequence is sufficient to reconstruct the board state by replaying moves
+ * from the level's initial state.
+ */
+export interface PartialPlayProgress {
+  /** Save-data schema version. Currently 1. */
+  formatVersion?: number;
+  /** Campaign this progress belongs to. */
+  campaignId: string;
+  /** Level ID within the campaign. */
+  levelId: number;
+  /**
+   * Ordered list of encoded action strings after the last restart boundary.
+   * Format: see `src/moveRecorder.ts`.
+   */
+  moves: string[];
+  /** Unix timestamp (ms) of when this entry was saved. */
+  timestamp: number;
+}
+
 // ─── Recording / playback types ───────────────────────────────────────────────
 
 /**
