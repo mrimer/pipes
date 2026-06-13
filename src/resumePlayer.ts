@@ -90,13 +90,13 @@ export class ResumePlayer {
 
     // Stop if game has moved out of Playing state (win/lose from a previous step).
     if (this._game.getGameState() !== GameState.Playing) {
-      this._finish(false);
+      this._finish();
       return;
     }
 
     // All moves processed — full completion.
     if (index >= this._moves.length) {
-      this._finish(true);
+      this._finish();
       showTimedMessage(this._flashEl, t('resume.flash.resuming'), RESUME_FLASH_MS);
       return;
     }
@@ -105,7 +105,7 @@ export class ResumePlayer {
     const decoded = decodeMove(encoded);
     if (!decoded) {
       // Malformed move string — treat as invalid.
-      this._finish(false);
+      this._finish();
       showTimedMessage(this._flashEl, t('resume.flash.invalid'), RESUME_FLASH_MS);
       return;
     }
@@ -134,7 +134,7 @@ export class ResumePlayer {
 
     if (!moveResult.success) {
       // The move is invalid for this level's current state — halt here.
-      this._finish(false);
+      this._finish();
       showTimedMessage(this._flashEl, t('resume.flash.invalid'), RESUME_FLASH_MS);
       return;
     }
@@ -163,9 +163,8 @@ export class ResumePlayer {
     this._scheduleNext(index + 1);
   }
 
-  private _finish(clearActive = true): void {
-    if (clearActive) this._active = false;
-    else this._active = false;
+  private _finish(): void {
+    this._active = false;
     if (this._timerId !== null) {
       clearTimeout(this._timerId);
       this._timerId = null;
