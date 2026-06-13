@@ -47,6 +47,9 @@ import {
   saveRecording,
   loadAllRecordings,
   loadMusicMuteOnFocusLoss,
+  loadPartialProgress,
+  loadSaveNoticeSuppressed,
+  savePartialProgressEntry,
 } from '../src/persistence';
 import type { CampaignDef} from '../src/types';
 import { makeCampaignDef, makeChapterDef, makeLevelDef, makeRecord } from './testHelpers';
@@ -754,5 +757,76 @@ describe('applyPlayerProfile – import outcome deltas', () => {
     expect(merged!.newChaptersCompleted).toBe(0);
     expect(merged!.newStars).toBe(0);
     expect(merged!.newWater).toBe(0);
+  });
+});
+
+// ─── Partial progress export/import ───────────────────────────────────────────
+
+describe('playerProfile – partialProgress export/import', () => {
+  beforeEach(() => {
+    clearStorage();
+    localStorage.setItem('pipes_active_slot', '0');
+  });
+
+  it('buildPlayerProfilePayload includes partialProgress and saveNoticeSuppressed', () => {
+    savePartialProgressEntry({ campaignId: 'cmp1', levelId: 5, moves: ['P:ELBOW:0:0:0'], timestamp: 1000, formatVersion: 1 });
+    const payload = buildPlayerProfilePayload([]);
+    expect(payload.partialProgress).toEqual([
+      { campaignId: 'cmp1', levelId: 5, moves: ['P:ELBOW:0:0:0'], timestamp: 1000, formatVersion: 1 },
+    ]);
+    expect(payload.saveNoticeSuppressed).toBe(false);
+  });
+
+  it('round-trip: export then applyPlayerProfile restores partialProgress and saveNoticeSuppressed', () => {
+    savePartialProgressEntry({ campaignId: 'cmp1', levelId: 7, moves: ['D:1:1'], timestamp: 2000, formatVersion: 1 });
+    const cmp = makeMinimalCampaign('cmp1');
+    // Add a level with id 7 for the filter.
+    const chapter = cmp.chapters[0];
+    chapter.levels.push(makeLevelDef({ id: 7, name: 'L7', rows: 1, cols: 1, grid: [[null]] }));
+
+    const payload = buildPlayerProfilePayload([cmp]);
+    clearStorage();
+    localStorage.setItem('pipes_active_slot', '0');
+    applyPlayerProfile(payload, [cmp]);
+
+    const restored = loadPartialProgress();
+    expect(restored).toHaveLength(1);
+    expect(restored[0].levelId).toBe(7);
+    expect(loadSaveNoticeSuppressed()).toBe(false);
+  });
+
+  it('invalid-levelId is silently dropped on import', () => {
+    const cmp = makeMinimalCampaign('cmp1');
+    const payload = buildPlayerProfilePayload([cmp]);
+    payload.partialProgress = [
+      { campaignId: 'cmp1', levelId: 101, moves: [], timestamp: 1, formatVersion: 1 }, // valid
+      { campaignId: 'cmp1', levelId: 9999, moves: [], timestamp: 2, formatVersion: 1 }, // invalid id
+    ];
+    applyPlayerProfile(payload, [cmp]);
+    const entries = loadPartialProgress();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].levelId).toBe(101);
+  });
+
+  it('back-compat: missing partialProgress / saveNoticeSuppressed imports cleanly', () => {
+    const cmp = makeMinimalCampaign('cmp1');
+    const payload = buildPlayerProfilePayload([cmp]);
+    delete payload.partialProgress;
+    delete payload.saveNoticeSuppressed;
+    expect(() => applyPlayerProfile(payload, [cmp])).not.toThrow();
+    expect(loadPartialProgress()).toEqual([]);
+    expect(loadSaveNoticeSuppressed()).toBe(false);
+  });
+
+  it('validation rejects a payload where partialProgress is malformed', () => {
+    const goodPayload = buildPlayerProfilePayload([]);
+    const file = buildPlayerFile(goodPayload);
+    // Stringify the whole file, mutate the payload JSON, re-checksum, re-stringify.
+    const rawFile = JSON.parse(JSON.stringify(file)) as Record<string, unknown>;
+    const rawPayload = rawFile.payload as Record<string, unknown>;
+    rawPayload.partialProgress = [{ campaignId: 123, levelId: 'oops', moves: 'not-array', timestamp: 'bad' }];
+    rawFile.checksum = computeChecksum(JSON.stringify(rawPayload));
+    const result = parsePlayerFile(JSON.stringify(rawFile));
+    expect(result.ok).toBe(false);
   });
 });
