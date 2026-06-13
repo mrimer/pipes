@@ -459,7 +459,7 @@ export function renderLevelList(
     header.appendChild(continueBtn);
 
     // ── Continue at X-Y button (partial-progress resume shortcut) ──────────
-    if (partialLevelId != null && onContinuePartial) {
+    if (partialLevelId !== null && partialLevelId !== undefined && onContinuePartial) {
       const loc = levelIdToChapterLevel(chapters, partialLevelId);
       if (loc) {
         const partialBtn = document.createElement('button');

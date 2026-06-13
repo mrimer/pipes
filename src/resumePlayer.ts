@@ -13,7 +13,7 @@
  * knows where they left off.
  */
 
-import { Board } from './board';
+import type { Board } from './board';
 import { decodeMove } from './moveRecorder';
 import type { MoveAnimationInfo } from './playbackScreen';
 import type { Tile } from './tile';

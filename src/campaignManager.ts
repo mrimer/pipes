@@ -866,7 +866,7 @@ export class CampaignManager {
       () => this._callbacks.showPlayerProfile(),
       this._callbacks.getPlayerName() ?? undefined,
       () => this._callbacks.showCredits(),
-      this._callbacks.startLevelFromPartial ? (id: number) => this._callbacks.startLevelFromPartial!(id) : undefined,
+      this._callbacks.startLevelFromPartial ? (id: number) => this._callbacks.startLevelFromPartial?.(id) : undefined,
       this._callbacks.getPartialLevelId?.() ?? null,
     );
   }
