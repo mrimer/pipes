@@ -631,13 +631,15 @@ export class Game implements InputCallbacks {
 
   // ─── Screen transitions ───────────────────────────────────────────────────
 
-  private _showLevelSelect(stopAudio = true): void {
+  private _showLevelSelect(stopAudio = true, keepMusicGroup = false): void {
     // Cancel any pending intro-ring spawn before leaving the play screen.
     this._cancelPendingRings();
     // Stop any sounds still playing from the previous screen (skip when exiting editor screens).
     if (stopAudio) sfxManager.stopAll();
-    // Switch to main-menu music (gesture-gated on first call).
-    musicManager.playGroup('menu');
+    // Switch to main-menu music, unless the caller is about to restore the editor
+    // (which will re-apply the correct group itself, so interrupting with 'menu' would
+    // restart the track for no reason).
+    if (!keepMusicGroup) musicManager.playGroup('menu');
     // Remember the last played level ID for the scroll below, then clear currentLevel
     // so that re-entering the same level via the level-select screen will be treated
     // as a new entry (showing the ring effect again).
@@ -1978,7 +1980,9 @@ export class Game implements InputCallbacks {
     if (this._campaign.isPlaytesting) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- takePlaytestCallback is always set when isPlaytesting is true
       const cb = this._campaign.takePlaytestCallback()!;
-      this._showLevelSelect();
+      // keepMusicGroup=true: the editor restores the correct group itself, so skip
+      // the interim 'menu' switch that would restart the track for no reason.
+      this._showLevelSelect(true, true);
       cb(); // re-open the campaign editor
     } else if (this._campaign.winFromChapterMap && this._campaign.chapterMapScreen?.chapter) {
       this._campaign.winFromChapterMap = false;

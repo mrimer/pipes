@@ -141,6 +141,8 @@ src/
 ├── commandKeyManager.ts         # Keyboard shortcut registry
 ├── deviceUtils.ts               # Touch/mobile detection helpers
 ├── sfxManager.ts                # Sound effect playback
+├── musicManager.ts              # Background music: two-slot cross-fading via Web Audio, autoplay-policy handling
+├── musicScheduler.ts            # Pure music group/track scheduler (shuffle, avoid-repeat, group selection logic)
 │
 ├── visuals/
 │   ├── butterflyField.ts        # Butterfly visual effect
