@@ -977,7 +977,6 @@ describe('Game – pending rotation', () => {
 
 import { Board } from '../src/board';
 import { Tile } from '../src/tile';
-import { GameState } from '../src/types';
 import { renderInventoryBar } from '../src/inventoryRenderer';
 import { AnimationManager } from '../src/animationManager';
 
