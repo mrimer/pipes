@@ -3,7 +3,12 @@
 import { Board } from '../src/board';
 import { Direction, PipeShape } from '../src/types';
 import { Tile } from '../src/tile';
-import { computeFlowGoodDirs } from '../src/visuals/waterParticles';
+import {
+  computeFlowGoodDirs,
+  spawnLeakySprayDrop,
+  type LeakySprayDrop,
+  type LeakySprayCandidate,
+} from '../src/visuals/waterParticles';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -104,5 +109,50 @@ describe('computeFlowGoodDirs', () => {
     expect(goodDirs.get('0,0')?.has(Direction.East)).toBe(true);
     expect(goodDirs.get('0,1')?.has(Direction.East)).toBe(true);
     expect(goodDirs.get('0,1')?.has(Direction.West)).toBe(false);
+  });
+});
+
+// ─── spawnLeakySprayDrop ─────────────────────────────────────────────────────
+
+describe('spawnLeakySprayDrop', () => {
+  /**
+   * A dummy Board stub that satisfies the parameter type; the real board
+   * methods are never called when pre-built candidates are passed in.
+   */
+  function makeStubBoard(): Board {
+    const board = new Board(1, 1);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 0 };
+    return board;
+  }
+
+  /** A single candidate rust-spot at a known canvas position. */
+  const FIXED_CANDIDATE: LeakySprayCandidate = { cx: 100, cy: 100, armAngle: 0 };
+
+  it('always spawns a drop with speed >= 1 even when Math.random returns 0', () => {
+    const realRandom = Math.random;
+    try {
+      // Force Math.random to always return 0, which would produce
+      // _s(0.4 + 0 * 0.6) = Math.round(0.4) = 0 before the fix.
+      Math.random = () => 0;
+
+      const drops: LeakySprayDrop[] = [];
+      const board = makeStubBoard();
+      spawnLeakySprayDrop(drops, board, new Set<string>(), [FIXED_CANDIDATE]);
+
+      expect(drops).toHaveLength(1);
+      expect(drops[0].speed).toBeGreaterThanOrEqual(1);
+    } finally {
+      Math.random = realRandom;
+    }
+  });
+
+  it('always spawns a drop with speed >= 1 across all random values', () => {
+    const board = makeStubBoard();
+    for (let i = 0; i < 200; i++) {
+      const drops: LeakySprayDrop[] = [];
+      spawnLeakySprayDrop(drops, board, new Set<string>(), [FIXED_CANDIDATE]);
+      expect(drops[0].speed).toBeGreaterThanOrEqual(1);
+    }
   });
 });

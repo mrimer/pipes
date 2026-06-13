@@ -835,7 +835,9 @@ export function spawnLeakySprayDrop(
     originY: cy,
     angle: perpAngle + spread,
     distance: 0,
-    speed: _s(0.4 + Math.random() * 0.6),
+    // Math.max(1, …) guards against _s() rounding sub-0.5 inputs to 0 at
+    // the base tile size, which would freeze the drop on its origin forever.
+    speed: Math.max(1, _s(0.4 + Math.random() * 0.6)),
     size: _s(2 + Math.random() * 2.5),
   });
 }
