@@ -4,9 +4,15 @@
 
 import { Game } from '../src/game';
 import type { LevelDef, CampaignDef} from '../src/types';
-import { PipeShape, Direction } from '../src/types';
+import { PipeShape, Direction, GameState } from '../src/types';
 import { LEVELS, CHAPTERS } from './levels';
-import { saveImportedCampaigns, loadActiveCampaignId, saveLevelWater } from '../src/persistence';
+import {
+  saveImportedCampaigns,
+  loadActiveCampaignId,
+  saveLevelWater,
+  savePartialProgressEntry,
+  getPartialProgressFor,
+} from '../src/persistence';
 import { sfxManager, SfxId } from '../src/sfxManager';
 import { CloudShadowField } from '../src/visuals/cloudShadows';
 import { FireflyField } from '../src/visuals/fireflyField';
@@ -1633,11 +1639,11 @@ describe('Game – Escape key returns to level select', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
-    // Make a move so canUndo() is true — the modal is shown only when there is progress to save.
-    gameHooks(game).board!.recordMove();
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
 
     const exitSpy = jest.spyOn(game, 'exitToMenu');
-    const hooks = gameHooks(game);
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
 
     // Esc during active play with progress shows the save-progress notice; exitToMenu is NOT called immediately.
@@ -1649,10 +1655,9 @@ describe('Game – Escape key returns to level select', () => {
     const { game } = makeGame();
     game.startLevel(1);
 
-    // Make a move so canUndo() is true.
-    gameHooks(game).board!.recordMove();
-
     const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
     // First Esc: show modal
     hooks._input._handleKey(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
@@ -2358,6 +2363,96 @@ describe('Game – retryLevel preserves undo history', () => {
     game.performUndo();
     expect(boardAccess.board.grid[0][1].shape).toBe(PipeShape.Straight);
   });
+
+  it('requestExitLevel exits directly after retryLevel with no post-restart moves and deletes stale partial progress', () => {
+    const { game, levelSelectEl } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    const preRestartMoves = game.getMoveLog();
+    expect(preRestartMoves.length).toBeGreaterThan(0);
+
+    game.retryLevel();
+    expect(game.getMoveLog()).toEqual([]);
+
+    savePartialProgressEntry({
+      campaignId: 'test-campaign',
+      levelId: 1,
+      moves: preRestartMoves,
+      timestamp: 123,
+      formatVersion: 1,
+    });
+
+    const exitSpy = jest.spyOn(game, 'exitToMenu');
+    game.requestExitLevel();
+
+    expect(exitSpy).toHaveBeenCalled();
+    expect(hooks._exitConfirmModalEl.style.display).not.toBe('flex');
+    expect(levelSelectEl.style.display).toBe('flex');
+    expect(getPartialProgressFor('test-campaign', 1)).toBeNull();
+  });
+
+  it('requestExitLevel still shows the notice after retryLevel when new moves were made and saves only post-restart moves', () => {
+    const { game } = makeGame();
+    game.startLevel(1);
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    const preRestartMoves = game.getMoveLog();
+    expect(preRestartMoves.length).toBeGreaterThan(0);
+
+    game.retryLevel();
+
+    hooks.selectedShape = PipeShape.Tee;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 160, clientY: 32 }));
+    const postRestartMoves = game.getMoveLog();
+    expect(postRestartMoves.length).toBeGreaterThan(0);
+    expect(postRestartMoves).not.toEqual(preRestartMoves);
+
+    const exitSpy = jest.spyOn(game, 'exitToMenu');
+    game.requestExitLevel();
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(hooks._exitConfirmModalEl.style.display).toBe('flex');
+
+    game.exitToMenu();
+
+    expect(getPartialProgressFor('test-campaign', 1)?.moves).toEqual(postRestartMoves);
+  });
+
+  it('_hasSaveableProgress only tracks non-playtest, non-won, post-restart moves', () => {
+    const { game } = makeGame();
+    const hasSaveableProgress = (game as unknown as { _hasSaveableProgress(): boolean })._hasSaveableProgress.bind(game);
+
+    game.startLevel(1);
+    expect(hasSaveableProgress()).toBe(false);
+
+    const hooks = gameHooks(game);
+    hooks.selectedShape = PipeShape.Straight;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    expect(hasSaveableProgress()).toBe(true);
+
+    hooks.gameState = GameState.Won;
+    expect(hasSaveableProgress()).toBe(false);
+
+    game.retryLevel();
+    expect(hasSaveableProgress()).toBe(false);
+
+    hooks.selectedShape = PipeShape.Tee;
+    hooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 160, clientY: 32 }));
+    hooks.gameState = GameState.Playing;
+    expect(hasSaveableProgress()).toBe(true);
+
+    const { game: playtestGame } = makeGame();
+    gameHooks(playtestGame)._playtestLevel(LEVELS[0]);
+    const playtestHooks = gameHooks(playtestGame);
+    playtestHooks.selectedShape = PipeShape.Straight;
+    playtestHooks._input._handleCanvasClick(new MouseEvent('click', { clientX: 96, clientY: 32 }));
+    expect((playtestGame as unknown as { _hasSaveableProgress(): boolean })._hasSaveableProgress()).toBe(false);
+  });
 });
 
 // ─── Tests: new-chapter modal ─────────────────────────────────────────────────
@@ -2461,15 +2556,41 @@ describe('Game – challenge-level modal', () => {
     const { game, playScreenEl } = makeGame();
     const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
     gameHooks(game)._activateCampaign(campaign);
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
 
     game.requestLevel(9002);
 
     const hooks = gameHooks(game);
     expect(hooks._campaign._challengeModalElInternal.style.display).toBe('flex');
     expect(hooks._campaign._pendingLevelIdInternal).toBe(9002);
+    expect(playSpy).toHaveBeenCalledWith(SfxId.Challenge);
     // The level should be started (visible on screen) before the modal appears.
     expect(playScreenEl.style.display).toBe('flex');
     expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
+  });
+
+  it('skips the challenge modal and challenge sfx when partial progress is being resumed', () => {
+    const { game, playScreenEl } = makeGame();
+    const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+    gameHooks(game)._activateCampaign(campaign);
+    savePartialProgressEntry({
+      campaignId: campaign.id,
+      levelId: 9002,
+      moves: ['P:Straight:0:1:0'],
+      timestamp: 123,
+      formatVersion: 1,
+    });
+    const playSpy = jest.spyOn(sfxManager, 'play').mockImplementation(() => {});
+
+    game.requestLevel(9002);
+
+    const hooks = gameHooks(game);
+    expect(hooks._campaign._challengeModalElInternal.style.display).toBe('none');
+    expect(hooks._campaign._pendingLevelIdInternal).toBeNull();
+    expect(playSpy).not.toHaveBeenCalledWith(SfxId.Challenge);
+    expect(playScreenEl.style.display).toBe('flex');
+    expect((game as unknown as { currentLevel: LevelDef }).currentLevel?.id).toBe(9002);
+    expect(game.isResuming()).toBe(true);
   });
 
   it('does NOT show the challenge modal for a non-challenge level', () => {
