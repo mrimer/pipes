@@ -15,7 +15,7 @@ import {
   GRANITE_FILL_COLOR, GRANITE_COLOR,
   TREE_COLOR, TREE_LEAF_COLOR, TREE_LEAF_ALT_COLOR, TREE_TRUNK_COLOR,
   CEMENT_FILL_COLOR, CEMENT_COLOR,
-  GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR,
+  GOLD_SPACE_BASE_COLOR, GOLD_SPACE_BORDER_COLOR, GOLD_PIPE_COLOR,
   HEATER_COLOR, ICE_COLOR,
   PUMP_COLOR, SNOW_COLOR, SANDSTONE_COLOR,
   STAR_COLOR, HOT_PLATE_COLOR,
@@ -50,6 +50,30 @@ interface ControlRow {
 function colorSwatch(fill: string, border = fill): SVGSVGElement {
   return svgRoot(28, [
     svgEl('rect', { x: 2, y: 2, width: 24, height: 24, rx: 4, ry: 4, fill, stroke: border, 'stroke-width': 2 }),
+  ]);
+}
+
+/**
+ * Return a gold-space icon: shimmering gold tile with the pipe-keyhole glyph
+ * (bow ring + shaft) that signals "gold pipes only".  Mirrors
+ * {@link drawGoldKeyholeGlyph} in the renderer, scaled to the 28px swatch box.
+ */
+function goldSpaceSwatch(): SVGSVGElement {
+  return svgRoot(28, [
+    svgEl('rect', {
+      x: 2, y: 2, width: 24, height: 24, rx: 2, ry: 2,
+      fill: GOLD_SPACE_BASE_COLOR, stroke: GOLD_SPACE_BORDER_COLOR, 'stroke-width': 2,
+    }),
+    // Key shaft (rounded vertical tube from the bow down to the keyhole tip).
+    svgEl('line', {
+      x1: 14, y1: 13, x2: 14, y2: 22,
+      stroke: GOLD_PIPE_COLOR, 'stroke-width': 2.4, 'stroke-linecap': 'round',
+    }),
+    // Bow ring whose hollow center is the keyhole "hole".
+    svgEl('circle', {
+      cx: 14, cy: 13, r: 4.5, fill: 'none',
+      stroke: GOLD_PIPE_COLOR, 'stroke-width': 2.4,
+    }),
   ]);
 }
 
@@ -233,7 +257,7 @@ function getLegendRows(): LegendRow[] {
     description: t('rules.legend.tree.description'),
   },
   {
-    iconEl: () => colorSwatch(GOLD_SPACE_BASE_COLOR, GOLD_PIPE_COLOR),
+    iconEl: () => goldSpaceSwatch(),
     name: t('rules.legend.goldSpace.name'),
     description: t('rules.legend.goldSpace.description'),
   },
