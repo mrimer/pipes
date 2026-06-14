@@ -1051,6 +1051,11 @@ export class CampaignManager {
     }
   }
 
+  /**
+   * Reconcile chapter completion and mastery state after the chapter map is shown.
+   * Removes stale completion records when edited content makes the chapter incomplete,
+   * then independently recognizes first-time completion and first-time mastery.
+   */
   private _recognizeChapterProgress(chapterIdx: number): void {
     const campaign = this._activeCampaign;
     if (!campaign) return;
@@ -1120,6 +1125,11 @@ export class CampaignManager {
     }
   }
 
+  /**
+   * Reconcile campaign completion and mastery state after the campaign map is shown.
+   * Clears stale completion flags when the map is no longer complete, then independently
+   * recognizes first-time campaign completion and first-time full-campaign mastery.
+   */
   private _recognizeCampaignProgress(): void {
     const campaign = this._activeCampaign;
     if (!campaign?.grid || !this._campaignMapScreen) return;

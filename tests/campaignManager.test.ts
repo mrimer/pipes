@@ -109,6 +109,16 @@ type CampaignMapScreenStub = {
   playWinAnimation: jest.Mock<void, [(() => void)?]>;
 };
 
+type CampaignManagerTestAccess = {
+  _chapterMapScreen?: ChapterMapScreenStub;
+  _campaignMapScreen?: CampaignMapScreenStub;
+  _activeCampaignMasteredChaptersShown: Set<number>;
+  _campaignCompleteShown: boolean;
+  _campaignMasteredShown: boolean;
+  _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
+};
+
+/** Build a minimal chapter-map screen stub for recognition-path tests. */
 function makeChapterMapScreenStub(options: {
   chapterIdx?: number;
   isChapterComplete?: boolean;
@@ -123,6 +133,7 @@ function makeChapterMapScreenStub(options: {
   };
 }
 
+/** Build a minimal campaign-map screen stub for recognition-path tests. */
 function makeCampaignMapScreenStub(options: {
   isCampaignComplete?: boolean;
 } = {}): CampaignMapScreenStub {
@@ -372,11 +383,7 @@ describe('CampaignManager progress recognition', () => {
     const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const chapterMapScreen = makeChapterMapScreenStub({ isChapterComplete: true });
-    const managerAny = manager as unknown as {
-      _chapterMapScreen: ChapterMapScreenStub;
-      _activeCampaignMasteredChaptersShown: Set<number>;
-      _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
-    };
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
 
     manager.activate(campaign);
     markChapterCompleted(campaign.id, 1, manager.completedChapters);
@@ -392,10 +399,7 @@ describe('CampaignManager progress recognition', () => {
     const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const chapterMapScreen = makeChapterMapScreenStub({ isChapterComplete: true });
-    const managerAny = manager as unknown as {
-      _chapterMapScreen: ChapterMapScreenStub;
-      _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
-    };
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
 
     manager.activate(campaign);
     managerAny._chapterMapScreen = chapterMapScreen;
@@ -412,12 +416,7 @@ describe('CampaignManager progress recognition', () => {
     const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const campaignMapScreen = makeCampaignMapScreenStub({ isCampaignComplete: true });
-    const managerAny = manager as unknown as {
-      _campaignMapScreen: CampaignMapScreenStub;
-      _campaignCompleteShown: boolean;
-      _campaignMasteredShown: boolean;
-      _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
-    };
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
 
     manager.activate(campaign);
     markCampaignCompleteShown(campaign.id);
@@ -435,11 +434,7 @@ describe('CampaignManager progress recognition', () => {
     const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const campaignMapScreen = makeCampaignMapScreenStub({ isCampaignComplete: true });
-    const managerAny = manager as unknown as {
-      _campaignMapScreen: CampaignMapScreenStub;
-      _campaignCompleteShown: boolean;
-      _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
-    };
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
 
     manager.activate(campaign);
     managerAny._campaignMapScreen = campaignMapScreen;
@@ -455,11 +450,7 @@ describe('CampaignManager progress recognition', () => {
     const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const chapterMapScreen = makeChapterMapScreenStub({ isChapterComplete: false });
-    const managerAny = manager as unknown as {
-      _chapterMapScreen: ChapterMapScreenStub;
-      _activeCampaignMasteredChaptersShown: Set<number>;
-      _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
-    };
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
 
     manager.activate(campaign);
     markChapterCompleted(campaign.id, 1, manager.completedChapters);
@@ -477,11 +468,7 @@ describe('CampaignManager progress recognition', () => {
     const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
     const campaign = makeCampaign(true);
     const campaignMapScreen = makeCampaignMapScreenStub({ isCampaignComplete: true });
-    const managerAny = manager as unknown as {
-      _campaignMapScreen: CampaignMapScreenStub;
-      _campaignCompleteShown: boolean;
-      _isCampaignChapterMastered: (chapter: CampaignDef['chapters'][number]) => boolean;
-    };
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
 
     manager.activate(campaign);
     markCampaignCompleteShown(campaign.id);
