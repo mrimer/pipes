@@ -1216,6 +1216,50 @@ export function drawOneWayArrow(ctx: CanvasRenderingContext2D, x: number, y: num
 }
 
 /**
+ * Draw the gold-space restriction glyph: a keyhole rendered in pipe tubing.
+ *
+ * Fuses two cues into one mark — the keyhole silhouette (bow ring + shaft) reads
+ * "restricted slot," and rendering it as rounded gold tubing reads "a gold pipe
+ * is the key that fits here."  Drawn only on empty gold cells, so it disappears
+ * once a tile is placed.  Alpha rides the shared shimmer phase so it pulses with
+ * the cell background.
+ */
+export function drawGoldKeyholeGlyph(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  shimmerAlpha: number,
+): void {
+  const cx = x + TILE_SIZE / 2;
+  const cy = y + TILE_SIZE / 2;
+  const bowR = TILE_SIZE * 0.16;        // keyhole bow (ring) radius
+  const bowCy = cy - TILE_SIZE * 0.04;  // bow sits slightly above center
+  const shaftBottom = cy + TILE_SIZE * 0.30;
+  const tubeW = TILE_SIZE * 0.085;      // pipe tubing thickness
+
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, 0.4 + shimmerAlpha);
+  ctx.strokeStyle = GOLD_PIPE_COLOR;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Key shaft: rounded vertical tube from the bow down to the keyhole tip.
+  ctx.lineWidth = tubeW;
+  ctx.beginPath();
+  ctx.moveTo(cx, bowCy);
+  ctx.lineTo(cx, shaftBottom);
+  ctx.stroke();
+
+  // Bow: thick gold ring whose hollow center is the keyhole "hole".
+  ctx.lineWidth = tubeW;
+  ctx.beginPath();
+  ctx.arc(cx, bowCy, bowR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Return true when the neighbor cell at (nr, nc) is an open buildable floor —
  * a cell where a player can place a pipe but none is currently present.
  * Pipe arms pointing at open floor cells use round end caps (nubs); arms
@@ -2331,6 +2375,8 @@ function _renderPass1Backgrounds(
           ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
           ctx.lineWidth = 2;
           ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+          // Pipe-keyhole glyph: signals "gold pipes only" on the empty cell.
+          drawGoldKeyholeGlyph(ctx, x, y, shimmerAlpha);
         } else {
           const paritySum = (r % 2) + (c % 2);
           const [gc_light, gc_mid, gc_dark] = ginghamColorsForFloor(tile.shape);
