@@ -22,6 +22,7 @@ import {
 } from '../src/persistence';
 import * as levelTransition from '../src/levelTransition';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
+import { t } from '../src/i18n';
 
 jest.mock('../src/visuals/confetti', () => ({
   spawnConfetti: (onComplete?: () => void) => { if (onComplete) onComplete(); },
@@ -479,5 +480,80 @@ describe('CampaignManager progress recognition', () => {
     manager.reshowCampaignMap();
 
     expect(loadCampaignCompleteShown(campaign.id)).toBe(true);
+  });
+});
+
+describe('CampaignManager main-menu "Continue X-Y" resume', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    setActiveSlotIndex(0);
+    jest.restoreAllMocks();
+  });
+
+  it('establishes the chapter map context so exiting zooms back to the chapter map', () => {
+    const startLevel = jest.fn();
+    const callbacks = makeCallbacks({ startLevel });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaign(true); // grid-map chapter
+    const chapterMapScreen = makeChapterMapScreenStub({ chapterIdx: 0 });
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
+
+    manager.activate(campaign);
+    managerAny._chapterMapScreen = chapterMapScreen;
+
+    manager.startLevelFromMainMenuPartial(1);
+
+    expect(chapterMapScreen.show).toHaveBeenCalledWith(campaign, 0);
+    expect(manager.winFromChapterMap).toBe(true);
+    expect(callbacks.exitBtnEl.textContent).toBe(t('campaign.nav.chapterMap'));
+    expect(startLevel).toHaveBeenCalledWith(1);
+  });
+
+  it('starts plainly (no chapter-map context) for a non-grid chapter', () => {
+    const startLevel = jest.fn();
+    const callbacks = makeCallbacks({ startLevel });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaignDef({
+      id: 'cmp-list',
+      name: 'List campaign',
+      chapters: [
+        makeChapterDef({
+          id: 1,
+          name: 'Chapter 1',
+          // no grid → no chapter map screen
+          levels: [makeLevelDef({ id: 7, name: 'Level 7', rows: 1, cols: 1, grid: [[{ shape: PipeShape.Source }]] })],
+        }),
+      ],
+    });
+    const chapterMapScreen = makeChapterMapScreenStub({ chapterIdx: 0 });
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
+
+    manager.activate(campaign);
+    managerAny._chapterMapScreen = chapterMapScreen;
+
+    manager.startLevelFromMainMenuPartial(7);
+
+    expect(chapterMapScreen.show).not.toHaveBeenCalled();
+    expect(manager.winFromChapterMap).toBe(false);
+    expect(startLevel).toHaveBeenCalledWith(7);
+  });
+
+  it('starts plainly when the resumed level is not in the active campaign', () => {
+    const startLevel = jest.fn();
+    const callbacks = makeCallbacks({ startLevel });
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const chapterMapScreen = makeChapterMapScreenStub({ chapterIdx: 0 });
+    const managerAny = manager as unknown as CampaignManagerTestAccess;
+
+    manager.activate(campaign);
+    managerAny._chapterMapScreen = chapterMapScreen;
+
+    manager.startLevelFromMainMenuPartial(999); // unknown level id
+
+    expect(chapterMapScreen.show).not.toHaveBeenCalled();
+    expect(manager.winFromChapterMap).toBe(false);
+    expect(startLevel).toHaveBeenCalledWith(999);
   });
 });
