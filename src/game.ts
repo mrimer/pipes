@@ -561,7 +561,7 @@ export class Game implements InputCallbacks {
         return recent.levelId;
       },
       startLevelFromPartial: (levelId: number) => {
-        this.startLevel(levelId);
+        this._campaign.startLevelFromMainMenuPartial(levelId);
       },
       onMapScreenEntered: (style, isCampaignMap) => {
         musicManager.playGroup(selectGroupForContext({ style, isCampaignMap }));
