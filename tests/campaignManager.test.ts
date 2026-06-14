@@ -10,8 +10,13 @@ import { PipeShape } from '../src/types';
 import { setActiveSlotIndex } from '../src/activeProfile';
 import {
   loadCampaignProgress,
+  loadCampaignCompleteShown,
   loadCompletedChapters,
+  loadMasteredChaptersShown,
   loadLevelStars,
+  markCampaignCompleteShown,
+  markChapterCompleted,
+  markMasteredChapterShown,
   markCampaignLevelCompleted,
   saveLevelStar,
 } from '../src/persistence';
@@ -88,6 +93,43 @@ function makeCampaignEditorMock(): CampaignEditor {
     showAndRestore: () => {},
     hide: () => {},
   } as unknown as CampaignEditor;
+}
+
+type ChapterMapScreenStub = {
+  chapterIdx: number;
+  show: jest.Mock<void, [CampaignDef, number]>;
+  isChapterComplete: jest.Mock<boolean, []>;
+  playWinAnimation: jest.Mock<void, [(onComplete: () => void)?]>;
+};
+
+type CampaignMapScreenStub = {
+  repopulate: jest.Mock<void, [CampaignDef]>;
+  show: jest.Mock<void, [CampaignDef]>;
+  isCampaignComplete: jest.Mock<boolean, []>;
+  playWinAnimation: jest.Mock<void, [(onComplete: () => void)?]>;
+};
+
+function makeChapterMapScreenStub(options: {
+  chapterIdx?: number;
+  isChapterComplete?: boolean;
+} = {}): ChapterMapScreenStub {
+  return {
+    chapterIdx: options.chapterIdx ?? 0,
+    show: jest.fn(),
+    isChapterComplete: jest.fn(() => options.isChapterComplete ?? true),
+    playWinAnimation: jest.fn((onComplete?: () => void) => onComplete?.()),
+  };
+}
+
+function makeCampaignMapScreenStub(options: {
+  isCampaignComplete?: boolean;
+} = {}): CampaignMapScreenStub {
+  return {
+    repopulate: jest.fn(),
+    show: jest.fn(),
+    isCampaignComplete: jest.fn(() => options.isCampaignComplete ?? true),
+    playWinAnimation: jest.fn((onComplete?: () => void) => onComplete?.()),
+  };
 }
 
 describe('CampaignManager chapter-complete modal navigation button', () => {
@@ -311,5 +353,140 @@ describe('CampaignManager reshowCampaignMap', () => {
     manager.reshowCampaignMap();
 
     expect(onMapScreenEntered).not.toHaveBeenCalled();
+  });
+});
+
+describe('CampaignManager progress recognition', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    setActiveSlotIndex(0);
+    jest.restoreAllMocks();
+  });
+
+  it('shows chapter mastery on reshow after prior completion', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const chapterMapScreen = makeChapterMapScreenStub({ isChapterComplete: true });
+    const managerAny = manager as unknown as {
+      _chapterMapScreen: ChapterMapScreenStub;
+      _activeCampaignMasteredChaptersShown: Set<number>;
+      _isCampaignChapterMastered: jest.Mock<boolean, [CampaignDef['chapters'][number]]>;
+    };
+
+    manager.activate(campaign);
+    markChapterCompleted(campaign.id, 1, manager.completedChapters);
+    managerAny._chapterMapScreen = chapterMapScreen;
+    managerAny._isCampaignChapterMastered = jest.fn(() => true);
+
+    manager.reshowChapterMap();
+
+    expect(document.body.textContent).toContain('Chapter mastered!');
+  });
+
+  it('shows only one chapter mastery modal on first completion', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const chapterMapScreen = makeChapterMapScreenStub({ isChapterComplete: true });
+    const managerAny = manager as unknown as {
+      _chapterMapScreen: ChapterMapScreenStub;
+      _isCampaignChapterMastered: jest.Mock<boolean, [CampaignDef['chapters'][number]]>;
+    };
+
+    manager.activate(campaign);
+    managerAny._chapterMapScreen = chapterMapScreen;
+    managerAny._isCampaignChapterMastered = jest.fn(() => true);
+
+    manager.showChapterMap(0, false);
+
+    const masteryTitles = Array.from(document.querySelectorAll('h2'))
+      .filter((el) => el.textContent === 'Chapter mastered!');
+    expect(masteryTitles).toHaveLength(1);
+  });
+
+  it('shows campaign mastery on show after prior completion', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const campaignMapScreen = makeCampaignMapScreenStub({ isCampaignComplete: true });
+    const managerAny = manager as unknown as {
+      _campaignMapScreen: CampaignMapScreenStub;
+      _campaignCompleteShown: boolean;
+      _campaignMasteredShown: boolean;
+      _isCampaignChapterMastered: jest.Mock<boolean, [CampaignDef['chapters'][number]]>;
+    };
+
+    manager.activate(campaign);
+    markCampaignCompleteShown(campaign.id);
+    managerAny._campaignMapScreen = campaignMapScreen;
+    managerAny._campaignCompleteShown = true;
+    managerAny._campaignMasteredShown = false;
+    managerAny._isCampaignChapterMastered = jest.fn(() => true);
+
+    manager.showCampaignMap();
+
+    expect(document.body.textContent).toContain('Campaign Mastered!');
+  });
+
+  it('shows campaign complete on campaign-map reshow when newly completed', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const campaignMapScreen = makeCampaignMapScreenStub({ isCampaignComplete: true });
+    const managerAny = manager as unknown as {
+      _campaignMapScreen: CampaignMapScreenStub;
+      _campaignCompleteShown: boolean;
+      _isCampaignChapterMastered: jest.Mock<boolean, [CampaignDef['chapters'][number]]>;
+    };
+
+    manager.activate(campaign);
+    managerAny._campaignMapScreen = campaignMapScreen;
+    managerAny._campaignCompleteShown = false;
+    managerAny._isCampaignChapterMastered = jest.fn(() => false);
+
+    manager.reshowCampaignMap();
+
+    expect(document.body.textContent).toContain('Campaign Complete!');
+  });
+
+  it('clears stale chapter completion and mastery-shown records on reshow', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const chapterMapScreen = makeChapterMapScreenStub({ isChapterComplete: false });
+    const managerAny = manager as unknown as {
+      _chapterMapScreen: ChapterMapScreenStub;
+      _activeCampaignMasteredChaptersShown: Set<number>;
+      _isCampaignChapterMastered: jest.Mock<boolean, [CampaignDef['chapters'][number]]>;
+    };
+
+    manager.activate(campaign);
+    markChapterCompleted(campaign.id, 1, manager.completedChapters);
+    markMasteredChapterShown(campaign.id, 1, managerAny._activeCampaignMasteredChaptersShown);
+    managerAny._chapterMapScreen = chapterMapScreen;
+    managerAny._isCampaignChapterMastered = jest.fn(() => false);
+
+    manager.reshowChapterMap();
+
+    expect(loadCompletedChapters(campaign.id)).toEqual(new Set<number>());
+    expect(loadMasteredChaptersShown(campaign.id)).toEqual(new Set<number>());
+  });
+
+  it('keeps the campaign complete flag when the campaign remains complete', () => {
+    const manager = new CampaignManager(makeCallbacks(), makeCampaignEditorMock());
+    const campaign = makeCampaign(true);
+    const campaignMapScreen = makeCampaignMapScreenStub({ isCampaignComplete: true });
+    const managerAny = manager as unknown as {
+      _campaignMapScreen: CampaignMapScreenStub;
+      _campaignCompleteShown: boolean;
+      _isCampaignChapterMastered: jest.Mock<boolean, [CampaignDef['chapters'][number]]>;
+    };
+
+    manager.activate(campaign);
+    markCampaignCompleteShown(campaign.id);
+    managerAny._campaignMapScreen = campaignMapScreen;
+    managerAny._campaignCompleteShown = true;
+    managerAny._isCampaignChapterMastered = jest.fn(() => false);
+
+    manager.reshowCampaignMap();
+
+    expect(loadCampaignCompleteShown(campaign.id)).toBe(true);
   });
 });
