@@ -10,7 +10,7 @@
  */
 
 import { Board } from '../src/board';
-import { ResumePlayer } from '../src/resumePlayer';
+import { ResumePlayer, computeMoveIntervalMs } from '../src/resumePlayer';
 import type { ResumeGameCallbacks } from '../src/resumePlayer';
 import type { MoveAnimationInfo } from '../src/playbackScreen';
 import { GameState, PipeShape, Direction } from '../src/types';
@@ -88,6 +88,31 @@ function makeCallbacks(): {
 function flashEl(): HTMLElement {
   return document.createElement('div');
 }
+
+// ─── Dynamic per-move interval ──────────────────────────────────────────────
+
+describe('computeMoveIntervalMs', () => {
+  it('caps at 500 ms for 4 or fewer moves (>= 2 s total)', () => {
+    expect(computeMoveIntervalMs(4)).toBe(500);
+    expect(computeMoveIntervalMs(3)).toBe(500);
+    expect(computeMoveIntervalMs(2)).toBe(500);
+    expect(computeMoveIntervalMs(1)).toBe(500);
+  });
+
+  it('scales toward the 2 s target for mid-length sequences', () => {
+    expect(computeMoveIntervalMs(5)).toBe(400);
+    expect(computeMoveIntervalMs(8)).toBe(250);
+  });
+
+  it('floors at 125 ms for long sequences', () => {
+    expect(computeMoveIntervalMs(16)).toBe(125);
+    expect(computeMoveIntervalMs(40)).toBe(125);
+  });
+
+  it('returns the floor for an empty sequence', () => {
+    expect(computeMoveIntervalMs(0)).toBe(125);
+  });
+});
 
 // ─── Trigger gating ───────────────────────────────────────────────────────────
 
@@ -279,7 +304,7 @@ describe('ResumePlayer – cancel()', () => {
     const player = new ResumePlayer(callbacks, board, winningMoves(), flashEl());
     player.start();
     // Advance only one tick so the first move fires, then cancel.
-    jest.advanceTimersByTime(125);
+    jest.advanceTimersByTime(computeMoveIntervalMs(winningMoves().length));
     player.cancel();
     jest.runAllTimers();
 
