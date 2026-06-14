@@ -381,26 +381,7 @@ export class CampaignManager {
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
     this._callbacks.onMapScreenEntered?.(chapter.style, false);
-
-    // If the chapter is no longer complete (e.g. levels were added/edited), remove any
-    // stale completion and mastery records so that progress stays in sync.
-    if (chapter.id !== undefined && this._activeCampaign) {
-      const campaignId = this._activeCampaign.id;
-      if (!this._chapterMapScreen.isChapterComplete()) {
-        removeChapterCompleted(campaignId, chapter.id, this._activeCampaignCompletedChapters);
-        removeMasteredChapterShown(campaignId, chapter.id, this._activeCampaignMasteredChaptersShown);
-      }
-    }
-
-    // Auto-trigger chapter completion if the level is complete and not yet recorded
-    this._checkAutoCompleteChapter(chapterIdx);
-
-    // Show the mastery sequence once per chapter mastery, on entering the map
-    if (chapter.id !== undefined && this._isCampaignChapterMastered(chapter)) {
-      if (!this._activeCampaignMasteredChaptersShown.has(chapter.id)) {
-        this._showMasterySequence(chapterIdx, campaign, () => {});
-      }
-    }
+    this._recognizeChapterProgress(chapterIdx);
   }
 
   /** Hide the chapter map screen element (if it exists). */
@@ -432,11 +413,7 @@ export class CampaignManager {
     this._callbacks.setPlayScreenVisible(false);
     this._callbacks.setScreen(GameScreen.ChapterMap);
     this._callbacks.onMapScreenEntered?.(campaign.style, true);
-    if (this._campaignCompleteShown && !campaignMapScreen.isCampaignComplete()) {
-      clearCampaignCompleteShown(campaign.id);
-      this._campaignCompleteShown = false;
-    }
-    this._checkAutoCompleteCampaign();
+    this._recognizeCampaignProgress();
   }
 
   /** Re-show the campaign map after returning from a chapter map. */
@@ -447,7 +424,7 @@ export class CampaignManager {
       this._callbacks.setPlayScreenVisible(false);
       this._callbacks.setScreen(GameScreen.ChapterMap);
       this._callbacks.onMapScreenEntered?.(this._activeCampaign.style, true);
-      this._checkAutoCompleteCampaign();
+      this._recognizeCampaignProgress();
     }
   }
 
@@ -553,8 +530,7 @@ export class CampaignManager {
     if (this._chapterMapScreen && this._activeCampaign && this._chapterMapScreen.chapterIdx >= 0) {
       const chapterIdx = this._chapterMapScreen.chapterIdx;
       this._chapterMapScreen.show(this._activeCampaign, chapterIdx);
-      // Auto-trigger chapter completion if the last level just completed it
-      this._checkAutoCompleteChapter(chapterIdx);
+      this._recognizeChapterProgress(chapterIdx);
     }
   }
 
@@ -1075,6 +1051,28 @@ export class CampaignManager {
     }
   }
 
+  private _recognizeChapterProgress(chapterIdx: number): void {
+    const campaign = this._activeCampaign;
+    if (!campaign) return;
+    const chapter = campaign.chapters[chapterIdx];
+    if (!chapter) return;
+
+    if (chapter.id !== undefined && this._chapterMapScreen && !this._chapterMapScreen.isChapterComplete()) {
+      removeChapterCompleted(campaign.id, chapter.id, this._activeCampaignCompletedChapters);
+      removeMasteredChapterShown(campaign.id, chapter.id, this._activeCampaignMasteredChaptersShown);
+    }
+
+    this._checkAutoCompleteChapter(chapterIdx);
+
+    if (
+      chapter.id !== undefined &&
+      this._isCampaignChapterMastered(chapter) &&
+      !this._activeCampaignMasteredChaptersShown.has(chapter.id)
+    ) {
+      this._showMasterySequence(chapterIdx, campaign, () => {});
+    }
+  }
+
   private _completeChapter(chapterIdx: number): void {
     const campaign = this._activeCampaign;
     if (!campaign) return;
@@ -1119,6 +1117,26 @@ export class CampaignManager {
     if (!campaign?.grid || this._campaignCompleteShown) return;
     if (this._campaignMapScreen?.isCampaignComplete()) {
       this._completeCampaign();
+    }
+  }
+
+  private _recognizeCampaignProgress(): void {
+    const campaign = this._activeCampaign;
+    if (!campaign?.grid || !this._campaignMapScreen) return;
+
+    if (this._campaignCompleteShown && !this._campaignMapScreen.isCampaignComplete()) {
+      clearCampaignCompleteShown(campaign.id);
+      this._campaignCompleteShown = false;
+    }
+
+    this._checkAutoCompleteCampaign();
+
+    if (
+      this._campaignMapScreen.isCampaignComplete() &&
+      campaign.chapters.every((chapter) => this._isCampaignChapterMastered(chapter)) &&
+      !this._campaignMasteredShown
+    ) {
+      this._showCampaignMasterySequence();
     }
   }
 
