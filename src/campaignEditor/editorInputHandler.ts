@@ -334,14 +334,12 @@ export class EditorInputHandler {
         }
         state.recordSnapshot();
         this._cb.updateUndoRedoButtons();
-      } else if (
-        state.palette !== 'erase' &&
-        (
-          (PIPE_SHAPES.has(state.palette as PipeShape) && PIPE_SHAPES.has(tile.shape)) ||
-          (state.palette === PipeShape.OneWay && tile.shape === PipeShape.OneWay)
-        )
-      ) {
-        // Both palette and tile are pipe shapes: auto-replace; snapshot after.
+      } else if (state.palette === PipeShape.OneWay && tile.shape === PipeShape.OneWay) {
+        // Only OneWay-on-OneWay reaches an auto-replace here: a non-ctrl click on
+        // a PIPE_SHAPES tile is already intercepted above as a rotate, so this
+        // branch is only reached when tile.shape not in PIPE_SHAPES.  (Pipe to pipe and
+        // cross-type overwrites go through the Ctrl+click force-overwrite path.)
+        // Auto-replace; snapshot after.
         state.grid[startPos.row][startPos.col] = state.buildTileDef();
         this._playPlacementSfx(startPos);
         // Only link if the new tile has parameters beyond rotation.
