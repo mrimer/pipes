@@ -756,7 +756,11 @@ export function loadRecordingsForLevel(campaignId: string, levelId: number): Pla
  */
 export function loadRecordingsForProfile(guid: string, name: string): PlaySequenceRecord[] {
   return loadAllRecordings().filter(
-    (r) => r.playerGuid ? r.playerGuid === guid : r.playerName === name,
+    // GUID-first only when a GUID is available on both sides; otherwise fall
+    // back to name.  Without the `guid &&` guard, an empty profile GUID would
+    // make a GUID-tagged recording take the GUID branch, compare against '',
+    // fail, and never reach the name fallback — silently dropping it.
+    (r) => (guid && r.playerGuid) ? r.playerGuid === guid : r.playerName === name,
   );
 }
 
