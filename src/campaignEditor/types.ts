@@ -225,6 +225,23 @@ export const DEFAULT_PARAMS: TileParams = {
   regulatorOperator: '>',
 };
 
+/**
+ * Build a fresh {@link TileParams} initialized to the defaults.
+ *
+ * Returns new `connections` / `firstConnections` objects on every call so
+ * editor state never aliases the nested objects inside the shared module-level
+ * {@link DEFAULT_PARAMS}.  A bare `{ ...DEFAULT_PARAMS }` shallow-copy would
+ * leave those nested objects aliased, and the connection-toggle handlers mutate
+ * them in place — corrupting the global defaults for the rest of the session.
+ */
+export function createDefaultParams(): TileParams {
+  return {
+    ...DEFAULT_PARAMS,
+    connections: { ...DEFAULT_PARAMS.connections },
+    firstConnections: { ...DEFAULT_PARAMS.firstConnections },
+  };
+}
+
 // ─── Shared tile-def builder ──────────────────────────────────────────────────
 
 /**
