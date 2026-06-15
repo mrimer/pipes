@@ -198,7 +198,7 @@ export class PlayerProfileScreen {
   }
 
   private _buildEmptyCard(slotIndex: number): HTMLDivElement {
-    const card = this._card(slotIndex, false);
+    const card = this._card(false, true);
 
     const emptyLabel = document.createElement('div');
     emptyLabel.textContent = t('profile.empty');
@@ -222,7 +222,7 @@ export class PlayerProfileScreen {
   }
 
   private _buildOccupiedCard(slotIndex: number, meta: ProfileSlotMeta, isActive: boolean): HTMLDivElement {
-    const card = this._card(slotIndex, isActive);
+    const card = this._card(isActive);
 
     // Clicking the active card returns to the main menu.
     if (isActive) {
@@ -383,9 +383,9 @@ export class PlayerProfileScreen {
 
   // ── Card shell helpers ────────────────────────────────────────────────────
 
-  private _card(slotIndex: number, isActive: boolean): HTMLDivElement {
+  private _card(isActive: boolean, isEmpty = false): HTMLDivElement {
     const d = document.createElement('div');
-    const borderColor = slotIndex >= PROFILE_SLOT_COUNT
+    const borderColor = isEmpty
       ? CARD_BORDER_EMPTY
       : isActive
         ? CARD_BORDER_ACTIVE
