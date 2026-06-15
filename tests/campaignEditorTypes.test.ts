@@ -21,7 +21,39 @@ import {
   reflectPositionAboutDiagonal,
   buildMapTileDef,
   DEFAULT_PARAMS,
+  createDefaultParams,
 } from '../src/campaignEditor/types';
+
+// ─── createDefaultParams ──────────────────────────────────────────────────────
+
+describe('createDefaultParams', () => {
+  it('matches the default values', () => {
+    expect(createDefaultParams()).toEqual(DEFAULT_PARAMS);
+  });
+
+  it('returns fresh nested connections/firstConnections objects each call', () => {
+    const a = createDefaultParams();
+    const b = createDefaultParams();
+    expect(a.connections).not.toBe(b.connections);
+    expect(a.firstConnections).not.toBe(b.firstConnections);
+    // And distinct from the shared module-level default.
+    expect(a.connections).not.toBe(DEFAULT_PARAMS.connections);
+    expect(a.firstConnections).not.toBe(DEFAULT_PARAMS.firstConnections);
+  });
+
+  it('mutating a returned instance does not corrupt DEFAULT_PARAMS or other instances', () => {
+    const a = createDefaultParams();
+    const b = createDefaultParams();
+    a.connections.N = !a.connections.N;
+    a.firstConnections.E = !a.firstConnections.E;
+
+    // Shared default and the sibling instance are untouched.
+    expect(DEFAULT_PARAMS.connections).toEqual({ N: true, E: true, S: true, W: true });
+    expect(DEFAULT_PARAMS.firstConnections).toEqual({ N: false, E: false, S: false, W: false });
+    expect(b.connections).toEqual({ N: true, E: true, S: true, W: true });
+    expect(b.firstConnections).toEqual({ N: false, E: false, S: false, W: false });
+  });
+});
 
 // ─── isChamberPalette ─────────────────────────────────────────────────────────
 
