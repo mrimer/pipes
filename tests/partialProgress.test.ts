@@ -17,6 +17,7 @@ import {
   getPartialProgressFor,
   getMostRecentPartialProgress,
   replaceAllPartialProgress,
+  mergePartialProgress,
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
 } from '../src/persistence';
@@ -167,6 +168,67 @@ describe('replaceAllPartialProgress', () => {
     savePartialProgressEntry({ campaignId: 'c', levelId: 1, moves: [], timestamp: 1 });
     replaceAllPartialProgress([]);
     expect(loadPartialProgress()).toEqual([]);
+  });
+});
+
+// ─── mergePartialProgress ─────────────────────────────────────────────────────
+
+describe('mergePartialProgress', () => {
+  it('keeps local entries for levels the incoming set does not mention', () => {
+    savePartialProgressEntry({ campaignId: 'c', levelId: 1, moves: ['a'], timestamp: 100 });
+    savePartialProgressEntry({ campaignId: 'c', levelId: 2, moves: ['b'], timestamp: 100 });
+
+    mergePartialProgress([
+      { campaignId: 'c', levelId: 1, moves: ['a2'], timestamp: 200 },
+    ]);
+
+    const all = loadPartialProgress();
+    expect(all).toHaveLength(2);
+    // Level 2 (untouched by the merge) survives — not wiped.
+    expect(getPartialProgressFor('c', 2)?.moves).toEqual(['b']);
+  });
+
+  it('newer incoming timestamp wins a per-level conflict', () => {
+    savePartialProgressEntry({ campaignId: 'c', levelId: 1, moves: ['local'], timestamp: 100 });
+    mergePartialProgress([
+      { campaignId: 'c', levelId: 1, moves: ['incoming'], timestamp: 200 },
+    ]);
+    expect(getPartialProgressFor('c', 1)?.moves).toEqual(['incoming']);
+  });
+
+  it('keeps local on an equal-timestamp tie', () => {
+    savePartialProgressEntry({ campaignId: 'c', levelId: 1, moves: ['local'], timestamp: 100 });
+    mergePartialProgress([
+      { campaignId: 'c', levelId: 1, moves: ['incoming'], timestamp: 100 },
+    ]);
+    expect(getPartialProgressFor('c', 1)?.moves).toEqual(['local']);
+  });
+
+  it('keeps local when the incoming entry is older', () => {
+    savePartialProgressEntry({ campaignId: 'c', levelId: 1, moves: ['local'], timestamp: 200 });
+    mergePartialProgress([
+      { campaignId: 'c', levelId: 1, moves: ['incoming'], timestamp: 100 },
+    ]);
+    expect(getPartialProgressFor('c', 1)?.moves).toEqual(['local']);
+  });
+
+  it('adds a brand-new incoming entry', () => {
+    savePartialProgressEntry({ campaignId: 'c', levelId: 1, moves: ['local'], timestamp: 100 });
+    mergePartialProgress([
+      { campaignId: 'c', levelId: 9, moves: ['new'], timestamp: 50 },
+    ]);
+    expect(loadPartialProgress()).toHaveLength(2);
+    expect(getPartialProgressFor('c', 9)?.moves).toEqual(['new']);
+  });
+
+  it('distinguishes the same levelId across different campaigns', () => {
+    savePartialProgressEntry({ campaignId: 'a', levelId: 1, moves: ['a1'], timestamp: 100 });
+    mergePartialProgress([
+      { campaignId: 'b', levelId: 1, moves: ['b1'], timestamp: 100 },
+    ]);
+    expect(loadPartialProgress()).toHaveLength(2);
+    expect(getPartialProgressFor('a', 1)?.moves).toEqual(['a1']);
+    expect(getPartialProgressFor('b', 1)?.moves).toEqual(['b1']);
   });
 });
 
