@@ -483,6 +483,34 @@ describe('CampaignManager progress recognition', () => {
   });
 });
 
+describe('CampaignManager main-menu chapter click', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML = '';
+    setActiveSlotIndex(0);
+    jest.restoreAllMocks();
+  });
+
+  it('navigates to the chapter map (not the campaign map) when clicking an uncompleted chapter', () => {
+    const callbacks = makeCallbacks();
+    const manager = new CampaignManager(callbacks, makeCampaignEditorMock());
+    const campaign = makeCampaign(true); // both campaign and chapter have a grid
+    manager.activate(campaign);
+
+    // Chapter 1 is unlocked but not completed — clicking it must open its map.
+    const showChapterMap = jest.spyOn(manager, 'showChapterMap').mockImplementation(() => {});
+    const showCampaignMap = jest.spyOn(manager, 'showCampaignMap').mockImplementation(() => {});
+
+    manager.renderLevelList();
+    const header = callbacks.levelListEl.querySelector<HTMLButtonElement>('.chapter-header');
+    expect(header).not.toBeNull();
+    header!.click();
+
+    expect(showChapterMap).toHaveBeenCalledWith(0, true, true);
+    expect(showCampaignMap).not.toHaveBeenCalled();
+  });
+});
+
 describe('CampaignManager main-menu "Continue X-Y" resume', () => {
   beforeEach(() => {
     localStorage.clear();
