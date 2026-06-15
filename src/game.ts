@@ -2232,6 +2232,21 @@ export class Game implements InputCallbacks {
       cancelAnimationFrame(this._renderRafId);
       this._renderRafId = null;
     }
+    // Clear the remaining one-shot timers so their callbacks cannot fire after
+    // teardown (matters for test isolation when many Game instances share a
+    // document; the production Game is a page-lifetime singleton).
+    if (this._pendingRingsTimerId !== null) {
+      clearTimeout(this._pendingRingsTimerId);
+      this._pendingRingsTimerId = null;
+    }
+    if (this._errorFlashTimer !== null) {
+      clearTimeout(this._errorFlashTimer);
+      this._errorFlashTimer = null;
+    }
+    if (this._errorHighlightTimer !== null) {
+      clearTimeout(this._errorHighlightTimer);
+      this._errorHighlightTimer = null;
+    }
     unregisterScrollingPipeBackground(this._settingsModalEl);
     this._input.destroy();
   }
