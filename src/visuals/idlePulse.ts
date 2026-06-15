@@ -357,14 +357,13 @@ function _drawLocalizedPulse(
   ctx.clip();
 
   if (layer.isSource) {
-    // Source tile: glow spreads from center outward along all connected arms.
-    // phase2P covers the full tile duration for the source (passed in as the
-    // phase-2 value, but the caller also provides phase1P; we use phase2P for
-    // all arms since there is no entry arm on the source).
+    // Source tile: no entry arm, so the glow spreads from center outward along
+    // every connected arm.  Both phases drive one continuous 0→1 sweep: phase 1
+    // covers the inner half (0→0.5) and phase 2 the outer half (0.5→1.0).  The
+    // two meet at 0.5 at the handoff, so the travel is seamless (no stutter).
     for (const dir of layer.connections) {
       const dx = NEIGHBOUR_DELTA[dir].col;
       const dy = NEIGHBOUR_DELTA[dir].row;
-      // For source use the union of both phases so the glow travels the full arm.
       const p = phase1P < 1 ? phase1P * 0.5 : 0.5 + phase2P * 0.5;
       _drawGlowAt(ctx, cx + dx * half * p, cy + dy * half * p, r, g, b, alpha);
     }
