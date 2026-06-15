@@ -658,6 +658,11 @@ export class Game implements InputCallbacks {
   private _showLevelSelect(stopAudio = true, keepMusicGroup = false): void {
     // Cancel any pending intro-ring spawn before leaving the play screen.
     this._cancelPendingRings();
+    // Stop any in-flight resume-replay driver: exiting to the menu keeps the
+    // board and leaves gameState === Playing, so its _tick guard would not stop
+    // it and it would otherwise keep ticking against an off-screen board.
+    this._resumePlayer?.cancel();
+    this._resumePlayer = null;
     // Stop any sounds still playing from the previous screen (skip when exiting editor screens).
     if (stopAudio) sfxManager.stopAll();
     // Switch to main-menu music, unless the caller is about to restore the editor
@@ -845,6 +850,15 @@ export class Game implements InputCallbacks {
     // check from the first startLevel call still fires correctly.
 
     this.currentLevel = level;
+    // Cancel any resume-replay driver still running from a prior level/session
+    // before the board is replaced. Its chained setTimeout ticks hold a captured
+    // reference to the OLD board but call back into this live Game
+    // (checkWinLose/spawnMoveAnimations/updateUndoRedoButtons), so a surviving
+    // driver would fire against the new board → spurious win/lose and desynced
+    // HUD. Done unconditionally here (not only in the new-resume branch below)
+    // so restarts and partial-less level starts also clear it.
+    this._resumePlayer?.cancel();
+    this._resumePlayer = null;
     this.board = new Board(level.rows, level.cols, level, existingDecorations);
     this._enterPlayScreenState(level);
     this._animMgr.resetIdleTimer();
@@ -897,7 +911,7 @@ export class Game implements InputCallbacks {
       const campaignId = this._campaign.activeCampaign?.id ?? '';
       const partial = getPartialProgressFor(campaignId, levelId);
       if (partial && partial.moves.length > 0) {
-        this._resumePlayer?.cancel();
+        // Any prior driver was already cancelled near the top of startLevel.
         this._resumePlayer = new ResumePlayer(this, this.board, partial.moves, this.errorFlashEl);
         this._resumePlayer.start();
       }
@@ -2247,6 +2261,11 @@ export class Game implements InputCallbacks {
       clearTimeout(this._errorHighlightTimer);
       this._errorHighlightTimer = null;
     }
+    // Stop any in-flight resume-replay driver so its chained setTimeout cannot
+    // fire after teardown.
+    this._resumePlayer?.cancel();
+    this._resumePlayer = null;
+
     unregisterScrollingPipeBackground(this._settingsModalEl);
     this._input.destroy();
   }
