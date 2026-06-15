@@ -1719,6 +1719,9 @@ export class Board {
         case 'frozen':      statValue = frozen;      break;
         case 'temperature': statValue = temperature; break;
         case 'pressure':    statValue = pressure;    break;
+        // Exhaustive over RegulatorStat today; guard against a future member
+        // being added without a case (would otherwise leave statValue unset).
+        default: throw new Error(`Unhandled regulator stat: ${stat as string}`);
       }
 
       let passes: boolean;
@@ -1726,6 +1729,9 @@ export class Board {
         case '<': passes = statValue <  threshold; break;
         case '>': passes = statValue >  threshold; break;
         case '=': passes = statValue === threshold; break;
+        // Exhaustive over RegulatorOperator today; guard against a future
+        // operator being added without a case (would leave passes unset).
+        default: throw new Error(`Unhandled regulator operator: ${op as string}`);
       }
 
       if (!passes) {
