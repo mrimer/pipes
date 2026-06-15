@@ -698,6 +698,22 @@ export function buildSettingsModal(
     },
     canCloseOnEscape: () => capturing === null,
   });
+
+  // The modal is reused (hidden via display:none rather than removed), and it
+  // can be dismissed by paths that bypass setupModal's close (e.g. the game's
+  // own Escape handler calling _cancelSettingsModal directly). If a key
+  // reassignment was mid-capture when that happens, `capturing` would stay set
+  // and the document keydown listener would remain attached after the modal is
+  // gone. Reset capture whenever the modal becomes hidden — the single signal
+  // every dismissal path shares — so the listener can never leak.
+  const visibilityObserver = new MutationObserver(() => {
+    if (capturing !== null && el.style.display === 'none') {
+      capturing = null;
+      renderCommandRows();
+    }
+  });
+  visibilityObserver.observe(el, { attributes: true, attributeFilter: ['style'] });
+  
   return el;
 }
 
