@@ -2287,11 +2287,15 @@ export class Game implements InputCallbacks {
       info,
       (annotation) => {
         if (!this.board || !this.currentLevel) return;
+        // A recording is meaningless without a campaign to file it under, and a
+        // blank campaignId is rejected on load anyway — never create one.
+        const activeCampaignId = this._campaign.activeCampaign?.id;
+        if (!activeCampaignId) return;
         const activeSlot = getActiveSlotIndex();
         const record: PlaySequenceRecord = {
           formatVersion: 1,
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-          campaignId: this._campaign.activeCampaign?.id ?? '',
+          campaignId: activeCampaignId,
           levelId: this.currentLevel.id,
           moves,
           outcome,
@@ -2348,8 +2352,11 @@ export class Game implements InputCallbacks {
     stars: number | undefined,
   ): void {
     if (!this.board || !this.currentLevel) return;
+    // A recording is meaningless without a campaign to file it under, and a
+    // blank campaignId is rejected on load anyway — never create one.
+    const campaignId = this._campaign.activeCampaign?.id;
+    if (!campaignId) return;
     const moves = this.getMoveLog();
-    const campaignId = this._campaign.activeCampaign?.id ?? '';
     const levelId = this.currentLevel.id;
 
     // Dedup: skip if an identical auto-recorded sequence already exists for this level.
