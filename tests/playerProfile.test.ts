@@ -270,6 +270,54 @@ describe('parsePlayerFile', () => {
     if (!result.ok) expect(result.error).toMatch(/shape mismatch/i);
   });
 
+  it('rejects a recording that has the legacy minimal fields but omits required ones', () => {
+    // id/campaignId/levelId/moves present, but no outcome/autoRecorded/
+    // timestamp/playerName/corrupted — loadAllRecordings would later drop it,
+    // so import must reject it up front rather than persist a doomed entry.
+    const payload = {
+      guid: 'test-guid-bob',
+      lastPlayedAt: null,
+      playerName: 'Bob',
+      sfxVolume: 80,
+      touchUiEnabled: null,
+      commandKeys: null,
+      campaignProgress: [],
+      recordings: [{ id: 'r-1', campaignId: 'cmp_1', levelId: 1, moves: ['P:STRAIGHT:0:0:N'] }],
+    };
+    const json = JSON.stringify({
+      type: FILE_TYPE_PLAYER,
+      version: 1,
+      payload,
+      checksum: computeChecksum(JSON.stringify(payload)),
+    });
+    const result = parsePlayerFile(json);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/shape mismatch/i);
+  });
+
+  it('accepts a fully-formed recording (all required fields present)', () => {
+    const payload = {
+      guid: 'test-guid-bob',
+      lastPlayedAt: null,
+      playerName: 'Bob',
+      sfxVolume: 80,
+      touchUiEnabled: null,
+      commandKeys: null,
+      campaignProgress: [],
+      recordings: [{
+        id: 'r-1', campaignId: 'cmp_1', levelId: 1, moves: ['P:STRAIGHT:0:0:N'],
+        outcome: 'success', autoRecorded: false, timestamp: 123, playerName: 'Bob', corrupted: false,
+      }],
+    };
+    const json = JSON.stringify({
+      type: FILE_TYPE_PLAYER,
+      version: 1,
+      payload,
+      checksum: computeChecksum(JSON.stringify(payload)),
+    });
+    expect(parsePlayerFile(json).ok).toBe(true);
+  });
+
   it('rejects files from newer profile format versions', () => {
     const result = parsePlayerFile(makeValidJson({ version: 99 }));
     expect(result.ok).toBe(false);
