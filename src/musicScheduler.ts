@@ -87,10 +87,11 @@ export const MUSIC_REGISTRY: Record<MusicGroupId, TrackEntry[]> = {
   challenge: [{ id: 'challenge', url: eightBitEDMUrl }],
 };
 
-/** Set of valid group IDs for runtime membership checks. */
-const VALID_GROUP_IDS = new Set<string>([
-  'menu', 'overworld', 'Summer', 'Fall', 'Dark', 'Winter', 'Spring', 'challenge',
-]);
+/**
+ * Set of valid group IDs for runtime membership checks, derived from the
+ * registry so it can never drift out of sync with {@link MUSIC_REGISTRY}.
+ */
+const VALID_GROUP_IDS = new Set<string>(Object.keys(MUSIC_REGISTRY));
 
 // ─── Group selection ──────────────────────────────────────────────────────────
 
