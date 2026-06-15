@@ -870,16 +870,18 @@ export class CampaignManager {
       levelStars,
       levelWater,
       (ci) => {
-        if (this._activeCampaign?.grid) {
-          const chapter = this._activeCampaign.chapters[ci];
-          if (chapter && this._activeCampaignCompletedChapters.has(chapter.id)) {
-            this.showChapterMap(ci, true, true);
-          } else {
-            this.showCampaignMap(true);
-          }
-        } else {
+        // Clicking a chapter navigates to that chapter's own map when it has
+        // one — regardless of completion state.  Only fall back to the campaign
+        // map when the chapter itself has no map but the campaign does.
+        const chapter = this._activeCampaign?.chapters[ci];
+        if (chapter?.grid) {
           this.showChapterMap(ci, true, true);
+        } else if (this._activeCampaign?.grid) {
+          this.showCampaignMap(true);
         }
+        // No else: the chapter header only wires this callback when a map
+        // exists (campaign grid or chapter grid), so a "no map anywhere" click
+        // never reaches here.
       },
       this._activeCampaignCompletedChapters,
       () => this._callbacks.showSettings(),
