@@ -245,7 +245,10 @@ export class CampaignEditor {
     switch (this._screen) {
       case EditorScreen.LevelEditor: {
         const campaign = this._getActiveCampaign();
-        const readOnly = campaign?.official === true;
+        // Mirror the edit-permission rule used when entering the editor (see
+        // _buildCampaignRow): a campaign is read-only when it is official OR the
+        // active player lacks edit rights.
+        const readOnly = !campaign || campaign.official === true || !this._canActivePlayerEdit(campaign);
         this._showLevelEditor(readOnly);
         break;
       }
