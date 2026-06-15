@@ -32,7 +32,7 @@ import type {
 import {
   computeEditorFilledCells,
   rotateConnectionsBy90,
-  DEFAULT_PARAMS,
+  createDefaultParams,
   isChamberPalette,
   chamberPaletteContent,
 } from './types';
@@ -44,7 +44,7 @@ export abstract class MapEditorBase {
 
   // ── Palette / selection (shared) ─────────────────────────────────────────
   protected _palette: EditorPalette = PipeShape.Source;
-  protected _params: TileParams = { ...DEFAULT_PARAMS };
+  protected _params: TileParams = createDefaultParams();
 
   // ── Canvas / render references (shared) ──────────────────────────────────
   protected _canvas: HTMLCanvasElement | null = null;
