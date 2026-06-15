@@ -396,6 +396,36 @@ describe('Game – undoWinningMove', () => {
     // No moves made, so canUndo() returns false – method should be a no-op.
     expect(() => game.undoWinningMove()).not.toThrow();
   });
+
+  it('performUndo routes a Won-state undo through undoWinningMove (closes the win modal)', () => {
+    const { game, winModalEl } = makeGame();
+
+    game.startLevel(1);
+    gameHooks(game).board!.recordMove();
+    gameHooks(game).gameState = 'WON';
+    winModalEl.style.display = 'flex';
+
+    const winUndoSpy = jest.spyOn(game, 'undoWinningMove');
+    game.performUndo();
+
+    expect(winUndoSpy).toHaveBeenCalled();
+    // The win modal must be dismissed, not left stuck over the restored board.
+    expect(winModalEl.style.display).toBe('none');
+  });
+
+  it('Backspace in the Won state dismisses the win modal', () => {
+    const { game, winModalEl } = makeGame();
+
+    game.startLevel(1);
+    const hooks = gameHooks(game);
+    hooks.board!.recordMove();
+    hooks.gameState = 'WON';
+    winModalEl.style.display = 'flex';
+
+    hooks._input._handleDocKeyDown(new KeyboardEvent('keydown', { key: 'Backspace' }));
+
+    expect(winModalEl.style.display).toBe('none');
+  });
 });
 
 // ─── Type helper for accessing Game private members in tests ──────────────────
