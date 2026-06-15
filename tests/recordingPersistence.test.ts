@@ -53,6 +53,19 @@ describe('loadAllRecordings', () => {
     expect(all[0].id).toBe('ok-record');
   });
 
+  it('drops a recording with an empty campaignId (defends manually-edited data)', () => {
+    localStorage.setItem(
+      'pipes_recordings',
+      JSON.stringify([
+        makeRecord({ id: 'ok-record', campaignId: 'cmp_a' }),
+        makeRecord({ id: 'no-campaign', campaignId: '' }),
+      ]),
+    );
+    const all = loadAllRecordings();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe('ok-record');
+  });
+
   it('drops recordings from newer unsupported format versions', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     localStorage.setItem(
