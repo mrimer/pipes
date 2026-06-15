@@ -222,6 +222,17 @@ describe('loadRecordingsForProfile', () => {
     expect(loadRecordingsForProfile(GUID_A, 'Alice')).toHaveLength(0);
   });
 
+  it('matches GUID-tagged recordings by name when the profile GUID is empty', () => {
+    // A guid-less / active-null profile passes guid=''.  GUID-tagged recordings
+    // whose name matches must still be found (not dropped by the GUID branch).
+    saveRecording(makeRecord({ id: 'r-tagged', playerGuid: GUID_A, playerName: 'Alice' }));
+    saveRecording(makeRecord({ id: 'r-untagged', playerName: 'Alice' }));
+    saveRecording(makeRecord({ id: 'r-bob', playerGuid: GUID_B, playerName: 'Bob' }));
+
+    const result = loadRecordingsForProfile('', 'Alice');
+    expect(result.map((r) => r.id).sort()).toEqual(['r-tagged', 'r-untagged']);
+  });
+  
   it('returns all matching recordings across campaigns and levels', () => {
     saveRecording(makeRecord({ id: 'r1', playerGuid: GUID_A, playerName: 'Alice', campaignId: 'c1', levelId: 1 }));
     saveRecording(makeRecord({ id: 'r2', playerGuid: GUID_A, playerName: 'Alice', campaignId: 'c2', levelId: 5 }));
