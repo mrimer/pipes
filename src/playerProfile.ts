@@ -44,7 +44,7 @@ import {
   loadMusicMuteOnFocusLoss,
   saveMusicMuteOnFocusLoss,
   loadPartialProgress,
-  replaceAllPartialProgress,
+  mergePartialProgress,
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
 } from './persistence';
@@ -306,11 +306,24 @@ function hasValidRecordingsShape(value: unknown): boolean {
   return value.every((entry) => {
     if (!entry || typeof entry !== 'object') return false;
     const record = entry as Record<string, unknown>;
+    const moves = record['moves'];
+    // Enforce the SAME required-field contract that loadAllRecordings()
+    // (persistence.ts) enforces on read. If import accepted a weaker shape, a
+    // recording could be persisted here and then silently dropped on the next
+    // load — so reject it at the door instead of fabricating defaults.
     if (
       typeof record['id'] !== 'string'
-      || !Array.isArray(record['moves'])
+      || !Array.isArray(moves)
+      || !moves.every((move) => typeof move === 'string')
       || typeof record['campaignId'] !== 'string'
+      || record['campaignId'] === ''
       || typeof record['levelId'] !== 'number'
+      || typeof record['outcome'] !== 'string'
+      || !['success', 'failure', 'partial'].includes(record['outcome'])
+      || typeof record['autoRecorded'] !== 'boolean'
+      || typeof record['timestamp'] !== 'number'
+      || typeof record['playerName'] !== 'string'
+      || typeof record['corrupted'] !== 'boolean'
     ) {
       return false;
     }
@@ -543,7 +556,7 @@ export function applyPlayerProfile(
       }
     }
     const validEntries = payload.partialProgress.filter((e) => allLevelIds.has(e.levelId));
-    replaceAllPartialProgress(validEntries);
+    mergePartialProgress(validEntries);
   }
 
   // ── Per-campaign progress ──────────────────────────────────────────────────
