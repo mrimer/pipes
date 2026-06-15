@@ -172,6 +172,10 @@ export class PlayerProfileScreen {
     });
     this._el.style.display = 'flex';
     this._el.scrollTop = 0;
+    // Remove first so a show() without an intervening hide() cannot stack
+    // duplicate listeners (addEventListener with the same fn is idempotent,
+    // but this is explicit and survives future signature changes).
+    document.removeEventListener('keydown', this._onKeyDown);
     document.addEventListener('keydown', this._onKeyDown);
   }
 
