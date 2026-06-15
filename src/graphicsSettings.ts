@@ -1,22 +1,16 @@
 /**
- * In-memory cache for graphics settings (Background and Environmental).
+ * In-memory cache for the Environmental graphics setting.
  *
- * Both settings default to enabled (true). They are initialized from
- * localStorage at startup by the caller (main.ts) and updated when the
- * player changes them via the Settings modal (game.ts).
+ * Defaults to enabled (true). Initialized from localStorage at startup by the
+ * caller (main.ts) and updated when the player changes it via the Settings
+ * modal (game.ts).  (The Background setting is applied directly through
+ * setGlobalBackgroundPatternEnabled and needs no in-memory mirror here.)
  *
  * This module is intentionally dependency-free so that it can be imported
  * by both game.ts and mapScreenBase.ts without creating circular imports.
  */
 
-let _backgroundEnabled = true;
 let _environmentalEnabled = true;
-
-/** Sets the in-memory background-enabled flag. */
-export function setBackgroundEnabled(enabled: boolean): void {
-  if (_backgroundEnabled === enabled) return;
-  _backgroundEnabled = enabled;
-}
 
 /** Returns whether environmental visuals (clouds, cloud shadows) are enabled. */
 export function isEnvironmentalEnabled(): boolean {
