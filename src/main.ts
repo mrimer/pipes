@@ -7,7 +7,7 @@ import { migrateIfNeeded, loadActiveSlotIndex } from './playerProfileSlots';
 import { setActiveSlotIndex } from './activeProfile';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
 import { BG_COLOR } from './colors';
-import { setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
+import { setEnvironmentalEnabled } from './graphicsSettings';
 import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
 import { showIntroTitleScreen } from './titleScreen';
 import { showSplashScreen } from './splashScreen';
@@ -37,7 +37,6 @@ document.body.classList.toggle('is-touch', isTouchDevice());
 // Initialize graphics settings cache from persistence.
 const _bgEnabled  = loadBackgroundEnabled();
 const _envEnabled = loadEnvironmentalEnabled();
-setBackgroundEnabled(_bgEnabled);
 setEnvironmentalEnabled(_envEnabled);
 
 // Always apply the background (registering the target), then immediately
