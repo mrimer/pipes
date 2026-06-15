@@ -1074,7 +1074,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const existingTile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
 
     if (this._selectedChapterIdx !== null) {
-      if (existingTile === null) {
+      // Place onto empty cells AND empty-floor tiles, matching the placement
+      // ghost (see _computeOverlay: isEmpty = null || isEmptyFloor).  Gating on
+      // `=== null` alone left empty-floor clicks as a silent no-op despite the
+      // ghost inviting placement there.
+      if (existingTile === null || isEmptyFloor(existingTile.shape)) {
         this._gridState.grid[pos.row][pos.col] = {
           shape: PipeShape.Chamber,
           chamberContent: 'chapter',
