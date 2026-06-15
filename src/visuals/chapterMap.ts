@@ -100,28 +100,26 @@ function _drawLockIcon(
 // ─── Level chamber tile ────────────────────────────────────────────────────────
 
 /**
- * Cache for {@link computeMinimapRect} results.  The key is a single integer
- * encoding `(cellX, cellY, levelDef.rows, levelDef.cols)` using multipliers
- * chosen so that no two distinct inputs produce the same value given realistic
- * grid/tile-size bounds: cellX/cellY ≤ 50 tiles × 256 px = 12 800 px; rows/cols ≤ 99.
- *
- * Call {@link invalidateMinimapRectCache} after any TILE_SIZE change to evict stale entries.
+ * Cache for {@link computeMinimapRect} results.  The key encodes
+ * `(tileSize, cellX, cellY, levelDef.rows, levelDef.cols)`.  tileSize is part of
+ * the key because the computed rect is a function of TILE_SIZE; including it
+ * makes a stale entry impossible if a caller forgets to call
+ * {@link invalidateMinimapRectCache} after a tile-size change (that call is then
+ * only a memory-eviction nicety, not a correctness requirement).
  */
-const _minimapRectCache = new Map<number, { x: number; y: number; width: number; height: number }>();
+const _minimapRectCache = new Map<string, { x: number; y: number; width: number; height: number }>();
 
-/** Encode four integer inputs as a single collision-free Number key for the minimap rect cache. */
-function _minimapRectKey(cellX: number, cellY: number, rows: number, cols: number): number {
-  // Multipliers ensure each component occupies a unique decimal range:
-  //   cellX × 1e9  (max ~1.28e13, < 2^44 → safely below 2^53 integer limit)
-  //   cellY × 1e4  (max 1.28e8, << cellX resolution of 1e9 per tile)
-  //   rows  × 1e2  (max 9900, << cellY resolution of 1e4 per tile)
-  //   cols  × 1    (max 99,   << rows resolution of 1e2)
-  return cellX * 1e9 + cellY * 1e4 + rows * 1e2 + cols;
+/** Encode the cache inputs as a single collision-free string key for the minimap rect cache. */
+function _minimapRectKey(tileSize: number, cellX: number, cellY: number, rows: number, cols: number): string {
+  // A string key sidesteps the MAX_SAFE_INTEGER limit a 5-field integer pack
+  // would hit (tileSize × cellX magnitudes exceed 2^53).
+  return `${tileSize}:${cellX}:${cellY}:${rows}:${cols}`;
 }
 
 /** Discard all cached {@link computeMinimapRect} entries.
- * Call this whenever TILE_SIZE changes (e.g. after `setTileSize`) so stale
- * entries from the previous tile size do not accumulate in memory.
+ * Optional now that tileSize is part of the key (entries can no longer go
+ * stale), but still worth calling on a tile-size change to release memory held
+ * by the now-unreachable previous-size entries.
  */
 export function invalidateMinimapRectCache(): void {
   _minimapRectCache.clear();
@@ -134,15 +132,14 @@ export function invalidateMinimapRectCache(): void {
  * This is used both for rendering the minimap (in {@link drawLevelChamberTile})
  * and for the level-transition animation (via {@link ChapterMapScreen.getMinimapScreenRect}).
  *
- * Results are memoized by `(cellX, cellY, levelDef.rows, levelDef.cols)`.
- * Call {@link invalidateMinimapRectCache} after any TILE_SIZE change to evict stale entries.
+ * Results are memoized by `(TILE_SIZE, cellX, cellY, levelDef.rows, levelDef.cols)`.
  */
 export function computeMinimapRect(
   cellX: number,
   cellY: number,
   levelDef: LevelDef,
 ): { x: number; y: number; width: number; height: number } {
-  const cacheKey = _minimapRectKey(cellX, cellY, levelDef.rows, levelDef.cols);
+  const cacheKey = _minimapRectKey(TILE_SIZE, cellX, cellY, levelDef.rows, levelDef.cols);
   const cached = _minimapRectCache.get(cacheKey);
   if (cached) return cached;
 
