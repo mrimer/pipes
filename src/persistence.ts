@@ -692,6 +692,9 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
           || typeof entry !== 'object'
           || typeof candidate['id'] !== 'string'
           || typeof candidate['campaignId'] !== 'string'
+          // A recording with no campaign can never match a level for playback;
+          // reject it (defends against manually-adjusted input data).
+          || candidate['campaignId'] === ''
           || typeof candidate['levelId'] !== 'number'
           || !Array.isArray(moves)
           || !moves.every((move) => typeof move === 'string')
@@ -945,6 +948,28 @@ export function getMostRecentPartialProgress(): PartialPlayProgress | null {
 export function replaceAllPartialProgress(entries: PartialPlayProgress[]): void {
   try {
     localStorage.setItem(PARTIAL_PROGRESS_KEY(), JSON.stringify(entries));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Merge incoming partial-progress entries into the locally stored set,
+ * unioned by (campaignId, levelId). On a per-level conflict the entry with the
+ * newer `timestamp` wins; ties (or an older incoming entry) keep the local one.
+ *
+ * Used by profile Import-Merge so merging a same-GUID profile never discards
+ * local mid-level resume state for levels the imported file does not mention —
+ * matching the union/max-merge semantics of every other progress category.
+ */
+export function mergePartialProgress(incoming: PartialPlayProgress[]): void {
+  try {
+    const keyOf = (e: PartialPlayProgress): string => `${e.campaignId}::${e.levelId}`;
+    const byKey = new Map<string, PartialPlayProgress>();
+    for (const e of loadPartialProgress()) byKey.set(keyOf(e), e);
+    for (const e of incoming) {
+      const local = byKey.get(keyOf(e));
+      if (!local || e.timestamp > local.timestamp) byKey.set(keyOf(e), e);
+    }
+    localStorage.setItem(PARTIAL_PROGRESS_KEY(), JSON.stringify([...byKey.values()]));
   } catch { /* ignore */ }
 }
 
