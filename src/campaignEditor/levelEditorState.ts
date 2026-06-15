@@ -15,7 +15,7 @@ import type {
   EditorSnapshot,
   TileParams} from './types';
 import {
-  DEFAULT_PARAMS,
+  createDefaultParams,
   isChamberPalette,
   chamberPaletteContent,
   rotateGridBy90,
@@ -47,7 +47,7 @@ export class LevelEditorState {
 
   // ── Palette & params ───────────────────────────────────────────────────────
   palette: EditorPalette = PipeShape.Source;
-  params: TileParams = { ...DEFAULT_PARAMS };
+  params: TileParams = createDefaultParams();
 
   // ── Hover ──────────────────────────────────────────────────────────────────
   hover: { row: number; col: number } | null = null;
@@ -90,7 +90,7 @@ export class LevelEditorState {
     this.grid = structuredClone(level.grid);
     this.inventory = structuredClone(level.inventory);
     this.palette = PipeShape.Source;
-    this.params = { ...DEFAULT_PARAMS };
+    this.params = createDefaultParams();
     this._hist.clear();
     this.hover = null;
     this._linkedTilePos = null;
@@ -443,7 +443,7 @@ export class LevelEditorState {
 
   /** Set params to match all relevant fields from a TileDef. */
   populateParamsFromDef(def: TileDef): void {
-    this.params = { ...DEFAULT_PARAMS };
+    this.params = createDefaultParams();
     if (def.rotation !== undefined) this.params.rotation = def.rotation;
     if (def.capacity !== undefined) this.params.capacity = def.capacity;
     if (def.cost !== undefined) this.params.cost = def.cost;
