@@ -845,6 +845,21 @@ export class Board {
   /**
    * Compare the LIVE board state against a snapshot without allocating a new Snapshot object.
    * Used by {@link recordMove} to check whether a redo entry can be reused.
+   *
+   * INVARIANT (why comparing only shape + rotation + inventory is sufficient):
+   * every other field of a Snapshot is a deterministic function of the grid
+   * layout (shapes + rotations) and inventory, given an identical base state:
+   *   • A tile's `connections` derive from shape + rotation; `customConnections`
+   *     are set once at level init and never mutated during play.
+   *   • Per-tile `temperature`/`pressure`/`hardness`/`shatter` are authored level
+   *     data, read but never reassigned during a turn.
+   *   • `turnState`/`cement` are pure functions of the (pinned) layout sequence,
+   *     and turn resolution contains no RNG.
+   * So matching shape+rotation+inventory implies the full resolved state matches.
+   * If that invariant is ever broken — turn-resolution randomness, per-tile sim
+   * fields mutated during play, or a player-rotatable tile whose connections are
+   * NOT derived from shape+rotation — this comparison will wrongly reuse a stale
+   * redo entry and silently corrupt the redo chain. Extend the comparison then.
    */
   private _liveBoardMatchesSnapshot(snap: Snapshot): boolean {
     if (this.inventory.length !== snap.inventory.length) return false;
