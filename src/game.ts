@@ -69,7 +69,7 @@ import { getActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled, unregisterScrollingPipeBackground } from './uiBackground';
-import { isEnvironmentalEnabled, setBackgroundEnabled, setEnvironmentalEnabled } from './graphicsSettings';
+import { isEnvironmentalEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';
 import { FireflyField } from './visuals/fireflyField';
 import { ButterflyField } from './visuals/butterflyField';
@@ -430,7 +430,6 @@ export class Game implements InputCallbacks {
       loadBackgroundEnabled(),
       // live background toggle: update in-memory flag and all registered backgrounds immediately
       (enabled) => {
-        setBackgroundEnabled(enabled);
         setGlobalBackgroundPatternEnabled(enabled);
       },
       loadEnvironmentalEnabled(),
@@ -1989,6 +1988,15 @@ export class Game implements InputCallbacks {
    */
   performUndo(): void {
     if (!this.board) return;
+    // A winning move is undone via the dedicated win-flow teardown, which
+    // dismisses the win modal and clears confetti / star sparkles / win-flow
+    // drops.  performUndo only closes the game-over modal, so routing a Won
+    // undo here directly would revert the board while leaving the win modal
+    // and celebration overlays stuck on a now-playable board.
+    if (this.gameState === GameState.Won) {
+      this.undoWinningMove();
+      return;
+    }
     // In GameOver state, allow undo if canUndo() is true (normal case) or if the
     // failing move was the very first move and discardLastMoveFromHistory() was
     // already called, leaving _historyIndex at 0 with the initial snapshot available.
@@ -2390,7 +2398,6 @@ export class Game implements InputCallbacks {
     if (bgToggle) bgToggle.checked = persistedBg;
     if (envToggle) envToggle.checked = persistedEnv;
     if (muteOnFocusLossToggle) muteOnFocusLossToggle.checked = persistedMuteOnFocusLoss;
-    setBackgroundEnabled(persistedBg);
     setGlobalBackgroundPatternEnabled(persistedBg);
     setEnvironmentalEnabled(persistedEnv);
     musicManager.setMuteOnFocusLoss(persistedMuteOnFocusLoss);
