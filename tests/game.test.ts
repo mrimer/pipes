@@ -2622,6 +2622,52 @@ describe('Game – challenge-level modal', () => {
     expect(game.isResuming()).toBe(true);
   });
 
+  // Regression: a running ResumePlayer must be cancelled by every path that
+  // replaces or abandons the board, not only by the branch that starts a new
+  // resume. A surviving driver keeps ticking against the new/off-screen board
+  // (spurious win/lose, desynced HUD, locked input).
+  describe('resume-driver cancellation lifecycle', () => {
+    function startWithResume(): Game {
+      const { game } = makeGame();
+      const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
+      gameHooks(game)._activateCampaign(campaign);
+      savePartialProgressEntry({
+        campaignId: campaign.id,
+        levelId: 9001,
+        moves: ['P:Straight:0:1:0'],
+        timestamp: 123,
+        formatVersion: 1,
+      });
+      game.requestLevel(9001); // non-challenge → starts immediately and resumes
+      expect(game.isResuming()).toBe(true);
+      return game;
+    }
+
+    it('cancels the resume driver on retryLevel (restart skips the new-resume branch)', () => {
+      const game = startWithResume();
+      game.retryLevel();
+      expect(game.isResuming()).toBe(false);
+    });
+
+    it('cancels the resume driver on exitToMenu (board kept, gameState stays Playing)', () => {
+      const game = startWithResume();
+      game.exitToMenu();
+      expect(game.isResuming()).toBe(false);
+    });
+
+    it('cancels the resume driver on destroy', () => {
+      const game = startWithResume();
+      game.destroy();
+      expect(game.isResuming()).toBe(false);
+    });
+
+    it('cancels a prior resume driver when starting a different level with no partial progress', () => {
+      const game = startWithResume();
+      game.startLevel(9003); // non-challenge, no partial → resume branch skipped
+      expect(game.isResuming()).toBe(false);
+    });
+  });
+
   it('does NOT show the challenge modal for a non-challenge level', () => {
     const { game } = makeGame();
     const campaign = makeChallengeTestCampaign(LEVELS[0], LEVELS[1]);
