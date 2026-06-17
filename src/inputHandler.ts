@@ -1,5 +1,5 @@
 import type { Board, MoveResult} from './board';
-import { SPIN_PIPE_SHAPES, isEmptyFloor } from './board';
+import { GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, isEmptyFloor, posKey } from './board';
 import type { Tile } from './tile';
 import type { GridPos, PipeShape, Rotation } from './types';
 import { GameScreen, GameState } from './types';
@@ -407,6 +407,36 @@ export class InputHandler {
     return true;
   }
 
+  /** Clear the currently selected inventory shape and refresh the inventory UI. */
+  private _clearSelectedShape(): boolean {
+    if (this._cb.getSelectedShape() === null) return false;
+    this._cb.setSelectedShape(null);
+    this._cb.renderInventoryBar();
+    sfxManager.play(SfxId.InventoryUnselect);
+    return true;
+  }
+
+  /**
+   * Returns true when the selected inventory shape would show a placement ghost
+   * on the given tile using the same eligibility rules as the renderer.
+   */
+  private _canShowPlacementGhost(board: Board, tile: Tile, pos: GridPos): boolean {
+    const selectedShape = this._cb.getSelectedShape();
+    if (selectedShape === null) return false;
+    const selectedIsGold = GOLD_PIPE_SHAPES.has(selectedShape);
+    const isGoldCell = board.goldSpaces.has(posKey(pos.row, pos.col));
+    const pendingRotation = this._cb.getPendingRotation();
+    const canPlace = isEmptyFloor(tile.shape) && (!isGoldCell || selectedIsGold);
+    const canReplace = (
+      !tile.isFixed &&
+      !SPIN_PIPE_SHAPES.has(tile.shape) &&
+      (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) &&
+      (tile.shape !== selectedShape || tile.rotation !== pendingRotation) &&
+      (!isGoldCell || selectedIsGold)
+    );
+    return canPlace || canReplace;
+  }
+
   // ── Event handlers ──────────────────────────────────────────────────────────
 
   /** Returns true when player input should be blocked (resume replay in progress). */
@@ -446,16 +476,18 @@ export class InputHandler {
       if (this._rightDragLastTile && board &&
           this._cb.getGameState() === GameState.Playing &&
           this._cb.getScreen() === GameScreen.Play) {
-        const tile = board.getTile(this._rightDragLastTile);
-        if (!tile || isEmptyFloor(tile.shape) || SPIN_PIPE_SHAPES.has(tile.shape)) {
-          // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
-          if (this._cb.getSelectedShape() !== null) {
-            this._cb.setSelectedShape(null);
-            this._cb.renderInventoryBar();
-            sfxManager.play(SfxId.InventoryUnselect);
-          }
+        const pos = this._rightDragLastTile;
+        const tile = board.getTile(pos);
+        const shouldDeselect = !!tile && (
+          isEmptyFloor(tile.shape) ||
+          SPIN_PIPE_SHAPES.has(tile.shape) ||
+          (this._cb.getSelectedShape() !== null && !this._canShowPlacementGhost(board, tile, pos))
+        );
+        if (shouldDeselect) {
+          // Right-clicking a tile that cannot accept the selected shape: clear the pending selection.
+          this._clearSelectedShape();
         } else {
-          this._cb.reclaimTileAt(this._rightDragLastTile);
+          this._cb.reclaimTileAt(pos);
         }
       }
       this._suppressNextContextMenu = true;
@@ -568,23 +600,19 @@ export class InputHandler {
 
     // Right-clicking outside the grid (including inventory bar and other UI): deselect.
     if (pos.row < 0 || pos.row >= board.rows || pos.col < 0 || pos.col >= board.cols) {
-      if (this._cb.getSelectedShape() !== null) {
-        this._cb.setSelectedShape(null);
-        this._cb.renderInventoryBar();
-        sfxManager.play(SfxId.InventoryUnselect);
-      }
+      this._clearSelectedShape();
       return;
     }
 
     const tile = board.getTile(pos);
 
-    // Right-clicking an empty tile or a spinner: clear any pending inventory selection.
-    if (tile && (isEmptyFloor(tile.shape) || SPIN_PIPE_SHAPES.has(tile.shape))) {
-      if (this._cb.getSelectedShape() !== null) {
-        this._cb.setSelectedShape(null);
-        this._cb.renderInventoryBar();
-        sfxManager.play(SfxId.InventoryUnselect);
-      }
+    // Right-clicking a tile that cannot accept the selected shape: clear any pending inventory selection.
+    if (tile && (
+      isEmptyFloor(tile.shape) ||
+      SPIN_PIPE_SHAPES.has(tile.shape) ||
+      (this._cb.getSelectedShape() !== null && !this._canShowPlacementGhost(board, tile, pos))
+    )) {
+      this._clearSelectedShape();
       return;
     }
 

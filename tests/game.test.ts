@@ -2959,6 +2959,40 @@ describe('Game – spinner tile right-click deselects inventory', () => {
   });
 });
 
+describe('Game – right-click deselects on non-placeable hovered tile', () => {
+  it('deselects selected inventory on right-mouseup over an unreplaceable tile', () => {
+    const { game } = makeGame();
+    game.startLevel(1); // Level has Source at (0,0), which cannot be replaced.
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    hooks.selectedShape = PipeShape.Straight;
+    expect(boardAccess.board.grid[0][0].shape).toBe(PipeShape.Source);
+
+    // TILE_SIZE=64: col 0 → x=32, row 0 → y=32.
+    hooks._input._handleCanvasMouseDown(new MouseEvent('mousedown', { button: 2, clientX: 32, clientY: 32 }));
+    hooks._input._handleCanvasMouseUp(new MouseEvent('mouseup', { button: 2, clientX: 32, clientY: 32 }));
+
+    expect(hooks.selectedShape).toBeNull();
+    expect(boardAccess.board.grid[0][0].shape).toBe(PipeShape.Source);
+  });
+
+  it('deselects selected inventory on contextmenu over an unreplaceable tile', () => {
+    const { game } = makeGame();
+    game.startLevel(1); // Level has Source at (0,0), which cannot be replaced.
+    const hooks = gameHooks(game);
+    const boardAccess = game as unknown as { board: Board };
+
+    hooks.selectedShape = PipeShape.Straight;
+    expect(boardAccess.board.grid[0][0].shape).toBe(PipeShape.Source);
+
+    hooks._input._handleCanvasRightClick(new MouseEvent('contextmenu', { clientX: 32, clientY: 32 }));
+
+    expect(hooks.selectedShape).toBeNull();
+    expect(boardAccess.board.grid[0][0].shape).toBe(PipeShape.Source);
+  });
+});
+
 // ─── Tests: spinner tile wheel rotation ───────────────────────────────────────
 
 describe('Game – spinner tile wheel rotation', () => {
