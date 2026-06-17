@@ -1,5 +1,5 @@
 import type { Board, MoveResult} from './board';
-import { GOLD_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, isEmptyFloor, posKey } from './board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES, isEmptyFloor } from './board';
 import type { Tile } from './tile';
 import type { GridPos, PipeShape, Rotation } from './types';
 import { GameScreen, GameState } from './types';
@@ -416,25 +416,13 @@ export class InputHandler {
     return true;
   }
 
-  /**
-   * Returns true when the selected inventory shape would show a placement ghost
-   * on the given tile using the same eligibility rules as the renderer.
-   */
-  private _canShowPlacementGhost(board: Board, tile: Tile, pos: GridPos): boolean {
-    const selectedShape = this._cb.getSelectedShape();
-    if (selectedShape === null) return false;
-    const selectedIsGold = GOLD_PIPE_SHAPES.has(selectedShape);
-    const isGoldCell = board.goldSpaces.has(posKey(pos.row, pos.col));
-    const pendingRotation = this._cb.getPendingRotation();
-    const canPlace = isEmptyFloor(tile.shape) && (!isGoldCell || selectedIsGold);
-    const canReplace = (
-      !tile.isFixed &&
+  /** True when selected inventory cannot be placed/replaced on this hovered tile. */
+  private _isUnavailablePlacementTile(tile: Tile): boolean {
+    return tile.isFixed || (
+      !isEmptyFloor(tile.shape) &&
       !SPIN_PIPE_SHAPES.has(tile.shape) &&
-      (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) &&
-      (tile.shape !== selectedShape || tile.rotation !== pendingRotation) &&
-      (!isGoldCell || selectedIsGold)
+      !PIPE_SHAPES.has(tile.shape)
     );
-    return canPlace || canReplace;
   }
 
   // ── Event handlers ──────────────────────────────────────────────────────────
@@ -481,7 +469,7 @@ export class InputHandler {
         const shouldDeselect = !!tile && (
           isEmptyFloor(tile.shape) ||
           SPIN_PIPE_SHAPES.has(tile.shape) ||
-          (this._cb.getSelectedShape() !== null && !this._canShowPlacementGhost(board, tile, pos))
+          (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
         );
         if (shouldDeselect) {
           // Right-clicking a tile that cannot accept the selected shape: clear the pending selection.
@@ -610,7 +598,7 @@ export class InputHandler {
     if (tile && (
       isEmptyFloor(tile.shape) ||
       SPIN_PIPE_SHAPES.has(tile.shape) ||
-      (this._cb.getSelectedShape() !== null && !this._canShowPlacementGhost(board, tile, pos))
+      (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
     )) {
       this._clearSelectedShape();
       return;
