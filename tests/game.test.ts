@@ -12,12 +12,16 @@ import {
   saveLevelWater,
   savePartialProgressEntry,
   getPartialProgressFor,
+  saveBackgroundEnabled,
+  saveEnvironmentalEnabled,
 } from '../src/persistence';
 import { sfxManager, SfxId } from '../src/sfxManager';
 import { CloudShadowField } from '../src/visuals/cloudShadows';
 import { FireflyField } from '../src/visuals/fireflyField';
 import { ButterflyField } from '../src/visuals/butterflyField';
 import { isEnvironmentalEnabled, setEnvironmentalEnabled } from '../src/graphicsSettings';
+import { setActiveSlotIndex, withSlot } from '../src/activeProfile';
+import * as uiBackground from '../src/uiBackground';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
 jest.mock('../src/visuals/confetti', () => ({
@@ -472,6 +476,9 @@ type GameTestHooks = {
   _renderLevelList(): void;
   _playtestLevel(level: LevelDef): void;
   _activateCampaign(campaign: unknown): void;
+  _profileScreen: {
+    onProfileSelected(slotIndex: number): void;
+  };
   gameState: string;
 };
 
@@ -1649,6 +1656,22 @@ describe('Game – R key resets the level', () => {
 // ─── Tests: Escape key returns to level select ────────────────────────────────
 
 describe('Game – Escape key returns to level select', () => {
+  it('applies selected profile graphics settings before returning to menu', () => {
+    const { game } = makeGame();
+    const setBackgroundSpy = jest.spyOn(uiBackground, 'setGlobalBackgroundPatternEnabled');
+
+    withSlot(1, () => {
+      saveBackgroundEnabled(false);
+      saveEnvironmentalEnabled(false);
+    });
+    setActiveSlotIndex(1);
+
+    gameHooks(game)._profileScreen.onProfileSelected(1);
+
+    expect(setBackgroundSpy).toHaveBeenCalledWith(false);
+    expect(isEnvironmentalEnabled()).toBe(false);
+  });
+
   it('plays Back and closes the settings modal when Escape is pressed while it is open', () => {
     const { game } = makeGame();
     const hooks = game as unknown as {
