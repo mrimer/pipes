@@ -457,9 +457,13 @@ export class Game implements InputCallbacks {
     this._profileScreen = new PlayerProfileScreen();
     this._profileScreen.onProfileSelected = (slotIndex) => {
       // Update settings that depend on the newly active slot.
+      const backgroundEnabled = loadBackgroundEnabled();
+      const environmentalEnabled = loadEnvironmentalEnabled();
       sfxManager.setVolume(loadSfxVolume());
       musicManager.setVolume(loadMusicVolume());
       musicManager.setMuteOnFocusLoss(loadMusicMuteOnFocusLoss());
+      setGlobalBackgroundPatternEnabled(backgroundEnabled);
+      setEnvironmentalEnabled(environmentalEnabled);
       saveActiveSlotIndex(slotIndex);
       // Restore the active campaign from the new slot's persisted state, then
       // show the level-select screen.
