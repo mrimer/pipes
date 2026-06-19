@@ -65,7 +65,7 @@ import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecor
 import type { PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
 import { PlaybackScreen } from './playbackScreen';
 import { exportReplay, importReplay } from './profileIO';
-import { getActiveSlotIndex } from './activeProfile';
+import { getActiveSlotIndex, setActiveSlotIndex } from './activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './playerProfileSlots';
 import { PlayerProfileScreen } from './playerProfileScreen';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled, unregisterScrollingPipeBackground } from './uiBackground';
@@ -457,6 +457,9 @@ export class Game implements InputCallbacks {
     this._profileScreen = new PlayerProfileScreen();
     this._profileScreen.onProfileSelected = (slotIndex) => {
       // Update settings that depend on the newly active slot.
+      // These load* calls are slot-prefixed in persistence.ts, so activate the
+      // selected slot first to read the correct profile's settings.
+      setActiveSlotIndex(slotIndex);
       const backgroundEnabled = loadBackgroundEnabled();
       const environmentalEnabled = loadEnvironmentalEnabled();
       sfxManager.setVolume(loadSfxVolume());
