@@ -1653,10 +1653,10 @@ describe('Game – R key resets the level', () => {
   });
 });
 
-// ─── Tests: Escape key returns to level select ────────────────────────────────
+// ─── Tests: profile selection applies settings ─────────────────────────────────
 
-describe('Game – Escape key returns to level select', () => {
-  it('applies selected profile graphics settings before returning to menu', () => {
+describe('Game – profile selection settings', () => {
+  it('applies selected profile graphics settings when profile is selected', () => {
     const { game } = makeGame();
     const setBackgroundSpy = jest.spyOn(uiBackground, 'setGlobalBackgroundPatternEnabled');
     const previousActiveSlot = getActiveSlotIndex();
@@ -1665,7 +1665,6 @@ describe('Game – Escape key returns to level select', () => {
       saveBackgroundEnabled(false);
       saveEnvironmentalEnabled(false);
     });
-    setActiveSlotIndex(1);
     try {
       gameHooks(game)._profileScreen.onProfileSelected(1);
       expect(setBackgroundSpy).toHaveBeenCalledWith(false);
@@ -1674,6 +1673,11 @@ describe('Game – Escape key returns to level select', () => {
       setActiveSlotIndex(previousActiveSlot);
     }
   });
+});
+
+// ─── Tests: Escape key returns to level select ────────────────────────────────
+
+describe('Game – Escape key returns to level select', () => {
 
   it('plays Back and closes the settings modal when Escape is pressed while it is open', () => {
     const { game } = makeGame();
