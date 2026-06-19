@@ -20,7 +20,7 @@ import { CloudShadowField } from '../src/visuals/cloudShadows';
 import { FireflyField } from '../src/visuals/fireflyField';
 import { ButterflyField } from '../src/visuals/butterflyField';
 import { isEnvironmentalEnabled, setEnvironmentalEnabled } from '../src/graphicsSettings';
-import { setActiveSlotIndex, withSlot } from '../src/activeProfile';
+import { getActiveSlotIndex, setActiveSlotIndex, withSlot } from '../src/activeProfile';
 import * as uiBackground from '../src/uiBackground';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.
@@ -1659,17 +1659,20 @@ describe('Game – Escape key returns to level select', () => {
   it('applies selected profile graphics settings before returning to menu', () => {
     const { game } = makeGame();
     const setBackgroundSpy = jest.spyOn(uiBackground, 'setGlobalBackgroundPatternEnabled');
+    const previousActiveSlot = getActiveSlotIndex();
 
     withSlot(1, () => {
       saveBackgroundEnabled(false);
       saveEnvironmentalEnabled(false);
     });
     setActiveSlotIndex(1);
-
-    gameHooks(game)._profileScreen.onProfileSelected(1);
-
-    expect(setBackgroundSpy).toHaveBeenCalledWith(false);
-    expect(isEnvironmentalEnabled()).toBe(false);
+    try {
+      gameHooks(game)._profileScreen.onProfileSelected(1);
+      expect(setBackgroundSpy).toHaveBeenCalledWith(false);
+      expect(isEnvironmentalEnabled()).toBe(false);
+    } finally {
+      setActiveSlotIndex(previousActiveSlot);
+    }
   });
 
   it('plays Back and closes the settings modal when Escape is pressed while it is open', () => {
