@@ -5878,6 +5878,35 @@ describe('Gel and Siphon chambers — getCurrentWater (incremental path via appl
     expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(-4);
   });
 
+  it('Gel costs 0 when water is exactly 0 at connection time', () => {
+    // Source capacity = 0, so running total is 0 before gel connects.
+    const board = makeConnectedChamberBoard('gel', 0);
+    expect(board.getCurrentWater()).toBe(0);
+    // The gel's locked impact should be 0 (no water to halve).
+    expect(board.getLockedWaterImpact({ row: 0, col: 1 })).toBe(0);
+  });
+
+  it('Gel costs 0 when water is negative at connection time', () => {
+    // Build a board where a cost chamber has driven water negative before gel connects.
+    // Source=2, one dirt chamber (flat cost=5 → impact=-5), then gel.
+    // Running total before gel = 2 + (-5) = -3; clamped to 0, so gel adds 0 delta.
+    const board = new Board(1, 4);
+    board.source = { row: 0, col: 0 };
+    board.sink   = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source,  0, true, 2, 0, null, 1, new Set([Direction.East]));
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 5, null, 1, null, 'dirt');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'gel');
+    board.grid[0][3] = new Tile(PipeShape.Sink,    0, true, 0, 0, null, 1, new Set([Direction.West]));
+    board.sourceCapacity = 2;
+    board.inventory = [];
+    board.initHistory();
+
+    // Running total = 2 + (-5) = -3 before gel; clamped to 0, so gel adds 0 delta.
+    // Final water = 2 + (-5) + 0 = -3 (water can go negative via cost; gel doesn't worsen it).
+    expect(board.getCurrentWater()).toBe(-3);
+    expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(0);
+  });
+
   it('Siphon is a one-time effect — pipes and tanks added later are not doubled', () => {
     // Connect Siphon on turn 1 (one-time doubling), then add a Pipe + Tank on turn 2.
     // The Siphon impact is locked at connection time and does not re-apply.
