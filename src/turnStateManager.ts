@@ -638,10 +638,10 @@ export class TurnStateManager {
       }
       for (const key of newGelKeys) {
         // Clamp to 0: if water is already at or below zero, gel costs nothing.
-        const base = Math.max(0, runningTotal);
-        const halved = Math.floor(base / 2);
+        const nonNegativeTotal = Math.max(0, runningTotal);
+        const halved = Math.floor(nonNegativeTotal / 2);
         // Animation delta = water lost (negative, since it halves).
-        this._recordLockedTileState(key, halved - base, currentTemp, currentPressure);
+        this._recordLockedTileState(key, halved - nonNegativeTotal, currentTemp, currentPressure);
         runningTotal = halved;
       }
     }
