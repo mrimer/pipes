@@ -26,6 +26,8 @@ import {
 } from './persistence';
 import { renderLevelList } from './levelSelect';
 import { spawnConfetti } from './visuals/confetti';
+import { spawnBalloons } from './visuals/balloons';
+import { spawnFireworks } from './visuals/fireworks';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ResetProgressInfo } from './gameModals';
 import type { ChapterMapSnapshot } from './levelTransition';
@@ -1224,8 +1226,13 @@ export class CampaignManager {
       box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:430px;width:90%;text-align:center;';
       const titleEl = document.createElement('h2');
       titleEl.textContent = t('campaign.complete.title');
-      titleEl.style.cssText = 'color:#7ed321;margin:0 0 16px;font-size:1.5rem;';
+      titleEl.style.cssText = 'color:#7ed321;margin:0 0 8px;font-size:1.5rem;';
       box.appendChild(titleEl);
+
+      const msgEl = document.createElement('p');
+      msgEl.textContent = t('modal.campaignComplete.message');
+      msgEl.style.cssText = 'color:#ccc;margin:0 0 16px;font-size:0.95rem;';
+      box.appendChild(msgEl);
 
       const stats = document.createElement('div');
       stats.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:1rem;margin-bottom:16px;';
@@ -1254,6 +1261,7 @@ export class CampaignManager {
       modal.appendChild(box);
       document.body.appendChild(modal);
       spawnConfetti(() => {});
+      spawnBalloons(() => {});
     };
 
     const allChaptersMastered = campaign.chapters.every((ch) => this._isCampaignChapterMastered(ch));
@@ -1345,6 +1353,7 @@ export class CampaignManager {
 
     sfxManager.play(SfxId.MasterChapter);
     spawnConfetti();
+    spawnFireworks();
 
     const modal = buildCampaignMasteredModal(campaign.name, () => {
       modal.remove();
