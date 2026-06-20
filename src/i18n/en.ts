@@ -171,7 +171,7 @@ export const en: TranslationTable = {
   'title.pressAnyKey': 'Press any key',
   'splash.play': '▶  Play',
 
-  'levelSelect.noCampaign': 'Click Campaign Editor to import or create levels.',
+  'levelSelect.noCampaign': 'Click Select Campaign to import or create levels.',
   'levelSelect.heading': 'Select a Level',
   'levelSelect.settings': 'Settings',
   'levelSelect.player.title': 'Player: {playerName}',
