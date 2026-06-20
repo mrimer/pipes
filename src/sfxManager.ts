@@ -89,6 +89,8 @@ import gelUrl from '../data/sfx/gel.ogg';
 import siphonUrl from '../data/sfx/siphon.ogg';
 import titleBubblesUrl from '../data/sfx/title-bubbles.ogg';
 import uiConfirmUrl from '../data/sfx/ui-confirm.ogg';
+import malletsUrl from '../data/sfx/mallets.ogg';
+import trumpetsUrl from '../data/sfx/trumpets.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -155,6 +157,8 @@ export const enum SfxId {
   Siphon           = 58,
   TitleBubbles     = 59,
   UIConfirm        = 60,
+  WinCampaign      = 61,
+  MasterCampaign   = 62,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -226,6 +230,8 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.Siphon]:           [siphonUrl],
   [SfxId.TitleBubbles]:     [titleBubblesUrl],
   [SfxId.UIConfirm]:        [uiConfirmUrl],
+  [SfxId.WinCampaign]:      [malletsUrl],
+  [SfxId.MasterCampaign]:   [trumpetsUrl],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -322,6 +328,8 @@ class SfxManager {
     [SfxId.Siphon]:           -1,
     [SfxId.TitleBubbles]:     -1,
     [SfxId.UIConfirm]:        -1,
+    [SfxId.WinCampaign]:      -1,
+    [SfxId.MasterCampaign]:   -1,
   };
 
   /**

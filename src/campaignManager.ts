@@ -1260,6 +1260,7 @@ export class CampaignManager {
       box.appendChild(btnRow);
       modal.appendChild(box);
       document.body.appendChild(modal);
+      sfxManager.play(SfxId.WinCampaign);
       spawnConfetti(() => {});
       spawnBalloons(() => {});
     };
@@ -1352,6 +1353,7 @@ export class CampaignManager {
     markCampaignMasteredShown(campaign.id);
 
     sfxManager.play(SfxId.MasterChapter);
+    sfxManager.play(SfxId.MasterCampaign);
     spawnConfetti();
     spawnFireworks();
 
