@@ -69,8 +69,8 @@ export function buildShapeIcon(shape: PipeShape, color = '#4a90d9'): SVGSVGEleme
   }
 }
 
-/** Return a human-readable name for an inventory item shape (used inside item-container tooltips). */
-function _itemShapeDisplayName(shape: PipeShape | null): string {
+/** Return a human-readable name for an inventory item shape (used for inventory slot tooltips and item-container display names). */
+export function getInventoryItemDisplayName(shape: PipeShape | null): string {
   switch (shape) {
     case PipeShape.Straight:      return 'Straight';
     case PipeShape.Elbow:         return 'Elbow';
@@ -95,14 +95,14 @@ function _itemShapeDisplayName(shape: PipeShape | null): string {
  */
 export function getTileDisplayName(tile: Tile): string {
   switch (tile.shape) {
-    case PipeShape.Straight:
-    case PipeShape.GoldStraight: return 'Straight';
-    case PipeShape.Elbow:
-    case PipeShape.GoldElbow:    return 'Elbow';
-    case PipeShape.Tee:
-    case PipeShape.GoldTee:      return 'Tee';
-    case PipeShape.Cross:
-    case PipeShape.GoldCross:    return 'Cross';
+    case PipeShape.Straight:     return 'Straight';
+    case PipeShape.GoldStraight: return 'Gold Straight';
+    case PipeShape.Elbow:        return 'Elbow';
+    case PipeShape.GoldElbow:    return 'Gold Elbow';
+    case PipeShape.Tee:          return 'Tee';
+    case PipeShape.GoldTee:      return 'Gold Tee';
+    case PipeShape.Cross:        return 'Cross';
+    case PipeShape.GoldCross:    return 'Gold Cross';
     case PipeShape.SpinStraight: return 'Spin Straight';
     case PipeShape.SpinElbow:    return 'Spin Elbow';
     case PipeShape.SpinTee:      return 'Spin Tee';
@@ -127,8 +127,9 @@ export function getTileDisplayName(tile: Tile): string {
         case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity} water` : 'Tank water';
         case 'dirt':   return `Dirt -${tile.cost}`;
         case 'item': {
-          const itemName = _itemShapeDisplayName(tile.itemShape);
-          return tile.itemCount !== 1 ? `${tile.itemCount}× ${itemName}` : itemName;
+          const itemName = getInventoryItemDisplayName(tile.itemShape);
+          const countedName = tile.itemCount !== 1 ? `${tile.itemCount}× ${itemName}` : itemName;
+          return `Item: ${countedName}`;
         }
         case 'heater':
           if (tile.temperature < 0) return `Cooler ${tile.temperature}°`;
