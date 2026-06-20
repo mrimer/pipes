@@ -150,7 +150,9 @@ src/
 │   ├── chapterMap.ts            # Chapter map node visual helpers
 │   ├── chapterWaves.ts          # Animated waves on chapter map
 │   ├── cloudShadows.ts          # Procedural cloud-shadow overlay field for level/map screens
+│   ├── balloons.ts              # Rising balloon particle system (campaign completion)
 │   ├── confetti.ts              # Win confetti particle system
+│   ├── fireworks.ts             # Fireworks rocket+spark particle system (campaign mastery)
 │   ├── fieldUtils.ts            # Unified utility helper functions
 │   ├── fireflyField.ts          # Firefly visual effect
 │   ├── heatWave.ts              # Heat-wave distortion overlay
@@ -303,6 +305,8 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Title intro animation (COOL PIPES glyphs) | `titleScreen.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |
 | Win confetti | `visuals/confetti.ts` |
+| Balloon animation (campaign completion) | `visuals/balloons.ts` |
+| Fireworks animation (campaign mastery) | `visuals/fireworks.ts` |
 | Cloud shadow overlay | `visuals/cloudShadows.ts` |
 | Campaign-map wheel zoom + zoom sizing clamps | `mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
 | Map sea-wave animation on chapter/campaign screens | `mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |
