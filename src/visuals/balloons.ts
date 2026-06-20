@@ -50,8 +50,9 @@ export function spawnBalloons(onComplete?: () => void): void {
   _ensureCanvas();
   _onComplete = onComplete ?? null;
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- _ensureCanvas() always initializes _canvas
-  const w = _canvas!.width;
-  const h = _canvas!.height;
+  const canvas = _canvas!;
+  const w = canvas.width;
+  const h = canvas.height;
   const now = performance.now();
   const count = 30;
   for (let i = 0; i < count; i++) {
