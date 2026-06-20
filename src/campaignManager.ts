@@ -1352,7 +1352,6 @@ export class CampaignManager {
     this._campaignMasteredShown = true;
     markCampaignMasteredShown(campaign.id);
 
-    sfxManager.play(SfxId.MasterChapter);
     sfxManager.play(SfxId.MasterCampaign);
     spawnConfetti();
     spawnFireworks();
