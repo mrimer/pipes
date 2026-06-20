@@ -557,7 +557,7 @@ describe('renderLevelList – no-campaign / campaign header', () => {
     container = makeLevelListEl();
   });
 
-  it('shows "Click Campaign Editor" message when no activeCampaign is provided', () => {
+  it('shows "Select Campaign" message when no activeCampaign is provided', () => {
     renderLevelList(
       container, new Set<number>(),
       () => {}, () => {}, () => {}, () => {}, () => {},
@@ -566,7 +566,7 @@ describe('renderLevelList – no-campaign / campaign header', () => {
 
     const msg = container.querySelector('p');
     expect(msg).not.toBeNull();
-    expect(msg?.textContent).toContain('Campaign Editor');
+    expect(msg?.textContent).toContain('Select Campaign');
     expect(msg?.textContent).toContain('import or create');
   });
 
