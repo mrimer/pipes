@@ -66,6 +66,8 @@ export interface InputCallbacks {
   // ── Tooltip ─────────────────────────────────────────────────────────────────
   showTooltip(clientX: number, clientY: number): void;
   hideTooltip(): void;
+  /** Show a Ctrl-hover tooltip for an inventory item with the given shape. */
+  showInventoryItemTooltip(shape: PipeShape, clientX: number, clientY: number): void;
 
   // ── Additional UI callbacks ─────────────────────────────────────────────────
   /** Re-render the inventory bar (selection + sparkle effects). */
@@ -145,6 +147,15 @@ export class InputHandler {
    * active).
    */
   hoverRotationDelta = 0;
+
+  // ── Inventory hover state ──────────────────────────────────────────────────
+
+  /** Shape of the inventory item currently under the mouse cursor, or null. */
+  private _hoveredInvShape: PipeShape | null = null;
+  /** Client X position of the last mousemove over an inventory item. */
+  private _hoveredInvClientX = 0;
+  /** Client Y position of the last mousemove over an inventory item. */
+  private _hoveredInvClientY = 0;
 
   // ── Bound handlers (stored for removeEventListener in destroy()) ────────────
 
@@ -227,6 +238,26 @@ export class InputHandler {
   }
 
   // ── Inventory handlers (called by renderInventoryBar wiring in Game) ────────
+
+  /**
+   * Called when the mouse moves over an inventory item element.
+   * Tracks the hovered item and immediately shows a Ctrl-hover tooltip when
+   * Ctrl is held and the game is in play state.
+   */
+  setInventoryHover(shape: PipeShape, clientX: number, clientY: number): void {
+    this._hoveredInvShape = shape;
+    this._hoveredInvClientX = clientX;
+    this._hoveredInvClientY = clientY;
+    if (this.ctrlHeld && this._cb.getGameState() === GameState.Playing) {
+      this._cb.showInventoryItemTooltip(shape, clientX, clientY);
+    }
+  }
+
+  /** Called when the mouse leaves an inventory item element. Hides any active tooltip. */
+  clearInventoryHover(): void {
+    this._hoveredInvShape = null;
+    this._cb.hideTooltip();
+  }
 
   /**
    * Handle a left-click on an inventory item.
@@ -699,12 +730,16 @@ export class InputHandler {
     }
     if (e.key === 'Control' && !this.ctrlHeld) {
       this.ctrlHeld = true;
-      if (this._cb.getGameState() === GameState.Playing && this.mouseCanvasPos) {
-        const rect = this._canvas.getBoundingClientRect();
-        this._cb.showTooltip(
-          this.mouseCanvasPos.x + rect.left,
-          this.mouseCanvasPos.y + rect.top,
-        );
+      if (this._cb.getGameState() === GameState.Playing) {
+        if (this.mouseCanvasPos) {
+          const rect = this._canvas.getBoundingClientRect();
+          this._cb.showTooltip(
+            this.mouseCanvasPos.x + rect.left,
+            this.mouseCanvasPos.y + rect.top,
+          );
+        } else if (this._hoveredInvShape !== null) {
+          this._cb.showInventoryItemTooltip(this._hoveredInvShape, this._hoveredInvClientX, this._hoveredInvClientY);
+        }
       }
     }
     if (e.key === 'Shift' && !this.shiftHeld) {

@@ -1,5 +1,5 @@
 import type { Board} from './board';
-import { PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
+import { PIPE_SHAPES, SPIN_PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import type { Tile } from './tile';
 import { GameScreen, PipeShape, COLD_CHAMBER_CONTENTS } from './types';
 import { TILE_SIZE, getTileDisplayName } from './renderer';
@@ -189,8 +189,12 @@ export class TooltipManager {
     // Display as (row, col) to match the GridPos convention used throughout the codebase.
     let tooltipText = `(${row}, ${col})`;
     const tile = board.grid[row][col];
-    // Indicate a gold space regardless of the tile currently on top of it.
-    if (board.goldSpaces.has(posKey(row, col))) {
+    const isGoldSpace = board.goldSpaces.has(posKey(row, col));
+    const isGoldPipe = GOLD_PIPE_SHAPES.has(tile.shape);
+    // Indicate a gold space; when a gold pipe is already placed, omit the
+    // "needs gold pipe" hint and instead incorporate the space info into the
+    // tile name section below (e.g. "Gold Straight on Gold Space").
+    if (isGoldSpace && !isGoldPipe) {
       tooltipText += ' Gold Space - needs gold pipe';
     }
     // Indicate one-way cell direction.
@@ -208,9 +212,12 @@ export class TooltipManager {
       }
     }
     // Show a human-readable tile name derived from its shape and chamber content.
+    // When a gold pipe occupies a gold space, format it as "Gold Straight on Gold Space".
     const tileName = getTileDisplayName(tile);
     if (tileName) {
-      tooltipText += ` ${tileName}`;
+      tooltipText += isGoldSpace && isGoldPipe
+        ? ` ${tileName} on Gold Space`
+        : ` ${tileName}`;
     }
     // Pre-placed fixed pipe shapes get a "(fixed)" indicator.
     if (tile.isFixed && PIPE_SHAPES.has(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
@@ -239,6 +246,14 @@ export class TooltipManager {
       }
     }
     this._el.textContent = tooltipText;
+    this._el.style.display = 'block';
+    this._el.style.left = `${clientX + 12}px`;
+    this._el.style.top  = `${clientY + 12}px`;
+  }
+
+  /** Show a plain-text tooltip at the given client coordinates. */
+  showText(clientX: number, clientY: number, text: string): void {
+    this._el.textContent = text;
     this._el.style.display = 'block';
     this._el.style.left = `${clientX + 12}px`;
     this._el.style.top  = `${clientY + 12}px`;

@@ -5,7 +5,7 @@ import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDe
 import { GameScreen, GameState, PipeShape } from './types';
 import type { InputCallbacks} from './inputHandler';
 import { InputHandler } from './inputHandler';
-import { TILE_SIZE, renderBoard, setTileSize, computeTileSize } from './renderer';
+import { TILE_SIZE, renderBoard, setTileSize, computeTileSize, getInventoryItemDisplayName } from './renderer';
 import {
   loadPlayerName,
   loadSfxVolume,
@@ -991,6 +991,10 @@ export class Game implements InputCallbacks {
       (shape, count) => this._input.handleInventoryClick(shape, count),
       () => this._input.handleInventoryRightClick(),
       (el, shape, count) => this._input.attachInventoryItemTouchHandlers(el, shape, count),
+      (el, shape) => {
+        el.addEventListener('mousemove', (e) => { this._input.setInventoryHover(shape, e.clientX, e.clientY); });
+        el.addEventListener('mouseleave', () => { this._input.clearInventoryHover(); });
+      },
     );
   }
 
@@ -1415,6 +1419,10 @@ export class Game implements InputCallbacks {
 
   hideTooltip(): void {
     this._tooltip.hide();
+  }
+
+  showInventoryItemTooltip(shape: PipeShape, clientX: number, clientY: number): void {
+    this._tooltip.showText(clientX, clientY, getInventoryItemDisplayName(shape));
   }
 
   /** Show a brief error message that auto-dismisses after ~2 seconds. */

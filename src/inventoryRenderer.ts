@@ -16,6 +16,7 @@ import { t } from './i18n';
  * @param onItemClick - Callback invoked when the player left-clicks an inventory item.
  * @param onItemRightClick - Callback invoked when the player right-clicks an inventory item.
  * @param onItemTouch - Optional callback to attach touch handlers to each item element.
+ * @param onItemMouseHandlers - Optional callback to attach mousemove/mouseleave handlers for Ctrl-hover tooltips.
  */
 export function renderInventoryBar(
   inventoryBarEl: HTMLElement,
@@ -24,6 +25,7 @@ export function renderInventoryBar(
   onItemClick: (shape: PipeShape, effectiveCount: number) => void,
   onItemRightClick?: () => void,
   onItemTouch?: (el: HTMLElement, shape: PipeShape, effectiveCount: number) => void,
+  onItemMouseHandlers?: (el: HTMLElement, shape: PipeShape) => void,
 ): void {
   // Preserve any canvas children (e.g. the wave animation overlay) so that
   // the wave animation loop is not interrupted by DOM replacement.
@@ -69,6 +71,7 @@ export function renderInventoryBar(
       el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(); });
     }
     if (onItemTouch) onItemTouch(el, item.shape, effectiveCount);
+    if (onItemMouseHandlers) onItemMouseHandlers(el, item.shape);
     inventoryBarEl.appendChild(el);
     renderedCount++;
   }
@@ -105,6 +108,7 @@ export function renderInventoryBar(
       el.addEventListener('contextmenu', (e) => { e.preventDefault(); onItemRightClick(); });
     }
     if (onItemTouch) onItemTouch(el, bonusShape, bonusCount);
+    if (onItemMouseHandlers) onItemMouseHandlers(el, bonusShape);
     inventoryBarEl.appendChild(el);
     renderedCount++;
   }

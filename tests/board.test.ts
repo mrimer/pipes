@@ -3197,19 +3197,19 @@ describe('getTileDisplayName', () => {
     expect(getTileDisplayName(tile)).toBe('Heater');
   });
 
-  it('returns "Gold Straight" for an item container holding 1 GoldStraight', () => {
+  it('returns "Item: Gold Straight" for an item container holding 1 GoldStraight', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldStraight, 1, null, 'item');
-    expect(getTileDisplayName(tile)).toBe('Gold Straight');
+    expect(getTileDisplayName(tile)).toBe('Item: Gold Straight');
   });
 
-  it('returns "2× Gold Straight" for an item container holding 2 GoldStraight', () => {
+  it('returns "Item: 2× Gold Straight" for an item container holding 2 GoldStraight', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldStraight, 2, null, 'item');
-    expect(getTileDisplayName(tile)).toBe('2× Gold Straight');
+    expect(getTileDisplayName(tile)).toBe('Item: 2× Gold Straight');
   });
 
-  it('returns "Straight" for an item container holding a plain Straight', () => {
+  it('returns "Item: Straight" for an item container holding a plain Straight', () => {
     const tile = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Straight, 1, null, 'item');
-    expect(getTileDisplayName(tile)).toBe('Straight');
+    expect(getTileDisplayName(tile)).toBe('Item: Straight');
   });
 
   it('returns "Dirt -3" for a dirt chamber', () => {

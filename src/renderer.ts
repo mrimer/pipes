@@ -184,7 +184,7 @@ export function computeTileSize(rows: number, cols: number, vOverhead = 0, hOver
   return Math.max(BASE_TILE_SIZE, Math.min(128, maxFit));
 }
 
-export { SHAPE_ABBREV, buildShapeIcon, getTileDisplayName } from './renderer/tileDisplayNames';
+export { SHAPE_ABBREV, buildShapeIcon, getTileDisplayName, getInventoryItemDisplayName } from './renderer/tileDisplayNames';
 
 /**
  * Draw a curved rotation arrow with a black outline, centered at the canvas
