@@ -3,6 +3,7 @@ import { PIPE_SHAPES, SPIN_PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey, computeDeltaTe
 import type { Tile } from './tile';
 import { GameScreen, PipeShape, COLD_CHAMBER_CONTENTS } from './types';
 import { TILE_SIZE, getTileDisplayName } from './renderer';
+import { t } from './i18n';
 import { RADIUS_SM, UI_BG, UI_BORDER, UI_TEXT } from './uiConstants';
 
 /** CSS style for the Ctrl-hover coordinate tooltip element. */
@@ -80,33 +81,33 @@ export class TooltipManager {
       const lockedPressure = board.getLockedConnectPressure(pos) ?? 1;
       const lockedDeltaTemp = computeDeltaTemp(tile.temperature, lockedTemp);
       if (content === 'ice') {
-        return tooltipText + `\n${this._iceCostFormula(lockedDeltaTemp, tile.cost)} cost: ${lockedCost}`;
+        return tooltipText + '\n' + this._iceCostFormula(lockedDeltaTemp, tile.cost) + ' ' + t('tooltip.cost', { cost: lockedCost });
       } else if (content === 'snow') {
-        return tooltipText + `\n${this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost)} cost: ${lockedCost}`;
+        return tooltipText + '\n' + this._snowCostFormula(lockedDeltaTemp, lockedPressure, tile.cost) + ' ' + t('tooltip.cost', { cost: lockedCost });
       } else {
         // sandstone
         const shatterActive = tile.shatter > tile.hardness;
         const isShatterTriggered = shatterActive && lockedPressure >= tile.shatter;
         if (isShatterTriggered) {
-          return tooltipText + `\n[${lockedPressure}P ≥ ${tile.shatter}S] Cost: 0`;
+          return tooltipText + '\n' + t('tooltip.shatterCostZero', { pressure: lockedPressure, shatter: tile.shatter });
         }
         const lockedDeltaDamage = lockedPressure - tile.hardness;
         if (lockedDeltaDamage >= 1) {
-          return tooltipText + `\n${this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile)} cost: ${lockedCost}`;
+          return tooltipText + '\n' + this._sandstoneCostFormula(lockedDeltaTemp, lockedPressure, tile) + ' ' + t('tooltip.cost', { cost: lockedCost });
         }
-        return tooltipText + `\ncost: ${lockedCost}`;
+        return tooltipText + '\n' + t('tooltip.cost', { cost: lockedCost });
       }
     } else if (content === 'hot_plate') {
       const lockedGain = board.getLockedHotPlateGain(pos);
       const lockedTemp = board.getLockedConnectTemp(pos) ?? 0;
       if (lockedGain !== null) {
         const loss = Math.max(0, lockedGain - lockedImpact);
-        return tooltipText + `\n${this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost)} (+${lockedGain} -${loss})`;
+        return tooltipText + '\n' + this._hotPlateCostFormula(tile.temperature, lockedTemp, tile.cost) + ' ' + t('tooltip.hotPlateEffect', { gain: lockedGain, loss });
       }
     } else if (content === 'gel') {
-      return tooltipText + `\ncost: ${lockedCost}`;
+      return tooltipText + '\n' + t('tooltip.cost', { cost: lockedCost });
     } else if (content === 'siphon') {
-      return tooltipText + `\ngain: ${lockedImpact}`;
+      return tooltipText + '\n' + t('tooltip.gain', { gain: lockedImpact });
     }
     return tooltipText;
   }
@@ -121,7 +122,7 @@ export class TooltipManager {
     let predictedCost: number | null = null;
 
     if (content === 'dirt') {
-      return tooltipText + ' water';
+      return tooltipText + ' ' + t('tooltip.dirtWater');
     } else if (content === 'ice') {
       const currentTemp = board.getCurrentTemperature();
       const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
@@ -139,10 +140,10 @@ export class TooltipManager {
       const { shatterOverride, deltaDamage, costPerDeltaTemp } =
         sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
       if (shatterOverride) {
-        tooltipText += `\n[${currentPressure}P ≥ ${tile.shatter}S] Cost: 0`;
+        tooltipText += '\n' + t('tooltip.shatterCostZero', { pressure: currentPressure, shatter: tile.shatter });
         predictedCost = 0;
       } else if (deltaDamage <= 0) {
-        tooltipText += `\n— Raise pressure above hardness to connect (Pressure: ${currentPressure}P, Hardness: ${tile.hardness})`;
+        tooltipText += '\n' + t('tooltip.sandstoneNoConnect', { pressure: currentPressure, hardness: tile.hardness });
       } else {
         const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
         tooltipText += `\n${this._sandstoneCostFormula(deltaTemp, currentPressure, tile)}`;
@@ -153,8 +154,8 @@ export class TooltipManager {
       const effectiveCost = tile.cost * (tile.temperature + currentTemp);
       const waterGain = Math.min(board.frozen, effectiveCost);
       const waterLoss = Math.max(0, effectiveCost - waterGain);
-      tooltipText += `\n${this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost)}`;
-      tooltipText += ` (+${waterGain} -${waterLoss})`;
+      tooltipText += '\n' + this._hotPlateCostFormula(tile.temperature, currentTemp, tile.cost);
+      tooltipText += ' ' + t('tooltip.hotPlateEffect', { gain: waterGain, loss: waterLoss });
       predictedCost = waterLoss - waterGain;
     } else {
       predictedCost = 0;
@@ -162,8 +163,8 @@ export class TooltipManager {
 
     if (predictedCost !== null && predictedCost !== 0) {
       tooltipText += predictedCost > 0
-        ? ` cost: ${predictedCost}`
-        : ` gain: ${Math.abs(predictedCost)}`;
+        ? ' ' + t('tooltip.cost', { cost: predictedCost })
+        : ' ' + t('tooltip.gain', { gain: Math.abs(predictedCost) });
     }
     return tooltipText;
   }
@@ -195,20 +196,20 @@ export class TooltipManager {
     // "needs gold pipe" hint and instead incorporate the space info into the
     // tile name section below (e.g. "Gold Straight on Gold Space").
     if (isGoldSpace && !isGoldPipe) {
-      tooltipText += ' Gold Space - needs gold pipe';
+      tooltipText += ' ' + t('tooltip.goldSpace');
     }
     // Indicate one-way cell direction.
     const oneWayDir = board.getOneWayDirection({ row, col });
     if (oneWayDir !== null) {
-      tooltipText += ` (one-way ${oneWayDir})`;
+      tooltipText += ' ' + t('tooltip.oneWay', { direction: oneWayDir });
     }
     // Indicate cement cell status.
     const cementDryingTime = board.getCementDryingTime({ row, col });
     if (cementDryingTime !== null) {
       if (cementDryingTime === 0 && tile.shape !== PipeShape.Empty) {
-        tooltipText += ' Cement (Hardened)';
+        tooltipText += ' ' + t('tooltip.cementHardened');
       } else {
-        tooltipText += ` Cement T=${cementDryingTime}`;
+        tooltipText += ' ' + t('tooltip.cement', { time: cementDryingTime });
       }
     }
     // Show a human-readable tile name derived from its shape and chamber content.
@@ -216,12 +217,12 @@ export class TooltipManager {
     const tileName = getTileDisplayName(tile);
     if (tileName) {
       tooltipText += isGoldSpace && isGoldPipe
-        ? ` ${tileName} on Gold Space`
-        : ` ${tileName}`;
+        ? ' ' + t('tooltip.onGoldSpace', { name: tileName })
+        : ' ' + tileName;
     }
     // Pre-placed fixed pipe shapes get a "(fixed)" indicator.
     if (tile.isFixed && PIPE_SHAPES.has(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-      tooltipText += ' (fixed)';
+      tooltipText += ' ' + t('tooltip.fixed');
     }
     if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'regulator') {
       // Regulator parameters are already part of the tile display name above.
@@ -238,7 +239,7 @@ export class TooltipManager {
         // Disconnected siphon: show frozen gain if set, else no cost preview.
         const frozenGain = board.getSiphonLockedGain({ row, col });
         if (frozenGain !== null) {
-          tooltipText += `\ngain: ${frozenGain}`;
+          tooltipText += '\n' + t('tooltip.gain', { gain: frozenGain });
         }
       } else if (tile.cost > 0) {
         // Gel has no fixed cost to predict before connection.
