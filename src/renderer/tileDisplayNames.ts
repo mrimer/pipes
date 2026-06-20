@@ -6,6 +6,7 @@
 import type { Tile } from '../tile';
 import { PipeShape } from '../types';
 import { svgEl, svgRoot } from '../svgUtils';
+import { t } from '../i18n';
 
 /** Unambiguous two-character abbreviation for each pipe shape, used inside ItemContainer tiles. */
 export const SHAPE_ABBREV: Partial<Record<PipeShape, string>> = {
@@ -72,19 +73,19 @@ export function buildShapeIcon(shape: PipeShape, color = '#4a90d9'): SVGSVGEleme
 /** Return a human-readable name for an inventory item shape (used for inventory slot tooltips and item-container display names). */
 export function getInventoryItemDisplayName(shape: PipeShape | null): string {
   switch (shape) {
-    case PipeShape.Straight:      return 'Straight';
-    case PipeShape.Elbow:         return 'Elbow';
-    case PipeShape.Tee:           return 'Tee';
-    case PipeShape.Cross:         return 'Cross';
-    case PipeShape.GoldStraight:  return 'Gold Straight';
-    case PipeShape.GoldElbow:     return 'Gold Elbow';
-    case PipeShape.GoldTee:       return 'Gold Tee';
-    case PipeShape.GoldCross:     return 'Gold Cross';
-    case PipeShape.LeakyStraight: return 'Leaky Straight';
-    case PipeShape.LeakyElbow:    return 'Leaky Elbow';
-    case PipeShape.LeakyTee:      return 'Leaky Tee';
-    case PipeShape.LeakyCross:    return 'Leaky Cross';
-    default:                      return 'Item';
+    case PipeShape.Straight:      return t('tile.name.straight');
+    case PipeShape.Elbow:         return t('tile.name.elbow');
+    case PipeShape.Tee:           return t('tile.name.tee');
+    case PipeShape.Cross:         return t('tile.name.cross');
+    case PipeShape.GoldStraight:  return t('tile.name.goldStraight');
+    case PipeShape.GoldElbow:     return t('tile.name.goldElbow');
+    case PipeShape.GoldTee:       return t('tile.name.goldTee');
+    case PipeShape.GoldCross:     return t('tile.name.goldCross');
+    case PipeShape.LeakyStraight: return t('tile.name.leakyStraight');
+    case PipeShape.LeakyElbow:    return t('tile.name.leakyElbow');
+    case PipeShape.LeakyTee:      return t('tile.name.leakyTee');
+    case PipeShape.LeakyCross:    return t('tile.name.leakyCross');
+    default:                      return t('tile.name.item');
   }
 }
 
@@ -95,67 +96,67 @@ export function getInventoryItemDisplayName(shape: PipeShape | null): string {
  */
 export function getTileDisplayName(tile: Tile): string {
   switch (tile.shape) {
-    case PipeShape.Straight:     return 'Straight';
-    case PipeShape.GoldStraight: return 'Gold Straight';
-    case PipeShape.Elbow:        return 'Elbow';
-    case PipeShape.GoldElbow:    return 'Gold Elbow';
-    case PipeShape.Tee:          return 'Tee';
-    case PipeShape.GoldTee:      return 'Gold Tee';
-    case PipeShape.Cross:        return 'Cross';
-    case PipeShape.GoldCross:    return 'Gold Cross';
-    case PipeShape.SpinStraight: return 'Spin Straight';
-    case PipeShape.SpinElbow:    return 'Spin Elbow';
-    case PipeShape.SpinTee:      return 'Spin Tee';
-    case PipeShape.SpinStraightCement: return 'Spin Straight (Cement)';
-    case PipeShape.SpinElbowCement:    return 'Spin Elbow (Cement)';
-    case PipeShape.SpinTeeCement:      return 'Spin Tee (Cement)';
-    case PipeShape.LeakyStraight: return 'Leaky Straight';
-    case PipeShape.LeakyElbow:    return 'Leaky Elbow';
-    case PipeShape.LeakyTee:      return 'Leaky Tee';
-    case PipeShape.LeakyCross:    return 'Leaky Cross';
-    case PipeShape.Source:       return `Source - Initial Capacity: ${tile.capacity}`;
-    case PipeShape.Sink:         return 'Sink - goal';
-    case PipeShape.Granite:      return 'Granite';
-    case PipeShape.Tree:         return 'Tree';
-    case PipeShape.Tree2:        return 'Tree 2';
-    case PipeShape.Tree3:        return 'Tree 3';
-    case PipeShape.Tree4:        return 'Tree 4';
-    case PipeShape.Sea:          return 'Sea';
-    case PipeShape.Cement:       return 'Cement';
+    case PipeShape.Straight:     return t('tile.name.straight');
+    case PipeShape.GoldStraight: return t('tile.name.goldStraight');
+    case PipeShape.Elbow:        return t('tile.name.elbow');
+    case PipeShape.GoldElbow:    return t('tile.name.goldElbow');
+    case PipeShape.Tee:          return t('tile.name.tee');
+    case PipeShape.GoldTee:      return t('tile.name.goldTee');
+    case PipeShape.Cross:        return t('tile.name.cross');
+    case PipeShape.GoldCross:    return t('tile.name.goldCross');
+    case PipeShape.SpinStraight: return t('tile.name.spinStraight');
+    case PipeShape.SpinElbow:    return t('tile.name.spinElbow');
+    case PipeShape.SpinTee:      return t('tile.name.spinTee');
+    case PipeShape.SpinStraightCement: return t('tile.name.spinStraightCement');
+    case PipeShape.SpinElbowCement:    return t('tile.name.spinElbowCement');
+    case PipeShape.SpinTeeCement:      return t('tile.name.spinTeeCement');
+    case PipeShape.LeakyStraight: return t('tile.name.leakyStraight');
+    case PipeShape.LeakyElbow:    return t('tile.name.leakyElbow');
+    case PipeShape.LeakyTee:      return t('tile.name.leakyTee');
+    case PipeShape.LeakyCross:    return t('tile.name.leakyCross');
+    case PipeShape.Source:       return t('tile.name.source', { capacity: tile.capacity });
+    case PipeShape.Sink:         return t('tile.name.sink');
+    case PipeShape.Granite:      return t('tile.name.granite');
+    case PipeShape.Tree:         return t('tile.name.tree');
+    case PipeShape.Tree2:        return t('tile.name.tree2');
+    case PipeShape.Tree3:        return t('tile.name.tree3');
+    case PipeShape.Tree4:        return t('tile.name.tree4');
+    case PipeShape.Sea:          return t('tile.name.sea');
+    case PipeShape.Cement:       return t('tile.name.cementTile');
     case PipeShape.Chamber:
       switch (tile.chamberContent) {
-        case 'tank':   return tile.capacity > 0 ? `Tank +${tile.capacity} water` : 'Tank water';
-        case 'dirt':   return `Dirt -${tile.cost}`;
+        case 'tank':   return tile.capacity > 0 ? t('tile.chamber.tank', { capacity: tile.capacity }) : t('tile.chamber.tankEmpty');
+        case 'dirt':   return t('tile.chamber.dirt', { cost: tile.cost });
         case 'item': {
           const itemName = getInventoryItemDisplayName(tile.itemShape);
-          const countedName = tile.itemCount !== 1 ? `${tile.itemCount}× ${itemName}` : itemName;
-          return `Item: ${countedName}`;
+          const countedName = tile.itemCount !== 1 ? t('tile.chamber.item.counted', { count: tile.itemCount, name: itemName }) : itemName;
+          return t('tile.chamber.item', { name: countedName });
         }
         case 'heater':
-          if (tile.temperature < 0) return `Cooler ${tile.temperature}°`;
-          return tile.temperature > 0 ? `Heater +${tile.temperature}°` : 'Heater';
-        case 'ice':    return `Ice -${tile.temperature}° x ${tile.cost}`;
+          if (tile.temperature < 0) return t('tile.chamber.cooler', { temp: tile.temperature });
+          return tile.temperature > 0 ? t('tile.chamber.heater', { temp: tile.temperature }) : t('tile.chamber.heaterZero');
+        case 'ice':    return t('tile.chamber.ice', { temp: tile.temperature, cost: tile.cost });
         case 'pump':
-          if (tile.pressure < 0) return `Vacuum ${tile.pressure}P`;
-          return `Pump +${tile.pressure}P`;
-        case 'snow':    return `Snow -${tile.temperature}° x ${tile.cost}`;
+          if (tile.pressure < 0) return t('tile.chamber.vacuum', { pressure: tile.pressure });
+          return t('tile.chamber.pump', { pressure: tile.pressure });
+        case 'snow':    return t('tile.chamber.snow', { temp: tile.temperature, cost: tile.cost });
         case 'sandstone': {
           const shatterActive = tile.shatter > tile.hardness;
           return shatterActive
-            ? `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness}, S=${tile.shatter})`
-            : `Sandstone -${tile.temperature}° x ${tile.cost} (H=${tile.hardness})`;
+            ? t('tile.chamber.sandstoneShatter', { temp: tile.temperature, cost: tile.cost, hardness: tile.hardness, shatter: tile.shatter })
+            : t('tile.chamber.sandstone', { temp: tile.temperature, cost: tile.cost, hardness: tile.hardness });
         }
-        case 'hot_plate': return `Hot Plate ${tile.temperature}° x ${tile.cost}`;
-        case 'star':   return 'Star';
+        case 'hot_plate': return t('tile.chamber.hotPlate', { temp: tile.temperature, cost: tile.cost });
+        case 'star':   return t('tile.chamber.star');
         case 'regulator': {
           const stat = tile.regulatorStat ?? 'water';
           const op   = tile.regulatorOperator ?? '>';
           const statLabel = stat.charAt(0).toUpperCase() + stat.slice(1);
-          return `Regulator: ${statLabel} ${op} ${tile.cost}`;
+          return t('tile.chamber.regulator', { stat: statLabel, op, cost: tile.cost });
         }
-        case 'gel':    return 'Gel \u00D7\u00BD';
-        case 'siphon': return 'Siphon \u00D72';
-        default:       return 'Chamber';
+        case 'gel':    return t('tile.chamber.gel');
+        case 'siphon': return t('tile.chamber.siphon');
+        default:       return t('tile.chamber.default');
       }
     default: return '';
   }
