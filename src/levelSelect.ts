@@ -228,69 +228,75 @@ export function renderLevelList(
   let chapterListParent: HTMLElement = levelListEl;
 
   // ── Campaign-state header ──────────────────────────────────────────────────
+  if (onSettingsClick) {
+    // Row containing the player-profile button (left), optional "Select a Level"
+    // heading (only when a campaign is active), and the gear/settings button (right).
+    // Rendered unconditionally so the icon buttons are always accessible.
+    const selectRow = document.createElement('div');
+    selectRow.style.cssText =
+      'display:flex;align-items:center;justify-content:center;gap:10px;width:100%;position:relative;';
+
+    const gearBtn = document.createElement('button');
+    gearBtn.type = 'button';
+    gearBtn.title = t('levelSelect.settings');
+    gearBtn.setAttribute('aria-label', t('levelSelect.settings'));
+    gearBtn.textContent = '⚙️';
+    gearBtn.style.cssText =
+      'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
+      'position:absolute;right:0;';
+    gearBtn.addEventListener('click', () => {
+      sfxManager.play(SfxId.Click);
+      onSettingsClick();
+    });
+
+    if (onPlayerProfileClick) {
+      const profileBtn = document.createElement('button');
+      profileBtn.type = 'button';
+      profileBtn.title = playerName
+        ? t('levelSelect.player.title', { playerName })
+        : t('levelSelect.player.switch');
+      profileBtn.setAttribute('aria-label', t('levelSelect.player.ariaLabel'));
+      profileBtn.textContent = '👤';
+      profileBtn.style.cssText =
+        'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
+        'position:absolute;left:0;';
+      profileBtn.addEventListener('click', () => {
+        sfxManager.play(SfxId.Click);
+        onPlayerProfileClick();
+      });
+      selectRow.appendChild(profileBtn);
+    }
+
+    if (activeCampaign) {
+      const h2 = document.createElement('h2');
+      h2.textContent = t('levelSelect.heading');
+      h2.style.textAlign = 'center';
+      selectRow.appendChild(h2);
+    }
+
+    selectRow.appendChild(gearBtn);
+    levelListEl.appendChild(selectRow);
+
+    // Welcome line shown below the heading row when a named player is active.
+    if (activeCampaign && playerName) {
+      const welcomeEl = document.createElement('div');
+      welcomeEl.style.cssText = 'font-size:0.8rem;color:#aabbcc;text-align:center;margin-top:-6px;';
+      welcomeEl.textContent = t('levelSelect.welcome', { playerName });
+      levelListEl.appendChild(welcomeEl);
+    }
+  } else if (activeCampaign) {
+    const h2 = document.createElement('h2');
+    h2.textContent = t('levelSelect.heading');
+    h2.style.textAlign = 'center';
+    levelListEl.appendChild(h2);
+  }
+
   if (!activeCampaign) {
     const msg = document.createElement('p');
     msg.style.cssText =
       'font-size:0.95rem;color:#aaa;text-align:center;margin:16px 0;';
     msg.textContent = t('levelSelect.noCampaign');
     levelListEl.appendChild(msg);
-  } else {
-    const h2 = document.createElement('h2');
-    h2.textContent = t('levelSelect.heading');
-    h2.style.textAlign = 'center';
-
-    if (onSettingsClick) {
-      // Row containing the player-profile button (left), "Select a Level" heading,
-      // and the gear/settings button (right).
-      const selectRow = document.createElement('div');
-      selectRow.style.cssText =
-        'display:flex;align-items:center;justify-content:center;gap:10px;width:100%;position:relative;';
-
-      const gearBtn = document.createElement('button');
-      gearBtn.type = 'button';
-      gearBtn.title = t('levelSelect.settings');
-      gearBtn.setAttribute('aria-label', t('levelSelect.settings'));
-      gearBtn.textContent = '⚙️';
-      gearBtn.style.cssText =
-        'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
-        'position:absolute;right:0;';
-      gearBtn.addEventListener('click', () => {
-        sfxManager.play(SfxId.Click);
-        onSettingsClick();
-      });
-
-      if (onPlayerProfileClick) {
-        const profileBtn = document.createElement('button');
-        profileBtn.type = 'button';
-        profileBtn.title = playerName
-          ? t('levelSelect.player.title', { playerName })
-          : t('levelSelect.player.switch');
-        profileBtn.setAttribute('aria-label', t('levelSelect.player.ariaLabel'));
-        profileBtn.textContent = '👤';
-        profileBtn.style.cssText =
-          'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
-          'position:absolute;left:0;';
-        profileBtn.addEventListener('click', () => {
-          sfxManager.play(SfxId.Click);
-          onPlayerProfileClick();
-        });
-        selectRow.appendChild(profileBtn);
-      }
-      selectRow.appendChild(h2);
-      selectRow.appendChild(gearBtn);
-
-      levelListEl.appendChild(selectRow);
-
-      // Welcome line shown below the heading row when a named player is active.
-      if (playerName) {
-        const welcomeEl = document.createElement('div');
-        welcomeEl.style.cssText = 'font-size:0.8rem;color:#aabbcc;text-align:center;margin-top:-6px;';
-        welcomeEl.textContent = t('levelSelect.welcome', { playerName });
-        levelListEl.appendChild(welcomeEl);
-      }
-    } else {
-      levelListEl.appendChild(h2);
-    }
   }
 
   // ── Active campaign header ─────────────────────────────────────────────────
