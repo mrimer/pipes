@@ -1,5 +1,7 @@
 /** Fireworks particle system for campaign mastery celebrations. */
 
+import { sfxManager, SfxId } from '../sfxManager';
+
 interface Rocket {
   x: number;
   y: number;
@@ -83,6 +85,7 @@ function _spawnRocket(now: number): void {
 }
 
 function _explode(rocket: Rocket, now: number): void {
+  sfxManager.play(SfxId.Firework);
   for (let i = 0; i < SPARK_COUNT; i++) {
     const angle = (i / SPARK_COUNT) * Math.PI * 2 + Math.random() * 0.3;
     const speed = 2 + Math.random() * 8;

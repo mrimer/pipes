@@ -91,6 +91,9 @@ import titleBubblesUrl from '../data/sfx/title-bubbles.ogg';
 import uiConfirmUrl from '../data/sfx/ui-confirm.ogg';
 import malletsUrl from '../data/sfx/mallets.ogg';
 import trumpetsUrl from '../data/sfx/trumpets.ogg';
+import firework1Url from '../data/sfx/firework1.ogg';
+import firework2Url from '../data/sfx/firework2.ogg';
+import firework3Url from '../data/sfx/firework3.ogg';
 
 // ─── Sound effect identifiers ─────────────────────────────────────────────────
 
@@ -159,6 +162,7 @@ export const enum SfxId {
   UIConfirm        = 60,
   WinCampaign      = 61,
   MasterCampaign   = 62,
+  Firework         = 63,
 }
 
 // ─── File mappings ────────────────────────────────────────────────────────────
@@ -232,6 +236,7 @@ const SFX_FILES: { [K in SfxId]: string[] } = {
   [SfxId.UIConfirm]:        [uiConfirmUrl],
   [SfxId.WinCampaign]:      [malletsUrl],
   [SfxId.MasterCampaign]:   [trumpetsUrl],
+  [SfxId.Firework]:         [firework1Url, firework2Url, firework3Url],
 };
 
 // ─── SfxManager class ─────────────────────────────────────────────────────────
@@ -330,6 +335,7 @@ class SfxManager {
     [SfxId.UIConfirm]:        -1,
     [SfxId.WinCampaign]:      -1,
     [SfxId.MasterCampaign]:   -1,
+    [SfxId.Firework]:         -1,
   };
 
   /**
