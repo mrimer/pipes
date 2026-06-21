@@ -20,21 +20,32 @@ import overworldUrl from '../data/music/mysterious-guitar.ogg';
 
 // Spring tracks
 import happinessUrl    from '../data/music/Happiness.ogg';
+import rainyPuddlesUrl from '../data/music/Rainy Puddles.ogg';
+import theSnowMeltsUrl from '../data/music/The Snow Melts.ogg';
 
 // Summer tracks
 import alanWalkerPracticeUrl  from '../data/music/Alan_Walker_Practice.ogg';
+import sethsCinematicSongUrl  from "../data/music/Seth's Cinematic Song.ogg";
+import slowAndSteadyUrl       from '../data/music/Slow and Steady.ogg';
 
 // Fall tracks
-import reminiscenceUrl        from '../data/music/Reminiscence.ogg';
+import reminiscenceUrl  from '../data/music/Reminiscence.ogg';
+import aGentleTriumphUrl from '../data/music/A Gentle Triumph.ogg';
+import thePromiseUrl    from '../data/music/The Promise.ogg';
 
 // Winter tracks
-import reverentReflectionsUrl from '../data/music/Reverent Reflections.ogg';
+import reverentReflectionsUrl   from '../data/music/Reverent Reflections.ogg';
+import inspirationUrl           from '../data/music/Inspiration.ogg';
+import pirouetteUrl             from '../data/music/Pirouette.ogg';
 
 // Dark tracks
-import centerOfTheEarthUrl    from '../data/music/Center of the Earth.ogg';
+import centerOfTheEarthUrl      from '../data/music/Center of the Earth.ogg';
+import spaceAndAllItsWondersUrl from '../data/music/Space and All Its Wonders.ogg';
+import itsABopUrl               from '../data/music/Its a Bop.ogg';
 
 // Challenge tracks
-import eightBitEDMUrl from '../data/music/8-bit EDM.ogg';
+import eightBitEDMUrl         from '../data/music/8-bit EDM.ogg';
+import slowedAndReverbSongUrl  from '../data/music/Slowed and Reverb Song.ogg';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -79,12 +90,35 @@ export interface SelectGroupArgs {
 export const MUSIC_REGISTRY: Record<MusicGroupId, TrackEntry[]> = {
   menu:      [{ id: 'menu',      url: menuUrl }],
   overworld: [{ id: 'overworld', url: overworldUrl }],
-  Spring:    [{ id: 'spring',    url: happinessUrl }],
-  Summer:    [{ id: 'summer',    url: alanWalkerPracticeUrl }],
-  Fall:      [{ id: 'fall',      url: reminiscenceUrl }],
-  Winter:    [{ id: 'winter',    url: reverentReflectionsUrl }],
-  Dark:      [{ id: 'dark',      url: centerOfTheEarthUrl }],
-  challenge: [{ id: 'challenge', url: eightBitEDMUrl }],
+  Spring:    [
+    { id: 'happiness',      url: happinessUrl },
+    { id: 'rainy-puddles',  url: rainyPuddlesUrl },
+    { id: 'the-snow-melts', url: theSnowMeltsUrl },
+  ],
+  Summer:    [
+    { id: 'alan-walker-practice', url: alanWalkerPracticeUrl },
+    { id: 'seths-cinematic-song', url: sethsCinematicSongUrl },
+    { id: 'slow-and-steady',      url: slowAndSteadyUrl },
+  ],
+  Fall:      [
+    { id: 'reminiscence',    url: reminiscenceUrl },
+    { id: 'a-gentle-triumph', url: aGentleTriumphUrl },
+    { id: 'the-promise',     url: thePromiseUrl },
+  ],
+  Winter:    [
+    { id: 'reverent-reflections',     url: reverentReflectionsUrl },
+    { id: 'inspiration-instrumental-2', url: inspirationUrl },
+    { id: 'pirouette',                url: pirouetteUrl },
+  ],
+  Dark:      [
+    { id: 'center-of-the-earth',       url: centerOfTheEarthUrl },
+    { id: 'space-and-all-its-wonders', url: spaceAndAllItsWondersUrl },
+    { id: 'its-a-bop',                 url: itsABopUrl },
+  ],
+  challenge: [
+    { id: '8-bit-edm',              url: eightBitEDMUrl },
+    { id: 'slowed-and-reverb-song', url: slowedAndReverbSongUrl },
+  ],
 };
 
 /**
