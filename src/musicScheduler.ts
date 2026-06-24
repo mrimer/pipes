@@ -25,7 +25,7 @@ import theSnowMeltsUrl from '../data/music/The Snow Melts.ogg';
 
 // Summer tracks
 import alanWalkerPracticeUrl  from '../data/music/Alan_Walker_Practice.ogg';
-import sethsCinematicSongUrl  from "../data/music/Seth's Cinematic Song.ogg";
+import sethsCinematicSongUrl  from "../data/music/Seths Cinematic Song.ogg";
 import slowAndSteadyUrl       from '../data/music/Slow and Steady.ogg';
 
 // Fall tracks
