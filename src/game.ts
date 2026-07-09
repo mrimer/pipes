@@ -32,26 +32,26 @@ import {
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
 } from './persistence';
-import { createGameRulesModal, refreshGameRulesModalCommands } from './rulesModal';
-import { createCreditsModal } from './creditsModal';
+import { createGameRulesModal, refreshGameRulesModalCommands } from './modals/rulesModal';
+import { createCreditsModal } from './modals/creditsModal';
 import { CampaignEditor } from './campaignEditor';
 import type { CampaignCallbacks } from './campaignManager';
 import { CampaignManager } from './campaignManager';
 import { spawnConfetti, clearConfetti } from './visuals/confetti';
 import { spawnStarSparkles, clearStarSparkles } from './visuals/starSparkle';
 import { ROTATION_ANIM_DURATION } from './visuals/pipeEffects';
-import type { ResetProgressInfo} from './gameModals';
+import type { ResetProgressInfo} from './modals/gameModals';
 import {
   buildResetModal,
   buildSaveProgressNoticeModal, buildUnplayableModal,
   buildSettingsModal,
-} from './gameModals';
-import type { RecordModalInfo} from './recordingModals';
+} from './modals/gameModals';
+import type { RecordModalInfo} from './modals/recordingModals';
 import {
   buildRecordModal,
   buildPlaybackListModal,
   showReplayImportSuccessModal,
-} from './recordingModals';
+} from './modals/recordingModals';
 import { AnimationManager } from './animationManager';
 import { PLACE_EFFECT_DURATION } from './visuals/placementEffects';
 import { TooltipManager } from './tooltipManager';
@@ -63,12 +63,12 @@ import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_OVERLAY_BG, UI_TEXT } from './uiConstants';
 import { showTimedMessage } from './uiHelpers';
 import { encodePlaceMove, encodeRotateMove, encodeDeleteMove } from './moveRecorder';
-import type { PlaybackCallbacks, MoveAnimationInfo } from './playbackScreen';
-import { PlaybackScreen } from './playbackScreen';
+import type { PlaybackCallbacks, MoveAnimationInfo } from './screens/playbackScreen';
+import { PlaybackScreen } from './screens/playbackScreen';
 import { exportReplay, importReplay } from './profile/profileIO';
 import { getActiveSlotIndex, setActiveSlotIndex } from './profile/activeProfile';
 import { loadSlotMeta, saveActiveSlotIndex } from './profile/playerProfileSlots';
-import { PlayerProfileScreen } from './playerProfileScreen';
+import { PlayerProfileScreen } from './screens/playerProfileScreen';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled, unregisterScrollingPipeBackground } from './uiBackground';
 import { isEnvironmentalEnabled, setEnvironmentalEnabled } from './graphicsSettings';
 import { CloudShadowField } from './visuals/cloudShadows';

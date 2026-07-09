@@ -8,7 +8,7 @@
 
 import type { CampaignDef, ChapterDef, TileDef } from '../src/types';
 import { PipeShape } from '../src/types';
-import { CampaignMapScreen, augmentChapterLevelWater, chapterHasUncompletedChallenge } from '../src/campaignMapScreen';
+import { CampaignMapScreen, augmentChapterLevelWater, chapterHasUncompletedChallenge } from '../src/screens/campaignMapScreen';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

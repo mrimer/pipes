@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { setupModal } from '../src/modalUtils';
+import { setupModal } from '../src/modals/modalUtils';
 
 describe('setupModal', () => {
   let el: HTMLDivElement;

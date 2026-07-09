@@ -8,7 +8,7 @@
 
 import type { CampaignDef } from '../types';
 import { ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG } from '../uiConstants';
-import { setupModal } from '../modalUtils';
+import { setupModal } from '../modals/modalUtils';
 import { t } from '../i18n';
 
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */

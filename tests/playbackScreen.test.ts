@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 
-import type { PlaybackCallbacks } from '../src/playbackScreen';
-import { PlaybackScreen } from '../src/playbackScreen';
+import type { PlaybackCallbacks } from '../src/screens/playbackScreen';
+import { PlaybackScreen } from '../src/screens/playbackScreen';
 import type { Board } from '../src/board';
 import type { PlaySequenceRecord, LevelDef} from '../src/types';
 import { GameState } from '../src/types';

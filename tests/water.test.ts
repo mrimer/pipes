@@ -5,7 +5,7 @@
 /** Tests for water-remaining persistence and level-select water display. */
 
 import { loadLevelWater, saveLevelWater, clearLevelWater, clearLevelWaterRecord } from '../src/persistence';
-import { renderLevelList } from '../src/levelSelect';
+import { renderLevelList } from '../src/screens/levelSelect';
 import { makeLevelDef } from './testHelpers';
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────

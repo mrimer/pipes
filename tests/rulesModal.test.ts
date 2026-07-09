@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { createGameRulesModal, refreshGameRulesModalCommands } from '../src/rulesModal';
+import { createGameRulesModal, refreshGameRulesModalCommands } from '../src/modals/rulesModal';
 import { CommandKeyManager, commandKeyManager } from '../src/commandKeyManager';
 
 describe('createGameRulesModal', () => {
