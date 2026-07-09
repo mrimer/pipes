@@ -9,8 +9,8 @@
 
 import type { CampaignDef, ChapterDef, LevelDef, LevelStyle } from './types';
 import { GameScreen } from './types';
-import { ChapterMapScreen } from './chapterMapScreen';
-import { CampaignMapScreen } from './campaignMapScreen';
+import { ChapterMapScreen } from './screens/chapterMapScreen';
+import { CampaignMapScreen } from './screens/campaignMapScreen';
 import type { CampaignEditor } from './campaignEditor';
 import {
   loadCampaignProgress, markCampaignLevelCompleted, clearCampaignProgress,
@@ -24,12 +24,12 @@ import {
    loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
    loadCampaignCompleteShown, markCampaignCompleteShown, clearCampaignCompleteShown,
 } from './persistence';
-import { renderLevelList } from './levelSelect';
+import { renderLevelList } from './screens/levelSelect';
 import { spawnConfetti } from './visuals/confetti';
 import { spawnBalloons } from './visuals/balloons';
 import { spawnFireworks } from './visuals/fireworks';
-import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
-import type { ResetProgressInfo } from './gameModals';
+import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './modals/gameModals';
+import type { ResetProgressInfo } from './modals/gameModals';
 import type { ChapterMapSnapshot } from './visuals/levelTransition';
 import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScreenTransition } from './visuals/levelTransition';
 import { sfxManager, SfxId } from './audio/sfxManager';

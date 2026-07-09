@@ -293,7 +293,7 @@ describe('save-notice suppressed flag', () => {
 
 // ─── levelIdToChapterLevel ────────────────────────────────────────────────────
 
-import { levelIdToChapterLevel } from '../src/levelSelect';
+import { levelIdToChapterLevel } from '../src/screens/levelSelect';
 import { makeChapterDef, makeLevelDef } from './testHelpers';
 import type { ChapterDef } from '../src/types';
 

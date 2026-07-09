@@ -9,8 +9,8 @@ import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from 
 import { BG_COLOR } from './colors';
 import { setEnvironmentalEnabled } from './graphicsSettings';
 import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
-import { showIntroTitleScreen } from './titleScreen';
-import { showSplashScreen } from './splashScreen';
+import { showIntroTitleScreen } from './screens/titleScreen';
+import { showSplashScreen } from './screens/splashScreen';
 import { initLocale, registerTranslations, t } from './i18n';
 import { en } from './i18n/en';
 

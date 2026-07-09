@@ -8,10 +8,10 @@
  *  - showReplayImportSuccessModal – transient confirmation after import
  */
 
-import { EDITOR_INPUT_BG, RADIUS_LG, UI_BG, UI_INPUT_BORDER } from './uiConstants';
+import { EDITOR_INPUT_BG, RADIUS_LG, UI_BG, UI_INPUT_BORDER } from '../uiConstants';
 import { createModalOverlay } from './gameModals';
-import { t } from './i18n';
-import type { PlaySequenceRecord } from './types';
+import { t } from '../i18n';
+import type { PlaySequenceRecord } from '../types';
 import { setupModal } from './modalUtils';
 
 // ─── Record modal ─────────────────────────────────────────────────────────────

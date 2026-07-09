@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { buildPlaybackListModal } from '../src/recordingModals';
+import { buildPlaybackListModal } from '../src/modals/recordingModals';
 import type { PlaySequenceRecord } from '../src/types';
 
 function makeRecord(id: string): PlaySequenceRecord {

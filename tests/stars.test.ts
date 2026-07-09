@@ -5,7 +5,7 @@
 /** Tests for star-progress persistence and level-select star display. */
 
 import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
-import { renderLevelList } from '../src/levelSelect';
+import { renderLevelList } from '../src/screens/levelSelect';
 import { sfxManager, SfxId } from '../src/audio/sfxManager';
 import type { TileDef } from '../src/types';
 import { makeLevelDef } from './testHelpers';

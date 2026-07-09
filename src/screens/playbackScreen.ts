@@ -14,16 +14,16 @@
  *  - Restore the original game state on exit.
  */
 
-import type { Board, MoveResult } from './board';
-import type { LevelDef, GameState, PlaySequenceRecord, AmbientDecoration } from './types';
-import { GameScreen } from './types';
-import type { DecodedMove} from './moveRecorder';
-import { decodeMove, replayMoves } from './moveRecorder';
-import type { Tile } from './tile';
-import { saveRecording } from './persistence';
-import { MUTED_BTN_BG } from './uiConstants';
-import { showTimedMessage } from './uiHelpers';
-import { t } from './i18n';
+import type { Board, MoveResult } from '../board';
+import type { LevelDef, GameState, PlaySequenceRecord, AmbientDecoration } from '../types';
+import { GameScreen } from '../types';
+import type { DecodedMove} from '../moveRecorder';
+import { decodeMove, replayMoves } from '../moveRecorder';
+import type { Tile } from '../tile';
+import { saveRecording } from '../persistence';
+import { MUTED_BTN_BG } from '../uiConstants';
+import { showTimedMessage } from '../uiHelpers';
+import { t } from '../i18n';
 
 /** Default playback interval between moves (ms). */
 const DEFAULT_SPEED_MS = 500;

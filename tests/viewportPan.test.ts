@@ -6,7 +6,7 @@
  * Tests for viewport pan model, coordinate mapping, and gridSizePanel maxDim option.
  */
 
-import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../src/chapterMapScreen';
+import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../src/screens/chapterMapScreen';
 import { GRID_MAX_DIM, CAMPAIGN_MAP_MAX_DIM } from '../src/campaignEditor/types';
 import type { GridSizePanelCallbacks } from '../src/campaignEditor/gridSizePanel';
 import { buildGridSizePanel } from '../src/campaignEditor/gridSizePanel';
@@ -17,7 +17,7 @@ import {
   clampCampaignZoomScale,
   clampPanAxisWithFallback,
   computeCampaignZoomFitMinTileSize,
-} from '../src/mapScreenBase';
+} from '../src/screens/mapScreenBase';
 import { computeViewBounds } from '../src/mapUtils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────

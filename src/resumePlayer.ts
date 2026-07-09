@@ -16,7 +16,7 @@
 
 import type { Board } from './board';
 import { decodeMove } from './moveRecorder';
-import type { MoveAnimationInfo } from './playbackScreen';
+import type { MoveAnimationInfo } from './screens/playbackScreen';
 import type { Tile } from './tile';
 import { GameState } from './types';
 import { showTimedMessage } from './uiHelpers';

@@ -1,14 +1,14 @@
 /** Builds and manages the "Game Rules" modal overlay. */
 
-import { buildShapeIcon } from './renderer';
-import { PipeShape } from './types';
-import { isTouchDevice } from './deviceUtils';
-import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
-import { createButton } from './uiHelpers';
-import type { CommandAction, CommandKeyManager} from './commandKeyManager';
-import { commandKeyManager } from './commandKeyManager';
+import { buildShapeIcon } from '../renderer';
+import { PipeShape } from '../types';
+import { isTouchDevice } from '../deviceUtils';
+import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from '../uiConstants';
+import { createButton } from '../uiHelpers';
+import type { CommandAction, CommandKeyManager} from '../commandKeyManager';
+import { commandKeyManager } from '../commandKeyManager';
 import { setupModal } from './modalUtils';
-import { t } from './i18n';
+import { t } from '../i18n';
 import {
   SOURCE_COLOR, SINK_COLOR, EMPTY_COLOR,
   PIPE_COLOR, TANK_COLOR, DIRT_COST_COLOR,
@@ -23,8 +23,8 @@ import {
   GEL_COLOR, SIPHON_COLOR,
   ONE_WAY_BG_COLOR, ONE_WAY_ARROW_COLOR, ONE_WAY_ARROW_BORDER,
   LEAKY_PIPE_COLOR, LEAKY_RUST_COLOR,
-} from './colors';
-import { svgEl, svgRoot } from './svgUtils';
+} from '../colors';
+import { svgEl, svgRoot } from '../svgUtils';
 
 /** A single row in the tile legend. */
 interface LegendRow {

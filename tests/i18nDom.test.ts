@@ -2,8 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { buildPlaybackListModal } from '../src/recordingModals';
-import { PlayerProfileScreen } from '../src/playerProfileScreen';
+import { buildPlaybackListModal } from '../src/modals/recordingModals';
+import { PlayerProfileScreen } from '../src/screens/playerProfileScreen';
 import { registerTranslations, resetI18n, setLocale } from '../src/i18n';
 
 describe('i18n DOM integration', () => {

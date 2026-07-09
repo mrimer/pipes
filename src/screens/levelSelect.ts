@@ -1,11 +1,11 @@
 /** Helpers for rendering the level-selection screen. */
 
-import type { ChapterDef, LevelDef } from './types';
-import { attachChapterWaveAnimation, CHAPTER_WAVE_REDRAW_EVENT } from './visuals/chapterWaves';
-import { sfxManager, SfxId } from './audio/sfxManager';
-import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from './uiConstants';
-import { createButton } from './uiHelpers';
-import { t } from './i18n';
+import type { ChapterDef, LevelDef } from '../types';
+import { attachChapterWaveAnimation, CHAPTER_WAVE_REDRAW_EVENT } from '../visuals/chapterWaves';
+import { sfxManager, SfxId } from '../audio/sfxManager';
+import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from '../uiConstants';
+import { createButton } from '../uiHelpers';
+import { t } from '../i18n';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {

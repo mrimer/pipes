@@ -1,13 +1,13 @@
-import { drawPipeBody } from './renderer';
-import { BG_COLOR, LABEL_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from './colors';
-import type { Rotation } from './types';
-import { Direction, PipeShape } from './types';
-import { oppositeDirection } from './tile';
-import { sfxManager, SfxId } from './audio/sfxManager';
-import { getActiveSlotIndex } from './profile/activeProfile';
-import { loadSlotMeta } from './profile/playerProfileSlots';
-import { loadSfxVolume } from './persistence';
-import { t } from './i18n';
+import { drawPipeBody } from '../renderer';
+import { BG_COLOR, LABEL_COLOR, PIPE_COLOR, TILE_BG, WATER_COLOR } from '../colors';
+import type { Rotation } from '../types';
+import { Direction, PipeShape } from '../types';
+import { oppositeDirection } from '../tile';
+import { sfxManager, SfxId } from '../audio/sfxManager';
+import { getActiveSlotIndex } from '../profile/activeProfile';
+import { loadSlotMeta } from '../profile/playerProfileSlots';
+import { loadSfxVolume } from '../persistence';
+import { t } from '../i18n';
 
 type TitleLetter = 'C' | 'O' | 'L' | 'P' | 'I' | 'E' | 'S';
 

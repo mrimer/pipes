@@ -1,4 +1,4 @@
-import { buildIntroIcicleSeeds, buildLetterFillDoneTimes, buildTitleGlyphLayout } from '../src/titleScreen';
+import { buildIntroIcicleSeeds, buildLetterFillDoneTimes, buildTitleGlyphLayout } from '../src/screens/titleScreen';
 import { PipeShape } from '../src/types';
 
 function createSeededRandom(seed: number): () => number {

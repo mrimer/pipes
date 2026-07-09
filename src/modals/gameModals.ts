@@ -1,10 +1,10 @@
-import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
-import { createButton } from './uiHelpers';
-import type { CommandAction} from './commandKeyManager';
-import { commandKeyManager, isPureModifierKey } from './commandKeyManager';
-import type { CampaignImportOutcome } from './profile/playerProfile';
-import { t } from './i18n';
-import type { RecordingSettings } from './types';
+import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_LG, RADIUS_MD, UI_BG, UI_INPUT_BORDER, UI_OVERLAY_BG } from '../uiConstants';
+import { createButton } from '../uiHelpers';
+import type { CommandAction} from '../commandKeyManager';
+import { commandKeyManager, isPureModifierKey } from '../commandKeyManager';
+import type { CampaignImportOutcome } from '../profile/playerProfile';
+import { t } from '../i18n';
+import type { RecordingSettings } from '../types';
 import { setupModal } from './modalUtils';
 /**
  * Factory functions for building the game's modal overlay elements.

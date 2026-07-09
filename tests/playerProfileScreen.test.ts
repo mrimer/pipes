@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { PlayerProfileScreen } from '../src/playerProfileScreen';
+import { PlayerProfileScreen } from '../src/screens/playerProfileScreen';
 import { setActiveSlotIndex } from '../src/profile/activeProfile';
 import { saveSlotMeta } from '../src/profile/playerProfileSlots';
 import { sfxManager, SfxId } from '../src/audio/sfxManager';

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { createCreditsModal } from '../src/creditsModal';
+import { createCreditsModal } from '../src/modals/creditsModal';
 
 describe('createCreditsModal', () => {
   beforeEach(() => {

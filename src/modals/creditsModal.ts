@@ -1,6 +1,6 @@
-import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from './uiConstants';
-import { createButton } from './uiHelpers';
-import { t } from './i18n';
+import { RADIUS_LG, UI_BG, UI_BORDER, UI_INPUT_BORDER, UI_OVERLAY_BG } from '../uiConstants';
+import { createButton } from '../uiHelpers';
+import { t } from '../i18n';
 import { setupModal } from './modalUtils';
 
 interface CreditRow {

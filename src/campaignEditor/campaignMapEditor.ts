@@ -54,7 +54,7 @@ import {
 import { isTileConnectedToSource } from '../tile';
 import { buildCompletionInputWidget } from './chapterEditorUI';
 import { handleMapEditorKeyDown, applyMapValidationState, buildPaletteSubSection } from './mapEditorSectionUtils';
-import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../chapterMapScreen';
+import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../screens/chapterMapScreen';
 import { computeViewBounds } from '../mapUtils';
 import { MapEditorBase } from './mapEditorBase';
 import { t } from '../i18n';

@@ -12,7 +12,7 @@
 import { Board } from '../src/board';
 import { ResumePlayer, computeMoveIntervalMs } from '../src/resumePlayer';
 import type { ResumeGameCallbacks } from '../src/resumePlayer';
-import type { MoveAnimationInfo } from '../src/playbackScreen';
+import type { MoveAnimationInfo } from '../src/screens/playbackScreen';
 import { GameState, PipeShape, Direction } from '../src/types';
 import type { LevelDef } from '../src/types';
 import { encodePlaceMove } from '../src/moveRecorder';
