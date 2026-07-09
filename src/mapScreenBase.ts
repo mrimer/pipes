@@ -21,8 +21,8 @@ import type {
 import { spawnSourceSprayDrop, renderSourceSpray, spawnChapterMapBubble, renderBubbles, buildChapterMapBubbleCandidateKeys,
 } from './visuals/waterParticles';
 import { BG_COLOR, SINK_WATER_COLOR, SINK_COLOR, SOURCE_COLOR, WATER_COLOR, FOCUS_COLOR, SUCCESS_COLOR } from './colors';
-import type { ChapterMapSnapshot } from './levelTransition';
-import { sfxManager, SfxId } from './sfxManager';
+import type { ChapterMapSnapshot } from './visuals/levelTransition';
+import { sfxManager, SfxId } from './audio/sfxManager';
 import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from './uiBackground';
 import { isEnvironmentalEnabled } from './graphicsSettings';
 import type { WinTileGlow} from './visuals/winTileEffect';

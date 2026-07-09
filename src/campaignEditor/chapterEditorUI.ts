@@ -19,7 +19,7 @@ import {
   PALETTE_ITEM_UNSELECTED_COLOR,
 } from './types';
 import { buildStyleSectionPanel } from './tileParamsPanel';
-import { sfxManager, SfxId } from '../sfxManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';

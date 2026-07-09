@@ -10,10 +10,10 @@
 import type { CampaignDef, ChapterDef, TileDef} from '../types';
 import { PipeShape, Direction } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
-import type { DragState } from './renderer';
+import type { DragState } from './editorRenderer';
 import type { EditorPalette} from './types';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette, isTreeShape } from './types';
-import { sfxManager, SfxId } from '../sfxManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
 import { t } from '../i18n';

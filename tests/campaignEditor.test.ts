@@ -25,8 +25,8 @@ import {
 import type { CampaignDef, LevelDef, TileDef, InventoryItem, ChapterDef } from '../src/types';
 import { PipeShape } from '../src/types';
 import type { TileParams, EditorPalette, EditorSnapshot } from '../src/campaignEditor/types';
-import * as editorRenderer from '../src/campaignEditor/renderer';
-import { musicManager } from '../src/musicManager';
+import * as editorRenderer from '../src/campaignEditor/editorRenderer';
+import { musicManager } from '../src/audio/musicManager';
 import { DecompressionStream } from 'node:stream/web';
 import { TextEncoder as NodeTextEncoder, TextDecoder as NodeTextDecoder } from 'node:util';
 

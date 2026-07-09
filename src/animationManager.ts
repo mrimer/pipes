@@ -55,7 +55,7 @@ import {
   createPlacementEffect, createRemovalEffect,
   renderPlacementEffects, renderRemovalEffects,
 } from './visuals/placementEffects';
-import { sfxManager, SfxId } from './sfxManager';
+import { sfxManager, SfxId } from './audio/sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
 const DRY_PUFF_SPAWN_INTERVAL_MS = 200;

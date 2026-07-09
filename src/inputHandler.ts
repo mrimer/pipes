@@ -4,7 +4,7 @@ import type { Tile } from './tile';
 import type { GridPos, PipeShape, Rotation } from './types';
 import { GameScreen, GameState } from './types';
 import { TILE_SIZE } from './renderer';
-import { sfxManager, SfxId } from './sfxManager';
+import { sfxManager, SfxId } from './audio/sfxManager';
 import { RADIUS_MD, UI_BG, UI_BORDER } from './uiConstants';
 import { commandKeyManager } from './commandKeyManager';
 

@@ -19,8 +19,8 @@ import {
   loadChapterEditorMapBoxCollapsed,
   loadPlayerName,
 } from '../persistence';
-import { getActiveSlotIndex } from '../activeProfile';
-import { loadSlotMeta, loadAllSlotMetas } from '../playerProfileSlots';
+import { getActiveSlotIndex } from '../profile/activeProfile';
+import { loadSlotMeta, loadAllSlotMetas } from '../profile/playerProfileSlots';
 import type { ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { ChapterMapEditorSection } from './chapterMapEditor';
 import type { CampaignMapEditorCallbacks } from './campaignMapEditor';
@@ -38,16 +38,16 @@ import {
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
 } from './types';
-import type { HoverOverlay, DragState } from './renderer';
-import { renderEditorCanvas } from './renderer';
+import type { HoverOverlay, DragState } from './editorRenderer';
+import { renderEditorCanvas } from './editorRenderer';
 import { EditorInputHandler } from './editorInputHandler';
 import { DataValidationDialog } from './dataValidationDialog';
 import { EditorDialogs } from './editorDialogs';
 import { isTextEntryShortcutTarget } from './mapEditorSectionUtils';
 import { renderMinimap } from '../visuals/minimap';
 import { validateLevel } from './levelValidator';
-import { sfxManager, SfxId } from '../sfxManager';
-import { musicManager, selectGroupForContext } from '../musicManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
+import { musicManager, selectGroupForContext } from '../audio/musicManager';
 import { t } from '../i18n';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';

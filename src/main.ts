@@ -1,10 +1,10 @@
 import { Game } from './game';
-import { sfxManager, SfxId } from './sfxManager';
+import { sfxManager, SfxId } from './audio/sfxManager';
 import { loadSfxVolume, loadTouchUiEnabled } from './persistence';
 import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
 import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
-import { migrateIfNeeded, loadActiveSlotIndex } from './playerProfileSlots';
-import { setActiveSlotIndex } from './activeProfile';
+import { migrateIfNeeded, loadActiveSlotIndex } from './profile/playerProfileSlots';
+import { setActiveSlotIndex } from './profile/activeProfile';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
 import { BG_COLOR } from './colors';
 import { setEnvironmentalEnabled } from './graphicsSettings';

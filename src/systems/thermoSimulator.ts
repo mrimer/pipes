@@ -1,7 +1,7 @@
-import type { Tile } from './tile';
-import type { GridPos} from './types';
-import { PipeShape } from './types';
-import { parseKey } from './board';
+import type { Tile } from '../tile';
+import type { GridPos} from '../types';
+import { PipeShape } from '../types';
+import { parseKey } from '../board';
 
 // ── Ice / snow / sandstone cost-calculation helpers ────────────────────────
 // These formulas appear in getCurrentWater(), _lockNewTiles(), and

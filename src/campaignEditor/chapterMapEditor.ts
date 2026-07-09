@@ -10,8 +10,8 @@ import type { CampaignDef, ChapterDef, LevelDef, TileDef, LevelStyle } from '../
 import { PipeShape } from '../types';
 import { isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
-import type { HoverOverlay, DragState } from './renderer';
-import { renderEditorCanvas } from './renderer';
+import type { HoverOverlay, DragState } from './editorRenderer';
+import { renderEditorCanvas } from './editorRenderer';
 import type {
   EditorSnapshot} from './types';
 import {

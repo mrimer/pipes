@@ -21,7 +21,7 @@
 import type { Rotation, LevelStyle } from '../types';
 import { PipeShape, Direction } from '../types';
 import { PIPE_SHAPES } from '../board';
-import { sfxManager, SfxId } from '../sfxManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 import { updateUndoRedoButtonPair, showTimedMessage } from '../uiHelpers';
 import { HistoryManager } from './historyManager';
 import { MapEditorGridState } from './mapEditorGridState';

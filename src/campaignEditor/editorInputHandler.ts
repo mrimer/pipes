@@ -10,10 +10,10 @@
 import type { TileDef, Rotation } from '../types';
 import { PipeShape } from '../types';
 import { PIPE_SHAPES, LEAKY_PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_CEMENT_SHAPES, isEmptyFloor } from '../board';
-import type { DragState } from './renderer';
+import type { DragState } from './editorRenderer';
 import { REPEATABLE_EDITOR_TILES, isPipePlacementPalette } from './types';
 import type { LevelEditorState } from './levelEditorState';
-import { sfxManager, SfxId } from '../sfxManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
 

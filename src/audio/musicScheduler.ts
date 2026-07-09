@@ -15,37 +15,37 @@
  *  3. Add the group id to {@link MusicGroupId} and the URLs to {@link MUSIC_REGISTRY}.
  */
 
-import menuUrl      from '../data/music/mainmenu-waterpipes.ogg';
-import overworldUrl from '../data/music/mysterious-guitar.ogg';
+import menuUrl      from '../../data/music/mainmenu-waterpipes.ogg';
+import overworldUrl from '../../data/music/mysterious-guitar.ogg';
 
 // Spring tracks
-import happinessUrl    from '../data/music/Happiness.ogg';
-import rainyPuddlesUrl from '../data/music/Rainy Puddles.ogg';
-import theSnowMeltsUrl from '../data/music/The Snow Melts.ogg';
+import happinessUrl    from '../../data/music/Happiness.ogg';
+import rainyPuddlesUrl from '../../data/music/Rainy Puddles.ogg';
+import theSnowMeltsUrl from '../../data/music/The Snow Melts.ogg';
 
 // Summer tracks
-import alanWalkerPracticeUrl  from '../data/music/Alan_Walker_Practice.ogg';
+import alanWalkerPracticeUrl  from '../../data/music/Alan_Walker_Practice.ogg';
 import sethsCinematicSongUrl  from "../data/music/Seths Cinematic Song.ogg";
-import slowAndSteadyUrl       from '../data/music/Slow and Steady.ogg';
+import slowAndSteadyUrl       from '../../data/music/Slow and Steady.ogg';
 
 // Fall tracks
-import reminiscenceUrl  from '../data/music/Reminiscence.ogg';
-import aGentleTriumphUrl from '../data/music/A Gentle Triumph.ogg';
-import thePromiseUrl    from '../data/music/The Promise.ogg';
+import reminiscenceUrl  from '../../data/music/Reminiscence.ogg';
+import aGentleTriumphUrl from '../../data/music/A Gentle Triumph.ogg';
+import thePromiseUrl    from '../../data/music/The Promise.ogg';
 
 // Winter tracks
-import reverentReflectionsUrl   from '../data/music/Reverent Reflections.ogg';
-import inspirationUrl           from '../data/music/Inspiration.ogg';
-import pirouetteUrl             from '../data/music/Pirouette.ogg';
+import reverentReflectionsUrl   from '../../data/music/Reverent Reflections.ogg';
+import inspirationUrl           from '../../data/music/Inspiration.ogg';
+import pirouetteUrl             from '../../data/music/Pirouette.ogg';
 
 // Dark tracks
-import centerOfTheEarthUrl      from '../data/music/Center of the Earth.ogg';
-import spaceAndAllItsWondersUrl from '../data/music/Space and All Its Wonders.ogg';
-import itsABopUrl               from '../data/music/Its a Bop.ogg';
+import centerOfTheEarthUrl      from '../../data/music/Center of the Earth.ogg';
+import spaceAndAllItsWondersUrl from '../../data/music/Space and All Its Wonders.ogg';
+import itsABopUrl               from '../../data/music/Its a Bop.ogg';
 
 // Challenge tracks
-import eightBitEDMUrl         from '../data/music/8-bit EDM.ogg';
-import slowedAndReverbSongUrl  from '../data/music/Slowed and Reverb Song.ogg';
+import eightBitEDMUrl         from '../../data/music/8-bit EDM.ogg';
+import slowedAndReverbSongUrl  from '../../data/music/Slowed and Reverb Song.ogg';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

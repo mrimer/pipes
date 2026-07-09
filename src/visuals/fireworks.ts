@@ -1,6 +1,6 @@
 /** Fireworks particle system for campaign mastery celebrations. */
 
-import { sfxManager, SfxId } from '../sfxManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 
 interface Rocket {
   x: number;

@@ -1,4 +1,4 @@
-import type { CampaignDef, PlaySequenceRecord } from './types';
+import type { CampaignDef, PlaySequenceRecord } from '../types';
 import {
   FILE_TYPE_REPLAY,
   computeChecksum,
@@ -8,12 +8,12 @@ import {
   applyPlayerProfile,
   type CampaignImportOutcome,
 } from './playerProfile';
-import { saveRecording, loadPlayerName, loadRecordingsForProfile } from './persistence';
-import { downloadGzipJson, readGzipOrJsonFile } from './fileIO';
-import { findLevelLocation } from './campaignEditor/campaignService';
+import { saveRecording, loadPlayerName, loadRecordingsForProfile } from '../persistence';
+import { downloadGzipJson, readGzipOrJsonFile } from '../fileIO';
+import { findLevelLocation } from '../campaignEditor/campaignService';
 import { getActiveSlotIndex, withSlot } from './activeProfile';
 import { loadSlotMeta, loadAllSlotMetas, saveSlotMeta, findEmptySlotIndex, generateGuid, PROFILE_SLOT_COUNT } from './playerProfileSlots';
-import { t } from './i18n';
+import { t } from '../i18n';
 
 const FILE_INPUT_ACCEPT = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
 const FILENAME_SAFE_CHARACTERS_REGEX = /[^\w\s-]/g;

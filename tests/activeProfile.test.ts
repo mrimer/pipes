@@ -5,7 +5,7 @@
  * - withSlot
  */
 
-import { getActiveSlotIndex, setActiveSlotIndex, getActiveSlotPrefix, withSlot } from '../src/activeProfile';
+import { getActiveSlotIndex, setActiveSlotIndex, getActiveSlotPrefix, withSlot } from '../src/profile/activeProfile';
 
 beforeEach(() => {
   // Reset to no active slot before each test.

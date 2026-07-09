@@ -47,8 +47,8 @@ import {
   mergePartialProgress,
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
-} from './persistence';
-import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord } from './types';
+} from '../persistence';
+import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord } from '../types';
 
 // ─── File type constants ──────────────────────────────────────────────────────
 

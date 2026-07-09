@@ -6,10 +6,10 @@
  * persistence and profile round-trip tests.
  */
 
-import { MusicScheduler, selectGroupForContext, MUSIC_REGISTRY } from '../src/musicScheduler';
-import type { TrackEntry, MusicGroupId } from '../src/musicScheduler';
+import { MusicScheduler, selectGroupForContext, MUSIC_REGISTRY } from '../src/audio/musicScheduler';
+import type { TrackEntry, MusicGroupId } from '../src/audio/musicScheduler';
 import { loadMusicVolume, saveMusicVolume } from '../src/persistence';
-import { buildPlayerProfilePayload, applyPlayerProfile } from '../src/playerProfile';
+import { buildPlayerProfilePayload, applyPlayerProfile } from '../src/profile/playerProfile';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

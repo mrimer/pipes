@@ -22,7 +22,7 @@ import {
   loadCompletedChapters,
   loadLevelStars,
   loadLevelWater,
-} from './persistence';
+} from '../persistence';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

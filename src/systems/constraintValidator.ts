@@ -1,10 +1,10 @@
-import type { Tile } from './tile';
-import type { GridPos} from './types';
-import { PipeShape } from './types';
-import { parseKey } from './board';
+import type { Tile } from '../tile';
+import type { GridPos} from '../types';
+import { PipeShape } from '../types';
+import { parseKey } from '../board';
 import type { ThermoSimulator } from './thermoSimulator';
-import type { TranslationParams } from './i18nTypes';
-import { t } from './i18n';
+import type { TranslationParams } from '../i18nTypes';
+import { t } from '../i18n';
 
 /**
  * Error key emitted when a sandstone tile's pressure is too low to connect.
