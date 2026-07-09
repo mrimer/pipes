@@ -170,6 +170,13 @@ export class MetricsDisplay {
     }
   }
 
+  /** Restart the bounce CSS animation on a stat value element. */
+  private static _triggerValueBounce(valueEl: HTMLElement): void {
+    valueEl.classList.remove('stat-value-bounce');
+    void valueEl.offsetWidth; // force reflow to restart animation
+    valueEl.classList.add('stat-value-bounce');
+  }
+
   /** Spawn a small burst of sparkle particles centered on a HUD stat value element. */
   private static _spawnMetricSparkles(rowEl: HTMLElement, colors: readonly string[]): void {
     const valueEl = (rowEl.querySelector('.stat-value')) ?? rowEl;
@@ -290,38 +297,45 @@ export class MetricsDisplay {
     else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
     else             waterColor = WATER_COLOR;
     this.waterDisplayEl.style.color = waterColor;
-    if (!suppressSparkles && this._prevWater !== null && w > this._prevWater) {
-      // Per design: water sparkles only on increase (water can't meaningfully "decrease" as a good event).
-      MetricsDisplay._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
+    if (!suppressSparkles && this._prevWater !== null) {
+      if (w > this._prevWater) {
+        // Per design: water sparkles only on increase (water can't meaningfully "decrease" as a good event).
+        MetricsDisplay._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
+      }
+      if (w !== this._prevWater) MetricsDisplay._triggerValueBounce(this.waterValueEl);
     }
     this._prevWater = w;
 
     const tempValue = board.hasTempRelevantTiles() ? board.getCurrentTemperature() : null;
     MetricsDisplay._showStatRow(this.tempDisplayEl, this.tempValueEl, tempValue);
-    if (!suppressSparkles && tempValue !== null && this._prevTemp !== null) {
+    if (!suppressSparkles && tempValue !== null && this._prevTemp !== null && tempValue !== this._prevTemp) {
       if (tempValue > this._prevTemp)      MetricsDisplay._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_GOLD);
       else if (tempValue < this._prevTemp) MetricsDisplay._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_BLUE);
+      MetricsDisplay._triggerValueBounce(this.tempValueEl);
     }
     this._prevTemp = tempValue;
 
     const frozenValue = board.frozen > 0 ? board.frozen : null;
     MetricsDisplay._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
     if (!suppressSparkles) {
-      if (frozenValue !== null && this._prevFrozen !== null) {
+      if (frozenValue !== null && this._prevFrozen !== null && frozenValue !== this._prevFrozen) {
         if (frozenValue > this._prevFrozen)      MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
         else if (frozenValue < this._prevFrozen) MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
+        MetricsDisplay._triggerValueBounce(this.frozenValueEl);
       } else if (frozenValue !== null && this._prevFrozen === null) {
-        // Row just became visible (frozen increased from 0): show sparkle.
+        // Row just became visible (frozen increased from 0): show sparkle and bounce.
         MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+        MetricsDisplay._triggerValueBounce(this.frozenValueEl);
       }
     }
     this._prevFrozen = frozenValue;
 
     const pressureValue = board.hasPressureRelevantTiles() ? board.getCurrentPressure() : null;
     MetricsDisplay._showStatRow(this.pressureDisplayEl, this.pressureValueEl, pressureValue);
-    if (!suppressSparkles && pressureValue !== null && this._prevPressure !== null) {
+    if (!suppressSparkles && pressureValue !== null && this._prevPressure !== null && pressureValue !== this._prevPressure) {
       if (pressureValue > this._prevPressure)      MetricsDisplay._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_GOLD);
       else if (pressureValue < this._prevPressure) MetricsDisplay._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_BLUE);
+      MetricsDisplay._triggerValueBounce(this.pressureValueEl);
     }
     this._prevPressure = pressureValue;
   }
