@@ -92,6 +92,12 @@ export class MetricsDisplay {
   /** Shapes whose count span should bounce on the next inventory render. */
   private readonly _pendingBounceShapes: Set<PipeShape> = new Set();
 
+  /** Previous effective inventory counts per shape (for detecting depletion to zero). */
+  private readonly _prevInvCounts: Map<PipeShape, number> = new Map();
+
+  /** Shapes whose count just reached zero — get a pop animation on next render. */
+  private readonly _pendingDepletedShapes: Set<PipeShape> = new Set();
+
   scheduleCountBounce(shape: PipeShape): void {
     this._pendingBounceShapes.add(shape);
   }
@@ -203,6 +209,7 @@ export class MetricsDisplay {
     this._prevFrozen = null;
     this._prevPressure = null;
     this._suppressNextMetricSparkles = true;
+    this._prevInvCounts.clear();
   }
 
   /**
@@ -226,6 +233,17 @@ export class MetricsDisplay {
     onItemTouch?: (el: HTMLElement, shape: PipeShape, effectiveCount: number) => void,
     onItemMouseHandlers?: (el: HTMLElement, shape: PipeShape) => void,
   ): void {
+    // Detect inventory items that just dropped to zero effective count.
+    const bonuses = board.getContainerBonuses();
+    for (const item of board.inventory) {
+      const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
+      const prev = this._prevInvCounts.get(item.shape) ?? null;
+      if (prev !== null && prev >= 1 && effectiveCount <= 0) {
+        this._pendingDepletedShapes.add(item.shape);
+      }
+      this._prevInvCounts.set(item.shape, effectiveCount);
+    }
+
     renderInventoryBar(
       this.inventoryBarEl,
       board,
@@ -278,6 +296,17 @@ export class MetricsDisplay {
         }
       }
       this._pendingBounceShapes.clear();
+    }
+    if (this._pendingDepletedShapes.size > 0) {
+      for (const shape of this._pendingDepletedShapes) {
+        const span = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"] .inv-count`);
+        if (span) {
+          span.classList.remove('inv-count-depleted');
+          void span.offsetWidth;
+          span.classList.add('inv-count-depleted');
+        }
+      }
+      this._pendingDepletedShapes.clear();
     }
   }
 

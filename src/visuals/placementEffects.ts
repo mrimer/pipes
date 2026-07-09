@@ -4,6 +4,10 @@ import { TILE_SIZE } from '../renderer';
 export const PLACE_EFFECT_DURATION = 120;
 /** Duration of the shrink-fade overlay on tile removal (ms). */
 export const REMOVE_EFFECT_DURATION = 150;
+/** Duration of the horizontal shake on invalid placement (ms). */
+export const SHAKE_DURATION = 200;
+/** Duration of the undo/redo tile flash overlay (ms). */
+export const UNDO_FLASH_DURATION = 250;
 
 const DUST_DURATION = 320;
 const DUST_COUNT = 6;
@@ -27,6 +31,19 @@ export interface RemovalEffect {
   row: number;
   col: number;
   startTime: number;
+}
+
+export interface ShakeEffect {
+  row: number;
+  col: number;
+  startTime: number;
+}
+
+export interface UndoFlashEffect {
+  row: number;
+  col: number;
+  startTime: number;
+  type: 'add' | 'remove';
 }
 
 function _makeDust(row: number, col: number): DustParticle[] {
@@ -72,6 +89,43 @@ export function createPlacementEffect(row: number, col: number, now: number): Pl
 
 export function createRemovalEffect(row: number, col: number, now: number): RemovalEffect {
   return { row, col, startTime: now };
+}
+
+export function createShakeEffect(row: number, col: number, now: number): ShakeEffect {
+  return { row, col, startTime: now };
+}
+
+export function createUndoFlashEffect(row: number, col: number, type: 'add' | 'remove', now: number): UndoFlashEffect {
+  return { row, col, startTime: now, type };
+}
+
+/** Returns the horizontal pixel offset for a shake effect at the given elapsed time (2 full oscillations, damped). */
+export function computeShakeOffset(elapsed: number): number {
+  const t = Math.min(elapsed / SHAKE_DURATION, 1);
+  return 3 * Math.sin(4 * Math.PI * t) * (1 - t);
+}
+
+export function renderUndoFlashEffects(
+  ctx: CanvasRenderingContext2D,
+  effects: UndoFlashEffect[],
+  now: number,
+): void {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const e = effects[i];
+    const elapsed = now - e.startTime;
+    if (elapsed >= UNDO_FLASH_DURATION) {
+      effects.splice(i, 1);
+      continue;
+    }
+    const t = elapsed / UNDO_FLASH_DURATION;
+    // Quick rise to peak alpha at t=0.2, then fade out
+    const alpha = t < 0.2 ? (t / 0.2) * 0.45 : 0.45 * (1 - (t - 0.2) / 0.8);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = e.type === 'add' ? '#64b4ff' : '#ffa550';
+    ctx.fillRect(e.col * TILE_SIZE, e.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.restore();
+  }
 }
 
 export function renderPlacementEffects(

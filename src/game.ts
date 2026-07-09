@@ -1,5 +1,5 @@
 import type { MoveResult} from './board';
-import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
+import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
 import type { Tile } from './tile';
 import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
 import { GameScreen, GameState, PipeShape } from './types';
@@ -1048,6 +1048,7 @@ export class Game implements InputCallbacks {
     // Build per-frame animation overrides for the renderer.
     const rotationOverrides = this._animMgr.getRotationOverrides(now);
     const scaleOverrides = this._animMgr.getScaleOverrides(now);
+    const shakeOffsets = this._animMgr.getShakeOffsets(now);
     const fillExclude = this._animMgr.getFillExclude(now);
 
     renderBoard(
@@ -1064,6 +1065,7 @@ export class Game implements InputCallbacks {
       this._input.hoverRotationDelta,
       rotationOverrides,
       scaleOverrides,
+      shakeOffsets,
       fillExclude,
       () => {
         this._animMgr.renderWinTileGlowsOverlay(now);
@@ -1274,14 +1276,10 @@ export class Game implements InputCallbacks {
       });
       this.winWaterEl.style.display = 'block';
     }
-    // Show star count on win modal when at least one star was connected
+    // Hide star row initially; it is populated with animated spans inside the confetti callback.
     if (this.winStarsEl) {
-      if (starsCollected > 0) {
-        this.winStarsEl.textContent = t('game.win.starCount', { count: starsCollected });
-        this.winStarsEl.style.display = 'block';
-      } else {
-        this.winStarsEl.style.display = 'none';
-      }
+      this.winStarsEl.innerHTML = '';
+      this.winStarsEl.style.display = starsCollected > 0 ? 'block' : 'none';
     }
     // Play win sound immediately on winning, then spawn confetti and show modal.
     sfxManager.play(SfxId.WinLevel);
@@ -1294,16 +1292,28 @@ export class Game implements InputCallbacks {
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
       this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
-      // Spawn golden sparkles over the star icon in the win modal when stars were collected,
-      // and play the star sfx 0.5 s after the win-level sound.
+      // Build individual animated star spans and schedule per-star sparkles.
       if (starsCollected > 0 && this.winStarsEl) {
         const winStarsEl = this.winStarsEl;
-        setTimeout(() => {
-          if (this.gameState !== GameState.Won) return;
-          sfxManager.play(SfxId.Star);
-          const rect = winStarsEl.getBoundingClientRect();
-          spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 30);
-        }, STAR_SFX_DELAY_MS);
+        winStarsEl.innerHTML = '';
+        for (let i = 0; i < starsCollected; i++) {
+          const span = document.createElement('span');
+          span.className = 'star-pop';
+          span.textContent = '⭐';
+          span.style.animationDelay = `${i * 120}ms`;
+          winStarsEl.appendChild(span);
+        }
+        for (let i = 0; i < starsCollected; i++) {
+          setTimeout(() => {
+            if (this.gameState !== GameState.Won) return;
+            if (i === 0) sfxManager.play(SfxId.Star);
+            const starSpan = winStarsEl.children[i] as HTMLElement | undefined;
+            if (starSpan) {
+              const rect = starSpan.getBoundingClientRect();
+              spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 20);
+            }
+          }, STAR_SFX_DELAY_MS + i * 120);
+        }
       }
     });
   }
@@ -1675,6 +1685,7 @@ export class Game implements InputCallbacks {
     this._showErrorFlash(t(result.error, result.errorParams));
     if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       this._startErrorHighlight(result.errorTilePositions);
+      this._animMgr.spawnShakeEffects(result.errorTilePositions);
     }
     if (result.error === ERR_GOLD_SPACE) {
       sfxManager.play(SfxId.Locked);
@@ -2008,6 +2019,38 @@ export class Game implements InputCallbacks {
     this._finalizeHistoryJump();
   }
 
+  /** Returns the set of pos-keys for all non-empty tiles on the current board. */
+  private _snapshotPlacedTiles(): Set<string> {
+    if (!this.board) return new Set();
+    const placed = new Set<string>();
+    for (let r = 0; r < this.board.rows; r++) {
+      for (let c = 0; c < this.board.cols; c++) {
+        if (!isEmptyFloor(this.board.grid[r][c].shape)) {
+          placed.add(posKey(r, c));
+        }
+      }
+    }
+    return placed;
+  }
+
+  /** Diff two placed-tile snapshots and spawn undo/redo flash effects on changed tiles. */
+  private _spawnUndoFlashes(before: Set<string>, after: Set<string>): void {
+    const flashes: Array<{ row: number; col: number; type: 'add' | 'remove' }> = [];
+    for (const key of before) {
+      if (!after.has(key)) {
+        const [row, col] = parseKey(key);
+        flashes.push({ row, col, type: 'remove' });
+      }
+    }
+    for (const key of after) {
+      if (!before.has(key)) {
+        const [row, col] = parseKey(key);
+        flashes.push({ row, col, type: 'add' });
+      }
+    }
+    if (flashes.length > 0) this._animMgr.spawnUndoFlashes(flashes);
+  }
+
   /**
    * Finalize UI state after an undo, redo, or undo-win action:
    * deselect any exhausted inventory shape, reset metric sparkle baselines,
@@ -2043,6 +2086,7 @@ export class Game implements InputCallbacks {
     } else if (!this.board.canUndo()) {
       return;
     }
+    const placedBeforeUndo = this._snapshotPlacedTiles();
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const turnBefore = this.board.turnNumber;
@@ -2062,6 +2106,7 @@ export class Game implements InputCallbacks {
     } else {
       sfxManager.play(SfxId.Undo);
     }
+    this._spawnUndoFlashes(placedBeforeUndo, this._snapshotPlacedTiles());
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._metrics.sparkleCallbacks());
@@ -2073,10 +2118,12 @@ export class Game implements InputCallbacks {
     if (!this.board || !this.board.canRedo()) return;
     sfxManager.play(SfxId.Redo);
     this._animMgr.resetIdleTimer();
+    const placedBeforeRedo = this._snapshotPlacedTiles();
     const filledBefore = this.board.getFilledPositions();
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     this.board.redoMove();
+    this._spawnUndoFlashes(placedBeforeRedo, this._snapshotPlacedTiles());
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(

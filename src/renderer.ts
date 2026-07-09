@@ -2189,6 +2189,7 @@ export function renderBoard(
   hoverRotationDelta = 0,
   rotationOverrides?: Map<string, number>,
   scaleOverrides?: Map<string, number>,
+  shakeOffsets?: Map<string, number>,
   fillExclude?: Set<string>,
   winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void,
   sinkVortexFn?: () => void,
@@ -2219,7 +2220,7 @@ export function renderBoard(
   // Win tile glow overlay: rendered above Source/Sink/Chamber content but beneath
   // pipe strokes, so it is visible on all connected tile types.
   winTileOverlayFn?.(ctx);
-  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, now, rotationOverrides, scaleOverrides);
+  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets);
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);
   // Error highlights are drawn last so they appear above all tile content.
@@ -2543,6 +2544,7 @@ function _renderPass3PipeTiles(
   now: number,
   rotationOverrides?: Map<string, number>,
   scaleOverrides?: Map<string, number>,
+  shakeOffsets?: Map<string, number>,
 ): void {
   const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
   const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
@@ -2580,17 +2582,21 @@ function _renderPass3PipeTiles(
       // Apply any active rotation animation override for this tile.
       const rotOverride = rotationOverrides?.get(posKey(r, c));
       const scaleOverride = scaleOverrides?.get(posKey(r, c));
+      const shakeOffset = shakeOffsets?.get(posKey(r, c));
 
       // Determine which arm directions need a flat (butt) end cap.
       const buttEndDirs = _computeButtEndDirs(board, r, c);
 
-      if (scaleOverride !== undefined) {
+      if (scaleOverride !== undefined || shakeOffset !== undefined) {
         const cx = x + TILE_SIZE / 2;
         const cy = y + TILE_SIZE / 2;
         ctx.save();
-        ctx.translate(cx, cy);
-        ctx.scale(scaleOverride, scaleOverride);
-        ctx.translate(-cx, -cy);
+        if (shakeOffset !== undefined) ctx.translate(shakeOffset, 0);
+        if (scaleOverride !== undefined) {
+          ctx.translate(cx, cy);
+          ctx.scale(scaleOverride, scaleOverride);
+          ctx.translate(-cx, -cy);
+        }
         drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs, undefined, undefined, undefined, undefined, now);
         ctx.restore();
       } else {

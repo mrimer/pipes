@@ -48,12 +48,12 @@ import type { IdlePulse} from './visuals/idlePulse';
 import { computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
 import type { HeatWave} from './visuals/heatWave';
 import { tickHeatWaves, renderHeatWaves, collectHotPlateTiles } from './visuals/heatWave';
-import type { PlacementEffect, RemovalEffect } from './visuals/placementEffects';
+import type { PlacementEffect, RemovalEffect, ShakeEffect, UndoFlashEffect } from './visuals/placementEffects';
 import {
-  PLACE_EFFECT_DURATION,
-  computePlacementScale,
-  createPlacementEffect, createRemovalEffect,
-  renderPlacementEffects, renderRemovalEffects,
+  PLACE_EFFECT_DURATION, SHAKE_DURATION,
+  computePlacementScale, computeShakeOffset,
+  createPlacementEffect, createRemovalEffect, createShakeEffect, createUndoFlashEffect,
+  renderPlacementEffects, renderRemovalEffects, renderUndoFlashEffects,
 } from './visuals/placementEffects';
 import { sfxManager, SfxId } from './audio/sfxManager';
 
@@ -175,6 +175,8 @@ export class AnimationManager {
   private _heatWaves: HeatWave[] = [];
   private _placementEffects: PlacementEffect[] = [];
   private _removalEffects: RemovalEffect[] = [];
+  private _shakeEffects: ShakeEffect[] = [];
+  private _undoFlashEffects: UndoFlashEffect[] = [];
   /** Maps "row,col" → `performance.now()` of the last heat-wave spawn for that tile. */
   private _heatWaveLastSpawn: Map<string, number> = new Map();
   /** Cached hot-plate tile positions for the current board instance. */
@@ -306,6 +308,8 @@ export class AnimationManager {
     this._fillAnims = [];
     this._placementEffects = [];
     this._removalEffects = [];
+    this._shakeEffects = [];
+    this._undoFlashEffects = [];
   }
 
   /**
@@ -333,6 +337,34 @@ export class AnimationManager {
 
   spawnRemovalEffect(row: number, col: number): void {
     this._removalEffects.push(createRemovalEffect(row, col, performance.now()));
+  }
+
+  spawnShakeEffects(positions: readonly GridPos[]): void {
+    const now = performance.now();
+    for (const { row, col } of positions) {
+      this._shakeEffects.push(createShakeEffect(row, col, now));
+    }
+  }
+
+  spawnUndoFlashes(positions: Array<{ row: number; col: number; type: 'add' | 'remove' }>): void {
+    const now = performance.now();
+    for (const { row, col, type } of positions) {
+      this._undoFlashEffects.push(createUndoFlashEffect(row, col, type, now));
+    }
+  }
+
+  getShakeOffsets(now: number): Map<string, number> {
+    const map = new Map<string, number>();
+    for (let i = this._shakeEffects.length - 1; i >= 0; i--) {
+      const e = this._shakeEffects[i];
+      const elapsed = now - e.startTime;
+      if (elapsed >= SHAKE_DURATION) {
+        this._shakeEffects.splice(i, 1);
+        continue;
+      }
+      map.set(posKey(e.row, e.col), computeShakeOffset(elapsed));
+    }
+    return map;
   }
 
   /**
@@ -449,6 +481,7 @@ export class AnimationManager {
     const now = performance.now();
     renderPlacementEffects(this.ctx, this._placementEffects, now);
     renderRemovalEffects(this.ctx, this._removalEffects, now);
+    renderUndoFlashEffects(this.ctx, this._undoFlashEffects, now);
   }
 
   // ─── Win-flow lifecycle ───────────────────────────────────────────────────
@@ -572,6 +605,8 @@ export class AnimationManager {
     this._hotPlateBoard = null;
     this._drySourcePulseGradient = null;
     this._drySourcePulseGradientKey = null;
+    this._shakeEffects = [];
+    this._undoFlashEffects = [];
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */

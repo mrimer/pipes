@@ -169,7 +169,7 @@ src/
 │   ├── minimap.ts               # Minimap overlay renderer
 │   ├── pipeEffects.ts           # Pipe placement/rotation visual effects
 │   ├── levelTransition.ts       # Zoom/transition animations between screens
-│   ├── placementEffects.ts      # Scale-pop (placement) and shrink-fade (removal) tile effects
+│   ├── placementEffects.ts      # Scale-pop (placement), shrink-fade (removal), shake (invalid), and undo/redo flash tile effects
 │   ├── ringEffect.ts            # Expanding ring burst effect
 │   ├── sinkVortex.ts            # Sink drain vortex animation
 │   ├── starSparkle.ts           # Star award sparkle effect
