@@ -2,10 +2,21 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "kill-port-8080",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile", "-Command",
+                "$p = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess; if ($p) { Stop-Process -Id $p -Force; Write-Host \"Killed stale server (PID $p)\" } else { Write-Host \"Port 8080 is free\" }"
+            ],
+            "presentation": { "reveal": "silent", "panel": "shared" }
+        },
+        {
             "type": "npm",
             "script": "dev",
             "label": "npm: dev",
             "isBackground": true,
+            "dependsOn": "kill-port-8080",
             "problemMatcher": {
                 "owner": "webpack",
                 "pattern": {
