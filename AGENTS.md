@@ -105,9 +105,6 @@ src/
 ├── chapterMapUtils.ts           # Re-exports mapUtils for backward compat (do not add new logic here)
 │
 ├── bfs.ts                       # Generic BFS: bfs(start, getNeighbors) and bfsWithDepth
-├── cementSystem.ts              # Cement-locked tile logic
-├── constraintValidator.ts       # Placement constraint checks
-├── thermoSimulator.ts           # Thermometer pipe temperature simulation
 │
 ├── gameModals.ts                # Core game modals (level complete, level fail, rules)
 ├── recordingModals.ts           # Record/playback list modals
@@ -115,17 +112,12 @@ src/
 ├── splashScreen.ts              # Caravel Games logo splash screen (shown before title intro)
 ├── titleScreen.ts               # COOL PIPES glyph title intro animation
 ├── levelSelect.ts               # Level-select screen
-├── levelTransition.ts           # Zoom/transition animations between screens
 │
 ├── moveRecorder.ts              # Move encoding P/R/D strings, replayMoves()
 ├── autoRecording.ts             # Auto-recording dedup helper
 ├── resumePlayer.ts              # Save-and-resume replay driver (125 ms per-move chain)
 ├── playbackScreen.ts            # Transport-controls HUD for step-by-step replay
-├── profileIO.ts                 # Export/import orchestration for replays and player profiles
-├── playerProfile.ts             # Pure data: build/parse/apply/checksum player profile payloads
 ├── playerProfileScreen.ts       # Player profile management UI screen
-├── playerProfileSlots.ts        # Multi-slot profile persistence helpers
-├── activeProfile.ts             # Active profile state (which slot is current)
 │
 ├── persistence.ts               # All localStorage access — single source of truth for storage keys
 ├── fileIO.ts                    # Gzip+download and gzip-or-JSON file reading helpers
@@ -141,9 +133,21 @@ src/
 ├── modalUtils.ts                # Modal a11y helper — setupModal provides role=dialog, aria-modal, focus trap, focus restoration, Esc handling; all modal builders use this
 ├── commandKeyManager.ts         # Keyboard shortcut registry
 ├── deviceUtils.ts               # Touch/mobile detection helpers
-├── sfxManager.ts                # Sound effect playback
-├── musicManager.ts              # Background music: two-slot cross-fading via Web Audio, autoplay-policy handling
-├── musicScheduler.ts            # Pure music group/track scheduler (shuffle, avoid-repeat, group selection logic)
+├── audio/
+│   ├── sfxManager.ts            # Sound effect playback
+│   ├── musicManager.ts          # Background music: two-slot cross-fading via Web Audio, autoplay-policy handling
+│   └── musicScheduler.ts        # Pure music group/track scheduler (shuffle, avoid-repeat, group selection logic)
+│
+├── profile/
+│   ├── activeProfile.ts         # Active profile slot tracking and namespacing
+│   ├── playerProfile.ts         # Profile export/import/merge logic, pure data functions
+│   ├── playerProfileSlots.ts    # Multi-slot profile persistence helpers
+│   └── profileIO.ts             # File I/O for profile import/export via gzip/JSON
+│
+├── systems/
+│   ├── thermoSimulator.ts       # Temperature cost calculations for ice/snow/sandstone tiles
+│   ├── cementSystem.ts          # Cement cell hardening mechanics and state tracking
+│   └── constraintValidator.ts   # Sandstone pressure validation errors
 │
 ├── visuals/
 │   ├── butterflyField.ts        # Butterfly visual effect
@@ -159,6 +163,7 @@ src/
 │   ├── idlePulse.ts             # Idle water pulse (10 s idle → BFS-layered pulse animation)
 │   ├── minimap.ts               # Minimap overlay renderer
 │   ├── pipeEffects.ts           # Pipe placement/rotation visual effects
+│   ├── levelTransition.ts       # Zoom/transition animations between screens
 │   ├── placementEffects.ts      # Scale-pop (placement) and shrink-fade (removal) tile effects
 │   ├── ringEffect.ts            # Expanding ring burst effect
 │   ├── sinkVortex.ts            # Sink drain vortex animation
@@ -193,7 +198,7 @@ src/
     ├── mapEditorSectionUtils.ts # Shared section rendering helpers
     ├── canvasUtils.ts           # Editor canvas helpers
     ├── gridSizePanel.ts         # Grid-size control panel
-    ├── renderer.ts              # Editor-specific canvas renderer
+    ├── editorRenderer.ts        # Editor-specific canvas renderer
     └── types.ts                 # Editor-local types
 ```
 
@@ -301,7 +306,12 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Auto-recording dedup | `autoRecording.ts` |
-| Player profile schema | `playerProfile.ts` |
+| Player profile schema | `profile/playerProfile.ts` |
+| Active profile slot / namespacing | `profile/activeProfile.ts` |
+| Profile import/export (file I/O) | `profile/profileIO.ts` |
+| Sound effect playback | `audio/sfxManager.ts` |
+| Background music scheduling | `audio/musicScheduler.ts` |
+| Level screen transition animation | `visuals/levelTransition.ts` |
 | Splash screen (Caravel Games logo) | `splashScreen.ts` |
 | Title intro animation (COOL PIPES glyphs) | `titleScreen.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |
