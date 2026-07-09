@@ -82,6 +82,10 @@ import { ResumePlayer } from './resumePlayer';
 const ERROR_DISPLAY_MS = 3000;
 /** Delay (ms) after the win-level sfx before playing the star sfx and sparkles. */
 const STAR_SFX_DELAY_MS = 500;
+/** Must match the `modal-fade-in` animation duration in index.html (ms). */
+const WIN_MODAL_FADE_MS = 900;
+/** Delay between each star popping in on the win modal (ms). */
+const STAR_STAGGER_MS = 200;
 /** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
 const ICE_SFX_THRESHOLD_MID = 5;
 /** Ice-sfx threshold: raw cost at or above this uses Ice3 sfx (instead of Ice2). */
@@ -1292,28 +1296,32 @@ export class Game implements InputCallbacks {
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
       this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
-      // Build individual animated star spans and schedule per-star sparkles.
+      // Build individual animated star spans after the modal finishes fading in.
       if (starsCollected > 0 && this.winStarsEl) {
         const winStarsEl = this.winStarsEl;
-        winStarsEl.innerHTML = '';
-        for (let i = 0; i < starsCollected; i++) {
-          const span = document.createElement('span');
-          span.className = 'star-pop';
-          span.textContent = '⭐';
-          span.style.animationDelay = `${i * 120}ms`;
-          winStarsEl.appendChild(span);
-        }
-        for (let i = 0; i < starsCollected; i++) {
-          setTimeout(() => {
-            if (this.gameState !== GameState.Won) return;
-            if (i === 0) sfxManager.play(SfxId.Star);
-            const starSpan = winStarsEl.children[i] as HTMLElement | undefined;
-            if (starSpan) {
-              const rect = starSpan.getBoundingClientRect();
-              spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 20);
-            }
-          }, STAR_SFX_DELAY_MS + i * 120);
-        }
+        setTimeout(() => {
+          if (this.gameState !== GameState.Won) return;
+          winStarsEl.innerHTML = '';
+          for (let i = 0; i < starsCollected; i++) {
+            const span = document.createElement('span');
+            span.className = 'star-pop';
+            span.textContent = '⭐';
+            span.style.animationDelay = `${i * STAR_STAGGER_MS}ms`;
+            winStarsEl.appendChild(span);
+          }
+          // Fire the star SFX and sparkle for each star as it pops in.
+          for (let i = 0; i < starsCollected; i++) {
+            setTimeout(() => {
+              if (this.gameState !== GameState.Won) return;
+              if (i === 0) sfxManager.play(SfxId.Star);
+              const starSpan = winStarsEl.children[i] as HTMLElement | undefined;
+              if (starSpan) {
+                const rect = starSpan.getBoundingClientRect();
+                spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 20);
+              }
+            }, i * STAR_STAGGER_MS);
+          }
+        }, WIN_MODAL_FADE_MS);
       }
     });
   }
