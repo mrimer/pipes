@@ -7,7 +7,7 @@ import { CampaignManager } from '../src/campaignManager';
 import type { CampaignEditor } from '../src/campaignEditor';
 import type { CampaignDef } from '../src/types';
 import { PipeShape } from '../src/types';
-import { setActiveSlotIndex } from '../src/activeProfile';
+import { setActiveSlotIndex } from '../src/profile/activeProfile';
 import {
   loadCampaignProgress,
   loadCampaignCompleteShown,
@@ -20,7 +20,7 @@ import {
   markCampaignLevelCompleted,
   saveLevelStar,
 } from '../src/persistence';
-import * as levelTransition from '../src/levelTransition';
+import * as levelTransition from '../src/visuals/levelTransition';
 import { makeCampaignDef, makeChapterDef, makeLevelDef } from './testHelpers';
 import { t } from '../src/i18n';
 

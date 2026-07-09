@@ -21,7 +21,7 @@ import {
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
 } from '../src/persistence';
-import { setActiveSlotIndex } from '../src/activeProfile';
+import { setActiveSlotIndex } from '../src/profile/activeProfile';
 import type { PartialPlayProgress } from '../src/types';
 
 beforeEach(() => {

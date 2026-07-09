@@ -6,7 +6,7 @@
 
 import { loadLevelStars, saveLevelStar, clearLevelStars, clearLevelStarRecord } from '../src/persistence';
 import { renderLevelList } from '../src/levelSelect';
-import { sfxManager, SfxId } from '../src/sfxManager';
+import { sfxManager, SfxId } from '../src/audio/sfxManager';
 import type { TileDef } from '../src/types';
 import { makeLevelDef } from './testHelpers';
 

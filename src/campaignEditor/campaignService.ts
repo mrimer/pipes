@@ -26,7 +26,7 @@ import {
   getValidChapterMapTileDefKeys,
   getValidCampaignMapTileDefKeys,
 } from './types';
-import { FILE_TYPE_CAMPAIGN, FILE_TYPE_PLAYER } from '../playerProfile';
+import { FILE_TYPE_CAMPAIGN, FILE_TYPE_PLAYER } from '../profile/playerProfile';
 
 /**
  * Locate a level inside a campaign and return its 1-based chapter/level numbers.

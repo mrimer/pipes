@@ -1,7 +1,7 @@
 /** Helpers for persisting long-term player progress in localStorage. */
 
 import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord, RecordingSettings } from './types';
-import { getActiveSlotPrefix } from './activeProfile';
+import { getActiveSlotPrefix } from './profile/activeProfile';
 
 /**
  * Convenience shorthand: returns the active-slot prefix string.

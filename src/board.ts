@@ -1,17 +1,17 @@
 import { Tile, oppositeDirection } from './tile';
 import type { AmbientDecoration, AmbientDecorationType, GridPos, InventoryItem, LevelDef, LevelStyle, Rotation} from './types';
 import { Direction, DIRECTIONS, PipeShape, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
-import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
-import { CementSystem } from './cementSystem';
-import { ConstraintValidator } from './constraintValidator';
+import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './systems/thermoSimulator';
+import { CementSystem } from './systems/cementSystem';
+import { ConstraintValidator } from './systems/constraintValidator';
 import type { TurnStateSnapshot } from './turnStateManager';
 import { TurnStateManager } from './turnStateManager';
 import type { TranslationParams } from './i18nTypes';
 import { t } from './i18n';
 
 // Re-export cost helpers so existing consumers (game.ts, renderer.ts) need no import changes.
-export { computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './thermoSimulator';
-export { ERR_SANDSTONE_TOO_HARD } from './constraintValidator';
+export { computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './systems/thermoSimulator';
+export { ERR_SANDSTONE_TOO_HARD } from './systems/constraintValidator';
 
 /**
  * Encode a grid row/col pair into the canonical string key used by all internal

@@ -11,7 +11,7 @@
  */
 
 import type {
-  ProfileSlotMeta} from '../src/playerProfileSlots';
+  ProfileSlotMeta} from '../src/profile/playerProfileSlots';
 import {
   PROFILE_SLOT_COUNT,
   loadSlotMeta,
@@ -25,8 +25,8 @@ import {
   generateGuid,
   migrateIfNeeded,
   loadSlotStats,
-} from '../src/playerProfileSlots';
-import { setActiveSlotIndex, getActiveSlotPrefix } from '../src/activeProfile';
+} from '../src/profile/playerProfileSlots';
+import { setActiveSlotIndex, getActiveSlotPrefix } from '../src/profile/activeProfile';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

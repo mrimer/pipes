@@ -30,8 +30,8 @@ import {
 } from './types';
 import type { LevelEditorState } from './levelEditorState';
 import { TILE_SIZE } from '../renderer';
-import { drawEditorTile } from './renderer';
-import { sfxManager, SfxId } from '../sfxManager';
+import { drawEditorTile } from './editorRenderer';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 import { buildCompassConnectionsWidget } from './connectionsWidget';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER } from '../uiConstants';
 import { t } from '../i18n';

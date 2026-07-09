@@ -1,7 +1,7 @@
-import type { Tile } from './tile';
-import type { GridPos } from './types';
-import { PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey } from './board';
-import type { TranslationParams } from './i18nTypes';
+import type { Tile } from '../tile';
+import type { GridPos } from '../types';
+import { PIPE_SHAPES, GOLD_PIPE_SHAPES, posKey } from '../board';
+import type { TranslationParams } from '../i18nTypes';
 
 /**
  * Manages cement-cell state: setting times and the hardening/decrement rules.

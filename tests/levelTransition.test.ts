@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { playSwirlScreenTransition } from '../src/levelTransition';
+import { playSwirlScreenTransition } from '../src/visuals/levelTransition';
 
 describe('playSwirlScreenTransition', () => {
   let now = 0;

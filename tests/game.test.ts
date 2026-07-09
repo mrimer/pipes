@@ -15,12 +15,12 @@ import {
   saveBackgroundEnabled,
   saveEnvironmentalEnabled,
 } from '../src/persistence';
-import { sfxManager, SfxId } from '../src/sfxManager';
+import { sfxManager, SfxId } from '../src/audio/sfxManager';
 import { CloudShadowField } from '../src/visuals/cloudShadows';
 import { FireflyField } from '../src/visuals/fireflyField';
 import { ButterflyField } from '../src/visuals/butterflyField';
 import { isEnvironmentalEnabled, setEnvironmentalEnabled } from '../src/graphicsSettings';
-import { getActiveSlotIndex, setActiveSlotIndex, withSlot } from '../src/activeProfile';
+import { getActiveSlotIndex, setActiveSlotIndex, withSlot } from '../src/profile/activeProfile';
 import * as uiBackground from '../src/uiBackground';
 
 // Make spawnConfetti synchronous in tests by immediately invoking the onComplete callback.

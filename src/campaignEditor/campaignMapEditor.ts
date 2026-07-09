@@ -16,8 +16,8 @@ import type { CampaignDef, ChapterDef, TileDef, LevelDef } from '../types';
 import { PipeShape, Direction } from '../types';
 import { PIPE_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
-import type { HoverOverlay, DragState } from './renderer';
-import { renderEditorCanvas } from './renderer';
+import type { HoverOverlay, DragState } from './editorRenderer';
+import { renderEditorCanvas } from './editorRenderer';
 import type {
   EditorPalette,
   TileParams,
@@ -39,7 +39,7 @@ import {
   CAMPAIGN_MAP_MAX_DIM,
 } from './types';
 import { validateCampaignMap } from './campaignMapValidator';
-import { sfxManager, SfxId } from '../sfxManager';
+import { sfxManager, SfxId } from '../audio/sfxManager';
 import { hasShapeElsewhere } from './gridUtils';
 import { buildStyleSectionPanel } from './tileParamsPanel';
 import { buildCompassConnectionsWidget } from './connectionsWidget';

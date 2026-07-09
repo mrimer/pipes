@@ -3,9 +3,9 @@
  */
 
 import { PlayerProfileScreen } from '../src/playerProfileScreen';
-import { setActiveSlotIndex } from '../src/activeProfile';
-import { saveSlotMeta } from '../src/playerProfileSlots';
-import { sfxManager, SfxId } from '../src/sfxManager';
+import { setActiveSlotIndex } from '../src/profile/activeProfile';
+import { saveSlotMeta } from '../src/profile/playerProfileSlots';
+import { sfxManager, SfxId } from '../src/audio/sfxManager';
 
 describe('PlayerProfileScreen', () => {
   let screens: PlayerProfileScreen[] = [];

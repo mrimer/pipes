@@ -8,7 +8,7 @@ jest.mock('../src/renderer', () => ({
 }));
 
 import { Board } from '../src/board';
-import { playMapScreenEnterTransition, playMapScreenExitTransition, playMapTransition } from '../src/levelTransition';
+import { playMapScreenEnterTransition, playMapScreenExitTransition, playMapTransition } from '../src/visuals/levelTransition';
 
 describe('map zoom transition backgrounds', () => {
   let now = 0;

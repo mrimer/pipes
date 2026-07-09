@@ -2,7 +2,7 @@ import type { CampaignDef, ChapterDef, LevelDef, TileDef } from './types';
 import { PipeShape } from './types';
 import type { ChapterMapCallbacks} from './chapterMapScreen';
 import { ChapterMapScreen } from './chapterMapScreen';
-import type { ChapterMapSnapshot } from './levelTransition';
+import type { ChapterMapSnapshot } from './visuals/levelTransition';
 import { loadLevelStars, loadLevelWater } from './persistence';
 
 export interface CampaignMapCallbacks {

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { importReplay } from '../src/profileIO';
+import { importReplay } from '../src/profile/profileIO';
 import * as persistence from '../src/persistence';
 
 jest.mock('../src/fileIO', () => ({

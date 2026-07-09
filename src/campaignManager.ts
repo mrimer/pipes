@@ -30,9 +30,9 @@ import { spawnBalloons } from './visuals/balloons';
 import { spawnFireworks } from './visuals/fireworks';
 import { buildNewChapterModal, buildChallengeModal, buildCampaignMasteredModal } from './gameModals';
 import type { ResetProgressInfo } from './gameModals';
-import type { ChapterMapSnapshot } from './levelTransition';
-import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScreenTransition } from './levelTransition';
-import { sfxManager, SfxId } from './sfxManager';
+import type { ChapterMapSnapshot } from './visuals/levelTransition';
+import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScreenTransition } from './visuals/levelTransition';
+import { sfxManager, SfxId } from './audio/sfxManager';
 import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { t } from './i18n';
 

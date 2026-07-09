@@ -13,7 +13,7 @@
 
 import type {
   ProfileSlotMeta,
-  ProfileSlotStats} from './playerProfileSlots';
+  ProfileSlotStats} from './profile/playerProfileSlots';
 import {
   PROFILE_SLOT_COUNT,
   saveSlotMeta,
@@ -24,12 +24,12 @@ import {
   clearActiveSlotIndex,
   generateGuid,
   loadSlotStats,
-} from './playerProfileSlots';
-import { setActiveSlotIndex, getActiveSlotIndex, withSlot } from './activeProfile';
+} from './profile/playerProfileSlots';
+import { setActiveSlotIndex, getActiveSlotIndex, withSlot } from './profile/activeProfile';
 import { savePlayerName, loadSfxVolume, loadTouchUiEnabled } from './persistence';
-import { sfxManager, SfxId } from './sfxManager';
+import { sfxManager, SfxId } from './audio/sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from './deviceUtils';
-import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profileIO';
+import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from './profile/profileIO';
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from './gameModals';
 import { t } from './i18n';
 import { attachHoverWaveAnimation } from './visuals/chapterWaves';
