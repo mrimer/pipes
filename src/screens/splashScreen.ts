@@ -12,7 +12,7 @@ import { sfxManager, SfxId } from '../audio/sfxManager';
 import { BG_COLOR } from '../colors';
 import { UI_GOLD } from '../uiConstants';
 import { t } from '../i18n';
-import logoUrl from '../data/images/CaravelLogo_RectBlack.png';
+import logoUrl from '../../data/images/CaravelLogo_RectBlack.png';
 
 // ─── Timing ────────────────────────────────────────────────────────────────────
 
