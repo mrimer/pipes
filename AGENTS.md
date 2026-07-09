@@ -98,26 +98,13 @@ src/
 ├── tooltipManager.ts            # Hover tooltip rendering
 ├── turnStateManager.ts          # Per-turn scoring and water-state bookkeeping
 │
-├── mapScreenBase.ts             # Abstract base: canvas + anim loop + BFS fill shared by both map screens
-├── chapterMapScreen.ts          # Chapter map screen (thin wrapper over MapScreenBase)
-├── campaignMapScreen.ts         # Campaign map screen (thin wrapper over MapScreenBase)
 ├── mapUtils.ts                  # Shared BFS helpers: computeMapReachable, findMapTile, tileDefConnections
 ├── chapterMapUtils.ts           # Re-exports mapUtils for backward compat (do not add new logic here)
-│
 ├── bfs.ts                       # Generic BFS: bfs(start, getNeighbors) and bfsWithDepth
-│
-├── gameModals.ts                # Core game modals (level complete, level fail, rules)
-├── recordingModals.ts           # Record/playback list modals
-├── rulesModal.ts                # Rules/help modal
-├── splashScreen.ts              # Caravel Games logo splash screen (shown before title intro)
-├── titleScreen.ts               # COOL PIPES glyph title intro animation
-├── levelSelect.ts               # Level-select screen
 │
 ├── moveRecorder.ts              # Move encoding P/R/D strings, replayMoves()
 ├── autoRecording.ts             # Auto-recording dedup helper
 ├── resumePlayer.ts              # Save-and-resume replay driver (125 ms per-move chain)
-├── playbackScreen.ts            # Transport-controls HUD for step-by-step replay
-├── playerProfileScreen.ts       # Player profile management UI screen
 │
 ├── persistence.ts               # All localStorage access — single source of truth for storage keys
 ├── fileIO.ts                    # Gzip+download and gzip-or-JSON file reading helpers
@@ -126,13 +113,31 @@ src/
 ├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
+├── svgUtils.ts                  # SVG element creation utilities
 ├── i18n.ts                      # Lightweight locale registry, locale bootstrap, fallback, and string interpolation
 ├── i18n/
 │   └── en.ts                    # English translation catalog (canonical fallback locale)
 ├── i18nTypes.ts                 # Shared i18n type definitions
-├── modalUtils.ts                # Modal a11y helper — setupModal provides role=dialog, aria-modal, focus trap, focus restoration, Esc handling; all modal builders use this
 ├── commandKeyManager.ts         # Keyboard shortcut registry
 ├── deviceUtils.ts               # Touch/mobile detection helpers
+│
+├── screens/
+│   ├── titleScreen.ts           # COOL PIPES glyph title intro animation
+│   ├── splashScreen.ts          # Caravel Games logo splash screen (shown before title intro)
+│   ├── levelSelect.ts           # Level-select screen
+│   ├── playbackScreen.ts        # Transport-controls HUD for step-by-step replay
+│   ├── playerProfileScreen.ts   # Player profile management UI screen
+│   ├── mapScreenBase.ts         # Abstract base: canvas + anim loop + BFS fill shared by both map screens
+│   ├── chapterMapScreen.ts      # Chapter map screen (thin wrapper over MapScreenBase)
+│   └── campaignMapScreen.ts     # Campaign map screen (thin wrapper over MapScreenBase)
+│
+├── modals/
+│   ├── modalUtils.ts            # Modal a11y helper — setupModal provides role=dialog, aria-modal, focus trap, focus restoration, Esc handling; all modal builders use this
+│   ├── gameModals.ts            # Core game modals (level complete, level fail, settings, etc.)
+│   ├── recordingModals.ts       # Record/playback list modals
+│   ├── rulesModal.ts            # Rules/help modal
+│   └── creditsModal.ts          # Credits overlay
+│
 ├── audio/
 │   ├── sfxManager.ts            # Sound effect playback
 │   ├── musicManager.ts          # Background music: two-slot cross-fading via Web Audio, autoplay-policy handling
@@ -297,7 +302,7 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Chamber node drawing | `renderer/chamberRenderers.ts` |
 | Ambient grass/rocks | `renderer/ambientDecoration.ts` |
 | Modal dialogs (game) | `gameModals.ts`, `recordingModals.ts`, `rulesModal.ts` |
-| Modal accessibility plumbing | `modalUtils.ts` |
+| Modal accessibility plumbing | `modals/modalUtils.ts` |
 | Keyboard shortcuts | `commandKeyManager.ts` |
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
@@ -312,16 +317,16 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Sound effect playback | `audio/sfxManager.ts` |
 | Background music scheduling | `audio/musicScheduler.ts` |
 | Level screen transition animation | `visuals/levelTransition.ts` |
-| Splash screen (Caravel Games logo) | `splashScreen.ts` |
-| Title intro animation (COOL PIPES glyphs) | `titleScreen.ts` |
+| Splash screen (Caravel Games logo) | `screens/splashScreen.ts` |
+| Title intro animation (COOL PIPES glyphs) | `screens/titleScreen.ts` |
 | Idle pulse animation | `visuals/idlePulse.ts` |
 | Win confetti | `visuals/confetti.ts` |
 | Balloon animation (campaign completion) | `visuals/balloons.ts` |
 | Fireworks animation (campaign mastery) | `visuals/fireworks.ts` |
 | Tile placement/removal effects (scale pop, dust, shrink-fade) | `visuals/placementEffects.ts` |
 | Cloud shadow overlay | `visuals/cloudShadows.ts` |
-| Campaign-map wheel zoom + zoom sizing clamps | `mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
-| Map sea-wave animation on chapter/campaign screens | `mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |
+| Campaign-map wheel zoom + zoom sizing clamps | `screens/mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
+| Map sea-wave animation on chapter/campaign screens | `screens/mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |
 | Campaign CRUD | `campaignEditor/campaignService.ts` |
 | Editor undo/redo | `campaignEditor/historyManager.ts` + `mapEditorBase.ts` |
 | Validation error messages | `campaignEditor/validationMessages.ts` |
@@ -340,5 +345,5 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | `colors.ts` | Define UI chrome colors (those belong in `uiConstants.ts`) |
 | `fileIO.ts` | Contain game or editor domain logic |
 | `campaignEditor/historyManager.ts` | Import domain types from outside `campaignEditor/` |
-| `mapScreenBase.ts` | Reference chapter-specific or campaign-specific data directly (use abstract methods) |
+| `screens/mapScreenBase.ts` | Reference chapter-specific or campaign-specific data directly (use abstract methods) |
 | `chapterMapUtils.ts` | Define new logic — it is a re-export shim only |
