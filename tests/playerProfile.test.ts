@@ -10,7 +10,7 @@
  */
 
 import type {
-  PlayerProfilePayload} from '../src/playerProfile';
+  PlayerProfilePayload} from '../src/profile/playerProfile';
 import {
   computeChecksum,
   buildPlayerProfilePayload,
@@ -20,7 +20,7 @@ import {
   FILE_TYPE_PLAYER,
   FILE_TYPE_CAMPAIGN,
   PROFILE_FORMAT_VERSION
-} from '../src/playerProfile';
+} from '../src/profile/playerProfile';
 import {
   loadPlayerName,
   loadSfxVolume,
