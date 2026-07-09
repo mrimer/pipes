@@ -89,6 +89,13 @@ export class MetricsDisplay {
   /** Shapes that should receive a gray-sparkle CSS animation on the next inventory render (zero net change). */
   readonly pendingGraySparkleShapes: Set<PipeShape> = new Set();
 
+  /** Shapes whose count span should bounce on the next inventory render. */
+  private readonly _pendingBounceShapes: Set<PipeShape> = new Set();
+
+  scheduleCountBounce(shape: PipeShape): void {
+    this._pendingBounceShapes.add(shape);
+  }
+
   /** `performance.now()` after which the next golden-inventory-item twinkle may fire. */
   private _nextInventoryTwinkle = 0;
 
@@ -253,6 +260,17 @@ export class MetricsDisplay {
         }
       }
       this.pendingGraySparkleShapes.clear();
+    }
+    if (this._pendingBounceShapes.size > 0) {
+      for (const shape of this._pendingBounceShapes) {
+        const span = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"] .inv-count`);
+        if (span) {
+          span.classList.remove('inv-count-bounce');
+          void span.offsetWidth; // force reflow to restart animation
+          span.classList.add('inv-count-bounce');
+        }
+      }
+      this._pendingBounceShapes.clear();
     }
   }
 

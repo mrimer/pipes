@@ -48,6 +48,13 @@ import type { IdlePulse} from './visuals/idlePulse';
 import { computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
 import type { HeatWave} from './visuals/heatWave';
 import { tickHeatWaves, renderHeatWaves, collectHotPlateTiles } from './visuals/heatWave';
+import type { PlacementEffect, RemovalEffect } from './visuals/placementEffects';
+import {
+  PLACE_EFFECT_DURATION,
+  computePlacementScale,
+  createPlacementEffect, createRemovalEffect,
+  renderPlacementEffects, renderRemovalEffects,
+} from './visuals/placementEffects';
 import { sfxManager, SfxId } from './sfxManager';
 
 /** How often (ms) to spawn a dry-air puff particle from the source on game-over. */
@@ -166,6 +173,8 @@ export class AnimationManager {
 
   /** Currently active heat-wave ripple events (one per hot_plate tile at a time). */
   private _heatWaves: HeatWave[] = [];
+  private _placementEffects: PlacementEffect[] = [];
+  private _removalEffects: RemovalEffect[] = [];
   /** Maps "row,col" → `performance.now()` of the last heat-wave spawn for that tile. */
   private _heatWaveLastSpawn: Map<string, number> = new Map();
   /** Cached hot-plate tile positions for the current board instance. */
@@ -295,6 +304,8 @@ export class AnimationManager {
   completeAnims(): void {
     this._rotationAnims = [];
     this._fillAnims = [];
+    this._placementEffects = [];
+    this._removalEffects = [];
   }
 
   /**
@@ -303,6 +314,25 @@ export class AnimationManager {
    */
   spawnRotationAnim(row: number, col: number, oldRotation: number, newRotation: number): void {
     this._rotationAnims.push({ row, col, oldRotation, newRotation, startTime: performance.now() });
+  }
+
+  spawnPlacementEffect(row: number, col: number): void {
+    this._placementEffects.push(createPlacementEffect(row, col, performance.now()));
+  }
+
+  getScaleOverrides(now: number): Map<string, number> {
+    const map = new Map<string, number>();
+    for (const e of this._placementEffects) {
+      const elapsed = now - e.startTime;
+      if (elapsed < PLACE_EFFECT_DURATION) {
+        map.set(posKey(e.row, e.col), computePlacementScale(elapsed));
+      }
+    }
+    return map;
+  }
+
+  spawnRemovalEffect(row: number, col: number): void {
+    this._removalEffects.push(createRemovalEffect(row, col, performance.now()));
   }
 
   /**
@@ -416,6 +446,9 @@ export class AnimationManager {
     this._tickGoldenTwinkles(board);
     this._tickIdlePulse(board, gameState);
     this._tickHeatWaves(board);
+    const now = performance.now();
+    renderPlacementEffects(this.ctx, this._placementEffects, now);
+    renderRemovalEffects(this.ctx, this._removalEffects, now);
   }
 
   // ─── Win-flow lifecycle ───────────────────────────────────────────────────

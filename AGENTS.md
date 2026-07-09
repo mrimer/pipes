@@ -159,6 +159,7 @@ src/
 │   ├── idlePulse.ts             # Idle water pulse (10 s idle → BFS-layered pulse animation)
 │   ├── minimap.ts               # Minimap overlay renderer
 │   ├── pipeEffects.ts           # Pipe placement/rotation visual effects
+│   ├── placementEffects.ts      # Scale-pop (placement) and shrink-fade (removal) tile effects
 │   ├── ringEffect.ts            # Expanding ring burst effect
 │   ├── sinkVortex.ts            # Sink drain vortex animation
 │   ├── starSparkle.ts           # Star award sparkle effect
@@ -307,6 +308,7 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Win confetti | `visuals/confetti.ts` |
 | Balloon animation (campaign completion) | `visuals/balloons.ts` |
 | Fireworks animation (campaign mastery) | `visuals/fireworks.ts` |
+| Tile placement/removal effects (scale pop, dust, shrink-fade) | `visuals/placementEffects.ts` |
 | Cloud shadow overlay | `visuals/cloudShadows.ts` |
 | Campaign-map wheel zoom + zoom sizing clamps | `mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
 | Map sea-wave animation on chapter/campaign screens | `mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |

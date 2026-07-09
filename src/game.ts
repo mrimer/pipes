@@ -53,6 +53,7 @@ import {
   showReplayImportSuccessModal,
 } from './recordingModals';
 import { AnimationManager } from './animationManager';
+import { PLACE_EFFECT_DURATION } from './visuals/placementEffects';
 import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './levelTransition';
@@ -1046,6 +1047,7 @@ export class Game implements InputCallbacks {
 
     // Build per-frame animation overrides for the renderer.
     const rotationOverrides = this._animMgr.getRotationOverrides(now);
+    const scaleOverrides = this._animMgr.getScaleOverrides(now);
     const fillExclude = this._animMgr.getFillExclude(now);
 
     renderBoard(
@@ -1061,6 +1063,7 @@ export class Game implements InputCallbacks {
       this._errorHighlightKeys,
       this._input.hoverRotationDelta,
       rotationOverrides,
+      scaleOverrides,
       fillExclude,
       () => {
         this._animMgr.renderWinTileGlowsOverlay(now);
@@ -1339,6 +1342,8 @@ export class Game implements InputCallbacks {
       );
       this._animMgr.spawnLockedCostChangeAnimations(changes);
       this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
+      this._animMgr.spawnRemovalEffect(pos.row, pos.col);
+      if (reclaimedShape !== undefined) this._metrics.scheduleCountBounce(reclaimedShape);
       this._deselectIfDepleted();
       if (hadNoSelection && reclaimedShape !== undefined) {
         const inv = this.board.inventory.find((it) => it.shape === reclaimedShape);
@@ -1773,10 +1778,14 @@ export class Game implements InputCallbacks {
       this.board, filledBefore, sparkle, replacedTile, replacedRow, replacedCol,
       lockedWaterImpactBefore, lockedHotPlateGainBefore,
     );
-    this._animMgr.spawnFillAnims(this.board, filledBefore);
+    this._animMgr.spawnFillAnims(this.board, filledBefore, PLACE_EFFECT_DURATION);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
     if (result.cementDecrement) sfxManager.play(SfxId.Cement);
+
+    this._animMgr.spawnPlacementEffect(replacedRow, replacedCol);
+    this._metrics.scheduleCountBounce(placedShape);
+    if (replacedTile) this._metrics.scheduleCountBounce(replacedTile.shape);
 
     this._playAfterTilePlacedSfx(this.board, filledBefore, changes, placedIsLeakyAndConnected, posKey);
 
