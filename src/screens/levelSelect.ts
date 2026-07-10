@@ -559,6 +559,38 @@ export function renderLevelList(
     chapterListParent = chapterListWrap;
 
     levelListEl.appendChild(header);
+
+    if (IS_DEMO && STORE_URL && allNonChallengeCompleted) {
+      const upsell = document.createElement('div');
+      upsell.style.cssText =
+        'display:flex;flex-direction:column;align-items:center;gap:10px;' +
+        'background:#111e0a;border:2px solid #4a8a2a;border-radius:8px;' +
+        'padding:16px 20px;text-align:center;';
+
+      const heading = document.createElement('div');
+      heading.style.cssText = 'font-size:1rem;font-weight:bold;color:#8cbf5a;';
+      heading.textContent = t('demo.upsell.levelSelect.heading');
+
+      const sub = document.createElement('div');
+      sub.style.cssText = 'font-size:0.85rem;color:#aaa;';
+      sub.textContent = t('demo.upsell.levelSelect.sub');
+
+      const buyBtn = document.createElement('button');
+      buyBtn.type = 'button';
+      buyBtn.textContent = t('demo.buyNow');
+      buyBtn.style.cssText =
+        'font-size:0.9rem;font-weight:bold;background:#3d7a20;color:#e8f5d8;' +
+        'border:1px solid #6ab840;border-radius:6px;padding:8px 20px;cursor:pointer;';
+      buyBtn.addEventListener('click', () => {
+        sfxManager.play(SfxId.Click);
+        window.open(STORE_URL, '_blank');
+      });
+
+      upsell.appendChild(heading);
+      upsell.appendChild(sub);
+      upsell.appendChild(buyBtn);
+      levelListEl.appendChild(upsell);
+    }
   }
 
   let foundLockedChapter = false;

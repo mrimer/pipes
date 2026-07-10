@@ -252,6 +252,8 @@ export const en: TranslationTable = {
   'demo.badge': 'Demo Version',
   'demo.buyNow': '🛒 Buy Full Version',
   'demo.upsell.message': 'You\'ve completed the demo! Get the full game to unlock all levels.',
+  'demo.upsell.levelSelect.heading': '🎉 Demo complete!',
+  'demo.upsell.levelSelect.sub': 'Get the full game for more levels, chapters, and challenges.',
   'game.win.challengeComplete': '💀 Challenge level completed!',
   'game.win.waterRetained': '💧 {count} water retained{newBest}',
   'game.win.newBest': '(New Best!)',
