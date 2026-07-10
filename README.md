@@ -8,12 +8,14 @@ Browser-based, built with TypeScript + Webpack + Canvas.
 
 ```bash
 npm install
-npm run dev     # dev server at http://localhost:8080
-npm test        # jest test suite (1489 tests)
-npm run build   # production bundle → dist/
-npm run lint    # type-aware lint check (no auto-fix)
-npm run lint:fix  # apply auto-fixes
+npm run dev           # dev server at http://localhost:8080 (with dev controls)
+npm test              # jest test suite
+npm run build         # production web bundle → dist/  (alias for build:web)
+npm run lint          # type-aware lint check (no auto-fix)
+npm run lint:fix      # apply auto-fixes
 ```
+
+See **[BUILDS.md](BUILDS.md)** for the full build-mode matrix: web, Electron/Steam, Android/Google Play, demo builds, and the release CI pipeline.
 
 ## Project layout
 
@@ -28,7 +30,7 @@ Top-level directories:
 
 ## Deployment
 
-Pushes to main deploy to GitHub Pages via .github/workflows/deploy.yml. Build artifact lives in dist/.
+Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`. Release builds (Electron, demo) are triggered by `v*.*.*` version tags via `.github/workflows/release-builds.yml`. See [BUILDS.md](BUILDS.md) for details.
 
 ## Dependencies
 

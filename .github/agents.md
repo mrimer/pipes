@@ -30,10 +30,20 @@ pipes/
 │   ├── board.ts           # Board / grid state management
 │   ├── tile.ts            # Tile model and rendering
 │   └── types.ts           # Shared TypeScript types & enums
+├── electron/              # Electron main process (compiled separately)
+│   ├── main.ts            # BrowserWindow creation, loads dist/index.html
+│   ├── preload.ts         # contextBridge surface exposed to renderer
+│   └── tsconfig.json      # CommonJS/Node target, outputs to electron-dist/
+├── src/
+│   ├── buildConfig.d.ts   # Compile-time constant type declarations (BUILD_TARGET, IS_DEMO, DEV_CONTROLS)
+│   ├── platform/
+│   │   └── storage.ts     # PlatformStorage abstraction + per-target implementations
+│   └── ...                # (rest of game source)
 ├── index.html             # Shell HTML loaded by GitHub Pages
 ├── package.json
 ├── tsconfig.json
-├── webpack.config.js
+├── webpack.config.js      # Factory: accepts --env target/demo/devControls flags
+├── BUILDS.md              # Full build-mode reference
 └── README.md
 ```
 
@@ -52,18 +62,32 @@ pipes/
 # Install dependencies
 npm install
 
-# Start local dev server (hot-reload on http://localhost:8080)
+# Web dev server with hot-reload and dev controls (http://localhost:8080)
 npm run dev
 
-# Production build (output → dist/)
-npm run build
+# Web production build → dist/
+npm run build         # alias for build:web
+npm run build:web
+npm run build:web:demo
+
+# Electron desktop build → release/  (requires npm install first)
+npm run dev:electron        # webpack watch + live Electron window
+npm run build:electron
+npm run build:electron:demo
+
+# Android / Capacitor → android/  (requires Capacitor setup — see BUILDS.md)
+npm run build:android
+npm run build:android:demo
 
 # Run unit tests
 npm test
 
 # Lint & auto-fix
 npm run lint
+npm run lint:fix
 ```
+
+See **BUILDS.md** at the repo root for the full build-mode reference.
 
 ## Game Architecture Guidelines
 - **Game loop**: `requestAnimationFrame`-driven loop in `game.ts`.  
@@ -82,8 +106,9 @@ npm run lint
 
 ## GitHub Pages Deployment
 - The `deploy.yml` workflow triggers on every push to `main`.
-- It runs `npm ci`, `npm run build`, then deploys `dist/` to the `gh-pages` branch using `actions/deploy-pages`.
+- It runs `npm ci`, `npm run build:web`, then deploys `dist/` to GitHub Pages.
 - The game is publicly accessible at `https://mrimer.github.io/pipes/`.
+- Release builds (Electron, demo variants) are triggered by `v*.*.*` version tags via `release-builds.yml`.
 
 ## Security & Accessibility
 - No external network requests at runtime (fully self-contained).

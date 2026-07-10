@@ -1,0 +1,85 @@
+name: Release Builds
+
+# Triggers:
+#   - Push a version tag (v*.*.*) to produce a full release set.
+#   - Manual workflow_dispatch for ad-hoc builds.
+#
+# Produces artifacts for every entry in the build matrix.
+# Web artifacts are under dist/; Electron artifacts are under release/.
+# Artifacts are retained for 30 days. Upload to Steam / Google Play manually
+# after downloading the artifacts from the Actions run summary.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Web builds (run on Linux, fast) ──────────────────────────────
+          - label: web
+            os: ubuntu-latest
+            script: build:web
+            artifact-path: dist/
+            artifact-name: dist-web
+
+          - label: web-demo
+            os: ubuntu-latest
+            script: build:web:demo
+            artifact-path: dist/
+            artifact-name: dist-web-demo
+
+          # ── Electron / desktop builds ─────────────────────────────────────
+          # Windows target runs on windows-latest so electron-builder can
+          # produce a signed NSIS installer (code-signing cert required for
+          # distribution; unsigned builds work for testing).
+          - label: electron-win
+            os: windows-latest
+            script: build:electron
+            artifact-path: release/
+            artifact-name: dist-electron-win
+
+          - label: electron-win-demo
+            os: windows-latest
+            script: build:electron:demo
+            artifact-path: release/
+            artifact-name: dist-electron-win-demo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build (${{ matrix.label }})
+        run: npm run ${{ matrix.script }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          retention-days: 30

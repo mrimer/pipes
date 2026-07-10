@@ -3,17 +3,29 @@
   "version": "0.1.0",
   "description": "A puzzle game about getting water to flow through pipes",
   "private": true,
+  "main": "electron-dist/main.js",
   "scripts": {
-    "dev": "webpack serve --mode development --open",
-    "build": "webpack --mode production",
+    "dev": "webpack serve --mode development --env target=web devControls=true --open",
+    "dev:electron": "concurrently \"webpack --mode development --env target=electron devControls=true --watch\" \"electron .\"",
+    "build": "npm run build:web",
+    "build:web": "webpack --mode production --env target=web",
+    "build:web:demo": "webpack --mode production --env target=web demo=true",
+    "build:electron": "tsc --project electron/tsconfig.json && webpack --mode production --env target=electron && electron-builder",
+    "build:electron:demo": "tsc --project electron/tsconfig.json && webpack --mode production --env target=electron demo=true && electron-builder",
+    "build:android": "webpack --mode production --env target=android && cap sync android",
+    "build:android:demo": "webpack --mode production --env target=android demo=true && cap sync android",
     "test": "jest",
     "lint": "eslint \"{src,tests}/**/*.ts\" --max-warnings=0",
     "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
+    "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
+    "concurrently": "^9.0.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.0.0",
     "eslint": "^8.57.0",
     "html-webpack-plugin": "^5.6.6",
     "jest": "^29.7.0",
@@ -27,5 +39,28 @@
   },
   "overrides": {
     "uuid": "^11.1.1"
+  },
+  "build": {
+    "appId": "com.pipes.game",
+    "productName": "Cool Pipes",
+    "files": [
+      "dist/**/*",
+      "electron-dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "mac": {
+      "target": "dmg"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
   }
 }
