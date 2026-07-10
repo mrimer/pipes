@@ -1,6 +1,8 @@
 {
     "version": "2.0.0",
     "tasks": [
+
+        // ── Shared helpers ────────────────────────────────────────────────────
         {
             "label": "kill-port-8080",
             "type": "shell",
@@ -12,23 +14,99 @@
             "presentation": { "reveal": "silent", "panel": "shared" }
         },
         {
+            // Compile electron/main.ts + preload.ts → electron-dist/
+            "label": "tsc: electron",
+            "type": "shell",
+            "command": "npx tsc --project electron/tsconfig.json",
+            "presentation": { "reveal": "silent", "panel": "shared" },
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            // One-shot dev renderer bundle for Electron (used by Debug launch config)
+            "label": "webpack: electron renderer (dev)",
+            "type": "shell",
+            "command": "npx webpack --mode development --env target=electron devControls=true",
+            "presentation": { "reveal": "silent", "panel": "shared" },
+            "problemMatcher": []
+        },
+        {
+            // Compound pre-launch: build main process + renderer in parallel
+            "label": "build: electron (dev)",
+            "dependsOn": ["tsc: electron", "webpack: electron renderer (dev)"],
+            "dependsOrder": "parallel",
+            "presentation": { "reveal": "silent" },
+            "problemMatcher": []
+        },
+
+        // ── Dev servers ───────────────────────────────────────────────────────
+        {
+            "label": "npm: dev",
             "type": "npm",
             "script": "dev",
-            "label": "npm: dev",
             "isBackground": true,
             "dependsOn": "kill-port-8080",
             "problemMatcher": {
                 "owner": "webpack",
-                "pattern": {
-                    "regexp": "^ERROR in (.*)$",
-                    "file": 1
-                },
+                "pattern": { "regexp": "^ERROR in (.*)$", "file": 1 },
                 "background": {
                     "activeOnStart": true,
                     "beginsPattern": "webpack",
                     "endsPattern": "compiled"
                 }
             }
+        },
+        {
+            // Compiles the main process first, then starts webpack watch + Electron.
+            // Use the "Debug: Electron" launch config instead for breakpoints in main.ts.
+            "label": "npm: dev:electron",
+            "type": "npm",
+            "script": "dev:electron",
+            "isBackground": true,
+            "dependsOn": "tsc: electron",
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": {
+                "owner": "webpack",
+                "pattern": { "regexp": "^ERROR in (.*)$", "file": 1 },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "webpack",
+                    "endsPattern": "compiled"
+                }
+            }
+        },
+
+        // ── Production builds ─────────────────────────────────────────────────
+        {
+            "label": "npm: build:web",
+            "type": "npm",
+            "script": "build:web",
+            "group": { "kind": "build", "isDefault": true },
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            "label": "npm: build:web:demo",
+            "type": "npm",
+            "script": "build:web:demo",
+            "group": "build",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            "label": "npm: build:electron",
+            "type": "npm",
+            "script": "build:electron",
+            "group": "build",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$tsc"]
+        },
+        {
+            "label": "npm: build:electron:demo",
+            "type": "npm",
+            "script": "build:electron:demo",
+            "group": "build",
+            "presentation": { "reveal": "always", "panel": "shared" },
+            "problemMatcher": ["$tsc"]
         }
     ]
 }

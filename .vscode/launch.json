@@ -1,16 +1,37 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        // ── Web ───────────────────────────────────────────────────────────────
         {
+            // Starts the webpack dev server then opens Chrome with the VS Code debugger
+            // attached. Set breakpoints in any src/ file and they will hit.
+            "name": "Debug: Web",
             "type": "chrome",
             "request": "launch",
-            "name": "Launch Chrome against localhost",
             "url": "http://localhost:8080",
             "webRoot": "${workspaceFolder}",
             "preLaunchTask": "npm: dev"
+        },
+
+        // ── Electron ──────────────────────────────────────────────────────────
+        {
+            // Debugs the Electron MAIN PROCESS (electron/main.ts) in VS Code.
+            // Builds both the main process and a fresh dev renderer bundle first.
+            // Breakpoints in electron/main.ts and electron/preload.ts will hit.
+            //
+            // To also debug the RENDERER (game source in src/):
+            //   Open DevTools inside the running Electron window with Ctrl+Shift+I.
+            //   Source maps are included so you can set breakpoints there as well.
+            "name": "Debug: Electron",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+            "args": ["."],
+            "outFiles": ["${workspaceFolder}/electron-dist/**/*.js"],
+            "sourceMaps": true,
+            "preLaunchTask": "build: electron (dev)"
         }
     ]
 }
