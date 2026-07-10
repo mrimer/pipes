@@ -100,7 +100,7 @@ The packaged output lands in `release/`:
 
 **Electron version:** The `electron` devDependency is pinned to `^33.0.0`. Update it to the current [LTS release](https://www.electronjs.org/docs/latest/tutorial/electron-timelines) before shipping.
 
-**Steam integration:** Install `greenworks` (Steamworks SDK wrapper) and expose Steam API calls via IPC from `electron/preload.ts`. See the comments in [electron/preload.ts](electron/preload.ts) for the pattern.
+**Steam integration:** Install [`steamworks.js`](https://github.com/ceifa/steamworks.js) (the modern Steamworks SDK wrapper for Electron) and expose the client via `contextBridge` in `electron/preload.ts` as `window.steamworksClient`. The achievement adapter in [src/platform/achievementAdapter.ts](src/platform/achievementAdapter.ts) calls `window.steamworksClient.achievement.activate(steamId)` — wire it up there. Achievement API names (`steamId` fields in `src/achievements/definitions.ts`) must be registered in the Steam partner portal before the adapter calls will do anything.
 
 ### Android / Google Play (Capacitor)
 
@@ -120,6 +120,8 @@ npm run build:android:demo  # demo build
 After `cap sync`, open `android/` in Android Studio to run on a device/emulator or produce a signed APK/AAB for the Play Store.
 
 **Storage note:** `localStorage` works in the Capacitor WebView and requires no code changes. If you later need `@capacitor/preferences` (OS-managed store), migrate `persistence.ts` to use `getStorage()` from [src/platform/storage.ts](src/platform/storage.ts) and fill in the `AndroidStorage` stub.
+
+**Google Play achievements:** Install `@capawesome-team/capacitor-google-play-games-services` and fill in the stub in [src/platform/achievementAdapter.ts](src/platform/achievementAdapter.ts). Achievement IDs (`androidId` fields in `src/achievements/definitions.ts`) come from the Google Play Console.
 
 ---
 

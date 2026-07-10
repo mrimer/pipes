@@ -19,9 +19,14 @@
  *                 cheat shortcuts, and verbose logging — never set in any
  *                 public-facing build
  */
-declare const BUILD_TARGET: 'web' | 'electron' | 'android';
-declare const IS_DEMO: boolean;
-declare const DEV_CONTROLS: boolean;
-declare const BUNDLED_CAMPAIGNS: readonly (import('./types').CampaignDef)[];
-/** Store purchase URL for the current build target. Empty string in non-demo builds. */
-declare const STORE_URL: string;
+
+import type { CampaignDef } from './types';
+
+declare global {
+  const BUILD_TARGET: 'web' | 'electron' | 'android';
+  const IS_DEMO: boolean;
+  const DEV_CONTROLS: boolean;
+  const BUNDLED_CAMPAIGNS: readonly CampaignDef[];
+  /** Store purchase URL for the current build target. Empty string in non-demo builds. */
+  const STORE_URL: string;
+}

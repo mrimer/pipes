@@ -106,6 +106,7 @@ src/
 ├── autoRecording.ts             # Auto-recording dedup helper
 ├── resumePlayer.ts              # Save-and-resume replay driver (125 ms per-move chain)
 │
+├── bundledCampaigns.ts          # Syncs bundled official campaign(s) from BUNDLED_CAMPAIGNS into localStorage at startup
 ├── persistence.ts               # All localStorage access — single source of truth for storage keys
 ├── fileIO.ts                    # Gzip+download and gzip-or-JSON file reading helpers
 ├── uiConstants.ts               # UI color tokens, border-radius constants, modal CSS strings
@@ -152,7 +153,17 @@ src/
 ├── systems/
 │   ├── thermoSimulator.ts       # Temperature cost calculations for ice/snow/sandstone tiles
 │   ├── cementSystem.ts          # Cement cell hardening mechanics and state tracking
-│   └── constraintValidator.ts   # Sandstone pressure validation errors
+│   ├── constraintValidator.ts   # Sandstone pressure validation errors
+│   ├── gameEventBus.ts          # Typed pub/sub event bus (levelStarted, levelWon, levelFailed)
+│   └── achievementSystem.ts     # Subscribes to game events, evaluates predicates, shows toast, calls adapter
+│
+├── achievements/
+│   ├── definitions.ts           # Static AchievementDef[] list; contains OFFICIAL_CAMPAIGN_ID TODO
+│   └── stats.ts                 # Per-profile cumulative stats (levels won, stars, etc.) + localStorage helpers
+│
+├── platform/
+│   ├── storage.ts               # PlatformStorage interface and BUILD_TARGET-selected implementation
+│   └── achievementAdapter.ts    # AchievementAdapter interface; Local / Steam / GooglePlay implementations
 │
 ├── visuals/
 │   ├── butterflyField.ts        # Butterfly visual effect
@@ -260,7 +271,9 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 
 **`mapScreenBase.ts` / `mapEditorBase.ts` avoid code duplication.** Chapter and campaign variants of each screen are thin wrappers; shared canvas setup, animation loop, BFS water fill, click handling, and history management live in the base.
 
-**`persistence.ts` is the single localStorage gateway.** No other file should call `localStorage.getItem/setItem` directly. All storage keys are constants defined there.
+**Achievement system uses event bus + platform adapter.** `src/systems/gameEventBus.ts` is a module-level pub/sub for typed `GameEvent` values (`levelStarted`, `levelWon`, `levelFailed`). `game.ts` dispatches events at the three key moments; `AchievementSystem` subscribes and evaluates the static `AchievementDef[]` predicates in `achievements/definitions.ts`. Platform unlock is delegated to an `AchievementAdapter` (selected by `BUILD_TARGET`) that wraps Steam (`steamworks.js`), Google Play (`@capawesome-team/capacitor-google-play-games-services`), or a no-op local stub. This keeps achievement logic fully decoupled from the existing callback chains — adding a new achievement means adding a predicate to `definitions.ts`, not modifying `game.ts`.
+
+**`persistence.ts` is the primary localStorage gateway.** All storage keys for gameplay, campaign progress, and player settings are constants defined there. Exception: self-contained subsystems that own their own data (e.g. `achievements/stats.ts`) may define their own helpers, but must follow the same `pipes_<slot>…` key-naming convention and must not overlap with keys in `persistence.ts`.
 
 **`uiConstants.ts` owns all UI style tokens.** Color strings, border-radius values, and modal CSS template strings are defined once here and imported everywhere. `colors.ts` is separate and covers only canvas-rendering colors (not UI chrome).
 
@@ -330,6 +343,10 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Campaign CRUD | `campaignEditor/campaignService.ts` |
 | Editor undo/redo | `campaignEditor/historyManager.ts` + `mapEditorBase.ts` |
 | Validation error messages | `campaignEditor/validationMessages.ts` |
+| Game event pub/sub | `systems/gameEventBus.ts` |
+| Achievement predicates and IDs | `achievements/definitions.ts` |
+| Achievement stats + per-profile persistence | `achievements/stats.ts` |
+| Platform achievement unlock (Steam / Google Play) | `platform/achievementAdapter.ts` |
 
 ---
 
@@ -347,3 +364,5 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | `campaignEditor/historyManager.ts` | Import domain types from outside `campaignEditor/` |
 | `screens/mapScreenBase.ts` | Reference chapter-specific or campaign-specific data directly (use abstract methods) |
 | `chapterMapUtils.ts` | Define new logic — it is a re-export shim only |
+| `systems/gameEventBus.ts` | Import from `game.ts`, `campaignManager.ts`, or any domain module — it must remain a pure pub/sub primitive |
+| `platform/achievementAdapter.ts` | Contain achievement predicates or stats logic — adapters only call the platform SDK |

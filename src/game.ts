@@ -79,6 +79,7 @@ import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
 import { t, setEmojisEnabled } from './i18n';
 import { ResumePlayer } from './resumePlayer';
+import { dispatchGameEvent } from './systems/gameEventBus';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 3000;
@@ -918,6 +919,15 @@ export class Game implements InputCallbacks {
 
     this._checkAndShowInitialError();
 
+    if (!this._campaign.isPlaytesting && this._campaign.activeCampaign) {
+      dispatchGameEvent({
+        type: 'levelStarted',
+        campaignId: this._campaign.activeCampaign.id,
+        levelId,
+        isChallenge: !!level.challenge,
+      });
+    }
+
     // If the level starts already in a losing state, show the unplayable modal.
     if (this.board.getCurrentWater() <= 0) {
       this._showModalWithAnimation(this._unplayableModalEl, 'sparkle-red');
@@ -1251,6 +1261,14 @@ export class Game implements InputCallbacks {
     if (!this._campaign.isPlaytesting && loadRecordingSettings().recordFailures) {
       this._maybeAutoRecord('failure', undefined, undefined);
     }
+
+    if (!this._campaign.isPlaytesting && this._campaign.activeCampaign && this.currentLevel) {
+      dispatchGameEvent({
+        type: 'levelFailed',
+        campaignId: this._campaign.activeCampaign.id,
+        levelId: this.currentLevel.id,
+      });
+    }
   }
 
   /** Transition the game to the Won state and show the win modal after confetti. */
@@ -1295,6 +1313,37 @@ export class Game implements InputCallbacks {
       this.winStarsEl.innerHTML = '';
       this.winStarsEl.style.display = starsCollected > 0 ? 'block' : 'none';
     }
+    // Dispatch achievement event (after progress is persisted so completedChapterId
+    // and isCampaignComplete reflect the state that includes this level).
+    if (!this._campaign.isPlaytesting && this._campaign.activeCampaign) {
+      const campaign = this._campaign.activeCampaign;
+      const progress = this._campaign.progress;
+      const currentLevelId = this.currentLevel.id;
+      let completedChapterId: number | null = null;
+      const chapter = campaign.chapters.find(
+        (ch) => ch.levels.some((l) => l.id === currentLevelId),
+      );
+      if (chapter !== undefined) {
+        const allNonChallengeComplete = chapter.levels
+          .filter((l) => !l.challenge)
+          .every((l) => progress.has(l.id));
+        if (allNonChallengeComplete) completedChapterId = chapter.id;
+      }
+      const isCampaignComplete = campaign.chapters.every((ch) =>
+        ch.levels.filter((l) => !l.challenge).every((l) => progress.has(l.id)),
+      );
+      dispatchGameEvent({
+        type: 'levelWon',
+        campaignId: campaign.id,
+        levelId: currentLevelId,
+        stars: starsCollected,
+        waterRemaining,
+        isChallenge,
+        completedChapterId,
+        isCampaignComplete,
+      });
+    }
+
     // Play win sound immediately on winning, then spawn confetti and show modal.
     sfxManager.play(SfxId.WinLevel);
 

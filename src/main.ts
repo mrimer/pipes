@@ -1,4 +1,6 @@
 import { Game } from './game';
+import { AchievementSystem } from './systems/achievementSystem';
+import { getAchievementAdapter } from './platform/achievementAdapter';
 import { sfxManager, SfxId } from './audio/sfxManager';
 import { loadSfxVolume, loadTouchUiEnabled } from './persistence';
 import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
@@ -148,6 +150,9 @@ async function bootstrap(): Promise<void> {
     redoBtnEl,
     exitBtnEl,
   );
+
+  const achievementSystem = new AchievementSystem(getAchievementAdapter());
+  achievementSystem.init();
 
   // Attach a persistent water-wave background animation (alpha 0.2) to the inventory box, stats box, and best-score box.
   attachInventoryWaveAnimation(statsBoxEl);
