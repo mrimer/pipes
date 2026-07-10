@@ -50,8 +50,8 @@
                 "pattern": { "regexp": "^ERROR in (.*)$", "file": 1 },
                 "background": {
                     "activeOnStart": true,
-                    "beginsPattern": "webpack",
-                    "endsPattern": "compiled"
+                    "beginsPattern": "webpack .* compiling",
+                    "endsPattern": "Loopback:"
                 }
             }
         },
