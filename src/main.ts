@@ -120,6 +120,15 @@ async function bootstrap(): Promise<void> {
   initLocale(['en']);
   localizeStaticChrome();
 
+  if (IS_DEMO) {
+    const badge = document.createElement('div');
+    badge.textContent = t('demo.badge');
+    badge.style.cssText =
+      'position:fixed;bottom:8px;right:10px;font-size:0.65rem;font-weight:bold;' +
+      'letter-spacing:0.15em;color:rgba(140,190,90,0.4);pointer-events:none;z-index:9999;';
+    document.body.appendChild(badge);
+  }
+
   await showSplashScreen();
   await showIntroTitleScreen();
 

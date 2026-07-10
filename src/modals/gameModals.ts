@@ -672,6 +672,20 @@ export function buildSettingsModal(
 
   box.appendChild(graphicsSection);
 
+  if (IS_DEMO && STORE_URL) {
+    const buyRow = document.createElement('div');
+    buyRow.style.cssText = 'display:flex;justify-content:center;padding-top:4px;width:100%;';
+    const buyBtn = document.createElement('button');
+    buyBtn.type = 'button';
+    buyBtn.textContent = t('demo.buyNow');
+    buyBtn.style.cssText =
+      'font-size:0.85rem;font-weight:bold;background:#3d7a20;color:#e8f5d8;' +
+      'border:1px solid #6ab840;border-radius:6px;padding:6px 18px;cursor:pointer;';
+    buyBtn.addEventListener('click', () => { window.open(STORE_URL, '_blank'); });
+    buyRow.appendChild(buyBtn);
+    box.appendChild(buyRow);
+  }
+
   // ── Confirm button ───────────────────────────────────────────────────────
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
@@ -755,9 +769,22 @@ export function buildCampaignMasteredModal(
   box.appendChild(nameEl);
 
   const msgEl = document.createElement('p');
-  msgEl.textContent = t('modal.campaignMastered.message');
+  msgEl.textContent = IS_DEMO
+    ? t('demo.upsell.message')
+    : t('modal.campaignMastered.message');
   msgEl.style.cssText = 'color:#eee;font-size:1rem;margin:0 0 20px;';
   box.appendChild(msgEl);
+
+  if (IS_DEMO && STORE_URL) {
+    const buyBtn = createButton(
+      t('demo.buyNow'),
+      '#3d7a20',
+      '#e8f5d8',
+      () => { window.open(STORE_URL, '_blank'); },
+      'padding:10px 28px;font-size:1rem;border:1px solid #6ab840;margin-bottom:8px;',
+    );
+    box.appendChild(buyBtn);
+  }
 
   const kudosBtn = createButton(
     t('modal.campaignMastered.button'),

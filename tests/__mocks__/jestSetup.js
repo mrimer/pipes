@@ -14,3 +14,4 @@ globalThis.BUILD_TARGET       = 'web';
 globalThis.IS_DEMO            = false;
 globalThis.DEV_CONTROLS       = false;
 globalThis.BUNDLED_CAMPAIGNS  = [];
+globalThis.STORE_URL          = '';

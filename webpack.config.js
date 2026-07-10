@@ -40,6 +40,15 @@ module.exports = (env = {}, argv) => {
 
   const bundledCampaigns = loadCampaignFiles(isDemo ? 'demo' : 'full');
 
+  // Purchase URLs per target.
+  // TODO: replace each STUB value with the real store URL before shipping a demo build.
+  const storeUrls = {
+    web:      'https://STUB_WEB_STORE_URL',
+    electron: 'https://STUB_STEAM_STORE_URL',
+    android:  'https://STUB_GOOGLE_PLAY_URL',
+  };
+  const storeUrl = isDemo ? (storeUrls[target] ?? '') : '';
+
   // Electron renderer and Android (Capacitor WebView) load assets from disk
   // via file:// URLs and always need relative paths. The dev server needs an
   // absolute publicPath so its "Cannot GET /" errors don't appear.
@@ -101,6 +110,7 @@ module.exports = (env = {}, argv) => {
         IS_DEMO:             JSON.stringify(isDemo),
         DEV_CONTROLS:        JSON.stringify(devControls),
         BUNDLED_CAMPAIGNS:   JSON.stringify(bundledCampaigns),
+        STORE_URL:           JSON.stringify(storeUrl),
       }),
     ],
 

@@ -301,6 +301,33 @@ export function renderLevelList(
     levelListEl.appendChild(h2);
   }
 
+  if (IS_DEMO && STORE_URL) {
+    const banner = document.createElement('div');
+    banner.style.cssText =
+      'display:flex;align-items:center;justify-content:space-between;gap:12px;' +
+      'background:#111e0a;border:1px solid #4a8a2a;border-radius:6px;' +
+      'padding:8px 14px;margin-top:4px;';
+
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:0.82rem;font-weight:bold;color:#8cbf5a;letter-spacing:0.05em;';
+    label.textContent = t('demo.badge');
+
+    const buyBtn = document.createElement('button');
+    buyBtn.type = 'button';
+    buyBtn.textContent = t('demo.buyNow');
+    buyBtn.style.cssText =
+      'font-size:0.8rem;font-weight:bold;background:#3d7a20;color:#e8f5d8;' +
+      'border:1px solid #6ab840;border-radius:4px;padding:4px 12px;cursor:pointer;white-space:nowrap;';
+    buyBtn.addEventListener('click', () => {
+      sfxManager.play(SfxId.Click);
+      window.open(STORE_URL, '_blank');
+    });
+
+    banner.appendChild(label);
+    banner.appendChild(buyBtn);
+    levelListEl.appendChild(banner);
+  }
+
   if (!activeCampaign) {
     const msg = document.createElement('p');
     msg.style.cssText =

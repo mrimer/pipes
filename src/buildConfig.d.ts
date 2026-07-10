@@ -23,3 +23,5 @@ declare const BUILD_TARGET: 'web' | 'electron' | 'android';
 declare const IS_DEMO: boolean;
 declare const DEV_CONTROLS: boolean;
 declare const BUNDLED_CAMPAIGNS: readonly (import('./types').CampaignDef)[];
+/** Store purchase URL for the current build target. Empty string in non-demo builds. */
+declare const STORE_URL: string;
