@@ -40,12 +40,11 @@ module.exports = (env = {}, argv) => {
 
   const bundledCampaigns = loadCampaignFiles(isDemo ? 'demo' : 'full');
 
-  // Purchase URLs per target.
-  // TODO: replace each STUB value with the real store URL before shipping a demo build.
+  // Purchase URLs per target — replace with real store URLs before shipping a demo build.
   const storeUrls = {
-    web:      'https://STUB_WEB_STORE_URL',
-    electron: 'https://STUB_STEAM_STORE_URL',
-    android:  'https://STUB_GOOGLE_PLAY_URL',
+    web:      'https://example.com/buy',
+    electron: 'https://store.steampowered.com/app/YOUR_APP_ID',
+    android:  'https://play.google.com/store/apps/details?id=com.pipes.game',
   };
   const storeUrl = isDemo ? (storeUrls[target] ?? '') : '';
 
