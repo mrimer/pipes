@@ -194,9 +194,6 @@ export function renderPlacementEffects(
       continue;
     }
 
-    const cx = (e.col + 0.5) * TILE_SIZE;
-    const cy = (e.row + 0.5) * TILE_SIZE;
-
     // Dust particles scatter outward with gentle downward gravity.
     if (elapsed < DUST_DURATION) {
       const tDust = elapsed / DUST_DURATION;

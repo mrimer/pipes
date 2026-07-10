@@ -409,7 +409,7 @@ export function computeDrainOrder(
     const firstKey = disconnected.values().next().value as string;
     const [fr, fc] = parseKey(firstKey);
     const fallbackTile = board.grid[fr]?.[fc];
-    const fallbackExitDir: Direction = (fallbackTile?.connections.values().next().value as Direction | undefined) ?? DIRECTIONS[0];
+    const fallbackExitDir: Direction = (fallbackTile?.connections.values().next().value) ?? DIRECTIONS[0];
     visited.add(firstKey);
     queue.push({ row: fr, col: fc, exitDir: fallbackExitDir, depth: 0 });
   }
@@ -460,7 +460,7 @@ export function renderDrainAnims(
       anims.splice(i, 1);
       continue;
     }
-    if (elapsed < 0 || anim.isContainer || !anim.waterColor) continue;
+    if (elapsed < 0 || !!anim.isContainer || !anim.waterColor) continue;
     const progress = elapsed / FILL_ANIM_DURATION;
     const connections = tileConnectionsMap.get(posKey(anim.row, anim.col));
     if (!connections) continue;

@@ -2204,7 +2204,7 @@ export function renderBoard(
   // Tiles in fillExclude are rendered dry so the fill overlay can paint water on top.
   // Tiles in drainInclude are rendered as filled (water) so the drain overlay can paint dry on top.
   let effectiveFilled: Set<string>;
-  const needsModified = (fillExclude && fillExclude.size > 0) || (drainInclude && drainInclude.size > 0);
+  const needsModified = (fillExclude !== undefined && fillExclude.size > 0) || (drainInclude !== undefined && drainInclude.size > 0);
   if (needsModified) {
     effectiveFilled = new Set<string>(filled);
     if (fillExclude) {

@@ -81,7 +81,7 @@ import { ResumePlayer } from './resumePlayer';
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 3000;
 /** Delay (ms) after the win-level sfx before playing the star sfx and sparkles. */
-const STAR_SFX_DELAY_MS = 500;
+const _STAR_SFX_DELAY_MS = 500;
 /** Must match the `modal-fade-in` animation duration in index.html (ms). */
 const WIN_MODAL_FADE_MS = 900;
 /** Delay between each star popping in on the win modal (ms). */
