@@ -5,6 +5,7 @@ import { attachInventoryWaveAnimation } from './visuals/chapterWaves';
 import { hasTouchUiSupport, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { migrateIfNeeded, loadActiveSlotIndex } from './profile/playerProfileSlots';
 import { setActiveSlotIndex } from './profile/activeProfile';
+import { syncBundledCampaigns } from './bundledCampaigns';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
 import { BG_COLOR } from './colors';
 import { setEnvironmentalEnabled } from './graphicsSettings';
@@ -16,6 +17,9 @@ import { en } from './i18n/en';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
+
+// ─── Step 1b: sync bundled official campaign(s) into local storage ────────────
+syncBundledCampaigns();
 
 // ─── Step 2: activate the persisted slot (if any) ────────────────────────────
 const savedActiveSlot = loadActiveSlotIndex();

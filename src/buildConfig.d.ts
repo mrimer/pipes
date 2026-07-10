@@ -22,3 +22,4 @@
 declare const BUILD_TARGET: 'web' | 'electron' | 'android';
 declare const IS_DEMO: boolean;
 declare const DEV_CONTROLS: boolean;
+declare const BUNDLED_CAMPAIGNS: readonly (import('./types').CampaignDef)[];

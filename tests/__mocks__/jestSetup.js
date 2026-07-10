@@ -10,6 +10,7 @@ if (typeof globalThis.structuredClone === 'undefined') {
 // Webpack DefinePlugin build constants — default to a non-demo web build.
 // Any test that imports src/platform/storage.ts or branches on these constants
 // will get deterministic, non-demo, non-devControls web values unless overridden.
-globalThis.BUILD_TARGET  = 'web';
-globalThis.IS_DEMO       = false;
-globalThis.DEV_CONTROLS  = false;
+globalThis.BUILD_TARGET       = 'web';
+globalThis.IS_DEMO            = false;
+globalThis.DEV_CONTROLS       = false;
+globalThis.BUNDLED_CAMPAIGNS  = [];

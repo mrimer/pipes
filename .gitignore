@@ -4,6 +4,9 @@ coverage/
 *.js.map
 electron-dist/
 release/
+releases/
+campaigns/full/*.json.gz
+campaigns/demo/*.json.gz
 android/.gradle/
 android/app/build/
 android/build/

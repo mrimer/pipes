@@ -1,6 +1,20 @@
 const path = require('path');
+const fs   = require('fs');
+const zlib = require('zlib');
 const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+
+/** Read all .json.gz files from a campaigns sub-directory and return their parsed contents. */
+function loadCampaignFiles(subdir) {
+  const dir = path.resolve(__dirname, 'campaigns', subdir);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter(f => f.endsWith('.json.gz'))
+    .map(f => {
+      const compressed = fs.readFileSync(path.join(dir, f));
+      return JSON.parse(zlib.gunzipSync(compressed).toString('utf8'));
+    });
+}
 
 /**
  * Webpack configuration factory.
@@ -23,6 +37,8 @@ module.exports = (env = {}, argv) => {
   const isDemo      = !!env.demo;
   const devControls = !!env.devControls;
   const isProd      = argv.mode === 'production';
+
+  const bundledCampaigns = loadCampaignFiles(isDemo ? 'demo' : 'full');
 
   // Electron renderer and Android (Capacitor WebView) load assets from disk
   // via file:// URLs and always need relative paths. The dev server needs an
@@ -81,9 +97,10 @@ module.exports = (env = {}, argv) => {
       new webpack.DefinePlugin({
         // JSON.stringify so the injected value is a quoted string literal, not
         // a bare identifier that webpack would try to resolve as a variable.
-        BUILD_TARGET:   JSON.stringify(target),
-        IS_DEMO:        JSON.stringify(isDemo),
-        DEV_CONTROLS:   JSON.stringify(devControls),
+        BUILD_TARGET:        JSON.stringify(target),
+        IS_DEMO:             JSON.stringify(isDemo),
+        DEV_CONTROLS:        JSON.stringify(devControls),
+        BUNDLED_CAMPAIGNS:   JSON.stringify(bundledCampaigns),
       }),
     ],
 

@@ -75,6 +75,16 @@
             }
         },
 
+        // ── Release pipeline ──────────────────────────────────────────────────
+        {
+            "label": "npm: release",
+            "type": "npm",
+            "script": "release",
+            "group": "build",
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": []
+        },
+
         // ── Production builds ─────────────────────────────────────────────────
         {
             "label": "npm: build:web",

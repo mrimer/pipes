@@ -16,7 +16,8 @@
     "build:android:demo": "webpack --mode production --env target=android demo=true && cap sync android",
     "test": "jest",
     "lint": "eslint \"{src,tests}/**/*.ts\" --max-warnings=0",
-    "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix"
+    "lint:fix": "eslint \"{src,tests}/**/*.ts\" --fix",
+    "release": "node scripts/build-release.js"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
