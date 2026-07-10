@@ -1068,9 +1068,12 @@ const IMPORT_RESULT_MODAL_OVERLAY_ALPHA = 0.7;
  *                              and `isNewSlot` is true, the name is displayed in the modal.
  */
 export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], isNewSlot: boolean, importedPlayerName?: string): void {
-  // Format "N noun[s]" with an optional verb suffix appended when !isNewSlot.
-  const statLine = (n: number, singular: string, plural: string, verb: string): string =>
-    `${n} ${n === 1 ? singular : plural}${isNewSlot ? '' : ` ${verb}`}`;
+  // Format "N noun[s]" — noun/verb args are i18n keys; emoji args pass through (t() returns the key when not found).
+  const statLine = (n: number, singularKey: string, pluralKey: string, verbKey: string): string => {
+    const noun = t(n === 1 ? singularKey : pluralKey);
+    const verb = isNewSlot ? '' : ` ${t(verbKey)}`;
+    return `${n} ${noun}${verb}`;
+  };
 
   const el = createModalOverlay(IMPORT_RESULT_MODAL_OVERLAY_ALPHA);
   const box = document.createElement('div');
@@ -1101,7 +1104,9 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   if (merged.length > 0) {
     const mergedHeader = document.createElement('h3');
     mergedHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#7ed321;';
-    mergedHeader.textContent = isNewSlot ? '✅ Campaign progress imported' : '✅ Campaign progress merged';
+    mergedHeader.textContent = isNewSlot
+      ? t('import.progressHeader.imported')
+      : t('import.progressHeader.merged');
     box.appendChild(mergedHeader);
 
     const ul = document.createElement('ul');
@@ -1115,15 +1120,15 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
 
       const stats: string[] = [];
       if (o.newLevelsCompleted > 0)
-        stats.push(statLine(o.newLevelsCompleted, 'level', 'levels', 'completed'));
+        stats.push(statLine(o.newLevelsCompleted, 'import.stats.levelWord', 'import.stats.levelsWord', 'import.stats.completedVerb'));
       if (o.newChaptersCompleted > 0)
-        stats.push(statLine(o.newChaptersCompleted, 'chapter', 'chapters', 'completed'));
+        stats.push(statLine(o.newChaptersCompleted, 'import.stats.chapterWord', 'import.stats.chaptersWord', 'import.stats.completedVerb'));
       if (o.newStars > 0)
-        stats.push(statLine(o.newStars, '⭐', '⭐', 'added'));
+        stats.push(statLine(o.newStars, '⭐', '⭐', 'import.stats.addedVerb'));
       if (o.newWater > 0)
-        stats.push(statLine(o.newWater, '💧', '💧', 'added'));
+        stats.push(statLine(o.newWater, '💧', '💧', 'import.stats.addedVerb'));
       if (o.newRecordings > 0)
-        stats.push(`${o.newRecordings} recording${o.newRecordings !== 1 ? 's' : ''} imported`);
+        stats.push(t(o.newRecordings === 1 ? 'import.stats.recordingImported' : 'import.stats.recordingsImported', { count: o.newRecordings }));
 
       if (stats.length > 0) {
         const detail = document.createElement('span');
@@ -1133,7 +1138,9 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
       } else {
         const detail = document.createElement('span');
         detail.style.cssText = 'color:#a0a0a0;';
-        detail.textContent = isNewSlot ? ' — no campaign progress' : ' — already up to date';
+        detail.textContent = isNewSlot
+          ? ` — ${t('import.stats.noCampaignProgress')}`
+          : ` — ${t('import.stats.alreadyUpToDate')}`;
         li.appendChild(detail);
       }
       ul.appendChild(li);
@@ -1164,9 +1171,10 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
 
   const note = document.createElement('p');
   note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';
+  const hasMerged = merged.length > 0;
   note.textContent = isNewSlot
-    ? 'Settings loaded. Campaign progress has been imported.'
-    : 'Settings updated. Campaign progress has been merged.';
+    ? t(hasMerged ? 'import.note.new' : 'import.note.newNoProgress')
+    : t(hasMerged ? 'import.note.merge' : 'import.note.mergeNoProgress');
   box.appendChild(note);
 
   const closeBtn = document.createElement('button');

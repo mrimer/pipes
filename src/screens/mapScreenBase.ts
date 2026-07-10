@@ -1524,7 +1524,7 @@ export abstract class MapScreenBase {
         complete.style.color = SUCCESS_COLOR;
         complete.style.fontSize = '1rem';
         complete.style.fontWeight = 'bold';
-        complete.textContent = '✅ Level Complete!';
+        complete.textContent = t('game.levelComplete');
         this._statusEl.replaceChildren(complete);
       }
     } else {

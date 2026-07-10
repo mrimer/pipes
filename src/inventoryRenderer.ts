@@ -32,7 +32,7 @@ export function renderInventoryBar(
   const savedCanvases = Array.from(inventoryBarEl.querySelectorAll<HTMLCanvasElement>(':scope > canvas'));
   const title = document.createElement('h3');
   title.className = 'inv-title';
-  title.textContent = 'Inventory';
+  title.textContent = t('inventory.title');
   inventoryBarEl.replaceChildren(title);
   for (const cv of savedCanvases) inventoryBarEl.appendChild(cv);
 

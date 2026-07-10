@@ -275,11 +275,11 @@ export function buildPlaybackListModal(callbacks: PlaybackListCallbacks): HTMLEl
     return btn;
   };
 
-  const replayBtn  = makeBtn('Replay',  true);
-  const returnBtn  = makeBtn('Return',  false);
-  const deleteBtn  = makeBtn('Delete',  false);
-  const exportBtn  = makeBtn('Export',  false);
-  const importBtn  = makeBtn('Import',  false);
+  const replayBtn  = makeBtn(t('recording.list.btnReplay'),  true);
+  const returnBtn  = makeBtn(t('recording.list.btnReturn'),  false);
+  const deleteBtn  = makeBtn(t('recording.list.btnDelete'),  false);
+  const exportBtn  = makeBtn(t('recording.list.btnExport'),  false);
+  const importBtn  = makeBtn(t('recording.list.btnImport'),  false);
 
   const setSelectedRecord = (record: PlaySequenceRecord | null): void => {
     selectedRecord = record;
