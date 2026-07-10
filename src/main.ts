@@ -9,10 +9,10 @@ import { syncBundledCampaigns } from './bundledCampaigns';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
 import { BG_COLOR } from './colors';
 import { setEnvironmentalEnabled } from './graphicsSettings';
-import { loadBackgroundEnabled, loadEnvironmentalEnabled } from './persistence';
+import { loadBackgroundEnabled, loadEnvironmentalEnabled, loadEmojisEnabled } from './persistence';
 import { showIntroTitleScreen } from './screens/titleScreen';
 import { showSplashScreen } from './screens/splashScreen';
-import { initLocale, registerTranslations, t } from './i18n';
+import { initLocale, registerTranslations, setEmojisEnabled, t } from './i18n';
 import { en } from './i18n/en';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
@@ -118,6 +118,7 @@ const rulesBtnEl     = getEl<HTMLButtonElement>('rules-btn');
 async function bootstrap(): Promise<void> {
   registerTranslations('en', en);
   initLocale(['en']);
+  setEmojisEnabled(loadEmojisEnabled());
   localizeStaticChrome();
 
   if (IS_DEMO) {

@@ -226,6 +226,7 @@ export const en: TranslationTable = {
   'settings.graphics.title': '🖼️ Graphics',
   'settings.graphics.background': 'Background',
   'settings.graphics.environmental': 'Environmental',
+  'settings.emojis': 'Show emojis in text',
   'settings.confirm': 'Confirm',
   'common.close': 'Close',
 

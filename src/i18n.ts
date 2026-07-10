@@ -7,6 +7,18 @@ export type { Locale, TranslationParams, TranslationTable } from './i18nTypes';
 const DEFAULT_LOCALE = 'en';
 const tables = new Map<Locale, TranslationTable>([[DEFAULT_LOCALE, en]]);
 let currentLocale: Locale = DEFAULT_LOCALE;
+let emojisEnabled = false;
+
+export function setEmojisEnabled(enabled: boolean): void {
+  emojisEnabled = enabled;
+}
+
+function stripEmoji(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}️?(‍\p{Extended_Pictographic}️?)*/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
 
 function interpolate(message: string, params?: TranslationParams): string {
   if (!params) return message;
@@ -30,6 +42,7 @@ export function getLocale(): Locale {
 
 export function resetI18n(): void {
   currentLocale = DEFAULT_LOCALE;
+  emojisEnabled = false;
   tables.clear();
   tables.set(DEFAULT_LOCALE, en);
 }
@@ -56,5 +69,6 @@ export function t(key: string, params?: TranslationParams): string {
   const currentTable = tables.get(currentLocale);
   const fallbackTable = tables.get(DEFAULT_LOCALE);
   const message = currentTable?.[key] ?? fallbackTable?.[key] ?? key;
-  return interpolate(message, params);
+  const interpolated = interpolate(message, params);
+  return emojisEnabled ? interpolated : stripEmoji(interpolated);
 }

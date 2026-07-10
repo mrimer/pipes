@@ -1,4 +1,4 @@
-import { getLocale, registerTranslations, resetI18n, setLocale, t } from '../src/i18n';
+import { getLocale, registerTranslations, resetI18n, setEmojisEnabled, setLocale, t } from '../src/i18n';
 
 describe('i18n', () => {
   afterEach(() => {
@@ -12,6 +12,7 @@ describe('i18n', () => {
   });
 
   it('uses registered locale overrides and falls back to English for missing keys', () => {
+    setEmojisEnabled(true);
     registerTranslations('pirate', {
       'profile.title': '🏴‍☠️ Choose Pirate',
       'recording.delete.message': 'Keelhaul {playerName}?',
@@ -24,12 +25,25 @@ describe('i18n', () => {
   });
 
   it('resets back to the default English catalog', () => {
-    registerTranslations('pirate', { 'profile.title': '��‍☠️ Choose Pirate' });
+    setEmojisEnabled(true);
+    registerTranslations('pirate', { 'profile.title': '🏴‍☠️ Choose Pirate' });
     setLocale('pirate');
     resetI18n();
 
     expect(getLocale()).toBe('en');
-    expect(t('profile.title')).toBe('👤 Select Player');
+    expect(t('profile.title')).toBe('Select Player');
+  });
+
+  it('strips emoji from translated strings when emojis are disabled', () => {
+    setEmojisEnabled(false);
+    registerTranslations('en', { 'test.emoji': '⭐ Great job! 🎉' });
+    expect(t('test.emoji')).toBe('Great job!');
+  });
+
+  it('preserves emoji in translated strings when emojis are enabled', () => {
+    setEmojisEnabled(true);
+    registerTranslations('en', { 'test.emoji': '⭐ Great job! 🎉' });
+    expect(t('test.emoji')).toBe('⭐ Great job! 🎉');
   });
 
   it('coerces numeric params to string', () => {

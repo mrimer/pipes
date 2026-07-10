@@ -25,6 +25,8 @@ import {
   saveEnvironmentalEnabled,
   loadMusicMuteOnFocusLoss,
   saveMusicMuteOnFocusLoss,
+  loadEmojisEnabled,
+  saveEmojisEnabled,
   savePartialProgressEntry,
   deletePartialProgress,
   getPartialProgressFor,
@@ -75,7 +77,7 @@ import { CloudShadowField } from './visuals/cloudShadows';
 import { FireflyField } from './visuals/fireflyField';
 import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
-import { t } from './i18n';
+import { t, setEmojisEnabled } from './i18n';
 import { ResumePlayer } from './resumePlayer';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
@@ -417,6 +419,7 @@ export class Game implements InputCallbacks {
         const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
         const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
         const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
+        const emojisToggle = el.querySelector<HTMLInputElement>('[data-emojis-enabled]');
         sfxManager.play(SfxId.Click);
         saveSfxVolume(sfxManager.getVolume());
         saveMusicVolume(musicManager.getVolume());
@@ -428,6 +431,9 @@ export class Game implements InputCallbacks {
         saveBackgroundEnabled(bgToggle?.checked ?? true);
         saveEnvironmentalEnabled(envToggle?.checked ?? true);
         saveMusicMuteOnFocusLoss(muteOnFocusLossToggle?.checked ?? true);
+        const emojisOn = emojisToggle?.checked ?? false;
+        saveEmojisEnabled(emojisOn);
+        setEmojisEnabled(emojisOn);
         el.style.display = 'none';
       },
       () => loadRecordingSettings(),
@@ -445,6 +451,7 @@ export class Game implements InputCallbacks {
       // Mute on focus loss: initial value and live toggle
       loadMusicMuteOnFocusLoss(),
       (enabled) => { musicManager.setMuteOnFocusLoss(enabled); },
+      loadEmojisEnabled(),
     );
     applyScrollingPipeBackground(this._settingsModalEl, {
       baseColor: UI_OVERLAY_BG,

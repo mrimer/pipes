@@ -327,6 +327,7 @@ export function buildSettingsModal(
   onCancel?: (el: HTMLElement) => void,
   initialMusicMuteOnFocusLoss = true,
   onMusicMuteOnFocusLossChange?: (enabled: boolean) => void,
+  initialEmojisEnabled = false,
 ): HTMLElement {
   const el = createModalOverlay(0.5);
   const box = document.createElement('div');
@@ -669,6 +670,7 @@ export function buildSettingsModal(
 
   makeGraphicsToggleRow(t('settings.graphics.background'), 'graphicsBackground', initialBackgroundEnabled, onBackgroundChange);
   makeGraphicsToggleRow(t('settings.graphics.environmental'), 'graphicsEnvironmental', initialEnvironmentalEnabled, onEnvironmentalChange);
+  makeGraphicsToggleRow(t('settings.emojis'), 'emojisEnabled', initialEmojisEnabled);
 
   box.appendChild(graphicsSection);
 

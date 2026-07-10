@@ -866,6 +866,31 @@ export function saveEnvironmentalEnabled(enabled: boolean): void {
     }
   } catch { /* ignore */ }
 }
+
+const EMOJIS_ENABLED_KEY = (): string => `pipes_${p()}emojis_enabled`;
+
+/**
+ * Load the persisted emoji-in-text setting.
+ * @returns false by default (emojis stripped) unless the player has explicitly enabled them.
+ */
+export function loadEmojisEnabled(): boolean {
+  try {
+    if (localStorage.getItem(EMOJIS_ENABLED_KEY()) === '1') return true;
+  } catch { /* ignore */ }
+  return false;
+}
+
+/** Persist the emoji-in-text setting. */
+export function saveEmojisEnabled(enabled: boolean): void {
+  try {
+    if (enabled) {
+      localStorage.setItem(EMOJIS_ENABLED_KEY(), '1');
+    } else {
+      localStorage.removeItem(EMOJIS_ENABLED_KEY());
+    }
+  } catch { /* ignore */ }
+}
+
 // ─── Partial-progress persistence ────────────────────────────────────────────
 
 /** Storage key for the partial-progress array (one JSON array per profile slot). */

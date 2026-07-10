@@ -12,6 +12,7 @@ module.exports = {
   // jsdom-provided globals (document/window/localStorage) are available in
   // tests that opt into jsdom.
   setupFiles: ['<rootDir>/tests/__mocks__/jestSetup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/__mocks__/jestSetupAfterFramework.js'],
   collectCoverageFrom: ['src/**/*.ts', '!src/main.ts', '!src/game.ts'],
   coverageThreshold: {
     './src/board.ts': { lines: 80 },
