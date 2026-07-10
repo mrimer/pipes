@@ -230,24 +230,16 @@ export function renderLevelList(
   // ── Campaign-state header ──────────────────────────────────────────────────
   if (onSettingsClick) {
     // Row containing the player-profile button (left), optional "Select a Level"
-    // heading (only when a campaign is active), and the gear/settings button (right).
-    // Rendered unconditionally so the icon buttons are always accessible.
+    // heading (center), and the gear/settings button (right).
+    // Three-column flex: left and right slots each take flex:1 so the heading is
+    // always exactly centered with guaranteed horizontal buffer on both sides,
+    // even when the heading text is wide or the icon buttons are narrow.
     const selectRow = document.createElement('div');
-    selectRow.style.cssText =
-      'display:flex;align-items:center;justify-content:center;gap:10px;width:100%;position:relative;';
+    selectRow.style.cssText = 'display:flex;align-items:center;width:100%;';
 
-    const gearBtn = document.createElement('button');
-    gearBtn.type = 'button';
-    gearBtn.title = t('levelSelect.settings');
-    gearBtn.setAttribute('aria-label', t('levelSelect.settings'));
-    gearBtn.textContent = '⚙️';
-    gearBtn.style.cssText =
-      'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
-      'position:absolute;right:0;';
-    gearBtn.addEventListener('click', () => {
-      sfxManager.play(SfxId.Click);
-      onSettingsClick();
-    });
+    // Left slot — always rendered so the center heading stays anchored
+    const leftSlot = document.createElement('div');
+    leftSlot.style.cssText = 'flex:1;display:flex;align-items:center;';
 
     if (onPlayerProfileClick) {
       const profileBtn = document.createElement('button');
@@ -258,14 +250,15 @@ export function renderLevelList(
       profileBtn.setAttribute('aria-label', t('levelSelect.player.ariaLabel'));
       profileBtn.textContent = '👤';
       profileBtn.style.cssText =
-        'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:0;line-height:1;' +
-        'position:absolute;left:0;';
+        'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:4px;line-height:1;';
       profileBtn.addEventListener('click', () => {
         sfxManager.play(SfxId.Click);
         onPlayerProfileClick();
       });
-      selectRow.appendChild(profileBtn);
+      leftSlot.appendChild(profileBtn);
     }
+
+    selectRow.appendChild(leftSlot);
 
     if (activeCampaign) {
       const h2 = document.createElement('h2');
@@ -274,7 +267,24 @@ export function renderLevelList(
       selectRow.appendChild(h2);
     }
 
-    selectRow.appendChild(gearBtn);
+    // Right slot — always rendered, gear button right-aligned inside
+    const rightSlot = document.createElement('div');
+    rightSlot.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:flex-end;';
+
+    const gearBtn = document.createElement('button');
+    gearBtn.type = 'button';
+    gearBtn.title = t('levelSelect.settings');
+    gearBtn.setAttribute('aria-label', t('levelSelect.settings'));
+    gearBtn.textContent = '⚙️';
+    gearBtn.style.cssText =
+      'font-size:1.2rem;background:none;border:none;cursor:pointer;padding:4px;line-height:1;';
+    gearBtn.addEventListener('click', () => {
+      sfxManager.play(SfxId.Click);
+      onSettingsClick();
+    });
+    rightSlot.appendChild(gearBtn);
+
+    selectRow.appendChild(rightSlot);
     levelListEl.appendChild(selectRow);
 
     // Welcome line shown below the heading row when a named player is active.
