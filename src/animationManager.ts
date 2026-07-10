@@ -15,7 +15,7 @@ import {
   GOLD_PIPE_WATER_COLOR, LEAKY_PIPE_WATER_COLOR,
   GOLD_BUBBLE_COLOR,
 } from './colors';
-import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, drawConnectorGlow, connectorLitIndex } from './renderer';
+import { TILE_SIZE, LINE_WIDTH, renderContainerFillAnims, renderContainerDrainAnims, drawConnectorGlow, connectorLitIndex } from './renderer';
 import type {
   TileAnimation} from './visuals/tileAnimation';
 import { renderAnimations, animColor, ANIM_DURATION,
@@ -34,12 +34,13 @@ import {
 } from './visuals/waterParticles';
 import type { VortexParticle} from './visuals/sinkVortex';
 import { spawnVortexParticle, renderVortex } from './visuals/sinkVortex';
-import { spawnRingEffect, clearRingEffects } from './visuals/ringEffect';
+import { spawnRingEffect, spawnEchoEffect, clearRingEffects } from './visuals/ringEffect';
 import type {
-  PipeRotationAnim, PipeFillAnim} from './visuals/pipeEffects';
+  PipeRotationAnim, PipeFillAnim, PipeDrainAnim} from './visuals/pipeEffects';
 import {
   computeRotationOverrides, computeActiveFillKeys, computeFillOrder,
   renderFillAnims, FILL_ANIM_DURATION,
+  computeDrainOrder, renderDrainAnims,
 } from './visuals/pipeEffects';
 import { spawnStarSparkles, spawnStarTwinkle } from './visuals/starSparkle';
 import type { WinTileGlow} from './visuals/winTileEffect';
@@ -48,12 +49,14 @@ import type { IdlePulse} from './visuals/idlePulse';
 import { computePulseLayers, renderIdlePulse } from './visuals/idlePulse';
 import type { HeatWave} from './visuals/heatWave';
 import { tickHeatWaves, renderHeatWaves, collectHotPlateTiles } from './visuals/heatWave';
-import type { PlacementEffect, RemovalEffect, ShakeEffect, UndoFlashEffect } from './visuals/placementEffects';
+import type { PlacementEffect, RemovalEffect, ShakeEffect, UndoFlashEffect, SinkGulpEffect, GoldShimmerEffect, CementHardenEffect } from './visuals/placementEffects';
 import {
   PLACE_EFFECT_DURATION, SHAKE_DURATION,
   computePlacementScale, computeShakeOffset,
   createPlacementEffect, createRemovalEffect, createShakeEffect, createUndoFlashEffect,
+  createSinkGulpEffect, createGoldShimmerEffect, createCementHardenEffect,
   renderPlacementEffects, renderRemovalEffects, renderUndoFlashEffects,
+  renderSinkGulpEffects, renderGoldShimmerEffects, renderCementHardenEffects,
 } from './visuals/placementEffects';
 import { sfxManager, SfxId } from './audio/sfxManager';
 
@@ -102,6 +105,7 @@ export class AnimationManager {
 
   private _rotationAnims: PipeRotationAnim[] = [];
   private _fillAnims: PipeFillAnim[] = [];
+  private _drainAnims: PipeDrainAnim[] = [];
 
   private _sourceSprayDrops: SourceSprayDrop[] = [];
   /** `performance.now()` of the last source spray / dry-puff spawn. */
@@ -177,6 +181,9 @@ export class AnimationManager {
   private _removalEffects: RemovalEffect[] = [];
   private _shakeEffects: ShakeEffect[] = [];
   private _undoFlashEffects: UndoFlashEffect[] = [];
+  private _sinkGulpEffects: SinkGulpEffect[] = [];
+  private _goldShimmerEffects: GoldShimmerEffect[] = [];
+  private _cementHardenEffects: CementHardenEffect[] = [];
   /** Maps "row,col" → `performance.now()` of the last heat-wave spawn for that tile. */
   private _heatWaveLastSpawn: Map<string, number> = new Map();
   /** Cached hot-plate tile positions for the current board instance. */
@@ -306,10 +313,13 @@ export class AnimationManager {
   completeAnims(): void {
     this._rotationAnims = [];
     this._fillAnims = [];
+    this._drainAnims = [];
     this._placementEffects = [];
     this._removalEffects = [];
     this._shakeEffects = [];
     this._undoFlashEffects = [];
+    this._goldShimmerEffects = [];
+    this._cementHardenEffects = [];
   }
 
   /**
@@ -351,6 +361,22 @@ export class AnimationManager {
     for (const { row, col, type } of positions) {
       this._undoFlashEffects.push(createUndoFlashEffect(row, col, type, now));
     }
+  }
+
+  spawnSinkGulp(row: number, col: number): void {
+    this._sinkGulpEffects.push(createSinkGulpEffect(row, col, performance.now()));
+  }
+
+  spawnGoldShimmer(row: number, col: number): void {
+    this._goldShimmerEffects.push(createGoldShimmerEffect(row, col, performance.now()));
+  }
+
+  spawnCementHardenEffect(row: number, col: number): void {
+    this._cementHardenEffects.push(createCementHardenEffect(row, col, performance.now()));
+  }
+
+  renderCementCracks(ctx: CanvasRenderingContext2D, now: number): void {
+    renderCementHardenEffects(ctx, this._cementHardenEffects, now);
   }
 
   getShakeOffsets(now: number): Map<string, number> {
@@ -416,6 +442,67 @@ export class AnimationManager {
     }
   }
 
+  /**
+   * Spawn drain animations for all tiles that just became disconnected from the
+   * water source.  The drain wave starts from tiles adjacent to `origin` and
+   * propagates outward in BFS order.  Each tile's dry-color overlay grows over
+   * the water fill (mirroring the fill animation geometry), and the tile remains
+   * in `drainInclude` — rendered as filled by the base board — until its
+   * animation completes.
+   */
+  spawnDrainAnims(board: Board, filledBefore: Set<string>, origin?: GridPos, startDelay = 0): void {
+    const order = computeDrainOrder(board, filledBefore, origin);
+    if (order.length === 0) return;
+    const now = performance.now();
+    for (const { row, col, exitDir, depth } of order) {
+      const tile = board.getTile({ row, col });
+      const startTime = now + startDelay + depth * FILL_ANIM_DURATION;
+      // Container tiles (non-pipe: Source, Sink, Chamber) switch appearance directly
+      // on expiry — no overlay drawn, same as isContainer in fill.
+      const isContainer = tile !== null &&
+        !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape) &&
+        !SPIN_PIPE_SHAPES.has(tile.shape) && !LEAKY_PIPE_SHAPES.has(tile.shape);
+      if (isContainer) {
+        this._drainAnims.push({ row, col, exitDir, isContainer: true, startTime });
+        continue;
+      }
+      let waterColor: string | undefined;
+      if (tile) {
+        if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
+        else if (LEAKY_PIPE_SHAPES.has(tile.shape)) waterColor = LEAKY_PIPE_WATER_COLOR;
+        else waterColor = WATER_COLOR;
+      }
+      // Pre-compute mutual connections so the overlay can use lineCap='butt' for arms
+      // that share an edge with a reciprocating adjacent tile arm (no nub past tile edge).
+      const mutualDirs = new Set<Direction>();
+      if (tile) {
+        for (const dir of tile.connections) {
+          if (board.areMutuallyConnected({ row, col }, dir)) mutualDirs.add(dir);
+        }
+      }
+      this._drainAnims.push({ row, col, exitDir, waterColor, mutualDirs, startTime });
+    }
+  }
+
+  /**
+   * Returns the set of tile keys that should be rendered as FILLED (water) by the base board
+   * even though the board state has them disconnected.
+   *
+   * Non-container tiles: included only while waiting to start (now < startTime).  Once the
+   * animation starts the tile drops to the dry base render and the water overlay takes over.
+   * Container tiles: included until animation expiry (now < startTime + FILL_ANIM_DURATION)
+   * so they switch directly from connected to disconnected appearance with no overlay.
+   */
+  getDrainInclude(now: number): Set<string> {
+    const keys = new Set<string>();
+    for (const anim of this._drainAnims) {
+      if (now < anim.startTime) {
+        keys.add(posKey(anim.row, anim.col));
+      }
+    }
+    return keys;
+  }
+
   /** Returns per-tile rotation overrides for the current frame (passed to `renderBoard`). */
   getRotationOverrides(now: number): Map<string, number> {
     return computeRotationOverrides(this._rotationAnims, now);
@@ -438,20 +525,23 @@ export class AnimationManager {
     currentPressure: number,
     now: number,
   ): void {
-    if (this._fillAnims.length === 0) return;
-    // Build a map of connections for each animating tile.
+    if (this._fillAnims.length === 0 && this._drainAnims.length === 0) return;
+    // Build a shared connections map covering both fill and drain animating tiles.
     const tileConnectionsMap = new Map<string, Set<Direction>>();
-    for (const anim of this._fillAnims) {
-      const tile = board.getTile(anim);
-      if (tile) {
-        tileConnectionsMap.set(`${anim.row},${anim.col}`, tile.connections);
+    for (const anim of (this._fillAnims as Array<{ row: number; col: number }>).concat(this._drainAnims)) {
+      const key = `${anim.row},${anim.col}`;
+      if (!tileConnectionsMap.has(key)) {
+        const tile = board.getTile(anim);
+        if (tile) tileConnectionsMap.set(key, tile.connections);
       }
     }
     renderFillAnims(this.ctx, this._fillAnims, tileConnectionsMap, LINE_WIDTH, now);
-    // Draw container (Chamber) tile reveal animations: wipe from the entry edge
-    // to the opposite edge, showing the connected state progressively.
+    renderDrainAnims(this.ctx, this._drainAnims, tileConnectionsMap, LINE_WIDTH, now);
     renderContainerFillAnims(
       this.ctx, board, this._fillAnims, water, shiftHeld, currentTemp, currentPressure, now,
+    );
+    renderContainerDrainAnims(
+      this.ctx, board, this._drainAnims, water, shiftHeld, currentTemp, currentPressure, now,
     );
   }
 
@@ -482,6 +572,8 @@ export class AnimationManager {
     renderPlacementEffects(this.ctx, this._placementEffects, now);
     renderRemovalEffects(this.ctx, this._removalEffects, now);
     renderUndoFlashEffects(this.ctx, this._undoFlashEffects, now);
+    renderGoldShimmerEffects(this.ctx, this._goldShimmerEffects, now);
+    renderSinkGulpEffects(this.ctx, this._sinkGulpEffects, now);
   }
 
   // ─── Win-flow lifecycle ───────────────────────────────────────────────────
@@ -596,6 +688,7 @@ export class AnimationManager {
     this._flowGoodDirs = null;
     this._rotationAnims = [];
     this._fillAnims = [];
+    this._drainAnims = [];
     this._nextGoldenTwinkle = 0;
     this._winTileGlows = [];
     this._activePulse = null;
@@ -607,6 +700,9 @@ export class AnimationManager {
     this._drySourcePulseGradientKey = null;
     this._shakeEffects = [];
     this._undoFlashEffects = [];
+    this._sinkGulpEffects = [];
+    this._goldShimmerEffects = [];
+    this._cementHardenEffects = [];
   }
 
   /** Clear the canvas-based level-intro ring effects (module-level state). */
@@ -626,10 +722,15 @@ export class AnimationManager {
     sfxManager.play(SfxId.Rings);
 
     const spawnSinkRing = () => {
-      spawnRingEffect(canvas, sink.col, sink.row, cols, rows, SINK_COLOR);
+      spawnRingEffect(canvas, sink.col, sink.row, cols, rows, SINK_COLOR, () => {
+        spawnEchoEffect(canvas, sink.col, sink.row, SINK_COLOR);
+      });
     };
 
-    spawnRingEffect(canvas, source.col, source.row, cols, rows, SOURCE_COLOR, spawnSinkRing);
+    spawnRingEffect(canvas, source.col, source.row, cols, rows, SOURCE_COLOR, () => {
+      spawnEchoEffect(canvas, source.col, source.row, SOURCE_COLOR);
+      spawnSinkRing();
+    });
   }
 
   // ─── Idle-pulse lifecycle ─────────────────────────────────────────────────

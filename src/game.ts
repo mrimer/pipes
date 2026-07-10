@@ -1,5 +1,5 @@
 import type { MoveResult} from './board';
-import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor } from './board';
+import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor, SPIN_PIPE_SHAPES } from './board';
 import type { Tile } from './tile';
 import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
 import { GameScreen, GameState, PipeShape } from './types';
@@ -1071,6 +1071,7 @@ export class Game implements InputCallbacks {
       scaleOverrides,
       shakeOffsets,
       fillExclude,
+      this._animMgr.getDrainInclude(now),
       () => {
         this._animMgr.renderWinTileGlowsOverlay(now);
         if (this.gameState === GameState.GameOver) {
@@ -1083,6 +1084,7 @@ export class Game implements InputCallbacks {
       // and underneath the arms.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- board is always set during play state
       () => this._animMgr.tickVortex(this.board!),
+      (ctx) => this._animMgr.renderCementCracks(ctx, now),
     );
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
@@ -1250,6 +1252,7 @@ export class Game implements InputCallbacks {
     this.gameState = GameState.Won;
     this._animMgr.initWinFlow(this.board);
     this._animMgr.initWinTileGlows(this.board);
+    this._animMgr.spawnSinkGulp(this.board.sink.row, this.board.sink.col);
     const starsCollected = this.board.getStarsCollected();
     const waterRemaining = this.board.getCurrentWater();
     const isChallenge = !!this.currentLevel.challenge;
@@ -1358,6 +1361,7 @@ export class Game implements InputCallbacks {
         this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col,
         lockedWaterImpactBefore, lockedHotPlateGainBefore,
       );
+      this._animMgr.spawnDrainAnims(this.board, filledBefore, pos);
       this._animMgr.spawnLockedCostChangeAnimations(changes);
       this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
       this._animMgr.spawnRemovalEffect(pos.row, pos.col);
@@ -1430,8 +1434,15 @@ export class Game implements InputCallbacks {
       lockedWaterImpactBefore, lockedHotPlateGainBefore,
     );
     this._animMgr.spawnFillAnims(this.board, filledBefore, fillDelay);
+    this._animMgr.spawnDrainAnims(this.board, filledBefore, rotationInfo, fillDelay);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
+    if (result.cementDecrement) {
+      const { row: cr, col: cc } = result.cementDecrement;
+      if (this.board.cementData.get(`${cr},${cc}`) === 0) {
+        this._animMgr.spawnCementHardenEffect(cr, cc);
+      }
+    }
   }
 
 
@@ -1693,7 +1704,6 @@ export class Game implements InputCallbacks {
     this._showErrorFlash(t(result.error, result.errorParams));
     if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       this._startErrorHighlight(result.errorTilePositions);
-      this._animMgr.spawnShakeEffects(result.errorTilePositions);
     }
     if (result.error === ERR_GOLD_SPACE) {
       sfxManager.play(SfxId.Locked);
@@ -1798,11 +1808,21 @@ export class Game implements InputCallbacks {
       lockedWaterImpactBefore, lockedHotPlateGainBefore,
     );
     this._animMgr.spawnFillAnims(this.board, filledBefore, PLACE_EFFECT_DURATION);
+    this._animMgr.spawnDrainAnims(this.board, filledBefore, { row: replacedRow, col: replacedCol }, PLACE_EFFECT_DURATION);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
-    if (result.cementDecrement) sfxManager.play(SfxId.Cement);
+    if (result.cementDecrement) {
+      sfxManager.play(SfxId.Cement);
+      const { row: cr, col: cc } = result.cementDecrement;
+      if (this.board.cementData.get(`${cr},${cc}`) === 0) {
+        this._animMgr.spawnCementHardenEffect(cr, cc);
+      }
+    }
 
     this._animMgr.spawnPlacementEffect(replacedRow, replacedCol);
+    if (GOLD_PIPE_SHAPES.has(placedShape) && this.board.goldSpaces.has(posKey)) {
+      this._animMgr.spawnGoldShimmer(replacedRow, replacedCol);
+    }
     this._metrics.scheduleCountBounce(placedShape);
     if (replacedTile) this._metrics.scheduleCountBounce(replacedTile.shape);
 
@@ -1850,6 +1870,9 @@ export class Game implements InputCallbacks {
       this.afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
     } else if (result.error) {
       this.handleBoardError(result);
+    } else if (currentTile && currentTile.isFixed && !SPIN_PIPE_SHAPES.has(currentTile.shape)) {
+      // Fixed non-spinner: neither replacement nor rotation is possible — shake the tile.
+      this._animMgr.spawnShakeEffects([pos]);
     }
     return true; // a board operation was attempted
   }
@@ -1870,6 +1893,10 @@ export class Game implements InputCallbacks {
   flashInventoryItemError(shape: PipeShape): void {
     this._metrics.pendingRedSparkleShapes.add(shape);
     this._renderInventoryBar();
+  }
+
+  shakeAt(pos: GridPos): void {
+    this._animMgr.spawnShakeEffects([pos]);
   }
 
   /** Returns true while a resume-replay is replaying saved moves. */

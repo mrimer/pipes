@@ -7,7 +7,7 @@ import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, pos
 import { Tile, oppositeDirection } from './tile';
 import type { GridPos, LevelStyle} from './types';
 import { PipeShape, Direction, COLD_CHAMBER_CONTENTS, floorShapeToStyle } from './types';
-import type { PipeFillAnim} from './visuals/pipeEffects';
+import type { PipeFillAnim, PipeDrainAnim } from './visuals/pipeEffects';
 import { FILL_ANIM_DURATION } from './visuals/pipeEffects';
 import { drawChamber, sandstoneColorState, drawChamberValveIcons } from './renderer/chamberRenderers';
 import { drawAmbientDecoration } from './renderer/ambientDecoration';
@@ -2191,20 +2191,28 @@ export function renderBoard(
   scaleOverrides?: Map<string, number>,
   shakeOffsets?: Map<string, number>,
   fillExclude?: Set<string>,
+  drainInclude?: Set<string>,
   winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void,
   sinkVortexFn?: () => void,
+  cementCrackFn?: (ctx: CanvasRenderingContext2D) => void,
 ): void {
   const now = Date.now();
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const filled = board.getFilledPositions();
-  // Tiles currently in a fill animation are rendered as dry so the fill overlay
-  // can draw the partial water progress on top.
+  // Tiles in fillExclude are rendered dry so the fill overlay can paint water on top.
+  // Tiles in drainInclude are rendered as filled (water) so the drain overlay can paint dry on top.
   let effectiveFilled: Set<string>;
-  if (fillExclude && fillExclude.size > 0) {
+  const needsModified = (fillExclude && fillExclude.size > 0) || (drainInclude && drainInclude.size > 0);
+  if (needsModified) {
     effectiveFilled = new Set<string>(filled);
-    for (const k of fillExclude) effectiveFilled.delete(k);
+    if (fillExclude) {
+      for (const k of fillExclude) effectiveFilled.delete(k);
+    }
+    if (drainInclude) {
+      for (const k of drainInclude) effectiveFilled.add(k);
+    }
   } else {
     effectiveFilled = filled;
   }
@@ -2216,10 +2224,12 @@ export function renderBoard(
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
   _renderPass1Backgrounds(ctx, board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha);
-  _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn);
+  _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn, shakeOffsets);
   // Win tile glow overlay: rendered above Source/Sink/Chamber content but beneath
   // pipe strokes, so it is visible on all connected tile types.
   winTileOverlayFn?.(ctx);
+  // Cement crack lines: rendered above floor/obstacle tiles but beneath pipe strokes.
+  cementCrackFn?.(ctx);
   _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets);
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);
@@ -2331,6 +2341,101 @@ export function renderContainerFillAnims(
 }
 
 /**
+ * Draw the drain animation for container tiles (Chamber, Source, Sink).
+ *
+ * The tile is drawn in its connected (water) state, clipped to the remaining-water
+ * region that shrinks as the animation progresses.  The drain sweeps in the same
+ * direction as fill (exit edge drains first, opposite side last), so the clip
+ * shrinks from the exit edge toward the opposite side.
+ */
+export function renderContainerDrainAnims(
+  ctx: CanvasRenderingContext2D,
+  board: Board,
+  anims: PipeDrainAnim[],
+  currentWater: number,
+  shiftHeld: boolean,
+  currentTemp: number,
+  currentPressure: number,
+  now: number,
+): void {
+  for (const anim of anims) {
+    if (!anim.isContainer) continue;
+    const elapsed = now - anim.startTime;
+    if (elapsed < 0 || elapsed >= FILL_ANIM_DURATION) continue;
+    const progress = elapsed / FILL_ANIM_DURATION;
+
+    const { row, col, exitDir } = anim;
+    const x = col * TILE_SIZE;
+    const y = row * TILE_SIZE;
+    const tile = board.getTile({ row, col });
+    if (!tile) continue;
+
+    // Clip to the remaining-water region.  Drain sweeps from the exit edge toward
+    // the opposite side, so remaining water is on the side opposite to exitDir.
+    // Expand by LINE_WIDTH/2 in all directions so that round-cap nubs extending
+    // past the tile boundary are included and drain smoothly instead of clipping immediately.
+    const nub = LINE_WIDTH / 2;
+    let clipX = x, clipY = y, clipW = TILE_SIZE, clipH = TILE_SIZE;
+    switch (exitDir) {
+      case Direction.North: // exit at top → remaining water shrinks upward from bottom
+        clipX = x - nub;
+        clipY = y + progress * TILE_SIZE - nub;
+        clipW = TILE_SIZE + LINE_WIDTH;
+        clipH = (1 - progress) * TILE_SIZE + LINE_WIDTH;
+        break;
+      case Direction.South: // exit at bottom → remaining water shrinks downward from top
+        clipX = x - nub;
+        clipY = y - nub;
+        clipW = TILE_SIZE + LINE_WIDTH;
+        clipH = (1 - progress) * TILE_SIZE + LINE_WIDTH;
+        break;
+      case Direction.East: // exit at right → remaining water shrinks rightward from left
+        clipX = x - nub;
+        clipY = y - nub;
+        clipW = (1 - progress) * TILE_SIZE + LINE_WIDTH;
+        clipH = TILE_SIZE + LINE_WIDTH;
+        break;
+      case Direction.West: // exit at left → remaining water shrinks leftward from right
+        clipX = x + progress * TILE_SIZE - nub;
+        clipY = y - nub;
+        clipW = (1 - progress) * TILE_SIZE + LINE_WIDTH;
+        clipH = TILE_SIZE + LINE_WIDTH;
+        break;
+    }
+
+    let lockedCost: number | null = null;
+    let lockedGain: number | null = null;
+    if (tile.shape === PipeShape.Chamber) {
+      if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
+        const impact = board.getLockedWaterImpact({ row, col });
+        if (impact !== null) lockedCost = Math.abs(impact);
+      } else if (tile.chamberContent === 'siphon') {
+        lockedGain = board.getSiphonLockedGain({ row, col });
+      } else if (tile.chamberContent === 'hot_plate') {
+        const impact = board.getLockedWaterImpact({ row, col });
+        const gain = board.getLockedHotPlateGain({ row, col });
+        if (impact !== null && gain !== null) {
+          const loss = Math.max(0, gain - impact);
+          lockedGain = gain;
+          lockedCost = loss;
+        }
+      }
+    }
+
+    const buttEndDirs = tile.shape === PipeShape.Chamber
+      ? (_computeButtEndDirs(board, row, col) ?? new Set<Direction>())
+      : _computeButtEndDirs(board, row, col);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(clipX, clipY, clipW, clipH);
+    ctx.clip();
+    drawTile(ctx, x, y, tile, true, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
+    ctx.restore();
+  }
+}
+
+/**
  * Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
  * is never covered by a neighboring empty tile's background fill.
  */
@@ -2422,6 +2527,7 @@ function _renderPass2NonPipeTiles(
   currentTemp: number,
   currentPressure: number,
   sinkVortexFn?: () => void,
+  shakeOffsets?: Map<string, number>,
 ): void {
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
@@ -2520,7 +2626,15 @@ function _renderPass2NonPipeTiles(
         };
       }
 
-      drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, tileStyle);
+      const shakeOffset = shakeOffsets?.get(posKey(r, c));
+      if (shakeOffset !== undefined) {
+        ctx.save();
+        ctx.translate(shakeOffset, 0);
+        drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, tileStyle);
+        ctx.restore();
+      } else {
+        drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, tileStyle);
+      }
     }
   }
 }

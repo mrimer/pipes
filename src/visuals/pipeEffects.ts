@@ -14,7 +14,8 @@
 import type { Direction} from '../types';
 import { DIRECTIONS } from '../types';
 import type { Board} from '../board';
-import { NEIGHBOUR_DELTA, posKey } from '../board';
+import { NEIGHBOUR_DELTA, posKey, parseKey } from '../board';
+import type { GridPos } from '../types';
 import { oppositeDirection } from '../tile';
 import { WATER_COLOR } from '../colors';
 import { TILE_SIZE } from '../renderer';
@@ -67,6 +68,37 @@ export interface PipeFillAnim {
    * appearance until the animation reaches it, but no water overlay is drawn on
    * top of it (the container switches directly to its connected appearance once
    * the animation entry expires).
+   */
+  isContainer?: boolean;
+}
+
+/** One active pipe-drain animation entry for a single tile. */
+export interface PipeDrainAnim {
+  row: number;
+  col: number;
+  /**
+   * The direction toward the disconnection origin — the water overlay shrinks from
+   * this arm's edge first (Phase 1), then from center toward other arm tips (Phase 2).
+   */
+  exitDir: Direction;
+  /** `performance.now()` when this tile's drain animation should start. */
+  startTime: number;
+  /**
+   * CSS water color for this tile's overlay strokes.
+   * Undefined for container tiles (no overlay drawn; they switch appearance on expiry).
+   */
+  waterColor?: string;
+  /**
+   * Directions where the adjacent tile has a reciprocal arm (mutual connection).
+   * The drain overlay uses `lineCap='butt'` for these directions so no round-cap nub
+   * extends past the tile edge — matching non-animated tile rendering behavior.
+   * Directions absent from this set get `lineCap='round'` (dead-end nub stays visible).
+   */
+  mutualDirs?: Set<Direction>;
+  /**
+   * When true the tile stays in drainInclude until expiry with no overlay drawn.
+   * Used for container tiles (Source, Sink, Chamber) — they switch directly from their
+   * connected appearance to their disconnected appearance, mirroring isContainer in fill.
    */
   isContainer?: boolean;
 }
@@ -324,6 +356,185 @@ function _drawFillOverlay(
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + dx * half * otherP, cy + dy * half * otherP);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+// ─── BFS drain-order computation ─────────────────────────────────────────────
+
+/**
+ * Compute the ordered list of tiles that just became disconnected from the
+ * water source (present in `filledBefore`, absent in the current filled set).
+ *
+ * BFS starts from disconnected tiles spatially adjacent to `origin` (the tile
+ * that was placed, rotated, or reclaimed to cause the disconnection).  Each
+ * entry records the `exitDir` — the direction pointing back toward the BFS
+ * parent, i.e. the direction water exits the tile toward the disconnection
+ * source — and the BFS `depth` used to stagger animation start times.
+ */
+export function computeDrainOrder(
+  board: Board,
+  filledBefore: Set<string>,
+  origin?: GridPos,
+): Array<{ row: number; col: number; exitDir: Direction; depth: number }> {
+  const filledAfter = board.getFilledPositions();
+  const disconnected = new Set<string>();
+  for (const k of filledBefore) {
+    if (!filledAfter.has(k)) disconnected.add(k);
+  }
+  if (disconnected.size === 0) return [];
+
+  const result: Array<{ row: number; col: number; exitDir: Direction; depth: number }> = [];
+  const visited = new Set<string>();
+  const queue: Array<{ row: number; col: number; exitDir: Direction; depth: number }> = [];
+
+  if (origin) {
+    for (const dir of DIRECTIONS) {
+      const delta = NEIGHBOUR_DELTA[dir];
+      const nr = origin.row + delta.row;
+      const nc = origin.col + delta.col;
+      const nk = posKey(nr, nc);
+      if (disconnected.has(nk) && !visited.has(nk)) {
+        visited.add(nk);
+        queue.push({ row: nr, col: nc, exitDir: oppositeDirection(dir), depth: 0 });
+      }
+    }
+  }
+
+  // Fallback: if no adjacent disconnected tiles found, start from any disconnected tile.
+  if (queue.length === 0) {
+    const firstKey = disconnected.values().next().value as string;
+    const [fr, fc] = parseKey(firstKey);
+    const fallbackTile = board.grid[fr]?.[fc];
+    const fallbackExitDir: Direction = (fallbackTile?.connections.values().next().value as Direction | undefined) ?? DIRECTIONS[0];
+    visited.add(firstKey);
+    queue.push({ row: fr, col: fc, exitDir: fallbackExitDir, depth: 0 });
+  }
+
+  let qi = 0;
+  while (qi < queue.length) {
+    const cur = queue[qi++];
+    result.push(cur);
+    for (const dir of DIRECTIONS) {
+      if (!board.areMutuallyConnected(cur, dir)) continue;
+      const delta = NEIGHBOUR_DELTA[dir];
+      const nr = cur.row + delta.row;
+      const nc = cur.col + delta.col;
+      const nk = posKey(nr, nc);
+      if (!disconnected.has(nk) || visited.has(nk)) continue;
+      visited.add(nk);
+      queue.push({ row: nr, col: nc, exitDir: oppositeDirection(dir), depth: cur.depth + 1 });
+    }
+  }
+
+  return result;
+}
+
+// ─── Drain rendering ──────────────────────────────────────────────────────────
+
+/**
+ * Render drain-animation overlays for all active drain animations onto `ctx`.
+ *
+ * Waiting tiles (not yet started) remain in `drainInclude` so the base board renders them
+ * as water.  When a tile's animation starts it drops from `drainInclude` (base shows dry),
+ * and this overlay draws the remaining water as water-colored strokes that shrink until gone.
+ * Container tiles have no overlay — they switch appearance directly when removed from
+ * drainInclude on expiry.
+ *
+ * Expired entries are removed from `anims` in-place.
+ */
+export function renderDrainAnims(
+  ctx: CanvasRenderingContext2D,
+  anims: PipeDrainAnim[],
+  tileConnectionsMap: Map<string, Set<Direction>>,
+  lineWidth: number,
+  now: number,
+): void {
+  for (let i = anims.length - 1; i >= 0; i--) {
+    const anim = anims[i];
+    const elapsed = now - anim.startTime;
+    if (elapsed >= FILL_ANIM_DURATION) {
+      anims.splice(i, 1);
+      continue;
+    }
+    if (elapsed < 0 || anim.isContainer || !anim.waterColor) continue;
+    const progress = elapsed / FILL_ANIM_DURATION;
+    const connections = tileConnectionsMap.get(posKey(anim.row, anim.col));
+    if (!connections) continue;
+    _drawDrainOverlay(ctx, anim, connections, lineWidth, progress, anim.waterColor, anim.mutualDirs);
+  }
+}
+
+/**
+ * Draw the water-shrinking overlay for a single draining tile on top of the dry base.
+ *
+ * Phase 1 (progress 0→0.5): exit arm remaining water shrinks from exit edge toward center
+ *   (exit edge disappears first, center is last).  Other arms are drawn at full length.
+ * Phase 2 (progress 0.5→1): exit arm is gone; each other arm shrinks from center toward
+ *   its tip (center disappears first, tip is last).
+ *
+ * At progress=0 the overlay draws the full water fill, providing a seamless handoff from
+ * the drainInclude base-board render.
+ */
+function _drawDrainOverlay(
+  ctx: CanvasRenderingContext2D,
+  anim: PipeDrainAnim,
+  connections: Set<Direction>,
+  lineWidth: number,
+  progress: number,
+  waterColor: string,
+  mutualDirs?: Set<Direction>,
+): void {
+  const cx = anim.col * TILE_SIZE + TILE_SIZE / 2;
+  const cy = anim.row * TILE_SIZE + TILE_SIZE / 2;
+  const half = TILE_SIZE / 2;
+
+  // Phase 1 (0→0.5): fraction of Phase 1 elapsed (0→1).
+  const drainP = Math.min(1, progress * 2);
+  // Phase 2 (0.5→1): fraction of Phase 2 elapsed (0→1).
+  const drainP2 = Math.max(0, (progress - 0.5) * 2);
+
+  ctx.save();
+  ctx.strokeStyle = waterColor;
+  ctx.lineWidth = lineWidth;
+
+  // Phase 1: exit arm remaining water shrinks — exit edge retreats toward center.
+  if (connections.has(anim.exitDir) && drainP < 1) {
+    const dx = NEIGHBOUR_DELTA[anim.exitDir].col;
+    const dy = NEIGHBOUR_DELTA[anim.exitDir].row;
+    // Butt cap when adjacent tile has a reciprocal arm (no nub past tile edge).
+    ctx.lineCap = mutualDirs?.has(anim.exitDir) ? 'butt' : 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx + dx * half * (1 - drainP), cy + dy * half * (1 - drainP));
+    ctx.lineTo(cx, cy);
+    ctx.stroke();
+  }
+
+  if (drainP2 === 0) {
+    // Phase 1: other arms still fully water.
+    for (const dir of connections) {
+      if (dir === anim.exitDir) continue;
+      const dx = NEIGHBOUR_DELTA[dir].col;
+      const dy = NEIGHBOUR_DELTA[dir].row;
+      ctx.lineCap = mutualDirs?.has(dir) ? 'butt' : 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + dx * half, cy + dy * half);
+      ctx.stroke();
+    }
+  } else {
+    // Phase 2: each other arm shrinks — center end retreats toward tip, tip is last to drain.
+    for (const dir of connections) {
+      if (dir === anim.exitDir) continue;
+      const dx = NEIGHBOUR_DELTA[dir].col;
+      const dy = NEIGHBOUR_DELTA[dir].row;
+      ctx.lineCap = mutualDirs?.has(dir) ? 'butt' : 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * half * drainP2, cy + dy * half * drainP2);
+      ctx.lineTo(cx + dx * half, cy + dy * half);
       ctx.stroke();
     }
   }

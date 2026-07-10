@@ -31,9 +31,19 @@ interface RingAnim {
   onComplete?: () => void;
 }
 
+/** A single outward echo-ring + particle burst spawned when an inward ring arrives. */
+interface EchoAnim {
+  cx: number;
+  cy: number;
+  /** Ring stroke color (matches the inward ring). */
+  ringColor: string;
+  startTime: number;
+}
+
 // ── Module state ──────────────────────────────────────────────────────────────
 
 let _rings: RingAnim[] = [];
+let _echos: EchoAnim[] = [];
 let _animId: number | null = null;
 let _canvas: HTMLCanvasElement | null = null;
 let _ctx: CanvasRenderingContext2D | null = null;
@@ -41,6 +51,14 @@ let _resizeListenerAdded = false;
 
 /** Total ring animation duration in milliseconds. */
 const RING_DURATION = 700;
+/** Duration of the outward echo ring + particle burst (ms). */
+const ECHO_DURATION = 520;
+/** Max radius the echo ring expands to (canvas pixels). */
+const ECHO_MAX_RADIUS = TILE_SIZE * 1.4;
+/** Particle travel distance from tile center (canvas pixels). */
+const ECHO_PARTICLE_REACH = TILE_SIZE * 1.2;
+const ECHO_PARTICLE_COUNT = 12;
+const ECHO_PARTICLE_COLOR = '#5ab4e8';
 
 // ── Canvas management ─────────────────────────────────────────────────────────
 
@@ -98,7 +116,48 @@ function _tick(): void {
     i++;
   }
 
-  if (_rings.length > 0) {
+  // Draw echo rings and impact particles.
+  let j = 0;
+  while (j < _echos.length) {
+    const echo = _echos[j];
+    const elapsed = now - echo.startTime;
+    if (elapsed >= ECHO_DURATION) {
+      _echos.splice(j, 1);
+      continue;
+    }
+    const t = elapsed / ECHO_DURATION;
+    // Echo expands quickly and fades — ease-out so it reads as a "snap."
+    const eased = 1 - (1 - t) * (1 - t);
+    const radius = ECHO_MAX_RADIUS * eased;
+    // Hold at full opacity for the first 30%, then fade out.
+    const alpha = t < 0.3 ? 0.92 : 0.92 * (1 - (t - 0.3) / 0.7);
+
+    _ctx.save();
+    _ctx.globalAlpha = alpha;
+
+    // Expanding ring stroke (full pipe width for visibility).
+    _ctx.strokeStyle = echo.ringColor;
+    _ctx.lineWidth = LINE_WIDTH;
+    _ctx.beginPath();
+    _ctx.arc(echo.cx, echo.cy, Math.max(0.5, radius), 0, Math.PI * 2);
+    _ctx.stroke();
+
+    // Radial particle dots.
+    _ctx.fillStyle = ECHO_PARTICLE_COLOR;
+    const particleR = Math.max(0.5, 4.5 * (1 - t * 0.55));
+    for (let p = 0; p < ECHO_PARTICLE_COUNT; p++) {
+      const angle = (p / ECHO_PARTICLE_COUNT) * Math.PI * 2;
+      const dist = ECHO_PARTICLE_REACH * eased;
+      _ctx.beginPath();
+      _ctx.arc(echo.cx + dist * Math.cos(angle), echo.cy + dist * Math.sin(angle), particleR, 0, Math.PI * 2);
+      _ctx.fill();
+    }
+
+    _ctx.restore();
+    j++;
+  }
+
+  if (_rings.length > 0 || _echos.length > 0) {
     _animId = requestAnimationFrame(_tick);
   } else {
     _animId = null;
@@ -168,9 +227,31 @@ export function spawnRingEffect(
   }
 }
 
-/** Stop all ring animations and clear the overlay canvas. */
+/**
+ * Spawn an outward echo ring + radial particle burst centered on the given
+ * grid tile.  Call this from the `onComplete` of a shrinking ring to create
+ * a satisfying "arrival impact" at the moment the inward ring collapses.
+ */
+export function spawnEchoEffect(
+  boardCanvas: HTMLCanvasElement,
+  col: number,
+  row: number,
+  ringColor: string,
+): void {
+  _ensureCanvas();
+  const rect = boardCanvas.getBoundingClientRect();
+  const cx = rect.left + (col + 0.5) * TILE_SIZE;
+  const cy = rect.top  + (row + 0.5) * TILE_SIZE;
+  _echos.push({ cx, cy, ringColor, startTime: performance.now() });
+  if (_animId === null) {
+    _animId = requestAnimationFrame(_tick);
+  }
+}
+
+/** Stop all ring and echo animations and clear the overlay canvas. */
 export function clearRingEffects(): void {
   _rings = [];
+  _echos = [];
   if (_animId !== null) {
     cancelAnimationFrame(_animId);
     _animId = null;

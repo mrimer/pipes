@@ -79,6 +79,8 @@ export interface InputCallbacks {
   handleEscapeKey(): void;
   /** Flash a red "unavailable" sparkle on the given inventory item. */
   flashInventoryItemError(shape: PipeShape): void;
+  /** Spawn a shake animation on the tile at pos. */
+  shakeAt(pos: GridPos): void;
   /**
    * Returns true while a resume-replay is replaying saved moves.
    * The input handler ignores player gestures during this window.
@@ -599,6 +601,9 @@ export class InputHandler {
         this._cb.checkWinLose();
       } else if (rotResult.error) {
         this._cb.handleBoardError(rotResult);
+      } else if (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+        // Fixed non-spinner: can't be placed on or rotated — shake the tile.
+        this._cb.shakeAt(pos);
       }
     }
   }
