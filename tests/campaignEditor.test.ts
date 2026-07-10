@@ -2634,8 +2634,12 @@ describe('CampaignEditor – Source tile placement constraint', () => {
 
 describe('CampaignEditor – Dev Official Campaign toggle', () => {
   beforeEach(() => {
+    (globalThis as unknown as Record<string, unknown>)['DEV_CONTROLS'] = true;
     localStorage.clear();
     document.body.innerHTML = '';
+  });
+  afterEach(() => {
+    (globalThis as unknown as Record<string, unknown>)['DEV_CONTROLS'] = false;
   });
 
   /** Navigate the editor to the campaign detail page for the given user campaign. */

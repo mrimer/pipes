@@ -709,11 +709,12 @@ export function renderLevelList(
     levelListEl.appendChild(resetBtn);
   }
 
-  // Dev cheat button: mark all levels completed and unlock all chapters/levels
-  const unlockAllBtn = createButton(
-    t('levelSelect.devUnlockAll'), MUTED_BTN_BG, '#f39c12',
-    () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); },
-    'margin-top:8px;padding:10px 20px;width:100%;',
-  );
-  levelListEl.appendChild(unlockAllBtn);
+  if (DEV_CONTROLS) {
+    const unlockAllBtn = createButton(
+      t('levelSelect.devUnlockAll'), MUTED_BTN_BG, '#f39c12',
+      () => { sfxManager.play(SfxId.ChapterSelect); onUnlockAllClick(); },
+      'margin-top:8px;padding:10px 20px;width:100%;',
+    );
+    levelListEl.appendChild(unlockAllBtn);
+  }
 }

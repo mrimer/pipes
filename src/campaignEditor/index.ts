@@ -654,21 +654,23 @@ export class CampaignEditor {
     );
     if (!isOfficial) {
       toolbar.appendChild(this._btn(t('editor.toolbar.export'), UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
-      toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => {
-        if (this._service.remapLegacyGrassStyles(campaign)) {
-          this._service.touch(campaign);
-          this._service.save();
-        }
-        // If no authorGuid is set, try to match by author name across all profiles.
-        if (!campaign.authorGuid) {
-          const allMetas = loadAllSlotMetas();
-          const match = allMetas.find((m) => m !== null && m.name === campaign.author);
-          if (match) {
-            this._service.updateCampaignField(campaign, 'authorGuid', match.guid);
+      if (DEV_CONTROLS) {
+        toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => {
+          if (this._service.remapLegacyGrassStyles(campaign)) {
+            this._service.touch(campaign);
+            this._service.save();
           }
-        }
-        this._dataValidator.show(this._el, campaign);
-      }));
+          // If no authorGuid is set, try to match by author name across all profiles.
+          if (!campaign.authorGuid) {
+            const allMetas = loadAllSlotMetas();
+            const match = allMetas.find((m) => m !== null && m.name === campaign.author);
+            if (match) {
+              this._service.updateCampaignField(campaign, 'authorGuid', match.guid);
+            }
+          }
+          this._dataValidator.show(this._el, campaign);
+        }));
+      }
     }
     this._el.appendChild(toolbar);
 
@@ -684,26 +686,28 @@ export class CampaignEditor {
         `background:${UI_BG};border:1px solid ${UI_GOLD};border-radius:8px;padding:12px 16px;` +
         'display:flex;align-items:center;gap:20px;flex-wrap:wrap;';
 
-      // Official toggle
-      const officialCb = document.createElement('input');
-      officialCb.type = 'checkbox';
-      officialCb.id = 'official-toggle';
-      officialCb.checked = isOfficial;
-      officialCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
-      const officialLbl = document.createElement('label');
-      officialLbl.htmlFor = 'official-toggle';
-      officialLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
-      officialLbl.textContent = t('editor.campaign.officialToggle');
-      officialCb.addEventListener('change', () => {
-        this._service.updateCampaignField(campaign, 'official', officialCb.checked);
-        // Re-render to update read-only state
-        this._showCampaignDetail();
-      });
-      const officialGroup = document.createElement('div');
-      officialGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      officialGroup.appendChild(officialCb);
-      officialGroup.appendChild(officialLbl);
-      toggleWrap.appendChild(officialGroup);
+      // Official toggle (dev only)
+      if (DEV_CONTROLS) {
+        const officialCb = document.createElement('input');
+        officialCb.type = 'checkbox';
+        officialCb.id = 'official-toggle';
+        officialCb.checked = isOfficial;
+        officialCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+        const officialLbl = document.createElement('label');
+        officialLbl.htmlFor = 'official-toggle';
+        officialLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
+        officialLbl.textContent = t('editor.campaign.officialToggle');
+        officialCb.addEventListener('change', () => {
+          this._service.updateCampaignField(campaign, 'official', officialCb.checked);
+          // Re-render to update read-only state
+          this._showCampaignDetail();
+        });
+        const officialGroup = document.createElement('div');
+        officialGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+        officialGroup.appendChild(officialCb);
+        officialGroup.appendChild(officialLbl);
+        toggleWrap.appendChild(officialGroup);
+      }
 
       // "Anyone edit" checkbox
       const anyoneEditCb = document.createElement('input');
