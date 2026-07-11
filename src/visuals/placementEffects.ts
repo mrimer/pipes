@@ -138,14 +138,16 @@ export function createGoldShimmerEffect(row: number, col: number, now: number): 
   return { row, col, startTime: now };
 }
 
-const CEMENT_CRACK_COUNT = 5;
+const CEMENT_CRACK_COUNT = 4;
 const CEMENT_CRACK_COLOR = '#7a8888';
 const CEMENT_DUST_COLOR = '#9aadad';
 
 export function createCementHardenEffect(row: number, col: number, now: number): CementHardenEffect {
   const cracks: CrackLine[] = [];
   for (let i = 0; i < CEMENT_CRACK_COUNT; i++) {
-    const angle = (i / CEMENT_CRACK_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    // Base angles at the four diagonals (45°, 135°, 225°, 315°) so cracks radiate
+    // between the cardinal directions and remain visible under a placed pipe tile.
+    const angle = Math.PI / 4 + (i / CEMENT_CRACK_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 1.0;
     const length = TILE_SIZE * (0.38 + Math.random() * 0.12);
     cracks.push({ angle, length });
   }
