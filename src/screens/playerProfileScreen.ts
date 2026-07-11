@@ -35,6 +35,7 @@ import { t } from '../i18n';
 import { attachHoverWaveAnimation } from '../visuals/chapterWaves';
 import type { CampaignDef } from '../types';
 import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from '../uiBackground';
+import { triggerCloudSave } from '../platform/cloudSave';
 
 // ─── Styling constants ────────────────────────────────────────────────────────
 
@@ -267,6 +268,7 @@ export class PlayerProfileScreen {
       buildEditPlayerNameModal(meta.name, (newName) => {
         withSlot(slotIndex, () => savePlayerName(newName));
         saveSlotMeta(slotIndex, { ...meta, name: newName });
+        triggerCloudSave();
         this._render();
       }, () => { /* cancelled */ });
     });
@@ -418,6 +420,7 @@ export class PlayerProfileScreen {
     saveSlotMeta(slotIndex, meta);
     // Save the player name in the new slot's namespace.
     withSlot(slotIndex, () => savePlayerName(meta.name));
+    triggerCloudSave();
     this._render();
   }
 
@@ -436,6 +439,7 @@ export class PlayerProfileScreen {
       setTouchUiEnabledOverride(touchUiPref);
     }
 
+    triggerCloudSave();
     this.hide();
     this.onProfileSelected(slotIndex);
   }
@@ -457,6 +461,7 @@ export class PlayerProfileScreen {
       clearActiveSlotIndex();
     }
 
+    triggerCloudSave();
     this._render();
   }
 

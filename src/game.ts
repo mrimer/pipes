@@ -80,6 +80,7 @@ import { hasDuplicateAutoRecording } from './autoRecording';
 import { t, setEmojisEnabled } from './i18n';
 import { ResumePlayer } from './resumePlayer';
 import { dispatchGameEvent } from './systems/gameEventBus';
+import { triggerCloudSave } from './platform/cloudSave';
 
 /** How long (ms) error flash messages and tile error highlights are displayed. */
 const ERROR_DISPLAY_MS = 3000;
@@ -435,6 +436,7 @@ export class Game implements InputCallbacks {
         const emojisOn = emojisToggle?.checked ?? false;
         saveEmojisEnabled(emojisOn);
         setEmojisEnabled(emojisOn);
+        triggerCloudSave();
         el.style.display = 'none';
       },
       () => loadRecordingSettings(),
@@ -1351,6 +1353,7 @@ export class Game implements InputCallbacks {
     if (!this._campaign.isPlaytesting && loadRecordingSettings().recordSuccesses) {
       this._maybeAutoRecord('success', waterRemaining, starsCollected);
     }
+    triggerCloudSave();
 
     spawnConfetti(() => {
       if (this.gameState !== GameState.Won) return;
@@ -2513,6 +2516,7 @@ export class Game implements InputCallbacks {
       onReturn: () => { /* modal removes itself */ },
       onDelete: (record) => {
         deleteRecording(record.id);
+        triggerCloudSave();
       },
       onExport: (record) => {
         this._exportReplay(record);
