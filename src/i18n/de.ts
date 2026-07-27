@@ -202,6 +202,7 @@ export const de: TranslationTable = {
   'levelSelect.devUnlockAll': '🛠️ [Dev] Alles freischalten',
 
   'settings.title': '⚙️ Einstellungen',
+  'settings.language': '🌐 Sprache',
   'settings.soundEffects': '🔊 Soundeffekte',
   'settings.music': '🎵 Musik',
   'settings.music.muteOnFocusLoss': 'Musik stummschalten, wenn die App den Fokus verliert',

@@ -202,6 +202,7 @@ export const pl: TranslationTable = {
   'levelSelect.devUnlockAll': '🛠️ [Dev] Odblokuj Wszystko',
 
   'settings.title': '⚙️ Ustawienia',
+  'settings.language': '🌐 Język',
   'settings.soundEffects': '🔊 Efekty Dźwiękowe',
   'settings.music': '🎵 Muzyka',
   'settings.music.muteOnFocusLoss': 'Wycisz muzykę, gdy aplikacja traci fokus',

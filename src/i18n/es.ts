@@ -202,6 +202,7 @@ export const es: TranslationTable = {
   'levelSelect.devUnlockAll': '🛠️ [Dev] Desbloquear Todo',
 
   'settings.title': '⚙️ Ajustes',
+  'settings.language': '🌐 Idioma',
   'settings.soundEffects': '🔊 Efectos de Sonido',
   'settings.music': '🎵 Música',
   'settings.music.muteOnFocusLoss': 'Silenciar música cuando la app pierde el foco',

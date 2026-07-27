@@ -9,6 +9,15 @@ const tables = new Map<Locale, TranslationTable>([[DEFAULT_LOCALE, en]]);
 let currentLocale: Locale = DEFAULT_LOCALE;
 let emojisEnabled = false;
 
+/** Locales with registered translation tables, shown in the settings language picker. */
+export const SUPPORTED_LOCALES: ReadonlyArray<{ code: Locale; nativeName: string }> = [
+  { code: 'en', nativeName: 'English' },
+  { code: 'es', nativeName: 'Español' },
+  { code: 'fr', nativeName: 'Français' },
+  { code: 'de', nativeName: 'Deutsch' },
+  { code: 'pl', nativeName: 'Polski' },
+];
+
 export function setEmojisEnabled(enabled: boolean): void {
   emojisEnabled = enabled;
 }

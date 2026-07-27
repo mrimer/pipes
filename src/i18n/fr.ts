@@ -202,6 +202,7 @@ export const fr: TranslationTable = {
   'levelSelect.devUnlockAll': '🛠️ [Dev] Tout Déverrouiller',
 
   'settings.title': '⚙️ Paramètres',
+  'settings.language': '🌐 Langue',
   'settings.soundEffects': '🔊 Effets Sonores',
   'settings.music': '🎵 Musique',
   'settings.music.muteOnFocusLoss': "Couper la musique quand l'application perd le focus",

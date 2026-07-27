@@ -14,7 +14,7 @@ import { setEnvironmentalEnabled } from './graphicsSettings';
 import { loadBackgroundEnabled, loadEnvironmentalEnabled, loadEmojisEnabled } from './persistence';
 import { showIntroTitleScreen } from './screens/titleScreen';
 import { showSplashScreen } from './screens/splashScreen';
-import { initLocale, registerTranslations, setEmojisEnabled, t } from './i18n';
+import { initLocale, registerTranslations, setEmojisEnabled, SUPPORTED_LOCALES, t } from './i18n';
 import { en } from './i18n/en';
 import { es } from './i18n/es';
 import { fr } from './i18n/fr';
@@ -127,7 +127,7 @@ async function bootstrap(): Promise<void> {
   registerTranslations('fr', fr);
   registerTranslations('de', de);
   registerTranslations('pl', pl);
-  initLocale(['en', 'es', 'fr', 'de', 'pl']);
+  initLocale(SUPPORTED_LOCALES.map((l) => l.code));
   setEmojisEnabled(loadEmojisEnabled());
   localizeStaticChrome();
 

@@ -33,6 +33,7 @@ import {
   getMostRecentPartialProgress,
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
+  saveLocale,
 } from './persistence';
 import { createGameRulesModal, refreshGameRulesModalCommands } from './modals/rulesModal';
 import { createCreditsModal } from './modals/creditsModal';
@@ -77,7 +78,7 @@ import { CloudShadowField } from './visuals/cloudShadows';
 import { FireflyField } from './visuals/fireflyField';
 import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
-import { t, setEmojisEnabled } from './i18n';
+import { t, setEmojisEnabled, getLocale, setLocale } from './i18n';
 import { ResumePlayer } from './resumePlayer';
 import { dispatchGameEvent } from './systems/gameEventBus';
 import { triggerCloudSave } from './platform/cloudSave';
@@ -422,6 +423,7 @@ export class Game implements InputCallbacks {
         const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
         const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
         const emojisToggle = el.querySelector<HTMLInputElement>('[data-emojis-enabled]');
+        const localeSelect = el.querySelector<HTMLSelectElement>('[data-locale-select]');
         sfxManager.play(SfxId.Click);
         saveSfxVolume(sfxManager.getVolume());
         saveMusicVolume(musicManager.getVolume());
@@ -437,6 +439,17 @@ export class Game implements InputCallbacks {
         saveEmojisEnabled(emojisOn);
         setEmojisEnabled(emojisOn);
         triggerCloudSave();
+
+        const selectedLocale = localeSelect?.value;
+        if (selectedLocale && selectedLocale !== getLocale()) {
+          // Changing the language requires every screen to rebuild its DOM text,
+          // which this app doesn't do reactively — reload to re-render fresh.
+          saveLocale(selectedLocale);
+          setLocale(selectedLocale);
+          window.location.reload();
+          return;
+        }
+
         el.style.display = 'none';
       },
       () => loadRecordingSettings(),

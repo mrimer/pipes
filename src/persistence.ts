@@ -484,6 +484,13 @@ export function loadLocale(): string | null {
   }
 }
 
+/** Persist the player's chosen locale. */
+export function saveLocale(locale: string): void {
+  try {
+    localStorage.setItem(LOCALE_KEY, locale);
+  } catch { /* ignore storage errors */ }
+}
+
 /**
  * Load the persisted SFX volume setting.
  * @returns An integer in [0, 100]; defaults to 100 when not yet set.
