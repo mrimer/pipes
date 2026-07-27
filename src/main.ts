@@ -16,6 +16,10 @@ import { showIntroTitleScreen } from './screens/titleScreen';
 import { showSplashScreen } from './screens/splashScreen';
 import { initLocale, registerTranslations, setEmojisEnabled, t } from './i18n';
 import { en } from './i18n/en';
+import { es } from './i18n/es';
+import { fr } from './i18n/fr';
+import { de } from './i18n/de';
+import { pl } from './i18n/pl';
 
 // ─── Step 1: migrate legacy profile data (runs once, no-op thereafter) ───────
 migrateIfNeeded();
@@ -119,7 +123,11 @@ const rulesBtnEl     = getEl<HTMLButtonElement>('rules-btn');
 
 async function bootstrap(): Promise<void> {
   registerTranslations('en', en);
-  initLocale(['en']);
+  registerTranslations('es', es);
+  registerTranslations('fr', fr);
+  registerTranslations('de', de);
+  registerTranslations('pl', pl);
+  initLocale(['en', 'es', 'fr', 'de', 'pl']);
   setEmojisEnabled(loadEmojisEnabled());
   localizeStaticChrome();
 
