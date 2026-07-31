@@ -58,6 +58,7 @@ import { MAP_VIEW_MAX_COLS, MAP_VIEW_MAX_ROWS } from '../screens/chapterMapScree
 import { computeViewBounds } from '../mapUtils';
 import { MapEditorBase } from './mapEditorBase';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 /** The palette entry that places a chapter-chamber tile on the campaign map. */
 const CHAPTER_CHAMBER_PALETTE: EditorPalette = 'chamber:chapter';
@@ -600,7 +601,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = `Ch-${ci + 1}: ${chapter.name}${isPlaced ? ' ✓' : ''}`;
+      btn.textContent = `Ch-${ci + 1}: ${resolveLocalizedText(chapter.name)}${isPlaced ? ' ✓' : ''}`;
       btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.campaignMap.selectToPlaceChapter', { index: ci + 1 });
       btn.disabled = isPlaced;
       btn.style.cssText =
@@ -1239,7 +1240,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
         const camp = this._cbs.getActiveCampaign();
         const chapter = camp?.chapters[tile.chapterIdx];
         this._canvas.title = chapter
-          ? `Ch-${tile.chapterIdx + 1}: ${chapter.name}`
+          ? `Ch-${tile.chapterIdx + 1}: ${resolveLocalizedText(chapter.name)}`
           : `Chapter ${tile.chapterIdx + 1}`;
       } else {
         this._canvas.title = '';

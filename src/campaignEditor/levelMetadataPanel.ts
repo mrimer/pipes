@@ -18,6 +18,8 @@ import type { LevelEditorState } from './levelEditorState';
 import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD, UI_TEXT } from '../uiConstants';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
+import { buildLocalizedTextInput, buildLocalizedTextarea } from './localizedTextInput';
 
 // ─── Callback interface ───────────────────────────────────────────────────────
 
@@ -48,25 +50,15 @@ export class LevelMetadataPanel {
   buildNameSection(readOnly: boolean): HTMLElement {
     const state = this._cb.getState();
     if (!readOnly) {
-      const nameWrap = document.createElement('div');
-      nameWrap.style.cssText = EDITOR_FLEX_ROW_CSS;
-      const nameLbl = document.createElement('label');
-      nameLbl.textContent = t('editor.level.name');
-      nameLbl.style.cssText = 'font-size:0.85rem;color:#aaa;';
-      const nameInp = document.createElement('input');
-      nameInp.type = 'text';
-      nameInp.value = state.levelName;
-      nameInp.style.cssText =
-        'padding:6px 10px;font-size:0.9rem;background:' + EDITOR_INPUT_BG + ';color:#eee;' +
-        `border:1px solid ${UI_BORDER};border-radius:${RADIUS_SM};flex:1;`;
-      nameInp.addEventListener('input', () => { state.levelName = nameInp.value; });
-      nameWrap.appendChild(nameLbl);
-      nameWrap.appendChild(nameInp);
-      return nameWrap;
+      return buildLocalizedTextInput(
+        t('editor.level.name'),
+        { get: () => state.levelName, set: (v) => { state.levelName = v ?? ''; } },
+        EDITOR_FLEX_ROW_CSS,
+      );
     } else {
       const lvlNameEl = document.createElement('div');
       lvlNameEl.style.cssText = 'font-size:1rem;font-weight:bold;color:#f0c040;';
-      lvlNameEl.textContent = state.levelName;
+      lvlNameEl.textContent = resolveLocalizedText(state.levelName);
       return lvlNameEl;
     }
   }
@@ -89,11 +81,11 @@ export class LevelMetadataPanel {
     const noteLbl = document.createElement('label');
     noteLbl.textContent = t('editor.level.note');
     noteLbl.style.cssText = 'font-size:0.8rem;color:#aaa;';
-    const noteInp = document.createElement('textarea');
-    noteInp.value = state.levelNote;
-    noteInp.placeholder = t('editor.level.notePlaceholder');
-    noteInp.style.cssText = textareaStyle;
-    noteInp.addEventListener('input', () => { state.levelNote = noteInp.value; });
+    const noteInp = buildLocalizedTextarea(
+      { get: () => state.levelNote, set: (v) => { state.levelNote = v ?? ''; } },
+      textareaStyle,
+      t('editor.level.notePlaceholder'),
+    );
     noteWrap.appendChild(noteLbl);
     noteWrap.appendChild(noteInp);
     container.appendChild(noteWrap);
@@ -110,16 +102,16 @@ export class LevelMetadataPanel {
 
     const rebuildHintList = (): void => {
       hintListEl.innerHTML = '';
-      state.levelHints.forEach((hint, idx) => {
+      state.levelHints.forEach((_hint, idx) => {
         const rowEl = document.createElement('div');
         rowEl.style.cssText = 'display:flex;gap:4px;align-items:flex-start;';
-        const inp = document.createElement('textarea');
-        inp.value = hint;
-        inp.placeholder = idx === 0
-          ? t('editor.level.hintPlaceholderFirst')
-          : t('editor.level.hintPlaceholderNext', { index: idx + 1 });
-        inp.style.cssText = textareaStyle + 'border-color:#f0c040;flex:1;';
-        inp.addEventListener('input', () => { state.levelHints[idx] = inp.value; });
+        const inp = buildLocalizedTextarea(
+          { get: () => state.levelHints[idx], set: (v) => { state.levelHints[idx] = v ?? ''; } },
+          textareaStyle + 'border-color:#f0c040;flex:1;',
+          idx === 0
+            ? t('editor.level.hintPlaceholderFirst')
+            : t('editor.level.hintPlaceholderNext', { index: idx + 1 }),
+        );
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.textContent = '✕';
@@ -181,10 +173,11 @@ export class LevelMetadataPanel {
     const state = this._cb.getState();
     const container = document.createElement('div');
     container.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
-    if (state.levelNote) {
-      container.appendChild(this._createInfoBox('#4a90d9', `📝 ${state.levelNote}`));
+    const noteText = resolveLocalizedText(state.levelNote);
+    if (noteText) {
+      container.appendChild(this._createInfoBox('#4a90d9', `📝 ${noteText}`));
     }
-    const activeHints = state.levelHints.filter(h => h.trim());
+    const activeHints = state.levelHints.map((h) => resolveLocalizedText(h)).filter((h) => h.trim());
     if (activeHints.length > 0) {
       container.appendChild(this._createInfoBox('#f0c040', `💡 ${activeHints.join(' → ')}`));
     }

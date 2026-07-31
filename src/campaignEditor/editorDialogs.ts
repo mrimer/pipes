@@ -7,9 +7,10 @@
  */
 
 import type { CampaignDef } from '../types';
-import { ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG } from '../uiConstants';
+import { EDITOR_INPUT_BG, ERROR_DARK, MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, MUTED_BTN_BG, UI_INPUT_BORDER } from '../uiConstants';
 import { setupModal } from '../modals/modalUtils';
-import { t } from '../i18n';
+import { t, SUPPORTED_LOCALES } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 /** CSS for a button row aligned to the trailing edge (used at the bottom of modal/confirm dialogs). */
 export const EDITOR_BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -91,7 +92,7 @@ export class EditorDialogs {
     msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
     const importedName = document.createElement('strong');
     importedName.style.color = '#fff';
-    importedName.textContent = `"${imported.name}"`;
+    importedName.textContent = `"${resolveLocalizedText(imported.name)}"`;
     const localTs = document.createElement('em');
     localTs.textContent = this._formatTimestamp(existing.lastUpdated);
     const importedTs = document.createElement('em');
@@ -161,6 +162,96 @@ export class EditorDialogs {
     btnRow.appendChild(discardBtn);
     btnRow.appendChild(saveBtn);
     dialog.appendChild(msg);
+    dialog.appendChild(btnRow);
+  }
+
+  /**
+   * Show the "Export Texts" language-picker dialog: a dropdown of
+   * SUPPORTED_LOCALES plus Cancel/Export buttons. Calls `onConfirm` with the
+   * chosen locale code.
+   */
+  showExportTextsDialog(campaignName: string, onConfirm: (locale: string) => void): void {
+    const { overlay, dialog } = this._createOverlay('420px');
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
+    title.textContent = t('editor.dialog.exportTexts.title');
+    const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
+    msg.textContent = t('editor.dialog.exportTexts.message', { name: campaignName });
+
+    const selectRow = document.createElement('div');
+    selectRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:10px;';
+    const selectLbl = document.createElement('label');
+    selectLbl.textContent = t('settings.language');
+    selectLbl.style.cssText = 'font-size:0.9rem;color:#aaa;';
+    const select = document.createElement('select');
+    select.style.cssText =
+      `font-size:0.9rem;color:#ddd;background:${EDITOR_INPUT_BG};border:1px solid ${UI_INPUT_BORDER};border-radius:6px;padding:4px 8px;flex:1;`;
+    for (const { code, nativeName } of SUPPORTED_LOCALES) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = nativeName;
+      select.appendChild(opt);
+    }
+    selectRow.appendChild(selectLbl);
+    selectRow.appendChild(select);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS + 'margin-top:14px;';
+    btnRow.appendChild(this._btn(t('modal.common.cancel'), MUTED_BTN_BG, '#aaa', () => closeModal()));
+    btnRow.appendChild(this._btn(t('editor.dialog.exportTexts.confirmButton'), '#4a90d9', '#fff', () => {
+      closeModal();
+      onConfirm(select.value);
+    }));
+
+    dialog.appendChild(title);
+    dialog.appendChild(msg);
+    dialog.appendChild(selectRow);
+    dialog.appendChild(btnRow);
+  }
+
+  /**
+   * Show the confirmation dialog before merging a text pack into a matched
+   * local campaign, with an "Overwrite existing translations" checkbox
+   * (off by default). Calls `onConfirm` with the checkbox's final state.
+   */
+  showTextPackImportConfirm(
+    campaignName: string,
+    locale: string,
+    onConfirm: (overwrite: boolean) => void,
+  ): void {
+    const { overlay, dialog } = this._createOverlay('460px');
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:1.1rem;font-weight:bold;color:#4a90d9;';
+    title.textContent = t('editor.dialog.importTextPack.title');
+    const { closeModal } = setupModal(overlay, { titleEl: title, onClose: () => { overlay.remove(); } });
+
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.95rem;color:#eee;line-height:1.6;';
+    msg.textContent = t('editor.dialog.importTextPack.message', { name: campaignName, locale });
+
+    const checkRow = document.createElement('label');
+    checkRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;font-size:0.9rem;color:#eee;cursor:pointer;';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkRow.appendChild(checkbox);
+    checkRow.appendChild(document.createTextNode(t('editor.dialog.importTextPack.overwriteCheckbox')));
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = EDITOR_BTN_ROW_CSS + 'margin-top:14px;';
+    btnRow.appendChild(this._btn(t('modal.common.cancel'), MUTED_BTN_BG, '#aaa', () => closeModal()));
+    btnRow.appendChild(this._btn(t('editor.dialog.importTextPack.confirmButton'), '#27ae60', '#fff', () => {
+      closeModal();
+      onConfirm(checkbox.checked);
+    }));
+
+    dialog.appendChild(title);
+    dialog.appendChild(msg);
+    dialog.appendChild(checkRow);
     dialog.appendChild(btnRow);
   }
 

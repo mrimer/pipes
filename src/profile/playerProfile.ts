@@ -49,6 +49,7 @@ import {
   saveSaveNoticeSuppressed,
 } from '../persistence';
 import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord } from '../types';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 // ─── File type constants ──────────────────────────────────────────────────────
 
@@ -57,6 +58,9 @@ export const FILE_TYPE_PLAYER   = 'pipes-player-profile';
 
 /** Semantic type identifier for campaign files. */
 export const FILE_TYPE_CAMPAIGN = 'pipes-campaign';
+
+/** Semantic type identifier for campaign text-pack (translation-only) files. */
+export const FILE_TYPE_CAMPAIGN_TEXT_PACK = 'pipes-campaign-text-pack';
 
 /** Semantic type identifier for replay recording files. */
 export const FILE_TYPE_REPLAY   = 'pipes-replay';
@@ -222,7 +226,7 @@ export function buildPlayerProfilePayload(
     const chapterIds = validChapterIds(c);
     return {
       campaignId:            c.id,
-      campaignName:          c.name,
+      campaignName:          resolveLocalizedText(c.name),
       completedLevels:       [...loadCampaignProgress(c.id)].filter((id) => levelIds.has(id)),
       completedChapters:     [...loadCompletedChapters(c.id)].filter((id) => chapterIds.has(id)),
       masteredChaptersShown: [...loadMasteredChaptersShown(c.id)].filter((id) => chapterIds.has(id)),
@@ -652,7 +656,7 @@ export function applyPlayerProfile(
 
     outcomes.push({
       status: 'merged',
-      campaignName: local.name,
+      campaignName: resolveLocalizedText(local.name),
       campaignId: block.campaignId,
       newLevelsCompleted,
       newChaptersCompleted,

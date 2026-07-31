@@ -81,7 +81,7 @@ src/
 ├── game.ts                      # Game orchestrator (delegates to sub-managers below)
 ├── board.ts                     # Pure game state: grid, BFS water flow, undo/redo
 ├── tile.ts                      # Tile data model
-├── types.ts                     # All shared TypeScript types and interfaces
+├── types.ts                     # All shared TypeScript types and interfaces, incl. LocalizedText
 │
 ├── renderer.ts                  # Canvas rendering — tile grid, pipe strokes, overlays
 ├── renderer/
@@ -108,7 +108,8 @@ src/
 │
 ├── bundledCampaigns.ts          # Syncs bundled official campaign(s) from BUNDLED_CAMPAIGNS into localStorage at startup
 ├── persistence.ts               # All localStorage access — single source of truth for storage keys
-├── fileIO.ts                    # Gzip+download and gzip-or-JSON file reading helpers
+├── campaignLocalization.ts      # resolveLocalizedText/writeLocalizedText/etc. — localization for user-authored campaign text (separate from src/i18n.ts)
+├── fileIO.ts                    # Gzip+download, plain-JSON download, and gzip-or-JSON file reading helpers
 ├── uiConstants.ts               # UI color tokens, border-radius constants, modal CSS strings
 ├── uiBackground.ts              # Shared dim scrolling pipe-pattern background helper for full-screen UI layers
 ├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
@@ -195,7 +196,7 @@ src/
 │
 └── campaignEditor/
     ├── index.ts                 # Editor orchestrator — wires all editor sub-modules
-    ├── campaignService.ts       # Campaign/chapter/level CRUD, import/export, findLevelLocation
+    ├── campaignService.ts       # Campaign/chapter/level CRUD, import/export, text-pack export/import (exportTextPack/parseTextPack/mergeTextPack), findLevelLocation
     ├── mapEditorBase.ts         # Abstract base for both map editors: history, grid ops, undo/redo
     ├── chapterMapEditor.ts      # Chapter map editor (extends MapEditorBase)
     ├── campaignMapEditor.ts     # Campaign map editor (extends MapEditorBase)
@@ -205,7 +206,8 @@ src/
     ├── levelEditorState.ts      # Level editor mutable state
     ├── tileParamsPanel.ts       # Tile-parameter side panel UI
     ├── levelMetadataPanel.ts    # Level metadata form UI
-    ├── editorDialogs.ts         # Editor modal dialogs
+    ├── localizedTextInput.ts    # buildLocalizedTextInput/buildLocalizedTextarea — shared locale-aware field builders for name/note/hints
+    ├── editorDialogs.ts         # Editor modal dialogs, incl. Export Texts and text-pack import confirmation
     ├── dataValidationDialog.ts  # Campaign data validation results dialog
     ├── levelValidator.ts        # Level-specific validation rules
     ├── chapterMapValidator.ts   # Chapter map validation rules
@@ -254,17 +256,33 @@ To add a new locale:
 2. Register in `src/main.ts`: `registerTranslations('<locale>', table)`.
 3. Add an entry to `SUPPORTED_LOCALES` in `src/i18n.ts` (drives both `initLocale([...])` and the settings language picker).
 
-Don't localize:
+Don't localize via `t()`:
 - `console.warn` / `console.error` (developer-facing)
 - Test strings (Jest descriptions, assertions)
 - Validation error keys (keep them symbolic; localize the displayed value)
-- User-generated content (campaign names, level names)
+- Campaign/chapter/level name, note, and hints — these are user-generated content with their **own**, separate localization mechanism; see "Campaign-content localization" below. Never route them through `t()`.
 
-Migration status: All user-facing strings are localized via `t()`. New strings must add keys to `src/i18n/en.ts`. CI guards against missing keys and warns on hardcoded `textContent`.
+Migration status: All static, app-authored user-facing strings are localized via `t()`. New strings must add keys to `src/i18n/en.ts`. CI guards against missing keys and warns on hardcoded `textContent`. Whenever a new key is added to `en.ts`, add a machine-translated entry for it to `es.ts`/`fr.ts`/`de.ts`/`pl.ts` too, at the same relative position — don't leave the other locale catalogs behind.
 
 Bootstrap is explicit: `src/main.ts` registers all five translation tables and calls `initLocale(SUPPORTED_LOCALES.map((l) => l.code))` before any UI renders. Adding a locale requires updating this bootstrap plus `SUPPORTED_LOCALES`.
 
 **Language selector:** The settings modal (`src/modals/gameModals.ts`) exposes a language picker driven by `SUPPORTED_LOCALES`; the chosen locale is persisted via `saveLocale()`/`loadLocale()` in `persistence.ts`.
+
+---
+
+## Campaign-content localization
+
+A **second, independent** localization mechanism — separate from the `t()` system above — covers user-authored campaign text: `CampaignDef.name`, `ChapterDef.name`, `LevelDef.name`/`.note`/`.hints[]`. These are typed `string | LocalizedText` (`LocalizedText = Partial<Record<string, string>>`, defined in `src/types.ts`) rather than routed through translation-table keys, because their content is arbitrary player-authored data, not a fixed set of app strings.
+
+- A bare `string` value is locale-agnostic and displays to every player regardless of locale — this is the shape every campaign has by default and requires no migration.
+- A field only becomes a `{ locale: text, ... }` object once a second language is actually authored for it.
+- `src/campaignLocalization.ts` is the single choke point for reading/writing these fields:
+  - `resolveLocalizedText(value, locale = getLocale())` — display resolution: current locale → `'en'` → first non-empty value found → `''`.
+  - `writeLocalizedText(current, locale, newValue)` — the "tag with the currently-authoring language" write rule; promotes a bare string to an object the first time a non-`'en'` locale is written, preserving the original text under `'en'`.
+  - `rawLocalizedTextSlice(value, locale)` — the untranslated-vs-translated editor view: the exact text for one locale, no fallback (used so editor inputs show blank, not fallback text, for an untranslated locale).
+  - `isLocalizedTextShape` / `collectLocalesPresent` — import-time shape validation and multi-language detection, respectively.
+- **Editor UI:** `src/campaignEditor/localizedTextInput.ts` (`buildLocalizedTextInput`/`buildLocalizedTextarea`) is the shared builder for every editable instance of these fields (campaign name, chapter name, level name/note/hints in `campaignEditor/index.ts` and `levelMetadataPanel.ts`). The authoring language is always the app's current locale — there is no separate editor-only language selector.
+- **Export Texts:** a lighter, locale-scoped export/import path alongside full campaign export/import, for translating a campaign without full-content access. `CampaignService.exportTextPack`/`parseTextPack`/`mergeTextPack` (`campaignEditor/campaignService.ts`) produce/consume a `pipes-campaign-text-pack` file (plain JSON, never gzip — meant to be hand-edited) keyed by `CampaignDef.guid` (a stable cross-install UUID, distinct from the local-storage-key `id`, generated via `generateGuid()` and backfilled lazily on first export). Merges are additive-only by default (never overwrite existing translations) with an explicit opt-in overwrite toggle in the confirmation dialog.
 
 ---
 
@@ -327,7 +345,10 @@ Bootstrap is explicit: `src/main.ts` registers all five translation tables and c
 | localStorage keys | `persistence.ts` |
 | Gzip download / file read | `fileIO.ts` |
 | Menu/settings/profile background pattern | `uiBackground.ts` |
-| Localization helper and catalogs | `i18n.ts`, `i18n/en.ts` |
+| Localization helper and catalogs (app-chrome strings) | `i18n.ts`, `i18n/en.ts` |
+| Campaign-content localization (name/note/hints) | `campaignLocalization.ts` → `resolveLocalizedText()`/`writeLocalizedText()` |
+| Localized editor input builders | `campaignEditor/localizedTextInput.ts` |
+| Text-pack (translation-only) export/import | `campaignEditor/campaignService.ts` → `exportTextPack()`/`parseTextPack()`/`mergeTextPack()` |
 | Graphics settings (background / environmental) in-memory cache | `graphicsSettings.ts` |
 | Move encoding format | `moveRecorder.ts` (top-of-file JSDoc) |
 | Auto-recording dedup | `autoRecording.ts` |

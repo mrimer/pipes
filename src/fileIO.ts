@@ -39,6 +39,23 @@ export async function downloadGzipJson(json: string, filename: string): Promise<
   }
 }
 
+/** Trigger a browser download of plain (uncompressed) JSON text — for files meant to be hand-edited directly. */
+export function downloadJson(json: string, filename: string): void {
+  try {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
+  } catch (err) {
+    throw new Error(`Failed to trigger download for "${filename}": ${describeError(err)}`);
+  }
+}
+
 /** Read a File and return text, automatically decompressing gzip inputs. */
 export async function readGzipOrJsonFile(file: File): Promise<string> {
   if (file.size > MAX_IMPORT_FILE_BYTES) {

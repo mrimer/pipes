@@ -1055,3 +1055,253 @@ describe('CampaignService – scanData', () => {
     expect((campaign.chapters[0].grid[0][0] as unknown as Record<string, unknown>)['capacity']).toBeUndefined();
   });
 });
+
+// ─── guid handling ──────────────────────────────────────────────────────────
+
+describe('CampaignService – guid handling', () => {
+  it('createCampaign assigns a guid', () => {
+    const svc = makeService();
+    const campaign = svc.createCampaign('New Campaign', 'Author');
+    expect(campaign.guid).toEqual(expect.any(String));
+    expect(campaign.guid).not.toBe('');
+  });
+
+  it('getCampaignByGuid finds a campaign by its guid', () => {
+    const campaign = { ...emptyCampaign('cmp_guid'), guid: 'guid-123' };
+    const svc = makeService([campaign]);
+    expect(svc.getCampaignByGuid('guid-123')?.id).toBe('cmp_guid');
+  });
+
+  it('getCampaignByGuid returns null when no campaign matches', () => {
+    const svc = makeService([emptyCampaign()]);
+    expect(svc.getCampaignByGuid('does-not-exist')).toBeNull();
+  });
+
+  it('exportToJson backfills and persists a guid for a campaign that lacks one', () => {
+    const campaign = emptyCampaign('cmp_no_guid');
+    expect(campaign.guid).toBeUndefined();
+    const svc = makeService([campaign]);
+    svc.exportToJson(campaign);
+    expect(campaign.guid).toEqual(expect.any(String));
+    // Persisted, not just set on the in-memory object.
+    const reloaded = loadImportedCampaigns();
+    expect(reloaded[0].guid).toBe(campaign.guid);
+  });
+
+  it('exportToJson does not change an existing guid', () => {
+    const campaign = { ...emptyCampaign('cmp_has_guid'), guid: 'existing-guid' };
+    const svc = makeService([campaign]);
+    svc.exportToJson(campaign);
+    expect(campaign.guid).toBe('existing-guid');
+  });
+});
+
+// ─── Text-pack export/import ────────────────────────────────────────────────
+
+describe('CampaignService – exportTextPack', () => {
+  it('backfills a guid and includes it in the pack', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const json = svc.exportTextPack(campaign, 'es');
+    const pack = JSON.parse(json) as Record<string, unknown>;
+    expect(pack['type']).toBe('pipes-campaign-text-pack');
+    expect(pack['campaignGuid']).toBe(campaign.guid);
+    expect(pack['locale']).toBe('es');
+  });
+
+  it('resolves each field via the standard fallback chain for the target locale', () => {
+    const campaign = makeCampaignDef({
+      id: 'cmp_fallback',
+      name: 'English Only',
+      chapters: [makeChapterDef({
+        id: 1,
+        name: { en: 'Chapter EN', es: 'Chapter ES' },
+        levels: [makeLevelDef({ id: 101, name: 'Level EN' })],
+      })],
+    });
+    const svc = makeService([campaign]);
+    const pack = JSON.parse(svc.exportTextPack(campaign, 'es')) as {
+      campaign: { name: string };
+      chapters: { name: string; levels: { name: string }[] }[];
+    };
+    // No Spanish campaign name -> falls back to the only (bare-string) value.
+    expect(pack.campaign.name).toBe('English Only');
+    // Explicit Spanish chapter name wins.
+    expect(pack.chapters[0].name).toBe('Chapter ES');
+    // No Spanish level name -> falls back to the bare-string English name.
+    expect(pack.chapters[0].levels[0].name).toBe('Level EN');
+  });
+
+  it('omits note/hints for a level that has neither', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const pack = JSON.parse(svc.exportTextPack(campaign, 'es')) as {
+      chapters: { levels: Record<string, unknown>[] }[];
+    };
+    expect(pack.chapters[0].levels[0]['note']).toBeUndefined();
+    expect(pack.chapters[0].levels[0]['hints']).toBeUndefined();
+  });
+
+  it('includes note/hints when present, resolved per-hint', () => {
+    const campaign = makeCampaignDef({
+      id: 'cmp_hints',
+      chapters: [makeChapterDef({
+        id: 1,
+        levels: [makeLevelDef({
+          id: 101,
+          note: 'A note',
+          hints: ['Hint one', { en: 'Hint two EN', es: 'Hint two ES' }],
+        })],
+      })],
+    });
+    const svc = makeService([campaign]);
+    const pack = JSON.parse(svc.exportTextPack(campaign, 'es')) as {
+      chapters: { levels: { note?: string; hints?: string[] }[] }[];
+    };
+    expect(pack.chapters[0].levels[0].note).toBe('A note');
+    expect(pack.chapters[0].levels[0].hints).toEqual(['Hint one', 'Hint two ES']);
+  });
+});
+
+describe('CampaignService – parseTextPack', () => {
+  it('parses a well-formed text pack', () => {
+    const svc = makeService();
+    const pack = svc.parseTextPack(JSON.stringify({
+      type: 'pipes-campaign-text-pack',
+      campaignGuid: 'g-1',
+      locale: 'es',
+      campaign: { name: 'Nombre' },
+      chapters: [],
+    }));
+    expect(pack.campaignGuid).toBe('g-1');
+    expect(pack.locale).toBe('es');
+  });
+
+  it('throws for the wrong type identifier', () => {
+    const svc = makeService();
+    expect(() => svc.parseTextPack(JSON.stringify({ type: 'pipes-campaign', campaignGuid: 'g', locale: 'es', campaign: { name: 'X' }, chapters: [] }))).toThrow();
+  });
+
+  it('throws for missing required fields', () => {
+    const svc = makeService();
+    expect(() => svc.parseTextPack(JSON.stringify({ type: 'pipes-campaign-text-pack' }))).toThrow();
+  });
+
+  it('throws for invalid JSON', () => {
+    const svc = makeService();
+    expect(() => svc.parseTextPack('not-json')).toThrow();
+  });
+});
+
+describe('CampaignService – mergeTextPack', () => {
+  function exportAndParsePack(svc: CampaignService, campaign: CampaignDef, locale: string) {
+    return svc.parseTextPack(svc.exportTextPack(campaign, locale));
+  }
+
+  it('throws when no local campaign matches the pack guid', () => {
+    const svc = makeService([campaignWithChapter()]);
+    const pack = svc.parseTextPack(JSON.stringify({
+      type: 'pipes-campaign-text-pack', campaignGuid: 'no-such-guid', locale: 'es', campaign: { name: 'X' }, chapters: [],
+    }));
+    expect(() => svc.mergeTextPack(pack)).toThrow();
+  });
+
+  it('adds text for a locale not already present, without touching other locales', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const pack = exportAndParsePack(svc, campaign, 'es');
+    // Hand-edit the pack as a translator would.
+    pack.campaign.name = 'Campaña (ES)';
+    pack.chapters[0].name = 'Capítulo (ES)';
+    pack.chapters[0].levels[0].name = 'Nivel (ES)';
+
+    const result = svc.mergeTextPack(pack);
+    expect(result.added).toBe(3);
+    expect(result.skipped).toBe(0);
+    expect(result.overwritten).toBe(0);
+    expect(campaign.name).toEqual({ en: 'Campaign', es: 'Campaña (ES)' });
+    expect(campaign.chapters[0].name).toEqual({ en: 'Chapter 1', es: 'Capítulo (ES)' });
+    expect(campaign.chapters[0].levels[0].name).toEqual({ en: 'Level 1', es: 'Nivel (ES)' });
+  });
+
+  it('does not overwrite existing text for that locale by default, even if the pack value changed', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const pack = exportAndParsePack(svc, campaign, 'es');
+    pack.campaign.name = 'Campaña (ES) v1';
+
+    // First merge: campaign name, chapter name, and level name all get 'es' added.
+    const firstResult = svc.mergeTextPack(pack);
+    expect(firstResult.added).toBe(3);
+    expect(firstResult.skipped).toBe(0);
+
+    // Second merge with a changed campaign-name value: everything is already
+    // present for 'es', so nothing is added and the earlier value is kept.
+    pack.campaign.name = 'Campaña (ES) v2';
+    const secondResult = svc.mergeTextPack(pack);
+    expect(secondResult.added).toBe(0);
+    expect(secondResult.skipped).toBe(3);
+    expect(campaign.name).toEqual({ en: 'Campaign', es: 'Campaña (ES) v1' });
+  });
+
+  it('overwrites existing text for that locale when overwrite: true is passed', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const pack = exportAndParsePack(svc, campaign, 'es');
+    pack.campaign.name = 'Campaña (ES) v1';
+    svc.mergeTextPack(pack);
+
+    pack.campaign.name = 'Campaña (ES) v2';
+    const result = svc.mergeTextPack(pack, { overwrite: true });
+    // All 3 fields (campaign/chapter/level name) already had 'es' text from
+    // the first merge, so with overwrite:true all 3 get replaced.
+    expect(result.overwritten).toBe(3);
+    expect(result.added).toBe(0);
+    expect(campaign.name).toEqual({ en: 'Campaign', es: 'Campaña (ES) v2' });
+  });
+
+  it('skips (and counts) chapters/levels in the pack that no longer exist locally', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const pack = exportAndParsePack(svc, campaign, 'es');
+    // Simulate a stale pack referencing a deleted chapter.
+    pack.chapters.push({ id: 999, name: 'Ghost Chapter', levels: [] });
+
+    const result = svc.mergeTextPack(pack);
+    expect(result.unmatchedNodes).toBe(1);
+  });
+
+  it('merges hints by index, bounded by the shorter of pack/local hint arrays', () => {
+    const campaign = makeCampaignDef({
+      id: 'cmp_hint_merge',
+      chapters: [makeChapterDef({
+        id: 1,
+        levels: [makeLevelDef({ id: 101, hints: ['Hint A', 'Hint B'] })],
+      })],
+    });
+    const svc = makeService([campaign]);
+    const pack = exportAndParsePack(svc, campaign, 'es');
+    // Pack has 3 hints (stale — local level was trimmed to 2 since export).
+    pack.chapters[0].levels[0].hints = ['Hint A (ES)', 'Hint B (ES)', 'Hint C (ES)'];
+
+    const result = svc.mergeTextPack(pack);
+    // 3 name fields (campaign/chapter/level) + 2 bounded hints = 5; the pack's
+    // 3rd hint is never consulted since the local level only has 2.
+    expect(result.added).toBe(5);
+    expect(campaign.chapters[0].levels[0].hints).toEqual([
+      { en: 'Hint A', es: 'Hint A (ES)' },
+      { en: 'Hint B', es: 'Hint B (ES)' },
+    ]);
+  });
+
+  it('persists the merge via save()', () => {
+    const campaign = campaignWithChapter();
+    const svc = makeService([campaign]);
+    const pack = exportAndParsePack(svc, campaign, 'es');
+    pack.campaign.name = 'Campaña (ES)';
+    svc.mergeTextPack(pack);
+
+    const reloaded = loadImportedCampaigns();
+    expect(reloaded[0].name).toEqual({ en: 'Campaign', es: 'Campaña (ES)' });
+  });
+});

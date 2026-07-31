@@ -6,6 +6,7 @@ import { sfxManager, SfxId } from '../audio/sfxManager';
 import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_GOLD } from '../uiConstants';
 import { createButton } from '../uiHelpers';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -693,7 +694,7 @@ export function renderLevelList(
     const chapterTitle = document.createElement('span');
     chapterTitle.textContent = t('levelSelect.chapter.title', {
       chapter: ci + 1,
-      chapterName: chapter.name,
+      chapterName: resolveLocalizedText(chapter.name),
       lockIcon,
       progressText,
     });

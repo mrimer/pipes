@@ -320,10 +320,32 @@ export function floorShapeToStyle(shape: PipeShape): LevelStyle | undefined {
   return undefined;
 }
 
+/**
+ * A block of user-authored campaign text with one optional string per locale
+ * code (e.g. 'en', 'es'). Locale codes are open-ended (not limited to
+ * SUPPORTED_LOCALES in i18n.ts) so hand-edited campaign files can carry
+ * languages the app UI doesn't yet ship. This is a separate, independent
+ * localization mechanism from the app-chrome i18n system (src/i18n.ts) —
+ * see src/campaignLocalization.ts for the resolve/write helpers.
+ */
+export type LocalizedText = Partial<Record<string, string>>;
+
+/**
+ * True if `value` is a valid `string | LocalizedText` shape. Used at
+ * import/load boundaries to accept both legacy plain strings and the newer
+ * locale-keyed object shape. Kept dependency-free (no i18n import) so both
+ * persistence.ts and campaignLocalization.ts can use it without a cycle.
+ */
+export function isLocalizedTextShape(value: unknown): value is string | LocalizedText {
+  if (typeof value === 'string') return true;
+  if (value === null || typeof value !== 'object') return false;
+  return Object.values(value as Record<string, unknown>).every((v) => typeof v === 'string');
+}
+
 /** Complete definition of a game level. */
 export interface LevelDef {
   id: number;
-  name: string;
+  name: string | LocalizedText;
   rows: number;
   cols: number;
   /** Row-major grid; null means the tile starts as Empty (player can fill it). */
@@ -331,13 +353,15 @@ export interface LevelDef {
   /** Starting inventory of pipe pieces available for the player to place. */
   inventory: InventoryItem[];
   /** Optional notes displayed in a box beneath the grid while playing. */
-  note?: string;
+  note?: string | LocalizedText;
   /**
    * Optional ordered list of hints. The first is revealed when the player
    * clicks "Show Hint", and each subsequent hint is nested inside the previous
-   * one so they are revealed in sequence.
+   * one so they are revealed in sequence. Each hint entry is independently
+   * localized; the array length/order is a single shared sequence across
+   * locales (translators supply text for the same N hints, not different ones).
    */
-  hints?: string[];
+  hints?: (string | LocalizedText)[];
   /**
    * Cached number of Star chamber tiles present in the level grid.
    * Set automatically when the level is saved in the campaign editor.
@@ -390,7 +414,7 @@ export interface AmbientDecoration {
 /** A chapter groups a set of levels under a shared name. */
 export interface ChapterDef {
   id: number;
-  name: string;
+  name: string | LocalizedText;
   levels: LevelDef[];
   /**
    * Optional 2-D chapter map grid, stored as a row-major array.
@@ -415,9 +439,19 @@ export interface ChapterDef {
 export interface CampaignDef {
   /** Unique identifier used to key persistent progress tracking. */
   id: string;
-  name: string;
+  name: string | LocalizedText;
   author: string;
   chapters: ChapterDef[];
+  /**
+   * Stable UUID identifying this campaign across separate local installs,
+   * independent of `id` (a local storage key that can be remapped, e.g. when
+   * an imported 'official' campaign gets a fresh `id`). Generated once at
+   * creation via generateGuid() and never changed. Used to match a campaign
+   * against a text-only translation pack (see campaignService.exportTextPack).
+   * Absent for campaigns created before this field was introduced; backfilled
+   * lazily on first export.
+   */
+  guid?: string;
   /**
    * When true, this campaign is flagged as an "official" campaign.
    * Official campaigns are displayed as read-only in the Campaign Editor

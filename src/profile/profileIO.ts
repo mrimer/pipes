@@ -14,6 +14,7 @@ import { findLevelLocation } from '../campaignEditor/campaignService';
 import { getActiveSlotIndex, withSlot } from './activeProfile';
 import { loadSlotMeta, loadAllSlotMetas, saveSlotMeta, findEmptySlotIndex, generateGuid, PROFILE_SLOT_COUNT } from './playerProfileSlots';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 const FILE_INPUT_ACCEPT = '.json,.gz,.pipes.json.gz,application/json,application/gzip';
 const FILENAME_SAFE_CHARACTERS_REGEX = /[^\w\s-]/g;
@@ -90,7 +91,7 @@ export async function exportReplay(
   campaigns: CampaignDef[],
 ): Promise<void> {
   const campaign = campaigns.find((c) => c.id === record.campaignId);
-  const campaignName = campaign?.name ?? record.campaignId;
+  const campaignName = campaign ? resolveLocalizedText(campaign.name) : record.campaignId;
   const location = campaign ? findLevelLocation(campaign, record.levelId) : null;
   const chapterNumber = location?.chapterNumber ?? null;
   const levelNumber = location?.levelNumber ?? null;
@@ -168,7 +169,9 @@ export function importReplay(
     saveRecording(record);
 
     const campaign = campaigns.find((c) => c.id === record.campaignId);
-    const campaignName = campaign?.name ?? (typeof parsed.campaignName === 'string' ? parsed.campaignName : record.campaignId);
+    const campaignName = campaign
+      ? resolveLocalizedText(campaign.name)
+      : (typeof parsed.campaignName === 'string' ? parsed.campaignName : record.campaignId);
     const location = campaign ? findLevelLocation(campaign, record.levelId) : null;
     onSuccess(record, campaignName, location?.chapterNumber ?? null, location?.levelNumber ?? null);
   };

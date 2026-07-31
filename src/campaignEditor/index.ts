@@ -25,7 +25,7 @@ import type { ChapterMapEditorCallbacks } from './chapterMapEditor';
 import { ChapterMapEditorSection } from './chapterMapEditor';
 import type { CampaignMapEditorCallbacks } from './campaignMapEditor';
 import { CampaignMapEditorSection } from './campaignMapEditor';
-import type { ImportResult } from './campaignService';
+import type { ImportResult, CampaignTextPack } from './campaignService';
 import { CampaignService } from './campaignService';
 import { LevelEditorState } from './levelEditorState';
 import { TileParamsPanel } from './tileParamsPanel';
@@ -37,7 +37,9 @@ import {
   EDITOR_CANVAS_BORDER,
   EDITOR_PANEL_BASE_CSS,
   EDITOR_PANEL_TITLE_CSS,
+  EDITOR_FLEX_ROW_CSS,
 } from './types';
+import { buildLocalizedTextInput } from './localizedTextInput';
 import type { HoverOverlay, DragState } from './editorRenderer';
 import { renderEditorCanvas } from './editorRenderer';
 import { EditorInputHandler } from './editorInputHandler';
@@ -48,14 +50,16 @@ import { renderMinimap } from '../visuals/minimap';
 import { validateLevel } from './levelValidator';
 import { sfxManager, SfxId } from '../audio/sfxManager';
 import { musicManager, selectGroupForContext } from '../audio/musicManager';
-import { t } from '../i18n';
+import { t, getLocale } from '../i18n';
+import { resolveLocalizedText, writeLocalizedText } from '../campaignLocalization';
 import { updateCanvasDisplaySize } from './canvasUtils';
 import { isTouchDevice } from '../deviceUtils';
 import { ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG, UI_BORDER, UI_GOLD } from '../uiConstants';
 import { createButton, showTimedMessage } from '../uiHelpers';
 import { ONLY_ONE_SOURCE } from './validationMessages';
 import { commandKeyManager } from '../commandKeyManager';
-import { downloadGzipJson, readGzipOrJsonFile } from '../fileIO';
+import { downloadGzipJson, downloadJson, readGzipOrJsonFile } from '../fileIO';
+import { FILE_TYPE_CAMPAIGN_TEXT_PACK } from '../profile/playerProfile';
 import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from '../uiBackground';
 
 /** Horizontal padding (px) of the main editor layout container. */
@@ -543,7 +547,7 @@ export class CampaignEditor {
 
     const name = document.createElement('div');
     name.style.cssText = 'font-size:1rem;font-weight:bold;';
-    name.textContent = campaign.name + (isOfficial ? ' 🔒' : '');
+    name.textContent = resolveLocalizedText(campaign.name) + (isOfficial ? ' 🔒' : '');
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:4px;';
     const levelCount = campaign.chapters.reduce((n, ch) => n + ch.levels.length, 0);
@@ -648,12 +652,13 @@ export class CampaignEditor {
 
     const toolbar = this._buildToolbar(
       isOfficial
-        ? t('editor.campaign.readOnlyTitle', { name: campaign.name })
-        : t('editor.campaign.editTitle', { name: campaign.name }),
+        ? t('editor.campaign.readOnlyTitle', { name: resolveLocalizedText(campaign.name) })
+        : t('editor.campaign.editTitle', { name: resolveLocalizedText(campaign.name) }),
       () => this._showCampaignList(),
     );
     if (!isOfficial) {
       toolbar.appendChild(this._btn(t('editor.toolbar.export'), UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
+      toolbar.appendChild(this._btn(t('editor.toolbar.exportTexts'), UI_BG, '#7ed321', () => this._exportCampaignTexts(campaign)));
       if (DEV_CONTROLS) {
         toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => {
           if (this._service.remapLegacyGrassStyles(campaign)) {
@@ -671,6 +676,10 @@ export class CampaignEditor {
           this._dataValidator.show(this._el, campaign);
         }));
       }
+    } else if (DEV_CONTROLS) {
+      // Official campaigns get no export UI for non-devs; devs can still produce
+      // a text pack to hand out for community translation.
+      toolbar.appendChild(this._btn(t('editor.toolbar.exportTexts'), UI_BG, '#7ed321', () => this._exportCampaignTexts(campaign)));
     }
     this._el.appendChild(toolbar);
 
@@ -738,9 +747,14 @@ export class CampaignEditor {
         `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
         'display:flex;flex-direction:column;gap:10px;';
 
-      fields.appendChild(this._labeledInput(t('editor.metadata.name'), campaign.name, (v) => {
-        this._service.updateCampaignField(campaign, 'name', v);
-      }));
+      fields.appendChild(buildLocalizedTextInput(
+        t('editor.metadata.name'),
+        {
+          get: () => campaign.name,
+          set: (v) => { this._service.updateCampaignField(campaign, 'name', v ?? ''); },
+        },
+        EDITOR_FLEX_ROW_CSS,
+      ));
 
       // Author: static text (set from the active player profile at creation time)
       const authorRow = document.createElement('div');
@@ -806,7 +820,7 @@ export class CampaignEditor {
 
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
-    name.textContent = t('editor.chapter.rowTitle', { index: chapterIdx + 1, name: chapter.name });
+    name.textContent = t('editor.chapter.rowTitle', { index: chapterIdx + 1, name: resolveLocalizedText(chapter.name) });
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:3px;';
     const totalStars = chapter.levels.reduce((s, l) => s + (l.starCount ?? 0), 0);
@@ -847,7 +861,7 @@ export class CampaignEditor {
         (fromIdx, toIdx) => this._service.reorderChapters(campaign, fromIdx, toIdx));
       btns.appendChild(this._btn(t('editor.toolbar.deleteIcon'), UI_BG, ERROR_COLOR, () => {
         this._dialogs.showConfirm(
-          t('editor.chapter.deleteConfirm', { name: chapter.name }),
+          t('editor.chapter.deleteConfirm', { name: resolveLocalizedText(chapter.name) }),
           () => {
           this._service.deleteChapter(campaign, chapterIdx);
           this._showCampaignDetail();
@@ -885,7 +899,7 @@ export class CampaignEditor {
       t('editor.chapter.title', {
         icon: isOfficial ? '📋' : '✏️',
         index: this._activeChapterIdx + 1,
-        name: chapter.name,
+        name: resolveLocalizedText(chapter.name),
       }),
       () => this._showCampaignDetail(),
     );
@@ -901,9 +915,14 @@ export class CampaignEditor {
       const nameWrap = document.createElement('div');
       nameWrap.style.cssText =
         `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;`;
-      nameWrap.appendChild(this._labeledInput(t('editor.chapter.name'), chapter.name, (v) => {
-        this._service.renameChapter(campaign, this._activeChapterIdx, v);
-      }));
+      nameWrap.appendChild(buildLocalizedTextInput(
+        t('editor.chapter.name'),
+        {
+          get: () => chapter.name,
+          set: (v) => { this._service.renameChapter(campaign, this._activeChapterIdx, v ?? ''); },
+        },
+        EDITOR_FLEX_ROW_CSS,
+      ));
       content.appendChild(nameWrap);
     }
 
@@ -963,7 +982,7 @@ export class CampaignEditor {
     const starSuffix = (level.starCount ?? 0) > 0 ? ` ⭐×${level.starCount}` : '';
     name.textContent = t('editor.level.rowTitle', {
       index: levelIdx + 1,
-      name: level.name,
+      name: resolveLocalizedText(level.name),
       challenge: level.challenge ? ' 💀' : '',
       stars: starSuffix,
     });
@@ -992,7 +1011,7 @@ export class CampaignEditor {
         (fromIdx, toIdx) => this._service.reorderLevels(campaign, chapterIdx, fromIdx, toIdx));
       btns.appendChild(this._btn(t('editor.toolbar.deleteIcon'), UI_BG, ERROR_COLOR, () => {
         this._dialogs.showConfirm(
-          t('editor.level.deleteConfirm', { name: level.name }),
+          t('editor.level.deleteConfirm', { name: resolveLocalizedText(level.name) }),
           () => {
           this._service.deleteLevel(campaign, chapterIdx, levelIdx);
           this._showChapterDetail();
@@ -1017,7 +1036,7 @@ export class CampaignEditor {
           if (ci !== chapterIdx) {
             const opt = document.createElement('option');
             opt.value = String(ci);
-            opt.textContent = t('editor.level.moveToChapter', { index: ci + 1, name: ch.name });
+            opt.textContent = t('editor.level.moveToChapter', { index: ci + 1, name: resolveLocalizedText(ch.name) });
             sel.appendChild(opt);
           }
         });
@@ -1086,7 +1105,7 @@ export class CampaignEditor {
     );
 
     const toolbar = this._buildToolbar(
-      readOnly ? `👁 View Level: ${this._state.levelName}` : `✏️ Level Editor (${this._activeChapterIdx + 1}-${this._activeLevelIdx + 1})`,
+      readOnly ? `👁 View Level: ${resolveLocalizedText(this._state.levelName)}` : `✏️ Level Editor (${this._activeChapterIdx + 1}-${this._activeLevelIdx + 1})`,
       () => {
         if (!readOnly && this._state.hasUnsavedChanges) {
           this._dialogs.showUnsavedChanges(
@@ -1199,7 +1218,7 @@ export class CampaignEditor {
       this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx, { clearRecords: false });
       const chapterNum = this._activeChapterIdx + 1;
       const levelNum = this._activeLevelIdx + 1;
-      this._onPlaytest({ ...levelDef, name: `${chapterNum}-${levelNum}: ${levelDef.name}` });
+      this._onPlaytest({ ...levelDef, name: `${chapterNum}-${levelNum}: ${resolveLocalizedText(levelDef.name)}` });
     }));
 
     // Save
@@ -1532,8 +1551,8 @@ export class CampaignEditor {
       grid: cleanGrid,
       inventory: structuredClone(this._state.inventory),
     };
-    if (this._state.levelNote.trim()) def.note = this._state.levelNote.trim();
-    const activeHints = this._state.levelHints.map(h => h.trim()).filter(h => h.length > 0);
+    if (resolveLocalizedText(this._state.levelNote).trim()) def.note = this._state.levelNote;
+    const activeHints = this._state.levelHints.filter((h) => resolveLocalizedText(h).trim() !== '');
     if (activeHints.length > 0) def.hints = activeHints;
     if (starCount > 0) def.starCount = starCount;
     if (this._state.levelChallenge) def.challenge = true;
@@ -1574,14 +1593,14 @@ export class CampaignEditor {
     const author = loadPlayerName();
     const activeSlot = getActiveSlotIndex();
     const authorGuid = activeSlot !== null ? loadSlotMeta(activeSlot)?.guid : undefined;
-    this._service.createCampaign(name.trim(), author, authorGuid);
+    this._service.createCampaign(writeLocalizedText(undefined, getLocale(), name.trim()) ?? '', author, authorGuid);
     this._showCampaignList();
   }
 
   private _addChapter(campaign: CampaignDef): void {
     const name = prompt(t('editor.prompt.chapterName'));
     if (!name?.trim()) return;
-    this._service.addChapter(campaign, name.trim());
+    this._service.addChapter(campaign, writeLocalizedText(undefined, getLocale(), name.trim()) ?? '');
     this._activeChapterIdx = campaign.chapters.length - 1;
     this._showChapterDetail();
   }
@@ -1591,7 +1610,7 @@ export class CampaignEditor {
     if (!chapter) return;
     const name = prompt(t('editor.prompt.levelName'), t('editor.prompt.newLevelDefault'));
     if (!name?.trim()) return;
-    const newLevel = this._service.addLevel(campaign, chapterIdx, name.trim());
+    const newLevel = this._service.addLevel(campaign, chapterIdx, writeLocalizedText(undefined, getLocale(), name.trim()) ?? '');
     // Open the level editor immediately
     this._activeLevelIdx = chapter.levels.length - 1;
     this._openLevelEditor(newLevel, false);
@@ -1601,7 +1620,7 @@ export class CampaignEditor {
     const campaign = this._service.getCampaign(campaignId);
     if (!campaign) return;
     this._dialogs.showConfirm(
-      t('editor.campaign.deleteConfirm', { name: campaign.name }),
+      t('editor.campaign.deleteConfirm', { name: resolveLocalizedText(campaign.name) }),
       () => {
         this._service.deleteCampaign(campaignId);
         this._showCampaignList();
@@ -1644,13 +1663,37 @@ export class CampaignEditor {
     }
 
     log.append('⏳ Compressing and downloading …');
-    const filename = `${campaign.name.replace(/\s+/g, '_')}.pipes.json.gz`;
+    const filename = `${resolveLocalizedText(campaign.name).replace(/\s+/g, '_')}.pipes.json.gz`;
     downloadGzipJson(json, filename).then(() => {
       log.append('✅ Export complete – download should have started.');
       log.done(true);
     }).catch((err) => {
       log.append(`❌ Export failed: ${String(err)}`);
       log.done(false);
+    });
+  }
+
+  /**
+   * Export just the translatable text of a campaign (name/note/hints, at
+   * campaign/chapter/level level) as a plain, uncompressed JSON file for a
+   * chosen language — meant to be hand-edited and re-imported to add that
+   * language. Prompts for the target locale first.
+   */
+  private _exportCampaignTexts(campaign: CampaignDef): void {
+    this._dialogs.showExportTextsDialog(resolveLocalizedText(campaign.name), (locale) => {
+      let json: string;
+      try {
+        json = this._service.exportTextPack(campaign, locale);
+      } catch (err) {
+        this._dialogs.showMessage(t('editor.textPack.exportErrorTitle'), String(err), ERROR_COLOR);
+        return;
+      }
+      const filename = `${resolveLocalizedText(campaign.name).replace(/\s+/g, '_')}.pipes-texts.${locale}.json`;
+      downloadJson(json, filename);
+      this._dialogs.showMessage(
+        t('editor.textPack.exportSuccessTitle'),
+        t('editor.textPack.exportSuccessMessage', { locale, name: resolveLocalizedText(campaign.name) }),
+      );
     });
   }
 
@@ -1705,6 +1748,18 @@ export class CampaignEditor {
       const file = input.files?.[0];
       if (!file) return;
       const processText = (text: string) => {
+        let sniffedType: unknown;
+        try {
+          sniffedType = (JSON.parse(text) as Record<string, unknown>)['type'];
+        } catch {
+          this._dialogs.showMessage(t('editor.import.errorTitle'), t('editor.import.parseError'), ERROR_COLOR);
+          return;
+        }
+        if (sniffedType === FILE_TYPE_CAMPAIGN_TEXT_PACK) {
+          this._importCampaignTextPack(text);
+          return;
+        }
+
         let result: ImportResult;
         try {
           result = this._service.parseImport(text);
@@ -1714,7 +1769,7 @@ export class CampaignEditor {
         }
 
         if (result.conflict === 'same_version') {
-          this._dialogs.showImportSameVersion(result.campaign.name, result.campaign.lastUpdated);
+          this._dialogs.showImportSameVersion(resolveLocalizedText(result.campaign.name), result.campaign.lastUpdated);
           return;
         }
 
@@ -1725,7 +1780,7 @@ export class CampaignEditor {
             this._service.acceptImport(result);
             this._dialogs.showMessage(
               t('editor.import.successTitle'),
-              t('editor.import.successMessage', { name: result.campaign.name }),
+              t('editor.import.successMessage', { name: resolveLocalizedText(result.campaign.name) }),
             );
             this.hide();
             this._onPlayCampaign(result.campaign);
@@ -1737,7 +1792,7 @@ export class CampaignEditor {
         this._service.acceptImport(result);
         this._dialogs.showMessage(
           t('editor.import.successTitle'),
-          t('editor.import.successMessage', { name: result.campaign.name }),
+          t('editor.import.successMessage', { name: resolveLocalizedText(result.campaign.name) }),
         );
         this.hide();
         this._onPlayCampaign(result.campaign);
@@ -1753,6 +1808,42 @@ export class CampaignEditor {
       });
     });
     input.click();
+  }
+
+  /**
+   * Parse and merge a text-pack file into the local campaign it references
+   * (matched by `campaignGuid`, never by the local `id`). Prompts for
+   * confirmation (with an opt-in overwrite toggle) before writing anything.
+   */
+  private _importCampaignTextPack(text: string): void {
+    let pack: CampaignTextPack;
+    try {
+      pack = this._service.parseTextPack(text);
+    } catch {
+      this._dialogs.showMessage(t('editor.textPack.importErrorTitle'), t('editor.textPack.parseError'), ERROR_COLOR);
+      return;
+    }
+    const campaign = this._service.getCampaignByGuid(pack.campaignGuid);
+    if (!campaign) {
+      this._dialogs.showMessage(t('editor.textPack.importErrorTitle'), t('editor.textPack.campaignNotFound'), ERROR_COLOR);
+      return;
+    }
+    this._dialogs.showTextPackImportConfirm(resolveLocalizedText(campaign.name), pack.locale, (overwrite) => {
+      const result = this._service.mergeTextPack(pack, { overwrite });
+      let message = t('editor.textPack.mergeSummary', {
+        added: result.added,
+        locale: result.locale,
+        name: resolveLocalizedText(result.campaign.name),
+        skipped: result.skipped,
+      });
+      if (result.overwritten > 0) {
+        message += t('editor.textPack.mergeSummaryOverwritten', { overwritten: result.overwritten });
+      }
+      if (result.unmatchedNodes > 0) {
+        message += t('editor.textPack.mergeSummaryUnmatched', { unmatched: result.unmatchedNodes });
+      }
+      this._dialogs.showMessage(t('editor.textPack.mergeSuccessTitle'), message);
+    });
   }
 
   // ─── Persistence ──────────────────────────────────────────────────────────

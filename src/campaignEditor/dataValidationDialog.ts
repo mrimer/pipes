@@ -6,10 +6,11 @@
  * independently testable.
  */
 
-import type { CampaignDef } from '../types';
+import type { CampaignDef, LocalizedText } from '../types';
 import type { CampaignService } from './campaignService';
 import { MODAL_DIALOG_CSS, MODAL_OVERLAY_CSS, UI_INPUT_BORDER } from '../uiConstants';
 import { t } from '../i18n';
+import { collectLocalesPresent, rawLocalizedTextSlice } from '../campaignLocalization';
 
 /** CSS for a button row aligned to the trailing edge (mirrors EDITOR_BTN_ROW_CSS). */
 const BTN_ROW_CSS = 'display:flex;gap:12px;justify-content:flex-end;';
@@ -36,6 +37,58 @@ export class DataValidationDialog {
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  /** Every campaign/chapter/level text field, in a flat list, for completeness scanning. */
+  private _collectTextFields(campaign: CampaignDef): (string | LocalizedText | undefined)[] {
+    const fields: (string | LocalizedText | undefined)[] = [campaign.name];
+    for (const chapter of campaign.chapters) {
+      fields.push(chapter.name);
+      for (const level of chapter.levels) {
+        fields.push(level.name);
+        if (level.note !== undefined) fields.push(level.note);
+        if (level.hints !== undefined) fields.push(...level.hints);
+      }
+    }
+    return fields;
+  }
+
+  /**
+   * Build a per-locale "N / total fields translated" table, or null when the
+   * campaign has 0 or 1 languages present (nothing meaningful to report yet).
+   */
+  private _buildCompletenessTable(campaign: CampaignDef): HTMLElement | null {
+    const fields = this._collectTextFields(campaign);
+    const locales = collectLocalesPresent(fields);
+    if (locales.size <= 1) return null;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'margin-bottom:14px;';
+
+    const heading = document.createElement('p');
+    heading.style.margin = '0 0 8px 0';
+    heading.textContent = t('editor.dataValidation.translationCompleteness');
+    wrap.appendChild(heading);
+
+    const table = document.createElement('table');
+    table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.85rem;';
+    const tbody = document.createElement('tbody');
+    for (const locale of [...locales].sort()) {
+      const translated = fields.filter((f) => rawLocalizedTextSlice(f, locale).trim() !== '').length;
+      const tr = document.createElement('tr');
+      const localeTd = document.createElement('td');
+      localeTd.style.cssText = `padding:4px 8px;border-bottom:1px solid #1a2a3e;`;
+      localeTd.textContent = locale;
+      const countTd = document.createElement('td');
+      countTd.style.cssText = `text-align:right;padding:4px 8px;border-bottom:1px solid #1a2a3e;color:#aaa;`;
+      countTd.textContent = t('editor.dataValidation.translationCount', { count: translated, total: fields.length });
+      tr.appendChild(localeTd);
+      tr.appendChild(countTd);
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
 
   private _buildIssuesTable(
     issues: Map<string, Map<string, number>>,
@@ -101,6 +154,9 @@ export class DataValidationDialog {
 
     const body = document.createElement('div');
     body.style.cssText = 'font-size:0.9rem;color:#eee;line-height:1.6;';
+
+    const completenessTable = this._buildCompletenessTable(campaign);
+    if (completenessTable) body.appendChild(completenessTable);
 
     const issuesTable = this._buildIssuesTable(issues);
     if (!issuesTable) {

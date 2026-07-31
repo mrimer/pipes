@@ -25,6 +25,7 @@ import { buildGridSizePanel } from './gridSizePanel';
 import { EDITOR_INPUT_BG, RADIUS_SM, UI_BORDER, UI_TEXT } from '../uiConstants';
 import { buildPaletteSubSection } from './mapEditorSectionUtils';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -265,7 +266,7 @@ export class ChapterEditorUI {
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.textContent = `L-${li + 1}: ${level.name}${level.challenge ? ' ☠' : ''}${isPlaced ? ' ✓' : ''}`;
+      btn.textContent = `L-${li + 1}: ${resolveLocalizedText(level.name)}${level.challenge ? ' ☠' : ''}${isPlaced ? ' ✓' : ''}`;
       btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.chapter.selectToPlaceLevel', { index: li + 1 });
       btn.disabled = isPlaced;
       btn.style.cssText =

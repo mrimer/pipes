@@ -35,6 +35,7 @@ import { playMapScreenEnterTransition, playMapScreenExitTransition, playSwirlScr
 import { sfxManager, SfxId } from './audio/sfxManager';
 import { ERROR_COLOR, RADIUS_MD, UI_BG, UI_BORDER, UI_OVERLAY_BG } from './uiConstants';
 import { t } from './i18n';
+import { resolveLocalizedText } from './campaignLocalization';
 
 type SparkleClass = 'sparkle-gold' | 'sparkle-red' | 'sparkle-yellow' | 'sparkle-blue';
 const NO_OP = (): void => {};
@@ -745,13 +746,13 @@ export class CampaignManager {
         if (this._activeCampaign) {
           const line1 = document.createElement('div');
           line1.style.cssText = 'font-size:0.9rem;color:#aaa;';
-          line1.textContent = this._activeCampaign.name;
+          line1.textContent = resolveLocalizedText(this._activeCampaign.name);
           el.appendChild(line1);
         }
         const line2 = document.createElement('div');
         line2.style.cssText = 'font-size:1rem;color:#f0c040;';
         line2.textContent =
-          `Chapter ${chapterNumber}: ${chapter.name}  ·  Level ${idx + 1}: ${level.name}${challengeSuffix}`;
+          `Chapter ${chapterNumber}: ${resolveLocalizedText(chapter.name)}  ·  Level ${idx + 1}: ${resolveLocalizedText(level.name)}${challengeSuffix}`;
         el.appendChild(line2);
         return;
       }
@@ -764,7 +765,7 @@ export class CampaignManager {
     el.replaceChildren();
     const line2 = document.createElement('div');
     line2.style.cssText = 'font-size:1rem;color:#f0c040;';
-    line2.textContent = level ? `Level ${levelId}: ${level.name}${challengeSuffix}` : '';
+    line2.textContent = level ? `Level ${levelId}: ${resolveLocalizedText(level.name)}${challengeSuffix}` : '';
     el.appendChild(line2);
   }
 
@@ -851,7 +852,7 @@ export class CampaignManager {
     if (this._activeCampaign) {
       const pct = computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress);
       activeCampaignInfo = {
-        name: this._activeCampaign.name,
+        name: resolveLocalizedText(this._activeCampaign.name),
         author: this._activeCampaign.author,
         completionPct: pct,
       };
@@ -1006,7 +1007,7 @@ export class CampaignManager {
       ch => ch.id !== undefined && this._activeCampaignCompletedChapters.has(ch.id)
     ).length;
     return {
-      campaignName: campaign.name,
+      campaignName: resolveLocalizedText(campaign.name),
       chaptersCompleted,
       chaptersTotal,
       levelsCompleted,
@@ -1027,7 +1028,7 @@ export class CampaignManager {
 
   private _showNewChapterModal(chapterIdx: number, chapter: ChapterDef): void {
     this._newChapterNumberEl.textContent = t('campaign.chapterLabel', { number: chapterIdx + 1 });
-    this._newChapterNameEl.textContent = chapter.name;
+    this._newChapterNameEl.textContent = resolveLocalizedText(chapter.name);
     this._newChapterModalEl.style.display = 'flex';
     sfxManager.play(SfxId.NewChapter);
     this._callbacks.triggerModalSparkle(this._newChapterModalEl, 'sparkle-blue');
@@ -1356,7 +1357,7 @@ export class CampaignManager {
     spawnConfetti();
     spawnFireworks();
 
-    const modal = buildCampaignMasteredModal(campaign.name, () => {
+    const modal = buildCampaignMasteredModal(resolveLocalizedText(campaign.name), () => {
       modal.remove();
       onComplete();
     });

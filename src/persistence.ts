@@ -1,6 +1,7 @@
 /** Helpers for persisting long-term player progress in localStorage. */
 
 import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord, RecordingSettings } from './types';
+import { isLocalizedTextShape } from './types';
 import { getActiveSlotPrefix } from './profile/activeProfile';
 
 /**
@@ -102,7 +103,7 @@ export function loadImportedCampaigns(): CampaignDef[] {
           entry
           && typeof entry === 'object'
           && typeof (entry as Record<string, unknown>)['id'] === 'string'
-          && typeof (entry as Record<string, unknown>)['name'] === 'string'
+          && isLocalizedTextShape((entry as Record<string, unknown>)['name'])
           && Array.isArray((entry as Record<string, unknown>)['chapters'])
         ) {
           campaigns.push(migrateCampaign(entry as CampaignDef));

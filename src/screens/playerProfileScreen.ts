@@ -32,6 +32,7 @@ import { hasTouchUiSupport, setTouchUiEnabledOverride } from '../deviceUtils';
 import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from '../profile/profileIO';
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from '../modals/gameModals';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 import { attachHoverWaveAnimation } from '../visuals/chapterWaves';
 import type { CampaignDef } from '../types';
 import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from '../uiBackground';
@@ -353,7 +354,7 @@ export class PlayerProfileScreen {
       const campaign = this._campaigns.find((c) => c.id === stats.activeCampaignId);
       if (campaign) {
         const campaignEl = document.createElement('div');
-        campaignEl.textContent = t('profile.campaign', { name: campaign.name });
+        campaignEl.textContent = t('profile.campaign', { name: resolveLocalizedText(campaign.name) });
         campaignEl.style.color = TEXT_ACCENT;
         container.appendChild(campaignEl);
       }

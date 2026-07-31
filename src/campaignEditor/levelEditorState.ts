@@ -7,7 +7,7 @@
  * re-renders.
  */
 
-import type { TileDef, InventoryItem, Rotation, LevelDef, LevelStyle } from '../types';
+import type { TileDef, InventoryItem, Rotation, LevelDef, LevelStyle, LocalizedText } from '../types';
 import { PipeShape, Direction } from '../types';
 import { SPIN_CEMENT_SHAPES, isEmptyFloor, EMPTY_FLOOR_SHAPES } from '../board';
 import type {
@@ -38,9 +38,9 @@ export class LevelEditorState {
   inventory: InventoryItem[] = [];
 
   // ── Level metadata ─────────────────────────────────────────────────────────
-  levelName: string = 'New Level';
-  levelNote: string = '';
-  levelHints: string[] = [''];
+  levelName: string | LocalizedText = 'New Level';
+  levelNote: string | LocalizedText = '';
+  levelHints: (string | LocalizedText)[] = [''];
   levelChallenge: boolean = false;
   /** Visual style for this level, controlling the default empty floor tile type. */
   levelStyle: LevelStyle | undefined = undefined;

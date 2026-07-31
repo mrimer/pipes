@@ -6,7 +6,7 @@
  * (prompt/confirm dialogs) and tells CampaignService what to do.
  */
 
-import type { CampaignDef, ChapterDef, LevelDef, TileDef} from '../types';
+import type { CampaignDef, ChapterDef, LevelDef, LocalizedText, TileDef} from '../types';
 import { PipeShape, Direction, LEVEL_STYLES } from '../types';
 import {
   loadImportedCampaigns,
@@ -26,7 +26,9 @@ import {
   getValidChapterMapTileDefKeys,
   getValidCampaignMapTileDefKeys,
 } from './types';
-import { FILE_TYPE_CAMPAIGN, FILE_TYPE_PLAYER } from '../profile/playerProfile';
+import { FILE_TYPE_CAMPAIGN, FILE_TYPE_CAMPAIGN_TEXT_PACK, FILE_TYPE_PLAYER } from '../profile/playerProfile';
+import { generateGuid } from '../profile/playerProfileSlots';
+import { resolveLocalizedText, writeLocalizedText, isLocalizedTextShape } from '../campaignLocalization';
 
 /**
  * Locate a level inside a campaign and return its 1-based chapter/level numbers.
@@ -60,6 +62,47 @@ export interface ImportResult {
   conflict: 'none' | 'same_version' | 'version_conflict';
   existing?: CampaignDef;
   isNewer?: boolean;
+}
+
+// ─── Text-pack (translation-only) import/export ────────────────────────────────
+
+/** A single level's text fields within a {@link CampaignTextPack}. */
+export interface TextPackLevel {
+  id: number;
+  name: string;
+  note?: string;
+  hints?: string[];
+}
+
+/** A single chapter's text fields within a {@link CampaignTextPack}. */
+export interface TextPackChapter {
+  id: number;
+  name: string;
+  levels: TextPackLevel[];
+}
+
+/**
+ * A locale-scoped, ID-scaffolded "text pack" — the shape produced by
+ * {@link CampaignService.exportTextPack} and consumed by
+ * {@link CampaignService.mergeTextPack}. Carries only the 5 translatable text
+ * fields plus enough IDs to relink onto a matching local campaign; no grid,
+ * tile, or inventory data. `author` is never included — it isn't localized.
+ */
+export interface CampaignTextPack {
+  campaignGuid: string;
+  locale: string;
+  campaign: { name: string };
+  chapters: TextPackChapter[];
+}
+
+/** Summary of what a {@link CampaignService.mergeTextPack} call actually did. */
+export interface TextPackMergeResult {
+  campaign: CampaignDef;
+  locale: string;
+  added: number;
+  skipped: number;
+  overwritten: number;
+  unmatchedNodes: number;
 }
 
 // ─── CampaignService ──────────────────────────────────────────────────────────
@@ -209,6 +252,25 @@ export class CampaignService {
     return this._campaigns.find((c) => c.id === id) ?? null;
   }
 
+  /** Find a campaign by its stable cross-install `guid`, or null if not found. */
+  getCampaignByGuid(guid: string): CampaignDef | null {
+    return this._campaigns.find((c) => c.guid === guid) ?? null;
+  }
+
+  /**
+   * Ensure `campaign.guid` is set, lazily backfilling it (and persisting the
+   * change) for campaigns created before this field existed. Called before
+   * any export that needs a stable cross-install identifier.
+   */
+  private _ensureGuid(campaign: CampaignDef): string {
+    if (!campaign.guid) {
+      campaign.guid = generateGuid();
+      this.touch(campaign);
+      this.save();
+    }
+    return campaign.guid;
+  }
+
   /** Re-read campaigns from persistence. */
   reload(): void {
     this._campaigns = loadImportedCampaigns();
@@ -217,11 +279,12 @@ export class CampaignService {
   // ── Campaign CRUD ────────────────────────────────────────────────────────────
 
   /** Create a new campaign, persist it, and return it. */
-  createCampaign(name: string, author: string, authorGuid?: string): CampaignDef {
+  createCampaign(name: string | LocalizedText, author: string, authorGuid?: string): CampaignDef {
     const defaults = this._buildDefaultCampaignMap();
     const campaign: CampaignDef = {
       id: generateCampaignId(),
-      name: name.trim(),
+      guid: generateGuid(),
+      name: typeof name === 'string' ? name.trim() : name,
       author: author.trim(),
       chapters: [],
       rows: defaults.rows,
@@ -249,9 +312,9 @@ export class CampaignService {
   updateCampaignField(
     campaign: CampaignDef,
     field: 'name' | 'author' | 'official' | 'authorGuid' | 'anyoneEdit',
-    value: string | boolean | undefined,
+    value: string | LocalizedText | boolean | undefined,
   ): void {
-    if (field === 'name') campaign.name = value as string;
+    if (field === 'name') campaign.name = value as string | LocalizedText;
     else if (field === 'author') campaign.author = value as string;
     else if (field === 'official') campaign.official = (value as boolean) ? true : undefined;
     else if (field === 'authorGuid') campaign.authorGuid = value as string | undefined;
@@ -273,9 +336,9 @@ export class CampaignService {
   // ── Chapter CRUD ─────────────────────────────────────────────────────────────
 
   /** Add a new chapter to a campaign, persist, and return it. */
-  addChapter(campaign: CampaignDef, name: string): ChapterDef {
+  addChapter(campaign: CampaignDef, name: string | LocalizedText): ChapterDef {
     const newId = campaign.chapters.reduce((mx, ch) => Math.max(mx, ch.id), 0) + 1;
-    const chapter: ChapterDef = { id: newId, name: name.trim(), levels: [] };
+    const chapter: ChapterDef = { id: newId, name: typeof name === 'string' ? name.trim() : name, levels: [] };
     campaign.chapters.push(chapter);
     this.touch(campaign);
     this.save();
@@ -291,7 +354,7 @@ export class CampaignService {
   }
 
   /** Rename a chapter and persist. */
-  renameChapter(campaign: CampaignDef, chapterIdx: number, name: string): void {
+  renameChapter(campaign: CampaignDef, chapterIdx: number, name: string | LocalizedText): void {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
     chapter.name = name;
@@ -319,13 +382,13 @@ export class CampaignService {
   // ── Level CRUD ───────────────────────────────────────────────────────────────
 
   /** Add a new blank 6×6 level to a chapter, persist, and return it. */
-  addLevel(campaign: CampaignDef, chapterIdx: number, name: string): LevelDef {
+  addLevel(campaign: CampaignDef, chapterIdx: number, name: string | LocalizedText): LevelDef {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) throw new Error(`Chapter index ${chapterIdx} does not exist.`);
     const grid: (TileDef | null)[][] = Array.from({ length: 6 }, () => Array(6).fill(null) as null[]);
     const newLevel: LevelDef = {
       id: generateLevelId(),
-      name: name.trim(),
+      name: typeof name === 'string' ? name.trim() : name,
       rows: 6,
       cols: 6,
       grid,
@@ -360,7 +423,9 @@ export class CampaignService {
     const copy: LevelDef = {
       ...(structuredClone(level)),
       id: generateLevelId(),
-      name: `${level.name} (copy)`,
+      name: typeof level.name === 'string'
+        ? `${level.name} (copy)`
+        : Object.fromEntries(Object.entries(level.name).map(([loc, text]) => [loc, `${text} (copy)`])),
     };
     this._remapLevelRefsOnInsert(chapter, levelIdx + 1);
     chapter.levels.splice(levelIdx + 1, 0, copy);
@@ -457,6 +522,7 @@ export class CampaignService {
    * prepend the campaign file-type identifier, and return the resulting JSON string.
    */
   exportToJson(campaign: CampaignDef): string {
+    this._ensureGuid(campaign);
     const clean = structuredClone(campaign);
     this.scanData(clean, false);
     // Add the type identifier AFTER scanData so it is never stripped.
@@ -495,7 +561,7 @@ export class CampaignService {
 
     if (
       typeof raw['id'] !== 'string'
-      || typeof raw['name'] !== 'string'
+      || !isLocalizedTextShape(raw['name'])
       || !Array.isArray(raw['chapters'])
     ) {
       throw new Error('Invalid campaign file format.');
@@ -538,6 +604,123 @@ export class CampaignService {
       this._campaigns.push(campaign);
     }
     this.save();
+  }
+
+  // ── Text-pack (translation-only) import/export ───────────────────────────────
+
+  /**
+   * Build a locale-scoped "text pack": just the campaign's guid, IDs, and its
+   * 5 translatable text fields (resolved for `locale` via the standard
+   * fallback chain, so untranslated fields pre-fill with the best available
+   * source text). No grid/tile/inventory data. Backfills `campaign.guid` if
+   * missing. Always plain JSON (never gzip) — meant to be hand-edited.
+   */
+  exportTextPack(campaign: CampaignDef, locale: string): string {
+    const campaignGuid = this._ensureGuid(campaign);
+    const pack: CampaignTextPack = {
+      campaignGuid,
+      locale,
+      campaign: { name: resolveLocalizedText(campaign.name, locale) },
+      chapters: campaign.chapters.map((chapter) => ({
+        id: chapter.id,
+        name: resolveLocalizedText(chapter.name, locale),
+        levels: chapter.levels.map((level) => {
+          const textLevel: TextPackLevel = {
+            id: level.id,
+            name: resolveLocalizedText(level.name, locale),
+          };
+          if (level.note !== undefined) textLevel.note = resolveLocalizedText(level.note, locale);
+          if (level.hints !== undefined) {
+            textLevel.hints = level.hints.map((hint) => resolveLocalizedText(hint, locale));
+          }
+          return textLevel;
+        }),
+      })),
+    };
+    return JSON.stringify({ type: FILE_TYPE_CAMPAIGN_TEXT_PACK, ...pack }, null, 2);
+  }
+
+  /**
+   * Parse a JSON string as a {@link CampaignTextPack}.
+   * @throws {Error} If the JSON is malformed, the type is wrong, or the shape is invalid.
+   */
+  parseTextPack(json: string): CampaignTextPack {
+    const raw = JSON.parse(json) as Record<string, unknown>;
+    if (raw['type'] !== FILE_TYPE_CAMPAIGN_TEXT_PACK) {
+      throw new Error('Wrong file type: expected a campaign text-pack file.');
+    }
+    if (
+      typeof raw['campaignGuid'] !== 'string'
+      || typeof raw['locale'] !== 'string'
+      || !Array.isArray(raw['chapters'])
+    ) {
+      throw new Error('Invalid campaign text-pack file format.');
+    }
+    delete raw['type'];
+    return raw as unknown as CampaignTextPack;
+  }
+
+  /**
+   * Merge a text pack into the local campaign it references (matched by
+   * `pack.campaignGuid`, never by the local `id`). By default, only adds text
+   * for locale slices that aren't already present anywhere in the matched
+   * fields — it can never overwrite existing translations. Pass
+   * `overwrite: true` to replace existing values for `pack.locale` instead.
+   *
+   * Chapters/levels referenced by the pack that no longer exist locally are
+   * skipped (not a hard failure); only a missing *campaign* aborts the merge
+   * entirely, since translators' packs can go stale after a campaign edit.
+   *
+   * @throws {Error} If no local campaign has a matching `guid`.
+   */
+  mergeTextPack(pack: CampaignTextPack, options?: { overwrite?: boolean }): TextPackMergeResult {
+    const campaign = this.getCampaignByGuid(pack.campaignGuid);
+    if (!campaign) {
+      throw new Error('No local campaign matches this text pack. It may belong to a different installation.');
+    }
+    const overwrite = options?.overwrite === true;
+    const result: TextPackMergeResult = { campaign, locale: pack.locale, added: 0, skipped: 0, overwritten: 0, unmatchedNodes: 0 };
+
+    const mergeField = (
+      current: string | LocalizedText | undefined,
+      packValue: string,
+    ): string | LocalizedText | undefined => {
+      const alreadyPresent = typeof current === 'object' && current[pack.locale] !== undefined;
+      if (alreadyPresent && !overwrite) {
+        result.skipped++;
+        return current;
+      }
+      if (alreadyPresent) result.overwritten++;
+      else result.added++;
+      return writeLocalizedText(current, pack.locale, packValue);
+    };
+
+    campaign.name = mergeField(campaign.name, pack.campaign.name) ?? campaign.name;
+
+    for (const packChapter of pack.chapters) {
+      const chapter = campaign.chapters.find((c) => c.id === packChapter.id);
+      if (!chapter) { result.unmatchedNodes++; continue; }
+      chapter.name = mergeField(chapter.name, packChapter.name) ?? chapter.name;
+
+      for (const packLevel of packChapter.levels) {
+        const level = chapter.levels.find((l) => l.id === packLevel.id);
+        if (!level) { result.unmatchedNodes++; continue; }
+        level.name = mergeField(level.name, packLevel.name) ?? level.name;
+        if (packLevel.note !== undefined) {
+          level.note = mergeField(level.note, packLevel.note);
+        }
+        if (packLevel.hints !== undefined && level.hints !== undefined) {
+          const count = Math.min(packLevel.hints.length, level.hints.length);
+          for (let i = 0; i < count; i++) {
+            level.hints[i] = mergeField(level.hints[i], packLevel.hints[i]) ?? level.hints[i];
+          }
+        }
+      }
+    }
+
+    this.touch(campaign);
+    this.save();
+    return result;
   }
 
   // ── Data validation ──────────────────────────────────────────────────────────

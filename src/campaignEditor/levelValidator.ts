@@ -3,6 +3,7 @@ import type { LevelDef} from '../types';
 import { PipeShape } from '../types';
 import type { ValidationResult } from './types';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 import { MULTIPLE_SINKS, MULTIPLE_SOURCES, NO_SINK, NO_SOURCE } from './validationMessages';
 
 /**
@@ -36,6 +37,9 @@ export function validateLevel(levelDef: LevelDef): ValidationResult {
   // Check that inventory has at least one item (otherwise level may be impossible)
   const hasInventory = levelDef.inventory.some((it) => it.count > 0);
   if (!hasInventory) msgs.push(t('validation.level.inventoryEmpty'));
+
+  // Non-blocking: warn if the level name has no text in any language.
+  if (!resolveLocalizedText(levelDef.name).trim()) msgs.push(t('validation.level.nameEmpty'));
 
   // Try to create a Board and check if the level has a valid layout
   try {

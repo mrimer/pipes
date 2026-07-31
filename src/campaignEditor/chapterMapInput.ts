@@ -17,6 +17,7 @@ import { sfxManager, SfxId } from '../audio/sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
@@ -360,7 +361,7 @@ export class ChapterMapInput {
         const campaign = this._cb.getActiveCampaign();
         const chapter = campaign?.chapters[this._cb.getActiveChapterIdx()];
         const level = chapter?.levels[tile.levelIdx];
-        this._canvas.title = level ? `${tile.levelIdx + 1}: ${level.name}` : t('editor.chapterMap.levelFallback', { number: tile.levelIdx + 1 });
+        this._canvas.title = level ? `${tile.levelIdx + 1}: ${resolveLocalizedText(level.name)}` : t('editor.chapterMap.levelFallback', { number: tile.levelIdx + 1 });
       } else {
         this._canvas.title = '';
       }

@@ -32,6 +32,7 @@ import { createButton } from '../uiHelpers';
 import type { CloudShadowPreset } from '../visuals/cloudShadows';
 import { CampaignBirdFlockField, CloudShadowField } from '../visuals/cloudShadows';
 import { t } from '../i18n';
+import { resolveLocalizedText } from '../campaignLocalization';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
@@ -888,12 +889,12 @@ export abstract class MapScreenBase {
     header.style.cssText = 'text-align:center;width:100%;max-width:900px;';
     const campaignName = document.createElement('div');
     campaignName.style.cssText = 'font-size:0.9rem;color:#aaa;';
-    campaignName.textContent = campaign.name;
+    campaignName.textContent = resolveLocalizedText(campaign.name);
     header.appendChild(campaignName);
     const customChapterTitle = this._formatChapterTitle(campaign, chapterIdx, chapter);
     const chapterTitleText =
       customChapterTitle === undefined
-        ? `Chapter ${chapterIdx + 1}: ${chapter.name}`
+        ? `Chapter ${chapterIdx + 1}: ${resolveLocalizedText(chapter.name)}`
         : customChapterTitle;
     if (chapterTitleText !== null) {
       const chapterTitle = document.createElement('h2');
@@ -1159,7 +1160,7 @@ export abstract class MapScreenBase {
     if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
       const isFilled = filledKeys.has(`${row},${col}`);
       const entity = this._getEntityDefs()[def.levelIdx];
-      return isFilled && entity ? `${def.levelIdx + 1}: ${entity.name}` : t('map.tooltip.locked');
+      return isFilled && entity ? `${def.levelIdx + 1}: ${resolveLocalizedText(entity.name)}` : t('map.tooltip.locked');
     }
     if (def?.shape === PipeShape.Source) {
       const count = this._getEntityDefs().filter(l => displayProgress.has(l.id)).length;

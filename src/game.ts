@@ -79,6 +79,7 @@ import { FireflyField } from './visuals/fireflyField';
 import { ButterflyField } from './visuals/butterflyField';
 import { hasDuplicateAutoRecording } from './autoRecording';
 import { t, setEmojisEnabled, getLocale, setLocale } from './i18n';
+import { resolveLocalizedText } from './campaignLocalization';
 import { ResumePlayer } from './resumePlayer';
 import { dispatchGameEvent } from './systems/gameEventBus';
 import { triggerCloudSave } from './platform/cloudSave';
@@ -968,8 +969,9 @@ export class Game implements InputCallbacks {
   private _renderLevelList(): void { this._campaign.renderLevelList(); }
   private _updateNoteHintBoxes(level: LevelDef): void {
     // Note box
-    if (level.note) {
-      this.noteBoxEl.textContent = '\u2755  ' + level.note;
+    const noteText = resolveLocalizedText(level.note);
+    if (noteText) {
+      this.noteBoxEl.textContent = '\u2755  ' + noteText;
       this.noteBoxEl.style.display = 'block';
     } else {
       this.noteBoxEl.style.display = 'none';
@@ -999,7 +1001,7 @@ export class Game implements InputCallbacks {
 
       const textEl = document.createElement('div');
       textEl.style.cssText = HINT_TEXT_STYLE;
-      textEl.textContent = hint;
+      textEl.textContent = resolveLocalizedText(hint);
 
       toggleBtn.addEventListener('click', () => {
         const isHidden = textEl.style.display === 'none';
@@ -2669,7 +2671,7 @@ export class Game implements InputCallbacks {
     this.levelHeaderEl.appendChild(ptLine1);
     const ptLine2 = document.createElement('div');
     ptLine2.style.cssText = 'font-size:1rem;color:#f0c040;';
-    ptLine2.textContent = level.name;
+    ptLine2.textContent = resolveLocalizedText(level.name);
     this.levelHeaderEl.appendChild(ptLine2);
     this._refreshPlayUI();
     this._updateNoteHintBoxes(level);
