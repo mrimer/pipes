@@ -115,9 +115,13 @@ src/
 ├── colors.ts                    # Canvas rendering colors only (not UI)
 ├── uiHelpers.ts                 # Shared DOM-building helpers
 ├── svgUtils.ts                  # SVG element creation utilities
-├── i18n.ts                      # Lightweight locale registry, locale bootstrap, fallback, and string interpolation
+├── i18n.ts                      # Lightweight locale registry, locale bootstrap, fallback, string interpolation, and SUPPORTED_LOCALES
 ├── i18n/
-│   └── en.ts                    # English translation catalog (canonical fallback locale)
+│   ├── en.ts                    # English translation catalog (canonical fallback locale)
+│   ├── es.ts                    # Spanish translation catalog (draft)
+│   ├── fr.ts                    # French translation catalog (draft)
+│   ├── de.ts                    # German translation catalog (draft)
+│   └── pl.ts                    # Polish translation catalog (draft)
 ├── i18nTypes.ts                 # Shared i18n type definitions
 ├── commandKeyManager.ts         # Keyboard shortcut registry
 ├── deviceUtils.ts               # Touch/mobile detection helpers
@@ -163,7 +167,8 @@ src/
 │
 ├── platform/
 │   ├── storage.ts               # PlatformStorage interface and BUILD_TARGET-selected implementation
-│   └── achievementAdapter.ts    # AchievementAdapter interface; Local / Steam / GooglePlay implementations
+│   ├── achievementAdapter.ts    # AchievementAdapter interface; Local / Steam / GooglePlay implementations
+│   └── cloudSave.ts             # triggerCloudSave() — no-op outside electron, else calls window.electronAPI.triggerCloudSave()
 │
 ├── visuals/
 │   ├── butterflyField.ts        # Butterfly visual effect
@@ -238,7 +243,7 @@ el.textContent = t('hud.undo');
 el.textContent = t('levelSelect.stars', { count: 3 });
 ```
 
-Source tables live in `src/i18n/<locale>.ts`. English (`en.ts`) is canonical and the fallback.
+Source tables live in `src/i18n/<locale>.ts`. English (`en.ts`) is canonical and the fallback. Locales currently shipped: `en`, `es`, `fr`, `de`, `pl` (the `de`/`es`/`fr`/`pl` catalogs are a draft machine-assisted translation pass, not yet native-reviewed).
 
 To add a new string:
 1. Add the key + English value to `src/i18n/en.ts`.
@@ -247,7 +252,7 @@ To add a new string:
 To add a new locale:
 1. Create `src/i18n/<locale>.ts` exporting a `TranslationTable`.
 2. Register in `src/main.ts`: `registerTranslations('<locale>', table)`.
-3. Add to the supported list in the `initLocale([...])` call.
+3. Add an entry to `SUPPORTED_LOCALES` in `src/i18n.ts` (drives both `initLocale([...])` and the settings language picker).
 
 Don't localize:
 - `console.warn` / `console.error` (developer-facing)
@@ -257,7 +262,9 @@ Don't localize:
 
 Migration status: All user-facing strings are localized via `t()`. New strings must add keys to `src/i18n/en.ts`. CI guards against missing keys and warns on hardcoded `textContent`.
 
-Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and `initLocale(['en'])` before any UI renders. Adding a locale requires updating this bootstrap.
+Bootstrap is explicit: `src/main.ts` registers all five translation tables and calls `initLocale(SUPPORTED_LOCALES.map((l) => l.code))` before any UI renders. Adding a locale requires updating this bootstrap plus `SUPPORTED_LOCALES`.
+
+**Language selector:** The settings modal (`src/modals/gameModals.ts`) exposes a language picker driven by `SUPPORTED_LOCALES`; the chosen locale is persisted via `saveLocale()`/`loadLocale()` in `persistence.ts`.
 
 ---
 
@@ -347,6 +354,9 @@ Bootstrap is explicit: `src/main.ts` calls `registerTranslations('en', en)` and 
 | Achievement predicates and IDs | `achievements/definitions.ts` |
 | Achievement stats + per-profile persistence | `achievements/stats.ts` |
 | Platform achievement unlock (Steam / Google Play) | `platform/achievementAdapter.ts` |
+| Steam Cloud save trigger (renderer side) | `platform/cloudSave.ts` → `triggerCloudSave()` |
+| Steam Cloud save read/write (main process) | `electron/main.ts` → `readSaveFile()` / `writeSaveFile()`; IPC in `electron/preload.ts` → `collectSaveData()` |
+| Language selector UI | `modals/gameModals.ts`; locale list in `i18n.ts` → `SUPPORTED_LOCALES` |
 
 ---
 

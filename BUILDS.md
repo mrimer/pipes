@@ -102,6 +102,8 @@ The packaged output lands in `release/`:
 
 **Steam integration:** Install [`steamworks.js`](https://github.com/ceifa/steamworks.js) (the modern Steamworks SDK wrapper for Electron) and expose the client via `contextBridge` in `electron/preload.ts` as `window.steamworksClient`. The achievement adapter in [src/platform/achievementAdapter.ts](src/platform/achievementAdapter.ts) calls `window.steamworksClient.achievement.activate(steamId)` — wire it up there. Achievement API names (`steamId` fields in `src/achievements/definitions.ts`) must be registered in the Steam partner portal before the adapter calls will do anything.
 
+**Steam Cloud save:** Electron builds already snapshot all `pipes_*` localStorage keys (excluding partial-progress and official bundled campaign data) into `<userData>/save.json.gz` on six checkpoints — level win, settings confirm, profile CRUD, recording delete, and before-quit — via `electron/main.ts` (`readSaveFile`/`writeSaveFile` over IPC) and `electron/preload.ts` (`collectSaveData`). The save file is imported into `localStorage` synchronously at startup, before any page JS runs. The renderer triggers a checkpoint write via `src/platform/cloudSave.ts` → `triggerCloudSave()` (no-op outside `BUILD_TARGET === 'electron'`). For actual Steam Cloud sync (not just local persistence), point Steamworks' auto-cloud feature at `<userData>/save.json.gz` in the Steamworks partner portal, or call the `steamworks.js` cloud API directly from `electron/main.ts`.
+
 ### Android / Google Play (Capacitor)
 
 > Capacitor is not installed yet. Run the one-time setup below before using the Android scripts.
