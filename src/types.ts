@@ -437,7 +437,12 @@ export interface ChapterDef {
  * Campaigns can be created, imported, and exported in the Campaign Editor.
  */
 export interface CampaignDef {
-  /** Unique identifier used to key persistent progress tracking. */
+  /**
+   * Local identifier used to key persistent progress tracking
+   * (`pipes_campaign_progress_<id>` etc.). Not reliable for cross-install
+   * "is this the same campaign" comparisons — use `guid` for that (see
+   * campaignService's `_findMatchingCampaignIndex` and `getCampaignByGuid`).
+   */
   id: string;
   name: string | LocalizedText;
   author: string;
@@ -446,10 +451,12 @@ export interface CampaignDef {
    * Stable UUID identifying this campaign across separate local installs,
    * independent of `id` (a local storage key that can be remapped, e.g. when
    * an imported 'official' campaign gets a fresh `id`). Generated once at
-   * creation via generateGuid() and never changed. Used to match a campaign
-   * against a text-only translation pack (see campaignService.exportTextPack).
-   * Absent for campaigns created before this field was introduced; backfilled
-   * lazily on first export.
+   * creation via generateGuid() and never changed. This is the preferred
+   * cross-install match key for both full-campaign import conflict detection
+   * (parseImport/acceptImport, falling back to `id` when either side lacks a
+   * guid) and text-only translation-pack import (mergeTextPack, guid-only —
+   * see campaignService.exportTextPack). Absent for campaigns created before
+   * this field was introduced; backfilled lazily on first export.
    */
   guid?: string;
   /**

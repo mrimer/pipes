@@ -258,6 +258,30 @@ export class CampaignService {
   }
 
   /**
+   * Find the local campaign that represents the same campaign as `data` (a
+   * parsed/imported CampaignDef-shaped record), for import conflict
+   * detection. Prefers guid equality when both sides have a guid — the
+   * robust, collision-resistant check also used by the text-pack import
+   * path (see mergeTextPack). Falls back to id equality when either side
+   * lacks a guid (reproducing prior behavior for campaigns/files that
+   * predate the guid field), but NOT when both sides have a guid and it
+   * differs: that's a definitive "different campaign" signal that a mere id
+   * coincidence must not override. Returns the array index, or -1 if none
+   * match.
+   */
+  private _findMatchingCampaignIndex(data: { id: string; guid?: string }): number {
+    if (data.guid) {
+      const byGuid = this._campaigns.findIndex((c) => c.guid !== undefined && c.guid === data.guid);
+      if (byGuid !== -1) return byGuid;
+    }
+    const byId = this._campaigns.findIndex((c) => c.id === data.id);
+    if (byId === -1) return -1;
+    const candidate = this._campaigns[byId];
+    if (data.guid && candidate.guid && candidate.guid !== data.guid) return -1;
+    return byId;
+  }
+
+  /**
    * Ensure `campaign.guid` is set, lazily backfilling it (and persisting the
    * change) for campaigns created before this field existed. Called before
    * any export that needs a stable cross-install identifier.
@@ -577,7 +601,7 @@ export class CampaignService {
     if (data.official) {
       data.official = undefined;
     }
-    const existingIdx = this._campaigns.findIndex((c) => c.id === data.id);
+    const existingIdx = this._findMatchingCampaignIndex(data);
     if (existingIdx !== -1) {
       const existing = this._campaigns[existingIdx];
       const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
@@ -597,8 +621,15 @@ export class CampaignService {
    */
   acceptImport(result: ImportResult): void {
     const { campaign } = result;
-    const existingIdx = this._campaigns.findIndex((c) => c.id === campaign.id);
+    const existingIdx = this._findMatchingCampaignIndex(campaign);
     if (existingIdx !== -1) {
+      const existing = this._campaigns[existingIdx];
+      // Matched via guid but the id drifted (e.g. a hand-edited file, or two
+      // installs that diverged before ever syncing) — keep the local id so
+      // progress/star/water records keyed under it stay attached.
+      if (existing.guid && campaign.guid === existing.guid && campaign.id !== existing.id) {
+        campaign.id = existing.id;
+      }
       this._campaigns[existingIdx] = campaign;
     } else {
       this._campaigns.push(campaign);

@@ -924,6 +924,41 @@ describe('CampaignService – parseImport', () => {
     const svc = makeService();
     expect(() => svc.parseImport(json)).toThrow(/wrong file type/i);
   });
+
+  // ── guid-preferred matching ───────────────────────────────────────────────
+
+  it('matches by guid (not id) when both sides have one, even if the id differs', () => {
+    const existing: CampaignDef = { ...emptyCampaign('cmp_local_id'), guid: 'guid-shared', lastUpdated: '2024-01-01T00:00:00.000Z' };
+    const svc = makeService([existing]);
+    const imported = { ...emptyCampaign('cmp_different_id'), guid: 'guid-shared', lastUpdated: '2024-06-01T00:00:00.000Z' };
+    const result = svc.parseImport(JSON.stringify(imported));
+    expect(result.conflict).toBe('version_conflict');
+    expect(result.existing?.id).toBe('cmp_local_id');
+  });
+
+  it('does not treat two campaigns as conflicting when ids coincide but guids differ', () => {
+    const existing: CampaignDef = { ...emptyCampaign('cmp_shared_id'), guid: 'guid-a' };
+    const svc = makeService([existing]);
+    const imported = { ...emptyCampaign('cmp_shared_id'), guid: 'guid-b' };
+    const result = svc.parseImport(JSON.stringify(imported));
+    expect(result.conflict).toBe('none');
+  });
+
+  it('falls back to id matching when the imported file has no guid', () => {
+    const existing: CampaignDef = { ...emptyCampaign('cmp_no_guid'), guid: 'guid-local', lastUpdated: '2024-01-01T00:00:00.000Z' };
+    const svc = makeService([existing]);
+    const imported = { ...emptyCampaign('cmp_no_guid'), lastUpdated: '2024-06-01T00:00:00.000Z' }; // no guid field
+    const result = svc.parseImport(JSON.stringify(imported));
+    expect(result.conflict).toBe('version_conflict');
+  });
+
+  it('falls back to id matching when the local campaign has no guid', () => {
+    const existing: CampaignDef = { ...emptyCampaign('cmp_no_local_guid'), lastUpdated: '2024-01-01T00:00:00.000Z' }; // no guid
+    const svc = makeService([existing]);
+    const imported = { ...emptyCampaign('cmp_no_local_guid'), guid: 'guid-imported', lastUpdated: '2024-06-01T00:00:00.000Z' };
+    const result = svc.parseImport(JSON.stringify(imported));
+    expect(result.conflict).toBe('version_conflict');
+  });
 });
 
 // ─── acceptImport ─────────────────────────────────────────────────────────────
@@ -951,6 +986,37 @@ describe('CampaignService – acceptImport', () => {
     const result: ImportResult = { campaign: emptyCampaign('cmp_persist'), conflict: 'none' };
     svc.acceptImport(result);
     expect(loadImportedCampaigns().some((c) => c.id === 'cmp_persist')).toBe(true);
+  });
+
+  // ── guid-preferred matching ───────────────────────────────────────────────
+
+  it('matches by guid when replacing, even if the incoming id differs, and keeps the local id', () => {
+    const existing: CampaignDef = {
+      ...emptyCampaign('cmp_local_id'), guid: 'guid-shared',
+      chapters: [{ id: 1, name: 'Old', levels: [] }],
+    };
+    const svc = makeService([existing]);
+    const incoming: CampaignDef = {
+      ...emptyCampaign('cmp_different_id'), guid: 'guid-shared',
+      chapters: [{ id: 1, name: 'New', levels: [] }],
+    };
+    const result: ImportResult = { campaign: incoming, conflict: 'version_conflict', existing, isNewer: true };
+    svc.acceptImport(result);
+    expect(svc.campaigns).toHaveLength(1);
+    // Local id (and whatever progress is keyed under it) is preserved...
+    expect(svc.getCampaign('cmp_local_id')).not.toBeNull();
+    expect(svc.getCampaign('cmp_different_id')).toBeNull();
+    // ...while the imported content (chapter name) replaces the old content.
+    expect(svc.getCampaign('cmp_local_id')!.chapters[0].name).toBe('New');
+  });
+
+  it('does not rewrite the id when matched by id (guid absent or unchanged)', () => {
+    const existing: CampaignDef = { ...emptyCampaign('cmp_same_id'), chapters: [{ id: 1, name: 'Old', levels: [] }] };
+    const svc = makeService([existing]);
+    const incoming: CampaignDef = { ...emptyCampaign('cmp_same_id'), chapters: [{ id: 1, name: 'New', levels: [] }] };
+    const result: ImportResult = { campaign: incoming, conflict: 'version_conflict', existing, isNewer: true };
+    svc.acceptImport(result);
+    expect(svc.getCampaign('cmp_same_id')!.chapters[0].name).toBe('New');
   });
 });
 
