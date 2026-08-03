@@ -47,9 +47,13 @@ import {
   mergePartialProgress,
   loadSaveNoticeSuppressed,
   saveSaveNoticeSuppressed,
+  loadGnomeAppearance,
+  saveGnomeAppearance,
 } from '../persistence';
 import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord } from '../types';
 import { resolveLocalizedText } from '../campaignLocalization';
+import type { GnomeAppearance } from './gnomeAppearance';
+import { isValidGnomeAppearance, migrateGnomeAppearance } from './gnomeAppearance';
 
 // ─── File type constants ──────────────────────────────────────────────────────
 
@@ -66,7 +70,7 @@ export const FILE_TYPE_CAMPAIGN_TEXT_PACK = 'pipes-campaign-text-pack';
 export const FILE_TYPE_REPLAY   = 'pipes-replay';
 
 /** Current player-profile file format version. */
-export const PROFILE_FORMAT_VERSION = 3;
+export const PROFILE_FORMAT_VERSION = 4;
 
 // ─── Checksum ─────────────────────────────────────────────────────────────────
 
@@ -156,6 +160,12 @@ export interface PlayerProfilePayload {
    * Optional for back-compat; defaults to false when absent.
    */
   saveNoticeSuppressed?: boolean;
+  /**
+   * The player's gnome avatar appearance. Added in v4.
+   * Optional for back-compat; when absent on import, the local appearance is
+   * left untouched rather than overwritten with a default.
+   */
+  appearance?: GnomeAppearance;
 }
 
 /** The complete serialized player-profile file. */
@@ -252,6 +262,7 @@ export function buildPlayerProfilePayload(
     campaignProgress,
     partialProgress:     loadPartialProgress(),
     saveNoticeSuppressed: loadSaveNoticeSuppressed(),
+    appearance:          loadGnomeAppearance(),
   };
   if (recordings !== undefined) {
     payload.recordings = recordings;
@@ -365,6 +376,12 @@ function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
   }
   // saveNoticeSuppressed is optional for back-compat; reject only if present but not a boolean
   if ('saveNoticeSuppressed' in payload && typeof payload['saveNoticeSuppressed'] !== 'boolean') return false;
+  // appearance is optional for back-compat; migrate older shapes (e.g. files exported
+  // before shoeShape existed) in place, then reject only if still malformed.
+  if ('appearance' in payload && payload['appearance'] !== undefined) {
+    payload['appearance'] = migrateGnomeAppearance(payload['appearance']);
+    if (!isValidGnomeAppearance(payload['appearance'])) return false;
+  }
   return true;
 }
 
@@ -385,6 +402,12 @@ function migratePayloadV2ToV3(payload: Record<string, unknown>): Record<string, 
   }
   // Future structural migrations should keep this version-cursor pattern:
   // add migratePayloadVnToVn+1 and advance cursor one step at a time.
+  return payload;
+}
+
+function migratePayloadV3ToV4(payload: Record<string, unknown>): Record<string, unknown> {
+  // v4 introduced the gnome avatar appearance; older files simply lack it, and
+  // applyPlayerProfile leaves the local appearance untouched when absent.
   return payload;
 }
 
@@ -469,6 +492,11 @@ export function parsePlayerFile(json: string): PlayerFileResult {
       payloadVersion = 3;
       continue;
     }
+    if (payloadVersion === 3) {
+      migratePayloadV3ToV4(rawPayload);
+      payloadVersion = 4;
+      continue;
+    }
     // Guardrail for incomplete future migration chains during development.
     return { ok: false, error: `Unsupported player profile version: ${payloadVersion}` };
   }
@@ -547,6 +575,10 @@ export function applyPlayerProfile(
   saveMusicMuteOnFocusLoss(payload.musicMuteOnFocusLoss ?? true);
   // saveNoticeSuppressed is optional for back-compat; default to false when absent
   saveSaveNoticeSuppressed(payload.saveNoticeSuppressed ?? false);
+  // appearance is optional for back-compat; leave the local appearance untouched when absent
+  if (payload.appearance) {
+    saveGnomeAppearance(payload.appearance);
+  }
 
   // ── Partial progress ───────────────────────────────────────────────────────
   if (payload.partialProgress) {

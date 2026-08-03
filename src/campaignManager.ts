@@ -23,6 +23,7 @@ import {
   loadMasteredChaptersShown, markMasteredChapterShown, clearMasteredChaptersShown, removeMasteredChapterShown,
    loadCampaignMasteredShown, markCampaignMasteredShown, clearCampaignMasteredShown,
    loadCampaignCompleteShown, markCampaignCompleteShown, clearCampaignCompleteShown,
+   loadGnomeAppearance,
 } from './persistence';
 import { renderLevelList } from './screens/levelSelect';
 import { spawnConfetti } from './visuals/confetti';
@@ -896,6 +897,7 @@ export class CampaignManager {
       () => this._callbacks.showCredits(),
       this._callbacks.startLevelFromPartial ? (id: number) => this._callbacks.startLevelFromPartial?.(id) : undefined,
       this._callbacks.getPartialLevelId?.() ?? null,
+      loadGnomeAppearance(),
     );
   }
 

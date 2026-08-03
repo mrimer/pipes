@@ -11,7 +11,7 @@ import { syncBundledCampaigns } from './bundledCampaigns';
 import { applyScrollingPipeBackground, setGlobalBackgroundPatternEnabled } from './uiBackground';
 import { BG_COLOR } from './colors';
 import { setEnvironmentalEnabled } from './graphicsSettings';
-import { loadBackgroundEnabled, loadEnvironmentalEnabled, loadEmojisEnabled } from './persistence';
+import { loadBackgroundEnabled, loadEnvironmentalEnabled, loadEmojisEnabled, ensureGnomeAppearance } from './persistence';
 import { showIntroTitleScreen } from './screens/titleScreen';
 import { showSplashScreen } from './screens/splashScreen';
 import { initLocale, registerTranslations, setEmojisEnabled, SUPPORTED_LOCALES, t } from './i18n';
@@ -31,6 +31,10 @@ syncBundledCampaigns();
 const savedActiveSlot = loadActiveSlotIndex();
 if (savedActiveSlot !== null) {
   setActiveSlotIndex(savedActiveSlot);
+  // Profiles created before the gnome avatar feature existed have no stored
+  // appearance yet — generate and persist a random one now rather than
+  // silently rendering the fallback default forever.
+  ensureGnomeAppearance();
 }
 
 // ─── Step 3: apply player settings from the active slot ──────────────────────

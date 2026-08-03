@@ -3,6 +3,10 @@
 import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord, RecordingSettings } from './types';
 import { isLocalizedTextShape } from './types';
 import { getActiveSlotPrefix } from './profile/activeProfile';
+import type { GnomeAppearance } from './profile/gnomeAppearance';
+import {
+  DEFAULT_GNOME_APPEARANCE, isValidGnomeAppearance, migrateGnomeAppearance, randomGnomeAppearance,
+} from './profile/gnomeAppearance';
 
 /**
  * Convenience shorthand: returns the active-slot prefix string.
@@ -602,6 +606,49 @@ export function savePlayerName(name: string): void {
     const normalized = name.trim() || DEFAULT_PLAYER_NAME;
     localStorage.setItem(PLAYER_NAME_KEY(), normalized);
   } catch { /* ignore */ }
+}
+
+const GNOME_APPEARANCE_KEY = (): string => `pipes_${p()}gnome_appearance`;
+
+/** Load the persisted gnome avatar appearance, or the default appearance when unset/invalid. */
+export function loadGnomeAppearance(): GnomeAppearance {
+  try {
+    const raw = localStorage.getItem(GNOME_APPEARANCE_KEY());
+    if (raw) {
+      const migrated = migrateGnomeAppearance(JSON.parse(raw) as unknown);
+      if (isValidGnomeAppearance(migrated)) return migrated;
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_GNOME_APPEARANCE;
+}
+
+/** Persist the gnome avatar appearance. */
+export function saveGnomeAppearance(appearance: GnomeAppearance): void {
+  try {
+    localStorage.setItem(GNOME_APPEARANCE_KEY(), JSON.stringify(appearance));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Load the gnome appearance for the active slot, generating and persisting a
+ * random one first if none exists yet (e.g. a profile created before this
+ * feature existed). Safe to call repeatedly — a no-op once an appearance exists.
+ */
+export function ensureGnomeAppearance(): GnomeAppearance {
+  try {
+    const raw = localStorage.getItem(GNOME_APPEARANCE_KEY());
+    if (raw) {
+      const migrated = migrateGnomeAppearance(JSON.parse(raw) as unknown);
+      if (isValidGnomeAppearance(migrated)) {
+        // Persist the migrated shape so future loads skip the migration step.
+        saveGnomeAppearance(migrated);
+        return migrated;
+      }
+    }
+  } catch { /* ignore, fall through to generate one */ }
+  const generated = randomGnomeAppearance();
+  saveGnomeAppearance(generated);
+  return generated;
 }
 
 /** Load persisted command key assignments (action -> binding string), or null when unset/invalid. */

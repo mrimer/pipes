@@ -68,3 +68,58 @@ export function createButton(
   b.addEventListener('click', onClick);
   return b;
 }
+
+/**
+ * Create a small circular icon button (emoji glyph), used for the pencil/slider/
+ * color-picker affordances on the gnome avatar and its editor dialog.
+ */
+export function createRoundIconButton(
+  glyph: string,
+  title: string,
+  ariaLabel: string,
+  onClick: (e: MouseEvent) => void,
+): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = glyph;
+  b.title = title;
+  b.setAttribute('aria-label', ariaLabel);
+  b.style.cssText =
+    'width:22px;height:22px;border-radius:50%;background:#16213e;border:1px solid #4a90d9;' +
+    'color:#eee;cursor:pointer;font-size:0.75rem;line-height:1;padding:0;' +
+    'display:flex;align-items:center;justify-content:center;';
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+/**
+ * Fire `onOutside` on the next mousedown that lands outside `el`, then detach.
+ * Returns a manual-detach function for callers that need to dismiss early
+ * (e.g. the popover's own close button).
+ *
+ * @param excludeEl - Optional element (typically the button that opened `el`) whose clicks
+ *   are also treated as "inside" — without this, re-clicking the trigger button would be
+ *   seen as an outside click on the mousedown that fires *before* the button's own click
+ *   handler runs, closing the popover a beat before that handler could decide to toggle it
+ *   itself; the popover would then just reopen, looking like the outside click did nothing.
+ */
+export function attachClickOutsideToClose(
+  el: HTMLElement,
+  onOutside: () => void,
+  excludeEl?: HTMLElement,
+): () => void {
+  const handler = (e: MouseEvent): void => {
+    if (!(e.target instanceof Node)) return;
+    if (el.contains(e.target)) return;
+    if (excludeEl && excludeEl.contains(e.target)) return;
+    detach();
+    onOutside();
+  };
+  // Deferred so the click that opened the popover doesn't immediately close it.
+  const timer = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+  const detach = (): void => {
+    clearTimeout(timer);
+    document.removeEventListener('mousedown', handler);
+  };
+  return detach;
+}

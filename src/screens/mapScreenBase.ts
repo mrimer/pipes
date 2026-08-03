@@ -11,7 +11,8 @@ import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
 import { PIPE_SHAPES, generateAmbientDecorations } from '../board';
 import type { ChapterMapFlowDrop} from '../visuals/chapterMap';
 import { renderChapterMapCanvas, findChapterMapAnimPositions, spawnChapterMapFlowDrop, renderChapterMapFlowDrops, drawEdgeFlower, computeMinimapRect, renderChapterMapConnectorLights, computeChapterFloorTypes, invalidateMinimapRectCache, renderChapterMapSeaTiles } from '../visuals/chapterMap';
-import { loadLevelStars, loadLevelWater } from '../persistence';
+import { loadLevelStars, loadLevelWater, loadGnomeAppearance } from '../persistence';
+import { renderGnomeAvatarSvg } from '../visuals/gnomeAvatar';
 import { computeMapReachable, tileDefConnections, findMapTile, computeViewBounds } from '../mapUtils';
 import type { VortexParticle} from '../visuals/sinkVortex';
 import { spawnVortexParticle, renderVortex } from '../visuals/sinkVortex';
@@ -42,6 +43,10 @@ const CHAPTER_MAP_CANVAS_BORDER_PX = 2;
 const CHAPTER_MAP_CANVAS_BORDER_COLOR = '#4a90d9';
 /** CSS border-radius (px) on the chapter map canvas element. */
 const CHAPTER_MAP_CANVAS_BORDER_RADIUS = 6;
+
+/** Gnome avatar height above the map, and beside the level tooltip. */
+const GNOME_MAP_PIXEL_HEIGHT = 70;
+const GNOME_TOOLTIP_PIXEL_HEIGHT = 60;
 
 // ─── Viewport size limits ─────────────────────────────────────────────────────
 
@@ -175,6 +180,9 @@ export abstract class MapScreenBase {
   private _ctrlHeld = false;
   /** Floating tooltip element shown on Ctrl+hover. */
   private readonly _tooltipEl: HTMLElement;
+  /** Gnome avatar shown beside the floating tooltip, kept as a separate element since
+   *  _tooltipEl's textContent is fully rebuilt on every show. */
+  private readonly _tooltipGnomeEl: HTMLElement;
   /** Bound keydown handler stored so it can be removed when the screen is hidden. */
   private readonly _onKeyDown: (e: KeyboardEvent) => void;
   /** Bound keyup handler stored so it can be removed when the screen is hidden. */
@@ -358,6 +366,11 @@ export abstract class MapScreenBase {
       `display:none;position:fixed;background:${UI_BG};color:${UI_TEXT};border:1px solid ${UI_BORDER};` +
       `border-radius:${RADIUS_SM};padding:4px 8px;font-size:0.8rem;pointer-events:none;z-index:50;white-space:pre-wrap;`;
     document.body.appendChild(this._tooltipEl);
+
+    // Gnome avatar shown standing to the left of the level tooltip.
+    this._tooltipGnomeEl = document.createElement('div');
+    this._tooltipGnomeEl.style.cssText = 'display:none;position:fixed;pointer-events:none;z-index:50;';
+    document.body.appendChild(this._tooltipGnomeEl);
 
     this._onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Control' && !this._ctrlHeld) {
@@ -919,6 +932,12 @@ export abstract class MapScreenBase {
     });
     el.appendChild(backBtn);
 
+    // Gnome avatar, standing above the map at its left edge.
+    const gnomeRow = document.createElement('div');
+    gnomeRow.style.cssText = 'display:flex;justify-content:flex-start;max-width:900px;width:100%;margin:0 auto;';
+    gnomeRow.appendChild(renderGnomeAvatarSvg(loadGnomeAppearance(), GNOME_MAP_PIXEL_HEIGHT));
+    el.appendChild(gnomeRow);
+
     // Canvas container
     const canvasWrap = document.createElement('div');
     canvasWrap.style.cssText = 'max-width:900px;width:100%;';
@@ -1185,6 +1204,12 @@ export abstract class MapScreenBase {
       this._tooltipEl.style.display = 'block';
       this._tooltipEl.style.left = `${clientX + 12}px`;
       this._tooltipEl.style.top  = `${clientY + 12}px`;
+
+      this._tooltipGnomeEl.innerHTML = '';
+      this._tooltipGnomeEl.appendChild(renderGnomeAvatarSvg(loadGnomeAppearance(), GNOME_TOOLTIP_PIXEL_HEIGHT));
+      this._tooltipGnomeEl.style.display = 'block';
+      this._tooltipGnomeEl.style.left = `${clientX + 12 - GNOME_TOOLTIP_PIXEL_HEIGHT - 8}px`;
+      this._tooltipGnomeEl.style.top  = `${clientY + 12}px`;
     } else {
       this._hideTooltip();
     }
@@ -1192,6 +1217,7 @@ export abstract class MapScreenBase {
 
   private _hideTooltip(): void {
     this._tooltipEl.style.display = 'none';
+    this._tooltipGnomeEl.style.display = 'none';
   }
 
   /**

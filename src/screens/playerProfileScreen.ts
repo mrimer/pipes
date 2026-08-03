@@ -26,17 +26,34 @@ import {
   loadSlotStats,
 } from '../profile/playerProfileSlots';
 import { setActiveSlotIndex, getActiveSlotIndex, withSlot } from '../profile/activeProfile';
-import { savePlayerName, loadSfxVolume, loadTouchUiEnabled } from '../persistence';
+import { savePlayerName, loadSfxVolume, loadTouchUiEnabled, saveGnomeAppearance, ensureGnomeAppearance } from '../persistence';
 import { sfxManager, SfxId } from '../audio/sfxManager';
 import { hasTouchUiSupport, setTouchUiEnabledOverride } from '../deviceUtils';
 import { importPlayerProfile, exportPlayerProfile, exportPlayerProfileWithRecordings } from '../profile/profileIO';
 import { buildNewPlayerModal, buildConfirmModal, buildEditPlayerNameModal, showPlayerImportResultModal } from '../modals/gameModals';
+import { buildGnomeEditorModal } from '../modals/gnomeEditorModal';
 import { t } from '../i18n';
 import { resolveLocalizedText } from '../campaignLocalization';
 import { attachHoverWaveAnimation } from '../visuals/chapterWaves';
 import type { CampaignDef } from '../types';
 import { applyScrollingPipeBackground, unregisterScrollingPipeBackground } from '../uiBackground';
 import { triggerCloudSave } from '../platform/cloudSave';
+import { createRoundIconButton } from '../uiHelpers';
+import { DEFAULT_GNOME_APPEARANCE, randomGnomeAppearance } from '../profile/gnomeAppearance';
+import { renderGnomeAvatarSvg } from '../visuals/gnomeAvatar';
+
+/** Avatar pixel height on the profile card — small enough to sit beside the name/stats column. */
+const PROFILE_CARD_GNOME_HEIGHT = 64;
+
+/**
+ * Height of the tallest possible avatar (any hat) at {@link PROFILE_CARD_GNOME_HEIGHT} —
+ * used as each card's gnome slot height so avatars bottom-align (feet on a shared
+ * baseline) across cards instead of top-aligning (which would line up hat tips and let
+ * a tall hat push a profile's feet lower than its neighbors'). The appearance passed in
+ * doesn't matter: `fixedFrame` always reserves headroom for the tallest hat regardless.
+ */
+const PROFILE_CARD_GNOME_SLOT_HEIGHT =
+  Number(renderGnomeAvatarSvg(DEFAULT_GNOME_APPEARANCE, PROFILE_CARD_GNOME_HEIGHT, { fixedFrame: true }).getAttribute('height'));
 
 // ─── Styling constants ────────────────────────────────────────────────────────
 
@@ -250,6 +267,40 @@ export class PlayerProfileScreen {
     // Hover wave animation on all occupied cards.
     attachHoverWaveAnimation(card, CARD_HOVER_WAVE_ALPHA);
 
+    // ── Gnome avatar + info column ─────────────────────────────────────────
+    const contentRow = document.createElement('div');
+    contentRow.style.cssText = 'display:flex;gap:10px;align-items:flex-start;';
+
+    // Fixed-height slot (tallest possible hat) with the actual (variable-height) avatar
+    // bottom-aligned inside it, so every card's gnome stands on the same baseline instead
+    // of lining up by hat tip. The edit button is anchored to this fixed box (not the
+    // avatar itself), so its top also lines up the same across every card — pinned to
+    // where the tallest possible hat would end, not each gnome's own (shorter) top.
+    const gnomeBox = document.createElement('div');
+    gnomeBox.style.cssText =
+      `position:relative;flex:0 0 auto;margin-right:16px;` +
+      `height:${PROFILE_CARD_GNOME_SLOT_HEIGHT}px;display:flex;align-items:flex-end;`;
+    const gnomeAppearance = withSlot(slotIndex, ensureGnomeAppearance);
+    gnomeBox.appendChild(renderGnomeAvatarSvg(gnomeAppearance, PROFILE_CARD_GNOME_HEIGHT));
+
+    const gnomeEditBtn = createRoundIconButton('✏️', t('gnome.editButton'), t('gnome.editButton'), (e) => {
+      e.stopPropagation();
+      sfxManager.play(SfxId.Click);
+      buildGnomeEditorModal(
+        gnomeAppearance,
+        (updated) => { withSlot(slotIndex, () => saveGnomeAppearance(updated)); triggerCloudSave(); },
+        () => { this._render(); },
+      );
+    });
+    gnomeEditBtn.style.cssText += 'position:absolute;top:-6px;right:-6px;';
+    gnomeBox.appendChild(gnomeEditBtn);
+    contentRow.appendChild(gnomeBox);
+
+    const infoColumn = document.createElement('div');
+    infoColumn.style.cssText = 'display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;';
+    contentRow.appendChild(infoColumn);
+    card.appendChild(contentRow);
+
     // Name row
     const nameEl = document.createElement('div');
     nameEl.textContent = meta.name;
@@ -278,13 +329,13 @@ export class PlayerProfileScreen {
     nameRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:4px;';
     nameRow.appendChild(nameEl);
     nameRow.appendChild(pencilBtn);
-    card.appendChild(nameRow);
+    infoColumn.appendChild(nameRow);
 
     // Last played
     const lastPlayedEl = document.createElement('div');
     lastPlayedEl.textContent = t('profile.lastPlayed', { date: formatDate(meta.lastPlayedAt) });
     lastPlayedEl.style.cssText = `font-size:0.8rem;color:${TEXT_MUTED};text-align:center;`;
-    card.appendChild(lastPlayedEl);
+    infoColumn.appendChild(lastPlayedEl);
 
     // Stats block (lazy-loaded from that slot's namespaced keys)
     const statsEl = document.createElement('div');
@@ -292,7 +343,7 @@ export class PlayerProfileScreen {
       `flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.82rem;color:${TEXT_MUTED};` +
       'margin:8px 0;align-items:center;';
     this._populateStats(statsEl, slotIndex);
-    card.appendChild(statsEl);
+    infoColumn.appendChild(statsEl);
 
     // Active badge
     if (isActive) {
@@ -421,6 +472,8 @@ export class PlayerProfileScreen {
     saveSlotMeta(slotIndex, meta);
     // Save the player name in the new slot's namespace.
     withSlot(slotIndex, () => savePlayerName(meta.name));
+    // Give the new profile a randomized gnome avatar.
+    withSlot(slotIndex, () => saveGnomeAppearance(randomGnomeAppearance()));
     triggerCloudSave();
     this._render();
   }
@@ -432,6 +485,10 @@ export class PlayerProfileScreen {
 
     // Update last-played timestamp.
     saveSlotMeta(slotIndex, { ...meta, lastPlayedAt: new Date().toISOString() });
+
+    // Generate a gnome avatar for this profile if it doesn't have one yet
+    // (e.g. it was created before this feature existed).
+    ensureGnomeAppearance();
 
     // Apply this slot's audio / UI settings.
     sfxManager.setVolume(loadSfxVolume());

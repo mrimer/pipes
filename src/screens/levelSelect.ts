@@ -7,6 +7,11 @@ import { EDITOR_INPUT_BG, ERROR_COLOR, MUTED_BTN_BG, RADIUS_MD, RADIUS_SM, UI_BG
 import { createButton } from '../uiHelpers';
 import { t } from '../i18n';
 import { resolveLocalizedText } from '../campaignLocalization';
+import type { GnomeAppearance } from '../profile/gnomeAppearance';
+import { renderGnomeAvatarSvg } from '../visuals/gnomeAvatar';
+
+/** Gnome avatar height beside the active-campaign box on the main menu. */
+const GNOME_MENU_PIXEL_HEIGHT = 80;
 
 /** Metadata for the active campaign shown in the campaign header on the main menu. */
 export interface ActiveCampaignInfo {
@@ -220,6 +225,7 @@ export function renderLevelList(
   onCreditsClick?: () => void,
   onContinuePartial?: (levelId: number) => void,
   partialLevelId?: number | null,
+  gnomeAppearance?: GnomeAppearance,
 ): void {
   levelListEl.innerHTML = '';
 
@@ -288,12 +294,25 @@ export function renderLevelList(
     selectRow.appendChild(rightSlot);
     levelListEl.appendChild(selectRow);
 
-    // Welcome line shown below the heading row when a named player is active.
-    if (activeCampaign && playerName) {
+    // Welcome line (with the player's gnome, when there's no active-campaign box for the
+    // gnome to sit beside instead) shown below the heading row whenever a named player is
+    // active — regardless of whether a campaign is active.
+    if (playerName) {
       const welcomeEl = document.createElement('div');
       welcomeEl.style.cssText = 'font-size:0.8rem;color:#aabbcc;text-align:center;margin-top:-6px;';
       welcomeEl.textContent = t('levelSelect.welcome', { playerName });
-      levelListEl.appendChild(welcomeEl);
+
+      if (!activeCampaign && gnomeAppearance) {
+        const welcomeRow = document.createElement('div');
+        welcomeRow.style.cssText = 'display:flex;gap:10px;align-items:center;justify-content:center;margin-top:4px;';
+        const gnomeBox = document.createElement('div');
+        gnomeBox.appendChild(renderGnomeAvatarSvg(gnomeAppearance, GNOME_MENU_PIXEL_HEIGHT));
+        welcomeRow.appendChild(gnomeBox);
+        welcomeRow.appendChild(welcomeEl);
+        levelListEl.appendChild(welcomeRow);
+      } else {
+        levelListEl.appendChild(welcomeEl);
+      }
     }
   } else if (activeCampaign) {
     const h2 = document.createElement('h2');
@@ -559,7 +578,19 @@ export function renderLevelList(
     header.appendChild(chapterListWrap);
     chapterListParent = chapterListWrap;
 
-    levelListEl.appendChild(header);
+    if (gnomeAppearance) {
+      const headerRow = document.createElement('div');
+      headerRow.style.cssText = 'display:flex;gap:12px;align-items:flex-start;';
+      const gnomeBox = document.createElement('div');
+      gnomeBox.style.cssText = 'flex:0 0 auto;';
+      gnomeBox.appendChild(renderGnomeAvatarSvg(gnomeAppearance, GNOME_MENU_PIXEL_HEIGHT));
+      headerRow.appendChild(gnomeBox);
+      header.style.flex = '1';
+      headerRow.appendChild(header);
+      levelListEl.appendChild(headerRow);
+    } else {
+      levelListEl.appendChild(header);
+    }
 
     if (IS_DEMO && STORE_URL && allNonChallengeCompleted) {
       const upsell = document.createElement('div');
