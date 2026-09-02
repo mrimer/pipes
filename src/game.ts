@@ -1683,6 +1683,7 @@ export class Game implements InputCallbacks {
     return sfxToPlay;
   }
 
+
   /**
    * Play all SFX for a tile-placement action.
    *
@@ -1694,13 +1695,8 @@ export class Game implements InputCallbacks {
    *   Leak (if a leaky tile penalty was applied), Gold/Pickup (if applicable),
    *   and all chamber-connection sounds collected by {@link _collectConnectionSfx}.
    */
-  private _playAfterTilePlacedSfx(
-    board: Board,
-    filledBefore: Set<string>,
-    changes: Array<{ row: number; col: number; delta: number }>,
-    placedIsLeakyAndConnected: boolean,
-    placedPosKey: string | null,
-  ): void {
+  private _playAfterTilePlacedSfx(opts: PlayAfterTilePlacedSfxOptions): void {
+    const { board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey } = opts;
     if (placedIsLeakyAndConnected) {
       sfxManager.play(SfxId.Leak);
       return;
@@ -1887,14 +1883,8 @@ export class Game implements InputCallbacks {
    * Records the move, updates last-used rotation, deselects the shape when
    * inventory is exhausted, and refreshes all affected UI elements.
    */
-  afterTilePlaced(
-    placedShape: PipeShape,
-    result: MoveResult,
-    filledBefore: Set<string>,
-    replacedTile: Tile | undefined,
-    replacedRow: number,
-    replacedCol: number,
-  ): void {
+  afterTilePlaced(opts: AfterTilePlacedOptions): void {
+    const { placedShape, result, filledBefore, replacedTile, replacedRow, replacedCol } = opts;
     if (!this.board) return;
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
@@ -1935,7 +1925,7 @@ export class Game implements InputCallbacks {
     this._metrics.scheduleCountBounce(placedShape);
     if (replacedTile) this._metrics.scheduleCountBounce(replacedTile.shape);
 
-    this._playAfterTilePlacedSfx(this.board, filledBefore, changes, placedIsLeakyAndConnected, posKey);
+    this._playAfterTilePlacedSfx({ board: this.board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey: posKey });
 
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
@@ -1984,7 +1974,10 @@ export class Game implements InputCallbacks {
       return false; // tile already has the selected shape+rotation – no action
     }
     if (result.success) {
-      this.afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
+      this.afterTilePlaced({
+        placedShape: this.selectedShape, result, filledBefore, replacedTile,
+        replacedRow: pos.row, replacedCol: pos.col,
+      });
     } else if (result.error) {
       this.handleBoardError(result);
     } else if (this._isFixedNonSpinnerTile(currentTile)) {
@@ -2756,6 +2749,25 @@ export class Game implements InputCallbacks {
   private _activateCampaign(campaign: CampaignDef): void { this._campaign.activate(campaign); }
   private _deactivateCampaign(): void { this._campaign.deactivate(); }
 
+}
+
+// Private interface for _playAfterTilePlacedSfx options
+interface PlayAfterTilePlacedSfxOptions {
+  board: Board;
+  filledBefore: Set<string>;
+  changes: Array<{ row: number; col: number; delta: number }>;
+  placedIsLeakyAndConnected: boolean;
+  placedPosKey: string | null;
+}
+
+// Exported interface for afterTilePlaced options
+export interface AfterTilePlacedOptions {
+  placedShape: PipeShape;
+  result: MoveResult;
+  filledBefore: Set<string>;
+  replacedTile: Tile | undefined;
+  replacedRow: number;
+  replacedCol: number;
 }
 
 // Re-export for backward compatibility with tests that import InventoryItem via game.ts
