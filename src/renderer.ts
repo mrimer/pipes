@@ -780,12 +780,9 @@ function _drawTreeEllipseShadow(
  */
 function _strokeAndFillLobeRing(
   ctx: CanvasRenderingContext2D,
-  count: number,
-  offset: number,
-  radius: number,
-  strokeColor: string,
-  fillColor: string,
+  opts: { count: number; offset: number; radius: number; strokeColor: string; fillColor: string },
 ): void {
+  const { count, offset, radius, strokeColor, fillColor } = opts;
   ctx.strokeStyle = strokeColor;
   ctx.lineWidth = _s(2);
   for (let i = 0; i < count; i++) {
@@ -811,12 +808,9 @@ function _strokeAndFillLobeRing(
  */
 function _fillLobeRing(
   ctx: CanvasRenderingContext2D,
-  count: number,
-  offset: number,
-  radius: number,
-  fillColor: string,
-  phaseOffset = 0,
+  opts: { count: number; offset: number; radius: number; fillColor: string; phaseOffset?: number },
 ): void {
+  const { count, offset, radius, fillColor, phaseOffset = 0 } = opts;
   ctx.fillStyle = fillColor;
   for (let i = 0; i < count; i++) {
     const angle = phaseOffset + (i / count) * Math.PI * 2;
@@ -826,23 +820,39 @@ function _fillLobeRing(
   }
 }
 
-/**
- * Draw Tree 2 – a top-down tree with a bumpy rounded outline formed by 6 outer lobes
- * and a concentric inner ring pattern, giving it a layered canopy look.
- */
-export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const styleTable: Record<string, [string, string, string]> = {
-    Fall:   [TREE2_FALL_LEAF_COLOR,   TREE2_FALL_LEAF_ALT_COLOR,   TREE2_FALL_COLOR],
-    Dark:   [TREE2_DARK_LEAF_COLOR,   TREE2_DARK_LEAF_ALT_COLOR,   TREE2_DARK_COLOR],
-    Winter: [TREE2_WINTER_LEAF_COLOR, TREE2_WINTER_LEAF_ALT_COLOR, TREE2_WINTER_COLOR],
-    Spring: [TREE2_SPRING_LEAF_COLOR, TREE2_SPRING_LEAF_ALT_COLOR, TREE2_SPRING_COLOR],
-  };
-  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(
-    styleTable, [TREE2_LEAF_COLOR, TREE2_LEAF_ALT_COLOR, TREE2_COLOR], style,
-  );
+/** Full color set for a tree canopy: default plus per-LevelStyle overrides. */
+interface TreeColorSet {
+  default: [string, string, string];
+  Fall: [string, string, string];
+  Dark: [string, string, string];
+  Winter: [string, string, string];
+  Spring: [string, string, string];
+}
 
-  const r = half * 0.72;
-  _drawTreeEllipseShadow(ctx, half, r, style);
+/**
+ * Shared canopy setup for top-down trees: resolves style-specific colors,
+ * computes the canopy radius, draws the ground shadow, then fills the main
+ * canopy circle. Returns the resolved radius and colors so callers can draw
+ * their lobe rings on top.
+ */
+function _drawTreeCanopyBase(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  radiusFactor: number,
+  colors: TreeColorSet,
+  style: LevelStyle | undefined,
+  drawShadow: (ctx: CanvasRenderingContext2D, half: number, r: number, style: LevelStyle | undefined) => void,
+): { r: number; leafColor: string; leafAltColor: string; outlineColor: string } {
+  const styleTable: Record<string, [string, string, string]> = {
+    Fall: colors.Fall,
+    Dark: colors.Dark,
+    Winter: colors.Winter,
+    Spring: colors.Spring,
+  };
+  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(styleTable, colors.default, style);
+
+  const r = half * radiusFactor;
+  drawShadow(ctx, half, r, style);
 
   // Main canopy – large filled circle
   ctx.fillStyle = leafColor;
@@ -850,11 +860,31 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
 
+  return { r, leafColor, leafAltColor, outlineColor };
+}
+
+/**
+ * Draw Tree 2 – a top-down tree with a bumpy rounded outline formed by 6 outer lobes
+ * and a concentric inner ring pattern, giving it a layered canopy look.
+ */
+export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
+  const { r, leafColor, leafAltColor, outlineColor } = _drawTreeCanopyBase(
+    ctx, half, 0.72,
+    {
+      default: [TREE2_LEAF_COLOR, TREE2_LEAF_ALT_COLOR, TREE2_COLOR],
+      Fall:   [TREE2_FALL_LEAF_COLOR,   TREE2_FALL_LEAF_ALT_COLOR,   TREE2_FALL_COLOR],
+      Dark:   [TREE2_DARK_LEAF_COLOR,   TREE2_DARK_LEAF_ALT_COLOR,   TREE2_DARK_COLOR],
+      Winter: [TREE2_WINTER_LEAF_COLOR, TREE2_WINTER_LEAF_ALT_COLOR, TREE2_WINTER_COLOR],
+      Spring: [TREE2_SPRING_LEAF_COLOR, TREE2_SPRING_LEAF_ALT_COLOR, TREE2_SPRING_COLOR],
+    },
+    style, _drawTreeEllipseShadow,
+  );
+
   // Six outer bumps evenly spaced to create the bumpy outline
-  _strokeAndFillLobeRing(ctx, 6, r * 0.64, r * 0.42, outlineColor, leafAltColor);
+  _strokeAndFillLobeRing(ctx, { count: 6, offset: r * 0.64, radius: r * 0.42, strokeColor: outlineColor, fillColor: leafAltColor });
 
   // Inner concentric ring of smaller lobes (layered look)
-  _fillLobeRing(ctx, 6, r * 0.32, r * 0.30, leafColor, Math.PI / 6);
+  _fillLobeRing(ctx, { count: 6, offset: r * 0.32, radius: r * 0.30, fillColor: leafColor, phaseOffset: Math.PI / 6 });
 }
 
 /**
@@ -862,30 +892,23 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
  * and a concentric inner ring pattern, giving it a layered canopy look.
  */
 export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const styleTable: Record<string, [string, string, string]> = {
-    Fall:   [TREE3_FALL_LEAF_COLOR,   TREE3_FALL_LEAF_ALT_COLOR,   TREE3_FALL_COLOR],
-    Dark:   [TREE3_DARK_LEAF_COLOR,   TREE3_DARK_LEAF_ALT_COLOR,   TREE3_DARK_COLOR],
-    Winter: [TREE3_WINTER_LEAF_COLOR, TREE3_WINTER_LEAF_ALT_COLOR, TREE3_WINTER_COLOR],
-    Spring: [TREE3_SPRING_LEAF_COLOR, TREE3_SPRING_LEAF_ALT_COLOR, TREE3_SPRING_COLOR],
-  };
-  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(
-    styleTable, [TREE3_LEAF_COLOR, TREE3_LEAF_ALT_COLOR, TREE3_COLOR], style,
+  const { r, leafColor, leafAltColor, outlineColor } = _drawTreeCanopyBase(
+    ctx, half, 0.72,
+    {
+      default: [TREE3_LEAF_COLOR, TREE3_LEAF_ALT_COLOR, TREE3_COLOR],
+      Fall:   [TREE3_FALL_LEAF_COLOR,   TREE3_FALL_LEAF_ALT_COLOR,   TREE3_FALL_COLOR],
+      Dark:   [TREE3_DARK_LEAF_COLOR,   TREE3_DARK_LEAF_ALT_COLOR,   TREE3_DARK_COLOR],
+      Winter: [TREE3_WINTER_LEAF_COLOR, TREE3_WINTER_LEAF_ALT_COLOR, TREE3_WINTER_COLOR],
+      Spring: [TREE3_SPRING_LEAF_COLOR, TREE3_SPRING_LEAF_ALT_COLOR, TREE3_SPRING_COLOR],
+    },
+    style, _drawTreeEllipseShadow,
   );
 
-  const r = half * 0.72;
-  _drawTreeEllipseShadow(ctx, half, r, style);
-
-  // Main canopy – large filled circle
-  ctx.fillStyle = leafColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
   // Five outer lobes evenly spaced to create the outer five-leaf shape
-  _strokeAndFillLobeRing(ctx, 5, r * 0.62, r * 0.44, outlineColor, leafAltColor);
+  _strokeAndFillLobeRing(ctx, { count: 5, offset: r * 0.62, radius: r * 0.44, strokeColor: outlineColor, fillColor: leafAltColor });
 
   // Inner concentric ring of smaller lobes (layered look)
-  _fillLobeRing(ctx, 5, r * 0.32, r * 0.30, leafColor, Math.PI / 5);
+  _fillLobeRing(ctx, { count: 5, offset: r * 0.32, radius: r * 0.30, fillColor: leafColor, phaseOffset: Math.PI / 5 });
 }
 
 /**
@@ -893,29 +916,22 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
  * lobes arranged in concentric rings, giving a rosette / dense-foliage appearance.
  */
 export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle): void {
-  const styleTable: Record<string, [string, string, string]> = {
-    Fall:   [TREE4_FALL_LEAF_COLOR,   TREE4_FALL_LEAF_ALT_COLOR,   TREE4_FALL_COLOR],
-    Dark:   [TREE4_DARK_LEAF_COLOR,   TREE4_DARK_LEAF_ALT_COLOR,   TREE4_DARK_COLOR],
-    Winter: [TREE4_WINTER_LEAF_COLOR, TREE4_WINTER_LEAF_ALT_COLOR, TREE4_WINTER_COLOR],
-    Spring: [TREE4_SPRING_LEAF_COLOR, TREE4_SPRING_LEAF_ALT_COLOR, TREE4_SPRING_COLOR],
-  };
-  const [leafColor, leafAltColor, outlineColor] = _treeColorTriple(
-    styleTable, [TREE4_LEAF_COLOR, TREE4_LEAF_ALT_COLOR, TREE4_COLOR], style,
+  const { r, leafColor, leafAltColor, outlineColor } = _drawTreeCanopyBase(
+    ctx, half, 0.70,
+    {
+      default: [TREE4_LEAF_COLOR, TREE4_LEAF_ALT_COLOR, TREE4_COLOR],
+      Fall:   [TREE4_FALL_LEAF_COLOR,   TREE4_FALL_LEAF_ALT_COLOR,   TREE4_FALL_COLOR],
+      Dark:   [TREE4_DARK_LEAF_COLOR,   TREE4_DARK_LEAF_ALT_COLOR,   TREE4_DARK_COLOR],
+      Winter: [TREE4_WINTER_LEAF_COLOR, TREE4_WINTER_LEAF_ALT_COLOR, TREE4_WINTER_COLOR],
+      Spring: [TREE4_SPRING_LEAF_COLOR, TREE4_SPRING_LEAF_ALT_COLOR, TREE4_SPRING_COLOR],
+    },
+    style, _drawTreeCircleShadow,
   );
 
-  const r = half * 0.70;
-  _drawTreeCircleShadow(ctx, half, r, style);
-
-  // Outer ring: 8 small lobes
-  ctx.fillStyle = leafColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  _strokeAndFillLobeRing(ctx, 8, r * 0.65, r * 0.35, outlineColor, leafAltColor);
+  _strokeAndFillLobeRing(ctx, { count: 8, offset: r * 0.65, radius: r * 0.35, strokeColor: outlineColor, fillColor: leafAltColor });
 
   // Middle ring: 6 slightly smaller lobes at offset phase
-  _fillLobeRing(ctx, 6, r * 0.38, r * 0.28, leafColor, Math.PI / 6);
+  _fillLobeRing(ctx, { count: 6, offset: r * 0.38, radius: r * 0.28, fillColor: leafColor, phaseOffset: Math.PI / 6 });
 
   // Center dot (alt color)
   ctx.fillStyle = leafAltColor;
