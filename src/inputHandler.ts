@@ -1,4 +1,5 @@
 import type { Board, MoveResult} from './board';
+import type { AfterTilePlacedOptions } from './game';
 import { PIPE_SHAPES, SPIN_PIPE_SHAPES, isEmptyFloor } from './board';
 import type { Tile } from './tile';
 import type { GridPos, PipeShape, Rotation } from './types';
@@ -38,14 +39,7 @@ export interface InputCallbacks {
    * Called after a successful tile placement.  Handles animations, records the
    * move, updates lastPlacedRotations, deselects if depleted, and refreshes UI.
    */
-  afterTilePlaced(
-    shape: PipeShape,
-    result: MoveResult,
-    filledBefore: Set<string>,
-    replacedTile: Tile | undefined,
-    row: number,
-    col: number,
-  ): void;
+  afterTilePlaced(opts: AfterTilePlacedOptions): void;
   /**
    * Called after a successful tile rotation.  Handles animations and records
    * the move.  Does **not** call refreshUI/checkWinLose — the caller is
