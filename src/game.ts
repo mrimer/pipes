@@ -167,6 +167,23 @@ const PLAY_CANVAS_BORDER_W = 6;
  */
 const PLAY_RIGHT_PANEL_STACKED_H = 150;
 
+/** DOM element references the Game class needs, grouped to keep its constructor's parameter count sane. */
+export interface GameDomRefs {
+  canvas: HTMLCanvasElement;
+  levelSelectEl: HTMLElement;
+  levelListEl: HTMLElement;
+  playScreenEl: HTMLElement;
+  levelHeaderEl: HTMLElement;
+  inventoryBarEl: HTMLElement;
+  waterDisplayEl: HTMLElement;
+  winModalEl: HTMLElement;
+  gameoverModalEl: HTMLElement;
+  gameoverMsgEl: HTMLElement;
+  undoBtnEl: HTMLButtonElement;
+  redoBtnEl: HTMLButtonElement;
+  exitBtnEl: HTMLButtonElement;
+}
+
 /**
  * Manages the game loop, rendering, and user input for the Pipes puzzle.
  * Handles both the level-selection menu and the active play screen.
@@ -309,21 +326,12 @@ export class Game implements InputCallbacks {
   /** Player profile selection screen overlay. */
   private readonly _profileScreen: PlayerProfileScreen;
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    levelSelectEl: HTMLElement,
-    levelListEl: HTMLElement,
-    playScreenEl: HTMLElement,
-    levelHeaderEl: HTMLElement,
-    inventoryBarEl: HTMLElement,
-    waterDisplayEl: HTMLElement,
-    winModalEl: HTMLElement,
-    gameoverModalEl: HTMLElement,
-    gameoverMsgEl: HTMLElement,
-    undoBtnEl: HTMLButtonElement,
-    redoBtnEl: HTMLButtonElement,
-    exitBtnEl: HTMLButtonElement,
-  ) {
+  constructor(refs: GameDomRefs) {
+    const {
+      canvas, levelSelectEl, levelListEl, playScreenEl, levelHeaderEl,
+      inventoryBarEl, waterDisplayEl, winModalEl, gameoverModalEl, gameoverMsgEl,
+      undoBtnEl, redoBtnEl, exitBtnEl,
+    } = refs;
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Could not get 2D rendering context');

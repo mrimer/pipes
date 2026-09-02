@@ -147,7 +147,7 @@ async function bootstrap(): Promise<void> {
   await showSplashScreen();
   await showIntroTitleScreen();
 
-  const game = new Game(
+  const game = new Game({
     canvas,
     levelSelectEl,
     levelListEl,
@@ -161,7 +161,7 @@ async function bootstrap(): Promise<void> {
     undoBtnEl,
     redoBtnEl,
     exitBtnEl,
-  );
+  });
 
   const achievementSystem = new AchievementSystem(getAchievementAdapter());
   achievementSystem.init();

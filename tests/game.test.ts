@@ -157,7 +157,7 @@ function makeGame(): {
 
   const canvas = get('game-canvas') as HTMLCanvasElement;
 
-  const game = new Game(
+  const game = new Game({
     canvas,
     levelSelectEl,
     levelListEl,
@@ -171,7 +171,7 @@ function makeGame(): {
     undoBtnEl,
     redoBtnEl,
     exitBtnEl,
-  );
+  });
 
   // Activate a test campaign using the original CHAPTERS reference so that
   // tests can mutate LEVELS objects and see the changes reflected in startLevel().
@@ -2839,21 +2839,21 @@ function makeGameWithStorage(): Game {
     <div id="gameover-modal"><p id="gameover-msg"></p><button id="gameover-menu-btn">Level Select</button></div>
   `;
   const get = (id: string) => document.getElementById(id) as HTMLElement;
-  return new Game(
-    get('game-canvas') as HTMLCanvasElement,
-    get('level-select'),
-    get('level-list'),
-    get('play-screen'),
-    get('level-header'),
-    get('inventory-bar'),
-    get('water-display'),
-    get('win-modal'),
-    get('gameover-modal'),
-    get('gameover-msg'),
-    get('undo-btn') as HTMLButtonElement,
-    get('redo-btn') as HTMLButtonElement,
-    get('exit-btn') as HTMLButtonElement,
-  );
+  return new Game({
+    canvas: get('game-canvas') as HTMLCanvasElement,
+    levelSelectEl: get('level-select'),
+    levelListEl: get('level-list'),
+    playScreenEl: get('play-screen'),
+    levelHeaderEl: get('level-header'),
+    inventoryBarEl: get('inventory-bar'),
+    waterDisplayEl: get('water-display'),
+    winModalEl: get('win-modal'),
+    gameoverModalEl: get('gameover-modal'),
+    gameoverMsgEl: get('gameover-msg'),
+    undoBtnEl: get('undo-btn') as HTMLButtonElement,
+    redoBtnEl: get('redo-btn') as HTMLButtonElement,
+    exitBtnEl: get('exit-btn') as HTMLButtonElement,
+  });
 }
 
 describe('Game – campaign auto-selection on startup', () => {
