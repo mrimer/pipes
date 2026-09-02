@@ -744,31 +744,40 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * True when the game is in a screen state with an active level and board,
+   * i.e. it's safe to compute tile size and re-render the board canvas.
+   */
+  private _canRenderBoard(): boolean {
+    return (this.screen === GameScreen.Play || this.screen === GameScreen.Playback) &&
+      !!this.currentLevel && !!this.board;
+  }
+
+  /**
    * Called when the window is resized or the device orientation changes.
    * Re-computes the tile size and resizes the canvas to match the new viewport,
    * then triggers a fresh render so the board fills the updated area.
    */
   private _handleResize(): void {
-    if ((this.screen !== GameScreen.Play && this.screen !== GameScreen.Playback) || !this.currentLevel || !this.board) return;
+    if (!this._canRenderBoard()) return;
     setTileSize(computeTileSize(
-      this.currentLevel.rows,
-      this.currentLevel.cols,
-      this._computePlayOverhead(this.currentLevel),
+      this.currentLevel!.rows, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+      this.currentLevel!.cols, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+      this._computePlayOverhead(this.currentLevel!), // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
       PLAY_CANVAS_BORDER_W,
     ));
-    this.canvas.width  = this.currentLevel.cols * TILE_SIZE;
-    this.canvas.height = this.currentLevel.rows * TILE_SIZE;
+    this.canvas.width  = this.currentLevel!.cols * TILE_SIZE; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+    this.canvas.height = this.currentLevel!.rows * TILE_SIZE; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
     this._fireflies.resetForLevel(
       this.canvas.width,
       this.canvas.height,
       TILE_SIZE,
-      this.currentLevel.style,
+      this.currentLevel!.style, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
     );
     this._butterflies.resetForLevel(
       this.canvas.width,
       this.canvas.height,
       TILE_SIZE,
-      this.currentLevel.style,
+      this.currentLevel!.style, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
       this.board,
     );
   }
@@ -1267,6 +1276,15 @@ export class Game implements InputCallbacks {
     }
   }
 
+  /**
+   * True when a `levelFailed` event should be dispatched: not playtesting,
+   * an active campaign is tracking progress, and there's a current level
+   * to attribute the failure to.
+   */
+  private _shouldDispatchLevelFailedEvent(): boolean {
+    return !this._campaign.isPlaytesting && !!this._campaign.activeCampaign && !!this.currentLevel;
+  }
+
   /** Transition the game to the GameOver state and show the gameover modal. */
   private _showGameOver(): void {
     this.gameState = GameState.GameOver;
@@ -1279,11 +1297,11 @@ export class Game implements InputCallbacks {
       this._maybeAutoRecord('failure', undefined, undefined);
     }
 
-    if (!this._campaign.isPlaytesting && this._campaign.activeCampaign && this.currentLevel) {
+    if (this._shouldDispatchLevelFailedEvent()) {
       dispatchGameEvent({
         type: 'levelFailed',
-        campaignId: this._campaign.activeCampaign.id,
-        levelId: this.currentLevel.id,
+        campaignId: this._campaign.activeCampaign!.id, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- activeCampaign and currentLevel are non-null here, guarded by _shouldDispatchLevelFailedEvent() above
+        levelId: this.currentLevel!.id, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- activeCampaign and currentLevel are non-null here, guarded by _shouldDispatchLevelFailedEvent() above
       });
     }
   }
@@ -1730,6 +1748,14 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * True when `tile` is a chamber holding a pickupable item (gold or
+   * regular) — i.e. its item chamber content is populated with a shape.
+   */
+  private _isPickupableItemTile(tile: Tile | undefined): boolean {
+    return tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null;
+  }
+
+  /**
    * Play the gold sound if any gold item chamber became newly connected since
    * `filledBefore` was captured.  If no gold item connected but a positive-count
    * non-gold item chamber did, play the pickup sound instead.
@@ -1742,9 +1768,8 @@ export class Game implements InputCallbacks {
       if (filledBefore.has(key)) continue;
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' &&
-          tile.itemShape !== null) {
-        if (GOLD_PIPE_SHAPES.has(tile.itemShape)) {
+      if (this._isPickupableItemTile(tile)) {
+        if (GOLD_PIPE_SHAPES.has(tile.itemShape!)) { // eslint-disable-line @typescript-eslint/no-non-null-assertion -- itemShape is non-null here, guarded by _isPickupableItemTile() above
           sfxManager.play(SfxId.Gold);
           return;
         } else if (tile.itemCount > 0) {
@@ -1909,6 +1934,14 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * True when `tile` is fixed in place and not one of the spinner shapes —
+   * i.e. neither replacement nor rotation is possible for it.
+   */
+  private _isFixedNonSpinnerTile(tile: Tile): boolean {
+    return tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape);
+  }
+
+  /**
    * Attempt to place or replace the currently selected inventory shape at `pos`.
    *
    * - If `currentTile` is empty, tries {@link Board.placeInventoryTile}.
@@ -1944,7 +1977,7 @@ export class Game implements InputCallbacks {
       this.afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
     } else if (result.error) {
       this.handleBoardError(result);
-    } else if (currentTile && currentTile.isFixed && !SPIN_PIPE_SHAPES.has(currentTile.shape)) {
+    } else if (currentTile && this._isFixedNonSpinnerTile(currentTile)) {
       // Fixed non-spinner: neither replacement nor rotation is possible — shake the tile.
       this._animMgr.spawnShakeEffects([pos]);
     }
@@ -2037,6 +2070,15 @@ export class Game implements InputCallbacks {
     this._refreshPlayUI();
   }
 
+  /**
+   * True when `this.board` was replaced with a new Board instance since
+   * `prevBoard` was captured (e.g. a level restart), so pre-restart move
+   * history needs to be grafted onto the new board.
+   */
+  private _didBoardGetReplaced(prevBoard: Board | null): boolean {
+    return !!prevBoard && !!this.board && this.board !== prevBoard;
+  }
+
   // ─── Public API called by main.ts button handlers ─────────────────────────
 
   /**
@@ -2061,8 +2103,8 @@ export class Game implements InputCallbacks {
     // The new board's initial snapshot serves as the restart boundary marker
     // (move === undefined), so getMoveLog() automatically returns only the
     // moves from the current session when the board history is assembled.
-    if (prevBoard && this.board && this.board !== prevBoard) {
-      this.board.graftPreRestartHistory(prevBoard);
+    if (this._didBoardGetReplaced(prevBoard)) {
+      this.board!.graftPreRestartHistory(prevBoard!); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- board and prevBoard are non-null here, guarded by _didBoardGetReplaced() above
       this._updateUndoRedoButtons();
     }
   }
