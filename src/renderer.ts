@@ -550,6 +550,24 @@ export function drawGinghamOverlay(
 }
 
 /**
+ * True when a diagonal corner between two adjacent granite/sea edges is
+ * itself also granite/sea — the corner square is fully surrounded and
+ * should be filled solid to avoid a sub-pixel seam.
+ */
+function _isCornerFilled(edgeA: boolean, edgeB: boolean, diagonal: boolean): boolean {
+  return edgeA && edgeB && diagonal;
+}
+
+/**
+ * True when two adjacent edges are granite/sea but the diagonal between
+ * them is not — the corner square would otherwise be left as an uncovered
+ * (or under-bordered) gap and needs an explicit fill/border segment.
+ */
+function _isCornerExposed(edgeA: boolean, edgeB: boolean, diagonal: boolean): boolean {
+  return edgeA && edgeB && !diagonal;
+}
+
+/**
  * Draw a granite tile centered at the origin.
  *
  * When `neighbors` is provided the shape seams cleanly with adjacent granite
@@ -596,10 +614,10 @@ export function drawGranite(
   // Corner fills: only when both edge neighbors AND the diagonal are granite.
   // Extended by OVERLAP in both dimensions to cover the boundary pixel shared
   // with the adjacent strips.
-  if (n.north && n.west && n.nw) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
-  if (n.north && n.east && n.ne) ctx.fillRect(bw - OVERLAP, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
-  if (n.south && n.west && n.sw) ctx.fillRect(-outerHalf, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
-  if (n.south && n.east && n.se) ctx.fillRect(bw - OVERLAP, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.north, n.west, n.nw)) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.north, n.east, n.ne)) ctx.fillRect(bw - OVERLAP, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.south, n.west, n.sw)) ctx.fillRect(-outerHalf, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.south, n.east, n.se)) ctx.fillRect(bw - OVERLAP, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
 
   // ── Border ───────────────────────────────────────────────────────────────
   // Draw border only on edges that are NOT adjacent to granite.
@@ -634,10 +652,10 @@ export function drawGranite(
   // L-shaped inset borders at corners where two edges are granite but the
   // diagonal is not.  These trace the inner boundary of the unfilled corner
   // gap and connect cleanly to the adjacent tiles' inset border lines.
-  if (n.north && n.west && !n.nw) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
-  if (n.north && n.east && !n.ne) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
-  if (n.south && n.west && !n.sw) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
-  if (n.south && n.east && !n.se) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
+  if (_isCornerExposed(n.north, n.west, n.nw)) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
+  if (_isCornerExposed(n.north, n.east, n.ne)) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
+  if (_isCornerExposed(n.south, n.west, n.sw)) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
+  if (_isCornerExposed(n.south, n.east, n.se)) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
 
   ctx.stroke();
 
@@ -1028,10 +1046,10 @@ export function drawSea(
   // Outer corners: when two adjacent edges are both sea but their shared
   // diagonal is not, fill the bw×bw corner square that would otherwise be
   // left uncovered.
-  if (neighbors.north && neighbors.west && !neighbors.nw) ctx.fillRect(-half, -half, bw, bw);
-  if (neighbors.north && neighbors.east && !neighbors.ne) ctx.fillRect(half - bw, -half, bw, bw);
-  if (neighbors.south && neighbors.west && !neighbors.sw) ctx.fillRect(-half, half - bw, bw, bw);
-  if (neighbors.south && neighbors.east && !neighbors.se) ctx.fillRect(half - bw, half - bw, bw, bw);
+  if (_isCornerExposed(neighbors.north, neighbors.west, neighbors.nw)) ctx.fillRect(-half, -half, bw, bw);
+  if (_isCornerExposed(neighbors.north, neighbors.east, neighbors.ne)) ctx.fillRect(half - bw, -half, bw, bw);
+  if (_isCornerExposed(neighbors.south, neighbors.west, neighbors.sw)) ctx.fillRect(-half, half - bw, bw, bw);
+  if (_isCornerExposed(neighbors.south, neighbors.east, neighbors.se)) ctx.fillRect(half - bw, half - bw, bw, bw);
 
   // ── Ripple effects ──────────────────────────────────────────────────────
   _drawSeaRipple(ctx, half, -half * 0.3, -half * 0.25, now, 0);
