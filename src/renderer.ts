@@ -773,6 +773,60 @@ function _drawTreeEllipseShadow(
 }
 
 /**
+ * Draw a ring of `count` evenly-spaced lobes (small circles) around the
+ * origin: stroke every lobe's outline first, then fill every lobe on top.
+ * This two-pass order is what makes only the outer perimeter arc of each
+ * circle visible as an outline once the fill paints over the interior.
+ */
+function _strokeAndFillLobeRing(
+  ctx: CanvasRenderingContext2D,
+  count: number,
+  offset: number,
+  radius: number,
+  strokeColor: string,
+  fillColor: string,
+): void {
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = _s(2);
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * offset, Math.sin(angle) * offset, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.fillStyle = fillColor;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * offset, Math.sin(angle) * offset, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Fill a ring of `count` evenly-spaced lobes (small circles) around the
+ * origin with a single color — no outline pass. `phaseOffset` (radians)
+ * rotates the ring's starting angle, used for inner rings drawn at a
+ * different phase than the outer ring.
+ */
+function _fillLobeRing(
+  ctx: CanvasRenderingContext2D,
+  count: number,
+  offset: number,
+  radius: number,
+  fillColor: string,
+  phaseOffset = 0,
+): void {
+  ctx.fillStyle = fillColor;
+  for (let i = 0; i < count; i++) {
+    const angle = phaseOffset + (i / count) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * offset, Math.sin(angle) * offset, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
  * Draw Tree 2 – a top-down tree with a bumpy rounded outline formed by 6 outer lobes
  * and a concentric inner ring pattern, giving it a layered canopy look.
  */
@@ -797,38 +851,10 @@ export function drawTree2(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.fill();
 
   // Six outer bumps evenly spaced to create the bumpy outline
-  const bumpR = r * 0.42;
-  const bumpOff = r * 0.64;
-
-  // Outline circles drawn first so the bump fills paint on top, leaving only the
-  // outer perimeter arc of each circle visible as an outline.
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(2);
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = leafAltColor;
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  _strokeAndFillLobeRing(ctx, 6, r * 0.64, r * 0.42, outlineColor, leafAltColor);
 
   // Inner concentric ring of smaller lobes (layered look)
-  const innerR = r * 0.30;
-  const innerOff = r * 0.32;
-  ctx.fillStyle = leafColor;
-  for (let i = 0; i < 6; i++) {
-    const angle = Math.PI / 6 + (i / 6) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * innerOff, Math.sin(angle) * innerOff, innerR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  _fillLobeRing(ctx, 6, r * 0.32, r * 0.30, leafColor, Math.PI / 6);
 }
 
 /**
@@ -856,38 +882,10 @@ export function drawTree3(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.fill();
 
   // Five outer lobes evenly spaced to create the outer five-leaf shape
-  const bumpR = r * 0.44;
-  const bumpOff = r * 0.62;
-
-  // Outline circles drawn first so the lobe fills paint on top, leaving only the
-  // outer perimeter arc of each circle visible as an outline.
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(2);
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = leafAltColor;
-  for (let i = 0; i < 5; i++) {
-    const angle = (i / 5) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * bumpOff, Math.sin(angle) * bumpOff, bumpR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  _strokeAndFillLobeRing(ctx, 5, r * 0.62, r * 0.44, outlineColor, leafAltColor);
 
   // Inner concentric ring of smaller lobes (layered look)
-  const innerR = r * 0.30;
-  const innerOff = r * 0.32;
-  ctx.fillStyle = leafColor;
-  for (let i = 0; i < 5; i++) {
-    const angle = Math.PI / 5 + (i / 5) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * innerOff, Math.sin(angle) * innerOff, innerR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  _fillLobeRing(ctx, 5, r * 0.32, r * 0.30, leafColor, Math.PI / 5);
 }
 
 /**
@@ -914,38 +912,10 @@ export function drawTree4(ctx: CanvasRenderingContext2D, half: number, style?: L
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
 
-  const outerLobeR = r * 0.35;
-  const outerLobeOff = r * 0.65;
-
-  // Outline circles drawn first so the lobe fills paint on top, leaving only the
-  // outer perimeter arc of each circle visible as an outline.
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = _s(2);
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * outerLobeOff, Math.sin(angle) * outerLobeOff, outerLobeR, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = leafAltColor;
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * outerLobeOff, Math.sin(angle) * outerLobeOff, outerLobeR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  _strokeAndFillLobeRing(ctx, 8, r * 0.65, r * 0.35, outlineColor, leafAltColor);
 
   // Middle ring: 6 slightly smaller lobes at offset phase
-  const midLobeR = r * 0.28;
-  const midLobeOff = r * 0.38;
-  ctx.fillStyle = leafColor;
-  for (let i = 0; i < 6; i++) {
-    const angle = Math.PI / 6 + (i / 6) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * midLobeOff, Math.sin(angle) * midLobeOff, midLobeR, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  _fillLobeRing(ctx, 6, r * 0.38, r * 0.28, leafColor, Math.PI / 6);
 
   // Center dot (alt color)
   ctx.fillStyle = leafAltColor;
