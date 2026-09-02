@@ -767,25 +767,27 @@ export class Game implements InputCallbacks {
    */
   private _handleResize(): void {
     if (!this._canRenderBoard()) return;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- currentLevel is non-null here, guarded by _canRenderBoard() above
+    const level = this.currentLevel!;
     setTileSize(computeTileSize(
-      this.currentLevel!.rows, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
-      this.currentLevel!.cols, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
-      this._computePlayOverhead(this.currentLevel!), // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+      level.rows,
+      level.cols,
+      this._computePlayOverhead(level),
       PLAY_CANVAS_BORDER_W,
     ));
-    this.canvas.width  = this.currentLevel!.cols * TILE_SIZE; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
-    this.canvas.height = this.currentLevel!.rows * TILE_SIZE; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+    this.canvas.width  = level.cols * TILE_SIZE;
+    this.canvas.height = level.rows * TILE_SIZE;
     this._fireflies.resetForLevel(
       this.canvas.width,
       this.canvas.height,
       TILE_SIZE,
-      this.currentLevel!.style, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+      level.style,
     );
     this._butterflies.resetForLevel(
       this.canvas.width,
       this.canvas.height,
       TILE_SIZE,
-      this.currentLevel!.style, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- currentLevel and board are non-null here, guarded by _canRenderBoard() above
+      level.style,
       this.board,
     );
   }
@@ -1985,7 +1987,7 @@ export class Game implements InputCallbacks {
       this.afterTilePlaced(this.selectedShape, result, filledBefore, replacedTile, pos.row, pos.col);
     } else if (result.error) {
       this.handleBoardError(result);
-    } else if (currentTile && this._isFixedNonSpinnerTile(currentTile)) {
+    } else if (this._isFixedNonSpinnerTile(currentTile)) {
       // Fixed non-spinner: neither replacement nor rotation is possible — shake the tile.
       this._animMgr.spawnShakeEffects([pos]);
     }
