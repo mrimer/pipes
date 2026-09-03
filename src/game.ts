@@ -407,81 +407,7 @@ export class Game implements InputCallbacks {
     );
 
     // Create the settings modal (SFX/music volume control, etc.)
-    this._settingsModalEl = buildSettingsModal(
-      () => sfxManager.getVolume(),
-      (v) => { sfxManager.setVolume(v); },
-      () => { sfxManager.play(SfxId.PipePlacement); },
-      () => musicManager.getVolume(),
-      (v) => {
-        const wasMuted = musicManager.getVolume() === 0;
-        musicManager.setVolume(v);
-        // Start playing the menu track when the player raises volume from 0.
-        if (wasMuted && v > 0) musicManager.playGroup('menu');
-      },
-      () => { /* no audio ping for music preview */ },
-      () => isTouchDevice(),
-      () => hasTouchUiSupport(),
-      (enabled) => {
-        setTouchUiEnabledOverride(enabled);
-        document.body.classList.toggle('is-touch', enabled);
-      },
-      (el) => {
-        const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
-        const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
-        const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
-        const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
-        const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
-        const emojisToggle = el.querySelector<HTMLInputElement>('[data-emojis-enabled]');
-        const localeSelect = el.querySelector<HTMLSelectElement>('[data-locale-select]');
-        sfxManager.play(SfxId.Click);
-        saveSfxVolume(sfxManager.getVolume());
-        saveMusicVolume(musicManager.getVolume());
-        saveTouchUiEnabled(isTouchDevice());
-        saveRecordingSettings({
-          recordSuccesses: recordSuccessesToggle?.checked ?? true,
-          recordFailures:  recordFailuresToggle?.checked  ?? false,
-        });
-        saveBackgroundEnabled(bgToggle?.checked ?? true);
-        saveEnvironmentalEnabled(envToggle?.checked ?? true);
-        saveMusicMuteOnFocusLoss(muteOnFocusLossToggle?.checked ?? true);
-        const emojisOn = emojisToggle?.checked ?? false;
-        saveEmojisEnabled(emojisOn);
-        setEmojisEnabled(emojisOn);
-        triggerCloudSave();
-
-        const selectedLocale = localeSelect?.value;
-        if (selectedLocale && selectedLocale !== getLocale()) {
-          // Changing the language requires every screen to rebuild its DOM text,
-          // which this app doesn't do reactively — reload to re-render fresh.
-          saveLocale(selectedLocale);
-          setLocale(selectedLocale);
-          window.location.reload();
-          return;
-        }
-
-        el.style.display = 'none';
-      },
-      () => loadRecordingSettings(),
-      // Graphics: initial values loaded from persistence
-      loadBackgroundEnabled(),
-      // live background toggle: update in-memory flag and all registered backgrounds immediately
-      (enabled) => {
-        setGlobalBackgroundPatternEnabled(enabled);
-      },
-      loadEnvironmentalEnabled(),
-      // live environmental toggle: update in-memory flag immediately
-      (enabled) => { setEnvironmentalEnabled(enabled); },
-      // Esc cancels: revert live changes and hide modal
-      () => { this._cancelSettingsModal(); },
-      // Mute on focus loss: initial value and live toggle
-      loadMusicMuteOnFocusLoss(),
-      (enabled) => { musicManager.setMuteOnFocusLoss(enabled); },
-      loadEmojisEnabled(),
-    );
-    applyScrollingPipeBackground(this._settingsModalEl, {
-      baseColor: UI_OVERLAY_BG,
-      overlayAlpha: 0.84,
-    });
+    this._settingsModalEl = this._buildSettingsModal();
 
     // Create the campaign editor (appends its own overlay to document.body)
     this.campaignEditor = new CampaignEditor(
@@ -695,6 +621,85 @@ export class Game implements InputCallbacks {
       resetMetricBaselines: () => this._metrics.resetBaselines(),
     };
     this._playbackScreen = new PlaybackScreen(playbackCbs);
+  }
+
+  private _buildSettingsModal(): HTMLElement {
+    const el = buildSettingsModal(
+      () => sfxManager.getVolume(),
+      (v) => { sfxManager.setVolume(v); },
+      () => { sfxManager.play(SfxId.PipePlacement); },
+      () => musicManager.getVolume(),
+      (v) => {
+        const wasMuted = musicManager.getVolume() === 0;
+        musicManager.setVolume(v);
+        // Start playing the menu track when the player raises volume from 0.
+        if (wasMuted && v > 0) musicManager.playGroup('menu');
+      },
+      () => { /* no audio ping for music preview */ },
+      () => isTouchDevice(),
+      () => hasTouchUiSupport(),
+      (enabled) => {
+        setTouchUiEnabledOverride(enabled);
+        document.body.classList.toggle('is-touch', enabled);
+      },
+      (el) => {
+        const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
+        const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
+        const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
+        const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+        const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
+        const emojisToggle = el.querySelector<HTMLInputElement>('[data-emojis-enabled]');
+        const localeSelect = el.querySelector<HTMLSelectElement>('[data-locale-select]');
+        sfxManager.play(SfxId.Click);
+        saveSfxVolume(sfxManager.getVolume());
+        saveMusicVolume(musicManager.getVolume());
+        saveTouchUiEnabled(isTouchDevice());
+        saveRecordingSettings({
+          recordSuccesses: recordSuccessesToggle?.checked ?? true,
+          recordFailures:  recordFailuresToggle?.checked  ?? false,
+        });
+        saveBackgroundEnabled(bgToggle?.checked ?? true);
+        saveEnvironmentalEnabled(envToggle?.checked ?? true);
+        saveMusicMuteOnFocusLoss(muteOnFocusLossToggle?.checked ?? true);
+        const emojisOn = emojisToggle?.checked ?? false;
+        saveEmojisEnabled(emojisOn);
+        setEmojisEnabled(emojisOn);
+        triggerCloudSave();
+
+        const selectedLocale = localeSelect?.value;
+        if (selectedLocale && selectedLocale !== getLocale()) {
+          // Changing the language requires every screen to rebuild its DOM text,
+          // which this app doesn't do reactively — reload to re-render fresh.
+          saveLocale(selectedLocale);
+          setLocale(selectedLocale);
+          window.location.reload();
+          return;
+        }
+
+        el.style.display = 'none';
+      },
+      () => loadRecordingSettings(),
+      // Graphics: initial values loaded from persistence
+      loadBackgroundEnabled(),
+      // live background toggle: update in-memory flag and all registered backgrounds immediately
+      (enabled) => {
+        setGlobalBackgroundPatternEnabled(enabled);
+      },
+      loadEnvironmentalEnabled(),
+      // live environmental toggle: update in-memory flag immediately
+      (enabled) => { setEnvironmentalEnabled(enabled); },
+      // Esc cancels: revert live changes and hide modal
+      () => { this._cancelSettingsModal(); },
+      // Mute on focus loss: initial value and live toggle
+      loadMusicMuteOnFocusLoss(),
+      (enabled) => { musicManager.setMuteOnFocusLoss(enabled); },
+      loadEmojisEnabled(),
+    );
+    applyScrollingPipeBackground(el, {
+      baseColor: UI_OVERLAY_BG,
+      overlayAlpha: 0.84,
+    });
+    return el;
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
