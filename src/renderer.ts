@@ -359,17 +359,19 @@ export function drawConnectorGlow(
  *                            should appear above the tile circle backdrop but below the
  *                            arms.  Only called for the Sink tile (when isSource=false).
  */
-export function drawSourceOrSink(
-  ctx: CanvasRenderingContext2D,
-  connections: ReadonlySet<Direction>,
-  color: string,
-  half: number,
-  isSource: boolean,
-  buttEndDirs?: Set<Direction>,
-  centerLabel?: { text: string; color: string },
-  bgColor?: string,
-  afterOuterCircleFn?: () => void,
-): void {
+export interface DrawSourceOrSinkOptions {
+  connections: ReadonlySet<Direction>;
+  color: string;
+  half: number;
+  isSource: boolean;
+  buttEndDirs?: Set<Direction>;
+  centerLabel?: { text: string; color: string };
+  bgColor?: string;
+  afterOuterCircleFn?: () => void;
+}
+
+export function drawSourceOrSink(ctx: CanvasRenderingContext2D, opts: DrawSourceOrSinkOptions): void {
+  const { connections, color, half, isSource, buttEndDirs, centerLabel, bgColor, afterOuterCircleFn } = opts;
   // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
   const outerR = isSource ? half * 0.5 : half * 0.45;
 
@@ -1344,14 +1346,16 @@ function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction>
  *                    at the tile boundary.  The center end always uses a natural
  *                    round linecap — no explicit center cap circle is needed.
  */
-function _drawPipeArmInRotatedFrame(
-  ctx: CanvasRenderingContext2D,
-  absDir: Direction,
-  tileRotation: number,
-  half: number,
-  color: string,
-  buttEnd = false,
-): void {
+interface DrawPipeArmOptions {
+  absDir: Direction;
+  tileRotation: number;
+  half: number;
+  color: string;
+  buttEnd?: boolean;
+}
+
+function _drawPipeArmInRotatedFrame(ctx: CanvasRenderingContext2D, opts: DrawPipeArmOptions): void {
+  const { absDir, tileRotation, half, color, buttEnd = false } = opts;
   // Convert the absolute direction to the local coordinate-system direction by
   // rotating it CCW by (tileRotation / 90) steps.  The canvas coordinate frame
   // is rotated CW by tileRotation, so we invert to find the local axis.
@@ -1899,28 +1903,36 @@ function _resolveTileColor(
     : isWater ? WATER_COLOR : PIPE_COLOR;
 }
 
-export function drawTile(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  tile: Tile,
-  isWater: boolean,
-  currentWater: number,
-  shiftHeld = false,
-  currentTemp = 0,
-  currentPressure = 1,
-  lockedCost: number | null = null,
-  lockedGain: number | null = null,
-  isHovered = false,
-  blockedWaterDir: Direction | null = null,
-  rotationDegOverride?: number,
-  buttEndDirs?: Set<Direction>,
-  seaNeighbors?: SeaNeighbors,
-  graniteNeighbors?: GraniteNeighbors,
-  afterOuterCircleFn?: () => void,
-  levelStyle?: LevelStyle,
-  nowMs = Date.now(),
-): void {
+export interface DrawTileOptions {
+  x: number;
+  y: number;
+  tile: Tile;
+  isWater: boolean;
+  currentWater: number;
+  shiftHeld?: boolean;
+  currentTemp?: number;
+  currentPressure?: number;
+  lockedCost?: number | null;
+  lockedGain?: number | null;
+  isHovered?: boolean;
+  blockedWaterDir?: Direction | null;
+  rotationDegOverride?: number;
+  buttEndDirs?: Set<Direction>;
+  seaNeighbors?: SeaNeighbors;
+  graniteNeighbors?: GraniteNeighbors;
+  afterOuterCircleFn?: () => void;
+  levelStyle?: LevelStyle;
+  nowMs?: number;
+}
+
+export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): void {
+  const {
+    x, y, tile, isWater, currentWater,
+    shiftHeld = false, currentTemp = 0, currentPressure = 1,
+    lockedCost = null, lockedGain = null, isHovered = false, blockedWaterDir = null,
+    rotationDegOverride, buttEndDirs, seaNeighbors, graniteNeighbors,
+    afterOuterCircleFn, levelStyle, nowMs = Date.now(),
+  } = opts;
   const { shape, rotation } = tile;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
@@ -1962,15 +1974,19 @@ export function drawTile(
     // cover the centre junction without visible seaming.
     ctx.lineWidth = LINE_WIDTH + _s(3);
     for (const armDir of tile.connections) {
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, 'black',
-        effectiveButtEndDirs?.has(armDir) ?? false);
+      _drawPipeArmInRotatedFrame(ctx, {
+        absDir: armDir, tileRotation: rotation, half, color: 'black',
+        buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
+      });
     }
     // Step 2: all arm color fills (blocked arm first; dominant water color last).
     ctx.lineWidth = LINE_WIDTH;
     for (const armDir of sortedArms) {
       const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
-      _drawPipeArmInRotatedFrame(ctx, armDir, rotation, half, armColor,
-        effectiveButtEndDirs?.has(armDir) ?? false);
+      _drawPipeArmInRotatedFrame(ctx, {
+        absDir: armDir, tileRotation: rotation, half, color: armColor,
+        buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
+      });
     }
     if (LEAKY_PIPE_SHAPES.has(shape)) {
       _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
@@ -2001,7 +2017,11 @@ export function drawTile(
     ctx.save();
     ctx.translate(cx, cy);
     const isSource = shape === PipeShape.Source;
-    drawSourceOrSink(ctx, tile.connections, color, half, isSource, effectiveButtEndDirs, isSource ? { text: String(currentWater), color: LABEL_COLOR } : undefined, undefined, afterOuterCircleFn);
+    drawSourceOrSink(ctx, {
+      connections: tile.connections, color, half, isSource, buttEndDirs: effectiveButtEndDirs,
+      centerLabel: isSource ? { text: String(currentWater), color: LABEL_COLOR } : undefined,
+      afterOuterCircleFn,
+    });
   } else if (shape === PipeShape.Chamber) {
     // Chamber – a steel-blue enclosure whose interior display varies by content
     ctx.restore();
@@ -2339,7 +2359,10 @@ export function renderContainerFillAnims(
     ctx.rect(clipX, clipY, clipW, clipH);
     ctx.clip();
     // Draw the tile in its connected (water) state within the clip region.
-    drawTile(ctx, x, y, tile, true, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
+    drawTile(ctx, {
+      x, y, tile, isWater: true, currentWater, shiftHeld, currentTemp, currentPressure,
+      lockedCost, lockedGain, buttEndDirs,
+    });
     ctx.restore();
   }
 }
@@ -2434,7 +2457,10 @@ export function renderContainerDrainAnims(
     ctx.beginPath();
     ctx.rect(clipX, clipY, clipW, clipH);
     ctx.clip();
-    drawTile(ctx, x, y, tile, true, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs);
+    drawTile(ctx, {
+      x, y, tile, isWater: true, currentWater, shiftHeld, currentTemp, currentPressure,
+      lockedCost, lockedGain, buttEndDirs,
+    });
     ctx.restore();
   }
 }
@@ -2634,10 +2660,18 @@ function _renderPass2NonPipeTiles(
       if (shakeOffset !== undefined) {
         ctx.save();
         ctx.translate(shakeOffset, 0);
-        drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, tileStyle);
+        drawTile(ctx, {
+          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+          lockedCost, lockedGain, buttEndDirs, seaNeighbors, graniteNeighbors,
+          afterOuterCircleFn, levelStyle: tileStyle,
+        });
         ctx.restore();
       } else {
-        drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, false, null, undefined, buttEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, tileStyle);
+        drawTile(ctx, {
+          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+          lockedCost, lockedGain, buttEndDirs, seaNeighbors, graniteNeighbors,
+          afterOuterCircleFn, levelStyle: tileStyle,
+        });
       }
     }
   }
@@ -2715,10 +2749,16 @@ function _renderPass3PipeTiles(
           ctx.scale(scaleOverride, scaleOverride);
           ctx.translate(-cx, -cy);
         }
-        drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs, undefined, undefined, undefined, undefined, now);
+        drawTile(ctx, {
+          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+          isHovered, blockedWaterDir, rotationDegOverride: rotOverride, buttEndDirs, nowMs: now,
+        });
         ctx.restore();
       } else {
-        drawTile(ctx, x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure, null, null, isHovered, blockedWaterDir, rotOverride, buttEndDirs, undefined, undefined, undefined, undefined, now);
+        drawTile(ctx, {
+          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+          isHovered, blockedWaterDir, rotationDegOverride: rotOverride, buttEndDirs, nowMs: now,
+        });
       }
     }
   }
@@ -2762,7 +2802,7 @@ function _drawPreviewTile(
   ctx.globalAlpha = alpha;
   ctx.shadowColor = PREVIEW_SHADOW_COLOR;
   ctx.shadowBlur = PREVIEW_SHADOW_BLUR;
-  drawTile(ctx, px, py, previewTile, false, currentWater);
+  drawTile(ctx, { x: px, y: py, tile: previewTile, isWater: false, currentWater });
   ctx.restore();
 }
 
