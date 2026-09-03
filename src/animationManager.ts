@@ -537,12 +537,12 @@ export class AnimationManager {
     }
     renderFillAnims(this.ctx, this._fillAnims, tileConnectionsMap, LINE_WIDTH, now);
     renderDrainAnims(this.ctx, this._drainAnims, tileConnectionsMap, LINE_WIDTH, now);
-    renderContainerFillAnims(
-      this.ctx, board, this._fillAnims, water, shiftHeld, currentTemp, currentPressure, now,
-    );
-    renderContainerDrainAnims(
-      this.ctx, board, this._drainAnims, water, shiftHeld, currentTemp, currentPressure, now,
-    );
+    renderContainerFillAnims(this.ctx, {
+      board, anims: this._fillAnims, currentWater: water, shiftHeld, currentTemp, currentPressure, now,
+    });
+    renderContainerDrainAnims(this.ctx, {
+      board, anims: this._drainAnims, currentWater: water, shiftHeld, currentTemp, currentPressure, now,
+    });
   }
 
   // ─── Particle tick ────────────────────────────────────────────────────────
