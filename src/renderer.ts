@@ -2283,16 +2283,18 @@ export function renderBoard(
  * @param currentPressure - Current effective pressure.
  * @param now          - Current {@link performance.now()} timestamp.
  */
-export function renderContainerFillAnims(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  anims: PipeFillAnim[],
-  currentWater: number,
-  shiftHeld: boolean,
-  currentTemp: number,
-  currentPressure: number,
-  now: number,
-): void {
+export interface ContainerFillAnimsOptions {
+  board: Board;
+  anims: PipeFillAnim[];
+  currentWater: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  now: number;
+}
+
+export function renderContainerFillAnims(ctx: CanvasRenderingContext2D, opts: ContainerFillAnimsOptions): void {
+  const { board, anims, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
   for (const anim of anims) {
     if (!anim.isContainer) continue;
     const elapsed = now - anim.startTime;
@@ -2377,16 +2379,18 @@ export function renderContainerFillAnims(
  * direction as fill (exit edge drains first, opposite side last), so the clip
  * shrinks from the exit edge toward the opposite side.
  */
-export function renderContainerDrainAnims(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  anims: PipeDrainAnim[],
-  currentWater: number,
-  shiftHeld: boolean,
-  currentTemp: number,
-  currentPressure: number,
-  now: number,
-): void {
+export interface ContainerDrainAnimsOptions {
+  board: Board;
+  anims: PipeDrainAnim[];
+  currentWater: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  now: number;
+}
+
+export function renderContainerDrainAnims(ctx: CanvasRenderingContext2D, opts: ContainerDrainAnimsOptions): void {
+  const { board, anims, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
   for (const anim of anims) {
     if (!anim.isContainer) continue;
     const elapsed = now - anim.startTime;
