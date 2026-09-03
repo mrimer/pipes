@@ -128,14 +128,14 @@ describe('isValidGnomeAppearance', () => {
   });
 
   it('rejects an appearance missing shoeShape', () => {
-    const { shoeShape, ...withoutShoeShape } = DEFAULT_GNOME_APPEARANCE;
+    const { shoeShape: _shoeShape, ...withoutShoeShape } = DEFAULT_GNOME_APPEARANCE;
     expect(isValidGnomeAppearance(withoutShoeShape)).toBe(false);
   });
 });
 
 describe('migrateGnomeAppearance', () => {
   it('adds a default shoeShape to an appearance saved before shoe shapes existed', () => {
-    const { shoeShape, ...legacy } = DEFAULT_GNOME_APPEARANCE;
+    const { shoeShape: _shoeShape, ...legacy } = DEFAULT_GNOME_APPEARANCE;
     const migrated = migrateGnomeAppearance(legacy);
     expect(isValidGnomeAppearance(migrated)).toBe(true);
     expect((migrated as typeof DEFAULT_GNOME_APPEARANCE).shoeShape).toBe('clog');
