@@ -1108,24 +1108,22 @@ export class Game implements InputCallbacks {
     const shakeOffsets = this._animMgr.getShakeOffsets(now);
     const fillExclude = this._animMgr.getFillExclude(now);
 
-    renderBoard(
-      this.ctx,
-      this.canvas,
-      this.board,
-      this.selectedShape,
-      this.pendingRotation,
-      this._input.mouseCanvasPos,
-      this._input.shiftHeld,
+    renderBoard(this.ctx, this.canvas, {
+      board: this.board,
+      selectedShape: this.selectedShape,
+      pendingRotation: this.pendingRotation,
+      mouseCanvasPos: this._input.mouseCanvasPos,
+      shiftHeld: this._input.shiftHeld,
       currentTemp,
       currentPressure,
-      this._errorHighlightKeys,
-      this._input.hoverRotationDelta,
+      highlightedPositions: this._errorHighlightKeys,
+      hoverRotationDelta: this._input.hoverRotationDelta,
       rotationOverrides,
       scaleOverrides,
       shakeOffsets,
       fillExclude,
-      this._animMgr.getDrainInclude(now),
-      () => {
+      drainInclude: this._animMgr.getDrainInclude(now),
+      winTileOverlayFn: () => {
         this._animMgr.renderWinTileGlowsOverlay(now);
         if (this.gameState === GameState.GameOver) {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- board is always set during play state
@@ -1136,9 +1134,9 @@ export class Game implements InputCallbacks {
       // but before the connector arms, so particles appear above the sink backdrop
       // and underneath the arms.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- board is always set during play state
-      () => this._animMgr.tickVortex(this.board!),
-      (ctx) => this._animMgr.renderCementCracks(ctx, now),
-    );
+      sinkVortexFn: () => this._animMgr.tickVortex(this.board!),
+      cementCrackFn: (ctx) => this._animMgr.renderCementCracks(ctx, now),
+    });
 
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
     this._animMgr.renderFillEffects(
@@ -2391,7 +2389,7 @@ export class Game implements InputCallbacks {
         offscreen.height = this.board.rows * TILE_SIZE;
         const offCtx = offscreen.getContext('2d');
         if (offCtx) {
-          renderBoard(offCtx, offscreen, this.board, null, 0, null);
+          renderBoard(offCtx, offscreen, { board: this.board, selectedShape: null, pendingRotation: 0, mouseCanvasPos: null });
           boardSnapshot = offscreen;
         }
       }

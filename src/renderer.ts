@@ -2201,27 +2201,35 @@ function _renderPass6ErrorHighlights(
 }
 
 /** Render the full game board onto the canvas. */
-export function renderBoard(
-  ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  board: Board,
-  selectedShape: PipeShape | null,
-  pendingRotation: number,
-  mouseCanvasPos: { x: number; y: number } | null,
-  shiftHeld = false,
-  currentTemp = 0,
-  currentPressure = 1,
-  highlightedPositions: Set<string> = new Set(),
-  hoverRotationDelta = 0,
-  rotationOverrides?: Map<string, number>,
-  scaleOverrides?: Map<string, number>,
-  shakeOffsets?: Map<string, number>,
-  fillExclude?: Set<string>,
-  drainInclude?: Set<string>,
-  winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void,
-  sinkVortexFn?: () => void,
-  cementCrackFn?: (ctx: CanvasRenderingContext2D) => void,
-): void {
+export interface RenderBoardOptions {
+  board: Board;
+  selectedShape: PipeShape | null;
+  pendingRotation: number;
+  mouseCanvasPos: { x: number; y: number } | null;
+  shiftHeld?: boolean;
+  currentTemp?: number;
+  currentPressure?: number;
+  highlightedPositions?: Set<string>;
+  hoverRotationDelta?: number;
+  rotationOverrides?: Map<string, number>;
+  scaleOverrides?: Map<string, number>;
+  shakeOffsets?: Map<string, number>;
+  fillExclude?: Set<string>;
+  drainInclude?: Set<string>;
+  winTileOverlayFn?: (ctx: CanvasRenderingContext2D) => void;
+  sinkVortexFn?: () => void;
+  cementCrackFn?: (ctx: CanvasRenderingContext2D) => void;
+}
+
+export function renderBoard(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, opts: RenderBoardOptions): void {
+  const {
+    board, selectedShape, pendingRotation, mouseCanvasPos,
+    shiftHeld = false, currentTemp = 0, currentPressure = 1,
+    highlightedPositions = new Set<string>(), hoverRotationDelta = 0,
+    rotationOverrides, scaleOverrides, shakeOffsets, fillExclude, drainInclude,
+    winTileOverlayFn, sinkVortexFn, cementCrackFn,
+  } = opts;
+
   const now = Date.now();
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2249,19 +2257,28 @@ export function renderBoard(
 
   const selectedIsGold = selectedShape !== null && GOLD_PIPE_SHAPES.has(selectedShape);
 
-  _renderPass1Backgrounds(ctx, board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha);
-  _renderPass2NonPipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn, shakeOffsets);
+  _renderPass1Backgrounds(ctx, { board, selectedShape, pendingRotation, selectedIsGold, shimmerAlpha });
+  _renderPass2NonPipeTiles(ctx, {
+    board, filled: effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure,
+    sinkVortexFn, shakeOffsets,
+  });
   // Win tile glow overlay: rendered above Source/Sink/Chamber content but beneath
   // pipe strokes, so it is visible on all connected tile types.
   winTileOverlayFn?.(ctx);
   // Cement crack lines: rendered above floor/obstacle tiles but beneath pipe strokes.
   cementCrackFn?.(ctx);
-  _renderPass3PipeTiles(ctx, board, effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure, mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets);
+  _renderPass3PipeTiles(ctx, {
+    board, filled: effectiveFilled, currentWater, shiftHeld, currentTemp, currentPressure,
+    mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets,
+  });
   _renderPass4CementLabels(ctx, board);
   _renderPass5FixedPipeBolts(ctx, board);
   // Error highlights are drawn last so they appear above all tile content.
   _renderPass6ErrorHighlights(ctx, board, highlightedPositions, now);
-  _renderHoverPreview(ctx, board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos, hoverRotationDelta, currentWater, effectiveFilled, now);
+  _renderHoverPreview(ctx, {
+    board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos,
+    hoverRotationDelta, currentWater, filledPositions: effectiveFilled, now,
+  });
 }
 
 /**
@@ -2476,14 +2493,19 @@ export function renderContainerDrainAnims(ctx: CanvasRenderingContext2D, opts: C
  * Pass 1: Draw all tile backgrounds first so that pipe tile content drawn in pass 2
  * is never covered by a neighboring empty tile's background fill.
  */
-function _renderPass1Backgrounds(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  selectedShape: PipeShape | null,
-  pendingRotation: number,
-  selectedIsGold: boolean,
-  shimmerAlpha: number,
-): void {
+interface RenderPass1BackgroundsOptions {
+  board: Board;
+  selectedShape: PipeShape | null;
+  pendingRotation: number;
+  selectedIsGold: boolean;
+  shimmerAlpha: number;
+}
+
+function _renderPass1Backgrounds(ctx: CanvasRenderingContext2D, opts: RenderPass1BackgroundsOptions): void {
+  // selectedShape/pendingRotation/selectedIsGold are accepted for interface consistency
+  // with the other render passes but are not read by this pass (pre-existing: they were
+  // unused parameters before this refactor too).
+  const { board, shimmerAlpha } = opts;
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
@@ -2555,17 +2577,19 @@ function _renderPass1Backgrounds(
 /**
  * Pass 2: Draw all non-pipe tile content on top of all backgrounds.
  */
-function _renderPass2NonPipeTiles(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  filled: Set<string>,
-  currentWater: number,
-  shiftHeld: boolean,
-  currentTemp: number,
-  currentPressure: number,
-  sinkVortexFn?: () => void,
-  shakeOffsets?: Map<string, number>,
-): void {
+interface RenderPass2NonPipeTilesOptions {
+  board: Board;
+  filled: Set<string>;
+  currentWater: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  sinkVortexFn?: () => void;
+  shakeOffsets?: Map<string, number>;
+}
+
+function _renderPass2NonPipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass2NonPipeTilesOptions): void {
+  const { board, filled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn, shakeOffsets } = opts;
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
@@ -2691,20 +2715,25 @@ function _renderPass2NonPipeTiles(
  * Arms pointing at non-empty adjacent tiles use lineCap='butt' (flat ends) so
  * they sit flush with the tile boundary and do not bleed into adjacent tiles.
  */
-function _renderPass3PipeTiles(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  filled: Set<string>,
-  currentWater: number,
-  shiftHeld: boolean,
-  currentTemp: number,
-  currentPressure: number,
-  mouseCanvasPos: { x: number; y: number } | null,
-  now: number,
-  rotationOverrides?: Map<string, number>,
-  scaleOverrides?: Map<string, number>,
-  shakeOffsets?: Map<string, number>,
-): void {
+interface RenderPass3PipeTilesOptions {
+  board: Board;
+  filled: Set<string>;
+  currentWater: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  mouseCanvasPos: { x: number; y: number } | null;
+  now: number;
+  rotationOverrides?: Map<string, number>;
+  scaleOverrides?: Map<string, number>;
+  shakeOffsets?: Map<string, number>;
+}
+
+function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3PipeTilesOptions): void {
+  const {
+    board, filled, currentWater, shiftHeld, currentTemp, currentPressure,
+    mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets,
+  } = opts;
   const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
   const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
 
@@ -2922,18 +2951,23 @@ function _renderConnectionPreview(
  * Draw semi-transparent hover previews: the pending inventory item placement
  * preview and the rotation preview for an existing tile.
  */
-function _renderHoverPreview(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  selectedShape: PipeShape | null,
-  pendingRotation: number,
-  selectedIsGold: boolean,
-  mouseCanvasPos: { x: number; y: number } | null,
-  hoverRotationDelta: number,
-  currentWater: number,
-  filledPositions: Set<string>,
-  now: number,
-): void {
+interface RenderHoverPreviewOptions {
+  board: Board;
+  selectedShape: PipeShape | null;
+  pendingRotation: number;
+  selectedIsGold: boolean;
+  mouseCanvasPos: { x: number; y: number } | null;
+  hoverRotationDelta: number;
+  currentWater: number;
+  filledPositions: Set<string>;
+  now: number;
+}
+
+function _renderHoverPreview(ctx: CanvasRenderingContext2D, opts: RenderHoverPreviewOptions): void {
+  const {
+    board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos,
+    hoverRotationDelta, currentWater, filledPositions, now,
+  } = opts;
   if (!mouseCanvasPos) return;
   const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
   const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
