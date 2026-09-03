@@ -5,7 +5,7 @@
 import type { Board} from './board';
 import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, PIPE_SHAPES, SPIN_PIPE_SHAPES, posKey, parseKey, NEIGHBOUR_DELTA, isEmptyFloor } from './board';
 import { Tile, oppositeDirection } from './tile';
-import type { GridPos, LevelStyle} from './types';
+import type { GridPos, LevelStyle, ChamberContent} from './types';
 import { PipeShape, Direction, COLD_CHAMBER_CONTENTS, floorShapeToStyle } from './types';
 import type { PipeFillAnim, PipeDrainAnim } from './visuals/pipeEffects';
 import { FILL_ANIM_DURATION } from './visuals/pipeEffects';
@@ -1819,6 +1819,99 @@ function _drawLeakyRustSpots(
   ctx.restore();
 }
 
+/** Chamber content types whose color is a fixed (color, waterColor) pair with no other conditional logic. */
+const SIMPLE_CHAMBER_COLOR: Partial<Record<ChamberContent, { color: string; waterColor: string }>> = {
+  tank: { color: TANK_COLOR, waterColor: TANK_WATER_COLOR },
+  dirt: { color: DIRT_COLOR, waterColor: DIRT_WATER_COLOR },
+  ice: { color: ICE_COLOR, waterColor: ICE_WATER_COLOR },
+  snow: { color: SNOW_COLOR, waterColor: SNOW_WATER_COLOR },
+  hot_plate: { color: HOT_PLATE_COLOR, waterColor: HOT_PLATE_WATER_COLOR },
+  gel: { color: GEL_COLOR, waterColor: GEL_WATER_COLOR },
+  siphon: { color: SIPHON_COLOR, waterColor: SIPHON_WATER_COLOR },
+  regulator: { color: REGULATOR_COLOR, waterColor: REGULATOR_WATER_COLOR },
+};
+
+/** Non-chamber shapes whose color is a single fixed value, the same for water and non-water tiles. */
+const SIMPLE_SHAPE_COLOR: Partial<Record<PipeShape, string>> = {
+  [PipeShape.Granite]: GRANITE_COLOR,
+  [PipeShape.Tree]: TREE_COLOR,
+  [PipeShape.Tree2]: TREE2_COLOR,
+  [PipeShape.Tree3]: TREE3_COLOR,
+  [PipeShape.Tree4]: TREE4_COLOR,
+  [PipeShape.Sea]: SEA_COLOR,
+};
+
+/** Color for a chamber's 'item' content: gold when its itemShape is a gold pipe shape, otherwise a plain pipe. */
+function _itemChamberColor(tile: Tile, isWater: boolean): string {
+  const isGoldItem = tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape);
+  if (isGoldItem) return isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
+  return isWater ? WATER_COLOR : PIPE_COLOR;
+}
+
+/** Color for a chamber's 'heater' content: Cooler when its temperature is negative, otherwise Heater. */
+function _heaterChamberColor(tile: Tile, isWater: boolean): string {
+  if (tile.temperature < 0) return isWater ? COOLER_WATER_COLOR : COOLER_COLOR;
+  return isWater ? HEATER_WATER_COLOR : HEATER_COLOR;
+}
+
+/** Color for a chamber's 'pump' content: Vacuum when its pressure is negative, otherwise Pump. */
+function _pumpChamberColor(tile: Tile, isWater: boolean): string {
+  if (tile.pressure < 0) return isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR;
+  return isWater ? PUMP_WATER_COLOR : PUMP_COLOR;
+}
+
+/** Color for a chamber's 'sandstone' content: shatter/hard/normal tier, from {@link sandstoneColorState}. */
+function _sandstoneChamberColor(tile: Tile, isWater: boolean, currentPressure: number): string {
+  const { isShatterTriggered, isHard } = sandstoneColorState(tile, currentPressure);
+  if (isShatterTriggered) return isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR;
+  if (isHard) return isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
+  return isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR;
+}
+
+/** Color for a chamber with no special-cased content (including `null`, `'star'`, `'level'`, and `'chapter'`). */
+function _plainChamberColor(isWater: boolean): string {
+  return isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
+}
+
+/**
+ * Return the color for a Chamber tile, dispatching on its chamberContent.
+ * Chamber content types with no special-cased handling here fall through
+ * to {@link _plainChamberColor}.
+ */
+function _chamberTileColor(tile: Tile, isWater: boolean, currentPressure: number): string {
+  const { chamberContent } = tile;
+  if (chamberContent !== null) {
+    const simple = SIMPLE_CHAMBER_COLOR[chamberContent];
+    if (simple !== undefined) return isWater ? simple.waterColor : simple.color;
+  }
+  if (chamberContent === 'item') return _itemChamberColor(tile, isWater);
+  if (chamberContent === 'heater') return _heaterChamberColor(tile, isWater);
+  if (chamberContent === 'pump') return _pumpChamberColor(tile, isWater);
+  if (chamberContent === 'sandstone') return _sandstoneChamberColor(tile, isWater, currentPressure);
+  return _plainChamberColor(isWater);
+}
+
+/** Color for a Source or Sink tile, or null if `shape` is neither. */
+function _sourceOrSinkColor(shape: PipeShape, isWater: boolean): string | null {
+  if (shape === PipeShape.Source) return isWater ? SOURCE_WATER_COLOR : SOURCE_COLOR;
+  if (shape === PipeShape.Sink) return isWater ? SINK_WATER_COLOR : SINK_COLOR;
+  return null;
+}
+
+/** Color for a gold/leaky/spin pipe shape, or null if `shape` is in none of those sets. */
+function _specialPipeSetColor(shape: PipeShape, isWater: boolean): string | null {
+  if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+  if (LEAKY_PIPE_SHAPES.has(shape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
+  if (SPIN_PIPE_SHAPES.has(shape)) return isWater ? WATER_COLOR : FIXED_PIPE_BODY_COLOR;
+  return null;
+}
+
+/** Color for any pipe shape not covered by a more specific branch. */
+function _defaultPipeColor(isFixed: boolean, isWater: boolean): string {
+  if (isFixed) return isWater ? WATER_COLOR : FIXED_PIPE_BODY_COLOR;
+  return isWater ? WATER_COLOR : PIPE_COLOR;
+}
+
 /** Draw a single tile at canvas position (x, y). */
 /**
  * Resolve the canvas stroke/fill color for a tile based on its shape, fill
@@ -1833,76 +1926,19 @@ export function resolveTileColor(
   currentPressure: number,
 ): string {
   const { shape, isFixed } = tile;
-  if (shape === PipeShape.Source) {
-    return isWater ? SOURCE_WATER_COLOR : SOURCE_COLOR;
-  }
-  if (shape === PipeShape.Sink) {
-    return isWater ? SINK_WATER_COLOR : SINK_COLOR;
-  }
-  if (shape === PipeShape.Chamber) {
-    const { chamberContent } = tile;
-    if (chamberContent === 'tank') {
-      return isWater ? TANK_WATER_COLOR : TANK_COLOR;
-    }
-    if (chamberContent === 'dirt') {
-      return isWater ? DIRT_WATER_COLOR : DIRT_COLOR;
-    }
-    if (chamberContent === 'item') {
-      const isGoldItem = tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape);
-      return isGoldItem
-        ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
-        : (isWater ? WATER_COLOR : PIPE_COLOR);
-    }
-    if (chamberContent === 'heater') {
-      return tile.temperature < 0
-        ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
-        : (isWater ? HEATER_WATER_COLOR : HEATER_COLOR);
-    }
-    if (chamberContent === 'ice') {
-      return isWater ? ICE_WATER_COLOR : ICE_COLOR;
-    }
-    if (chamberContent === 'pump') {
-      return tile.pressure < 0
-        ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
-        : (isWater ? PUMP_WATER_COLOR : PUMP_COLOR);
-    }
-    if (chamberContent === 'snow') {
-      return isWater ? SNOW_WATER_COLOR : SNOW_COLOR;
-    }
-    if (chamberContent === 'sandstone') {
-      const { isShatterTriggered, isHard } = sandstoneColorState(tile, currentPressure);
-      return isShatterTriggered
-        ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
-        : isHard
-          ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-          : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
-    }
-    if (chamberContent === 'hot_plate') {
-      return isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
-    }
-    if (chamberContent === 'gel') {
-      return isWater ? GEL_WATER_COLOR : GEL_COLOR;
-    }
-    if (chamberContent === 'siphon') {
-      return isWater ? SIPHON_WATER_COLOR : SIPHON_COLOR;
-    }
-    if (chamberContent === 'regulator') {
-      return isWater ? REGULATOR_WATER_COLOR : REGULATOR_COLOR;
-    }
-    return isWater ? CHAMBER_WATER_COLOR : CHAMBER_COLOR;
-  }
-  if (shape === PipeShape.Granite) return GRANITE_COLOR;
-  if (shape === PipeShape.Tree) return TREE_COLOR;
-  if (shape === PipeShape.Tree2) return TREE2_COLOR;
-  if (shape === PipeShape.Tree3) return TREE3_COLOR;
-  if (shape === PipeShape.Tree4) return TREE4_COLOR;
-  if (shape === PipeShape.Sea) return SEA_COLOR;
-  if (GOLD_PIPE_SHAPES.has(shape)) return isWater ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
-  if (LEAKY_PIPE_SHAPES.has(shape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
-  if (SPIN_PIPE_SHAPES.has(shape)) return isWater ? WATER_COLOR : FIXED_PIPE_BODY_COLOR;
-  return isFixed
-    ? (isWater ? WATER_COLOR : FIXED_PIPE_BODY_COLOR)
-    : isWater ? WATER_COLOR : PIPE_COLOR;
+
+  const sourceOrSink = _sourceOrSinkColor(shape, isWater);
+  if (sourceOrSink !== null) return sourceOrSink;
+
+  if (shape === PipeShape.Chamber) return _chamberTileColor(tile, isWater, currentPressure);
+
+  const simpleShape = SIMPLE_SHAPE_COLOR[shape];
+  if (simpleShape !== undefined) return simpleShape;
+
+  const special = _specialPipeSetColor(shape, isWater);
+  if (special !== null) return special;
+
+  return _defaultPipeColor(isFixed, isWater);
 }
 
 export interface DrawTileOptions {
