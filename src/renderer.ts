@@ -2273,15 +2273,16 @@ export function renderBoard(
  * Call this after {@link renderBoard} so the reveal is painted on top of the dry
  * base tile.
  *
- * @param ctx          - 2D rendering context.
- * @param board        - The current game board.
- * @param anims        - The live fill animation array (already cleaned up by
- *                       {@link computeActiveFillKeys}).
- * @param currentWater - Current water count (passed to drawTile for Source labels).
- * @param shiftHeld    - Whether the Shift key is held (affects chamber cost display).
- * @param currentTemp  - Current effective temperature.
- * @param currentPressure - Current effective pressure.
- * @param now          - Current {@link performance.now()} timestamp.
+ * @param ctx  - 2D rendering context.
+ * @param opts - Rendering options.
+ * @param opts.board        - The current game board.
+ * @param opts.anims        - The live fill animation array (already cleaned up by
+ *                            {@link computeActiveFillKeys}).
+ * @param opts.currentWater - Current water count (passed to drawTile for Source labels).
+ * @param opts.shiftHeld    - Whether the Shift key is held (affects chamber cost display).
+ * @param opts.currentTemp  - Current effective temperature.
+ * @param opts.currentPressure - Current effective pressure.
+ * @param opts.now          - Current {@link performance.now()} timestamp.
  */
 export interface ContainerFillAnimsOptions {
   board: Board;
