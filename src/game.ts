@@ -482,51 +482,7 @@ export class Game implements InputCallbacks {
     }
 
     // Initialize the playback screen controller.
-    const playbackCbs: PlaybackCallbacks = {
-      getBoard: () => this.board,
-      getGameState: () => this.gameState,
-      setBoard: (b) => { this.board = b; },
-      setGameState: (s) => { this.gameState = s; },
-      setScreen: (s) => { this.screen = s; },
-      refreshUI: () => this._refreshPlayUI(),
-      canvas: this.canvas,
-      hudEl: document.getElementById('hud') as HTMLElement,
-      errorFlashEl: this.errorFlashEl,
-      levelHeaderEl: this.levelHeaderEl,
-      spawnMoveAnimations: (board, info: MoveAnimationInfo) => {
-        this._animMgr.completeAnims();
-        this._animMgr.resetIdleTimer();
-        const sparkle = this._metrics.sparkleCallbacks();
-        if (info.rotationInfo) {
-          const tile = board.getTile(info.rotationInfo);
-          this._animMgr.spawnRotationAnim(
-            info.rotationInfo.row, info.rotationInfo.col,
-            info.rotationInfo.oldRotation,
-            tile?.rotation ?? info.rotationInfo.oldRotation,
-          );
-        }
-        this._animMgr.spawnConnectionAnimations(board, info.filledBefore, sparkle);
-        if (info.decodedMove.type === 'delete') {
-          this._animMgr.spawnDisconnectionAnimations(
-            board, info.filledBefore, sparkle,
-            info.reclaimedTile, info.decodedMove.row, info.decodedMove.col,
-            info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
-          );
-        } else {
-          this._animMgr.spawnDisconnectionAnimations(
-            board, info.filledBefore, sparkle, undefined, undefined, undefined,
-            info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
-          );
-        }
-        const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
-        this._animMgr.spawnFillAnims(board, info.filledBefore, fillDelay);
-        this._animMgr.spawnLockedCostChangeAnimations(info.turnChanges);
-        this._animMgr.spawnCementDecrementAnimation(info.moveResult.cementDecrement);
-        this._refreshPlayUI();
-      },
-      resetMetricBaselines: () => this._metrics.resetBaselines(),
-    };
-    this._playbackScreen = new PlaybackScreen(playbackCbs);
+    this._playbackScreen = new PlaybackScreen(this._buildPlaybackCallbacks());
   }
 
   private _buildSettingsModal(): HTMLElement {
@@ -708,6 +664,55 @@ export class Game implements InputCallbacks {
       return null;
     }
     return recent.levelId;
+  }
+
+  private _buildPlaybackCallbacks(): PlaybackCallbacks {
+    return {
+      getBoard: () => this.board,
+      getGameState: () => this.gameState,
+      setBoard: (b) => { this.board = b; },
+      setGameState: (s) => { this.gameState = s; },
+      setScreen: (s) => { this.screen = s; },
+      refreshUI: () => this._refreshPlayUI(),
+      canvas: this.canvas,
+      hudEl: document.getElementById('hud') as HTMLElement,
+      errorFlashEl: this.errorFlashEl,
+      levelHeaderEl: this.levelHeaderEl,
+      spawnMoveAnimations: (board, info: MoveAnimationInfo) => this._spawnMoveAnimationsForMove(board, info),
+      resetMetricBaselines: () => this._metrics.resetBaselines(),
+    };
+  }
+
+  private _spawnMoveAnimationsForMove(board: Board, info: MoveAnimationInfo): void {
+    this._animMgr.completeAnims();
+    this._animMgr.resetIdleTimer();
+    const sparkle = this._metrics.sparkleCallbacks();
+    if (info.rotationInfo) {
+      const tile = board.getTile(info.rotationInfo);
+      this._animMgr.spawnRotationAnim(
+        info.rotationInfo.row, info.rotationInfo.col,
+        info.rotationInfo.oldRotation,
+        tile?.rotation ?? info.rotationInfo.oldRotation,
+      );
+    }
+    this._animMgr.spawnConnectionAnimations(board, info.filledBefore, sparkle);
+    if (info.decodedMove.type === 'delete') {
+      this._animMgr.spawnDisconnectionAnimations(
+        board, info.filledBefore, sparkle,
+        info.reclaimedTile, info.decodedMove.row, info.decodedMove.col,
+        info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
+      );
+    } else {
+      this._animMgr.spawnDisconnectionAnimations(
+        board, info.filledBefore, sparkle, undefined, undefined, undefined,
+        info.lockedWaterImpactBefore, info.lockedHotPlateGainBefore,
+      );
+    }
+    const fillDelay = info.rotationInfo ? ROTATION_ANIM_DURATION : 0;
+    this._animMgr.spawnFillAnims(board, info.filledBefore, fillDelay);
+    this._animMgr.spawnLockedCostChangeAnimations(info.turnChanges);
+    this._animMgr.spawnCementDecrementAnimation(info.moveResult.cementDecrement);
+    this._refreshPlayUI();
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
