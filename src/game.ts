@@ -504,42 +504,7 @@ export class Game implements InputCallbacks {
         setTouchUiEnabledOverride(enabled);
         document.body.classList.toggle('is-touch', enabled);
       },
-      (el) => {
-        const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
-        const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
-        const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
-        const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
-        const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
-        const emojisToggle = el.querySelector<HTMLInputElement>('[data-emojis-enabled]');
-        const localeSelect = el.querySelector<HTMLSelectElement>('[data-locale-select]');
-        sfxManager.play(SfxId.Click);
-        saveSfxVolume(sfxManager.getVolume());
-        saveMusicVolume(musicManager.getVolume());
-        saveTouchUiEnabled(isTouchDevice());
-        saveRecordingSettings({
-          recordSuccesses: recordSuccessesToggle?.checked ?? true,
-          recordFailures:  recordFailuresToggle?.checked  ?? false,
-        });
-        saveBackgroundEnabled(bgToggle?.checked ?? true);
-        saveEnvironmentalEnabled(envToggle?.checked ?? true);
-        saveMusicMuteOnFocusLoss(muteOnFocusLossToggle?.checked ?? true);
-        const emojisOn = emojisToggle?.checked ?? false;
-        saveEmojisEnabled(emojisOn);
-        setEmojisEnabled(emojisOn);
-        triggerCloudSave();
-
-        const selectedLocale = localeSelect?.value;
-        if (selectedLocale && selectedLocale !== getLocale()) {
-          // Changing the language requires every screen to rebuild its DOM text,
-          // which this app doesn't do reactively — reload to re-render fresh.
-          saveLocale(selectedLocale);
-          setLocale(selectedLocale);
-          window.location.reload();
-          return;
-        }
-
-        el.style.display = 'none';
-      },
+      (el) => this._applySettingsConfirm(el),
       () => loadRecordingSettings(),
       // Graphics: initial values loaded from persistence
       loadBackgroundEnabled(),
@@ -562,6 +527,47 @@ export class Game implements InputCallbacks {
       overlayAlpha: 0.84,
     });
     return el;
+  }
+
+  private _applySettingsConfirm(el: HTMLElement): void {
+    this._saveSettingsToggles(el);
+
+    const localeSelect = el.querySelector<HTMLSelectElement>('[data-locale-select]');
+    const selectedLocale = localeSelect?.value;
+    if (selectedLocale && selectedLocale !== getLocale()) {
+      // Changing the language requires every screen to rebuild its DOM text,
+      // which this app doesn't do reactively — reload to re-render fresh.
+      saveLocale(selectedLocale);
+      setLocale(selectedLocale);
+      window.location.reload();
+      return;
+    }
+
+    el.style.display = 'none';
+  }
+
+  private _saveSettingsToggles(el: HTMLElement): void {
+    const recordSuccessesToggle = el.querySelector<HTMLInputElement>('[data-record-successes]');
+    const recordFailuresToggle  = el.querySelector<HTMLInputElement>('[data-record-failures]');
+    const bgToggle  = el.querySelector<HTMLInputElement>('[data-graphics-background]');
+    const envToggle = el.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+    const muteOnFocusLossToggle = el.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
+    const emojisToggle = el.querySelector<HTMLInputElement>('[data-emojis-enabled]');
+    sfxManager.play(SfxId.Click);
+    saveSfxVolume(sfxManager.getVolume());
+    saveMusicVolume(musicManager.getVolume());
+    saveTouchUiEnabled(isTouchDevice());
+    saveRecordingSettings({
+      recordSuccesses: recordSuccessesToggle?.checked ?? true,
+      recordFailures:  recordFailuresToggle?.checked  ?? false,
+    });
+    saveBackgroundEnabled(bgToggle?.checked ?? true);
+    saveEnvironmentalEnabled(envToggle?.checked ?? true);
+    saveMusicMuteOnFocusLoss(muteOnFocusLossToggle?.checked ?? true);
+    const emojisOn = emojisToggle?.checked ?? false;
+    saveEmojisEnabled(emojisOn);
+    setEmojisEnabled(emojisOn);
+    triggerCloudSave();
   }
 
   private _buildCampaignCallbacks(): CampaignCallbacks {
@@ -630,22 +636,13 @@ export class Game implements InputCallbacks {
 
   private _showSettingsModal(): void {
     // Sync slider, toggles to current persisted values before showing.
-    const v = sfxManager.getVolume();
-    const mv = musicManager.getVolume();
+    this._syncVolumeControls();
     const savedTouchUiEnabled = loadTouchUiEnabled();
     const effectiveTouchEnabled = hasTouchUiSupport() ? (savedTouchUiEnabled ?? isTouchDevice()) : false;
-    const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
-    const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
-    const musicSlider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-slider]');
-    const musicValueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-music-value]');
     const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
     const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
     const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
     const muteOnFocusLossToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
-    if (slider) slider.value = String(v);
-    if (valueEl) valueEl.textContent = String(v);
-    if (musicSlider) musicSlider.value = String(mv);
-    if (musicValueEl) musicValueEl.textContent = String(mv);
     if (touchToggle) {
       touchToggle.checked = effectiveTouchEnabled;
       touchToggle.disabled = !hasTouchUiSupport();
@@ -654,6 +651,19 @@ export class Game implements InputCallbacks {
     if (envToggle) envToggle.checked = loadEnvironmentalEnabled();
     if (muteOnFocusLossToggle) muteOnFocusLossToggle.checked = loadMusicMuteOnFocusLoss();
     this._settingsModalEl.style.display = 'flex';
+  }
+
+  private _syncVolumeControls(): void {
+    const v = sfxManager.getVolume();
+    const mv = musicManager.getVolume();
+    const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
+    const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
+    const musicSlider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-slider]');
+    const musicValueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-music-value]');
+    if (slider) slider.value = String(v);
+    if (valueEl) valueEl.textContent = String(v);
+    if (musicSlider) musicSlider.value = String(mv);
+    if (musicValueEl) musicValueEl.textContent = String(mv);
   }
 
   private _getPartialLevelId(): number | null {
