@@ -462,7 +462,7 @@ function _drawChapterMapEndpointTile(
   drawGinghamOverlay(ctx, x, y, CELL, CELL, r, c, floorType, 1);
   ctx.save();
   ctx.translate(x + CELL / 2, y + CELL / 2);
-  drawSourceOrSink(ctx, connections, color, CELL / 2, isSource, buttEndDirs, centerLabel, CHAPTER_MAP_TILE_BG);
+  drawSourceOrSink(ctx, { connections, color, half: CELL / 2, isSource, buttEndDirs, centerLabel, bgColor: CHAPTER_MAP_TILE_BG });
   ctx.restore();
 }
 
