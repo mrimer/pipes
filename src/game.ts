@@ -441,101 +441,7 @@ export class Game implements InputCallbacks {
     };
 
     // Create the campaign manager and restore persisted campaign state
-    const campaignCallbacks: CampaignCallbacks = {
-      startLevel: (id) => this.startLevel(id),
-      startLevelDef: (level) => this.startLevelDef(level),
-      showLevelSelect: () => this._showLevelSelect(),
-      exitToMenu: () => this.exitToMenu(),
-      closeModal: (el) => {
-        this._closeModal(el);
-        // After a campaign modal is dismissed, the campaign manager may call
-        // startLevel() synchronously in the same tick.  Use setTimeout so the
-        // ring check runs after that second startLevel() completes.
-        setTimeout(() => this._spawnPendingRingsIfReady(), 0);
-      },
-      triggerModalSparkle: (el, cls) => this._triggerModalSparkle(el, cls),
-      setScreen: (s) => { this.screen = s; },
-      setLevelSelectVisible: (v) => { this.levelSelectEl.style.display = v ? 'flex' : 'none'; },
-      setPlayScreenVisible: (v) => { this.playScreenEl.style.display = v ? 'flex' : 'none'; },
-      playLevelTransition: (minimapRect, chapterMapSnapshot, onComplete) => {
-        if (!this.board) { onComplete(); return; }
-        // Force-render the board so the game canvas has the level content.
-        this._renderBoard();
-        this._levelTransitionInProgress = true;
-        playLevelTransition(
-          minimapRect,
-          this.canvas,
-          this.board,
-          chapterMapSnapshot,
-          this.playScreenEl,
-          () => {
-            this._levelTransitionInProgress = false;
-            onComplete();
-            this._spawnPendingRingsIfReady();
-          },
-        );
-      },
-      levelSelectEl: this.levelSelectEl,
-      levelHeaderEl: this.levelHeaderEl,
-      levelListEl: this.levelListEl,
-      winModalEl: this.winModalEl,
-      winNextBtnEl: this.winNextBtnEl,
-      exitBtnEl: this.exitBtnEl,
-      gameoverMenuBtnEl: this.gameoverMenuBtnEl,
-      showResetConfirmModal: (info) => {
-        this._updateResetModalInfo(info);
-        this.resetConfirmModalEl.style.display = 'flex';
-      },
-      showRules: () => this.showRules(),
-      showCredits: () => this.showCredits(),
-      showSettings: () => {
-        // Sync slider, toggles to current persisted values before showing.
-        const v = sfxManager.getVolume();
-        const mv = musicManager.getVolume();
-        const savedTouchUiEnabled = loadTouchUiEnabled();
-        const effectiveTouchEnabled = hasTouchUiSupport() ? (savedTouchUiEnabled ?? isTouchDevice()) : false;
-        const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
-        const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
-        const musicSlider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-slider]');
-        const musicValueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-music-value]');
-        const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
-        const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
-        const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
-        const muteOnFocusLossToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
-        if (slider) slider.value = String(v);
-        if (valueEl) valueEl.textContent = String(v);
-        if (musicSlider) musicSlider.value = String(mv);
-        if (musicValueEl) musicValueEl.textContent = String(mv);
-        if (touchToggle) {
-          touchToggle.checked = effectiveTouchEnabled;
-          touchToggle.disabled = !hasTouchUiSupport();
-        }
-        if (bgToggle)  bgToggle.checked  = loadBackgroundEnabled();
-        if (envToggle) envToggle.checked = loadEnvironmentalEnabled();
-        if (muteOnFocusLossToggle) muteOnFocusLossToggle.checked = loadMusicMuteOnFocusLoss();
-        this._settingsModalEl.style.display = 'flex';
-      },
-      showPlayerProfile: () => this._showPlayerProfileScreen(),
-      getPlayerName: () => {
-        const idx = getActiveSlotIndex();
-        return idx !== null ? (loadSlotMeta(idx)?.name ?? null) : null;
-      },
-      getPartialLevelId: () => {
-        const recent = getMostRecentPartialProgress();
-        if (!recent) return null;
-        // Only surface partials that belong to the currently active campaign.
-        if (this._campaign.activeCampaign && recent.campaignId !== this._campaign.activeCampaign.id) {
-          return null;
-        }
-        return recent.levelId;
-      },
-      startLevelFromPartial: (levelId: number) => {
-        this._campaign.startLevelFromMainMenuPartial(levelId);
-      },
-      onMapScreenEntered: (style, isCampaignMap) => {
-        musicManager.playGroup(selectGroupForContext({ style, isCampaignMap }));
-      },
-    };
+    const campaignCallbacks: CampaignCallbacks = this._buildCampaignCallbacks();
     this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
     this._campaign.restoreFromPersistence();
 
@@ -700,6 +606,108 @@ export class Game implements InputCallbacks {
       overlayAlpha: 0.84,
     });
     return el;
+  }
+
+  private _buildCampaignCallbacks(): CampaignCallbacks {
+    return {
+      startLevel: (id) => this.startLevel(id),
+      startLevelDef: (level) => this.startLevelDef(level),
+      showLevelSelect: () => this._showLevelSelect(),
+      exitToMenu: () => this.exitToMenu(),
+      closeModal: (el) => {
+        this._closeModal(el);
+        // After a campaign modal is dismissed, the campaign manager may call
+        // startLevel() synchronously in the same tick.  Use setTimeout so the
+        // ring check runs after that second startLevel() completes.
+        setTimeout(() => this._spawnPendingRingsIfReady(), 0);
+      },
+      triggerModalSparkle: (el, cls) => this._triggerModalSparkle(el, cls),
+      setScreen: (s) => { this.screen = s; },
+      setLevelSelectVisible: (v) => { this.levelSelectEl.style.display = v ? 'flex' : 'none'; },
+      setPlayScreenVisible: (v) => { this.playScreenEl.style.display = v ? 'flex' : 'none'; },
+      playLevelTransition: (minimapRect, chapterMapSnapshot, onComplete) => {
+        if (!this.board) { onComplete(); return; }
+        // Force-render the board so the game canvas has the level content.
+        this._renderBoard();
+        this._levelTransitionInProgress = true;
+        playLevelTransition(
+          minimapRect,
+          this.canvas,
+          this.board,
+          chapterMapSnapshot,
+          this.playScreenEl,
+          () => {
+            this._levelTransitionInProgress = false;
+            onComplete();
+            this._spawnPendingRingsIfReady();
+          },
+        );
+      },
+      levelSelectEl: this.levelSelectEl,
+      levelHeaderEl: this.levelHeaderEl,
+      levelListEl: this.levelListEl,
+      winModalEl: this.winModalEl,
+      winNextBtnEl: this.winNextBtnEl,
+      exitBtnEl: this.exitBtnEl,
+      gameoverMenuBtnEl: this.gameoverMenuBtnEl,
+      showResetConfirmModal: (info) => {
+        this._updateResetModalInfo(info);
+        this.resetConfirmModalEl.style.display = 'flex';
+      },
+      showRules: () => this.showRules(),
+      showCredits: () => this.showCredits(),
+      showSettings: () => this._showSettingsModal(),
+      showPlayerProfile: () => this._showPlayerProfileScreen(),
+      getPlayerName: () => {
+        const idx = getActiveSlotIndex();
+        return idx !== null ? (loadSlotMeta(idx)?.name ?? null) : null;
+      },
+      getPartialLevelId: () => this._getPartialLevelId(),
+      startLevelFromPartial: (levelId: number) => {
+        this._campaign.startLevelFromMainMenuPartial(levelId);
+      },
+      onMapScreenEntered: (style, isCampaignMap) => {
+        musicManager.playGroup(selectGroupForContext({ style, isCampaignMap }));
+      },
+    };
+  }
+
+  private _showSettingsModal(): void {
+    // Sync slider, toggles to current persisted values before showing.
+    const v = sfxManager.getVolume();
+    const mv = musicManager.getVolume();
+    const savedTouchUiEnabled = loadTouchUiEnabled();
+    const effectiveTouchEnabled = hasTouchUiSupport() ? (savedTouchUiEnabled ?? isTouchDevice()) : false;
+    const slider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-sfx-slider]');
+    const valueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-sfx-value]');
+    const musicSlider = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-slider]');
+    const musicValueEl = this._settingsModalEl.querySelector<HTMLElement>('[data-music-value]');
+    const touchToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-touch-ui-toggle]');
+    const bgToggle  = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-background]');
+    const envToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-graphics-environmental]');
+    const muteOnFocusLossToggle = this._settingsModalEl.querySelector<HTMLInputElement>('[data-music-mute-on-focus-loss]');
+    if (slider) slider.value = String(v);
+    if (valueEl) valueEl.textContent = String(v);
+    if (musicSlider) musicSlider.value = String(mv);
+    if (musicValueEl) musicValueEl.textContent = String(mv);
+    if (touchToggle) {
+      touchToggle.checked = effectiveTouchEnabled;
+      touchToggle.disabled = !hasTouchUiSupport();
+    }
+    if (bgToggle)  bgToggle.checked  = loadBackgroundEnabled();
+    if (envToggle) envToggle.checked = loadEnvironmentalEnabled();
+    if (muteOnFocusLossToggle) muteOnFocusLossToggle.checked = loadMusicMuteOnFocusLoss();
+    this._settingsModalEl.style.display = 'flex';
+  }
+
+  private _getPartialLevelId(): number | null {
+    const recent = getMostRecentPartialProgress();
+    if (!recent) return null;
+    // Only surface partials that belong to the currently active campaign.
+    if (this._campaign.activeCampaign && recent.campaignId !== this._campaign.activeCampaign.id) {
+      return null;
+    }
+    return recent.levelId;
   }
 
   // ─── Screen transitions ───────────────────────────────────────────────────
