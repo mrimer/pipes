@@ -1610,7 +1610,8 @@ export class Game implements InputCallbacks {
    * Track at most one hot-plate sfx per turn. Sizzle overrides SizzleIce when
    * both a frozen and a non-frozen hot-plate tile connect the same turn.
    */
-  private _accumulateHotPlateTracker(board: Board, tile: Tile, row: number, col: number, trackers: ConnectionSfxTrackers): void {
+  private _accumulateHotPlateTracker(opts: { board: Board; row: number; col: number; trackers: ConnectionSfxTrackers }): void {
+    const { board, row, col, trackers } = opts;
     // Use getLockedHotPlateGain to check if frozen water was actually consumed
     // when this hot plate's cost was computed during applyTurnDelta this turn.
     const frozenGain = board.getLockedHotPlateGain({ row, col }) ?? 0;
@@ -1656,6 +1657,26 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * Sfx for chamber content types that always play the same sound on connection,
+   * with no per-tile state to inspect. Used by {@link _immediateChamberSfx}.
+   */
+  private static readonly FIXED_CHAMBER_SFX: Partial<Record<string, SfxId>> = {
+    tank: SfxId.Tank,
+    star: SfxId.Star,
+    gel: SfxId.Gel,
+    siphon: SfxId.Siphon,
+  };
+
+  /**
+   * Return the sfx for a newly-connected item chamber, or null if it hasn't
+   * been assigned an item shape yet or its count is positive.
+   */
+  private _itemChamberSfx(tile: Tile): SfxId | null {
+    if (tile.itemShape === null) return null;
+    return tile.itemCount <= 0 ? SfxId.NegativeCount : null;
+  }
+
+  /**
    * Return the sfx to play immediately for a chamber content type that plays
    * at most once per tile per turn (as opposed to the cold/hot-plate content
    * types, which track a running max/priority across all tiles connected
@@ -1664,15 +1685,12 @@ export class Game implements InputCallbacks {
    * chamber, and every cold/hot-plate content type).
    */
   private _immediateChamberSfx(tile: Tile): SfxId | null {
-    if (tile.chamberContent === 'tank') return SfxId.Tank;
-    if (tile.chamberContent === 'item' && tile.itemShape !== null) {
-      return tile.itemCount <= 0 ? SfxId.NegativeCount : null;
-    }
+    if (tile.chamberContent === null) return null;
+    const fixed = Game.FIXED_CHAMBER_SFX[tile.chamberContent];
+    if (fixed !== undefined) return fixed;
+    if (tile.chamberContent === 'item') return this._itemChamberSfx(tile);
     if (tile.chamberContent === 'heater') return tile.temperature < 0 ? SfxId.Cooler : SfxId.Heater;
     if (tile.chamberContent === 'pump') return tile.pressure < 0 ? SfxId.Vacuum : SfxId.Pump;
-    if (tile.chamberContent === 'star') return SfxId.Star;
-    if (tile.chamberContent === 'gel') return SfxId.Gel;
-    if (tile.chamberContent === 'siphon') return SfxId.Siphon;
     return null;
   }
 
@@ -1685,11 +1703,40 @@ export class Game implements InputCallbacks {
     currentTemp: number; currentPressure: number; trackers: ConnectionSfxTrackers;
   }): void {
     const { board, tile, row, col, currentTemp, currentPressure, trackers } = opts;
-    if (tile.chamberContent === 'hot_plate') this._accumulateHotPlateTracker(board, tile, row, col, trackers);
+    if (tile.chamberContent === 'hot_plate') this._accumulateHotPlateTracker({ board, row, col, trackers });
     else if (tile.chamberContent === 'ice') this._accumulateIceTracker(tile, currentTemp, trackers);
     else if (tile.chamberContent === 'snow') this._accumulateSnowTracker(tile, currentTemp, currentPressure, trackers);
     else if (tile.chamberContent === 'dirt') this._accumulateDirtTracker(tile, trackers);
     else if (tile.chamberContent === 'sandstone') this._accumulateSandstoneTracker(tile, currentPressure, trackers);
+  }
+
+  /**
+   * Resolve and record the sfx for one newly-connected chamber tile: push an
+   * immediate sfx straight into `sfxToPlay`, or fold the tile into `trackers`
+   * for a cold/hot-plate content type. Used by {@link _collectConnectionSfx}'s
+   * scan loop.
+   */
+  private _collectChamberSfx(opts: {
+    board: Board; tile: Tile; row: number; col: number;
+    currentTemp: number; currentPressure: number;
+    trackers: ConnectionSfxTrackers; sfxToPlay: SfxId[];
+  }): void {
+    const { board, tile, row, col, currentTemp, currentPressure, trackers, sfxToPlay } = opts;
+    const immediate = this._immediateChamberSfx(tile);
+    if (immediate !== null) { sfxToPlay.push(immediate); return; }
+    this._accumulateColdChamberTrackers({ board, tile, row, col, currentTemp, currentPressure, trackers });
+  }
+
+  /**
+   * Push at most one sfx per accumulator category onto `sfxToPlay`, in this
+   * fixed order, once every newly-connected tile this turn has been scanned.
+   */
+  private _pushAccumulatedChamberSfx(trackers: ConnectionSfxTrackers, sfxToPlay: SfxId[]): void {
+    if (trackers.hotPlateSfx !== null) sfxToPlay.push(trackers.hotPlateSfx);
+    if (trackers.maxIceRaw >= 0) sfxToPlay.push(this._iceSfxForRaw(trackers.maxIceRaw));
+    if (trackers.maxSnowRaw >= 0) sfxToPlay.push(this._snowSfxForRaw(trackers.maxSnowRaw));
+    if (trackers.maxDirtCost >= 0) sfxToPlay.push(this._dirtSfxForCost(trackers.maxDirtCost));
+    if (trackers.maxSandstoneInfo !== null) sfxToPlay.push(this._sandstoneSfxFor(trackers.maxSandstoneInfo));
   }
 
   /**
@@ -1718,21 +1765,10 @@ export class Game implements InputCallbacks {
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
       if (tile?.shape !== PipeShape.Chamber) continue;
-
-      const immediate = this._immediateChamberSfx(tile);
-      if (immediate !== null) { sfxToPlay.push(immediate); continue; }
-
-      this._accumulateColdChamberTrackers({ board, tile, row: r, col: c, currentTemp, currentPressure, trackers });
+      this._collectChamberSfx({ board, tile, row: r, col: c, currentTemp, currentPressure, trackers, sfxToPlay });
     }
 
-    // Collect at most one sfx per accumulator category, in this fixed order,
-    // after every newly-connected tile this turn has been scanned.
-    if (trackers.hotPlateSfx !== null) sfxToPlay.push(trackers.hotPlateSfx);
-    if (trackers.maxIceRaw >= 0) sfxToPlay.push(this._iceSfxForRaw(trackers.maxIceRaw));
-    if (trackers.maxSnowRaw >= 0) sfxToPlay.push(this._snowSfxForRaw(trackers.maxSnowRaw));
-    if (trackers.maxDirtCost >= 0) sfxToPlay.push(this._dirtSfxForCost(trackers.maxDirtCost));
-    if (trackers.maxSandstoneInfo !== null) sfxToPlay.push(this._sandstoneSfxFor(trackers.maxSandstoneInfo));
-
+    this._pushAccumulatedChamberSfx(trackers, sfxToPlay);
     return sfxToPlay;
   }
 
