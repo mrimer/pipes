@@ -1827,7 +1827,7 @@ function _drawLeakyRustSpots(
  * Separated from {@link drawTile} so that color logic can be read and tested
  * independently of the drawing commands.
  */
-function _resolveTileColor(
+export function resolveTileColor(
   tile: Tile,
   isWater: boolean,
   currentPressure: number,
@@ -1950,7 +1950,7 @@ export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): 
   ctx.translate(cx, cy);
   ctx.rotate((effectiveRotation * Math.PI) / 180);
 
-  const color = _resolveTileColor(tile, isWater, currentPressure);
+  const color = resolveTileColor(tile, isWater, currentPressure);
 
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
@@ -1965,7 +1965,7 @@ export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): 
     // Arm-by-arm drawing for one-way blocked pipes: draw ALL black outlines
     // first, then ALL color fills.  This ordering prevents a later arm's black
     // outline from overwriting an already-painted arm's color at the junction.
-    const dryColor = _resolveTileColor(tile, false, currentPressure);
+    const dryColor = resolveTileColor(tile, false, currentPressure);
     // Sort blocked arm first so the dominant (water) color is painted last.
     const sortedArms = [...tile.connections].sort(
       (a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0),
