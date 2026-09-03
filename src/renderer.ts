@@ -346,18 +346,19 @@ export function drawConnectorGlow(
  * Call with the canvas already translated to the tile centre.
  *
  * @param ctx         Canvas rendering context (origin = tile centre).
- * @param connections Set of outgoing arm directions for this tile.
- * @param color       Arm and decoration colour (dry or water).
- * @param half        Half the tile size in canvas pixels.
- * @param isSource    true for Source (outward triangles, gradient), false for Sink (bullseye).
- * @param buttEndDirs Optional set of arm directions that should use flat (butt) end caps.
- * @param centerLabel Optional label to draw at the centre. When omitted no label is drawn.
- * @param bgColor     Fill colour for the outer-circle background (defaults to TILE_BG).
- * @param afterOuterCircleFn  Optional callback invoked after the outer circle (fill +
- *                            outline) is drawn and before the connector arms are drawn.
- *                            Use this to render effects (e.g. vortex particles) that
- *                            should appear above the tile circle backdrop but below the
- *                            arms.  Only called for the Sink tile (when isSource=false).
+ * @param opts - Rendering options.
+ * @param opts.connections Set of outgoing arm directions for this tile.
+ * @param opts.color       Arm and decoration colour (dry or water).
+ * @param opts.half        Half the tile size in canvas pixels.
+ * @param opts.isSource    true for Source (outward triangles, gradient), false for Sink (bullseye).
+ * @param opts.buttEndDirs Optional set of arm directions that should use flat (butt) end caps.
+ * @param opts.centerLabel Optional label to draw at the centre. When omitted no label is drawn.
+ * @param opts.bgColor     Fill colour for the outer-circle background (defaults to TILE_BG).
+ * @param opts.afterOuterCircleFn  Optional callback invoked after the outer circle (fill +
+ *                                 outline) is drawn and before the connector arms are drawn.
+ *                                 Use this to render effects (e.g. vortex particles) that
+ *                                 should appear above the tile circle backdrop but below the
+ *                                 arms.  Only called for the Sink tile (when isSource=false).
  */
 export interface DrawSourceOrSinkOptions {
   connections: ReadonlySet<Direction>;
@@ -1338,13 +1339,14 @@ function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction>
  * Call this while the canvas is already translated to the tile center and
  * rotated by `tileRotation`.
  *
- * @param absDir      Absolute (world-space) direction of the arm.
- * @param tileRotation The tile's rotation in degrees (0 / 90 / 180 / 270).
- * @param half        Half the tile size in pixels.
- * @param color       Stroke color for this arm.
- * @param buttEnd     When true, the tile-edge end is rendered flat by clipping
- *                    at the tile boundary.  The center end always uses a natural
- *                    round linecap — no explicit center cap circle is needed.
+ * @param opts - Rendering options.
+ * @param opts.absDir       Absolute (world-space) direction of the arm.
+ * @param opts.tileRotation The tile's rotation in degrees (0 / 90 / 180 / 270).
+ * @param opts.half         Half the tile size in pixels.
+ * @param opts.color        Stroke color for this arm.
+ * @param opts.buttEnd      When true, the tile-edge end is rendered flat by clipping
+ *                          at the tile boundary.  The center end always uses a natural
+ *                          round linecap — no explicit center cap circle is needed.
  */
 interface DrawPipeArmOptions {
   absDir: Direction;
