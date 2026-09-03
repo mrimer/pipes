@@ -1566,6 +1566,180 @@ export class Game implements InputCallbacks {
   }
 
   /**
+   * Map a connected ice chamber's highest raw cost this turn to its sfx tier.
+   */
+  private _iceSfxForRaw(raw: number): SfxId {
+    if (raw === 0) return SfxId.Ice0;
+    if (raw < ICE_SFX_THRESHOLD_MID) return SfxId.Ice1;
+    if (raw < ICE_SFX_THRESHOLD_HIGH) return SfxId.Ice2;
+    return SfxId.Ice3;
+  }
+
+  /**
+   * Map a connected snow chamber's highest raw cost this turn to its sfx tier.
+   */
+  private _snowSfxForRaw(raw: number): SfxId {
+    if (raw === 0) return SfxId.Snow0;
+    if (raw < SNOW_SFX_THRESHOLD_MID) return SfxId.Snow1;
+    if (raw < SNOW_SFX_THRESHOLD_HIGH) return SfxId.Snow2;
+    return SfxId.Snow3;
+  }
+
+  /**
+   * Map a connected dirt chamber's highest cost this turn to its sfx tier.
+   */
+  private _dirtSfxForCost(cost: number): SfxId {
+    if (cost < DIRT_SFX_THRESHOLD_MID) return SfxId.Dirt1;
+    if (cost < DIRT_SFX_THRESHOLD_HIGH) return SfxId.Dirt2;
+    return SfxId.Dirt3;
+  }
+
+  /**
+   * Map a connected sandstone chamber's highest-cost tile info this turn to its sfx tier.
+   * SandstoneShatter plays when the highest-cost tile was shattered (pressure ≥ shatter),
+   * overriding the cost-tier mapping.
+   */
+  private _sandstoneSfxFor(info: { cost: number; shattered: boolean }): SfxId {
+    if (info.shattered) return SfxId.SandstoneShatter;
+    if (info.cost < SANDSTONE_SFX_THRESHOLD_MID) return SfxId.Sandstone1;
+    if (info.cost < SANDSTONE_SFX_THRESHOLD_HIGH) return SfxId.Sandstone2;
+    return SfxId.Sandstone3;
+  }
+
+  /**
+   * Track at most one hot-plate sfx per turn. Sizzle overrides SizzleIce when
+   * both a frozen and a non-frozen hot-plate tile connect the same turn.
+   */
+  private _accumulateHotPlateTracker(opts: { board: Board; row: number; col: number; trackers: ConnectionSfxTrackers }): void {
+    const { board, row, col, trackers } = opts;
+    // Use getLockedHotPlateGain to check if frozen water was actually consumed
+    // when this hot plate's cost was computed during applyTurnDelta this turn.
+    const frozenGain = board.getLockedHotPlateGain({ row, col }) ?? 0;
+    const candidate = frozenGain > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
+    if (candidate === SfxId.Sizzle || trackers.hotPlateSfx === null) trackers.hotPlateSfx = candidate;
+  }
+
+  /**
+   * Track the highest raw cost among ice chambers connected this turn.
+   */
+  private _accumulateIceTracker(tile: Tile, currentTemp: number, trackers: ConnectionSfxTrackers): void {
+    const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
+    if (rawIceCost > trackers.maxIceRaw) trackers.maxIceRaw = rawIceCost;
+  }
+
+  /**
+   * Track the highest raw cost among snow chambers connected this turn.
+   * Snow cost is pressure-adjusted (unlike ice): snowCostPerDeltaTemp factors in
+   * the current pressure, which reduces the effective cost per deltaTemp unit.
+   */
+  private _accumulateSnowTracker(tile: Tile, currentTemp: number, currentPressure: number, trackers: ConnectionSfxTrackers): void {
+    const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+    const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
+    if (rawSnowCost > trackers.maxSnowRaw) trackers.maxSnowRaw = rawSnowCost;
+  }
+
+  /**
+   * Track the highest cost among dirt chambers connected this turn.
+   */
+  private _accumulateDirtTracker(tile: Tile, trackers: ConnectionSfxTrackers): void {
+    if (tile.cost > trackers.maxDirtCost) trackers.maxDirtCost = tile.cost;
+  }
+
+  /**
+   * Track the sandstone tile with the highest base cost connected this turn,
+   * and whether it shattered.
+   */
+  private _accumulateSandstoneTracker(tile: Tile, currentPressure: number, trackers: ConnectionSfxTrackers): void {
+    const { shatterOverride } = sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
+    if (trackers.maxSandstoneInfo === null || tile.cost > trackers.maxSandstoneInfo.cost) {
+      trackers.maxSandstoneInfo = { cost: tile.cost, shattered: shatterOverride };
+    }
+  }
+
+  /**
+   * Sfx for chamber content types that always play the same sound on connection,
+   * with no per-tile state to inspect. Used by {@link _immediateChamberSfx}.
+   */
+  private static readonly FIXED_CHAMBER_SFX: Partial<Record<string, SfxId>> = {
+    tank: SfxId.Tank,
+    star: SfxId.Star,
+    gel: SfxId.Gel,
+    siphon: SfxId.Siphon,
+  };
+
+  /**
+   * Return the sfx for a newly-connected item chamber, or null if it hasn't
+   * been assigned an item shape yet or its count is positive.
+   */
+  private _itemChamberSfx(tile: Tile): SfxId | null {
+    if (tile.itemShape === null) return null;
+    return tile.itemCount <= 0 ? SfxId.NegativeCount : null;
+  }
+
+  /**
+   * Return the sfx to play immediately for a chamber content type that plays
+   * at most once per tile per turn (as opposed to the cold/hot-plate content
+   * types, which track a running max/priority across all tiles connected
+   * this turn — see {@link _accumulateColdChamberTrackers}). Returns null for
+   * a content type not handled here (including a not-yet-fully-formed item
+   * chamber, and every cold/hot-plate content type).
+   */
+  private _immediateChamberSfx(tile: Tile): SfxId | null {
+    if (tile.chamberContent === null) return null;
+    const fixed = Game.FIXED_CHAMBER_SFX[tile.chamberContent];
+    if (fixed !== undefined) return fixed;
+    if (tile.chamberContent === 'item') return this._itemChamberSfx(tile);
+    if (tile.chamberContent === 'heater') return tile.temperature < 0 ? SfxId.Cooler : SfxId.Heater;
+    if (tile.chamberContent === 'pump') return tile.pressure < 0 ? SfxId.Vacuum : SfxId.Pump;
+    return null;
+  }
+
+  /**
+   * Dispatch a chamber tile to the tracker accumulator for its content type
+   * (hot_plate, ice, snow, dirt, sandstone). No-op for any other content type.
+   */
+  private _accumulateColdChamberTrackers(opts: {
+    board: Board; tile: Tile; row: number; col: number;
+    currentTemp: number; currentPressure: number; trackers: ConnectionSfxTrackers;
+  }): void {
+    const { board, tile, row, col, currentTemp, currentPressure, trackers } = opts;
+    if (tile.chamberContent === 'hot_plate') this._accumulateHotPlateTracker({ board, row, col, trackers });
+    else if (tile.chamberContent === 'ice') this._accumulateIceTracker(tile, currentTemp, trackers);
+    else if (tile.chamberContent === 'snow') this._accumulateSnowTracker(tile, currentTemp, currentPressure, trackers);
+    else if (tile.chamberContent === 'dirt') this._accumulateDirtTracker(tile, trackers);
+    else if (tile.chamberContent === 'sandstone') this._accumulateSandstoneTracker(tile, currentPressure, trackers);
+  }
+
+  /**
+   * Resolve and record the sfx for one newly-connected chamber tile: push an
+   * immediate sfx straight into `sfxToPlay`, or fold the tile into `trackers`
+   * for a cold/hot-plate content type. Used by {@link _collectConnectionSfx}'s
+   * scan loop.
+   */
+  private _collectChamberSfx(opts: {
+    board: Board; tile: Tile; row: number; col: number;
+    currentTemp: number; currentPressure: number;
+    trackers: ConnectionSfxTrackers; sfxToPlay: SfxId[];
+  }): void {
+    const { board, tile, row, col, currentTemp, currentPressure, trackers, sfxToPlay } = opts;
+    const immediate = this._immediateChamberSfx(tile);
+    if (immediate !== null) { sfxToPlay.push(immediate); return; }
+    this._accumulateColdChamberTrackers({ board, tile, row, col, currentTemp, currentPressure, trackers });
+  }
+
+  /**
+   * Push at most one sfx per accumulator category onto `sfxToPlay`, in this
+   * fixed order, once every newly-connected tile this turn has been scanned.
+   */
+  private _pushAccumulatedChamberSfx(trackers: ConnectionSfxTrackers, sfxToPlay: SfxId[]): void {
+    if (trackers.hotPlateSfx !== null) sfxToPlay.push(trackers.hotPlateSfx);
+    if (trackers.maxIceRaw >= 0) sfxToPlay.push(this._iceSfxForRaw(trackers.maxIceRaw));
+    if (trackers.maxSnowRaw >= 0) sfxToPlay.push(this._snowSfxForRaw(trackers.maxSnowRaw));
+    if (trackers.maxDirtCost >= 0) sfxToPlay.push(this._dirtSfxForCost(trackers.maxDirtCost));
+    if (trackers.maxSandstoneInfo !== null) sfxToPlay.push(this._sandstoneSfxFor(trackers.maxSandstoneInfo));
+  }
+
+  /**
    * Collect the SFX IDs to play for all chamber tiles that became newly
    * connected to the fill path since `filledBefore` was captured.
    *
@@ -1581,13 +1755,9 @@ export class Game implements InputCallbacks {
     const currentTemp = board.getCurrentTemperature(filledAfter);
     const currentPressure = board.getCurrentPressure(filledAfter);
 
-    let maxIceRaw = -1;
-    let maxSnowRaw = -1;
-    let maxDirtCost = -1;
-    let hotPlateSfx: SfxId | null = null;
-    // Track highest-cost sandstone tile connected this turn, and whether it shattered.
-    let maxSandstoneInfo: { cost: number; shattered: boolean } | null = null;
-
+    const trackers: ConnectionSfxTrackers = {
+      hotPlateSfx: null, maxIceRaw: -1, maxSnowRaw: -1, maxDirtCost: -1, maxSandstoneInfo: null,
+    };
     const sfxToPlay: SfxId[] = [];
 
     for (const key of filledAfter) {
@@ -1595,89 +1765,10 @@ export class Game implements InputCallbacks {
       const [r, c] = parseKey(key);
       const tile = board.grid[r]?.[c];
       if (tile?.shape !== PipeShape.Chamber) continue;
-
-      if (tile.chamberContent === 'tank') {
-        sfxToPlay.push(SfxId.Tank);
-      } else if (tile.chamberContent === 'item' && tile.itemShape !== null) {
-        if (tile.itemCount <= 0) sfxToPlay.push(SfxId.NegativeCount);
-      } else if (tile.chamberContent === 'heater') {
-        sfxToPlay.push(tile.temperature < 0 ? SfxId.Cooler : SfxId.Heater);
-      } else if (tile.chamberContent === 'pump') {
-        sfxToPlay.push(tile.pressure < 0 ? SfxId.Vacuum : SfxId.Pump);
-      } else if (tile.chamberContent === 'hot_plate') {
-        // Sizzle overrides SizzleIce; collect at most one hot-plate sound per turn.
-        // Use getLockedHotPlateGain to check if frozen water was actually consumed
-        // when this hot plate's cost was computed during applyTurnDelta this turn.
-        const frozenGain = board.getLockedHotPlateGain({ row: r, col: c }) ?? 0;
-        const candidate = frozenGain > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
-        if (candidate === SfxId.Sizzle || hotPlateSfx === null) hotPlateSfx = candidate;
-      } else if (tile.chamberContent === 'star') {
-        sfxToPlay.push(SfxId.Star);
-      } else if (tile.chamberContent === 'gel') {
-        sfxToPlay.push(SfxId.Gel);
-      } else if (tile.chamberContent === 'siphon') {
-        sfxToPlay.push(SfxId.Siphon);
-      } else if (tile.chamberContent === 'ice') {
-        const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
-        if (rawIceCost > maxIceRaw) maxIceRaw = rawIceCost;
-      } else if (tile.chamberContent === 'snow') {
-        // Snow cost is pressure-adjusted (unlike ice): snowCostPerDeltaTemp factors in
-        // the current pressure, which reduces the effective cost per deltaTemp unit.
-        const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-        const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
-        if (rawSnowCost > maxSnowRaw) maxSnowRaw = rawSnowCost;
-      } else if (tile.chamberContent === 'dirt') {
-        if (tile.cost > maxDirtCost) maxDirtCost = tile.cost;
-      } else if (tile.chamberContent === 'sandstone') {
-        // Track the sandstone tile with the highest base cost connected this turn.
-        // When the highest-cost tile shatters, play SandstoneShatter; otherwise Sandstone1/2/3.
-        const { shatterOverride } = sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-        if (maxSandstoneInfo === null || tile.cost > maxSandstoneInfo.cost) {
-          maxSandstoneInfo = { cost: tile.cost, shattered: shatterOverride };
-        }
-      }
+      this._collectChamberSfx({ board, tile, row: r, col: c, currentTemp, currentPressure, trackers, sfxToPlay });
     }
 
-    // Collect a single hot-plate sfx per turn (Sizzle overrides SizzleIce).
-    if (hotPlateSfx !== null) sfxToPlay.push(hotPlateSfx);
-
-    // Collect a single ice sfx based on the highest-cost ice tile connected this turn.
-    if (maxIceRaw >= 0) {
-      if (maxIceRaw === 0) sfxToPlay.push(SfxId.Ice0);
-      else if (maxIceRaw < ICE_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Ice1);
-      else if (maxIceRaw < ICE_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Ice2);
-      else sfxToPlay.push(SfxId.Ice3);
-    }
-
-    // Collect a single snow sfx based on the highest-cost snow tile connected this turn.
-    if (maxSnowRaw >= 0) {
-      if (maxSnowRaw === 0) sfxToPlay.push(SfxId.Snow0);
-      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Snow1);
-      else if (maxSnowRaw < SNOW_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Snow2);
-      else sfxToPlay.push(SfxId.Snow3);
-    }
-
-    // Collect a single dirt sfx based on the highest-cost dirt tile connected this turn.
-    if (maxDirtCost >= 0) {
-      if (maxDirtCost < DIRT_SFX_THRESHOLD_MID) sfxToPlay.push(SfxId.Dirt1);
-      else if (maxDirtCost < DIRT_SFX_THRESHOLD_HIGH) sfxToPlay.push(SfxId.Dirt2);
-      else sfxToPlay.push(SfxId.Dirt3);
-    }
-
-    // Collect a single sandstone sfx based on the highest-cost sandstone tile connected.
-    // SandstoneShatter plays when the highest-cost tile was shattered (pressure ≥ shatter).
-    if (maxSandstoneInfo !== null) {
-      if (maxSandstoneInfo.shattered) {
-        sfxToPlay.push(SfxId.SandstoneShatter);
-      } else if (maxSandstoneInfo.cost < SANDSTONE_SFX_THRESHOLD_MID) {
-        sfxToPlay.push(SfxId.Sandstone1);
-      } else if (maxSandstoneInfo.cost < SANDSTONE_SFX_THRESHOLD_HIGH) {
-        sfxToPlay.push(SfxId.Sandstone2);
-      } else {
-        sfxToPlay.push(SfxId.Sandstone3);
-      }
-    }
-
+    this._pushAccumulatedChamberSfx(trackers, sfxToPlay);
     return sfxToPlay;
   }
 
@@ -2747,6 +2838,15 @@ export class Game implements InputCallbacks {
   private _activateCampaign(campaign: CampaignDef): void { this._campaign.activate(campaign); }
   private _deactivateCampaign(): void { this._campaign.deactivate(); }
 
+}
+
+/** Running per-category accumulators for {@link Game._collectConnectionSfx}. */
+interface ConnectionSfxTrackers {
+  hotPlateSfx: SfxId | null;
+  maxIceRaw: number;
+  maxSnowRaw: number;
+  maxDirtCost: number;
+  maxSandstoneInfo: { cost: number; shattered: boolean } | null;
 }
 
 // Private interface for _playAfterTilePlacedSfx options
