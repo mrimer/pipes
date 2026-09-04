@@ -896,41 +896,15 @@ export class Game implements InputCallbacks {
 
   /** Start (or restart) the given level. */
   startLevel(levelId: number, existingDecorations?: ReadonlyMap<string, AmbientDecoration>, isUserRestart = false): void {
-    const isResumingSameLevel = !isUserRestart
-      && this.screen === GameScreen.Play
-      && this.currentLevel?.id === levelId;
+    const isResumingSameLevel = this._isResumingSameLevel(levelId, isUserRestart);
 
-    let level: LevelDef | undefined;
-    if (this._campaign.isPlaytesting) {
-      // During playtesting the level lives in the editor, not in the active campaign.
-      // Use currentLevel directly when the ID matches.
-      if (this.currentLevel?.id === levelId) level = this.currentLevel;
-    } else {
-      // Look up the level in the active campaign; no-op if no campaign is active.
-      if (!this._campaign.activeCampaign) return;
-      for (const ch of this._campaign.activeCampaign.chapters) {
-        level = ch.levels.find((l) => l.id === levelId);
-        if (level) break;
-      }
-    }
+    const level = this._resolveLevelToStart(levelId);
     if (!level) return;
 
     // Determine whether this is the first time entering this level (not a restart
     // or the campaign manager's second startLevel call for the same level).
-    const isNewLevel = !this.currentLevel || this.currentLevel.id !== levelId;
-
-    if (isUserRestart) {
-      // Explicit restart: cancel any ring spawning scheduled by a prior new-level entry.
-      this._cancelPendingRings();
-    } else if (isNewLevel) {
-      // New level: schedule the intro ring effect.  It is deferred (setTimeout) so
-      // that if a campaign modal (challenge / new-chapter) appears synchronously
-      // after this call the ring check can detect and wait for it.
-      this._schedulePendingRings();
-    }
-    // A campaign manager "second startLevel for same level" (e.g. from playChallengeLevel)
-    // falls through without touching the pending rings state so the already-scheduled
-    // check from the first startLevel call still fires correctly.
+    const isNewLevel = this._isNewLevelEntry(levelId);
+    this._scheduleLevelEntryRings(isUserRestart, isNewLevel);
 
     this.currentLevel = level;
     // Cancel any resume-replay driver still running from a prior level/session
@@ -948,6 +922,70 @@ export class Game implements InputCallbacks {
 
     // Switch to music appropriate for this level's style/challenge flag.
     musicManager.playGroup(selectGroupForContext({ isChallenge: level.challenge, style: level.style }));
+    this._resetLevelEnvironmentalEffects(level, isUserRestart, isResumingSameLevel);
+
+    this._maybeUpdateLevelHeader(levelId);
+    this._refreshPlayUI();
+    this._updateNoteHintBoxes(level);
+    this._metrics.updateBestScore(levelId, this._campaign);
+    this.canvas.focus();
+
+    this._checkAndShowInitialError();
+
+    this._maybeDispatchLevelStartedEvent(levelId, level);
+
+    // If the level starts already in a losing state, show the unplayable modal.
+    if (this._showUnplayableIfNeeded()) return;
+
+    // Trigger resume-replay driver when a partial-progress entry exists for this level
+    // (but not during restarts or editor playtests).
+    this._maybeStartResumeReplay(isUserRestart, levelId);
+  }
+
+  /** True when this startLevel call is simply re-entering the level already being played (not a restart). */
+  private _isResumingSameLevel(levelId: number, isUserRestart: boolean): boolean {
+    return !isUserRestart && this.screen === GameScreen.Play && this.currentLevel?.id === levelId;
+  }
+
+  /** True when this is the first time entering this level (not a restart or a duplicate startLevel call for the same level). */
+  private _isNewLevelEntry(levelId: number): boolean {
+    return !this.currentLevel || this.currentLevel.id !== levelId;
+  }
+
+  /** Look up the level to start: from currentLevel during playtesting, or by scanning the active campaign's chapters. */
+  private _resolveLevelToStart(levelId: number): LevelDef | undefined {
+    if (this._campaign.isPlaytesting) {
+      // During playtesting the level lives in the editor, not in the active campaign.
+      // Use currentLevel directly when the ID matches.
+      return this.currentLevel?.id === levelId ? this.currentLevel : undefined;
+    }
+    // Look up the level in the active campaign; no-op if no campaign is active.
+    if (!this._campaign.activeCampaign) return undefined;
+    for (const ch of this._campaign.activeCampaign.chapters) {
+      const level = ch.levels.find((l) => l.id === levelId);
+      if (level) return level;
+    }
+    return undefined;
+  }
+
+  /** Schedule or cancel the intro ring effect based on how this startLevel call was triggered. */
+  private _scheduleLevelEntryRings(isUserRestart: boolean, isNewLevel: boolean): void {
+    if (isUserRestart) {
+      // Explicit restart: cancel any ring spawning scheduled by a prior new-level entry.
+      this._cancelPendingRings();
+    } else if (isNewLevel) {
+      // New level: schedule the intro ring effect.  It is deferred (setTimeout) so
+      // that if a campaign modal (challenge / new-chapter) appears synchronously
+      // after this call the ring check can detect and wait for it.
+      this._schedulePendingRings();
+    }
+    // A campaign manager "second startLevel for same level" (e.g. from playChallengeLevel)
+    // falls through without touching the pending rings state so the already-scheduled
+    // check from the first startLevel call still fires correctly.
+  }
+
+  /** Reset ambient environmental effects (clouds/fireflies/butterflies) for the level being entered. */
+  private _resetLevelEnvironmentalEffects(level: LevelDef, isUserRestart: boolean, isResumingSameLevel: boolean): void {
     const isNewLevelStart = !isUserRestart && !isResumingSameLevel;
     if (isNewLevelStart) {
       this._cloudShadows.resetForScreen(
@@ -971,43 +1009,41 @@ export class Game implements InputCallbacks {
       level.style,
       this.board,
     );
+  }
 
-    if (!this._campaign.isPlaytesting) {
-      this._campaign.updateLevelHeader(levelId);
-    }
-    this._refreshPlayUI();
-    this._updateNoteHintBoxes(level);
-    this._metrics.updateBestScore(levelId, this._campaign);
-    this.canvas.focus();
+  /** Update the campaign level header, unless in playtesting mode (which has no persisted campaign progress). */
+  private _maybeUpdateLevelHeader(levelId: number): void {
+    if (this._campaign.isPlaytesting) return;
+    this._campaign.updateLevelHeader(levelId);
+  }
 
-    this._checkAndShowInitialError();
+  /** Dispatch the `levelStarted` achievement event, unless playtesting or no campaign is active. */
+  private _maybeDispatchLevelStartedEvent(levelId: number, level: LevelDef): void {
+    if (this._campaign.isPlaytesting || !this._campaign.activeCampaign) return;
+    dispatchGameEvent({
+      type: 'levelStarted',
+      campaignId: this._campaign.activeCampaign.id,
+      levelId,
+      isChallenge: !!level.challenge,
+    });
+  }
 
-    if (!this._campaign.isPlaytesting && this._campaign.activeCampaign) {
-      dispatchGameEvent({
-        type: 'levelStarted',
-        campaignId: this._campaign.activeCampaign.id,
-        levelId,
-        isChallenge: !!level.challenge,
-      });
-    }
+  /** Show the unplayable modal if the level starts already in a losing state. Returns true when shown. */
+  private _showUnplayableIfNeeded(): boolean {
+    if (!this.board || this.board.getCurrentWater() > 0) return false;
+    this._showModalWithAnimation(this._unplayableModalEl, 'sparkle-red');
+    return true;
+  }
 
-    // If the level starts already in a losing state, show the unplayable modal.
-    if (this.board.getCurrentWater() <= 0) {
-      this._showModalWithAnimation(this._unplayableModalEl, 'sparkle-red');
-      return;
-    }
-
-    // Trigger resume-replay driver when a partial-progress entry exists for this level
-    // (but not during restarts or editor playtests).
-    if (!isUserRestart && !this._campaign.isPlaytesting) {
-      const campaignId = this._campaign.activeCampaign?.id ?? '';
-      const partial = getPartialProgressFor(campaignId, levelId);
-      if (partial && partial.moves.length > 0) {
-        // Any prior driver was already cancelled near the top of startLevel.
-        this._resumePlayer = new ResumePlayer(this, this.board, partial.moves, this.errorFlashEl);
-        this._resumePlayer.start();
-      }
-    }
+  /** Start the resume-replay driver when a partial-progress entry exists for this level (skipped on restarts/playtesting). */
+  private _maybeStartResumeReplay(isUserRestart: boolean, levelId: number): void {
+    if (isUserRestart || this._campaign.isPlaytesting || !this.board) return;
+    const campaignId = this._campaign.activeCampaign?.id ?? '';
+    const partial = getPartialProgressFor(campaignId, levelId);
+    if (!partial || partial.moves.length === 0) return;
+    // Any prior driver was already cancelled near the top of startLevel.
+    this._resumePlayer = new ResumePlayer(this, this.board, partial.moves, this.errorFlashEl);
+    this._resumePlayer.start();
   }
 
   // ─── Level-select rendering ───────────────────────────────────────────────
