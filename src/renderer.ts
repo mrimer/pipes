@@ -1963,6 +1963,212 @@ export interface DrawTileOptions {
   nowMs?: number;
 }
 
+interface NonPipeShapeDrawContext {
+  shape: PipeShape;
+  tile: Tile;
+  color: string;
+  half: number;
+  isWater: boolean;
+  currentWater: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  lockedCost: number | null;
+  lockedGain: number | null;
+  effectiveButtEndDirs: Set<Direction> | undefined;
+  seaNeighbors: SeaNeighbors | undefined;
+  graniteNeighbors: GraniteNeighbors | undefined;
+  afterOuterCircleFn: (() => void) | undefined;
+  levelStyle: LevelStyle | undefined;
+}
+
+const NON_PIPE_DRAWN_SHAPES = new Set<PipeShape>([
+  PipeShape.Source, PipeShape.Sink, PipeShape.Chamber, PipeShape.Granite,
+  PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4, PipeShape.Sea,
+]);
+
+/** True for the shapes drawn in the un-rotated dispatch below (Empty/other shapes draw nothing here). */
+function _isNonPipeDrawnShape(shape: PipeShape): boolean {
+  return NON_PIPE_DRAWN_SHAPES.has(shape);
+}
+
+function _dispatchNonPipeShapeDraw(ctx: CanvasRenderingContext2D, c: NonPipeShapeDrawContext): void {
+  if (c.shape === PipeShape.Source || c.shape === PipeShape.Sink) {
+    _drawSourceOrSinkTile(ctx, c);
+    return;
+  }
+  if (c.shape === PipeShape.Chamber) {
+    _drawChamberTile(ctx, c);
+    return;
+  }
+  _drawStaticObstacleTile(ctx, c);
+}
+
+function _drawSourceOrSinkTile(ctx: CanvasRenderingContext2D, c: NonPipeShapeDrawContext): void {
+  const isSource = c.shape === PipeShape.Source;
+  drawSourceOrSink(ctx, {
+    connections: c.tile.connections, color: c.color, half: c.half, isSource, buttEndDirs: c.effectiveButtEndDirs,
+    centerLabel: isSource ? { text: String(c.currentWater), color: LABEL_COLOR } : undefined,
+    afterOuterCircleFn: c.afterOuterCircleFn,
+  });
+}
+
+function _drawChamberTile(ctx: CanvasRenderingContext2D, c: NonPipeShapeDrawContext): void {
+  // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the
+  // clip and stub endpoints land precisely on the tile edge at every tile size,
+  // consistent with the pipe-body path approach in _drawUnifiedPipeBody.
+  drawChamber(
+    ctx, c.tile, c.color, c.isWater, TILE_SIZE / 2, c.shiftHeld, c.currentTemp, c.currentPressure,
+    c.lockedCost, c.lockedGain, c.effectiveButtEndDirs,
+  );
+  // Valve icons: draw over the chamber when it has first-connection constraints.
+  if (c.tile.firstConnections && c.tile.firstConnections.size > 0) {
+    drawChamberValveIcons(ctx, c.tile.firstConnections, c.tile.connections, c.isWater, TILE_SIZE / 2);
+  }
+}
+
+function _drawStaticObstacleTile(ctx: CanvasRenderingContext2D, c: NonPipeShapeDrawContext): void {
+  // Granite – solid impassable stone block; no connections.
+  if (c.shape === PipeShape.Granite) { drawGranite(ctx, c.half, c.graniteNeighbors); return; }
+  // Tree variants – impassable obstacles rendered as top-down broad-leafed trees.
+  if (c.shape === PipeShape.Tree) { drawTree(ctx, c.half, c.levelStyle); return; }
+  if (c.shape === PipeShape.Tree2) { drawTree2(ctx, c.half, c.levelStyle); return; }
+  if (c.shape === PipeShape.Tree3) { drawTree3(ctx, c.half, c.levelStyle); return; }
+  if (c.shape === PipeShape.Tree4) { drawTree4(ctx, c.half, c.levelStyle); return; }
+  // Sea – impassable water tile with animated ripples and land border.
+  const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
+  drawSea(ctx, c.half, c.seaNeighbors ?? defaultNeighbors, seaFillColor(c.levelStyle));
+}
+
+interface BlockedPipeTileContext {
+  tile: Tile;
+  shape: PipeShape;
+  rotation: number;
+  half: number;
+  color: string;
+  currentPressure: number;
+  effectiveBlockedWaterDir: Direction | null;
+  effectiveButtEndDirs: Set<Direction> | undefined;
+}
+
+/**
+ * Arm-by-arm drawing for one-way blocked pipes: draw ALL black outlines
+ * first, then ALL color fills.  This ordering prevents a later arm's black
+ * outline from overwriting an already-painted arm's color at the junction.
+ */
+function _drawBlockedPipeTile(ctx: CanvasRenderingContext2D, c: BlockedPipeTileContext): void {
+  const dryColor = resolveTileColor(c.tile, false, c.currentPressure);
+  // Sort blocked arm first so the dominant (water) color is painted last.
+  const sortedArms = _sortArmsBlockedFirst(c.tile.connections, c.effectiveBlockedWaterDir);
+  _drawPipeArmOutlines(ctx, c.tile.connections, c.rotation, c.half, c.effectiveButtEndDirs);
+  _drawPipeArmFills(ctx, sortedArms, c.rotation, c.half, c.color, dryColor, c.effectiveBlockedWaterDir, c.effectiveButtEndDirs);
+  if (LEAKY_PIPE_SHAPES.has(c.shape)) {
+    _drawLeakyRustSpots(ctx, c.tile, c.half, c.effectiveBlockedWaterDir);
+  }
+}
+
+function _sortArmsBlockedFirst(connections: ReadonlySet<Direction>, blockedDir: Direction | null): Direction[] {
+  return [...connections].sort((a, b) => (a === blockedDir ? -1 : b === blockedDir ? 1 : 0));
+}
+
+/**
+ * All arm black outlines.  Each arm uses lineCap='round' at the centre end
+ * (natural semicircle cap) and a clip-based flat end at the tile edge when
+ * buttEnd is true.  The natural round caps from all arms together cover the
+ * centre junction without visible seaming.
+ */
+function _drawPipeArmOutlines(
+  ctx: CanvasRenderingContext2D, connections: ReadonlySet<Direction>, rotation: number, half: number,
+  effectiveButtEndDirs: Set<Direction> | undefined,
+): void {
+  ctx.lineWidth = LINE_WIDTH + _s(3);
+  for (const armDir of connections) {
+    _drawPipeArmInRotatedFrame(ctx, {
+      absDir: armDir, tileRotation: rotation, half, color: 'black',
+      buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
+    });
+  }
+}
+
+/** All arm color fills (blocked arm first; dominant water color last). */
+function _drawPipeArmFills(
+  ctx: CanvasRenderingContext2D, sortedArms: Direction[], rotation: number, half: number,
+  color: string, dryColor: string, blockedDir: Direction | null, effectiveButtEndDirs: Set<Direction> | undefined,
+): void {
+  ctx.lineWidth = LINE_WIDTH;
+  for (const armDir of sortedArms) {
+    const armColor = armDir === blockedDir ? dryColor : color;
+    _drawPipeArmInRotatedFrame(ctx, {
+      absDir: armDir, tileRotation: rotation, half, color: armColor,
+      buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
+    });
+  }
+}
+
+/**
+ * Unified shape path: draw the entire pipe body as a single filled shape
+ * with a contiguous outer outline.  This eliminates the junction seam
+ * artifacts that appear when arms are stroked individually.
+ */
+function _drawUnifiedPipeBody(ctx: CanvasRenderingContext2D, c: {
+  tile: Tile; shape: PipeShape; half: number; color: string;
+  effectiveRotation: number; effectiveButtEndDirs: Set<Direction> | undefined;
+}): void {
+  // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the path
+  // endpoints land precisely on the tile edge at every tile size.
+  const pathHalf = TILE_SIZE / 2;
+  const localButtEndDirs = _resolveLocalButtEndDirs(c.effectiveButtEndDirs, c.effectiveRotation);
+  drawPipeBody(ctx, c.shape, pathHalf, localButtEndDirs, c.color);
+  if (LEAKY_PIPE_SHAPES.has(c.shape)) {
+    _drawLeakyRustSpots(ctx, c.tile, c.half, null);
+  }
+}
+
+function _resolveLocalButtEndDirs(
+  effectiveButtEndDirs: Set<Direction> | undefined, effectiveRotation: number,
+): ReadonlySet<Direction> | undefined {
+  if (!effectiveButtEndDirs?.size) return undefined;
+  LOCAL_BUTT_END_DIRS_BUFFER.clear();
+  for (const dir of effectiveButtEndDirs) {
+    LOCAL_BUTT_END_DIRS_BUFFER.add(toLocalDir(dir, effectiveRotation));
+  }
+  return LOCAL_BUTT_END_DIRS_BUFFER;
+}
+
+/**
+ * Rotation arrow overlay for spinnable pipes.
+ * When Shift is held the arrow reflects CCW to indicate the click direction.
+ * When the mouse hovers over the tile the arrow rotates continuously in the
+ * indicated direction so the player knows the pipe is interactive.
+ */
+function _drawSpinArrowOverlay(ctx: CanvasRenderingContext2D, opts: {
+  cx: number; cy: number; isHovered: boolean; shiftHeld: boolean; nowMs: number;
+}): void {
+  const { cx, cy, isHovered, shiftHeld, nowMs } = opts;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (isHovered) {
+    const animAngle = (nowMs * SPIN_ANIM_SPEED) % (2 * Math.PI);
+    ctx.rotate(shiftHeld ? -animAngle : animAngle);
+  }
+  drawSpinArrow(ctx, shiftHeld);
+  ctx.restore();
+}
+
+/**
+ * When a rotation override is active, use it; blocked arms and butt-end dirs are
+ * suppressed during rotation animation because the arm directions are mid-transition.
+ */
+function _computeEffectiveRotationState(
+  rotation: number, rotationDegOverride: number | undefined,
+  blockedWaterDir: Direction | null, buttEndDirs: Set<Direction> | undefined,
+): { effectiveRotation: number; effectiveBlockedWaterDir: Direction | null; effectiveButtEndDirs: Set<Direction> | undefined } {
+  if (rotationDegOverride === undefined) {
+    return { effectiveRotation: rotation, effectiveBlockedWaterDir: blockedWaterDir, effectiveButtEndDirs: buttEndDirs };
+  }
+  return { effectiveRotation: rotationDegOverride, effectiveBlockedWaterDir: null, effectiveButtEndDirs: undefined };
+}
+
 export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): void {
   const {
     x, y, tile, isWater, currentWater,
@@ -1976,11 +2182,8 @@ export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): 
   const cy = y + TILE_SIZE / 2;
   const half = Math.ceil(TILE_SIZE / 2);
 
-  // When a rotation override is active, use it; blocked arms and butt-end dirs are
-  // suppressed during rotation animation because the arm directions are mid-transition.
-  const effectiveRotation = rotationDegOverride ?? rotation;
-  const effectiveBlockedWaterDir = rotationDegOverride !== undefined ? null : blockedWaterDir;
-  const effectiveButtEndDirs = rotationDegOverride !== undefined ? undefined : buttEndDirs;
+  const { effectiveRotation, effectiveBlockedWaterDir, effectiveButtEndDirs } =
+    _computeEffectiveRotationState(rotation, rotationDegOverride, blockedWaterDir, buttEndDirs);
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -1998,132 +2201,26 @@ export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): 
   const isBlockedPipe = effectiveBlockedWaterDir !== null && isWater && isPipeShape;
 
   if (isBlockedPipe) {
-    // Arm-by-arm drawing for one-way blocked pipes: draw ALL black outlines
-    // first, then ALL color fills.  This ordering prevents a later arm's black
-    // outline from overwriting an already-painted arm's color at the junction.
-    const dryColor = resolveTileColor(tile, false, currentPressure);
-    // Sort blocked arm first so the dominant (water) color is painted last.
-    const sortedArms = [...tile.connections].sort(
-      (a, b) => (a === effectiveBlockedWaterDir ? -1 : b === effectiveBlockedWaterDir ? 1 : 0),
-    );
-    // Step 1: all arm black outlines.  Each arm uses lineCap='round' at the
-    // centre end (natural semicircle cap) and a clip-based flat end at the tile
-    // edge when buttEnd is true.  The natural round caps from all arms together
-    // cover the centre junction without visible seaming.
-    ctx.lineWidth = LINE_WIDTH + _s(3);
-    for (const armDir of tile.connections) {
-      _drawPipeArmInRotatedFrame(ctx, {
-        absDir: armDir, tileRotation: rotation, half, color: 'black',
-        buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
-      });
-    }
-    // Step 2: all arm color fills (blocked arm first; dominant water color last).
-    ctx.lineWidth = LINE_WIDTH;
-    for (const armDir of sortedArms) {
-      const armColor = armDir === effectiveBlockedWaterDir ? dryColor : color;
-      _drawPipeArmInRotatedFrame(ctx, {
-        absDir: armDir, tileRotation: rotation, half, color: armColor,
-        buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
-      });
-    }
-    if (LEAKY_PIPE_SHAPES.has(shape)) {
-      _drawLeakyRustSpots(ctx, tile, half, effectiveBlockedWaterDir);
-    }
+    _drawBlockedPipeTile(ctx, {
+      tile, shape, rotation, half, color, currentPressure, effectiveBlockedWaterDir, effectiveButtEndDirs,
+    });
   } else if (isPipeShape) {
-    // Unified shape path: draw the entire pipe body as a single filled shape
-    // with a contiguous outer outline.  This eliminates the junction seam
-    // artifacts that appear when arms are stroked individually.
-    //
-    // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the path
-    // endpoints land precisely on the tile edge at every tile size.
-    const pathHalf = TILE_SIZE / 2;
-    let localButtEndDirs: ReadonlySet<Direction> | undefined;
-    if (effectiveButtEndDirs?.size) {
-      LOCAL_BUTT_END_DIRS_BUFFER.clear();
-      for (const dir of effectiveButtEndDirs) {
-        LOCAL_BUTT_END_DIRS_BUFFER.add(toLocalDir(dir, effectiveRotation));
-      }
-      localButtEndDirs = LOCAL_BUTT_END_DIRS_BUFFER;
-    }
-    drawPipeBody(ctx, shape, pathHalf, localButtEndDirs, color);
-    if (LEAKY_PIPE_SHAPES.has(shape)) {
-      _drawLeakyRustSpots(ctx, tile, half, null);
-    }
-  } else if (shape === PipeShape.Source || shape === PipeShape.Sink) {
+    _drawUnifiedPipeBody(ctx, { tile, shape, half, color, effectiveRotation, effectiveButtEndDirs });
+  } else if (_isNonPipeDrawnShape(shape)) {
     // Restore to un-rotated state so we can draw based on actual connections
     ctx.restore();
     ctx.save();
     ctx.translate(cx, cy);
-    const isSource = shape === PipeShape.Source;
-    drawSourceOrSink(ctx, {
-      connections: tile.connections, color, half, isSource, buttEndDirs: effectiveButtEndDirs,
-      centerLabel: isSource ? { text: String(currentWater), color: LABEL_COLOR } : undefined,
-      afterOuterCircleFn,
+    _dispatchNonPipeShapeDraw(ctx, {
+      shape, tile, color, half, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+      lockedCost, lockedGain, effectiveButtEndDirs, seaNeighbors, graniteNeighbors, afterOuterCircleFn, levelStyle,
     });
-  } else if (shape === PipeShape.Chamber) {
-    // Chamber – a steel-blue enclosure whose interior display varies by content
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    // Use TILE_SIZE / 2 (exact tile boundary) rather than Math.ceil so the
-    // clip and stub endpoints land precisely on the tile edge at every tile size,
-    // consistent with the pipe-body path approach above.
-    drawChamber(ctx, tile, color, isWater, TILE_SIZE / 2, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain, effectiveButtEndDirs);
-    // Valve icons: draw over the chamber when it has first-connection constraints.
-    if (tile.firstConnections && tile.firstConnections.size > 0) {
-      drawChamberValveIcons(ctx, tile.firstConnections, tile.connections, isWater, TILE_SIZE / 2);
-    }
-  } else if (shape === PipeShape.Granite) {
-    // Granite – solid impassable stone block; no connections
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawGranite(ctx, half, graniteNeighbors);
-  } else if (shape === PipeShape.Tree) {
-    // Tree – impassable obstacle rendered as a top-down broad-leafed tree
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree(ctx, half, levelStyle);
-  } else if (shape === PipeShape.Tree2) {
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree2(ctx, half, levelStyle);
-  } else if (shape === PipeShape.Tree3) {
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree3(ctx, half, levelStyle);
-  } else if (shape === PipeShape.Tree4) {
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree4(ctx, half, levelStyle);
-  } else if (shape === PipeShape.Sea) {
-    // Sea – impassable water tile with animated ripples and land border
-    ctx.restore();
-    ctx.save();
-    ctx.translate(cx, cy);
-    const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
-    drawSea(ctx, half, seaNeighbors ?? defaultNeighbors, seaFillColor(levelStyle));
   }
 
   ctx.restore();
 
-  // Rotation arrow overlay for spinnable pipes.
-  // When Shift is held the arrow reflects CCW to indicate the click direction.
-  // When the mouse hovers over the tile the arrow rotates continuously in the
-  // indicated direction so the player knows the pipe is interactive.
   if (SPIN_PIPE_SHAPES.has(shape)) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    if (isHovered) {
-      const animAngle = (nowMs * SPIN_ANIM_SPEED) % (2 * Math.PI);
-      ctx.rotate(shiftHeld ? -animAngle : animAngle);
-    }
-    drawSpinArrow(ctx, shiftHeld);
-    ctx.restore();
+    _drawSpinArrowOverlay(ctx, { cx, cy, isHovered, shiftHeld, nowMs });
   }
 }
 
