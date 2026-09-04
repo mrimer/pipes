@@ -2939,13 +2939,62 @@ interface RenderPass3PipeTilesOptions {
   shakeOffsets?: Map<string, number>;
 }
 
+/**
+ * If this pipe sits on a one-way cell, the arm pointing opposite the arrow
+ * direction is blocked (dry) unless the neighbor in that direction is both
+ * mutually connected AND actually water-filled.  A pipe tile placed adjacent
+ * but not carrying water must not make the blocked arm appear wet.
+ */
+function _computeBlockedWaterDir(board: Board, filled: Set<string>, r: number, c: number): Direction | null {
+  const owDir = board.oneWayData.get(posKey(r, c));
+  if (owDir === undefined) return null;
+  const antiDir = oppositeDirection(owDir);
+  const delta = NEIGHBOUR_DELTA[antiDir];
+  const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
+  // The arm carries water only when the neighbor can mutually connect AND
+  // is actually water-filled (present in the filled set).
+  const neighborCarriesWater = board.areMutuallyConnected(neighborPos, owDir)
+    && filled.has(posKey(neighborPos.row, neighborPos.col));
+  return neighborCarriesWater ? null : antiDir;
+}
+
+/** Draw a tile, applying an active shake and/or scale-pop transform when present. */
+function _drawPipeTileWithOverrides(
+  ctx: CanvasRenderingContext2D, x: number, y: number, drawOpts: DrawTileOptions,
+  scaleOverride: number | undefined, shakeOffset: number | undefined,
+): void {
+  if (scaleOverride === undefined && shakeOffset === undefined) {
+    drawTile(ctx, drawOpts);
+    return;
+  }
+  const cx = x + TILE_SIZE / 2;
+  const cy = y + TILE_SIZE / 2;
+  ctx.save();
+  if (shakeOffset !== undefined) ctx.translate(shakeOffset, 0);
+  if (scaleOverride !== undefined) {
+    ctx.translate(cx, cy);
+    ctx.scale(scaleOverride, scaleOverride);
+    ctx.translate(-cx, -cy);
+  }
+  drawTile(ctx, drawOpts);
+  ctx.restore();
+}
+
+function _computeHoverGridPos(mouseCanvasPos: { x: number; y: number } | null): { hoverRow: number; hoverCol: number } {
+  if (!mouseCanvasPos) return { hoverRow: -1, hoverCol: -1 };
+  return { hoverRow: Math.floor(mouseCanvasPos.y / TILE_SIZE), hoverCol: Math.floor(mouseCanvasPos.x / TILE_SIZE) };
+}
+
+function _isHoveredSpinnableTile(r: number, c: number, hoverRow: number, hoverCol: number, shape: PipeShape): boolean {
+  return r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(shape);
+}
+
 function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3PipeTilesOptions): void {
   const {
     board, filled, currentWater, shiftHeld, currentTemp, currentPressure,
     mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets,
   } = opts;
-  const hoverRow = mouseCanvasPos ? Math.floor(mouseCanvasPos.y / TILE_SIZE) : -1;
-  const hoverCol = mouseCanvasPos ? Math.floor(mouseCanvasPos.x / TILE_SIZE) : -1;
+  const { hoverRow, hoverCol } = _computeHoverGridPos(mouseCanvasPos);
 
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
@@ -2955,27 +3004,8 @@ function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3P
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       const isWater = filled.has(posKey(r, c));
-      const isHovered = r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(tile.shape);
-
-      // If this pipe sits on a one-way cell, the arm pointing opposite the arrow
-      // direction is blocked (dry) unless the neighbor in that direction is both
-      // mutually connected AND actually water-filled.  A pipe tile placed adjacent
-      // but not carrying water must not make the blocked arm appear wet.
-      const owDir = board.oneWayData.get(posKey(r, c));
-      let blockedWaterDir: Direction | null = null;
-      if (owDir !== undefined) {
-        const antiDir = oppositeDirection(owDir);
-        const delta = NEIGHBOUR_DELTA[antiDir];
-        const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
-        // The arm carries water only when the neighbor can mutually connect AND
-        // is actually water-filled (present in the filled set).
-        if (
-          !board.areMutuallyConnected(neighborPos, owDir) ||
-          !filled.has(posKey(neighborPos.row, neighborPos.col))
-        ) {
-          blockedWaterDir = antiDir;
-        }
-      }
+      const isHovered = _isHoveredSpinnableTile(r, c, hoverRow, hoverCol, tile.shape);
+      const blockedWaterDir = _computeBlockedWaterDir(board, filled, r, c);
 
       // Apply any active rotation animation override for this tile.
       const rotOverride = rotationOverrides?.get(posKey(r, c));
@@ -2985,27 +3015,10 @@ function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3P
       // Determine which arm directions need a flat (butt) end cap.
       const buttEndDirs = _computeButtEndDirs(board, r, c);
 
-      if (scaleOverride !== undefined || shakeOffset !== undefined) {
-        const cx = x + TILE_SIZE / 2;
-        const cy = y + TILE_SIZE / 2;
-        ctx.save();
-        if (shakeOffset !== undefined) ctx.translate(shakeOffset, 0);
-        if (scaleOverride !== undefined) {
-          ctx.translate(cx, cy);
-          ctx.scale(scaleOverride, scaleOverride);
-          ctx.translate(-cx, -cy);
-        }
-        drawTile(ctx, {
-          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
-          isHovered, blockedWaterDir, rotationDegOverride: rotOverride, buttEndDirs, nowMs: now,
-        });
-        ctx.restore();
-      } else {
-        drawTile(ctx, {
-          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
-          isHovered, blockedWaterDir, rotationDegOverride: rotOverride, buttEndDirs, nowMs: now,
-        });
-      }
+      _drawPipeTileWithOverrides(ctx, x, y, {
+        x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+        isHovered, blockedWaterDir, rotationDegOverride: rotOverride, buttEndDirs, nowMs: now,
+      }, scaleOverride, shakeOffset);
     }
   }
 }
