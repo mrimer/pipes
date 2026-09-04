@@ -371,6 +371,101 @@ export interface DrawSourceOrSinkOptions {
   afterOuterCircleFn?: () => void;
 }
 
+/** Pass 1: all arm black outlines, then the black filled centre cap covering the junction seam. */
+function _drawSourceOrSinkArmOutlines(
+  ctx: CanvasRenderingContext2D, connections: ReadonlySet<Direction>, buttEndDirs: Set<Direction> | undefined, half: number,
+): void {
+  ctx.lineWidth = LINE_WIDTH + _s(3);
+  ctx.strokeStyle = 'black';
+  for (const [dir, nx, ny] of CARDINAL_DIRS) {
+    if (!connections.has(dir)) continue;
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(nx * half, ny * half);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.arc(0, 0, (LINE_WIDTH + _s(3)) / 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Pass 2: all arm coloured fills + landing-strip triangles, then the coloured filled centre cap. */
+function _drawSourceOrSinkArmFills(
+  ctx: CanvasRenderingContext2D, connections: ReadonlySet<Direction>, buttEndDirs: Set<Direction> | undefined,
+  half: number, color: string, isSource: boolean,
+): void {
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.strokeStyle = color;
+  for (const [dir, nx, ny] of CARDINAL_DIRS) {
+    if (!connections.has(dir)) continue;
+    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(nx * half, ny * half);
+    ctx.stroke();
+    // 3 small dark triangles along the arm (landing-strip base markers)
+    drawArmTriangles(ctx, nx, ny, half, isSource);
+  }
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Central circle with radial gradient – bright glow at centre fading to the tile colour – plus the outer aperture ring. */
+function _drawSourceCenterDecoration(ctx: CanvasRenderingContext2D, half: number, color: string): void {
+  const circleR = half * 0.35;
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, color);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, circleR, 0, Math.PI * 2);
+  ctx.fill();
+  // Outer aperture ring – suggests a nozzle opening
+  ctx.strokeStyle = color;
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/**
+ * Bullseye / drain pattern – concentric stroke rings with a solid innermost dot.
+ * Drawn after the arms so the rings remain visible on top of the arm fills.
+ */
+function _drawSinkCenterDecoration(ctx: CanvasRenderingContext2D, half: number, color: string): void {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Optional centre label – drawn last so it appears on top of all decorations. */
+function _drawSourceOrSinkCenterLabel(ctx: CanvasRenderingContext2D, centerLabel: { text: string; color: string } | undefined): void {
+  if (centerLabel === undefined) return;
+  ctx.save();
+  ctx.fillStyle = centerLabel.color;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.8)';
+  ctx.shadowBlur = _s(2);
+  ctx.fillText(centerLabel.text, 0, 0);
+  ctx.restore();
+}
+
 export function drawSourceOrSink(ctx: CanvasRenderingContext2D, opts: DrawSourceOrSinkOptions): void {
   const { connections, color, half, isSource, buttEndDirs, centerLabel, bgColor, afterOuterCircleFn } = opts;
   // Outer circle radius: aperture ring (source) or outermost bullseye ring (sink).
@@ -398,89 +493,16 @@ export function drawSourceOrSink(ctx: CanvasRenderingContext2D, opts: DrawSource
   // Radiating lines – drawn as two passes (all black outlines first, then all
   // coloured fills) so that no arm's black outline overwrites an already-painted
   // arm's colour at the centre junction, which would leave visible black artefacts.
-
-  // Pass 1: all arm black outlines.
-  ctx.lineWidth = LINE_WIDTH + _s(3);
-  ctx.strokeStyle = 'black';
-  for (const [dir, nx, ny] of CARDINAL_DIRS) {
-    if (!connections.has(dir)) continue;
-    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(nx * half, ny * half);
-    ctx.stroke();
-  }
-  // Black filled centre cap to cover the junction seam between arm outlines.
-  ctx.fillStyle = 'black';
-  ctx.beginPath();
-  ctx.arc(0, 0, (LINE_WIDTH + _s(3)) / 2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Pass 2: all arm coloured fills, then landing-strip triangles.
-  ctx.lineWidth = LINE_WIDTH;
-  ctx.strokeStyle = color;
-  for (const [dir, nx, ny] of CARDINAL_DIRS) {
-    if (!connections.has(dir)) continue;
-    ctx.lineCap = buttEndDirs?.has(dir) ? 'butt' : 'round';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(nx * half, ny * half);
-    ctx.stroke();
-    // 3 small dark triangles along the arm (landing-strip base markers)
-    drawArmTriangles(ctx, nx, ny, half, isSource);
-  }
-  // Coloured filled centre cap to fill the junction interior.
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(0, 0, LINE_WIDTH / 2, 0, Math.PI * 2);
-  ctx.fill();
+  _drawSourceOrSinkArmOutlines(ctx, connections, buttEndDirs, half);
+  _drawSourceOrSinkArmFills(ctx, connections, buttEndDirs, half, color, isSource);
 
   if (isSource) {
-    // Central circle with radial gradient – bright glow at centre fading to the tile colour
-    const circleR = half * 0.35;
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
-    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-    grad.addColorStop(0.5, color);
-    grad.addColorStop(1, color);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
-    ctx.fill();
-    // Outer aperture ring – suggests a nozzle opening
-    ctx.strokeStyle = color;
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
-    ctx.stroke();
+    _drawSourceCenterDecoration(ctx, half, color);
   } else {
-    // Sink: bullseye / drain pattern – concentric stroke rings with a solid innermost dot.
-    // Drawn after the arms so the rings remain visible on top of the arm fills.
-    ctx.strokeStyle = color;
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
-    ctx.fill();
+    _drawSinkCenterDecoration(ctx, half, color);
   }
 
-  // Optional centre label – drawn last so it appears on top of all decorations.
-  if (centerLabel !== undefined) {
-    ctx.save();
-    ctx.fillStyle = centerLabel.color;
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0,0,0,0.8)';
-    ctx.shadowBlur = _s(2);
-    ctx.fillText(centerLabel.text, 0, 0);
-    ctx.restore();
-  }
+  _drawSourceOrSinkCenterLabel(ctx, centerLabel);
 }
 
 /**
