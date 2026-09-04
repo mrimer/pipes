@@ -1631,8 +1631,7 @@ export class Game implements InputCallbacks {
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     const tile = this.board.getTile(rotationInfo);
-    const delta = tile ? (tile.rotation - rotationInfo.oldRotation + 360) % 360 : 0;
-    sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
+    const delta = this._playRotationSfxAndGetDelta(tile, rotationInfo.oldRotation);
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
@@ -1641,20 +1640,9 @@ export class Game implements InputCallbacks {
     this._playAfterTileRotatedSfx(this.board, filledBefore);
 
     // Compute the encoded move string and record the snapshot.
-    const encodedMove = tile
-      ? encodeRotateMove(rotationInfo.row, rotationInfo.col, delta > 180 ? 'CCW' : 'CW')
-      : '';
-    this.board.recordMove(encodedMove);
+    this.board.recordMove(this._encodeRotationMove(tile, rotationInfo, delta));
 
-    let fillDelay = 0;
-    if (tile) {
-      this._animMgr.spawnRotationAnim(
-        rotationInfo.row, rotationInfo.col,
-        rotationInfo.oldRotation, tile.rotation,
-      );
-      // Fill animations begin only after the rotation animation completes.
-      fillDelay = ROTATION_ANIM_DURATION;
-    }
+    const fillDelay = this._spawnRotationAnimAndGetFillDelay(tile, rotationInfo);
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(
@@ -1665,11 +1653,46 @@ export class Game implements InputCallbacks {
     this._animMgr.spawnDrainAnims(this.board, filledBefore, rotationInfo, fillDelay);
     this._animMgr.spawnLockedCostChangeAnimations(changes);
     this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
-    if (result.cementDecrement) {
-      const { row: cr, col: cc } = result.cementDecrement;
-      if (this.board.cementData.get(`${cr},${cc}`) === 0) {
-        this._animMgr.spawnCementHardenEffect(cr, cc);
-      }
+    this._maybeSpawnCementHardenEffect(result);
+  }
+
+  /** Compute the rotation delta (degrees turned) and play the matching CW/CCW rotate sfx. */
+  private _playRotationSfxAndGetDelta(tile: Tile | null, oldRotation: number): number {
+    const delta = tile ? (tile.rotation - oldRotation + 360) % 360 : 0;
+    sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
+    return delta;
+  }
+
+  /** Encode the rotate move for the move log, or '' when no tile was rotated. */
+  private _encodeRotationMove(
+    tile: Tile | null,
+    rotationInfo: { row: number; col: number },
+    delta: number,
+  ): string {
+    if (!tile) return '';
+    return encodeRotateMove(rotationInfo.row, rotationInfo.col, delta > 180 ? 'CCW' : 'CW');
+  }
+
+  /** Spawn the rotation animation when a tile was rotated, returning the fill-animation start delay. */
+  private _spawnRotationAnimAndGetFillDelay(
+    tile: Tile | null,
+    rotationInfo: { row: number; col: number; oldRotation: number },
+  ): number {
+    if (!tile) return 0;
+    this._animMgr.spawnRotationAnim(
+      rotationInfo.row, rotationInfo.col,
+      rotationInfo.oldRotation, tile.rotation,
+    );
+    // Fill animations begin only after the rotation animation completes.
+    return ROTATION_ANIM_DURATION;
+  }
+
+  /** Spawn the cement-harden sparkle effect when this move just hardened a cement tile to zero remaining. */
+  private _maybeSpawnCementHardenEffect(result: MoveResult): void {
+    if (!this.board || !result.cementDecrement) return;
+    const { row: cr, col: cc } = result.cementDecrement;
+    if (this.board.cementData.get(`${cr},${cc}`) === 0) {
+      this._animMgr.spawnCementHardenEffect(cr, cc);
     }
   }
 
@@ -1942,21 +1965,23 @@ export class Game implements InputCallbacks {
   private _playAfterTileRotatedSfx(board: Board, filledBefore: Set<string>): void {
     const filledAfter = board.getFilledPositions();
     const connectionSfx = this._collectConnectionSfx(board, filledBefore);
-    if (connectionSfx.length === 0) {
-      let anyNewlyConnected = false;
-      for (const key of filledAfter) {
-        if (!filledBefore.has(key)) { anyNewlyConnected = true; break; }
-      }
-      if (anyNewlyConnected) sfxManager.play(SfxId.PipeConnected);
+    if (connectionSfx.length === 0 && this._hasSetDifference(filledAfter, filledBefore)) {
+      sfxManager.play(SfxId.PipeConnected);
     }
-    let anyDisconnected = false;
-    for (const key of filledBefore) {
-      if (!filledAfter.has(key)) { anyDisconnected = true; break; }
+    if (this._hasSetDifference(filledBefore, filledAfter)) {
+      sfxManager.play(SfxId.Disconnect);
     }
-    if (anyDisconnected) sfxManager.play(SfxId.Disconnect);
     for (const sfx of connectionSfx) {
       sfxManager.play(sfx);
     }
+  }
+
+  /** True when `source` contains a key not present in `other` (early-exit set-difference check). */
+  private _hasSetDifference(source: Set<string>, other: Set<string>): boolean {
+    for (const key of source) {
+      if (!other.has(key)) return true;
+    }
+    return false;
   }
 
   /**
@@ -2027,6 +2052,11 @@ export class Game implements InputCallbacks {
     if (result.errorTilePositions && result.errorTilePositions.length > 0) {
       this._startErrorHighlight(result.errorTilePositions);
     }
+    this._playBoardErrorSfx(result);
+  }
+
+  /** Play the sfx matching this board-error type (fixed by error code, or a generic bad-connection buzz for tile highlights). */
+  private _playBoardErrorSfx(result: MoveResult): void {
     if (result.error === ERR_GOLD_SPACE) {
       sfxManager.play(SfxId.Locked);
     } else if (result.error === ERR_SANDSTONE_TOO_HARD) {
@@ -2063,8 +2093,21 @@ export class Game implements InputCallbacks {
    */
   selectNextAvailableInventory(): void {
     if (!this.board) return;
+    const available = this._buildAvailableInventoryShapes(this.board);
+    if (available.length === 0) return;
 
-    const bonuses = this.board.getContainerBonuses();
+    const currentIdx = this.selectedShape !== null ? available.indexOf(this.selectedShape) : -1;
+    const nextShape = available[(currentIdx + 1) % available.length];
+
+    this.selectedShape = nextShape;
+    this.pendingRotation = this._input.lastPlacedRotations.get(nextShape) ?? 0;
+    this._renderInventoryBar();
+    this.canvas.focus();
+  }
+
+  /** Ordered list of selectable shapes (positive effective count), matching the inventory bar's visual order. */
+  private _buildAvailableInventoryShapes(board: Board): PipeShape[] {
+    const bonuses = board.getContainerBonuses();
 
     // Build the ordered list of selectable shapes, exactly as rendered by the
     // inventory bar, so the visual order and the cycling order agree.
@@ -2072,7 +2115,7 @@ export class Game implements InputCallbacks {
     const available: PipeShape[] = [];
     const seen = new Set<PipeShape>();
 
-    for (const item of this.board.inventory) {
+    for (const item of board.inventory) {
       seen.add(item.shape);
       const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
       if (effectiveCount > 0) available.push(item.shape);
@@ -2084,15 +2127,7 @@ export class Game implements InputCallbacks {
       if (bonusCount > 0) available.push(bonusShape);
     }
 
-    if (available.length === 0) return;
-
-    const currentIdx = this.selectedShape !== null ? available.indexOf(this.selectedShape) : -1;
-    const nextShape = available[(currentIdx + 1) % available.length];
-
-    this.selectedShape = nextShape;
-    this.pendingRotation = this._input.lastPlacedRotations.get(nextShape) ?? 0;
-    this._renderInventoryBar();
-    this.canvas.focus();
+    return available;
   }
 
   /**
@@ -2180,19 +2215,45 @@ export class Game implements InputCallbacks {
     filledBefore: Set<string>,
   ): boolean {
     if (!this.board || this.selectedShape === null) return false;
-    let replacedTile: Tile | undefined;
-    let result: MoveResult;
+    const shape = this.selectedShape;
+    const attempt = this._attemptPlaceOrReplaceTile(pos, currentTile, shape, this.pendingRotation);
+    if (!attempt) return false; // tile already has the selected shape+rotation – no action
+    this._handlePlaceOrReplaceResult({
+      pos, currentTile, shape, result: attempt.result, replacedTile: attempt.replacedTile, filledBefore,
+    });
+    return true; // a board operation was attempted
+  }
+
+  /** Place into an empty floor tile or replace an occupied one; returns null when the tile already matches (no action). */
+  private _attemptPlaceOrReplaceTile(
+    pos: GridPos,
+    currentTile: Tile,
+    shape: PipeShape,
+    rotation: Rotation,
+  ): { result: MoveResult; replacedTile: Tile | undefined } | null {
+    if (!this.board) return null;
     if (isEmptyFloor(currentTile.shape)) {
-      result = this.board.placeInventoryTile(pos, this.selectedShape, this.pendingRotation);
-    } else if (currentTile.shape !== this.selectedShape || currentTile.rotation !== this.pendingRotation) {
-      replacedTile = currentTile;
-      result = this.board.replaceInventoryTile(pos, this.selectedShape, this.pendingRotation);
-    } else {
-      return false; // tile already has the selected shape+rotation – no action
+      return { result: this.board.placeInventoryTile(pos, shape, rotation), replacedTile: undefined };
     }
+    if (currentTile.shape !== shape || currentTile.rotation !== rotation) {
+      return { result: this.board.replaceInventoryTile(pos, shape, rotation), replacedTile: currentTile };
+    }
+    return null;
+  }
+
+  /** Apply the placement result: success effects, a board-error toast, or a shake for an immovable fixed tile. */
+  private _handlePlaceOrReplaceResult(opts: {
+    pos: GridPos;
+    currentTile: Tile;
+    shape: PipeShape;
+    result: MoveResult;
+    replacedTile: Tile | undefined;
+    filledBefore: Set<string>;
+  }): void {
+    const { pos, currentTile, shape, result, replacedTile, filledBefore } = opts;
     if (result.success) {
       this.afterTilePlaced({
-        placedShape: this.selectedShape, result, filledBefore, replacedTile,
+        placedShape: shape, result, filledBefore, replacedTile,
         replacedRow: pos.row, replacedCol: pos.col,
       });
     } else if (result.error) {
@@ -2201,7 +2262,6 @@ export class Game implements InputCallbacks {
       // Fixed non-spinner: neither replacement nor rotation is possible — shake the tile.
       this._animMgr.spawnShakeEffects([pos]);
     }
-    return true; // a board operation was attempted
   }
 
   // ─── InputCallbacks implementation ────────────────────────────────────────
@@ -2449,19 +2509,35 @@ export class Game implements InputCallbacks {
       this.undoWinningMove();
       return;
     }
-    // In GameOver state, allow undo if canUndo() is true (normal case) or if the
-    // failing move was the very first move and discardLastMoveFromHistory() was
-    // already called, leaving _historyIndex at 0 with the initial snapshot available.
-    if (this.gameState === GameState.GameOver) {
-      if (!this.board.canRestoreAfterGameOver()) return;
-    } else if (!this.board.canUndo()) {
-      return;
-    }
+    if (!this._canPerformUndo()) return;
+
     const placedBeforeUndo = this._snapshotPlacedTiles();
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const turnBefore = this.board.turnNumber;
     const filledBefore = this.board.getFilledPositions();
+    this._restoreBoardForUndo();
+    this._playUndoSfx(turnBefore);
+    this._spawnUndoFlashes(placedBeforeUndo, this._snapshotPlacedTiles());
+    this.gameState = GameState.Playing;
+    this._closeModal(this.gameoverModalEl);
+    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._metrics.sparkleCallbacks());
+    this._finalizeHistoryJump();
+  }
+
+  /** True when undo is currently allowed given the game/board state (Won is handled separately by the caller). */
+  private _canPerformUndo(): boolean {
+    if (!this.board) return false;
+    // In GameOver state, allow undo if canUndo() is true (normal case) or if the
+    // failing move was the very first move and discardLastMoveFromHistory() was
+    // already called, leaving _historyIndex at 0 with the initial snapshot available.
+    if (this.gameState === GameState.GameOver) return this.board.canRestoreAfterGameOver();
+    return this.board.canUndo();
+  }
+
+  /** Restore the board to its pre-move snapshot, using the GameOver-specific restore path when applicable. */
+  private _restoreBoardForUndo(): void {
+    if (!this.board) return;
     if (this.gameState === GameState.GameOver) {
       // discardLastMoveFromHistory() was already called when the fail was detected,
       // so _historyIndex already points to the pre-fail snapshot.  Just restore it
@@ -2470,18 +2546,16 @@ export class Game implements InputCallbacks {
     } else {
       this.board.undoMove();
     }
-    // Play UndoBeforeRestart when undoing from turn 0 restores a prior play sequence
-    // (turn count goes up), otherwise play the regular Undo sound.
+  }
+
+  /** Play the undo sfx: the "restart" variant when undoing from turn 0 restores a prior play sequence. */
+  private _playUndoSfx(turnBefore: number): void {
+    if (!this.board) return;
     if (turnBefore === 0 && this.board.turnNumber > 0) {
       sfxManager.play(SfxId.UndoBeforeRestart);
     } else {
       sfxManager.play(SfxId.Undo);
     }
-    this._spawnUndoFlashes(placedBeforeUndo, this._snapshotPlacedTiles());
-    this.gameState = GameState.Playing;
-    this._closeModal(this.gameoverModalEl);
-    this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._metrics.sparkleCallbacks());
-    this._finalizeHistoryJump();
   }
 
   /** Redo the last undone player action. */
