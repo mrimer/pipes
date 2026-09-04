@@ -1075,16 +1075,8 @@ function _seaParseHex(hex: string): [number, number, number] {
  *                  When provided the oscillation is centered on this color; when absent the
  *                  default Summer-style blue is used.
  */
-export function drawSea(
-  ctx: CanvasRenderingContext2D,
-  half: number,
-  neighbors: SeaNeighbors,
-  fillColor?: string,
-): void {
-  const now = Date.now();
-
-  // ── Water fill with gentle color oscillation ────────────────────────────
-  // Oscillate hue ±9/±14/±11 channels around the style-specific fill color.
+/** Oscillate hue ±9/±14/±11 channels around the style-specific fill color (or a default Summer-style blue). */
+function _computeSeaWaterColor(fillColor: string | undefined, now: number): string {
   const osc = Math.sin(now / 1200) * 0.5 + 0.5; // 0..1
   let wr: number, wg: number, wb: number;
   if (fillColor) {
@@ -1097,27 +1089,48 @@ export function drawSea(
     wg = Math.round(110 + osc * 28);  // 110..138
     wb = Math.round(175 + osc * 22);  // 175..197
   }
-  const waterColor = `rgb(${wr},${wg},${wb})`;
-  ctx.fillStyle = waterColor;
-  ctx.fillRect(-half, -half, half * 2, half * 2);
+  return `rgb(${wr},${wg},${wb})`;
+}
 
-  // ── Land border on non-sea edges ────────────────────────────────────────
-  const bw = _s(4);                           // border thickness
-  ctx.fillStyle = SEA_BORDER_COLOR;
-
-  // Edge borders
+function _fillSeaEdgeBorders(ctx: CanvasRenderingContext2D, half: number, bw: number, neighbors: SeaNeighbors): void {
   if (!neighbors.north) ctx.fillRect(-half, -half, half * 2, bw);
   if (!neighbors.south) ctx.fillRect(-half, half - bw, half * 2, bw);
   if (!neighbors.west)  ctx.fillRect(-half, -half, bw, half * 2);
   if (!neighbors.east)  ctx.fillRect(half - bw, -half, bw, half * 2);
+}
 
-  // Outer corners: when two adjacent edges are both sea but their shared
-  // diagonal is not, fill the bw×bw corner square that would otherwise be
-  // left uncovered.
+/**
+ * Outer corners: when two adjacent edges are both sea but their shared
+ * diagonal is not, fill the bw×bw corner square that would otherwise be
+ * left uncovered.
+ */
+function _fillSeaCornerBorders(ctx: CanvasRenderingContext2D, half: number, bw: number, neighbors: SeaNeighbors): void {
   if (_isCornerExposed(neighbors.north, neighbors.west, neighbors.nw)) ctx.fillRect(-half, -half, bw, bw);
   if (_isCornerExposed(neighbors.north, neighbors.east, neighbors.ne)) ctx.fillRect(half - bw, -half, bw, bw);
   if (_isCornerExposed(neighbors.south, neighbors.west, neighbors.sw)) ctx.fillRect(-half, half - bw, bw, bw);
   if (_isCornerExposed(neighbors.south, neighbors.east, neighbors.se)) ctx.fillRect(half - bw, half - bw, bw, bw);
+}
+
+/** Land border on non-sea edges. */
+function _drawSeaLandBorder(ctx: CanvasRenderingContext2D, half: number, neighbors: SeaNeighbors): void {
+  const bw = _s(4); // border thickness
+  ctx.fillStyle = SEA_BORDER_COLOR;
+  _fillSeaEdgeBorders(ctx, half, bw, neighbors);
+  _fillSeaCornerBorders(ctx, half, bw, neighbors);
+}
+
+export function drawSea(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  neighbors: SeaNeighbors,
+  fillColor?: string,
+): void {
+  const now = Date.now();
+
+  ctx.fillStyle = _computeSeaWaterColor(fillColor, now);
+  ctx.fillRect(-half, -half, half * 2, half * 2);
+
+  _drawSeaLandBorder(ctx, half, neighbors);
 
   // ── Ripple effects ──────────────────────────────────────────────────────
   _drawSeaRipple(ctx, half, -half * 0.3, -half * 0.25, now, 0);
