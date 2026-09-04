@@ -1352,33 +1352,9 @@ export class Game implements InputCallbacks {
     const starsCollected = this.board.getStarsCollected();
     const waterRemaining = this.board.getCurrentWater();
     const isChallenge = !!this.currentLevel.challenge;
-    this._campaign.markLevelCompleted(this.currentLevel.id);
-    this._campaign.saveStars(this.currentLevel.id, starsCollected);
-    // Load previous best before saving so we can detect a new personal record.
-    // Skip the comparison during playtesting (data isn't persisted in that mode).
-    let previousBest: number | undefined;
-    if (!this._campaign.isPlaytesting) {
-      previousBest = this._campaign.loadBestWater(this.currentLevel.id) ?? undefined;
-    }
-    this._campaign.saveWater(this.currentLevel.id, waterRemaining);
-    // Show challenge skull icon on win modal when the completed level is a challenge level
-    if (this.winChallengeEl) {
-      if (isChallenge) {
-        this.winChallengeEl.textContent = t('game.win.challengeComplete');
-        this.winChallengeEl.style.display = 'block';
-      } else {
-        this.winChallengeEl.style.display = 'none';
-      }
-    }
-    // Show water retained on win modal (always show since water is the core resource)
-    if (this.winWaterEl) {
-      const isNewBest = previousBest !== undefined && waterRemaining > previousBest;
-      this.winWaterEl.textContent = t('game.win.waterRetained', {
-        count: waterRemaining,
-        newBest: isNewBest ? ` ${t('game.win.newBest')}` : '',
-      });
-      this.winWaterEl.style.display = 'block';
-    }
+    const previousBest = this._persistWinProgress(starsCollected, waterRemaining);
+    this._updateWinChallengeLabel(isChallenge);
+    this._updateWinWaterLabel(waterRemaining, previousBest);
     // Hide star row initially; it is populated with animated spans inside the confetti callback.
     if (this.winStarsEl) {
       this.winStarsEl.innerHTML = '';
@@ -1386,75 +1362,133 @@ export class Game implements InputCallbacks {
     }
     // Dispatch achievement event (after progress is persisted so completedChapterId
     // and isCampaignComplete reflect the state that includes this level).
-    if (!this._campaign.isPlaytesting && this._campaign.activeCampaign) {
-      const campaign = this._campaign.activeCampaign;
-      const progress = this._campaign.progress;
-      const currentLevelId = this.currentLevel.id;
-      let completedChapterId: number | null = null;
-      const chapter = campaign.chapters.find(
-        (ch) => ch.levels.some((l) => l.id === currentLevelId),
-      );
-      if (chapter !== undefined) {
-        const allNonChallengeComplete = chapter.levels
-          .filter((l) => !l.challenge)
-          .every((l) => progress.has(l.id));
-        if (allNonChallengeComplete) completedChapterId = chapter.id;
-      }
-      const isCampaignComplete = campaign.chapters.every((ch) =>
-        ch.levels.filter((l) => !l.challenge).every((l) => progress.has(l.id)),
-      );
-      dispatchGameEvent({
-        type: 'levelWon',
-        campaignId: campaign.id,
-        levelId: currentLevelId,
-        stars: starsCollected,
-        waterRemaining,
-        isChallenge,
-        completedChapterId,
-        isCampaignComplete,
-      });
+    if (this._shouldDispatchLevelWonEvent()) {
+      this._dispatchLevelWonEvent(starsCollected, waterRemaining, isChallenge);
     }
 
     // Play win sound immediately on winning, then spawn confetti and show modal.
     sfxManager.play(SfxId.WinLevel);
 
-    // Auto-record success if the setting is enabled.
-    if (!this._campaign.isPlaytesting && loadRecordingSettings().recordSuccesses) {
-      this._maybeAutoRecord('success', waterRemaining, starsCollected);
-    }
+    this._maybeRecordWinSuccess(waterRemaining, starsCollected);
     triggerCloudSave();
 
-    spawnConfetti(() => {
-      if (this.gameState !== GameState.Won) return;
-      this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
-      // Build individual animated star spans after the modal finishes fading in.
-      if (starsCollected > 0 && this.winStarsEl) {
-        const winStarsEl = this.winStarsEl;
-        setTimeout(() => {
-          if (this.gameState !== GameState.Won) return;
-          winStarsEl.innerHTML = '';
-          for (let i = 0; i < starsCollected; i++) {
-            const span = document.createElement('span');
-            span.className = 'star-pop';
-            span.textContent = '⭐';
-            span.style.animationDelay = `${i * STAR_STAGGER_MS}ms`;
-            winStarsEl.appendChild(span);
-          }
-          // Fire the star SFX and sparkle for each star as it pops in.
-          for (let i = 0; i < starsCollected; i++) {
-            setTimeout(() => {
-              if (this.gameState !== GameState.Won) return;
-              if (i === 0) sfxManager.play(SfxId.Star);
-              const starSpan = winStarsEl.children[i] as HTMLElement | undefined;
-              if (starSpan) {
-                const rect = starSpan.getBoundingClientRect();
-                spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 20);
-              }
-            }, i * STAR_STAGGER_MS);
-          }
-        }, WIN_MODAL_FADE_MS);
-      }
+    spawnConfetti(() => this._onWinConfettiComplete(starsCollected));
+  }
+
+  /** Persist level-completion progress (stars/water/best) and return the pre-save best water, if any. */
+  private _persistWinProgress(starsCollected: number, waterRemaining: number): number | undefined {
+    this._campaign.markLevelCompleted(this.currentLevel!.id); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by caller's !this.currentLevel early-return above
+    this._campaign.saveStars(this.currentLevel!.id, starsCollected); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by caller's !this.currentLevel early-return above
+    // Load previous best before saving so we can detect a new personal record.
+    // Skip the comparison during playtesting (data isn't persisted in that mode).
+    const previousBest = this._campaign.isPlaytesting
+      ? undefined
+      : this._campaign.loadBestWater(this.currentLevel!.id) ?? undefined; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by caller's !this.currentLevel early-return above
+    this._campaign.saveWater(this.currentLevel!.id, waterRemaining); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by caller's !this.currentLevel early-return above
+    return previousBest;
+  }
+
+  /** Auto-record a success clip if the recording setting is enabled (skipped during playtesting). */
+  private _maybeRecordWinSuccess(waterRemaining: number, starsCollected: number): void {
+    if (this._campaign.isPlaytesting) return;
+    if (!loadRecordingSettings().recordSuccesses) return;
+    this._maybeAutoRecord('success', waterRemaining, starsCollected);
+  }
+
+  /** True when a `levelWon` achievement event should be dispatched: not playtesting, an active campaign is tracking progress. */
+  private _shouldDispatchLevelWonEvent(): boolean {
+    return !this._campaign.isPlaytesting && !!this._campaign.activeCampaign;
+  }
+
+  /** Show or hide the challenge-complete skull icon on the win modal. */
+  private _updateWinChallengeLabel(isChallenge: boolean): void {
+    if (!this.winChallengeEl) return;
+    if (isChallenge) {
+      this.winChallengeEl.textContent = t('game.win.challengeComplete');
+      this.winChallengeEl.style.display = 'block';
+    } else {
+      this.winChallengeEl.style.display = 'none';
+    }
+  }
+
+  /** Show water retained on the win modal, flagging a new personal best when applicable. */
+  private _updateWinWaterLabel(waterRemaining: number, previousBest: number | undefined): void {
+    if (!this.winWaterEl) return;
+    const isNewBest = previousBest !== undefined && waterRemaining > previousBest;
+    this.winWaterEl.textContent = t('game.win.waterRetained', {
+      count: waterRemaining,
+      newBest: isNewBest ? ` ${t('game.win.newBest')}` : '',
     });
+    this.winWaterEl.style.display = 'block';
+  }
+
+  /** Dispatch the `levelWon` achievement event, computing chapter/campaign completion state. */
+  private _dispatchLevelWonEvent(starsCollected: number, waterRemaining: number, isChallenge: boolean): void {
+    const campaign = this._campaign.activeCampaign!; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by _shouldDispatchLevelWonEvent() above
+    const progress = this._campaign.progress;
+    const currentLevelId = this.currentLevel!.id; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guarded by caller's !this.currentLevel early-return above
+    let completedChapterId: number | null = null;
+    const chapter = campaign.chapters.find(
+      (ch) => ch.levels.some((l) => l.id === currentLevelId),
+    );
+    if (chapter !== undefined) {
+      const allNonChallengeComplete = chapter.levels
+        .filter((l) => !l.challenge)
+        .every((l) => progress.has(l.id));
+      if (allNonChallengeComplete) completedChapterId = chapter.id;
+    }
+    const isCampaignComplete = campaign.chapters.every((ch) =>
+      ch.levels.filter((l) => !l.challenge).every((l) => progress.has(l.id)),
+    );
+    dispatchGameEvent({
+      type: 'levelWon',
+      campaignId: campaign.id,
+      levelId: currentLevelId,
+      stars: starsCollected,
+      waterRemaining,
+      isChallenge,
+      completedChapterId,
+      isCampaignComplete,
+    });
+  }
+
+  /** Confetti-complete callback: show the win modal, then pop in animated star spans. */
+  private _onWinConfettiComplete(starsCollected: number): void {
+    if (this.gameState !== GameState.Won) return;
+    this._showModalWithAnimation(this.winModalEl, 'sparkle-gold');
+    // Build individual animated star spans after the modal finishes fading in.
+    if (starsCollected > 0 && this.winStarsEl) {
+      const winStarsEl = this.winStarsEl;
+      setTimeout(() => this._spawnWinStarPops(winStarsEl, starsCollected), WIN_MODAL_FADE_MS);
+    }
+  }
+
+  /** Create the animated star spans and fire their staggered pop sfx/sparkles. */
+  private _spawnWinStarPops(winStarsEl: HTMLElement, starsCollected: number): void {
+    if (this.gameState !== GameState.Won) return;
+    winStarsEl.innerHTML = '';
+    for (let i = 0; i < starsCollected; i++) {
+      const span = document.createElement('span');
+      span.className = 'star-pop';
+      span.textContent = '⭐';
+      span.style.animationDelay = `${i * STAR_STAGGER_MS}ms`;
+      winStarsEl.appendChild(span);
+    }
+    // Fire the star SFX and sparkle for each star as it pops in.
+    for (let i = 0; i < starsCollected; i++) {
+      setTimeout(() => this._popWinStarSparkle(winStarsEl, i), i * STAR_STAGGER_MS);
+    }
+  }
+
+  /** Play the star sfx (first star only) and spawn sparkles for one popped-in star span. */
+  private _popWinStarSparkle(winStarsEl: HTMLElement, index: number): void {
+    if (this.gameState !== GameState.Won) return;
+    if (index === 0) sfxManager.play(SfxId.Star);
+    const starSpan = winStarsEl.children[index] as HTMLElement | undefined;
+    if (starSpan) {
+      const rect = starSpan.getBoundingClientRect();
+      spawnStarSparkles(rect.left + rect.width / 2, rect.top + rect.height / 2, 20);
+    }
   }
 
   /**
