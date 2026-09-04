@@ -3310,41 +3310,88 @@ interface RenderHoverPreviewOptions {
   now: number;
 }
 
+function _computeHoverGridPosInBounds(
+  mouseCanvasPos: { x: number; y: number }, board: Board,
+): { row: number; col: number } | null {
+  const col = Math.floor(mouseCanvasPos.x / TILE_SIZE);
+  const row = Math.floor(mouseCanvasPos.y / TILE_SIZE);
+  if (row < 0 || row >= board.rows || col < 0 || col >= board.cols) return null;
+  return { row, col };
+}
+
+interface HoverPreviewGeom {
+  board: Board;
+  hoverRow: number;
+  hoverCol: number;
+  hoverTile: Tile;
+  px: number;
+  py: number;
+  currentWater: number;
+  filledPositions: Set<string>;
+  now: number;
+}
+
+function _canPlaceOrReplaceHoverPreview(
+  hoverTile: Tile, selectedShape: PipeShape, pendingRotation: number, selectedIsGold: boolean, isGoldCell: boolean,
+): boolean {
+  const canPlace = isEmptyFloor(hoverTile.shape) && (!isGoldCell || selectedIsGold);
+  const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
+  return canPlace || canReplace;
+}
+
+/** Inventory item placement preview: the tile that would result from placing/replacing at the hovered cell. */
+function _renderPlacementHoverPreview(
+  ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom,
+  selectedShape: PipeShape, pendingRotation: number, selectedIsGold: boolean, isGoldCell: boolean,
+): void {
+  if (!_canPlaceOrReplaceHoverPreview(geom.hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell)) return;
+  const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
+  _drawPreviewTile(ctx, geom.px, geom.py, previewTile, geom.currentWater, geom.now);
+  _renderConnectionPreview(ctx, geom.board, geom.hoverRow, geom.hoverCol, previewTile, geom.filledPositions, geom.now);
+}
+
+function _canShowRotationHoverPreview(hoverTile: Tile): boolean {
+  return !hoverTile.isFixed && !isEmptyFloor(hoverTile.shape) && !SPIN_PIPE_SHAPES.has(hoverTile.shape);
+}
+
+function _buildRotationPreviewTile(hoverTile: Tile, hoverRotationDelta: number): Tile {
+  const previewRotation = ((hoverTile.rotation + hoverRotationDelta * 90) % 360) as 0 | 90 | 180 | 270;
+  return new Tile(
+    hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,
+    hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
+    hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
+  );
+}
+
+/** Rotation preview on an existing tile (no inventory item selected, Q/W or scroll). */
+function _renderRotationHoverPreview(ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom, hoverRotationDelta: number): void {
+  if (!_canShowRotationHoverPreview(geom.hoverTile)) return;
+  const previewTile = _buildRotationPreviewTile(geom.hoverTile, hoverRotationDelta);
+  _drawPreviewTile(ctx, geom.px, geom.py, previewTile, geom.currentWater, geom.now);
+  _renderConnectionPreview(ctx, geom.board, geom.hoverRow, geom.hoverCol, previewTile, geom.filledPositions, geom.now);
+}
+
 function _renderHoverPreview(ctx: CanvasRenderingContext2D, opts: RenderHoverPreviewOptions): void {
   const {
     board, selectedShape, pendingRotation, selectedIsGold, mouseCanvasPos,
     hoverRotationDelta, currentWater, filledPositions, now,
   } = opts;
   if (!mouseCanvasPos) return;
-  const hoverCol = Math.floor(mouseCanvasPos.x / TILE_SIZE);
-  const hoverRow = Math.floor(mouseCanvasPos.y / TILE_SIZE);
-  if (hoverRow < 0 || hoverRow >= board.rows || hoverCol < 0 || hoverCol >= board.cols) return;
+  const hoverPos = _computeHoverGridPosInBounds(mouseCanvasPos, board);
+  if (!hoverPos) return;
+  const { row: hoverRow, col: hoverCol } = hoverPos;
 
   const hoverTile = board.grid[hoverRow][hoverCol];
   const isGoldCell = board.goldSpaces.has(posKey(hoverRow, hoverCol));
-  const px = hoverCol * TILE_SIZE;
-  const py = hoverRow * TILE_SIZE;
+  const geom: HoverPreviewGeom = {
+    board, hoverRow, hoverCol, hoverTile,
+    px: hoverCol * TILE_SIZE, py: hoverRow * TILE_SIZE,
+    currentWater, filledPositions, now,
+  };
 
   if (selectedShape !== null) {
-    // Inventory item placement preview
-    const canPlace = isEmptyFloor(hoverTile.shape) && (!isGoldCell || selectedIsGold);
-    const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
-    if (canPlace || canReplace) {
-      const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
-      _drawPreviewTile(ctx, px, py, previewTile, currentWater, now);
-      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions, now);
-    }
+    _renderPlacementHoverPreview(ctx, geom, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
   } else if (hoverRotationDelta > 0) {
-    // Rotation preview on an existing tile (no inventory item selected, Q/W or scroll)
-    if (!hoverTile.isFixed && !isEmptyFloor(hoverTile.shape) && !SPIN_PIPE_SHAPES.has(hoverTile.shape)) {
-      const previewRotation = ((hoverTile.rotation + hoverRotationDelta * 90) % 360) as 0 | 90 | 180 | 270;
-      const previewTile = new Tile(
-        hoverTile.shape, previewRotation, false, hoverTile.capacity, hoverTile.cost,
-        hoverTile.itemShape, hoverTile.itemCount, null, hoverTile.chamberContent,
-        hoverTile.temperature, hoverTile.pressure, hoverTile.hardness, hoverTile.shatter,
-      );
-      _drawPreviewTile(ctx, px, py, previewTile, currentWater, now);
-      _renderConnectionPreview(ctx, board, hoverRow, hoverCol, previewTile, filledPositions, now);
-    }
+    _renderRotationHoverPreview(ctx, geom, hoverRotationDelta);
   }
 }
