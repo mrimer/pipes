@@ -2461,6 +2461,28 @@ export interface RenderBoardOptions {
   cementCrackFn?: (ctx: CanvasRenderingContext2D) => void;
 }
 
+/**
+ * Tiles in fillExclude are rendered dry so the fill overlay can paint water on top.
+ * Tiles in drainInclude are rendered as filled (water) so the drain overlay can paint dry on top.
+ */
+function _needsEffectiveFilledOverride(fillExclude: Set<string> | undefined, drainInclude: Set<string> | undefined): boolean {
+  return (fillExclude !== undefined && fillExclude.size > 0) || (drainInclude !== undefined && drainInclude.size > 0);
+}
+
+function _computeEffectiveFilledPositions(
+  filled: Set<string>, fillExclude: Set<string> | undefined, drainInclude: Set<string> | undefined,
+): Set<string> {
+  if (!_needsEffectiveFilledOverride(fillExclude, drainInclude)) return filled;
+  const effectiveFilled = new Set<string>(filled);
+  if (fillExclude) {
+    for (const k of fillExclude) effectiveFilled.delete(k);
+  }
+  if (drainInclude) {
+    for (const k of drainInclude) effectiveFilled.add(k);
+  }
+  return effectiveFilled;
+}
+
 export function renderBoard(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, opts: RenderBoardOptions): void {
   const {
     board, selectedShape, pendingRotation, mouseCanvasPos,
@@ -2475,21 +2497,7 @@ export function renderBoard(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const filled = board.getFilledPositions();
-  // Tiles in fillExclude are rendered dry so the fill overlay can paint water on top.
-  // Tiles in drainInclude are rendered as filled (water) so the drain overlay can paint dry on top.
-  let effectiveFilled: Set<string>;
-  const needsModified = (fillExclude !== undefined && fillExclude.size > 0) || (drainInclude !== undefined && drainInclude.size > 0);
-  if (needsModified) {
-    effectiveFilled = new Set<string>(filled);
-    if (fillExclude) {
-      for (const k of fillExclude) effectiveFilled.delete(k);
-    }
-    if (drainInclude) {
-      for (const k of drainInclude) effectiveFilled.add(k);
-    }
-  } else {
-    effectiveFilled = filled;
-  }
+  const effectiveFilled = _computeEffectiveFilledPositions(filled, fillExclude, drainInclude);
   const currentWater = board.getCurrentWater();
 
   // Shimmer phase for gold spaces (oscillates smoothly over time)
