@@ -579,96 +579,153 @@ function _isCornerExposed(edgeA: boolean, edgeB: boolean, diagonal: boolean): bo
  * granite tiles are present, and an L-shaped inset border marks corners where
  * two edges are adjacent to granite but the diagonal is not.
  */
+interface GraniteGeometry {
+  bw: number;
+  bh: number;
+  outerHalf: number;
+  OVERLAP: number;
+}
+
+/**
+ * Round inner boundary to integer pixels so fillRect calls share exact
+ * coordinates.  Ceiling of half is used as the outer boundary: for even
+ * tile sizes outerHalf === half (integer), for odd tile sizes (where
+ * half = TILE_SIZE/2 is fractional) it rounds up by ½px so the strips
+ * extend just past the tile boundary.  This guarantees that adjacent tiles'
+ * strips overlap rather than merely abut, eliminating sub-pixel seams under
+ * any CSS zoom level.  All resulting size expressions are then pure integers.
+ */
+function _computeGraniteGeometry(half: number): GraniteGeometry {
+  return {
+    bw: Math.round(half * 0.7),
+    bh: Math.round(half * 0.7),
+    outerHalf: Math.ceil(half),
+    OVERLAP: 1, // 1-pixel overlap margin: strips extend this many pixels into the core.
+  };
+}
+
+/**
+ * Edge extension strips toward adjacent granite tiles.
+ * Each strip overlaps the core by OVERLAP px to eliminate sub-pixel seams,
+ * and each edge strip is extended 1px INTO the core rectangle so that the
+ * shared boundary pixel is fully covered, preventing a sub-pixel seam that
+ * appears when the tile center (cx/cy) lands on a half-integer canvas
+ * coordinate (i.e. when TILE_SIZE is odd).
+ */
+function _fillGraniteEdgeStrips(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  const { bw, bh, outerHalf, OVERLAP } = g;
+  if (n.north) ctx.fillRect(-bw, -outerHalf,      bw * 2,          outerHalf - bh + OVERLAP);
+  if (n.south) ctx.fillRect(-bw, bh - OVERLAP,    bw * 2,          outerHalf - bh + OVERLAP);
+  if (n.west)  ctx.fillRect(-outerHalf, -bh,       outerHalf - bw + OVERLAP,  bh * 2);
+  if (n.east)  ctx.fillRect(bw - OVERLAP, -bh,     outerHalf - bw + OVERLAP,  bh * 2);
+}
+
+/**
+ * Corner fills: only when both edge neighbors AND the diagonal are granite.
+ * Extended by OVERLAP in both dimensions to cover the boundary pixel shared
+ * with the adjacent strips.
+ */
+function _fillGraniteCorners(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  const { bw, bh, outerHalf, OVERLAP } = g;
+  if (_isCornerFilled(n.north, n.west, n.nw)) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.north, n.east, n.ne)) ctx.fillRect(bw - OVERLAP, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.south, n.west, n.sw)) ctx.fillRect(-outerHalf, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  if (_isCornerFilled(n.south, n.east, n.se)) ctx.fillRect(bw - OVERLAP, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+}
+
+// Top border (y = -bh): skip when north is granite
+function _traceGraniteTopBorder(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  if (n.north) return;
+  const { bw, bh, outerHalf } = g;
+  ctx.moveTo(n.west ? -outerHalf : -bw, -bh);
+  ctx.lineTo(n.east ?  outerHalf :  bw, -bh);
+}
+
+// Bottom border (y = +bh): skip when south is granite
+function _traceGraniteBottomBorder(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  if (n.south) return;
+  const { bw, bh, outerHalf } = g;
+  ctx.moveTo(n.west ? -outerHalf : -bw, bh);
+  ctx.lineTo(n.east ?  outerHalf :  bw, bh);
+}
+
+// Left border (x = -bw): skip when west is granite
+function _traceGraniteLeftBorder(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  if (n.west) return;
+  const { bw, bh, outerHalf } = g;
+  ctx.moveTo(-bw, n.north ? -outerHalf : -bh);
+  ctx.lineTo(-bw, n.south ?  outerHalf :  bh);
+}
+
+// Right border (x = +bw): skip when east is granite
+function _traceGraniteRightBorder(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  if (n.east) return;
+  const { bw, bh, outerHalf } = g;
+  ctx.moveTo(bw, n.north ? -outerHalf : -bh);
+  ctx.lineTo(bw, n.south ?  outerHalf :  bh);
+}
+
+/**
+ * Draw border only on edges that are NOT adjacent to granite.
+ * Each exposed edge is drawn as a line at the inset level (±bw / ±bh),
+ * extended to the tile boundary when the perpendicular edges are adjacent to
+ * granite so that the border visually closes the filled shape.
+ */
+function _traceGraniteBorderEdges(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  _traceGraniteTopBorder(ctx, n, g);
+  _traceGraniteBottomBorder(ctx, n, g);
+  _traceGraniteLeftBorder(ctx, n, g);
+  _traceGraniteRightBorder(ctx, n, g);
+}
+
+/**
+ * L-shaped inset borders at corners where two edges are granite but the
+ * diagonal is not.  These trace the inner boundary of the unfilled corner
+ * gap and connect cleanly to the adjacent tiles' inset border lines.
+ */
+function _traceGraniteBorderCorners(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  const { bw, bh, outerHalf } = g;
+  if (_isCornerExposed(n.north, n.west, n.nw)) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
+  if (_isCornerExposed(n.north, n.east, n.ne)) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
+  if (_isCornerExposed(n.south, n.west, n.sw)) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
+  if (_isCornerExposed(n.south, n.east, n.se)) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
+}
+
+function _strokeGraniteBorder(ctx: CanvasRenderingContext2D, n: GraniteNeighbors, g: GraniteGeometry): void {
+  ctx.strokeStyle = GRANITE_COLOR;
+  ctx.lineWidth = _s(3);
+  ctx.beginPath();
+  _traceGraniteBorderEdges(ctx, n, g);
+  _traceGraniteBorderCorners(ctx, n, g);
+  ctx.stroke();
+}
+
+/** A few crack-like lines confined to the core inset rectangle, for stone texture. */
+function _drawGraniteTexture(ctx: CanvasRenderingContext2D, bw: number, bh: number): void {
+  ctx.strokeStyle = GRANITE_COLOR;
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
+}
+
 export function drawGranite(
   ctx: CanvasRenderingContext2D,
   half: number,
   neighbors?: GraniteNeighbors,
 ): void {
   const n = neighbors ?? { north: false, south: false, east: false, west: false, nw: false, ne: false, sw: false, se: false };
-  // Round inner boundary to integer pixels so fillRect calls share exact
-  // coordinates.  Ceiling of half is used as the outer boundary: for even
-  // tile sizes outerHalf === half (integer), for odd tile sizes (where
-  // half = TILE_SIZE/2 is fractional) it rounds up by ½px so the strips
-  // extend just past the tile boundary.  This guarantees that adjacent tiles'
-  // strips overlap rather than merely abut, eliminating sub-pixel seams under
-  // any CSS zoom level.  All resulting size expressions are then pure integers.
-  //
-  // Each edge strip is extended 1px INTO the core rectangle so that the
-  // shared boundary pixel is fully covered by the strip, preventing a
-  // sub-pixel seam that appears when the tile center (cx/cy) lands on a
-  // half-integer canvas coordinate (i.e. when TILE_SIZE is odd).
-  const bw = Math.round(half * 0.7);
-  const bh = Math.round(half * 0.7);
-  const outerHalf = Math.ceil(half);
-  // 1-pixel overlap margin: strips extend this many pixels into the core.
-  const OVERLAP = 1;
+  const g = _computeGraniteGeometry(half);
 
   ctx.fillStyle = GRANITE_FILL_COLOR;
-
-  // ── Fill ─────────────────────────────────────────────────────────────────
   // Core inset rectangle (always drawn)
-  ctx.fillRect(-bw, -bh, bw * 2, bh * 2);
-  // Edge extension strips toward adjacent granite tiles.
-  // Each strip overlaps the core by OVERLAP px to eliminate sub-pixel seams.
-  if (n.north) ctx.fillRect(-bw, -outerHalf,      bw * 2,          outerHalf - bh + OVERLAP);
-  if (n.south) ctx.fillRect(-bw, bh - OVERLAP,    bw * 2,          outerHalf - bh + OVERLAP);
-  if (n.west)  ctx.fillRect(-outerHalf, -bh,       outerHalf - bw + OVERLAP,  bh * 2);
-  if (n.east)  ctx.fillRect(bw - OVERLAP, -bh,     outerHalf - bw + OVERLAP,  bh * 2);
-  // Corner fills: only when both edge neighbors AND the diagonal are granite.
-  // Extended by OVERLAP in both dimensions to cover the boundary pixel shared
-  // with the adjacent strips.
-  if (_isCornerFilled(n.north, n.west, n.nw)) ctx.fillRect(-outerHalf, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
-  if (_isCornerFilled(n.north, n.east, n.ne)) ctx.fillRect(bw - OVERLAP, -outerHalf, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
-  if (_isCornerFilled(n.south, n.west, n.sw)) ctx.fillRect(-outerHalf, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
-  if (_isCornerFilled(n.south, n.east, n.se)) ctx.fillRect(bw - OVERLAP, bh - OVERLAP, outerHalf - bw + OVERLAP, outerHalf - bh + OVERLAP);
+  ctx.fillRect(-g.bw, -g.bh, g.bw * 2, g.bh * 2);
+  _fillGraniteEdgeStrips(ctx, n, g);
+  _fillGraniteCorners(ctx, n, g);
 
-  // ── Border ───────────────────────────────────────────────────────────────
-  // Draw border only on edges that are NOT adjacent to granite.
-  // Each exposed edge is drawn as a line at the inset level (±bw / ±bh),
-  // extended to the tile boundary when the perpendicular edges are adjacent to
-  // granite so that the border visually closes the filled shape.
-  ctx.strokeStyle = GRANITE_COLOR;
-  ctx.lineWidth = _s(3);
-  ctx.beginPath();
+  _strokeGraniteBorder(ctx, n, g);
 
-  // Top border (y = -bh): skip when north is granite
-  if (!n.north) {
-    ctx.moveTo(n.west ? -outerHalf : -bw, -bh);
-    ctx.lineTo(n.east ?  outerHalf :  bw, -bh);
-  }
-  // Bottom border (y = +bh): skip when south is granite
-  if (!n.south) {
-    ctx.moveTo(n.west ? -outerHalf : -bw, bh);
-    ctx.lineTo(n.east ?  outerHalf :  bw, bh);
-  }
-  // Left border (x = -bw): skip when west is granite
-  if (!n.west) {
-    ctx.moveTo(-bw, n.north ? -outerHalf : -bh);
-    ctx.lineTo(-bw, n.south ?  outerHalf :  bh);
-  }
-  // Right border (x = +bw): skip when east is granite
-  if (!n.east) {
-    ctx.moveTo(bw, n.north ? -outerHalf : -bh);
-    ctx.lineTo(bw, n.south ?  outerHalf :  bh);
-  }
-
-  // L-shaped inset borders at corners where two edges are granite but the
-  // diagonal is not.  These trace the inner boundary of the unfilled corner
-  // gap and connect cleanly to the adjacent tiles' inset border lines.
-  if (_isCornerExposed(n.north, n.west, n.nw)) { ctx.moveTo(-outerHalf, -bh); ctx.lineTo(-bw, -bh); ctx.lineTo(-bw, -outerHalf); }
-  if (_isCornerExposed(n.north, n.east, n.ne)) { ctx.moveTo( outerHalf, -bh); ctx.lineTo( bw, -bh); ctx.lineTo( bw, -outerHalf); }
-  if (_isCornerExposed(n.south, n.west, n.sw)) { ctx.moveTo(-outerHalf,  bh); ctx.lineTo(-bw,  bh); ctx.lineTo(-bw,  outerHalf); }
-  if (_isCornerExposed(n.south, n.east, n.se)) { ctx.moveTo( outerHalf,  bh); ctx.lineTo( bw,  bh); ctx.lineTo( bw,  outerHalf); }
-
-  ctx.stroke();
-
-  // ── Stone texture ─────────────────────────────────────────────────────────
-  // A few crack-like lines confined to the core inset rectangle.
-  ctx.strokeStyle = GRANITE_COLOR;
-  ctx.lineWidth = _s(1.5);
-  ctx.beginPath(); ctx.moveTo(-bw + _s(4), -bh + _s(10)); ctx.lineTo(bw - _s(6), -bh + _s(16)); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + _s(2), _s(2));         ctx.lineTo(bw - _s(8), _s(8));        ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-bw + _s(6), bh - _s(14));   ctx.lineTo(bw - _s(4), bh - _s(8));  ctx.stroke();
+  _drawGraniteTexture(ctx, g.bw, g.bh);
 }
 
 /** Draw a 2-D top-down tree (fern/palm style) centered at the origin. */
