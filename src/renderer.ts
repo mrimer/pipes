@@ -3058,6 +3058,14 @@ function _renderPass4CementLabels(ctx: CanvasRenderingContext2D, board: Board): 
   }
 }
 
+const PREVIEW_PULSE_PERIOD_MS = 1200;
+
+/** Slowly-pulsing alpha shared by the placement/rotation preview tile and its connection-preview edges. */
+function _computePreviewPulseAlpha(now: number): number {
+  const t = (now % PREVIEW_PULSE_PERIOD_MS) / PREVIEW_PULSE_PERIOD_MS;
+  return 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
+}
+
 /**
  * Draw a semi-transparent placement/rotation preview overlay at (px, py).
  * Applies a slowly-pulsing alpha and a yellow glow so the preview is visually
@@ -3071,11 +3079,8 @@ function _drawPreviewTile(
   currentWater: number,
   now: number,
 ): void {
-  const PULSE_PERIOD_MS = 1200;
-  const t = (now % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
-  const alpha = 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha = _computePreviewPulseAlpha(now);
   ctx.shadowColor = PREVIEW_SHADOW_COLOR;
   ctx.shadowBlur = PREVIEW_SHADOW_BLUR;
   drawTile(ctx, { x: px, y: py, tile: previewTile, isWater: false, currentWater });
@@ -3098,6 +3103,127 @@ function _drawPreviewTile(
  * @param previewTile  - The tile that would be placed / result from rotation.
  * @param filledPositions - Set of posKey strings for water-filled cells.
  */
+/** True when a one-way tile at `owDir` blocks entry from `dir` (entry is blocked from its opposite side). */
+function _oneWayBlocksDir(owDir: Direction | undefined, dir: Direction): boolean {
+  return owDir !== undefined && dir === oppositeDirection(owDir);
+}
+
+function _wouldConnectToNeighbor(
+  previewTile: Tile, neighbor: Tile, dir: Direction, oppDir: Direction, neighborOwDir: Direction | undefined,
+): boolean {
+  // The preview tile carries no one-way property, but the neighbor may block entry.
+  // In areMutuallyConnected the "to" (neighbor) one-way blocks when dir === opposite(toOwDir).
+  return previewTile.connections.has(dir) && neighbor.connections.has(oppDir) && !_oneWayBlocksDir(neighborOwDir, dir);
+}
+
+function _isCurrentlyConnectedToNeighbor(
+  currentTile: Tile, neighbor: Tile, dir: Direction, oppDir: Direction,
+  hoverOwDir: Direction | undefined, neighborOwDir: Direction | undefined,
+): boolean {
+  return currentTile.connections.has(dir) && neighbor.connections.has(oppDir)
+    && !_oneWayBlocksDir(hoverOwDir, dir) && !_oneWayBlocksDir(neighborOwDir, dir);
+}
+
+function _resolveConnectionPreviewColor(wouldDisconnect: boolean, isNeighborFilled: boolean): string {
+  if (wouldDisconnect) return DISCONNECTION_PREVIEW_COLOR;
+  return isNeighborFilled ? CONNECTION_PREVIEW_WATER_COLOR : CONNECTION_PREVIEW_COLOR;
+}
+
+function _computeNeighborGridPos(
+  hoverRow: number, hoverCol: number, dir: Direction, board: Board,
+): { nr: number; nc: number } | null {
+  const delta = NEIGHBOUR_DELTA[dir];
+  const nr = hoverRow + delta.row;
+  const nc = hoverCol + delta.col;
+  if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) return null;
+  return { nr, nc };
+}
+
+interface ConnectionPreviewNeighborContext {
+  board: Board;
+  hoverRow: number;
+  hoverCol: number;
+  previewTile: Tile;
+  currentTile: Tile;
+  hoverOwDir: Direction | undefined;
+  filledPositions: Set<string>;
+}
+
+/**
+ * Resolve the connection-preview highlight color for one cardinal direction from the
+ * hovered cell, or null when nothing should be highlighted (out of bounds, empty
+ * neighbor, or no connection change).
+ *
+ * Green highlight  → neighbor would connect to the preview tile (dry neighbor: bright green;
+ *                    water-filled neighbor: water-blue).
+ * Red highlight    → neighbor is currently connected to the hovered cell's tile, but the
+ *                    preview tile would break that connection (replacement / rotation case).
+ */
+function _resolveConnectionPreviewColorForDir(dir: Direction, c: ConnectionPreviewNeighborContext): string | null {
+  const pos = _computeNeighborGridPos(c.hoverRow, c.hoverCol, dir, c.board);
+  if (!pos) return null;
+
+  const neighbor = c.board.grid[pos.nr][pos.nc];
+  if (neighbor.shape === PipeShape.Empty) return null;
+
+  const oppDir = oppositeDirection(dir);
+  const neighborKey = posKey(pos.nr, pos.nc);
+  const neighborOwDir = c.board.oneWayData.get(neighborKey);
+
+  const wouldConnect = _wouldConnectToNeighbor(c.previewTile, neighbor, dir, oppDir, neighborOwDir);
+  const currentlyConnected = _isCurrentlyConnectedToNeighbor(c.currentTile, neighbor, dir, oppDir, c.hoverOwDir, neighborOwDir);
+  const wouldDisconnect = currentlyConnected && !wouldConnect;
+  if (!wouldConnect && !wouldDisconnect) return null;
+
+  return _resolveConnectionPreviewColor(wouldDisconnect, c.filledPositions.has(neighborKey));
+}
+
+function _traceConnectionPreviewEdgePath(ctx: CanvasRenderingContext2D, dir: Direction, px: number, py: number): void {
+  switch (dir) {
+    case Direction.North:
+      ctx.moveTo(px,             py);
+      ctx.lineTo(px + TILE_SIZE, py);
+      break;
+    case Direction.South:
+      ctx.moveTo(px,             py + TILE_SIZE);
+      ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
+      break;
+    case Direction.East:
+      ctx.moveTo(px + TILE_SIZE, py);
+      ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
+      break;
+    case Direction.West:
+      ctx.moveTo(px,             py);
+      ctx.lineTo(px,             py + TILE_SIZE);
+      break;
+  }
+}
+
+function _strokeConnectionPreviewEdge(
+  ctx: CanvasRenderingContext2D, dir: Direction, px: number, py: number, color: string, alpha: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  _traceConnectionPreviewEdgePath(ctx, dir, px, py);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw edge highlights on neighboring tiles that would form a new mutual
+ * connection with the hovered preview tile, or lose an existing one.
+ *
+ * @param ctx          - Canvas 2D context.
+ * @param board        - The current game board.
+ * @param hoverRow     - Row index of the hovered cell.
+ * @param hoverCol     - Column index of the hovered cell.
+ * @param previewTile  - The tile that would be placed / result from rotation.
+ * @param filledPositions - Set of posKey strings for water-filled cells.
+ */
 function _renderConnectionPreview(
   ctx: CanvasRenderingContext2D,
   board: Board,
@@ -3107,83 +3233,19 @@ function _renderConnectionPreview(
   filledPositions: Set<string>,
   now: number,
 ): void {
-  const PULSE_PERIOD_MS = 1200;
-  const t = (now % PULSE_PERIOD_MS) / PULSE_PERIOD_MS;
-  const alpha = 0.35 + 0.2 * ((Math.sin(t * Math.PI * 2) + 1) / 2);
-
+  const alpha = _computePreviewPulseAlpha(now);
   const px = hoverCol * TILE_SIZE;
   const py = hoverRow * TILE_SIZE;
   const currentTile = board.grid[hoverRow][hoverCol];
-  const hoverKey = posKey(hoverRow, hoverCol);
-  const hoverOwDir = board.oneWayData.get(hoverKey);
+  const hoverOwDir = board.oneWayData.get(posKey(hoverRow, hoverCol));
+  const neighborCtx: ConnectionPreviewNeighborContext = {
+    board, hoverRow, hoverCol, previewTile, currentTile, hoverOwDir, filledPositions,
+  };
 
   for (const [dir] of CARDINAL_DIRS) {
-    const delta = NEIGHBOUR_DELTA[dir];
-    const nr = hoverRow + delta.row;
-    const nc = hoverCol + delta.col;
-    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) continue;
-
-    const neighbor = board.grid[nr][nc];
-    if (neighbor.shape === PipeShape.Empty) continue;
-
-    const oppDir = oppositeDirection(dir);
-    const neighborKey = posKey(nr, nc);
-    const neighborOwDir = board.oneWayData.get(neighborKey);
-
-    // One-way check for the preview→neighbor direction:
-    // The preview tile carries no one-way property, but the neighbor may block entry.
-    // In areMutuallyConnected the "to" (neighbor) one-way blocks when dir === opposite(toOwDir).
-    const previewBlockedByNeighbor = neighborOwDir !== undefined && dir === oppositeDirection(neighborOwDir);
-    const wouldConnect =
-      previewTile.connections.has(dir) &&
-      neighbor.connections.has(oppDir) &&
-      !previewBlockedByNeighbor;
-
-    // One-way checks for the current tile in the hovered cell (for disconnection detection).
-    const currentBlockedByHover = hoverOwDir !== undefined && dir === oppositeDirection(hoverOwDir);
-    const currentBlockedByNeighbor = neighborOwDir !== undefined && dir === oppositeDirection(neighborOwDir);
-    const currentlyConnected =
-      currentTile.connections.has(dir) &&
-      neighbor.connections.has(oppDir) &&
-      !currentBlockedByHover &&
-      !currentBlockedByNeighbor;
-
-    const wouldDisconnect = currentlyConnected && !wouldConnect;
-    if (!wouldConnect && !wouldDisconnect) continue;
-
-    const isNeighborFilled = filledPositions.has(neighborKey);
-    const color = wouldDisconnect
-      ? DISCONNECTION_PREVIEW_COLOR
-      : isNeighborFilled
-        ? CONNECTION_PREVIEW_WATER_COLOR
-        : CONNECTION_PREVIEW_COLOR;
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    switch (dir) {
-      case Direction.North:
-        ctx.moveTo(px,             py);
-        ctx.lineTo(px + TILE_SIZE, py);
-        break;
-      case Direction.South:
-        ctx.moveTo(px,             py + TILE_SIZE);
-        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
-        break;
-      case Direction.East:
-        ctx.moveTo(px + TILE_SIZE, py);
-        ctx.lineTo(px + TILE_SIZE, py + TILE_SIZE);
-        break;
-      case Direction.West:
-        ctx.moveTo(px,             py);
-        ctx.lineTo(px,             py + TILE_SIZE);
-        break;
-    }
-    ctx.stroke();
-    ctx.restore();
+    const color = _resolveConnectionPreviewColorForDir(dir, neighborCtx);
+    if (color === null) continue;
+    _strokeConnectionPreviewEdge(ctx, dir, px, py, color, alpha);
   }
 }
 
