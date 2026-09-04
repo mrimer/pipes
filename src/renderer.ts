@@ -1724,44 +1724,68 @@ function _buildTeePath(
  * Cross pipe (N-S-E-W, canonical local frame).
  * Boundary goes clockwise, tracing the perimeter of the +-shape.
  */
-function _buildCrossPath(
-  ctx: CanvasRenderingContext2D,
-  half: number,
-  lw2: number,
-  localButt?: ReadonlySet<Direction>,
-): void {
-  const buttN = localButt?.has(Direction.North) ?? false;
-  const buttS = localButt?.has(Direction.South) ?? false;
-  const buttE = localButt?.has(Direction.East)  ?? false;
-  const buttW = localButt?.has(Direction.West)  ?? false;
+interface CrossPathButtFlags { buttN: boolean; buttS: boolean; buttE: boolean; buttW: boolean; }
+
+function _resolveCrossPathButtFlags(localButt: ReadonlySet<Direction> | undefined): CrossPathButtFlags {
+  return {
+    buttN: localButt?.has(Direction.North) ?? false,
+    buttS: localButt?.has(Direction.South) ?? false,
+    buttE: localButt?.has(Direction.East)  ?? false,
+    buttW: localButt?.has(Direction.West)  ?? false,
+  };
+}
+
+function _drawCrossNorthCap(ctx: CanvasRenderingContext2D, half: number, lw2: number, buttN: boolean): void {
   if (buttN) {
     ctx.moveTo(-lw2, -half);
     ctx.lineTo( lw2, -half);
   } else {
     ctx.arc(0, -half, lw2, Math.PI, 0, false);
   }
-  ctx.lineTo( lw2, -lw2);   // NE inner corner
-  ctx.lineTo(half, -lw2);   // top of E arm
+}
+
+function _drawCrossEastCap(ctx: CanvasRenderingContext2D, half: number, lw2: number, buttE: boolean): void {
   if (buttE) {
-    ctx.lineTo(half,  lw2);
+    ctx.lineTo(half, lw2);
   } else {
     ctx.arc(half, 0, lw2, -Math.PI / 2, Math.PI / 2, false);
   }
-  ctx.lineTo( lw2,  lw2);   // SE inner corner
-  ctx.lineTo( lw2,  half);  // right of S arm
+}
+
+function _drawCrossSouthCap(ctx: CanvasRenderingContext2D, half: number, lw2: number, buttS: boolean): void {
   if (buttS) {
-    ctx.lineTo(-lw2,  half);
+    ctx.lineTo(-lw2, half);
   } else {
     ctx.arc(0, half, lw2, 0, Math.PI, false);
   }
-  ctx.lineTo(-lw2,  lw2);   // SW inner corner
-  ctx.lineTo(-half,  lw2);  // bottom of W arm
+}
+
+function _drawCrossWestCap(ctx: CanvasRenderingContext2D, half: number, lw2: number, buttW: boolean): void {
   if (buttW) {
     ctx.lineTo(-half, -lw2);
   } else {
     // CW arc: bottom (-half,lw2) → left (-half-lw2,0) → top (-half,-lw2)
     ctx.arc(-half, 0, lw2, Math.PI / 2, -Math.PI / 2, false);
   }
+}
+
+function _buildCrossPath(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  lw2: number,
+  localButt?: ReadonlySet<Direction>,
+): void {
+  const { buttN, buttS, buttE, buttW } = _resolveCrossPathButtFlags(localButt);
+  _drawCrossNorthCap(ctx, half, lw2, buttN);
+  ctx.lineTo( lw2, -lw2);   // NE inner corner
+  ctx.lineTo(half, -lw2);   // top of E arm
+  _drawCrossEastCap(ctx, half, lw2, buttE);
+  ctx.lineTo( lw2,  lw2);   // SE inner corner
+  ctx.lineTo( lw2,  half);  // right of S arm
+  _drawCrossSouthCap(ctx, half, lw2, buttS);
+  ctx.lineTo(-lw2,  lw2);   // SW inner corner
+  ctx.lineTo(-half,  lw2);  // bottom of W arm
+  _drawCrossWestCap(ctx, half, lw2, buttW);
   ctx.lineTo(-lw2, -lw2);  // NW inner corner
   ctx.lineTo(-lw2, -half); // left of N arm
   ctx.closePath();
