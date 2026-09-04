@@ -1534,51 +1534,80 @@ export class Game implements InputCallbacks {
   reclaimTileAt(pos: GridPos): void {
     if (!this.board) return;
     const tileBeforeReclaim = this.board.grid[pos.row]?.[pos.col];
-    const reclaimedShape = tileBeforeReclaim?.shape;
-    const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
     const hadNoSelection = this.selectedShape === null;
     const filledBefore = this.board.getFilledPositions();
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     const result = this.board.reclaimTile(pos);
     if (result.success) {
-      const reclaimedPosKey = `${pos.row},${pos.col}`;
-      const filledAfterReclaim = this.board.getFilledPositions();
-      const anyDisconnected = [...filledBefore].some(key => key !== reclaimedPosKey && !filledAfterReclaim.has(key));
-      sfxManager.play(anyDisconnected ? SfxId.Disconnect : SfxId.Delete);
-      this._animMgr.completeAnims();
-      this._animMgr.resetIdleTimer();
-      const changes = this.board.applyTurnDelta();
-      this._playLeakSfxIfNeeded(this.board, changes);
-      this._playGoldSfxIfNeeded(this.board, filledBefore);
-
-      // Record delete move before board.recordMove() increments historyIndex.
-      this.board.recordMove(encodeDeleteMove(pos.row, pos.col));
-      const sparkle = this._metrics.sparkleCallbacks();
-      this._animMgr.spawnDisconnectionAnimations(
-        this.board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col,
-        lockedWaterImpactBefore, lockedHotPlateGainBefore,
-      );
-      this._animMgr.spawnDrainAnims(this.board, filledBefore, pos);
-      this._animMgr.spawnLockedCostChangeAnimations(changes);
-      this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
-      this._animMgr.spawnRemovalEffect(pos.row, pos.col);
-      if (reclaimedShape !== undefined) this._metrics.scheduleCountBounce(reclaimedShape);
-      this._deselectIfDepleted();
-      if (hadNoSelection && reclaimedShape !== undefined) {
-        const inv = this.board.inventory.find((it) => it.shape === reclaimedShape);
-        const bonuses = this.board.getContainerBonuses();
-        const effectiveCount = (inv?.count ?? 0) + (bonuses.get(reclaimedShape) ?? 0);
-        if (effectiveCount > 0) {
-          this.selectedShape = reclaimedShape;
-          this.pendingRotation = reclaimedRotation;
-        }
-      }
-      this._refreshPlayUI();
-      this._checkWinLoseAfterMove();
+      this._applyReclaimSuccessEffects({
+        board: this.board, pos, result, tileBeforeReclaim, hadNoSelection,
+        filledBefore, lockedWaterImpactBefore, lockedHotPlateGainBefore,
+      });
     } else if (result.error) {
       this.handleBoardError(result);
     }
+  }
+
+  /** Apply sfx/animation/persistence/reselection side effects after a successful tile reclaim. */
+  private _applyReclaimSuccessEffects(opts: {
+    board: Board;
+    pos: GridPos;
+    result: MoveResult;
+    tileBeforeReclaim: Tile | undefined;
+    hadNoSelection: boolean;
+    filledBefore: Set<string>;
+    lockedWaterImpactBefore: Map<string, number>;
+    lockedHotPlateGainBefore: Map<string, number>;
+  }): void {
+    const {
+      board, pos, result, tileBeforeReclaim, hadNoSelection,
+      filledBefore, lockedWaterImpactBefore, lockedHotPlateGainBefore,
+    } = opts;
+    const reclaimedShape = tileBeforeReclaim?.shape;
+    const reclaimedRotation = tileBeforeReclaim?.rotation ?? 0;
+    const reclaimedPosKey = `${pos.row},${pos.col}`;
+    const filledAfterReclaim = board.getFilledPositions();
+    const anyDisconnected = [...filledBefore].some(key => key !== reclaimedPosKey && !filledAfterReclaim.has(key));
+    sfxManager.play(anyDisconnected ? SfxId.Disconnect : SfxId.Delete);
+    this._animMgr.completeAnims();
+    this._animMgr.resetIdleTimer();
+    const changes = board.applyTurnDelta();
+    this._playLeakSfxIfNeeded(board, changes);
+    this._playGoldSfxIfNeeded(board, filledBefore);
+
+    // Record delete move before board.recordMove() increments historyIndex.
+    board.recordMove(encodeDeleteMove(pos.row, pos.col));
+    const sparkle = this._metrics.sparkleCallbacks();
+    this._animMgr.spawnDisconnectionAnimations(
+      board, filledBefore, sparkle, tileBeforeReclaim, pos.row, pos.col,
+      lockedWaterImpactBefore, lockedHotPlateGainBefore,
+    );
+    this._animMgr.spawnDrainAnims(board, filledBefore, pos);
+    this._animMgr.spawnLockedCostChangeAnimations(changes);
+    this._animMgr.spawnCementDecrementAnimation(result.cementDecrement);
+    this._animMgr.spawnRemovalEffect(pos.row, pos.col);
+    if (reclaimedShape !== undefined) this._metrics.scheduleCountBounce(reclaimedShape);
+    this._deselectIfDepleted();
+    this._maybeReselectReclaimedShape(board, hadNoSelection, reclaimedShape, reclaimedRotation);
+    this._refreshPlayUI();
+    this._checkWinLoseAfterMove();
+  }
+
+  /** Re-select the just-reclaimed shape when nothing was selected before and inventory/bonuses still cover it. */
+  private _maybeReselectReclaimedShape(
+    board: Board,
+    hadNoSelection: boolean,
+    reclaimedShape: Tile['shape'] | undefined,
+    reclaimedRotation: Tile['rotation'],
+  ): void {
+    if (!hadNoSelection || reclaimedShape === undefined) return;
+    const inv = board.inventory.find((it) => it.shape === reclaimedShape);
+    const bonuses = board.getContainerBonuses();
+    const effectiveCount = (inv?.count ?? 0) + (bonuses.get(reclaimedShape) ?? 0);
+    if (effectiveCount <= 0) return;
+    this.selectedShape = reclaimedShape;
+    this.pendingRotation = reclaimedRotation;
   }
 
   /**
