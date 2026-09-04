@@ -2585,85 +2585,67 @@ export interface ContainerDrainAnimsOptions {
   now: number;
 }
 
+/**
+ * Clip to the remaining-water region.  Drain sweeps from the exit edge toward
+ * the opposite side, so remaining water is on the side opposite to exitDir.
+ * Expand by LINE_WIDTH/2 in all directions so that round-cap nubs extending
+ * past the tile boundary are included and drain smoothly instead of clipping immediately.
+ */
+function _computeDrainAnimClipRect(
+  exitDir: Direction, x: number, y: number, progress: number,
+): { x: number; y: number; w: number; h: number } {
+  const nub = LINE_WIDTH / 2;
+  switch (exitDir) {
+    case Direction.North: // exit at top → remaining water shrinks upward from bottom
+      return { x: x - nub, y: y + progress * TILE_SIZE - nub, w: TILE_SIZE + LINE_WIDTH, h: (1 - progress) * TILE_SIZE + LINE_WIDTH };
+    case Direction.South: // exit at bottom → remaining water shrinks downward from top
+      return { x: x - nub, y: y - nub, w: TILE_SIZE + LINE_WIDTH, h: (1 - progress) * TILE_SIZE + LINE_WIDTH };
+    case Direction.East: // exit at right → remaining water shrinks rightward from left
+      return { x: x - nub, y: y - nub, w: (1 - progress) * TILE_SIZE + LINE_WIDTH, h: TILE_SIZE + LINE_WIDTH };
+    case Direction.West: // exit at left → remaining water shrinks leftward from right
+      return { x: x + progress * TILE_SIZE - nub, y: y - nub, w: (1 - progress) * TILE_SIZE + LINE_WIDTH, h: TILE_SIZE + LINE_WIDTH };
+    default:
+      return { x, y, w: TILE_SIZE, h: TILE_SIZE };
+  }
+}
+
+function _renderOneContainerDrainAnim(
+  ctx: CanvasRenderingContext2D, board: Board, anim: PipeDrainAnim, now: number,
+  drawOpts: { currentWater: number; shiftHeld: boolean; currentTemp: number; currentPressure: number },
+): void {
+  if (!anim.isContainer) return;
+  const elapsed = now - anim.startTime;
+  if (elapsed < 0 || elapsed >= FILL_ANIM_DURATION) return;
+  const progress = elapsed / FILL_ANIM_DURATION;
+
+  const { row, col, exitDir } = anim;
+  const x = col * TILE_SIZE;
+  const y = row * TILE_SIZE;
+  const tile = board.getTile({ row, col });
+  if (!tile) return;
+
+  const clip = _computeDrainAnimClipRect(exitDir, x, y, progress);
+  // This animation always renders the tile as if fully connected (isWater hardcoded
+  // true), same as _renderOneContainerFillAnim above.
+  const { lockedCost, lockedGain } = _computeChamberLockedValues(board, tile, { row, col }, true);
+  const buttEndDirs = _computeButtEndDirsForTile(board, tile, row, col);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(clip.x, clip.y, clip.w, clip.h);
+  ctx.clip();
+  drawTile(ctx, {
+    x, y, tile, isWater: true, currentWater: drawOpts.currentWater, shiftHeld: drawOpts.shiftHeld,
+    currentTemp: drawOpts.currentTemp, currentPressure: drawOpts.currentPressure,
+    lockedCost, lockedGain, buttEndDirs,
+  });
+  ctx.restore();
+}
+
 export function renderContainerDrainAnims(ctx: CanvasRenderingContext2D, opts: ContainerDrainAnimsOptions): void {
   const { board, anims, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
   for (const anim of anims) {
-    if (!anim.isContainer) continue;
-    const elapsed = now - anim.startTime;
-    if (elapsed < 0 || elapsed >= FILL_ANIM_DURATION) continue;
-    const progress = elapsed / FILL_ANIM_DURATION;
-
-    const { row, col, exitDir } = anim;
-    const x = col * TILE_SIZE;
-    const y = row * TILE_SIZE;
-    const tile = board.getTile({ row, col });
-    if (!tile) continue;
-
-    // Clip to the remaining-water region.  Drain sweeps from the exit edge toward
-    // the opposite side, so remaining water is on the side opposite to exitDir.
-    // Expand by LINE_WIDTH/2 in all directions so that round-cap nubs extending
-    // past the tile boundary are included and drain smoothly instead of clipping immediately.
-    const nub = LINE_WIDTH / 2;
-    let clipX = x, clipY = y, clipW = TILE_SIZE, clipH = TILE_SIZE;
-    switch (exitDir) {
-      case Direction.North: // exit at top → remaining water shrinks upward from bottom
-        clipX = x - nub;
-        clipY = y + progress * TILE_SIZE - nub;
-        clipW = TILE_SIZE + LINE_WIDTH;
-        clipH = (1 - progress) * TILE_SIZE + LINE_WIDTH;
-        break;
-      case Direction.South: // exit at bottom → remaining water shrinks downward from top
-        clipX = x - nub;
-        clipY = y - nub;
-        clipW = TILE_SIZE + LINE_WIDTH;
-        clipH = (1 - progress) * TILE_SIZE + LINE_WIDTH;
-        break;
-      case Direction.East: // exit at right → remaining water shrinks rightward from left
-        clipX = x - nub;
-        clipY = y - nub;
-        clipW = (1 - progress) * TILE_SIZE + LINE_WIDTH;
-        clipH = TILE_SIZE + LINE_WIDTH;
-        break;
-      case Direction.West: // exit at left → remaining water shrinks leftward from right
-        clipX = x + progress * TILE_SIZE - nub;
-        clipY = y - nub;
-        clipW = (1 - progress) * TILE_SIZE + LINE_WIDTH;
-        clipH = TILE_SIZE + LINE_WIDTH;
-        break;
-    }
-
-    let lockedCost: number | null = null;
-    let lockedGain: number | null = null;
-    if (tile.shape === PipeShape.Chamber) {
-      if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
-        const impact = board.getLockedWaterImpact({ row, col });
-        if (impact !== null) lockedCost = Math.abs(impact);
-      } else if (tile.chamberContent === 'siphon') {
-        lockedGain = board.getSiphonLockedGain({ row, col });
-      } else if (tile.chamberContent === 'hot_plate') {
-        const impact = board.getLockedWaterImpact({ row, col });
-        const gain = board.getLockedHotPlateGain({ row, col });
-        if (impact !== null && gain !== null) {
-          const loss = Math.max(0, gain - impact);
-          lockedGain = gain;
-          lockedCost = loss;
-        }
-      }
-    }
-
-    const buttEndDirs = tile.shape === PipeShape.Chamber
-      ? (_computeButtEndDirs(board, row, col) ?? new Set<Direction>())
-      : _computeButtEndDirs(board, row, col);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(clipX, clipY, clipW, clipH);
-    ctx.clip();
-    drawTile(ctx, {
-      x, y, tile, isWater: true, currentWater, shiftHeld, currentTemp, currentPressure,
-      lockedCost, lockedGain, buttEndDirs,
-    });
-    ctx.restore();
+    _renderOneContainerDrainAnim(ctx, board, anim, now, { currentWater, shiftHeld, currentTemp, currentPressure });
   }
 }
 
