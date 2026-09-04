@@ -1,6 +1,7 @@
 import type { MoveResult} from './board';
 import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor, SPIN_PIPE_SHAPES } from './board';
 import type { Tile } from './tile';
+import type { ChapterMapScreen } from './screens/chapterMapScreen';
 import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
 import { GameScreen, GameState, PipeShape } from './types';
 import type { InputCallbacks} from './inputHandler';
@@ -2582,81 +2583,102 @@ export class Game implements InputCallbacks {
   exitToMenu(): void {
     this._persistPartialProgressOnExit();
     if (this._campaign.isPlaytesting) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- takePlaytestCallback is always set when isPlaytesting is true
-      const cb = this._campaign.takePlaytestCallback()!;
-      // keepMusicGroup=true: the editor restores the correct group itself, so skip
-      // the interim 'menu' switch that would restart the track for no reason.
-      this._showLevelSelect(true, true);
-      cb(); // re-open the campaign editor
+      this._exitToPlaytestEditor();
     } else if (this._campaign.winFromChapterMap && this._campaign.chapterMapScreen?.chapter) {
-      this._campaign.winFromChapterMap = false;
-      this.winModalEl.style.display = 'none';
-      this._exitConfirmModalEl.style.display = 'none';
-      this._closeModal(this.gameoverModalEl);
-      // Cancel any pending ring spawning before leaving the play screen.
-      this._cancelPendingRings();
-      // Stop any sounds still playing from the play screen.
-      sfxManager.stopAll();
-
-      // Pre-render the board snapshot at the current game TILE_SIZE BEFORE
-      // reshowChapterMap() changes TILE_SIZE to the chapter-map tile size.
-      let boardSnapshot: HTMLCanvasElement | null = null;
-      if (this.board) {
-        const offscreen = document.createElement('canvas');
-        offscreen.width = this.board.cols * TILE_SIZE;
-        offscreen.height = this.board.rows * TILE_SIZE;
-        const offCtx = offscreen.getContext('2d');
-        if (offCtx) {
-          renderBoard(offCtx, offscreen, { board: this.board, selectedShape: null, pendingRotation: 0, mouseCanvasPos: null });
-          boardSnapshot = offscreen;
-        }
-      }
-
-      // Reshow the chapter map (restores chapter-map TILE_SIZE and renders the canvas).
-      this._campaign.reshowChapterMap();
-      this.screen = GameScreen.ChapterMap;
-
-      // Compute the minimap screen rect for the current level (uses chapter-map TILE_SIZE).
-      const chapterMapScreen = this._campaign.chapterMapScreen;
-      const minimapRect = this.currentLevel
-        ? chapterMapScreen.getMinimapScreenRect(this.currentLevel)
-        : null;
-
-      if (minimapRect && boardSnapshot) {
-        // Play zoom-out animation: level snapshot shrinks back to minimap position.
-        chapterMapScreen.screenEl.style.opacity = '0';
-        // Suppress scrollbar on the chapter map screen during the animation to
-        // prevent a momentary layout shift if the map content exceeds the viewport.
-        chapterMapScreen.screenEl.style.overflow = 'hidden';
-        playLevelExitTransition(
-          minimapRect,
-          chapterMapScreen.screenEl,
-          this.canvas,
-          boardSnapshot,
-          this.playScreenEl,
-          () => {
-            chapterMapScreen.screenEl.style.overflow = '';
-            // Only hide the play screen if the user hasn't already selected a new
-            // level while this exit animation was running.  If a new level was
-            // chosen mid-animation the screen is already GameScreen.Play, and
-            // unconditionally hiding the play screen here would leave a permanent
-            // black screen (the enter transition's onComplete sets opacity:1 on a
-            // display:none element, so nothing becomes visible).
-            if (this.screen === GameScreen.ChapterMap) {
-              this.playScreenEl.style.display = 'none';
-              this.currentLevel = null;
-            }
-          },
-        );
-      } else {
-        // No minimap or snapshot available – skip animation and switch immediately.
-        this.levelSelectEl.style.display = 'none';
-        this.playScreenEl.style.display = 'none';
-        this.currentLevel = null;
-      }
+      this._exitToChapterMap();
     } else {
       this._showLevelSelect();
     }
+  }
+
+  /** Re-open the campaign editor after an editor playtest session ends. */
+  private _exitToPlaytestEditor(): void {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- takePlaytestCallback is always set when isPlaytesting is true
+    const cb = this._campaign.takePlaytestCallback()!;
+    // keepMusicGroup=true: the editor restores the correct group itself, so skip
+    // the interim 'menu' switch that would restart the track for no reason.
+    this._showLevelSelect(true, true);
+    cb(); // re-open the campaign editor
+  }
+
+  /** Exit back to the chapter map after winning a level launched from it, with a zoom-out transition when possible. */
+  private _exitToChapterMap(): void {
+    this._campaign.winFromChapterMap = false;
+    this.winModalEl.style.display = 'none';
+    this._exitConfirmModalEl.style.display = 'none';
+    this._closeModal(this.gameoverModalEl);
+    // Cancel any pending ring spawning before leaving the play screen.
+    this._cancelPendingRings();
+    // Stop any sounds still playing from the play screen.
+    sfxManager.stopAll();
+
+    // Pre-render the board snapshot at the current game TILE_SIZE BEFORE
+    // reshowChapterMap() changes TILE_SIZE to the chapter-map tile size.
+    const boardSnapshot = this._captureBoardSnapshotForExit();
+
+    // Reshow the chapter map (restores chapter-map TILE_SIZE and renders the canvas).
+    this._campaign.reshowChapterMap();
+    this.screen = GameScreen.ChapterMap;
+
+    // Compute the minimap screen rect for the current level (uses chapter-map TILE_SIZE).
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by caller's chapterMapScreen?.chapter check in exitToMenu
+    const chapterMapScreen = this._campaign.chapterMapScreen!;
+    const minimapRect = this.currentLevel
+      ? chapterMapScreen.getMinimapScreenRect(this.currentLevel)
+      : null;
+
+    if (minimapRect && boardSnapshot) {
+      this._playLevelExitZoomAnimation(chapterMapScreen, minimapRect, boardSnapshot);
+    } else {
+      // No minimap or snapshot available – skip animation and switch immediately.
+      this.levelSelectEl.style.display = 'none';
+      this.playScreenEl.style.display = 'none';
+      this.currentLevel = null;
+    }
+  }
+
+  /** Render an offscreen snapshot of the current board at the current TILE_SIZE, for the level-exit zoom animation. */
+  private _captureBoardSnapshotForExit(): HTMLCanvasElement | null {
+    if (!this.board) return null;
+    const offscreen = document.createElement('canvas');
+    offscreen.width = this.board.cols * TILE_SIZE;
+    offscreen.height = this.board.rows * TILE_SIZE;
+    const offCtx = offscreen.getContext('2d');
+    if (!offCtx) return null;
+    renderBoard(offCtx, offscreen, { board: this.board, selectedShape: null, pendingRotation: 0, mouseCanvasPos: null });
+    return offscreen;
+  }
+
+  /** Play the level-exit zoom-out animation: the level snapshot shrinks back to its minimap position. */
+  private _playLevelExitZoomAnimation(
+    chapterMapScreen: ChapterMapScreen,
+    minimapRect: { x: number; y: number; width: number; height: number },
+    boardSnapshot: HTMLCanvasElement,
+  ): void {
+    chapterMapScreen.screenEl.style.opacity = '0';
+    // Suppress scrollbar on the chapter map screen during the animation to
+    // prevent a momentary layout shift if the map content exceeds the viewport.
+    chapterMapScreen.screenEl.style.overflow = 'hidden';
+    playLevelExitTransition(
+      minimapRect,
+      chapterMapScreen.screenEl,
+      this.canvas,
+      boardSnapshot,
+      this.playScreenEl,
+      () => {
+        chapterMapScreen.screenEl.style.overflow = '';
+        // Only hide the play screen if the user hasn't already selected a new
+        // level while this exit animation was running.  If a new level was
+        // chosen mid-animation the screen is already GameScreen.Play, and
+        // unconditionally hiding the play screen here would leave a permanent
+        // black screen (the enter transition's onComplete sets opacity:1 on a
+        // display:none element, so nothing becomes visible).
+        if (this.screen === GameScreen.ChapterMap) {
+          this.playScreenEl.style.display = 'none';
+          this.currentLevel = null;
+        }
+      },
+    );
   }
 
   /** Show the game-rules modal overlay. */
