@@ -2681,6 +2681,93 @@ interface RenderPass1BackgroundsOptions {
   shimmerAlpha: number;
 }
 
+/** Shared gingham-checkerboard color pick, by tile parity, for a given inferred floor shape. */
+function _resolveGinghamColor(floorShape: PipeShape, r: number, c: number): string {
+  const paritySum = (r % 2) + (c % 2);
+  const [gcLight, gcMid, gcDark] = ginghamColorsForFloor(floorShape);
+  if (paritySum === 0) return gcLight;
+  if (paritySum === 2) return gcDark;
+  return gcMid;
+}
+
+/** One-way cell: gingham background (inferred floor type) + directional arrow on top. */
+function _drawOneWayCellBackground(
+  ctx: CanvasRenderingContext2D, board: Board, r: number, c: number, x: number, y: number, oneWayDir: Direction,
+): void {
+  const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
+  ctx.fillStyle = _resolveGinghamColor(floorType, r, c);
+  ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+  drawOneWayArrow(ctx, x, y, oneWayDir);
+}
+
+/** Cement cell: always show cement background regardless of tile on top. */
+function _drawCementCellBackground(ctx: CanvasRenderingContext2D, board: Board, r: number, c: number, x: number, y: number): void {
+  const dryingTime = board.cementData.get(posKey(r, c)) as number;
+  _drawCementBackground(ctx, x, y, dryingTime === 0);
+}
+
+/** Shimmering gold background for an empty gold-space cell. */
+function _drawGoldEmptyCellBackground(ctx: CanvasRenderingContext2D, x: number, y: number, shimmerAlpha: number): void {
+  ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
+  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+  ctx.fillStyle = `${GOLD_SPACE_SHIMMER_COLOR}${shimmerAlpha.toFixed(3)})`;
+  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+  // Gold border to make the cell clearly distinct
+  ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+  // Pipe-keyhole glyph: signals "gold pipes only" on the empty cell.
+  drawGoldKeyholeGlyph(ctx, x, y, shimmerAlpha);
+}
+
+/** Gingham background plus any ambient decoration for a plain (non-gold) empty cell. */
+function _drawPlainEmptyCellBackground(
+  ctx: CanvasRenderingContext2D, board: Board, tile: Tile, r: number, c: number, x: number, y: number,
+): void {
+  ctx.fillStyle = _resolveGinghamColor(tile.shape, r, c);
+  ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+  const dec = board.ambientDecorations.get(posKey(r, c));
+  if (dec) drawAmbientDecoration(ctx, dec);
+}
+
+function _drawEmptyFloorBackground(
+  ctx: CanvasRenderingContext2D, board: Board, tile: Tile, r: number, c: number, x: number, y: number,
+  isGoldCell: boolean, shimmerAlpha: number,
+): void {
+  if (isGoldCell) {
+    _drawGoldEmptyCellBackground(ctx, x, y, shimmerAlpha);
+  } else {
+    _drawPlainEmptyCellBackground(ctx, board, tile, r, c, x, y);
+  }
+}
+
+/** Non-empty tile on a gold space: keep the darker gold background so the space is visible. */
+function _drawGoldNonEmptyCellBackground(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
+  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+  ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+}
+
+function _isRemovablePipeTile(tile: Tile): boolean {
+  return !tile.isFixed && (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
+}
+
+/** Player-placed (removable) pipes get a distinct background from fixed ones. */
+function _drawPlainNonEmptyCellBackground(ctx: CanvasRenderingContext2D, tile: Tile, x: number, y: number): void {
+  ctx.fillStyle = _isRemovablePipeTile(tile) ? REMOVABLE_BG_COLOR : TILE_BG;
+  ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+}
+
+function _drawNonEmptyTileBackground(ctx: CanvasRenderingContext2D, tile: Tile, x: number, y: number, isGoldCell: boolean): void {
+  if (isGoldCell) {
+    _drawGoldNonEmptyCellBackground(ctx, x, y);
+  } else {
+    _drawPlainNonEmptyCellBackground(ctx, tile, x, y);
+  }
+}
+
 function _renderPass1Backgrounds(ctx: CanvasRenderingContext2D, opts: RenderPass1BackgroundsOptions): void {
   // selectedShape/pendingRotation/selectedIsGold are accepted for interface consistency
   // with the other render passes but are not read by this pass (pre-existing: they were
@@ -2694,62 +2781,17 @@ function _renderPass1Backgrounds(ctx: CanvasRenderingContext2D, opts: RenderPass
       const isGoldCell = board.goldSpaces.has(posKey(r, c));
       const isCementCell = board.cementData.has(posKey(r, c));
       const oneWayDir = board.oneWayData.get(posKey(r, c));
-      const isOneWayCell = oneWayDir !== undefined;
 
       // Tile background
-      if (isOneWayCell) {
-        // One-way cell: gingham background (inferred floor type) + directional arrow on top
-        const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
-        const paritySum = (r % 2) + (c % 2);
-        const [gc_light, gc_mid, gc_dark] = ginghamColorsForFloor(floorType);
-        const ginghamColor = paritySum === 0 ? gc_light : paritySum === 2 ? gc_dark : gc_mid;
-        ctx.fillStyle = ginghamColor;
-        ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-        drawOneWayArrow(ctx, x, y, oneWayDir);
+      if (oneWayDir !== undefined) {
+        _drawOneWayCellBackground(ctx, board, r, c, x, y, oneWayDir);
       } else if (isCementCell) {
-        // Cement cell: always show cement background regardless of tile on top
-        const dryingTime = board.cementData.get(posKey(r, c)) as number;
-        _drawCementBackground(ctx, x, y, dryingTime === 0);
+        _drawCementCellBackground(ctx, board, r, c, x, y);
       } else if (isEmptyFloor(tile.shape)) {
-        if (isGoldCell) {
-          // Shimmering gold background
-          ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          ctx.fillStyle = `${GOLD_SPACE_SHIMMER_COLOR}${shimmerAlpha.toFixed(3)})`;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          // Gold border to make the cell clearly distinct
-          ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-          // Pipe-keyhole glyph: signals "gold pipes only" on the empty cell.
-          drawGoldKeyholeGlyph(ctx, x, y, shimmerAlpha);
-        } else {
-          const paritySum = (r % 2) + (c % 2);
-          const [gc_light, gc_mid, gc_dark] = ginghamColorsForFloor(tile.shape);
-          const ginghamColor = paritySum === 0 ? gc_light : paritySum === 2 ? gc_dark : gc_mid;
-          ctx.fillStyle = ginghamColor;
-          ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-          // Draw any ambient decoration on this empty non-gold cell
-          const dec = board.ambientDecorations.get(posKey(r, c));
-          if (dec) drawAmbientDecoration(ctx, dec);
-        }
+        _drawEmptyFloorBackground(ctx, board, tile, r, c, x, y, isGoldCell, shimmerAlpha);
       } else {
-        // Non-empty tile: player-placed (removable) pipes get a distinct background
-        if (isGoldCell) {
-          // Non-empty tile on a gold space: keep the darker gold background so the space is visible
-          ctx.fillStyle = GOLD_SPACE_BASE_COLOR;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-          ctx.strokeStyle = GOLD_SPACE_BORDER_COLOR;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        } else {
-          const isRemovable = !tile.isFixed &&
-            (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape));
-          ctx.fillStyle = isRemovable ? REMOVABLE_BG_COLOR : TILE_BG;
-          ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        }
+        _drawNonEmptyTileBackground(ctx, tile, x, y, isGoldCell);
       }
-
     }
   }
 }
