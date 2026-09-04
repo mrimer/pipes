@@ -1861,6 +1861,26 @@ export function drawPipeBody(
  * @param blockedDir   The direction whose arm is blocked by a one-way tile (no rust there),
  *                     or null when all arms carry water.
  */
+function _localDirToUnitDelta(localDir: Direction): { dx: number; dy: number } {
+  switch (localDir) {
+    case Direction.North: return { dx: 0, dy: -1 };
+    case Direction.South: return { dx: 0, dy: 1 };
+    case Direction.East:  return { dx: 1, dy: 0 };
+    default:              return { dx: -1, dy: 0 }; // West
+  }
+}
+
+/** Two rust spots along one arm: one at 1/3 of the arm, one at 2/3. */
+function _drawRustSpotsAlongArm(ctx: CanvasRenderingContext2D, dx: number, dy: number, half: number, spotR: number): void {
+  for (const frac of [0.33, 0.67]) {
+    const sx = dx * half * frac;
+    const sy = dy * half * frac;
+    ctx.beginPath();
+    ctx.arc(sx, sy, spotR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function _drawLeakyRustSpots(
   ctx: CanvasRenderingContext2D,
   tile: Tile,
@@ -1879,34 +1899,9 @@ function _drawLeakyRustSpots(
   const rotSteps = tile.rotation / 90;
   for (const dir of tile.connections) {
     if (dir === blockedDir) continue;
-
-    // Un-rotate the absolute direction back to local frame.
-    let localDir = dir;
-    for (let i = 0; i < rotSteps; i++) {
-      switch (localDir) {
-        case Direction.North: localDir = Direction.West;  break;
-        case Direction.West:  localDir = Direction.South; break;
-        case Direction.South: localDir = Direction.East;  break;
-        case Direction.East:  localDir = Direction.North; break;
-      }
-    }
-
-    let dx = 0, dy = 0;
-    switch (localDir) {
-      case Direction.North: dx =  0; dy = -1; break;
-      case Direction.South: dx =  0; dy =  1; break;
-      case Direction.East:  dx =  1; dy =  0; break;
-      case Direction.West:  dx = -1; dy =  0; break;
-    }
-
-    // Two spots: one at 1/3 of the arm, one at 2/3.
-    for (const frac of [0.33, 0.67]) {
-      const sx = dx * half * frac;
-      const sy = dy * half * frac;
-      ctx.beginPath();
-      ctx.arc(sx, sy, spotR, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const localDir = _rotateDirectionCCW(dir, rotSteps);
+    const { dx, dy } = _localDirToUnitDelta(localDir);
+    _drawRustSpotsAlongArm(ctx, dx, dy, half, spotR);
   }
   ctx.restore();
 }
