@@ -2624,122 +2624,172 @@ interface RenderPass2NonPipeTilesOptions {
   shakeOffsets?: Map<string, number>;
 }
 
+/** True when a non-pipe tile should be skipped entirely: it's a pipe tile, or an empty-floor dot that a cement/one-way overlay already covers. */
+function _shouldSkipNonPipeTile(board: Board, tile: Tile, r: number, c: number): boolean {
+  if (PIPE_SHAPES.has(tile.shape)) return true;
+  const isCementCell = board.cementData.has(posKey(r, c));
+  // Skip drawing the empty-tile dot on cement or one-way cells – their
+  // background texture/arrow is already clearly visible.
+  return isEmptyFloor(tile.shape) && (isCementCell || board.oneWayData.has(posKey(r, c)));
+}
+
+/**
+ * For connected ice/snow/sandstone tiles, the locked effective cost so
+ * the tile can display the single locked-in value instead of the live formula.
+ * For connected hot_plate tiles, both the locked gain (from frozen) and locked loss.
+ * For siphon tiles, the frozen gain regardless of connection state (displayed always).
+ */
+function _computeChamberLockedValues(
+  board: Board, tile: Tile, pos: { row: number; col: number }, isWater: boolean,
+): { lockedCost: number | null; lockedGain: number | null } {
+  const none = { lockedCost: null, lockedGain: null };
+  if (tile.shape !== PipeShape.Chamber) return none;
+  if (isWater && _isColdOrGelChamberContent(tile.chamberContent)) {
+    return { lockedCost: _computeColdChamberLockedCost(board, pos), lockedGain: null };
+  }
+  if (tile.chamberContent === 'siphon') {
+    return { lockedCost: null, lockedGain: board.getSiphonLockedGain(pos) };
+  }
+  if (isWater && tile.chamberContent === 'hot_plate') {
+    return _computeHotPlateLockedValues(board, pos);
+  }
+  return none;
+}
+
+function _isColdOrGelChamberContent(content: Tile['chamberContent']): boolean {
+  return content !== null && (COLD_CHAMBER_CONTENTS.has(content) || content === 'gel');
+}
+
+function _computeColdChamberLockedCost(board: Board, pos: { row: number; col: number }): number | null {
+  const impact = board.getLockedWaterImpact(pos);
+  return impact !== null ? Math.abs(impact) : null;
+}
+
+function _computeHotPlateLockedValues(
+  board: Board, pos: { row: number; col: number },
+): { lockedCost: number | null; lockedGain: number | null } {
+  const impact = board.getLockedWaterImpact(pos);
+  const gain = board.getLockedHotPlateGain(pos);
+  if (impact === null || gain === null) return { lockedCost: null, lockedGain: null };
+  return { lockedCost: Math.max(0, gain - impact), lockedGain: gain };
+}
+
+/**
+ * For Source/Sink/Chamber tiles, which arm directions need a butt end cap.
+ * For Chamber tiles the result is always a defined Set (possibly empty) so that
+ * arms pointing at empty tiles trigger Phase 2 in _drawChamber and get round end
+ * caps sticking into the adjacent tile.  An undefined result would fall through to
+ * the legacy "all butt caps" path and suppress the round nubs entirely.
+ */
+function _computeButtEndDirsForTile(board: Board, tile: Tile, r: number, c: number): Set<Direction> | undefined {
+  if (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
+    return _computeButtEndDirs(board, r, c);
+  }
+  if (tile.shape === PipeShape.Chamber) {
+    return _computeButtEndDirs(board, r, c) ?? new Set<Direction>();
+  }
+  return undefined;
+}
+
+/** For Sea tiles, which neighbors are also sea (for border rendering). */
+function _computeSeaNeighborsForTile(board: Board, tile: Tile, r: number, c: number): SeaNeighbors | undefined {
+  if (tile.shape !== PipeShape.Sea) return undefined;
+  return computeSeaNeighbors((dr, dc) => {
+    const nr = r + dr, nc = c + dc;
+    return nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols || board.grid[nr][nc].shape === PipeShape.Sea;
+  });
+}
+
+/** For Granite tiles, which neighbors are also granite (for seaming). */
+function _computeGraniteNeighborsForTile(board: Board, tile: Tile, r: number, c: number): GraniteNeighbors | undefined {
+  if (tile.shape !== PipeShape.Granite) return undefined;
+  return computeGraniteNeighbors(board, r, c);
+}
+
+/**
+ * Draw the gingham overlay on non-empty, non-pipe tiles (100% alpha pattern over the
+ * tile background color) and return the per-tile inferred floor shape for style-dependent
+ * rendering (e.g. Tree tile colors should match the local floor style, not the overall
+ * board style). Returns undefined for tiles that don't get an overlay.
+ */
+function _tileGetsGinghamOverlay(shape: PipeShape): boolean {
+  return shape === PipeShape.Granite || shape === PipeShape.Tree || shape === PipeShape.Tree2
+    || shape === PipeShape.Tree3 || shape === PipeShape.Tree4 || shape === PipeShape.Chamber
+    || shape === PipeShape.Source || shape === PipeShape.Sink;
+}
+
+function _drawGinghamOverlayIfNeeded(
+  ctx: CanvasRenderingContext2D, board: Board, tile: Tile,
+  geom: { row: number; col: number; x: number; y: number },
+): PipeShape | undefined {
+  if (!_tileGetsGinghamOverlay(tile.shape)) return undefined;
+  const inferredFloorShape = board.floorTypes.get(posKey(geom.row, geom.col)) ?? PipeShape.Empty;
+  drawGinghamOverlay(ctx, geom.x + 1, geom.y + 1, TILE_SIZE - 2, TILE_SIZE - 2, geom.row, geom.col, inferredFloorShape, 1.0); //alpha
+  return inferredFloorShape;
+}
+
+/**
+ * For the sink tile, an overlay callback that renders the vortex effect after the
+ * outer circle but before the connector arms.  The callback must temporarily undo
+ * the translation that drawTile/drawSourceOrSink applies to the context so that
+ * renderVortex can use absolute canvas coordinates.
+ */
+function _buildSinkVortexOverlayFn(
+  ctx: CanvasRenderingContext2D, tile: Tile, sinkVortexFn: (() => void) | undefined, x: number, y: number,
+): (() => void) | undefined {
+  if (tile.shape !== PipeShape.Sink || sinkVortexFn === undefined) return undefined;
+  const tileCx = x + TILE_SIZE / 2;
+  const tileCy = y + TILE_SIZE / 2;
+  return () => {
+    ctx.save();
+    ctx.translate(-tileCx, -tileCy);
+    sinkVortexFn();
+    ctx.restore();
+  };
+}
+
+/** Draw a tile, temporarily translating the context when a shake offset is active. */
+function _drawNonPipeTile(ctx: CanvasRenderingContext2D, drawOpts: DrawTileOptions, shakeOffset: number | undefined): void {
+  if (shakeOffset === undefined) {
+    drawTile(ctx, drawOpts);
+    return;
+  }
+  ctx.save();
+  ctx.translate(shakeOffset, 0);
+  drawTile(ctx, drawOpts);
+  ctx.restore();
+}
+
 function _renderPass2NonPipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass2NonPipeTilesOptions): void {
   const { board, filled, currentWater, shiftHeld, currentTemp, currentPressure, sinkVortexFn, shakeOffsets } = opts;
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
       const tile = board.grid[r][c];
-      if (PIPE_SHAPES.has(tile.shape)) continue;
-      const isCementCell = board.cementData.has(posKey(r, c));
-
-      // Skip drawing the empty-tile dot on cement or one-way cells – their
-      // background texture/arrow is already clearly visible.
-      if (isEmptyFloor(tile.shape) && (isCementCell || board.oneWayData.has(posKey(r, c)))) continue;
+      if (_shouldSkipNonPipeTile(board, tile, r, c)) continue;
 
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       const isWater = filled.has(posKey(r, c));
 
-      // For connected ice/snow/sandstone tiles, pass the locked effective cost so
-      // the tile can display the single locked-in value instead of the live formula.
-      // For connected hot_plate tiles, pass both the locked gain (from frozen) and locked loss.
-      // For siphon tiles, pass the frozen gain regardless of connection state (displayed always).
-      let lockedCost: number | null = null;
-      let lockedGain: number | null = null;
-      if (tile.shape === PipeShape.Chamber) {
-        if (isWater && tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
-          const impact = board.getLockedWaterImpact({ row: r, col: c });
-          if (impact !== null) lockedCost = Math.abs(impact);
-        } else if (tile.chamberContent === 'siphon') {
-          lockedGain = board.getSiphonLockedGain({ row: r, col: c });
-        } else if (isWater && tile.chamberContent === 'hot_plate') {
-          const impact = board.getLockedWaterImpact({ row: r, col: c });
-          const gain = board.getLockedHotPlateGain({ row: r, col: c });
-          if (impact !== null && gain !== null) {
-            const loss = Math.max(0, gain - impact);
-            lockedGain = gain;
-            lockedCost = loss;
-          }
-        }
-      }
-
-      // For Source/Sink/Chamber tiles, compute which arm directions need a butt end cap.
-      // For Chamber tiles the result is always a defined Set (possibly empty) so that
-      // arms pointing at empty tiles trigger Phase 2 in _drawChamber and get round end
-      // caps sticking into the adjacent tile.  An undefined result would fall through to
-      // the legacy "all butt caps" path and suppress the round nubs entirely.
-      let buttEndDirs: Set<Direction> | undefined;
-      if (tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
-        buttEndDirs = _computeButtEndDirs(board, r, c);
-      } else if (tile.shape === PipeShape.Chamber) {
-        buttEndDirs = _computeButtEndDirs(board, r, c) ?? new Set<Direction>();
-      }
-
-      // For Sea tiles, compute which neighbors are also sea for border rendering.
-      let seaNeighbors: SeaNeighbors | undefined;
-      if (tile.shape === PipeShape.Sea) {
-        seaNeighbors = computeSeaNeighbors((dr, dc) => {
-          const nr = r + dr, nc = c + dc;
-          return nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols || board.grid[nr][nc].shape === PipeShape.Sea;
-        });
-      }
-
-      // For Granite tiles, compute which neighbors are also granite for seaming.
-      let graniteNeighbors: GraniteNeighbors | undefined;
-      if (tile.shape === PipeShape.Granite) {
-        graniteNeighbors = computeGraniteNeighbors(board, r, c);
-      }
-
-      // Gingham overlay on non-empty, non-pipe tiles: 100% alpha (i.e. opacity)
-      // pattern drawn over the tile background color.
-      // Also compute the per-tile inferred floor shape for style-dependent rendering
-      // (e.g. Tree tile colors should match the local floor style, not the overall board style).
-      let inferredFloorShape: PipeShape | undefined;
-      if (tile.shape === PipeShape.Granite || tile.shape === PipeShape.Tree || tile.shape === PipeShape.Tree2
-          || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4 || tile.shape === PipeShape.Chamber
-          || tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink) {
-        inferredFloorShape = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
-        drawGinghamOverlay(ctx, x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2, r, c, inferredFloorShape, 1.0); //alpha
-      }
+      const { lockedCost, lockedGain } = _computeChamberLockedValues(board, tile, { row: r, col: c }, isWater);
+      const buttEndDirs = _computeButtEndDirsForTile(board, tile, r, c);
+      const seaNeighbors = _computeSeaNeighborsForTile(board, tile, r, c);
+      const graniteNeighbors = _computeGraniteNeighborsForTile(board, tile, r, c);
+      const inferredFloorShape = _drawGinghamOverlayIfNeeded(ctx, board, tile, { row: r, col: c, x, y });
 
       // Derive the per-tile level style from the inferred floor shape for tiles that
       // render style-dependent visuals (e.g. Tree leaf colors).  Falls back to the
       // overall board style when the inferred floor shape is the default (Empty/Summer).
       const tileStyle = (inferredFloorShape !== undefined ? floorShapeToStyle(inferredFloorShape) : undefined) ?? board.style;
 
-      // For the sink tile, build an overlay callback that renders the vortex effect
-      // after the outer circle but before the connector arms.  The callback must
-      // temporarily undo the translation that drawTile/drawSourceOrSink applies to
-      // the context so that renderVortex can use absolute canvas coordinates.
-      let afterOuterCircleFn: (() => void) | undefined;
-      if (tile.shape === PipeShape.Sink && sinkVortexFn !== undefined) {
-        const tileCx = x + TILE_SIZE / 2;
-        const tileCy = y + TILE_SIZE / 2;
-        afterOuterCircleFn = () => {
-          ctx.save();
-          ctx.translate(-tileCx, -tileCy);
-          sinkVortexFn();
-          ctx.restore();
-        };
-      }
+      const afterOuterCircleFn = _buildSinkVortexOverlayFn(ctx, tile, sinkVortexFn, x, y);
 
       const shakeOffset = shakeOffsets?.get(posKey(r, c));
-      if (shakeOffset !== undefined) {
-        ctx.save();
-        ctx.translate(shakeOffset, 0);
-        drawTile(ctx, {
-          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
-          lockedCost, lockedGain, buttEndDirs, seaNeighbors, graniteNeighbors,
-          afterOuterCircleFn, levelStyle: tileStyle,
-        });
-        ctx.restore();
-      } else {
-        drawTile(ctx, {
-          x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
-          lockedCost, lockedGain, buttEndDirs, seaNeighbors, graniteNeighbors,
-          afterOuterCircleFn, levelStyle: tileStyle,
-        });
-      }
+      _drawNonPipeTile(ctx, {
+        x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
+        lockedCost, lockedGain, buttEndDirs, seaNeighbors, graniteNeighbors,
+        afterOuterCircleFn, levelStyle: tileStyle,
+      }, shakeOffset);
     }
   }
 }
