@@ -2501,81 +2501,69 @@ export interface ContainerFillAnimsOptions {
   now: number;
 }
 
+/**
+ * Determine the clip rectangle that reveals connected state progressively,
+ * starting from the full entry edge and sweeping to the opposite edge.
+ */
+function _computeFillAnimClipRect(
+  entryDir: Direction, x: number, y: number, progress: number,
+): { x: number; y: number; w: number; h: number } {
+  switch (entryDir) {
+    case Direction.North: // entry at top → sweep downward
+      return { x, y, w: TILE_SIZE, h: progress * TILE_SIZE };
+    case Direction.South: // entry at bottom → sweep upward
+      return { x, y: y + (1 - progress) * TILE_SIZE, w: TILE_SIZE, h: progress * TILE_SIZE };
+    case Direction.East: // entry at right → sweep leftward
+      return { x: x + (1 - progress) * TILE_SIZE, y, w: progress * TILE_SIZE, h: TILE_SIZE };
+    case Direction.West: // entry at left → sweep rightward
+      return { x, y, w: progress * TILE_SIZE, h: TILE_SIZE };
+    default:
+      return { x, y, w: TILE_SIZE, h: TILE_SIZE };
+  }
+}
+
+function _renderOneContainerFillAnim(
+  ctx: CanvasRenderingContext2D, board: Board, anim: PipeFillAnim, now: number,
+  drawOpts: { currentWater: number; shiftHeld: boolean; currentTemp: number; currentPressure: number },
+): void {
+  if (!anim.isContainer) return;
+  const elapsed = now - anim.startTime;
+  if (elapsed < 0) return; // not started yet
+  const progress = Math.min(1, elapsed / FILL_ANIM_DURATION);
+  if (progress <= 0) return;
+
+  const { row, col, entryDir } = anim;
+  const x = col * TILE_SIZE;
+  const y = row * TILE_SIZE;
+  const tile = board.getTile({ row, col });
+  if (!tile) return;
+
+  const clip = _computeFillAnimClipRect(entryDir, x, y, progress);
+  // Locked cost/gain for chambers so the revealing tile shows the same values
+  // it will display once fully connected — this animation always renders the
+  // tile as if fully connected, so isWater is hardcoded true here.
+  const { lockedCost, lockedGain } = _computeChamberLockedValues(board, tile, { row, col }, true);
+  // Butt-end cap directions the same way the static board render does, so
+  // disconnected chamber connector nubs look identical during the animation and after.
+  const buttEndDirs = _computeButtEndDirsForTile(board, tile, row, col);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(clip.x, clip.y, clip.w, clip.h);
+  ctx.clip();
+  // Draw the tile in its connected (water) state within the clip region.
+  drawTile(ctx, {
+    x, y, tile, isWater: true, currentWater: drawOpts.currentWater, shiftHeld: drawOpts.shiftHeld,
+    currentTemp: drawOpts.currentTemp, currentPressure: drawOpts.currentPressure,
+    lockedCost, lockedGain, buttEndDirs,
+  });
+  ctx.restore();
+}
+
 export function renderContainerFillAnims(ctx: CanvasRenderingContext2D, opts: ContainerFillAnimsOptions): void {
   const { board, anims, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
   for (const anim of anims) {
-    if (!anim.isContainer) continue;
-    const elapsed = now - anim.startTime;
-    if (elapsed < 0) continue; // not started yet
-    const progress = Math.min(1, elapsed / FILL_ANIM_DURATION);
-    if (progress <= 0) continue;
-
-    const { row, col, entryDir } = anim;
-    const x = col * TILE_SIZE;
-    const y = row * TILE_SIZE;
-    const tile = board.getTile({ row, col });
-    if (!tile) continue;
-
-    // Determine the clip rectangle that reveals connected state progressively,
-    // starting from the full entry edge and sweeping to the opposite edge.
-    let clipX = x, clipY = y, clipW = TILE_SIZE, clipH = TILE_SIZE;
-    switch (entryDir) {
-      case Direction.North: // entry at top → sweep downward
-        clipH = progress * TILE_SIZE;
-        break;
-      case Direction.South: // entry at bottom → sweep upward
-        clipY = y + (1 - progress) * TILE_SIZE;
-        clipH = progress * TILE_SIZE;
-        break;
-      case Direction.East: // entry at right → sweep leftward
-        clipX = x + (1 - progress) * TILE_SIZE;
-        clipW = progress * TILE_SIZE;
-        break;
-      case Direction.West: // entry at left → sweep rightward
-        clipW = progress * TILE_SIZE;
-        break;
-    }
-
-    // Compute locked cost/gain for chambers so the revealing tile shows the
-    // same values it will display once fully connected.
-    let lockedCost: number | null = null;
-    let lockedGain: number | null = null;
-    if (tile.shape === PipeShape.Chamber) {
-      if (tile.chamberContent !== null && (COLD_CHAMBER_CONTENTS.has(tile.chamberContent) || tile.chamberContent === 'gel')) {
-        const impact = board.getLockedWaterImpact({ row, col });
-        if (impact !== null) lockedCost = Math.abs(impact);
-      } else if (tile.chamberContent === 'siphon') {
-        lockedGain = board.getSiphonLockedGain({ row, col });
-      } else if (tile.chamberContent === 'hot_plate') {
-        const impact = board.getLockedWaterImpact({ row, col });
-        const gain = board.getLockedHotPlateGain({ row, col });
-        if (impact !== null && gain !== null) {
-          const loss = Math.max(0, gain - impact);
-          lockedGain = gain;
-          lockedCost = loss;
-        }
-      }
-    }
-
-    // Compute butt-end cap directions the same way the static board render does so
-    // disconnected chamber connector nubs look identical during the animation and after.
-    // Chambers always receive a defined Set (possibly empty) so that arms pointing at
-    // open floor tiles trigger _drawChamberDisconnectedStubs; other container shapes
-    // (Source) use the same nullable result as the normal render path.
-    const buttEndDirs = tile.shape === PipeShape.Chamber
-      ? (_computeButtEndDirs(board, row, col) ?? new Set<Direction>())
-      : _computeButtEndDirs(board, row, col);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(clipX, clipY, clipW, clipH);
-    ctx.clip();
-    // Draw the tile in its connected (water) state within the clip region.
-    drawTile(ctx, {
-      x, y, tile, isWater: true, currentWater, shiftHeld, currentTemp, currentPressure,
-      lockedCost, lockedGain, buttEndDirs,
-    });
-    ctx.restore();
+    _renderOneContainerFillAnim(ctx, board, anim, now, { currentWater, shiftHeld, currentTemp, currentPressure });
   }
 }
 
