@@ -1826,6 +1826,30 @@ function buildPipeBodyPath(
  *                         butt ends.  Undefined means all arms get round nub caps.
  * @param fillColor        CSS color string used to fill the pipe body.
  */
+interface PipeBodyClipRect { l: number; r: number; t: number; b: number; }
+
+function _resolvePipeBodyClipBound(
+  localButtEndDirs: ReadonlySet<Direction> | undefined, dir: Direction, near: number, far: number,
+): number {
+  return localButtEndDirs?.has(dir) ? near : far;
+}
+
+/**
+ * Clip to the tile boundary on each butt-end direction so the black stroke
+ * outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
+ * left unconstrained so rounded caps can extend freely into empty space.
+ */
+function _computePipeBodyClipRect(
+  half: number, localButtEndDirs: ReadonlySet<Direction> | undefined, large: number,
+): PipeBodyClipRect {
+  return {
+    l: _resolvePipeBodyClipBound(localButtEndDirs, Direction.West, -half, -large),
+    r: _resolvePipeBodyClipBound(localButtEndDirs, Direction.East, half, large),
+    t: _resolvePipeBodyClipBound(localButtEndDirs, Direction.North, -half, -large),
+    b: _resolvePipeBodyClipBound(localButtEndDirs, Direction.South, half, large),
+  };
+}
+
 export function drawPipeBody(
   ctx: CanvasRenderingContext2D,
   shape: PipeShape,
@@ -1834,20 +1858,14 @@ export function drawPipeBody(
   fillColor: string,
 ): void {
   const lw2 = LINE_WIDTH / 2;
-  // Clip to the tile boundary on each butt-end direction so the black stroke
-  // outline never bleeds into adjacent tiles.  Non-butt (nub) directions are
-  // left unconstrained so rounded caps can extend freely into empty space.
   // When a shadow (e.g. the ghost-placement glow) is active, expand the free
   // edges by the blur radius so the glow is not clipped.
   const shadowClipExpansion = ctx.shadowBlur;
   const LARGE = half + LINE_WIDTH + shadowClipExpansion;
-  const clipL = localButtEndDirs?.has(Direction.West)  ? -half : -LARGE;
-  const clipR = localButtEndDirs?.has(Direction.East)  ?  half :  LARGE;
-  const clipT = localButtEndDirs?.has(Direction.North) ? -half : -LARGE;
-  const clipB = localButtEndDirs?.has(Direction.South) ?  half :  LARGE;
+  const clip = _computePipeBodyClipRect(half, localButtEndDirs, LARGE);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT);
+  ctx.rect(clip.l, clip.t, clip.r - clip.l, clip.b - clip.t);
   ctx.clip();
   // Build the pipe body path AFTER clipping so ctx.beginPath() for the clip
   // rect does not erase the pipe path before stroke/fill.
