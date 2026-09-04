@@ -2703,46 +2703,69 @@ export class Game implements InputCallbacks {
   private _openRecordModal(): void {
     if (!this.board || !this.currentLevel) return;
     const moves = this.getMoveLog();
-    const outcome: 'success' | 'failure' | 'partial' = this.gameState === GameState.Won ? 'success'
-      : this.gameState === GameState.GameOver ? 'failure'
-      : 'partial';
-    const info: RecordModalInfo = {
+    const outcome = this._computeGameOutcome();
+    const info = this._buildRecordModalInfo(outcome, moves.length, this.board);
+    buildRecordModal(
+      info,
+      (annotation) => this._saveRecordModalEntry(annotation, moves, outcome, info),
+      () => { /* cancelled */ },
+    );
+  }
+
+  /** Classify the current game state into a record outcome. */
+  private _computeGameOutcome(): 'success' | 'failure' | 'partial' {
+    if (this.gameState === GameState.Won) return 'success';
+    if (this.gameState === GameState.GameOver) return 'failure';
+    return 'partial';
+  }
+
+  /** Build the info payload shown in the record modal. */
+  private _buildRecordModalInfo(
+    outcome: 'success' | 'failure' | 'partial',
+    moveCount: number,
+    board: Board,
+  ): RecordModalInfo {
+    const isWon = this.gameState === GameState.Won;
+    return {
       outcome,
       playerName: loadPlayerName(),
       timestamp: Date.now(),
-      moveCount: moves.length,
-      waterScore: this.gameState === GameState.Won ? this.board.getCurrentWater() : undefined,
-      stars: this.gameState === GameState.Won ? this.board.getStarsCollected() : undefined,
+      moveCount,
+      waterScore: isWon ? board.getCurrentWater() : undefined,
+      stars: isWon ? board.getStarsCollected() : undefined,
     };
-    buildRecordModal(
-      info,
-      (annotation) => {
-        if (!this.board || !this.currentLevel) return;
-        // A recording is meaningless without a campaign to file it under, and a
-        // blank campaignId is rejected on load anyway — never create one.
-        const activeCampaignId = this._campaign.activeCampaign?.id;
-        if (!activeCampaignId) return;
-        const activeSlot = getActiveSlotIndex();
-        const record: PlaySequenceRecord = {
-          formatVersion: 1,
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-          campaignId: activeCampaignId,
-          levelId: this.currentLevel.id,
-          moves,
-          outcome,
-          autoRecorded: false,
-          timestamp: Date.now(),
-          playerName: loadPlayerName(),
-          playerGuid: activeSlot !== null ? loadSlotMeta(activeSlot)?.guid : undefined,
-          waterScore: info.waterScore,
-          stars: info.stars,
-          annotation: annotation || undefined,
-          corrupted: false,
-        };
-        saveRecording(record);
-      },
-      () => { /* cancelled */ },
-    );
+  }
+
+  /** Save the annotated play-sequence record, unless there's no board/level/active campaign to file it under. */
+  private _saveRecordModalEntry(
+    annotation: string,
+    moves: string[],
+    outcome: 'success' | 'failure' | 'partial',
+    info: RecordModalInfo,
+  ): void {
+    if (!this.board || !this.currentLevel) return;
+    // A recording is meaningless without a campaign to file it under, and a
+    // blank campaignId is rejected on load anyway — never create one.
+    const activeCampaignId = this._campaign.activeCampaign?.id;
+    if (!activeCampaignId) return;
+    const activeSlot = getActiveSlotIndex();
+    const record: PlaySequenceRecord = {
+      formatVersion: 1,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      campaignId: activeCampaignId,
+      levelId: this.currentLevel.id,
+      moves,
+      outcome,
+      autoRecorded: false,
+      timestamp: Date.now(),
+      playerName: loadPlayerName(),
+      playerGuid: activeSlot !== null ? loadSlotMeta(activeSlot)?.guid : undefined,
+      waterScore: info.waterScore,
+      stars: info.stars,
+      annotation: annotation || undefined,
+      corrupted: false,
+    };
+    saveRecording(record);
   }
 
   /**
