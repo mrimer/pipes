@@ -1413,44 +1413,57 @@ interface DrawPipeArmOptions {
   buttEnd?: boolean;
 }
 
+/** Rotate `dir` counter-clockwise by `steps` 90-degree increments. */
+function _rotateDirectionCCW(dir: Direction, steps: number): Direction {
+  let result = dir;
+  for (let i = 0; i < steps; i++) {
+    switch (result) {
+      case Direction.North: result = Direction.West;  break;
+      case Direction.West:  result = Direction.South; break;
+      case Direction.South: result = Direction.East;  break;
+      case Direction.East:  result = Direction.North; break;
+    }
+  }
+  return result;
+}
+
+function _localDirToArmEndpoint(localDir: Direction, half: number): { ex: number; ey: number } {
+  switch (localDir) {
+    case Direction.North: return { ex: 0, ey: -half };
+    case Direction.South: return { ex: 0, ey: half };
+    case Direction.East:  return { ex: half, ey: 0 };
+    default:              return { ex: -half, ey: 0 }; // West
+  }
+}
+
+/**
+ * For a butt end at the tile edge, clip to the tile half-boundary in the arm's
+ * direction so the natural round linecap is trimmed flat there.
+ */
+function _clipPipeArmButtEnd(ctx: CanvasRenderingContext2D, ex: number, ey: number, half: number): void {
+  // LARGE is a value safely outside the tile in any direction.
+  const LARGE = half * 2;
+  ctx.beginPath();
+  if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + half, LARGE * 2);
+  else if (ex < 0) ctx.rect(-half,  -LARGE, LARGE + half, LARGE * 2);
+  else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2,    LARGE + half);
+  else             ctx.rect(-LARGE, -half,  LARGE * 2,    LARGE + half);
+  ctx.clip();
+}
+
 function _drawPipeArmInRotatedFrame(ctx: CanvasRenderingContext2D, opts: DrawPipeArmOptions): void {
   const { absDir, tileRotation, half, color, buttEnd = false } = opts;
   // Convert the absolute direction to the local coordinate-system direction by
   // rotating it CCW by (tileRotation / 90) steps.  The canvas coordinate frame
   // is rotated CW by tileRotation, so we invert to find the local axis.
-  let localDir = absDir;
-  const steps = tileRotation / 90;
-  for (let i = 0; i < steps; i++) {
-    switch (localDir) {
-      case Direction.North: localDir = Direction.West;  break;
-      case Direction.West:  localDir = Direction.South; break;
-      case Direction.South: localDir = Direction.East;  break;
-      case Direction.East:  localDir = Direction.North; break;
-    }
-  }
+  const localDir = _rotateDirectionCCW(absDir, tileRotation / 90);
+  const { ex, ey } = _localDirToArmEndpoint(localDir, half);
 
-  let ex: number, ey: number;
-  switch (localDir) {
-    case Direction.North: ex =    0; ey = -half; break;
-    case Direction.South: ex =    0; ey =  half; break;
-    case Direction.East:  ex =  half; ey =    0; break;
-    default:              ex = -half; ey =    0; break; // West
-  }
-
-  // For a butt end at the tile edge, clip to the tile half-boundary in the arm's
-  // direction so the natural round linecap is trimmed flat there.  The center end
-  // is left unconstrained so its round cap lands naturally — no explicit center
-  // cap circle is required.
+  // The center end is left unconstrained so its round cap lands naturally — no
+  // explicit center cap circle is required.
   if (buttEnd) {
-    // LARGE is a value safely outside the tile in any direction.
-    const LARGE = half * 2;
     ctx.save();
-    ctx.beginPath();
-    if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + half, LARGE * 2);
-    else if (ex < 0) ctx.rect(-half,  -LARGE, LARGE + half, LARGE * 2);
-    else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2,    LARGE + half);
-    else             ctx.rect(-LARGE, -half,  LARGE * 2,    LARGE + half);
-    ctx.clip();
+    _clipPipeArmButtEnd(ctx, ex, ey, half);
   }
 
   ctx.strokeStyle = color;
