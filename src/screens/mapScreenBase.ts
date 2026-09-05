@@ -1600,9 +1600,10 @@ export abstract class MapScreenBase {
    * unless the chapter is already marked as completed (status is shown in the stats bar).
    */
   private _updateStatus(chapter: ChapterDef, displayProgress: Set<number>, filledKeys: Set<string>): void {
-    if (!this._statusEl) return;
+    const statusEl = this._statusEl;
+    if (!statusEl) return;
     if (!this._shouldShowCompletionStatus(chapter, displayProgress)) {
-      this._statusEl.innerHTML = '';
+      statusEl.innerHTML = '';
       return;
     }
 
@@ -1611,38 +1612,52 @@ export abstract class MapScreenBase {
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
 
-    // Find sink tile and check if it has water reaching it
-    let sinkFilled = false;
-    let sinkRemaining = 0;
+    const sink = this._findSinkStatus(grid, rows, cols, filledKeys, chapter, displayProgress);
+    this._renderCompletionStatus(statusEl, sink, chapter, displayProgress);
+  }
+
+  /** Finds the sink tile and checks whether it has water reaching it. */
+  private _findSinkStatus(
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+    chapter: ChapterDef,
+    displayProgress: Set<number>,
+  ): { filled: boolean; remaining: number } {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const tileDef = grid[r]?.[c];
-        if (tileDef?.shape === PipeShape.Sink) {
-          if (filledKeys.has(`${r},${c}`)) {
-            sinkFilled = true;
-            sinkRemaining = this._sinkRemaining(tileDef, chapter, displayProgress);
-          }
-          break;
+        if (tileDef?.shape !== PipeShape.Sink) continue;
+        if (filledKeys.has(`${r},${c}`)) {
+          return { filled: true, remaining: this._sinkRemaining(tileDef, chapter, displayProgress) };
         }
+        break;
       }
-      if (sinkFilled) break;
     }
+    return { filled: false, remaining: 0 };
+  }
 
-    if (sinkFilled && sinkRemaining <= 0) {
-      const isAlreadyCompleted = this._isMapCompleted(chapter, displayProgress);
-      if (isAlreadyCompleted) {
-        this._statusEl.innerHTML = ''; // "Complete"/"Mastered!" is already shown in the stats bar
-      } else {
-        const complete = document.createElement('span');
-        complete.style.color = SUCCESS_COLOR;
-        complete.style.fontSize = '1rem';
-        complete.style.fontWeight = 'bold';
-        complete.textContent = t('game.levelComplete');
-        this._statusEl.replaceChildren(complete);
-      }
-    } else {
-      this._statusEl.innerHTML = '';
+  private _renderCompletionStatus(
+    statusEl: HTMLElement,
+    sink: { filled: boolean; remaining: number },
+    chapter: ChapterDef,
+    displayProgress: Set<number>,
+  ): void {
+    if (!sink.filled || sink.remaining > 0) {
+      statusEl.innerHTML = '';
+      return;
     }
+    if (this._isMapCompleted(chapter, displayProgress)) {
+      statusEl.innerHTML = ''; // "Complete"/"Mastered!" is already shown in the stats bar
+      return;
+    }
+    const complete = document.createElement('span');
+    complete.style.color = SUCCESS_COLOR;
+    complete.style.fontSize = '1rem';
+    complete.style.fontWeight = 'bold';
+    complete.textContent = t('game.levelComplete');
+    statusEl.replaceChildren(complete);
   }
 
   /**
