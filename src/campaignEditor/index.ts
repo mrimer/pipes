@@ -688,6 +688,35 @@ export class CampaignEditor {
     this._campaignMapEditor.init(campaign);
     this._campaignMapEditor.setMapBoxCollapsed(loadCampaignEditorMapBoxCollapsed());
 
+    this._el.appendChild(this._buildCampaignDetailToolbar(campaign, isOfficial));
+
+    const content = document.createElement('div');
+    content.style.cssText =
+      'width:100%;max-width:1200px;padding:20px;box-sizing:border-box;display:flex;' +
+      'flex-direction:column;gap:16px;';
+
+    this._appendCampaignToggleSection(content, campaign, isOfficial, isUserCampaign);
+    this._appendCampaignFieldsSection(content, campaign, isOfficial);
+
+    // Campaign map editor section (full canvas editor, not just a static preview)
+    content.appendChild(this._campaignMapEditor.buildSection(campaign, isOfficial));
+
+    this._appendChaptersSection(content, campaign, isOfficial);
+
+    this._el.appendChild(content);
+
+    // Resize and render campaign map canvas after layout is in the DOM, and
+    // ensure undo/redo button state reflects current history on entry.
+    requestAnimationFrame(() => {
+      this._campaignMapEditor.updateCanvasDisplaySize();
+      this._campaignMapEditor.renderCanvas();
+      this._campaignMapEditor.syncUndoRedoButtons();
+      this._campaignMapEditor.startSeaAnimationLoop();
+    });
+  }
+
+  /** Builds the top toolbar (back/title + export/validate-data actions) for the campaign detail screen. */
+  private _buildCampaignDetailToolbar(campaign: CampaignDef, isOfficial: boolean): HTMLElement {
     const toolbar = this._buildToolbar(
       isOfficial
         ? t('editor.campaign.readOnlyTitle', { name: resolveLocalizedText(campaign.name) })
@@ -698,122 +727,129 @@ export class CampaignEditor {
       toolbar.appendChild(this._btn(t('editor.toolbar.export'), UI_BG, '#4a90d9', () => this._exportCampaign(campaign)));
       toolbar.appendChild(this._btn(t('editor.toolbar.exportTexts'), UI_BG, '#7ed321', () => this._exportCampaignTexts(campaign)));
       if (DEV_CONTROLS) {
-        toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => {
-          if (this._service.remapLegacyGrassStyles(campaign)) {
-            this._service.touch(campaign);
-            this._service.save();
-          }
-          // If no authorGuid is set, try to match by author name across all profiles.
-          if (!campaign.authorGuid) {
-            const allMetas = loadAllSlotMetas();
-            const match = allMetas.find((m) => m !== null && m.name === campaign.author);
-            if (match) {
-              this._service.updateCampaignField(campaign, 'authorGuid', match.guid);
-            }
-          }
-          this._dataValidator.show(this._el, campaign);
-        }));
+        toolbar.appendChild(this._btn(t('editor.toolbar.validateData'), UI_BG, '#f0c040', () => this._onValidateCampaignData(campaign)));
       }
     } else if (DEV_CONTROLS) {
       // Official campaigns get no export UI for non-devs; devs can still produce
       // a text pack to hand out for community translation.
       toolbar.appendChild(this._btn(t('editor.toolbar.exportTexts'), UI_BG, '#7ed321', () => this._exportCampaignTexts(campaign)));
     }
-    this._el.appendChild(toolbar);
+    return toolbar;
+  }
 
-    const content = document.createElement('div');
-    content.style.cssText =
-      'width:100%;max-width:1200px;padding:20px;box-sizing:border-box;display:flex;' +
-      'flex-direction:column;gap:16px;';
-
-    // ── Dev – Official Campaign toggle and "anyone edit" checkbox (user campaigns only) ──
-    if (isUserCampaign) {
-      const toggleWrap = document.createElement('div');
-      toggleWrap.style.cssText =
-        `background:${UI_BG};border:1px solid ${UI_GOLD};border-radius:8px;padding:12px 16px;` +
-        'display:flex;align-items:center;gap:20px;flex-wrap:wrap;';
-
-      // Official toggle (dev only)
-      if (DEV_CONTROLS) {
-        const officialCb = document.createElement('input');
-        officialCb.type = 'checkbox';
-        officialCb.id = 'official-toggle';
-        officialCb.checked = isOfficial;
-        officialCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
-        const officialLbl = document.createElement('label');
-        officialLbl.htmlFor = 'official-toggle';
-        officialLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
-        officialLbl.textContent = t('editor.campaign.officialToggle');
-        officialCb.addEventListener('change', () => {
-          this._service.updateCampaignField(campaign, 'official', officialCb.checked);
-          // Re-render to update read-only state
-          this._showCampaignDetail();
-        });
-        const officialGroup = document.createElement('div');
-        officialGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
-        officialGroup.appendChild(officialCb);
-        officialGroup.appendChild(officialLbl);
-        toggleWrap.appendChild(officialGroup);
+  /** Dev-only "Validate data" toolbar action: remaps legacy styles, backfills authorGuid, then shows the validator dialog. */
+  private _onValidateCampaignData(campaign: CampaignDef): void {
+    if (this._service.remapLegacyGrassStyles(campaign)) {
+      this._service.touch(campaign);
+      this._service.save();
+    }
+    // If no authorGuid is set, try to match by author name across all profiles.
+    if (!campaign.authorGuid) {
+      const allMetas = loadAllSlotMetas();
+      const match = allMetas.find((m) => m !== null && m.name === campaign.author);
+      if (match) {
+        this._service.updateCampaignField(campaign, 'authorGuid', match.guid);
       }
+    }
+    this._dataValidator.show(this._el, campaign);
+  }
 
-      // "Anyone edit" checkbox
-      const anyoneEditCb = document.createElement('input');
-      anyoneEditCb.type = 'checkbox';
-      anyoneEditCb.id = 'anyone-edit-toggle';
-      anyoneEditCb.checked = campaign.anyoneEdit === true;
-      anyoneEditCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
-      const anyoneEditLbl = document.createElement('label');
-      anyoneEditLbl.htmlFor = 'anyone-edit-toggle';
-      anyoneEditLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
-      anyoneEditLbl.textContent = t('editor.campaign.anyoneEdit');
-      anyoneEditCb.addEventListener('change', () => {
-        this._service.updateCampaignField(campaign, 'anyoneEdit', anyoneEditCb.checked);
+  /** Appends the dev "official" toggle and "anyone edit" checkbox row (user campaigns only). */
+  private _appendCampaignToggleSection(
+    content: HTMLElement,
+    campaign: CampaignDef,
+    isOfficial: boolean,
+    isUserCampaign: boolean,
+  ): void {
+    if (!isUserCampaign) return;
+
+    const toggleWrap = document.createElement('div');
+    toggleWrap.style.cssText =
+      `background:${UI_BG};border:1px solid ${UI_GOLD};border-radius:8px;padding:12px 16px;` +
+      'display:flex;align-items:center;gap:20px;flex-wrap:wrap;';
+
+    // Official toggle (dev only)
+    if (DEV_CONTROLS) {
+      const officialCb = document.createElement('input');
+      officialCb.type = 'checkbox';
+      officialCb.id = 'official-toggle';
+      officialCb.checked = isOfficial;
+      officialCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+      const officialLbl = document.createElement('label');
+      officialLbl.htmlFor = 'official-toggle';
+      officialLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
+      officialLbl.textContent = t('editor.campaign.officialToggle');
+      officialCb.addEventListener('change', () => {
+        this._service.updateCampaignField(campaign, 'official', officialCb.checked);
+        // Re-render to update read-only state
+        this._showCampaignDetail();
       });
-      const anyoneEditGroup = document.createElement('div');
-      anyoneEditGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      anyoneEditGroup.appendChild(anyoneEditCb);
-      anyoneEditGroup.appendChild(anyoneEditLbl);
-      toggleWrap.appendChild(anyoneEditGroup);
-
-      content.appendChild(toggleWrap);
+      const officialGroup = document.createElement('div');
+      officialGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      officialGroup.appendChild(officialCb);
+      officialGroup.appendChild(officialLbl);
+      toggleWrap.appendChild(officialGroup);
     }
 
-    if (!isOfficial) {
-      // Name field (editable) and author (static display – author is set automatically from the active player profile)
-      const fields = document.createElement('div');
-      fields.style.cssText =
-        `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
-        'display:flex;flex-direction:column;gap:10px;';
+    // "Anyone edit" checkbox
+    const anyoneEditCb = document.createElement('input');
+    anyoneEditCb.type = 'checkbox';
+    anyoneEditCb.id = 'anyone-edit-toggle';
+    anyoneEditCb.checked = campaign.anyoneEdit === true;
+    anyoneEditCb.style.cssText = 'width:16px;height:16px;cursor:pointer;';
+    const anyoneEditLbl = document.createElement('label');
+    anyoneEditLbl.htmlFor = 'anyone-edit-toggle';
+    anyoneEditLbl.style.cssText = 'font-size:0.9rem;color:#f0c040;cursor:pointer;';
+    anyoneEditLbl.textContent = t('editor.campaign.anyoneEdit');
+    anyoneEditCb.addEventListener('change', () => {
+      this._service.updateCampaignField(campaign, 'anyoneEdit', anyoneEditCb.checked);
+    });
+    const anyoneEditGroup = document.createElement('div');
+    anyoneEditGroup.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    anyoneEditGroup.appendChild(anyoneEditCb);
+    anyoneEditGroup.appendChild(anyoneEditLbl);
+    toggleWrap.appendChild(anyoneEditGroup);
 
-      fields.appendChild(buildLocalizedTextInput(
-        t('editor.metadata.name'),
-        {
-          get: () => campaign.name,
-          set: (v) => { this._service.updateCampaignField(campaign, 'name', v ?? ''); },
-        },
-        EDITOR_FLEX_ROW_CSS,
-      ));
+    content.appendChild(toggleWrap);
+  }
 
-      // Author: static text (set from the active player profile at creation time)
-      const authorRow = document.createElement('div');
-      authorRow.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.9rem;';
-      const authorLbl = document.createElement('span');
-      authorLbl.style.cssText = 'color:#aaa;min-width:80px;';
-      authorLbl.textContent = t('editor.metadata.author');
-      const authorVal = document.createElement('span');
-      authorVal.style.cssText = 'color:#eee;';
-      authorVal.textContent = campaign.author || t('editor.common.noneParen');
-      authorRow.appendChild(authorLbl);
-      authorRow.appendChild(authorVal);
-      fields.appendChild(authorRow);
+  /** Appends the editable name field + static author display (user campaigns only). */
+  private _appendCampaignFieldsSection(content: HTMLElement, campaign: CampaignDef, isOfficial: boolean): void {
+    if (isOfficial) return;
 
-      content.appendChild(fields);
-    }
+    // Name field (editable) and author (static display – author is set automatically from the active player profile)
+    const fields = document.createElement('div');
+    fields.style.cssText =
+      `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;` +
+      'display:flex;flex-direction:column;gap:10px;';
 
-    // Campaign map editor section (full canvas editor, not just a static preview)
-    content.appendChild(this._campaignMapEditor.buildSection(campaign, isOfficial));
+    fields.appendChild(buildLocalizedTextInput(
+      t('editor.metadata.name'),
+      {
+        get: () => campaign.name,
+        set: (v) => { this._service.updateCampaignField(campaign, 'name', v ?? ''); },
+      },
+      EDITOR_FLEX_ROW_CSS,
+    ));
 
-    // Chapters section
+    // Author: static text (set from the active player profile at creation time)
+    const authorRow = document.createElement('div');
+    authorRow.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.9rem;';
+    const authorLbl = document.createElement('span');
+    authorLbl.style.cssText = 'color:#aaa;min-width:80px;';
+    authorLbl.textContent = t('editor.metadata.author');
+    const authorVal = document.createElement('span');
+    authorVal.style.cssText = 'color:#eee;';
+    authorVal.textContent = campaign.author || t('editor.common.noneParen');
+    authorRow.appendChild(authorLbl);
+    authorRow.appendChild(authorVal);
+    fields.appendChild(authorRow);
+
+    content.appendChild(fields);
+  }
+
+  /** Appends the chapters header (+ add-chapter button), chapter rows, and the empty-state message. */
+  private _appendChaptersSection(content: HTMLElement, campaign: CampaignDef, isOfficial: boolean): void {
     const chaptersHeader = document.createElement('div');
     chaptersHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const chapTitle = document.createElement('h3');
@@ -839,17 +875,6 @@ export class CampaignEditor {
       empty.textContent = t('editor.campaign.noChapters');
       content.appendChild(empty);
     }
-
-    this._el.appendChild(content);
-
-    // Resize and render campaign map canvas after layout is in the DOM, and
-    // ensure undo/redo button state reflects current history on entry.
-    requestAnimationFrame(() => {
-      this._campaignMapEditor.updateCanvasDisplaySize();
-      this._campaignMapEditor.renderCanvas();
-      this._campaignMapEditor.syncUndoRedoButtons();
-      this._campaignMapEditor.startSeaAnimationLoop();
-    });
   }
 
   private _buildChapterRow(campaign: CampaignDef, chapterIdx: number, readOnly: boolean): HTMLElement {
