@@ -744,42 +744,58 @@ export class InputHandler {
       this._cb.handleEscapeKey();
       return;
     }
-    if (e.key === 'Control' && !this.ctrlHeld) {
-      this.ctrlHeld = true;
-      if (this._cb.getGameState() === GameState.Playing) {
-        if (this.mouseCanvasPos) {
-          const rect = this._canvas.getBoundingClientRect();
-          this._cb.showTooltip(
-            this.mouseCanvasPos.x + rect.left,
-            this.mouseCanvasPos.y + rect.top,
-          );
-        } else if (this._hoveredInvShape !== null) {
-          this._cb.showInventoryItemTooltip(this._hoveredInvShape, this._hoveredInvClientX, this._hoveredInvClientY);
-        }
-      }
+    this._handleCtrlKeyDown(e);
+    this._handleShiftKeyDown(e);
+    this._handleUndoKeyDown(e);
+    this._handleRedoKeyDown(e);
+    this._handleBackspaceKeyDown(e);
+  }
+
+  /** Ctrl held down: shows a tooltip for whatever's currently hovered (board tile or inventory item). */
+  private _handleCtrlKeyDown(e: KeyboardEvent): void {
+    if (e.key !== 'Control' || this.ctrlHeld) return;
+    this.ctrlHeld = true;
+    if (this._cb.getGameState() !== GameState.Playing) return;
+    if (this.mouseCanvasPos) {
+      const rect = this._canvas.getBoundingClientRect();
+      this._cb.showTooltip(
+        this.mouseCanvasPos.x + rect.left,
+        this.mouseCanvasPos.y + rect.top,
+      );
+    } else if (this._hoveredInvShape !== null) {
+      this._cb.showInventoryItemTooltip(this._hoveredInvShape, this._hoveredInvClientX, this._hoveredInvClientY);
     }
-    if (e.key === 'Shift' && !this.shiftHeld) {
-      this.shiftHeld = true;
-      if (this._cb.getScreen() === GameScreen.Play && this._cb.getGameState() === GameState.Playing &&
-          !commandKeyManager.isShiftUsedAsModifier()) {
-        this._cb.selectNextAvailableInventory();
-      }
+  }
+
+  /** Shift held down: cycles to the next available inventory item, unless Shift is bound as a modifier key. */
+  private _handleShiftKeyDown(e: KeyboardEvent): void {
+    if (e.key !== 'Shift' || this.shiftHeld) return;
+    this.shiftHeld = true;
+    if (this._cb.getScreen() === GameScreen.Play && this._cb.getGameState() === GameState.Playing &&
+        !commandKeyManager.isShiftUsedAsModifier()) {
+      this._cb.selectNextAvailableInventory();
     }
-    if (this._cb.getScreen() === GameScreen.Play && commandKeyManager.matches('undo', e)) {
-      e.preventDefault();
-      if (this._cb.getGameState() === GameState.Playing) this._cb.performUndo();
-    }
-    if (this._cb.getScreen() === GameScreen.Play && commandKeyManager.matches('redo', e)) {
-      e.preventDefault();
-      if (this._cb.getGameState() === GameState.Playing) this._cb.performRedo();
-    }
-    if (e.key === 'Backspace' && this._cb.getScreen() === GameScreen.Play) {
-      e.preventDefault();
-      if (this._cb.getGameState() === GameState.Playing ||
-          this._cb.getGameState() === GameState.GameOver ||
-          this._cb.getGameState() === GameState.Won) {
-        this._cb.performUndo();
-      }
+  }
+
+  private _handleUndoKeyDown(e: KeyboardEvent): void {
+    if (this._cb.getScreen() !== GameScreen.Play || !commandKeyManager.matches('undo', e)) return;
+    e.preventDefault();
+    if (this._cb.getGameState() === GameState.Playing) this._cb.performUndo();
+  }
+
+  private _handleRedoKeyDown(e: KeyboardEvent): void {
+    if (this._cb.getScreen() !== GameScreen.Play || !commandKeyManager.matches('redo', e)) return;
+    e.preventDefault();
+    if (this._cb.getGameState() === GameState.Playing) this._cb.performRedo();
+  }
+
+  private _handleBackspaceKeyDown(e: KeyboardEvent): void {
+    if (e.key !== 'Backspace' || this._cb.getScreen() !== GameScreen.Play) return;
+    e.preventDefault();
+    if (this._cb.getGameState() === GameState.Playing ||
+        this._cb.getGameState() === GameState.GameOver ||
+        this._cb.getGameState() === GameState.Won) {
+      this._cb.performUndo();
     }
   }
 
