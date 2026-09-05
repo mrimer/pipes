@@ -1131,62 +1131,77 @@ export class InputHandler {
     }
 
     if (this._touchMoved) {
-      // End of a drag-paint: place on the final tile.
-      const last = this._touchDragLastTile;
-      if (last && this._cb.getSelectedShape() !== null) {
-        const tile = board.getTile(last);
-        if (tile && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-          const filledBefore = board.getFilledPositions();
-          this._cb.tryPlaceOrReplace(last, tile, filledBefore);
-        }
-      }
+      this._finishTouchDragPaint(board);
     } else {
-      // Short tap: handle as a click.
-      const pos = this._getGridPosFromClientXY(changedTouch.clientX, changedTouch.clientY);
-      const tile = board.getTile(pos);
-      if (!tile) {
-        this._touchDragLastTile = null;
-        return;
-      }
-      const filledBefore = board.getFilledPositions();
-
-      if (SPIN_PIPE_SHAPES.has(tile.shape)) {
-        // Tap on a spin pipe: rotate CW by one step.
-        const oldRotation = tile.rotation;
-        const spinResult = board.rotateTileBy(pos, 1);
-        if (spinResult.success) {
-          if (this._cb.getSelectedShape() === tile.shape) {
-            this._cb.setPendingRotation(tile.rotation);
-          }
-          this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
-          this._cb.refreshUI();
-          this._cb.checkWinLose();
-        } else if (spinResult.error) {
-          this._cb.handleBoardError(spinResult);
-        }
-      } else if (this._cb.getSelectedShape() !== null &&
-                 (isEmptyFloor(tile.shape) ||
-                  tile.shape !== this._cb.getSelectedShape() ||
-                  tile.rotation !== this._cb.getPendingRotation())) {
-        // Place or replace.
-        this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
-      } else if (!isEmptyFloor(tile.shape)) {
-        // Tap on a placed non-selected tile: rotate CW.
-        const oldRotation = tile.rotation;
-        const rotResult = board.rotateTile(pos);
-        if (rotResult.success) {
-          if (this._cb.getSelectedShape() === tile.shape) {
-            this._cb.setPendingRotation(tile.rotation);
-          }
-          this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
-          this._cb.refreshUI();
-          this._cb.checkWinLose();
-        } else if (rotResult.error) {
-          this._cb.handleBoardError(rotResult);
-        }
-      }
+      this._handleTouchTapAsClick(changedTouch, board);
     }
 
     this._touchDragLastTile = null;
+  }
+
+  /** End of a drag-paint: place on the final dragged-over tile. */
+  private _finishTouchDragPaint(board: Board): void {
+    const last = this._touchDragLastTile;
+    if (!last || this._cb.getSelectedShape() === null) return;
+    const tile = board.getTile(last);
+    if (!tile || SPIN_PIPE_SHAPES.has(tile.shape)) return;
+    const filledBefore = board.getFilledPositions();
+    this._cb.tryPlaceOrReplace(last, tile, filledBefore);
+  }
+
+  /** Short tap (no drag): handle as a click on the tapped tile. */
+  private _handleTouchTapAsClick(changedTouch: Touch, board: Board): void {
+    const pos = this._getGridPosFromClientXY(changedTouch.clientX, changedTouch.clientY);
+    const tile = board.getTile(pos);
+    if (!tile) return;
+    const filledBefore = board.getFilledPositions();
+
+    if (SPIN_PIPE_SHAPES.has(tile.shape)) {
+      // Tap on a spin pipe: rotate CW by one step.
+      this._spinTileOnTouchTap(pos, tile, board, filledBefore);
+    } else if (this._shouldPlaceOrReplaceTapped(tile)) {
+      // Place or replace.
+      this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
+    } else if (!isEmptyFloor(tile.shape)) {
+      // Tap on a placed non-selected tile: rotate CW.
+      this._rotateTileOnTouchTap(pos, tile, board, filledBefore);
+    }
+  }
+
+  private _shouldPlaceOrReplaceTapped(tile: Tile): boolean {
+    return this._cb.getSelectedShape() !== null &&
+      (isEmptyFloor(tile.shape) ||
+       tile.shape !== this._cb.getSelectedShape() ||
+       tile.rotation !== this._cb.getPendingRotation());
+  }
+
+  private _spinTileOnTouchTap(pos: GridPos, tile: Tile, board: Board, filledBefore: Set<string>): void {
+    const oldRotation = tile.rotation;
+    const spinResult = board.rotateTileBy(pos, 1);
+    if (spinResult.success) {
+      if (this._cb.getSelectedShape() === tile.shape) {
+        this._cb.setPendingRotation(tile.rotation);
+      }
+      this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (spinResult.error) {
+      this._cb.handleBoardError(spinResult);
+    }
+  }
+
+  private _rotateTileOnTouchTap(pos: GridPos, tile: Tile, board: Board, filledBefore: Set<string>): void {
+    const oldRotation = tile.rotation;
+    const rotResult = board.rotateTile(pos);
+    if (rotResult.success) {
+      if (this._cb.getSelectedShape() === tile.shape) {
+        this._cb.setPendingRotation(tile.rotation);
+      }
+      this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (rotResult.error) {
+      this._cb.handleBoardError(rotResult);
+    }
   }
 }
