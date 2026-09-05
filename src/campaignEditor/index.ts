@@ -68,6 +68,44 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 const EDITOR_BG_COLOR = '#0d1520';
 
+/** Counts chambers whose content is a star, across the whole grid. */
+function _countStarChambers(grid: (TileDef | null)[][]): number {
+  let starCount = 0;
+  for (const row of grid) {
+    for (const cell of row) {
+      if (cell?.shape === PipeShape.Chamber && cell.chamberContent === 'star') {
+        starCount++;
+      }
+    }
+  }
+  return starCount;
+}
+
+/** Deep-clones a grid and strips any fields not supported by each tile's shape. */
+function _buildCleanGrid(grid: (TileDef | null)[][]): (TileDef | null)[][] {
+  const rawGrid = structuredClone(grid);
+  return rawGrid.map(row =>
+    row.map(tile => {
+      if (!tile) return null;
+      const validKeys = getValidTileDefKeys(tile);
+      for (const key of Object.keys(tile)) {
+        if (!validKeys.has(key)) delete (tile as unknown as Record<string, unknown>)[key];
+      }
+      return tile;
+    })
+  );
+}
+
+/** Sets the optional LevelDef fields (note, hints, starCount, challenge, style) that only apply when non-empty. */
+function _applyOptionalLevelDefFields(def: LevelDef, state: LevelEditorState, starCount: number): void {
+  if (resolveLocalizedText(state.levelNote).trim()) def.note = state.levelNote;
+  const activeHints = state.levelHints.filter((h) => resolveLocalizedText(h).trim() !== '');
+  if (activeHints.length > 0) def.hints = activeHints;
+  if (starCount > 0) def.starCount = starCount;
+  if (state.levelChallenge) def.challenge = true;
+  if (state.levelStyle) def.style = state.levelStyle;
+}
+
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
 export class CampaignEditor {
@@ -1521,28 +1559,9 @@ export class CampaignEditor {
     const chapter = campaign?.chapters[this._activeChapterIdx];
     const existingId = chapter?.levels[this._activeLevelIdx]?.id ?? generateLevelId();
 
-    // Count star chambers in the grid and cache in starCount
-    let starCount = 0;
-    for (const row of this._state.grid) {
-      for (const cell of row) {
-        if (cell?.shape === PipeShape.Chamber && cell.chamberContent === 'star') {
-          starCount++;
-        }
-      }
-    }
+    const starCount = _countStarChambers(this._state.grid);
+    const cleanGrid = _buildCleanGrid(this._state.grid);
 
-    const rawGrid = structuredClone(this._state.grid);
-    // Strip any fields not supported by each tile's shape to keep saved data clean.
-    const cleanGrid: (TileDef | null)[][] = rawGrid.map(row =>
-      row.map(tile => {
-        if (!tile) return null;
-        const validKeys = getValidTileDefKeys(tile);
-        for (const key of Object.keys(tile)) {
-          if (!validKeys.has(key)) delete (tile as unknown as Record<string, unknown>)[key];
-        }
-        return tile;
-      })
-    );
     const def: LevelDef = {
       id: existingId,
       name: this._state.levelName,
@@ -1551,12 +1570,7 @@ export class CampaignEditor {
       grid: cleanGrid,
       inventory: structuredClone(this._state.inventory),
     };
-    if (resolveLocalizedText(this._state.levelNote).trim()) def.note = this._state.levelNote;
-    const activeHints = this._state.levelHints.filter((h) => resolveLocalizedText(h).trim() !== '');
-    if (activeHints.length > 0) def.hints = activeHints;
-    if (starCount > 0) def.starCount = starCount;
-    if (this._state.levelChallenge) def.challenge = true;
-    if (this._state.levelStyle) def.style = this._state.levelStyle;
+    _applyOptionalLevelDefFields(def, this._state, starCount);
     return def;
   }
 
