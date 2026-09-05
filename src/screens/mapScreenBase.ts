@@ -1244,20 +1244,38 @@ export abstract class MapScreenBase {
   private _chapterNodeTooltip(chapter: ChapterDef, def: TileDef | null | undefined, row: number, col: number): string {
     const displayProgress = this._getDisplayProgress();
     const filledKeys = this._computeFilledCells();
-    if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-      const isFilled = filledKeys.has(`${row},${col}`);
-      const entity = this._getEntityDefs()[def.levelIdx];
-      return isFilled && entity ? `${def.levelIdx + 1}: ${resolveLocalizedText(entity.name)}` : t('map.tooltip.locked');
-    }
-    if (def?.shape === PipeShape.Source) {
-      const count = this._getEntityDefs().filter(l => displayProgress.has(l.id)).length;
-      return t(count === 1 ? 'map.tooltip.completed.one' : 'map.tooltip.completed.other', { count });
-    }
-    if (def?.shape === PipeShape.Sink) {
-      const remaining = this._sinkRemaining(def, chapter, displayProgress);
-      if (remaining > 0) return t(remaining === 1 ? 'map.tooltip.remaining.one' : 'map.tooltip.remaining.other', { count: remaining });
-      if (filledKeys.has(`${row},${col}`)) return t('map.tooltip.chapterComplete');
-    }
+    if (this._isLevelChamberDef(def)) return this._levelChamberTooltip(def, filledKeys, row, col);
+    if (def?.shape === PipeShape.Source) return this._sourceTooltip(displayProgress);
+    if (def?.shape === PipeShape.Sink) return this._sinkTooltip(def, chapter, displayProgress, filledKeys, row, col);
+    return '';
+  }
+
+  private _isLevelChamberDef(def: TileDef | null | undefined): def is TileDef & { levelIdx: number } {
+    return def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined;
+  }
+
+  private _levelChamberTooltip(def: TileDef & { levelIdx: number }, filledKeys: Set<string>, row: number, col: number): string {
+    const isFilled = filledKeys.has(`${row},${col}`);
+    const entity = this._getEntityDefs()[def.levelIdx];
+    return isFilled && entity ? `${def.levelIdx + 1}: ${resolveLocalizedText(entity.name)}` : t('map.tooltip.locked');
+  }
+
+  private _sourceTooltip(displayProgress: Set<number>): string {
+    const count = this._getEntityDefs().filter(l => displayProgress.has(l.id)).length;
+    return t(count === 1 ? 'map.tooltip.completed.one' : 'map.tooltip.completed.other', { count });
+  }
+
+  private _sinkTooltip(
+    def: TileDef,
+    chapter: ChapterDef,
+    displayProgress: Set<number>,
+    filledKeys: Set<string>,
+    row: number,
+    col: number,
+  ): string {
+    const remaining = this._sinkRemaining(def, chapter, displayProgress);
+    if (remaining > 0) return t(remaining === 1 ? 'map.tooltip.remaining.one' : 'map.tooltip.remaining.other', { count: remaining });
+    if (filledKeys.has(`${row},${col}`)) return t('map.tooltip.chapterComplete');
     return '';
   }
 
