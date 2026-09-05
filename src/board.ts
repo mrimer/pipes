@@ -1455,6 +1455,49 @@ export class Board {
    *  - Gold spaces only accept gold pipes (same constraint as fresh placement);
    *    gold pipes may replace regular pipes on non-gold spaces and vice versa.
    */
+  /**
+   * After a replacement tentatively lands `newShape` at `pos`, check whether the
+   * effective inventory count for `newShape` is still positive. If not, block the
+   * replacement unless the shape was already unavailable *before* the replacement
+   * and the replacement didn't disconnect a positive container grant for it (in
+   * which case connecting new negative grants is allowed). Returns `null` to let
+   * the replacement proceed.
+   */
+  private _checkNewShapeAvailability(
+    newShape: PipeShape,
+    filledBeforeReplace: Set<string>,
+    filledWithNewTile: Set<string>,
+    baseCount: number,
+    bonuses: Map<PipeShape, number>,
+    rollback: () => void,
+  ): MoveResult | null {
+    const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
+    if (effectiveCount > 0) return null;
+
+    // Check whether the new shape was available before the replacement (with the old tile
+    // in place). If it was, block only when the replacement disconnected positive grants
+    // for that shape; connecting new negative grants is allowed.
+    const originalBonuses = this.getContainerBonuses(filledBeforeReplace);
+    const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
+    if (originalEffective <= 0) {
+      rollback();
+      return { success: false };
+    }
+    const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
+      newShape,
+      filledBeforeReplace,
+      filledWithNewTile,
+    );
+    if (disconnectedPositions.length === 0) return null;
+    rollback();
+    return { success: false, error: ERR_CONTAINER_DISCONNECT, errorTilePositions: disconnectedPositions };
+  }
+
+  /** Current inventory count for `shape`, or 0 if not held. */
+  private _currentInventoryCount(shape: PipeShape): number {
+    return this.inventory.find((it) => it.shape === shape)?.count ?? 0;
+  }
+
   replaceInventoryTile(pos: GridPos, newShape: PipeShape, rotation: Rotation = 0): MoveResult {
     const tile = this.getTile(pos);
 
@@ -1490,40 +1533,18 @@ export class Board {
     // container bridged by this position remains connected in the affordability
     // check.  (Computing bonuses with an Empty cell here would temporarily
     // disconnect such a container and produce a false "not available" result.)
-    const newExisting = this.inventory.find((it) => it.shape === newShape);
-    const baseCount = newExisting?.count ?? 0;
+    const baseCount = this._currentInventoryCount(newShape);
     // Capture the pre-replacement fill for valve-gate checking (old tile still in grid).
     const filledBeforeReplace = this.getFilledPositions();
     this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(newShape, rotation);
     const filledWithNewTile = this.getFilledPositions();
     const bonuses = this.getContainerBonuses(filledWithNewTile);
-    const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
 
-    if (effectiveCount <= 0) {
-      // Check whether the new shape was available before the replacement (with the old tile
-      // in place). If it was, block only when the replacement disconnected positive grants
-      // for that shape; connecting new negative grants is allowed.
-      const originalBonuses = this.getContainerBonuses(filledBeforeReplace);
-      const originalEffective = baseCount + (originalBonuses.get(newShape) ?? 0);
-      if (originalEffective <= 0) {
-        this.inventory = savedInventory;
-        this._invalidateFilledCache();
-        this.grid[pos.row][pos.col] = tile;
-        return { success: false };
-      }
-      const disconnectedPositions = this._getDisconnectedPositiveItemChamberPositions(
-        newShape,
-        filledBeforeReplace,
-        filledWithNewTile,
-      );
-      if (disconnectedPositions.length > 0) {
-        this.inventory = savedInventory;
-        this._invalidateFilledCache();
-        this.grid[pos.row][pos.col] = tile;
-        return { success: false, error: ERR_CONTAINER_DISCONNECT, errorTilePositions: disconnectedPositions };
-      }
-    }
+    const availabilityFailure = this._checkNewShapeAvailability(
+      newShape, filledBeforeReplace, filledWithNewTile, baseCount, bonuses, rollback,
+    );
+    if (availabilityFailure) return availabilityFailure;
 
     this._spendInventory(newShape);
     // grid[pos.row][pos.col] is already set to new Tile(newShape, rotation) above
@@ -1560,10 +1581,7 @@ export class Board {
       filledBeforeReplace,
       finalFilled,
       rollback,
-      (raw) => {
-        const filledWithOldTile = this.getFilledPositions();
-        return this._computeDisconnectedConstraintPositions(filledWithOldTile, finalFilled, raw);
-      },
+      (raw) => this._computeReplaceDisconnectedPositions(finalFilled, raw),
     );
     if (constraintFailure) return constraintFailure;
 
@@ -1571,6 +1589,12 @@ export class Board {
     const cementDecrement = this._cement.applyDecrement(pos);
 
     return { success: true, cementDecrement };
+  }
+
+  /** Intersect a raw constraint-error position list against tiles disconnected by the replacement. */
+  private _computeReplaceDisconnectedPositions(finalFilled: Set<string>, raw: GridPos[] | undefined): GridPos[] {
+    const filledWithOldTile = this.getFilledPositions();
+    return this._computeDisconnectedConstraintPositions(filledWithOldTile, finalFilled, raw);
   }
 
   // ─── Water tracking ────────────────────────────────────────────────────────
