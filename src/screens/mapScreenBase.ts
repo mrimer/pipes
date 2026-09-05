@@ -1347,9 +1347,17 @@ export abstract class MapScreenBase {
     // Bounds-check against the view window (only cells currently visible can be hit).
     const viewCol = Math.floor(canvasPxX / TILE_SIZE);
     const viewRow = Math.floor(canvasPxY / TILE_SIZE);
-    if (viewRow < 0 || viewRow >= viewRows || viewCol < 0 || viewCol >= viewCols) return null;
-    if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+    if (this._isOutsideMapViewBounds(viewRow, viewCol, viewRows, viewCols)) return null;
+    if (this._isOutsideMapGridBounds(row, col, rows, cols)) return null;
     return { row, col };
+  }
+
+  private _isOutsideMapViewBounds(viewRow: number, viewCol: number, viewRows: number, viewCols: number): boolean {
+    return viewRow < 0 || viewRow >= viewRows || viewCol < 0 || viewCol >= viewCols;
+  }
+
+  private _isOutsideMapGridBounds(row: number, col: number, rows: number, cols: number): boolean {
+    return row < 0 || row >= rows || col < 0 || col >= cols;
   }
 
   private _canvasPos(e: MouseEvent, chapter: ChapterDef): { row: number; col: number } | null {
