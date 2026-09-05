@@ -106,6 +106,28 @@ function _applyOptionalLevelDefFields(def: LevelDef, state: LevelEditorState, st
   if (state.levelStyle) def.style = state.levelStyle;
 }
 
+/** Builds the "author · N chapters · M levels [· progress]" meta line for a campaign list row. */
+function _buildCampaignMetaText(campaign: CampaignDef, isOfficial: boolean, levelCount: number): string {
+  // Compute play completion percentage for non-official campaigns
+  let progressText = '';
+  if (!isOfficial && levelCount > 0) {
+    const progress = loadCampaignProgress(campaign.id);
+    const pct = computeCampaignCompletionPct(campaign, progress);
+    progressText = `  ·  ${t('editor.campaign.progressComplete', { percent: pct })}`;
+  }
+
+  const chapterWord = campaign.chapters.length === 1 ? t('editor.common.chapterSingular') : t('editor.common.chapterPlural');
+  const levelWord = levelCount === 1 ? t('editor.common.levelSingular') : t('editor.common.levelPlural');
+  return t('editor.campaign.meta', {
+    author: campaign.author,
+    chapterCount: campaign.chapters.length,
+    chapterWord,
+    levelCount,
+    levelWord,
+    progressText,
+  });
+}
+
 // ─── CampaignEditor class ─────────────────────────────────────────────────────
 
 export class CampaignEditor {
@@ -589,62 +611,58 @@ export class CampaignEditor {
     const meta = document.createElement('div');
     meta.style.cssText = 'font-size:0.8rem;color:#aaa;margin-top:4px;';
     const levelCount = campaign.chapters.reduce((n, ch) => n + ch.levels.length, 0);
-
-    // Compute play completion percentage for non-official campaigns
-    let progressText = '';
-    if (!isOfficial && levelCount > 0) {
-      const progress = loadCampaignProgress(campaign.id);
-      const pct = computeCampaignCompletionPct(campaign, progress);
-      progressText = `  ·  ${t('editor.campaign.progressComplete', { percent: pct })}`;
-    }
-
-    const chapterWord = campaign.chapters.length === 1 ? t('editor.common.chapterSingular') : t('editor.common.chapterPlural');
-    const levelWord = levelCount === 1 ? t('editor.common.levelSingular') : t('editor.common.levelPlural');
-    meta.textContent = t('editor.campaign.meta', {
-      author: campaign.author,
-      chapterCount: campaign.chapters.length,
-      chapterWord,
-      levelCount,
-      levelWord,
-      progressText,
-    });
+    meta.textContent = _buildCampaignMetaText(campaign, isOfficial, levelCount);
     info.appendChild(name);
     info.appendChild(meta);
 
     // Play or Active button (shared for both official and user campaigns)
+    btns.appendChild(this._buildCampaignPlayButton(campaign, isActive));
+    btns.appendChild(this._buildCampaignEditOrViewButton(campaign, isOfficial, canEdit));
+    btns.appendChild(this._buildCampaignExportButton(campaign, isOfficial, canEdit));
+    this._appendCampaignDeleteButton(btns, campaign, isOfficial);
+
+    return row;
+  }
+
+  /** Builds the "Active" (disabled) or "Play" button shared by official and user campaign rows. */
+  private _buildCampaignPlayButton(campaign: CampaignDef, isActive: boolean): HTMLElement {
     if (isActive) {
       const activeBtn = this._btn(t('editor.campaign.active'), UI_BG, '#888', () => {}, 'cursor:default;');
       activeBtn.disabled = true;
-      btns.appendChild(activeBtn);
-    } else {
-      btns.appendChild(this._btn(t('editor.toolbar.play'), UI_BG, '#7ed321', () => {
-        sfxManager.play(SfxId.ChapterSelect);
-        this.hide();
-        this._onPlayCampaign(campaign);
-      }));
+      return activeBtn;
     }
+    return this._btn(t('editor.toolbar.play'), UI_BG, '#7ed321', () => {
+      sfxManager.play(SfxId.ChapterSelect);
+      this.hide();
+      this._onPlayCampaign(campaign);
+    });
+  }
 
-    if (!isOfficial) {
-      const editBtn = this._btn(t('editor.toolbar.edit'), UI_BG, canEdit ? '#f0c040' : '#666', () => {
-        if (!canEdit) return;
-        sfxManager.play(SfxId.ChapterSelect);
+  /** Builds the read-only "View" button (official campaigns) or the "Edit" button, disabled when the active player isn't the author. */
+  private _buildCampaignEditOrViewButton(campaign: CampaignDef, isOfficial: boolean, canEdit: boolean): HTMLElement {
+    if (isOfficial) {
+      return this._btn(t('editor.toolbar.view'), UI_BG, '#aaa', () => {
         this._activeCampaignId = campaign.id;
         this._showCampaignDetail();
       });
-      if (!canEdit) {
-        editBtn.disabled = true;
-        editBtn.title = t('editor.campaign.notAuthor');
-        editBtn.style.opacity = '0.5';
-        editBtn.style.cursor = 'not-allowed';
-      }
-      btns.appendChild(editBtn);
-    } else {
-      btns.appendChild(this._btn(t('editor.toolbar.view'), UI_BG, '#aaa', () => {
-        this._activeCampaignId = campaign.id;
-        this._showCampaignDetail();
-      }));
     }
+    const editBtn = this._btn(t('editor.toolbar.edit'), UI_BG, canEdit ? '#f0c040' : '#666', () => {
+      if (!canEdit) return;
+      sfxManager.play(SfxId.ChapterSelect);
+      this._activeCampaignId = campaign.id;
+      this._showCampaignDetail();
+    });
+    if (!canEdit) {
+      editBtn.disabled = true;
+      editBtn.title = t('editor.campaign.notAuthor');
+      editBtn.style.opacity = '0.5';
+      editBtn.style.cursor = 'not-allowed';
+    }
+    return editBtn;
+  }
 
+  /** Builds the "Export" button, disabled for a non-official campaign the active player can't edit. */
+  private _buildCampaignExportButton(campaign: CampaignDef, isOfficial: boolean, canEdit: boolean): HTMLElement {
     const exportBtn = this._btn(t('editor.toolbar.export'), UI_BG, canEdit ? '#4a90d9' : '#444', () => {
       if (!canEdit) return;
       this._exportCampaign(campaign);
@@ -655,15 +673,15 @@ export class CampaignEditor {
       exportBtn.style.opacity = '0.5';
       exportBtn.style.cursor = 'not-allowed';
     }
-    btns.appendChild(exportBtn);
+    return exportBtn;
+  }
 
-    if (!isOfficial) {
-      btns.appendChild(this._btn(t('editor.toolbar.delete'), UI_BG, ERROR_COLOR, () => {
-        this._deleteCampaign(campaign.id);
-      }));
-    }
-
-    return row;
+  /** Appends the "Delete" button for non-official campaigns only. */
+  private _appendCampaignDeleteButton(btns: HTMLElement, campaign: CampaignDef, isOfficial: boolean): void {
+    if (isOfficial) return;
+    btns.appendChild(this._btn(t('editor.toolbar.delete'), UI_BG, ERROR_COLOR, () => {
+      this._deleteCampaign(campaign.id);
+    }));
   }
 
   // ─── Screen: Campaign detail ──────────────────────────────────────────────
