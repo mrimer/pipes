@@ -669,33 +669,48 @@ export class InputHandler {
 
     const board = this._cb.getBoard();
     // Drag-paint: place at the OLD tile each time the cursor enters a new grid cell.
-    if (this._isDragging && this._cb.getSelectedShape() !== null &&
-        board && this._cb.getScreen() === GameScreen.Play &&
-        this._cb.getGameState() === GameState.Playing) {
-      const { row, col } = newPos;
-      const last = this._dragLastTile;
-      if (last && (row !== last.row || col !== last.col)) {
-        // Moved to a new tile: place at the tile we just left.
-        const oldTile = board.getTile(last);
-        if (oldTile) {
-          const filledBefore = board.getFilledPositions();
-          this._cb.tryPlaceOrReplace(last, oldTile, filledBefore);
-        }
-        this._dragLastTile = { row, col };
-      }
-    }
-
+    this._handleDragPaintOnMouseMove(newPos, board);
     // Drag-erase: reclaim the OLD tile each time the cursor enters a new grid cell.
-    if (this._isRightDragging && board && this._cb.getScreen() === GameScreen.Play &&
-        this._cb.getGameState() === GameState.Playing) {
-      const { row, col } = newPos;
-      const last = this._rightDragLastTile;
-      if (last && (row !== last.row || col !== last.col)) {
-        // Moved to a new tile: reclaim the tile we just left.
-        this._cb.reclaimTileAt(last);
-        this._rightDragLastTile = { row, col };
-      }
+    this._handleDragEraseOnMouseMove(newPos, board);
+  }
+
+  private _isDragPaintActive(board: Board | null): board is Board {
+    return this._isDragging && this._cb.getSelectedShape() !== null &&
+      board !== null && this._cb.getScreen() === GameScreen.Play &&
+      this._cb.getGameState() === GameState.Playing;
+  }
+
+  private _handleDragPaintOnMouseMove(newPos: GridPos, board: Board | null): void {
+    if (!this._isDragPaintActive(board)) return;
+    const { row, col } = newPos;
+    const last = this._dragLastTile;
+    if (!last || (row === last.row && col === last.col)) return;
+    // Moved to a new tile: place at the tile we just left.
+    this._paintOldDragTile(last, board);
+    this._dragLastTile = { row, col };
+  }
+
+  private _paintOldDragTile(last: GridPos, board: Board): void {
+    const oldTile = board.getTile(last);
+    if (oldTile) {
+      const filledBefore = board.getFilledPositions();
+      this._cb.tryPlaceOrReplace(last, oldTile, filledBefore);
     }
+  }
+
+  private _isDragEraseActive(board: Board | null): board is Board {
+    return this._isRightDragging && board !== null && this._cb.getScreen() === GameScreen.Play &&
+      this._cb.getGameState() === GameState.Playing;
+  }
+
+  private _handleDragEraseOnMouseMove(newPos: GridPos, board: Board | null): void {
+    if (!this._isDragEraseActive(board)) return;
+    const { row, col } = newPos;
+    const last = this._rightDragLastTile;
+    if (!last || (row === last.row && col === last.col)) return;
+    // Moved to a new tile: reclaim the tile we just left.
+    this._cb.reclaimTileAt(last);
+    this._rightDragLastTile = { row, col };
   }
 
   private _handleCanvasWheel(e: WheelEvent): void {
