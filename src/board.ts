@@ -145,6 +145,117 @@ export function isEmptyFloor(shape: PipeShape): boolean {
  * @param getCellFloorType Returns the intrinsic floor type when (r, c) is an
  *                         empty-floor cell, or `null` for all other tile types.
  */
+/** Cardinal-neighbour offsets, shared by every helper below. */
+const CARDINAL_OFFSETS: readonly [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+/** Invoke `cb` for every in-bounds cardinal neighbour of (r, c). */
+function _forEachInBoundsNeighbor(
+  r: number, c: number, rows: number, cols: number,
+  cb: (nr: number, nc: number) => void,
+): void {
+  for (const [dr, dc] of CARDINAL_OFFSETS) {
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) cb(nr, nc);
+  }
+}
+
+/** True when (r, c) has at least one cardinal neighbour already resolved in `map`. */
+function _hasResolvedNeighbor(
+  r: number, c: number, rows: number, cols: number, map: ReadonlyMap<string, PipeShape>,
+): boolean {
+  for (const [dr, dc] of CARDINAL_OFFSETS) {
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && map.has(posKey(nr, nc))) return true;
+  }
+  return false;
+}
+
+/** Majority vote over cardinal neighbours already resolved in `map`. */
+function _majorityFloorFromNeighbors(
+  r: number, c: number, rows: number, cols: number,
+  map: ReadonlyMap<string, PipeShape>,
+  getCellFloorType: (r: number, c: number) => PipeShape | null,
+): PipeShape {
+  const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyFall, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
+  _forEachInBoundsNeighbor(r, c, rows, cols, (nr, nc) => {
+    const ft = map.get(posKey(nr, nc)) ?? getCellFloorType(nr, nc);
+    if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
+  });
+  let best: PipeShape = PipeShape.Empty;
+  let bestCount = -1;
+  for (const shape of EMPTY_FLOOR_SHAPES) {
+    const cnt = counts.get(shape) ?? 0;
+    if (cnt > bestCount) { bestCount = cnt; best = shape; }
+  }
+  return best;
+}
+
+/** Pass 1: seed `map` directly from every empty-floor cell. */
+function _seedResolvedFloorCells(
+  rows: number, cols: number,
+  getCellFloorType: (r: number, c: number) => PipeShape | null,
+  map: Map<string, PipeShape>,
+): void {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const ft = getCellFloorType(r, c);
+      if (ft !== null) map.set(posKey(r, c), ft);
+    }
+  }
+}
+
+/** Seed the BFS queue with every unresolved cell adjacent to an already-resolved one. */
+function _buildInitialFloorBfsQueue(
+  rows: number, cols: number, map: ReadonlyMap<string, PipeShape>,
+): [number, number][] {
+  const queue: [number, number][] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (map.has(posKey(r, c))) continue;
+      if (_hasResolvedNeighbor(r, c, rows, cols, map)) queue.push([r, c]);
+    }
+  }
+  return queue;
+}
+
+/** Push any still-unresolved neighbour of (r, c) onto `queue` for later BFS expansion. */
+function _enqueueUnresolvedNeighbors(
+  r: number, c: number, rows: number, cols: number,
+  map: ReadonlyMap<string, PipeShape>, queue: [number, number][],
+): void {
+  _forEachInBoundsNeighbor(r, c, rows, cols, (nr, nc) => {
+    if (!map.has(posKey(nr, nc))) queue.push([nr, nc]);
+  });
+}
+
+/** Pass 2: BFS outward from resolved cells, resolving each by neighbour majority vote. */
+function _expandFloorTypesByBfs(
+  queue: [number, number][], rows: number, cols: number,
+  map: Map<string, PipeShape>,
+  getCellFloorType: (r: number, c: number) => PipeShape | null,
+): void {
+  let qi = 0;
+  while (qi < queue.length) {
+    const [r, c] = queue[qi++];
+    const key = posKey(r, c);
+    if (map.has(key)) continue;
+    map.set(key, _majorityFloorFromNeighbors(r, c, rows, cols, map, getCellFloorType));
+    _enqueueUnresolvedNeighbors(r, c, rows, cols, map, queue);
+  }
+}
+
+/** Pass 3: fill any cells still unresolved (e.g. a board with no empty-floor tiles at all). */
+function _fillRemainingWithDefaultFloor(
+  rows: number, cols: number, map: Map<string, PipeShape>, defaultFloor: PipeShape,
+): void {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const key = posKey(r, c);
+      if (!map.has(key)) map.set(key, defaultFloor);
+    }
+  }
+}
+
 export function computeFloorTypesFromGrid(
   rows: number,
   cols: number,
@@ -153,69 +264,13 @@ export function computeFloorTypesFromGrid(
 ): ReadonlyMap<string, PipeShape> {
   const map = new Map<string, PipeShape>();
 
-  // Majority vote over cardinal neighbours already resolved in `map`.
-  const majorityFromNeighbors = (r: number, c: number): PipeShape => {
-    const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyFall, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
-    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
-      const nr = r + dr, nc = c + dc;
-      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-      const ft = map.get(posKey(nr, nc)) ?? getCellFloorType(nr, nc);
-      if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
-    }
-    let best: PipeShape = PipeShape.Empty;
-    let bestCount = -1;
-    for (const shape of EMPTY_FLOOR_SHAPES) {
-      const cnt = counts.get(shape) ?? 0;
-      if (cnt > bestCount) { bestCount = cnt; best = shape; }
-    }
-    return best;
-  };
+  _seedResolvedFloorCells(rows, cols, getCellFloorType, map);
 
-  // Pass 1: seed from empty-floor cells.
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const ft = getCellFloorType(r, c);
-      if (ft !== null) map.set(posKey(r, c), ft);
-    }
-  }
+  const queue = _buildInitialFloorBfsQueue(rows, cols, map);
+  _expandFloorTypesByBfs(queue, rows, cols, map, getCellFloorType);
 
-  // Pass 2: BFS outward from resolved cells to cover all remaining tile types.
-  const queue: [number, number][] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (map.has(posKey(r, c))) continue;
-      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && map.has(posKey(nr, nc))) {
-          queue.push([r, c]);
-          break;
-        }
-      }
-    }
-  }
-  let qi = 0;
-  while (qi < queue.length) {
-    const [r, c] = queue[qi++];
-    const key = posKey(r, c);
-    if (map.has(key)) continue;
-    map.set(key, majorityFromNeighbors(r, c));
-    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as [number, number][]) {
-      const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !map.has(posKey(nr, nc))) {
-        queue.push([nr, nc]);
-      }
-    }
-  }
-
-  // Pass 3: fill any cells still unresolved (e.g. when the board has no empty-floor
-  // tiles at all and BFS had nothing to propagate from) with the default floor type.
   if (defaultFloor !== PipeShape.Empty) {
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const key = posKey(r, c);
-        if (!map.has(key)) map.set(key, defaultFloor);
-      }
-    }
+    _fillRemainingWithDefaultFloor(rows, cols, map, defaultFloor);
   }
 
   return map;
