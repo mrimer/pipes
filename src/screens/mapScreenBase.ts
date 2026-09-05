@@ -447,47 +447,66 @@ export abstract class MapScreenBase {
 
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-
-    // Find the grid cell containing this level.
-    let cellRow = -1, cellCol = -1;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const def = chapter.grid[r]?.[c];
-        if (
-          def?.shape === PipeShape.Chamber &&
-          def.chamberContent === 'level' &&
-          def.levelIdx !== undefined &&
-          chapter.levels[def.levelIdx] === levelDef
-        ) {
-          cellRow = r;
-          cellCol = c;
-          break;
-        }
-      }
-      if (cellRow >= 0) break;
-    }
-    if (cellRow < 0) return null;
+    const cell = this._findLevelGridCell(chapter, rows, cols, levelDef);
+    if (!cell) return null;
 
     // Apply the pan offset so the minimap rect reflects the tile's current
     // on-canvas position within the view window.
-    const canvasX = cellCol * TILE_SIZE - this._panPixelX;
-    const canvasY = cellRow * TILE_SIZE - this._panPixelY;
+    const canvasX = cell.col * TILE_SIZE - this._panPixelX;
+    const canvasY = cell.row * TILE_SIZE - this._panPixelY;
 
     // If the cell is entirely outside the visible view window, return null so
     // the transition falls back gracefully (no off-screen animation target).
-    if (
-      canvasX + TILE_SIZE <= 0 || canvasX >= this._viewCols * TILE_SIZE ||
-      canvasY + TILE_SIZE <= 0 || canvasY >= this._viewRows * TILE_SIZE
-    ) return null;
+    if (this._isOutsideViewWindow(canvasX, canvasY)) return null;
 
     const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(
       canvasX, canvasY, levelDef
     );
 
-    // Convert canvas-space → screen-space using the canvas bounding rect.
-    // The canvas has a CSS border (CHAPTER_MAP_CANVAS_BORDER_PX wide on each side);
-    // getBoundingClientRect() returns the border-box, so we subtract the border from
-    // the dimensions and add it to the origin to get the true content area in screen space.
+    return this._minimapRectToScreenSpace(canvas, mx, my, mw, mh);
+  }
+
+  /** Finds the grid cell whose level chamber references levelDef, or null if not found. */
+  private _findLevelGridCell(
+    chapter: ChapterDef,
+    rows: number,
+    cols: number,
+    levelDef: LevelDef,
+  ): { row: number; col: number } | null {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const def = chapter.grid?.[r]?.[c];
+        if (this._isLevelCellDef(def, chapter, levelDef)) return { row: r, col: c };
+      }
+    }
+    return null;
+  }
+
+  private _isLevelCellDef(def: TileDef | null | undefined, chapter: ChapterDef, levelDef: LevelDef): boolean {
+    return def?.shape === PipeShape.Chamber &&
+      def.chamberContent === 'level' &&
+      def.levelIdx !== undefined &&
+      chapter.levels[def.levelIdx] === levelDef;
+  }
+
+  private _isOutsideViewWindow(canvasX: number, canvasY: number): boolean {
+    return canvasX + TILE_SIZE <= 0 || canvasX >= this._viewCols * TILE_SIZE ||
+      canvasY + TILE_SIZE <= 0 || canvasY >= this._viewRows * TILE_SIZE;
+  }
+
+  /**
+   * Convert canvas-space → screen-space using the canvas bounding rect.
+   * The canvas has a CSS border (CHAPTER_MAP_CANVAS_BORDER_PX wide on each side);
+   * getBoundingClientRect() returns the border-box, so we subtract the border from
+   * the dimensions and add it to the origin to get the true content area in screen space.
+   */
+  private _minimapRectToScreenSpace(
+    canvas: HTMLCanvasElement,
+    mx: number,
+    my: number,
+    mw: number,
+    mh: number,
+  ): { x: number; y: number; width: number; height: number } {
     const rect = canvas.getBoundingClientRect();
     const border = CHAPTER_MAP_CANVAS_BORDER_PX;
     const contentW = rect.width - 2 * border;
