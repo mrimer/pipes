@@ -2437,25 +2437,33 @@ export class Board {
     while (qi < queue.length) {
       const pos = queue[qi++];
       for (const dir of DIRECTIONS) {
-        if (!this.areMutuallyConnected(pos, dir)) continue;
-        const delta = NEIGHBOUR_DELTA[dir];
-        const nextPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
-        const nextKey = posKey(nextPos.row, nextPos.col);
-        if (reached.has(nextKey)) continue;
-        const nextTile = this.grid[nextPos.row]?.[nextPos.col];
-        if (!nextTile) continue;
-        // Valve check: only enter a chamber via a first-connection direction.
-        if (nextTile.firstConnections && nextTile.firstConnections.size > 0) {
-          const arrivalDir = oppositeDirection(dir);
-          if (!nextTile.firstConnections.has(arrivalDir)) continue;
-        }
-        reached.set(nextKey, nextPos);
-        queue.push(nextPos);
+        this._tryVisitFillBfsNeighbor(pos, dir, reached, queue);
       }
     }
 
     this._filledPositionsCache = new Set(reached.keys());
     return this._filledPositionsCache;
+  }
+
+  /** Visit the neighbour of `pos` in direction `dir`, enqueuing it into the flood-fill BFS if reachable. */
+  private _tryVisitFillBfsNeighbor(pos: GridPos, dir: Direction, reached: Map<string, GridPos>, queue: GridPos[]): void {
+    if (!this.areMutuallyConnected(pos, dir)) return;
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nextPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
+    const nextKey = posKey(nextPos.row, nextPos.col);
+    if (reached.has(nextKey)) return;
+    const nextTile = this.grid[nextPos.row]?.[nextPos.col];
+    if (!nextTile) return;
+    if (!this._canEnterViaValve(nextTile, dir)) return;
+    reached.set(nextKey, nextPos);
+    queue.push(nextPos);
+  }
+
+  /** Valve check: a chamber with first-connections may only be entered via one of them. */
+  private _canEnterViaValve(tile: Tile, arrivalFromDir: Direction): boolean {
+    if (!tile.firstConnections || tile.firstConnections.size === 0) return true;
+    const arrivalDir = oppositeDirection(arrivalFromDir);
+    return tile.firstConnections.has(arrivalDir);
   }
 
   /** Invalidate the {@link getFilledPositions} cache after any grid mutation. */
