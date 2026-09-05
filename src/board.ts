@@ -387,6 +387,84 @@ function decorationTypesForFloor(floorType: PipeShape): AmbientDecorationType[] 
  *   generated (see {@link decorationTypesForFloor}).  Defaults to Summer (Empty)
  *   for every cell when omitted.
  */
+/** Golden angle in degrees – gives the best uniform distribution of rotations. */
+const DECORATION_GOLDEN_ANGLE = 137.50776405003785;
+
+/** Pick one decoration type at random from those valid for `floorType`. */
+function _pickDecorationType(floorType: PipeShape): AmbientDecorationType {
+  const types = decorationTypesForFloor(floorType);
+  return types[Math.floor(Math.random() * types.length)];
+}
+
+/**
+ * Mushrooms scale 0.7–1.5 (up to 50% larger); crystals scale 0.75–1.25 (±25%);
+ * dandelions and sunflowers scale 0.65–1.35 (random factor as per design);
+ * leaves scale 0.70–1.20 (±25%). All other types have no scale variance.
+ */
+function _pickDecorationScale(type: AmbientDecorationType): number | undefined {
+  switch (type) {
+    case 'mushroom': return 0.7 + Math.random() * 0.8;
+    case 'crystal': return 0.75 + Math.random() * 0.5;
+    case 'dandelion': return 0.65 + Math.random() * 0.7;
+    case 'sunflower': return 0.65 + Math.random() * 0.7;
+    case 'leaves': return 0.70 + Math.random() * 0.5;
+    default: return undefined;
+  }
+}
+
+/** Crystals randomly show either one or two shards; leaves show 2–5 leaves. */
+function _pickDecorationCount(type: AmbientDecorationType): number | undefined {
+  switch (type) {
+    case 'crystal': return Math.random() < 0.5 ? 1 : 2;
+    case 'leaves': return 2 + Math.floor(Math.random() * 4);
+    default: return undefined;
+  }
+}
+
+/**
+ * Pebbles and crystals distribute rotations using the golden angle so that each
+ * instance of the same type has a visually distinct orientation; `idx` is that
+ * type's running count so far. A random base angle is chosen so board instances
+ * show different orientations. Every other type just uses the base angle.
+ */
+function _computeDecorationRotation(type: AmbientDecorationType, idx: number, baseAngle: number): number {
+  if (type === 'pebbles' || type === 'crystal') return (baseAngle + idx * DECORATION_GOLDEN_ANGLE) % 360;
+  return baseAngle;
+}
+
+/**
+ * Sunflowers and dandelions are positioned lower so their tops don't draw up onto
+ * the tile above. Dandelions extend ~20–26 px above their origin (stalk + puff,
+ * accounting for max scale 1.35), so offsetY >= 0.45 keeps them within the tile
+ * at TILE_SIZE = 64 px. Every other type centers in the tile's middle 15–85%.
+ */
+function _computeDecorationOffsetY(type: AmbientDecorationType): number {
+  if (type === 'sunflower' || type === 'dandelion') return 0.45 + Math.random() * 0.45;
+  return 0.15 + Math.random() * 0.70;
+}
+
+/** Build one fully-randomized ambient decoration for cell (r, c). */
+function _buildAmbientDecoration(
+  r: number, c: number, floorType: PipeShape, type: AmbientDecorationType, idx: number,
+): AmbientDecoration {
+  // Spring flowers are rendered brighter and fully opaque.
+  const bright = (floorType === PipeShape.EmptySpring && type === 'flower') ? true : undefined;
+  const baseAngle = Math.random() * 360;
+  return {
+    row: r,
+    col: c,
+    type,
+    // Keep decorations away from cell edges for a natural look
+    offsetX: 0.15 + Math.random() * 0.70,
+    offsetY: _computeDecorationOffsetY(type),
+    rotation: _computeDecorationRotation(type, idx, baseAngle),
+    variant: Math.floor(Math.random() * 3),
+    scale: _pickDecorationScale(type),
+    count: _pickDecorationCount(type),
+    bright,
+  };
+}
+
 export function generateAmbientDecorations(
   rows: number,
   cols: number,
@@ -395,58 +473,14 @@ export function generateAmbientDecorations(
   const map = new Map<string, AmbientDecoration>();
   // Counters per type for golden-angle rotation distribution (pebbles & crystals).
   const typeCount: Partial<Record<AmbientDecorationType, number>> = {};
-  // Golden angle in degrees – gives the best uniform distribution of rotations.
-  const GOLDEN_ANGLE = 137.50776405003785;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (Math.random() >= DECORATION_DENSITY) continue;
       const floorType = getFloorType ? getFloorType(r, c) : PipeShape.Empty;
-      const types = decorationTypesForFloor(floorType);
-      const type = types[Math.floor(Math.random() * types.length)];
-      // Mushrooms scale 0.7–1.5 (up to 50 % larger); crystals scale 0.75–1.25 (±25 %);
-      // dandelions and sunflowers scale 0.65–1.35 (random factor as per design);
-      // leaves scale 0.70–1.20 (±25 %).
-      const scale = type === 'mushroom'   ? 0.7 + Math.random() * 0.8
-                  : type === 'crystal'    ? 0.75 + Math.random() * 0.5
-                  : type === 'dandelion'  ? 0.65 + Math.random() * 0.7
-                  : type === 'sunflower'  ? 0.65 + Math.random() * 0.7
-                  : type === 'leaves'     ? 0.70 + Math.random() * 0.5
-                  : undefined;
-      // Crystals randomly show either one or two shards; leaves show 2–5 leaves.
-      const count = type === 'crystal' ? (Math.random() < 0.5 ? 1 : 2)
-                  : type === 'leaves'  ? 2 + Math.floor(Math.random() * 4)
-                  : undefined;
-      // Spring flowers are rendered brighter and fully opaque.
-      const bright = (floorType === PipeShape.EmptySpring && type === 'flower') ? true : undefined;
-      // Pebbles and crystals: distribute rotations using the golden angle so that
-      // each instance of the same type has a visually distinct orientation.
-      // A random base angle is chosen so board instances show different orientations.
+      const type = _pickDecorationType(floorType);
       const idx = typeCount[type] ?? 0;
       typeCount[type] = idx + 1;
-      const baseAngle = Math.random() * 360;
-      const rotation = (type === 'pebbles' || type === 'crystal')
-        ? (baseAngle + idx * GOLDEN_ANGLE) % 360
-        : baseAngle;
-      // Sunflowers and dandelions are positioned lower so their tops don't draw
-      // up onto the tile above. Dandelions extend ~20–26 px above their origin
-      // (stalk + puff, accounting for max scale 1.35), so offsetY ≥ 0.45 keeps
-      // them within the tile at TILE_SIZE = 64 px.
-      const offsetY = (type === 'sunflower' || type === 'dandelion')
-        ? 0.45 + Math.random() * 0.45   // center in lower 45–90 % of tile
-        : 0.15 + Math.random() * 0.70;
-      map.set(`${r},${c}`, {
-        row: r,
-        col: c,
-        type,
-        // Keep decorations away from cell edges for a natural look
-        offsetX: 0.15 + Math.random() * 0.70,
-        offsetY,
-        rotation,
-        variant: Math.floor(Math.random() * 3),
-        scale,
-        count,
-        bright,
-      });
+      map.set(`${r},${c}`, _buildAmbientDecoration(r, c, floorType, type, idx));
     }
   }
   return map;
