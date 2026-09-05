@@ -1811,47 +1811,77 @@ export abstract class MapScreenBase {
     const grid = chapter.grid;
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    const viewRows = this._viewRows;
-    const viewCols = this._viewCols;
 
-    // Active jitter animations animate the base grid layer, so keep it dirty
-    // for the duration of the animation.  The length check avoids iterating
-    // the array on the common path when no jitter is in progress.
-    if (this._jitterAnims.length > 0) {
-      for (const j of this._jitterAnims) {
-        if (now - j.startedAt < MapScreenBase.JITTER_DURATION_MS) {
-          this._chapterMapDirty = true;
-          break;
-        }
-      }
-    }
+    this._markDirtyIfJitterActive(now);
 
     // Re-render the base grid only when state has changed; otherwise reuse the
     // cached off-screen canvas to avoid the expensive BFS + 3-pass render.
-    if (this._chapterMapDirty) {
-      if (!this._renderBase(chapter, now)) return;
-    }
+    if (this._chapterMapDirty && !this._renderBase(chapter, now)) return;
 
     // Blit the cached base layer and draw cloud shadows (always animated).
     this._compositeFrame(now);
 
     const filledKeys = this._cachedFilledKeys;
     const displayProgress = this._cachedDisplayProgress;
-
     const positions = findChapterMapAnimPositions(grid, rows, cols, filledKeys);
 
-    // All particle/animation effects that use grid-space coordinates are rendered
-    // under the same pan transform that was applied in _renderBase.
+    this._renderPannedAnimationLayers(ctx, chapter, grid, rows, cols, filledKeys, positions, now);
+
+    // Edge flowers and the gold border are positioned in canvas (view-window)
+    // coordinates, not grid coords, so they render outside the pan transform.
+    const isMastered = this._isChapterMastered(chapter, displayProgress);
+    this._renderEdgeFlowersIfMastered(ctx, isMastered, now);
+    this._updateGoldBorder(isMastered, now);
+  }
+
+  /**
+   * Active jitter animations animate the base grid layer, so keep it dirty
+   * for the duration of the animation. The length check avoids iterating
+   * the array on the common path when no jitter is in progress.
+   */
+  private _markDirtyIfJitterActive(now: number): void {
+    if (this._jitterAnims.length === 0) return;
+    for (const j of this._jitterAnims) {
+      if (now - j.startedAt < MapScreenBase.JITTER_DURATION_MS) {
+        this._chapterMapDirty = true;
+        break;
+      }
+    }
+  }
+
+  /** All particle/animation effects that use grid-space coordinates, rendered under the same pan transform as _renderBase. */
+  private _renderPannedAnimationLayers(
+    ctx: CanvasRenderingContext2D,
+    chapter: ChapterDef,
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+    positions: ReturnType<typeof findChapterMapAnimPositions>,
+    now: number,
+  ): void {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, viewCols * TILE_SIZE, viewRows * TILE_SIZE);
+    ctx.rect(0, 0, this._viewCols * TILE_SIZE, this._viewRows * TILE_SIZE);
     ctx.clip();
     ctx.translate(-this._panPixelX, -this._panPixelY);
 
     // Connector landing-strip lights – rendered before particles so they appear below droplets
     renderChapterMapConnectorLights(ctx, positions, now);
+    this._tickSinkVortices(ctx, positions, now);
+    this._tickSourceSprayAndFlow(ctx, chapter, grid, rows, cols, filledKeys, positions, now);
+    this._tickPipeBubbles(ctx, grid, rows, cols, filledKeys, now);
+    this._renderWinGlowsIfAny(ctx, now);
 
-    // Sink vortex – spawn and render one vortex per sink tile
+    ctx.restore(); // Remove pan transform – canvas-coordinate effects follow
+  }
+
+  /** Sink vortex – spawn and render one vortex per sink tile. */
+  private _tickSinkVortices(
+    ctx: CanvasRenderingContext2D,
+    positions: ReturnType<typeof findChapterMapAnimPositions>,
+    now: number,
+  ): void {
     if (now - this._lastVortexSpawn >= MapScreenBase.VORTEX_SPAWN_INTERVAL_MS) {
       spawnVortexParticle(this._vortexParticles);
       this._lastVortexSpawn = now;
@@ -1860,33 +1890,67 @@ export abstract class MapScreenBase {
       const color = sink.isFilled ? SINK_WATER_COLOR : SINK_COLOR;
       renderVortex(ctx, this._vortexParticles, sink.x, sink.y, color);
     }
+  }
 
-    // Source spray – spawn and render water-drop spray from the source
-    if (positions.source) {
-      const src = positions.source;
-      if (now - this._lastSpraySpawn >= MapScreenBase.SPRAY_SPAWN_INTERVAL_MS) {
-        spawnSourceSprayDrop(this._sourceSprayDrops);
-        this._lastSpraySpawn = now;
-      }
-      // Source spray color matches the level screen: WATER_COLOR when the source is filled, SOURCE_COLOR when not.
-      const sprayColor = src.isFilled ? WATER_COLOR : SOURCE_COLOR;
-      renderSourceSpray(ctx, this._sourceSprayDrops, src.x, src.y, sprayColor);
-
-      // Flow drops – water drops traveling from source to sink along filled pipe path.
-      // Only shown once the chapter has been completed (auto-triggered on screen entry).
-      // Use WATER_COLOR to match the flow drop color on the level screen.
-      const sinkFilled = positions.sinks.some(s => s.isFilled);
-      if (src.isFilled && sinkFilled && this._isChapterCompleted(chapter)) {
-        const maxDrops = Math.max(10, filledKeys.size * 5);
-        if (now - this._lastFlowSpawn >= MapScreenBase.FLOW_SPAWN_INTERVAL_MS) {
-          spawnChapterMapFlowDrop(this._chapterMapFlowDrops, grid, rows, cols, filledKeys, src.row, src.col, maxDrops);
-          this._lastFlowSpawn = now;
-        }
-        renderChapterMapFlowDrops(ctx, this._chapterMapFlowDrops, grid, rows, cols, filledKeys, WATER_COLOR);
-      }
+  /** Source spray – spawn and render water-drop spray from the source, then tick completion flow drops. */
+  private _tickSourceSprayAndFlow(
+    ctx: CanvasRenderingContext2D,
+    chapter: ChapterDef,
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+    positions: ReturnType<typeof findChapterMapAnimPositions>,
+    now: number,
+  ): void {
+    const src = positions.source;
+    if (!src) return;
+    if (now - this._lastSpraySpawn >= MapScreenBase.SPRAY_SPAWN_INTERVAL_MS) {
+      spawnSourceSprayDrop(this._sourceSprayDrops);
+      this._lastSpraySpawn = now;
     }
+    // Source spray color matches the level screen: WATER_COLOR when the source is filled, SOURCE_COLOR when not.
+    const sprayColor = src.isFilled ? WATER_COLOR : SOURCE_COLOR;
+    renderSourceSpray(ctx, this._sourceSprayDrops, src.x, src.y, sprayColor);
 
-    // Pipe bubbles – fizzing particles inside connected pipe tiles.
+    this._tickChapterCompletionFlowDrops(ctx, chapter, grid, rows, cols, filledKeys, positions, src, now);
+  }
+
+  /**
+   * Flow drops – water drops traveling from source to sink along filled pipe path.
+   * Only shown once the chapter has been completed (auto-triggered on screen entry).
+   * Use WATER_COLOR to match the flow drop color on the level screen.
+   */
+  private _tickChapterCompletionFlowDrops(
+    ctx: CanvasRenderingContext2D,
+    chapter: ChapterDef,
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+    positions: ReturnType<typeof findChapterMapAnimPositions>,
+    src: NonNullable<ReturnType<typeof findChapterMapAnimPositions>['source']>,
+    now: number,
+  ): void {
+    const sinkFilled = positions.sinks.some(s => s.isFilled);
+    if (!src.isFilled || !sinkFilled || !this._isChapterCompleted(chapter)) return;
+    const maxDrops = Math.max(10, filledKeys.size * 5);
+    if (now - this._lastFlowSpawn >= MapScreenBase.FLOW_SPAWN_INTERVAL_MS) {
+      spawnChapterMapFlowDrop(this._chapterMapFlowDrops, grid, rows, cols, filledKeys, src.row, src.col, maxDrops);
+      this._lastFlowSpawn = now;
+    }
+    renderChapterMapFlowDrops(ctx, this._chapterMapFlowDrops, grid, rows, cols, filledKeys, WATER_COLOR);
+  }
+
+  /** Pipe bubbles – fizzing particles inside connected pipe tiles. */
+  private _tickPipeBubbles(
+    ctx: CanvasRenderingContext2D,
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+    now: number,
+  ): void {
     if (now - this._lastBubbleSpawn >= MapScreenBase.BUBBLE_SPAWN_INTERVAL_MS) {
       if (this._bubbleCandidateKeysDirty) {
         this._bubbleCandidateKeys = buildChapterMapBubbleCandidateKeys(grid, filledKeys);
@@ -1896,44 +1960,53 @@ export abstract class MapScreenBase {
       this._lastBubbleSpawn = now;
     }
     renderBubbles(ctx, this._bubbles, WATER_COLOR);
+  }
 
-    // Win tile glows – blue tile flash animation triggered by the chapter completion sequence
+  /** Win tile glows – blue tile flash animation triggered by the chapter completion sequence. */
+  private _renderWinGlowsIfAny(ctx: CanvasRenderingContext2D, now: number): void {
     if (this._winGlows.length > 0) {
       renderWinTileGlows(ctx, this._winGlows, now);
     }
+  }
 
-    ctx.restore(); // Remove pan transform – canvas-coordinate effects follow
-
-    // Edge flowers – shown only when the chapter is mastered.
-    // These are positioned in canvas (view-window) coordinates, not grid coords.
-    const isMastered = this._isChapterMastered(chapter, displayProgress);
-    if (isMastered) {
-      if (now - this._lastFlowerSpawn >= MapScreenBase.FLOWER_SPAWN_INTERVAL_MS) {
-        this._spawnEdgeFlower(now, viewRows, viewCols);
-        this._lastFlowerSpawn = now;
-      }
-      // Shared sway angle: ~25° amplitude, ~6 s period, synchronised across all flowers
-      const swayAngle = Math.sin(now / MapScreenBase.FLOWER_SWAY_PERIOD) * 25 * Math.PI / 180;
-      this._renderEdgeFlowers(ctx, now, swayAngle);
+  /** Edge flowers – shown only when the chapter is mastered. */
+  private _renderEdgeFlowersIfMastered(ctx: CanvasRenderingContext2D, isMastered: boolean, now: number): void {
+    if (!isMastered) return;
+    if (now - this._lastFlowerSpawn >= MapScreenBase.FLOWER_SPAWN_INTERVAL_MS) {
+      this._spawnEdgeFlower(now, this._viewRows, this._viewCols);
+      this._lastFlowerSpawn = now;
     }
+    // Shared sway angle: ~25° amplitude, ~6 s period, synchronised across all flowers
+    const swayAngle = Math.sin(now / MapScreenBase.FLOWER_SWAY_PERIOD) * 25 * Math.PI / 180;
+    this._renderEdgeFlowers(ctx, now, swayAngle);
+  }
 
-    // Gold border – shown when the chapter is mastered
-    if (this._canvas) {
-      if (isMastered) {
-        const t = (Math.sin(now / MapScreenBase.GOLD_BORDER_PERIOD) + 1) / 2;  // oscillates 0→1, period ~3.1 s
-        const r = Math.round(180 + t * 75);         // 180–255
-        const g = Math.round(130 + t * 85);         // 130–215
-        const color = `rgb(${r},${g},0)`;
-        if (color !== this._borderColor) {
-          this._borderColor = color;
-          this._canvas.style.borderColor = color;
-        }
-      } else {
-        if (this._borderColor !== CHAPTER_MAP_CANVAS_BORDER_COLOR) {
-          this._borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
-          this._canvas.style.borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
-        }
-      }
+  /** Gold border – shown when the chapter is mastered. */
+  private _updateGoldBorder(isMastered: boolean, now: number): void {
+    const canvas = this._canvas;
+    if (!canvas) return;
+    if (isMastered) {
+      this._applyMasteredBorderColor(canvas, now);
+    } else {
+      this._resetBorderColor(canvas);
+    }
+  }
+
+  private _applyMasteredBorderColor(canvas: HTMLCanvasElement, now: number): void {
+    const t = (Math.sin(now / MapScreenBase.GOLD_BORDER_PERIOD) + 1) / 2;  // oscillates 0→1, period ~3.1 s
+    const r = Math.round(180 + t * 75);         // 180–255
+    const g = Math.round(130 + t * 85);         // 130–215
+    const color = `rgb(${r},${g},0)`;
+    if (color !== this._borderColor) {
+      this._borderColor = color;
+      canvas.style.borderColor = color;
+    }
+  }
+
+  private _resetBorderColor(canvas: HTMLCanvasElement): void {
+    if (this._borderColor !== CHAPTER_MAP_CANVAS_BORDER_COLOR) {
+      this._borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
+      canvas.style.borderColor = CHAPTER_MAP_CANVAS_BORDER_COLOR;
     }
   }
 
