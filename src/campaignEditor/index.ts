@@ -1231,19 +1231,7 @@ export class CampaignEditor {
 
     const toolbar = this._buildToolbar(
       readOnly ? `👁 View Level: ${resolveLocalizedText(this._state.levelName)}` : `✏️ Level Editor (${this._activeChapterIdx + 1}-${this._activeLevelIdx + 1})`,
-      () => {
-        if (!readOnly && this._state.hasUnsavedChanges) {
-          this._dialogs.showUnsavedChanges(
-            () => {
-              this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
-              this._showChapterDetail();
-            },
-            () => this._showChapterDetail(),
-          );
-        } else {
-          this._showChapterDetail();
-        }
-      },
+      () => this._handleLevelEditorBack(readOnly, campaign),
     );
     this._addLevelEditorToolbarActions(toolbar, readOnly, campaign);
     this._el.appendChild(toolbar);
@@ -1300,6 +1288,21 @@ export class CampaignEditor {
     this._renderEditorCanvas();
     this._startLevelSeaAnimationLoop();
     this._updateEditorUndoRedoButtons();
+  }
+
+  /** Level editor toolbar "back" action: prompts to save unsaved changes before returning to the chapter. */
+  private _handleLevelEditorBack(readOnly: boolean, campaign: CampaignDef): void {
+    if (!readOnly && this._state.hasUnsavedChanges) {
+      this._dialogs.showUnsavedChanges(
+        () => {
+          this._saveLevel(campaign, this._activeChapterIdx, this._activeLevelIdx);
+          this._showChapterDetail();
+        },
+        () => this._showChapterDetail(),
+      );
+    } else {
+      this._showChapterDetail();
+    }
   }
 
   /**
