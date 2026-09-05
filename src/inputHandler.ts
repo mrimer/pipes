@@ -533,10 +533,7 @@ export class InputHandler {
   }
 
   private _handleCanvasClick(e: MouseEvent): void {
-    if (this._isInputLocked()) return;
-    if (this._cb.getScreen() !== GameScreen.Play) return;
-    if (this._cb.getGameState() !== GameState.Playing) return;
-    const board = this._cb.getBoard();
+    const board = this._getActiveClickBoard();
     if (!board) return;
 
     // The drag gesture already handled placement; swallow the click event.
@@ -553,53 +550,73 @@ export class InputHandler {
 
     if (SPIN_PIPE_SHAPES.has(tile.shape)) {
       // Spinnable pipes are always rotated on click (cannot be replaced or removed).
-      // Shift+click rotates CCW (3 steps); plain click rotates CW (1 step).
-      const steps = e.shiftKey ? 3 : 1;
-      const oldRotation = tile.rotation;
-      const spinResult = board.rotateTileBy(pos, steps);
-      if (spinResult.success) {
-        // Sync the pending placement rotation so the ghost image stays aligned.
-        if (this._cb.getSelectedShape() === tile.shape) {
-          this._cb.setPendingRotation(tile.rotation);
-        }
-        this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
-        this._cb.refreshUI();
-        this._cb.checkWinLose();
-      } else if (spinResult.error) {
-        this._cb.handleBoardError(spinResult);
-      }
-    } else if (this._cb.getSelectedShape() !== null &&
-               (isEmptyFloor(tile.shape) ||
-                tile.shape !== this._cb.getSelectedShape() ||
-                tile.rotation !== this._cb.getPendingRotation())) {
+      this._spinTileOnClick(pos, tile, board, filledBefore, e);
+    } else if (this._shouldPlaceOrReplaceTile(tile)) {
       // Place on an empty cell or replace a tile with a different shape/rotation.
       // When tile already matches exactly (same shape+rotation), fall through to rotate.
       this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
     } else if (!isEmptyFloor(tile.shape)) {
       // Rotate existing pipe (no inventory item selected, or same shape+rotation as selected).
-      // If the user has previewed multiple rotations via Q/W/wheel, apply all of them
-      // as a single game turn; otherwise fall back to a standard single 90° rotation.
-      const delta = this.hoverRotationDelta;
-      this.hoverRotationDelta = 0;
-      const oldRotation = tile.rotation;
-      const rotResult = delta > 0
-        ? board.rotateTileBy(pos, delta)
-        : e.shiftKey ? board.rotateTileBy(pos, 3) : board.rotateTile(pos);
-      if (rotResult.success) {
-        // Sync the pending placement rotation so the ghost image stays aligned.
-        if (this._cb.getSelectedShape() === tile.shape) {
-          this._cb.setPendingRotation(tile.rotation);
-        }
-        this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
-        this._cb.refreshUI();
-        this._cb.checkWinLose();
-      } else if (rotResult.error) {
-        this._cb.handleBoardError(rotResult);
-      } else if (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-        // Fixed non-spinner: can't be placed on or rotated — shake the tile.
-        this._cb.shakeAt(pos);
-      }
+      this._rotateTileOnClick(pos, tile, board, filledBefore, e);
     }
+  }
+
+  /** Guards common to canvas click handling; returns the active board, or null if the click should be ignored. */
+  private _getActiveClickBoard(): Board | null {
+    if (this._isInputLocked()) return null;
+    if (this._cb.getScreen() !== GameScreen.Play) return null;
+    if (this._cb.getGameState() !== GameState.Playing) return null;
+    return this._cb.getBoard();
+  }
+
+  /** Shift+click rotates CCW (3 steps); plain click rotates CW (1 step). */
+  private _spinTileOnClick(pos: GridPos, tile: Tile, board: Board, filledBefore: Set<string>, e: MouseEvent): void {
+    const steps = e.shiftKey ? 3 : 1;
+    const oldRotation = tile.rotation;
+    const spinResult = board.rotateTileBy(pos, steps);
+    if (spinResult.success) {
+      // Sync the pending placement rotation so the ghost image stays aligned.
+      if (this._cb.getSelectedShape() === tile.shape) {
+        this._cb.setPendingRotation(tile.rotation);
+      }
+      this._cb.afterTileRotated(filledBefore, spinResult, { row: pos.row, col: pos.col, oldRotation });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (spinResult.error) {
+      this._cb.handleBoardError(spinResult);
+    }
+  }
+
+  /**
+   * If the user has previewed multiple rotations via Q/W/wheel, apply all of them as a
+   * single game turn; otherwise fall back to a standard single 90° rotation (Shift+click
+   * rotates CCW by 3 steps, matching the spin-tile shortcut above).
+   */
+  private _rotateTileOnClick(pos: GridPos, tile: Tile, board: Board, filledBefore: Set<string>, e: MouseEvent): void {
+    const delta = this.hoverRotationDelta;
+    this.hoverRotationDelta = 0;
+    const oldRotation = tile.rotation;
+    const rotResult = this._computeClickRotateResult(pos, board, delta, e.shiftKey);
+    if (rotResult.success) {
+      // Sync the pending placement rotation so the ghost image stays aligned.
+      if (this._cb.getSelectedShape() === tile.shape) {
+        this._cb.setPendingRotation(tile.rotation);
+      }
+      this._cb.afterTileRotated(filledBefore, rotResult, { row: pos.row, col: pos.col, oldRotation });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (rotResult.error) {
+      this._cb.handleBoardError(rotResult);
+    } else if (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+      // Fixed non-spinner: can't be placed on or rotated — shake the tile.
+      this._cb.shakeAt(pos);
+    }
+  }
+
+  private _computeClickRotateResult(pos: GridPos, board: Board, delta: number, shiftKey: boolean): MoveResult {
+    if (delta > 0) return board.rotateTileBy(pos, delta);
+    if (shiftKey) return board.rotateTileBy(pos, 3);
+    return board.rotateTile(pos);
   }
 
   private _handleCanvasRightClick(e: MouseEvent): void {
@@ -1159,7 +1176,7 @@ export class InputHandler {
     if (SPIN_PIPE_SHAPES.has(tile.shape)) {
       // Tap on a spin pipe: rotate CW by one step.
       this._spinTileOnTouchTap(pos, tile, board, filledBefore);
-    } else if (this._shouldPlaceOrReplaceTapped(tile)) {
+    } else if (this._shouldPlaceOrReplaceTile(tile)) {
       // Place or replace.
       this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
     } else if (!isEmptyFloor(tile.shape)) {
@@ -1168,7 +1185,7 @@ export class InputHandler {
     }
   }
 
-  private _shouldPlaceOrReplaceTapped(tile: Tile): boolean {
+  private _shouldPlaceOrReplaceTile(tile: Tile): boolean {
     return this._cb.getSelectedShape() !== null &&
       (isEmptyFloor(tile.shape) ||
        tile.shape !== this._cb.getSelectedShape() ||
