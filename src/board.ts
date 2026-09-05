@@ -2099,11 +2099,24 @@ export class Board {
    */
   rotateTileBy(pos: GridPos, steps: number): MoveResult {
     const tile = this.getTile(pos);
+    if (!tile) return { success: false };
+    // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
+    const normalizedSteps = ((steps % 4) + 4) % 4;
+    const precheck = this._rotationPrecheckResult(pos, tile, normalizedSteps);
+    if (precheck) return precheck;
+    return this._performRotation(pos, tile, normalizedSteps);
+  }
+
+  /**
+   * Guard clauses shared by every rotation: spinner/fixed/empty-floor tiles, cross
+   * pipes (silently rejected), the cement constraint, and the steps===0 no-op.
+   * Returns a `MoveResult` when rotation should not proceed, `null` to continue.
+   */
+  private _rotationPrecheckResult(pos: GridPos, tile: Tile, normalizedSteps: number): MoveResult | null {
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
-    if (!tile || (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || isEmptyFloor(tile.shape)) {
+    if ((tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || isEmptyFloor(tile.shape)) {
       return { success: false };
     }
-
     // Cross pipes face all four directions and rotating them is not a valid move.
     // Fail silently (no error message) because there is nothing wrong with the board state.
     if (CROSS_PIPE_SHAPES.has(tile.shape)) return { success: false };
@@ -2113,10 +2126,75 @@ export class Board {
     if (cementCheck.blocked) {
       return { success: false, error: cementCheck.error, errorParams: cementCheck.params, errorTilePositions: cementCheck.positions };
     }
-
-    // Normalize to 0–3, handling both positive and negative values (e.g. -1 → 3).
-    const normalizedSteps = ((steps % 4) + 4) % 4;
     if (normalizedSteps === 0) return { success: true };
+    return null;
+  }
+
+  /** Rotate `tile` back to its pre-rotation orientation and drop the fill cache. */
+  private _revertRotation(tile: Tile, normalizedSteps: number): void {
+    for (let i = 0; i < 4 - normalizedSteps; i++) {
+      tile.rotate();
+    }
+    this._invalidateFilledCache();
+  }
+
+  /** Revert an in-progress rotation and return the failing result that triggered it. */
+  private _abortRotation(tile: Tile, normalizedSteps: number, result: MoveResult): MoveResult {
+    this._revertRotation(tile, normalizedSteps);
+    return result;
+  }
+
+  /** Regulator pre-check packaged as a `MoveResult`, or `null` when it passes. */
+  private _buildRegulatorPreCheckResult(filledBefore: Set<string>, filled: Set<string>): MoveResult | null {
+    const { error, params, positions } = this._runRegulatorPreCheck(filledBefore, filled);
+    if (!error) return null;
+    return { success: false, error, errorParams: params ?? undefined, errorTilePositions: positions ?? undefined };
+  }
+
+  /** Final-state constraint check packaged as a `MoveResult`, or `null` when it passes. */
+  private _buildConstraintCheckResult(filledBefore: Set<string>, filled: Set<string>): MoveResult | null {
+    const { error, params, positions } = this._validateConstraints(filled);
+    if (!error) return null;
+    // Highlight only tiles that are both disconnected by the rotation AND
+    // in the constraint-violating positions set.  Falls back to positions
+    // when the intersection is empty.
+    return {
+      success: false,
+      error,
+      errorParams: params ?? undefined,
+      errorTilePositions: this._computeDisconnectedConstraintPositions(filledBefore, filled, positions),
+    };
+  }
+
+  /**
+   * Container-grant constraint packaged as a `MoveResult`, or `null` when it passes.
+   * Blocks only if the rotation reduced the positive container grant for a shape by
+   * disconnecting positive grants (not simply connecting negative grants).
+   */
+  private _buildContainerCheckResult(
+    filledBefore: Set<string>, bonusesBefore: Map<PipeShape, number>,
+    filled: Set<string>, newBonuses: Map<PipeShape, number>,
+  ): MoveResult | null {
+    const disconnectedPositions = this._getBlockedNegativeContainerDropPositions(
+      this.inventory, this.inventory, filledBefore, bonusesBefore, filled, newBonuses,
+    );
+    if (!disconnectedPositions) return null;
+    return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
+  }
+
+  /** Regulator post-turn check packaged as a `MoveResult`, or `null` when it passes. */
+  private _buildRegulatorPostCheckResult(filledBefore: Set<string>, filled: Set<string>): MoveResult | null {
+    const { error, params, positions } = this._checkRegulatorsPostTurn(filledBefore, filled);
+    if (!error) return null;
+    return { success: false, error, errorParams: params ?? undefined, errorTilePositions: positions ?? undefined };
+  }
+
+  /**
+   * Rotates `tile` forward `normalizedSteps` and validates the result (valve gate,
+   * regulators, constraints, container grants), reverting the rotation and
+   * returning the failure on the first check that rejects it.
+   */
+  private _performRotation(pos: GridPos, tile: Tile, normalizedSteps: number): MoveResult {
     // Capture the pre-rotation fill and container grant bonuses
     // for disconnection-highlight computation and valve-gate check.
     const filledBefore = this.getFilledPositions();
@@ -2129,78 +2207,25 @@ export class Board {
     // Valve gate: reject if this rotation connects to a non-valve side
     // of an unsatisfied valve chamber.
     const valveViolation = this._checkValveViolation(pos, filledBefore);
-    if (valveViolation) {
-      for (let i = 0; i < 4 - normalizedSteps; i++) {
-        tile.rotate();
-      }
-      this._invalidateFilledCache();
-      return valveViolation;
-    }
+    if (valveViolation) return this._abortRotation(tile, normalizedSteps, valveViolation);
 
     // Validate the final state.
     const filled = this.getFilledPositions();
-    // Regulator pre-check: newly-connecting regulators against pre-rotation stats.
-    const { error: regError3, params: regParams3, positions: regPositions3 } = this._runRegulatorPreCheck(filledBefore, filled);
-    if (regError3) {
-      for (let i = 0; i < 4 - normalizedSteps; i++) {
-        tile.rotate();
-      }
-      this._invalidateFilledCache();
-      return { success: false, error: regError3, errorParams: regParams3 ?? undefined, errorTilePositions: regPositions3 ?? undefined };
-    }
-    const { error: constraintError, params: constraintParams, positions: constraintPositions } = this._validateConstraints(filled);
-    if (constraintError) {
-      // Revert by rotating the remaining steps to complete a full 360°.
-      for (let i = 0; i < 4 - normalizedSteps; i++) {
-        tile.rotate();
-      }
-      this._invalidateFilledCache();
-      // Highlight only tiles that are both disconnected by the rotation AND
-      // in the constraint-violating positions set.  Falls back to positions
-      // when the intersection is empty.
-      return {
-        success: false,
-        error: constraintError,
-        errorParams: constraintParams ?? undefined,
-        errorTilePositions: this._computeDisconnectedConstraintPositions(filledBefore, filled, constraintPositions),
-      };
-    }
+    const regPreResult = this._buildRegulatorPreCheckResult(filledBefore, filled);
+    if (regPreResult) return this._abortRotation(tile, normalizedSteps, regPreResult);
 
-    // Validate container-grant constraints: when rotation leaves an inventory item's
-    // effective count negative, block only if the rotation reduced the positive
-    // container grant for that shape by disconnecting positive grants
-    // (i.e., and not simply connecting negative grants).
+    const constraintResult = this._buildConstraintCheckResult(filledBefore, filled);
+    if (constraintResult) return this._abortRotation(tile, normalizedSteps, constraintResult);
+
     const newBonuses = this.getContainerBonuses(filled);
-    const disconnectedPositions = this._getBlockedNegativeContainerDropPositions(
-      this.inventory,
-      this.inventory,
-      filledBefore,
-      bonusesBefore,
-      filled,
-      newBonuses,
-    );
-    if (disconnectedPositions) {
-      for (let i = 0; i < 4 - normalizedSteps; i++) {
-        tile.rotate();
-      }
-      this._invalidateFilledCache();
-      return { success: false, error: ERR_CONTAINER_ROTATE, errorTilePositions: disconnectedPositions };
-    }
+    const containerResult = this._buildContainerCheckResult(filledBefore, bonusesBefore, filled, newBonuses);
+    if (containerResult) return this._abortRotation(tile, normalizedSteps, containerResult);
 
-    // Regulator post-turn check: re-validate newly-connecting regulators using
-    // the stats that result after all tiles in this turn have resolved.
-    const { error: postRegError3, params: postRegParams3, positions: postRegPositions3 } = this._checkRegulatorsPostTurn(filledBefore, filled);
-    if (postRegError3) {
-      for (let i = 0; i < 4 - normalizedSteps; i++) {
-        tile.rotate();
-      }
-      this._invalidateFilledCache();
-      return { success: false, error: postRegError3, errorParams: postRegParams3 ?? undefined, errorTilePositions: postRegPositions3 ?? undefined };
-    }
+    const regPostResult = this._buildRegulatorPostCheckResult(filledBefore, filled);
+    if (regPostResult) return this._abortRotation(tile, normalizedSteps, regPostResult);
 
     // Decrement cement setting time after successful rotation.
     const cementDecrement = this._cement.applyDecrement(pos, tile);
-
     return { success: true, cementDecrement };
   }
 
