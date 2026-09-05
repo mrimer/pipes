@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import type { AmbientDecoration, AmbientDecorationType, GridPos, InventoryItem, LevelDef, LevelStyle, Rotation, TileDef } from './types';
+import type { AmbientDecoration, AmbientDecorationType, GridPos, InventoryItem, LevelDef, LevelStyle, RegulatorOperator, RegulatorStat, Rotation, TileDef } from './types';
 import { Direction, DIRECTIONS, PipeShape, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './systems/thermoSimulator';
 import { CementSystem } from './systems/cementSystem';
@@ -122,7 +122,7 @@ const NAMED_EMPTY_FLOOR_SHAPES = new Set<PipeShape>([
 ]);
 
 /** `v ?? fallback`, promoted to a named function so its branch doesn't count against the caller. */
-function _orDefault<T>(v: T | undefined, fallback: T): T {
+function _orDefault<T>(v: T | null | undefined, fallback: T): T {
   return v ?? fallback;
 }
 
@@ -1841,40 +1841,54 @@ export class Board {
       const tile = this.grid[r]?.[c];
       if (!tile || tile.shape !== PipeShape.Chamber || tile.chamberContent !== 'regulator') continue;
 
-      const stat = tile.regulatorStat ?? 'water';
-      const op   = tile.regulatorOperator ?? '>';
-      const threshold = tile.cost;
-
-      let statValue: number;
-      switch (stat) {
-        case 'water':       statValue = water;       break;
-        case 'frozen':      statValue = frozen;      break;
-        case 'temperature': statValue = temperature; break;
-        case 'pressure':    statValue = pressure;    break;
-        // Exhaustive over RegulatorStat today; guard against a future member
-        // being added without a case (would otherwise leave statValue unset).
-        default: throw new Error(`Unhandled regulator stat: ${stat as string}`);
-      }
-
-      let passes: boolean;
-      switch (op) {
-        case '<': passes = statValue <  threshold; break;
-        case '>': passes = statValue >  threshold; break;
-        case '=': passes = statValue === threshold; break;
-        // Exhaustive over RegulatorOperator today; guard against a future
-        // operator being added without a case (would leave passes unset).
-        default: throw new Error(`Unhandled regulator operator: ${op as string}`);
-      }
-
-      if (!passes) {
-        return {
-          error: ERR_REGULATOR_CHECK,
-          params: { stat: t(`stat.${stat}`), op, threshold },
-          positions: [{ row: r, col: c }],
-        };
-      }
+      const result = this._checkRegulatorTile(tile, r, c, water, temperature, pressure, frozen);
+      if (result) return result;
     }
     return { error: null, params: null, positions: null };
+  }
+
+  /** Resolve which live stat value a regulator's `stat` field refers to. */
+  private _resolveRegulatorStatValue(
+    stat: RegulatorStat, water: number, temperature: number, pressure: number, frozen: number,
+  ): number {
+    switch (stat) {
+      case 'water':       return water;
+      case 'frozen':      return frozen;
+      case 'temperature': return temperature;
+      case 'pressure':    return pressure;
+      // Exhaustive over RegulatorStat today; guard against a future member
+      // being added without a case (would otherwise leave statValue unset).
+      default: throw new Error(`Unhandled regulator stat: ${stat as string}`);
+    }
+  }
+
+  /** Evaluate a regulator's comparison operator against its stat value and threshold. */
+  private _evaluateRegulatorOperator(op: RegulatorOperator, statValue: number, threshold: number): boolean {
+    switch (op) {
+      case '<': return statValue <  threshold;
+      case '>': return statValue >  threshold;
+      case '=': return statValue === threshold;
+      // Exhaustive over RegulatorOperator today; guard against a future
+      // operator being added without a case (would leave passes unset).
+      default: throw new Error(`Unhandled regulator operator: ${op as string}`);
+    }
+  }
+
+  /** Check one newly-connected regulator tile; returns the rejection result, or `null` if it passes. */
+  private _checkRegulatorTile(
+    tile: Tile, r: number, c: number, water: number, temperature: number, pressure: number, frozen: number,
+  ): { error: string; params: TranslationParams; positions: GridPos[] } | null {
+    const stat = _orDefault(tile.regulatorStat, 'water' as RegulatorStat);
+    const op = _orDefault(tile.regulatorOperator, '>' as RegulatorOperator);
+    const threshold = tile.cost;
+    const statValue = this._resolveRegulatorStatValue(stat, water, temperature, pressure, frozen);
+    const passes = this._evaluateRegulatorOperator(op, statValue, threshold);
+    if (passes) return null;
+    return {
+      error: ERR_REGULATOR_CHECK,
+      params: { stat: t(`stat.${stat}`), op, threshold },
+      positions: [{ row: r, col: c }],
+    };
   }
 
   /**
