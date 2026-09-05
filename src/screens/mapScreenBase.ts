@@ -189,6 +189,8 @@ export abstract class MapScreenBase {
   private readonly _onKeyUp: (e: KeyboardEvent) => void;
   /** Bound resize handler stored so it can be removed when the screen is hidden. */
   private readonly _onResize: () => void;
+  /** Debounce timer for _onResize's repopulate call. */
+  private _resizeTimer: ReturnType<typeof setTimeout> | null = null;
   private _statsEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   /** Ambient decorations for empty cells, keyed by "row,col". */
@@ -372,33 +374,37 @@ export abstract class MapScreenBase {
     this._tooltipGnomeEl.style.cssText = 'display:none;position:fixed;pointer-events:none;z-index:50;';
     document.body.appendChild(this._tooltipGnomeEl);
 
-    this._onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Control' && !this._ctrlHeld) {
-        this._ctrlHeld = true;
-        if (this._mouseClientPos && this._chapter) {
-          this._showTooltip(this._mouseClientPos.x, this._mouseClientPos.y);
-        }
-      }
-    };
-    this._onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Control') {
-        this._ctrlHeld = false;
-        this._hideTooltip();
-      }
-    };
+    this._onKeyDown = (e: KeyboardEvent) => this._handleGlobalKeyDown(e);
+    this._onKeyUp = (e: KeyboardEvent) => this._handleGlobalKeyUp(e);
 
     // Re-populate the chapter map when the viewport size changes (e.g. orientation change).
     // Debounced at 100 ms to avoid layout thrash during the resize animation.
-    let _resizeTimer: ReturnType<typeof setTimeout> | null = null;
-    this._onResize = () => {
-      if (_resizeTimer !== null) clearTimeout(_resizeTimer);
-      _resizeTimer = setTimeout(() => {
-        _resizeTimer = null;
-        if (this.screenEl.style.display !== 'none' && this._chapter && this._campaign) {
-          this.repopulate(this._campaign);
-        }
-      }, 100);
-    };
+    this._onResize = () => this._scheduleResizeRepopulate();
+  }
+
+  private _handleGlobalKeyDown(e: KeyboardEvent): void {
+    if (e.key !== 'Control' || this._ctrlHeld) return;
+    this._ctrlHeld = true;
+    if (this._mouseClientPos && this._chapter) {
+      this._showTooltip(this._mouseClientPos.x, this._mouseClientPos.y);
+    }
+  }
+
+  private _handleGlobalKeyUp(e: KeyboardEvent): void {
+    if (e.key !== 'Control') return;
+    this._ctrlHeld = false;
+    this._hideTooltip();
+  }
+
+  private _scheduleResizeRepopulate(): void {
+    if (this._resizeTimer !== null) clearTimeout(this._resizeTimer);
+    this._resizeTimer = setTimeout(() => this._onResizeTimeout(), 100);
+  }
+
+  private _onResizeTimeout(): void {
+    this._resizeTimer = null;
+    if (this.screenEl.style.display === 'none' || !this._chapter || !this._campaign) return;
+    this.repopulate(this._campaign);
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
