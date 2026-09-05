@@ -513,17 +513,21 @@ export class InputHandler {
 
   private _commitRightDragTile(pos: GridPos, board: Board): void {
     const tile = board.getTile(pos);
-    const shouldDeselect = !!tile && (
-      isEmptyFloor(tile.shape) ||
-      SPIN_PIPE_SHAPES.has(tile.shape) ||
-      (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
-    );
-    if (shouldDeselect) {
+    if (this._tileBlocksRightClickPlacement(tile)) {
       // Right-clicking a tile that cannot accept the selected shape: clear the pending selection.
       this._clearSelectedShape();
     } else {
       this._cb.reclaimTileAt(pos);
     }
+  }
+
+  /** True when right-clicking/erasing this tile cannot accept the selected shape (so selection should clear instead). */
+  private _tileBlocksRightClickPlacement(tile: Tile | null): boolean {
+    return !!tile && (
+      isEmptyFloor(tile.shape) ||
+      SPIN_PIPE_SHAPES.has(tile.shape) ||
+      (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
+    );
   }
 
   /**
@@ -654,7 +658,7 @@ export class InputHandler {
     const pos = this._getGridPosFromEvent(e);
 
     // Right-clicking outside the grid (including inventory bar and other UI): deselect.
-    if (pos.row < 0 || pos.row >= board.rows || pos.col < 0 || pos.col >= board.cols) {
+    if (this._isOutsideGrid(pos, board)) {
       this._clearSelectedShape();
       return;
     }
@@ -662,16 +666,16 @@ export class InputHandler {
     const tile = board.getTile(pos);
 
     // Right-clicking a tile that cannot accept the selected shape: clear any pending inventory selection.
-    if (tile && (
-      isEmptyFloor(tile.shape) ||
-      SPIN_PIPE_SHAPES.has(tile.shape) ||
-      (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
-    )) {
+    if (this._tileBlocksRightClickPlacement(tile)) {
       this._clearSelectedShape();
       return;
     }
 
     this._cb.reclaimTileAt(pos);
+  }
+
+  private _isOutsideGrid(pos: GridPos, board: Board): boolean {
+    return pos.row < 0 || pos.row >= board.rows || pos.col < 0 || pos.col >= board.cols;
   }
 
   private _handleCanvasMouseMove(e: MouseEvent): void {
