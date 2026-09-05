@@ -1189,7 +1189,7 @@ export abstract class MapScreenBase {
     if (this._touchMoved) return; // was a scroll/swipe/pan, not a tap
     const tapped = this._resolveTouchTappedChamber(e, chapter);
     if (!tapped) return;
-    this._commitTouchTapChamberSelection(tapped.pos, tapped.def, tapped.levelIdx);
+    this._commitChamberSelection(tapped.pos, tapped.def, tapped.levelIdx);
   }
 
   /** Synthesizes a click target at the touch-end coordinates: a level chamber, or null if not tappable. */
@@ -1200,16 +1200,27 @@ export abstract class MapScreenBase {
     const changedTouch = e.changedTouches[0];
     if (!changedTouch) return null;
     const pos = this._canvasPosFromCoords(changedTouch.clientX, changedTouch.clientY, chapter);
-    if (!pos || !chapter.grid) return null;
+    if (!pos) return null;
+    const chamber = this._resolveChamberAtPos(pos, chapter);
+    if (!chamber) return null;
+    return { pos, def: chamber.def, levelIdx: chamber.levelIdx };
+  }
+
+  /** Resolves the level chamber at a grid position, or null if it's not a selectable level chamber. */
+  private _resolveChamberAtPos(
+    pos: { row: number; col: number },
+    chapter: ChapterDef,
+  ): { def: TileDef; levelIdx: number } | null {
+    if (!chapter.grid) return null;
     const def = chapter.grid[pos.row]?.[pos.col];
     if (!def) return null;
     if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return null;
     const levelIdx = def.levelIdx;
     if (levelIdx === undefined) return null;
-    return { pos, def, levelIdx };
+    return { def, levelIdx };
   }
 
-  private _commitTouchTapChamberSelection(pos: { row: number; col: number }, def: TileDef, levelIdx: number): void {
+  private _commitChamberSelection(pos: { row: number; col: number }, def: TileDef, levelIdx: number): void {
     const filledKeys = this._computeFilledCells();
     if (!filledKeys.has(`${pos.row},${pos.col}`)) {
       this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
@@ -1377,29 +1388,10 @@ export abstract class MapScreenBase {
 
   private _onClick(e: MouseEvent, _campaign: CampaignDef, chapter: ChapterDef): void {
     const pos = this._canvasPos(e, chapter);
-    if (!pos || !chapter.grid) return;
-
-    const def = chapter.grid[pos.row]?.[pos.col];
-    if (!def) return;
-
-    const filledKeys = this._computeFilledCells();
-
-    // Handle level chamber click
-    if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
-
-    const levelIdx = def.levelIdx;
-    if (levelIdx === undefined) return;
-
-    // Only start a level that has water reaching it
-    if (!filledKeys.has(`${pos.row},${pos.col}`)) {
-      // Trigger a brief jitter animation to indicate the tile cannot be accessed
-      sfxManager.play(SfxId.InvalidSelection);
-      this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
-      return;
-    }
-
-    sfxManager.play(SfxId.LevelSelect);
-    this._onChamberSelected(def, levelIdx);
+    if (!pos) return;
+    const chamber = this._resolveChamberAtPos(pos, chapter);
+    if (!chamber) return;
+    this._commitChamberSelection(pos, chamber.def, chamber.levelIdx);
   }
 
   // ─── Private – rendering ────────────────────────────────────────────────────
