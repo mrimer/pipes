@@ -1,5 +1,5 @@
 import { Tile, oppositeDirection } from './tile';
-import type { AmbientDecoration, AmbientDecorationType, GridPos, InventoryItem, LevelDef, LevelStyle, Rotation} from './types';
+import type { AmbientDecoration, AmbientDecorationType, GridPos, InventoryItem, LevelDef, LevelStyle, Rotation, TileDef } from './types';
 import { Direction, DIRECTIONS, PipeShape, TEMP_RELEVANT_CONTENTS, PRESSURE_RELEVANT_CONTENTS, styleToFloorShape } from './types';
 import { ThermoSimulator, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './systems/thermoSimulator';
 import { CementSystem } from './systems/cementSystem';
@@ -115,6 +115,16 @@ function isObstacleTile(shape: PipeShape): boolean {
 export const EMPTY_FLOOR_SHAPES: readonly PipeShape[] = [
   PipeShape.Empty, PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
 ];
+
+/** Empty-floor shapes with their own distinct rendering (i.e. everything but plain Empty). */
+const NAMED_EMPTY_FLOOR_SHAPES = new Set<PipeShape>([
+  PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring,
+]);
+
+/** `v ?? fallback`, promoted to a named function so its branch doesn't count against the caller. */
+function _orDefault<T>(v: T | undefined, fallback: T): T {
+  return v ?? fallback;
+}
 
 /**
  * Returns true when shape is any empty floor type (Summer, Fall, Dark, Winter, or Spring).
@@ -651,53 +661,71 @@ export class Board {
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        const def = level.grid[r]?.[c] ?? null;
-        if (def === null) {
-          this.grid[r][c] = new Tile(defaultFloor, 0);
-        } else if (def.shape === PipeShape.EmptyFall || def.shape === PipeShape.EmptyDark || def.shape === PipeShape.EmptyWinter || def.shape === PipeShape.EmptySpring) {
-          // Fall, Dark, Winter, and Spring empty floor tiles are stored with their shape for rendering
-          this.grid[r][c] = new Tile(def.shape, 0);
-        } else if (def.shape === PipeShape.GoldSpace) {
-          // Gold spaces are tracked separately; the cell behaves like Empty
-          this.goldSpaces.add(posKey(r, c));
-          this.grid[r][c] = new Tile(defaultFloor, 0);
-        } else if (def.shape === PipeShape.OneWay) {
-          // One-way tiles are tracked separately; the cell behaves like Empty
-          const rot = (def.rotation ?? 0);
-          const owDir = ([Direction.North, Direction.East, Direction.South, Direction.West] as Direction[])[rot / 90];
-          this.oneWayData.set(posKey(r, c), owDir);
-          this.grid[r][c] = new Tile(defaultFloor, 0);
-        } else if (def.shape === PipeShape.Cement) {
-          // Cement tiles are tracked separately; the cell behaves like Empty
-          this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
-          this.grid[r][c] = new Tile(defaultFloor, 0);
-        } else {
-          const rot = (def.rotation ?? 0);
-          const itemShape = def.itemShape ?? null;
-          const itemCount = def.itemCount ?? 1;
-          const customConnections = def.connections ? new Set(def.connections) : null;
-          const chamberContent = def.chamberContent ?? null;
-          const firstConns = (def.firstConnections && def.firstConnections.length > 0)
-            ? new Set(def.firstConnections)
-            : null;
-          // Spinnable pipes are not fixed so the player can rotate them, but they
-          // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
-          const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
-          this.grid[r][c] = new Tile(def.shape, rot, isFixed, def.capacity ?? 0, def.cost ?? 0, itemShape, itemCount, customConnections, chamberContent, def.temperature ?? 0, def.pressure ?? 0, def.hardness ?? 0, def.shatter ?? 0, firstConns, def.regulatorStat ?? null, def.regulatorOperator ?? null);
-          // Spin-cement tiles also track cement drying time.
-          if (SPIN_CEMENT_SHAPES.has(def.shape)) {
-            this._cement.data.set(posKey(r, c), def.dryingTime ?? 0);
-          }
-          if (def.shape === PipeShape.Source) {
-            this.source = { row: r, col: c };
-          } else if (def.shape === PipeShape.Sink) {
-            this.sink = { row: r, col: c };
-          }
-        }
+        this._initCellFromDef(r, c, level.grid[r]?.[c] ?? null, defaultFloor);
       }
     }
 
     this.sourceCapacity = this.grid[this.source.row][this.source.col].capacity;
+  }
+
+  /** Populate `this.grid[r][c]` (and any side-tracked data) from one level cell definition. */
+  private _initCellFromDef(r: number, c: number, def: TileDef | null, defaultFloor: PipeShape): void {
+    if (def === null) {
+      this.grid[r][c] = new Tile(defaultFloor, 0);
+      return;
+    }
+    if (NAMED_EMPTY_FLOOR_SHAPES.has(def.shape)) {
+      // Fall, Dark, Winter, and Spring empty floor tiles are stored with their shape for rendering
+      this.grid[r][c] = new Tile(def.shape, 0);
+      return;
+    }
+    if (def.shape === PipeShape.GoldSpace) {
+      // Gold spaces are tracked separately; the cell behaves like Empty
+      this.goldSpaces.add(posKey(r, c));
+      this.grid[r][c] = new Tile(defaultFloor, 0);
+      return;
+    }
+    if (def.shape === PipeShape.OneWay) {
+      // One-way tiles are tracked separately; the cell behaves like Empty
+      const rot = _orDefault(def.rotation, 0);
+      const owDir = ([Direction.North, Direction.East, Direction.South, Direction.West] as Direction[])[rot / 90];
+      this.oneWayData.set(posKey(r, c), owDir);
+      this.grid[r][c] = new Tile(defaultFloor, 0);
+      return;
+    }
+    if (def.shape === PipeShape.Cement) {
+      // Cement tiles are tracked separately; the cell behaves like Empty
+      this._cement.data.set(posKey(r, c), _orDefault(def.dryingTime, 0));
+      this.grid[r][c] = new Tile(defaultFloor, 0);
+      return;
+    }
+    this._initPipeTileCell(r, c, def);
+  }
+
+  /** Populate `this.grid[r][c]` for any def whose shape is a real pipe/source/sink tile. */
+  private _initPipeTileCell(r: number, c: number, def: TileDef): void {
+    const customConnections = def.connections ? new Set(def.connections) : null;
+    const firstConns = (def.firstConnections && def.firstConnections.length > 0)
+      ? new Set(def.firstConnections)
+      : null;
+    // Spinnable pipes are not fixed so the player can rotate them, but they
+    // cannot be removed (that is enforced by reclaimTile / replaceInventoryTile).
+    const isFixed = !SPIN_PIPE_SHAPES.has(def.shape);
+    this.grid[r][c] = new Tile(
+      def.shape, _orDefault(def.rotation, 0), isFixed, _orDefault(def.capacity, 0), _orDefault(def.cost, 0),
+      _orDefault(def.itemShape, null), _orDefault(def.itemCount, 1), customConnections, _orDefault(def.chamberContent, null),
+      _orDefault(def.temperature, 0), _orDefault(def.pressure, 0), _orDefault(def.hardness, 0), _orDefault(def.shatter, 0),
+      firstConns, _orDefault(def.regulatorStat, null), _orDefault(def.regulatorOperator, null),
+    );
+    // Spin-cement tiles also track cement drying time.
+    if (SPIN_CEMENT_SHAPES.has(def.shape)) {
+      this._cement.data.set(posKey(r, c), _orDefault(def.dryingTime, 0));
+    }
+    if (def.shape === PipeShape.Source) {
+      this.source = { row: r, col: c };
+    } else if (def.shape === PipeShape.Sink) {
+      this.sink = { row: r, col: c };
+    }
   }
 
   /** Pre-compute the floor type (Empty/EmptyFall/EmptyDark/EmptyWinter/EmptySpring) for every cell. */
