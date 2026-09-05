@@ -1015,24 +1015,54 @@ export class Board {
       return { success: false, error: cementCheck.error, errorParams: cementCheck.params, errorTilePositions: cementCheck.positions };
     }
 
-    // ── Container-grant constraint check ─────────────────────────────────────
-    // Simulate tile removal and verify no inventory count would go below zero.
-    const filledBefore = this.getFilledPositions();
-    const currentBonuses = this.getContainerBonuses(filledBefore);
-    const projectedInventory = this.inventory.map((item) => ({ ...item }));
-    const projectedIndex = projectedInventory.findIndex((item) => item.shape === tile.shape);
-    if (projectedIndex !== -1) {
-      projectedInventory[projectedIndex].count++;
-    } else {
-      projectedInventory.push({ shape: tile.shape, count: 1 });
-    }
+    const containerResult = this._checkReclaimContainerConstraint(pos, tile.shape);
+    if (containerResult) return containerResult;
+
+    const sandstoneResult = this._checkReclaimSandstoneConstraint(pos);
+    if (sandstoneResult) return sandstoneResult;
+
+    this._reclaimInventory(tile.shape);
+    this._invalidateFilledCache();
+    this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
+    return { success: true };
+  }
+
+  /** Temporarily empty the cell at `pos`, run `compute`, then restore its original tile. */
+  private _withTileTemporarilyRemoved<T>(pos: GridPos, compute: () => T): T {
     const savedTile = this.grid[pos.row][pos.col];
     this._invalidateFilledCache();
     this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
-    const filledAfter = this.getFilledPositions();
-    const newBonuses = this.getContainerBonuses();
+    const result = compute();
     this._invalidateFilledCache();
-    this.grid[pos.row][pos.col] = savedTile; // restore
+    this.grid[pos.row][pos.col] = savedTile;
+    return result;
+  }
+
+  /** The reclaimed shape's inventory, with one more copy than currently held. */
+  private _projectInventoryWithReclaimedShape(shape: PipeShape): InventoryItem[] {
+    const projectedInventory = this.inventory.map((item) => ({ ...item }));
+    const projectedIndex = projectedInventory.findIndex((item) => item.shape === shape);
+    if (projectedIndex !== -1) {
+      projectedInventory[projectedIndex].count++;
+    } else {
+      projectedInventory.push({ shape, count: 1 });
+    }
+    return projectedInventory;
+  }
+
+  /**
+   * Container-grant constraint check: simulate removing the tile at `pos` and
+   * verify no inventory count would go below zero.
+   */
+  private _checkReclaimContainerConstraint(pos: GridPos, shape: PipeShape): MoveResult | null {
+    const filledBefore = this.getFilledPositions();
+    const currentBonuses = this.getContainerBonuses(filledBefore);
+    const projectedInventory = this._projectInventoryWithReclaimedShape(shape);
+
+    const { filledAfter, newBonuses } = this._withTileTemporarilyRemoved(pos, () => ({
+      filledAfter: this.getFilledPositions(),
+      newBonuses: this.getContainerBonuses(),
+    }));
 
     const disconnectedPositions = this._getBlockedNegativeContainerDropPositions(
       this.inventory,
@@ -1043,43 +1073,45 @@ export class Board {
       newBonuses,
       'disconnectionsOnly',
     );
-    if (disconnectedPositions) {
-      return { success: false, error: ERR_CONTAINER_REMOVE, errorTilePositions: disconnectedPositions };
-    }
+    if (!disconnectedPositions) return null;
+    return { success: false, error: ERR_CONTAINER_REMOVE, errorTilePositions: disconnectedPositions };
+  }
 
-    // ── Sandstone constraint check ───────────────────────────────────────────
-    // Simulate tile removal and verify no connected sandstone tile would have deltaDamage ≤ 0.
-    // (This can happen when removing a pipe that carried the only path to a pump chamber.)
-    {
-      const filledBefore = this.getFilledPositions();
-      this._invalidateFilledCache();
-      this.grid[pos.row][pos.col] = new Tile(PipeShape.Empty, 0);
+  /**
+   * Sandstone constraint check: simulate removing the tile at `pos` and verify no
+   * connected sandstone tile would have deltaDamage <= 0 (can happen when removing
+   * a pipe that carried the only path to a pump chamber).
+   */
+  private _checkReclaimSandstoneConstraint(pos: GridPos): MoveResult | null {
+    const filledBefore = this.getFilledPositions();
+    const { filledAfter, error, params, positions } = this._withTileTemporarilyRemoved(pos, () => {
       const filledAfter = this.getFilledPositions();
       const { error, params, positions } = this._validateConstraints(filledAfter);
-      this._invalidateFilledCache();
-      this.grid[pos.row][pos.col] = savedTile; // restore regardless
-      if (error) {
-        // Highlight only tiles that are both disconnected by the removal AND
-        // in the constraint-violating positions set.  This ensures only the
-        // relevant constraint tiles are shown.  Falls back to positions when
-        // the intersection is empty (common case: constraint tile stays connected).
-        const reclaimedKey = posKey(pos.row, pos.col);
-        const positionKeys = positions ? new Set(positions.map(p => posKey(p.row, p.col))) : null;
-        const disconnected: GridPos[] = [];
-        for (const k of filledBefore) {
-          if (k !== reclaimedKey && !filledAfter.has(k) && positionKeys?.has(k)) {
-            const [r, c] = parseKey(k);
-            disconnected.push({ row: r, col: c });
-          }
-        }
-        return { success: false, error, errorParams: params ?? undefined, errorTilePositions: disconnected.length ? disconnected : positions ?? undefined };
+      return { filledAfter, error, params, positions };
+    });
+    if (!error) return null;
+    // Highlight only tiles that are both disconnected by the removal AND
+    // in the constraint-violating positions set.  This ensures only the
+    // relevant constraint tiles are shown.  Falls back to positions when
+    // the intersection is empty (common case: constraint tile stays connected).
+    const errorTilePositions = this._computeReclaimDisconnectedConstraintPositions(pos, filledBefore, filledAfter, positions);
+    return { success: false, error, errorParams: params ?? undefined, errorTilePositions };
+  }
+
+  /** Reclaim-specific variant of the disconnected-constraint-position scan: excludes the reclaimed cell itself. */
+  private _computeReclaimDisconnectedConstraintPositions(
+    pos: GridPos, filledBefore: Set<string>, filledAfter: Set<string>, positions: GridPos[] | null,
+  ): GridPos[] | undefined {
+    const reclaimedKey = posKey(pos.row, pos.col);
+    const positionKeys = positions ? new Set(positions.map(p => posKey(p.row, p.col))) : null;
+    const disconnected: GridPos[] = [];
+    for (const k of filledBefore) {
+      if (k !== reclaimedKey && !filledAfter.has(k) && positionKeys?.has(k)) {
+        const [r, c] = parseKey(k);
+        disconnected.push({ row: r, col: c });
       }
     }
-
-    this._reclaimInventory(tile.shape);
-    this._invalidateFilledCache();
-    this.grid[pos.row][pos.col] = new Tile(this.floorTypes.get(posKey(pos.row, pos.col)) ?? PipeShape.Empty, 0);
-    return { success: true };
+    return disconnected.length ? disconnected : positions ?? undefined;
   }
 
   /**
