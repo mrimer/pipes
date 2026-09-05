@@ -1426,27 +1426,10 @@ export abstract class MapScreenBase {
     // determine which level chambers should show a minimap rather than a lock
     // icon.  Keeping this scan inside _renderBase (which only runs when dirty)
     // means the O(rows×cols) grid scan is skipped on frames with no state change.
-    const accessibleLevelIdxs = new Set<number>();
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (!filledKeys.has(`${r},${c}`)) continue;
-        const def = grid[r]?.[c];
-        if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
-          accessibleLevelIdxs.add(def.levelIdx);
-        }
-      }
-    }
+    const accessibleLevelIdxs = this._computeAccessibleLevelIdxs(grid, rows, cols, filledKeys);
 
     // Compute jitter offset for the most recently activated cell, if still active
-    this._jitterAnims = this._jitterAnims.filter(j => now - j.startedAt < MapScreenBase.JITTER_DURATION_MS);
-    let jitterCell: { row: number; col: number; dx: number; dy: number } | undefined;
-    if (this._jitterAnims.length > 0) {
-      const anim = this._jitterAnims[this._jitterAnims.length - 1];
-      const t = (now - anim.startedAt) / MapScreenBase.JITTER_DURATION_MS;
-      const amp = MapScreenBase.JITTER_AMPLITUDE * (1 - t);
-      const dx = Math.round(amp * Math.sin(t * MapScreenBase.JITTER_CYCLES * 2 * Math.PI));
-      jitterCell = { row: anim.row, col: anim.col, dx, dy: 0 };
-    }
+    const jitterCell = this._computeJitterCell(now);
 
     // Apply pan transform so the view window scrolls over the full grid.
     // The base canvas is sized to the view window (viewCols × viewRows tiles), and
@@ -1493,6 +1476,36 @@ export abstract class MapScreenBase {
     this._chapterMapDirty = false;
 
     return { filledKeys, displayProgress };
+  }
+
+  private _computeAccessibleLevelIdxs(
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+  ): Set<number> {
+    const accessibleLevelIdxs = new Set<number>();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (!filledKeys.has(`${r},${c}`)) continue;
+        const def = grid[r]?.[c];
+        if (def?.shape === PipeShape.Chamber && def.chamberContent === 'level' && def.levelIdx !== undefined) {
+          accessibleLevelIdxs.add(def.levelIdx);
+        }
+      }
+    }
+    return accessibleLevelIdxs;
+  }
+
+  /** Jitter offset for the most recently activated cell, if still active. */
+  private _computeJitterCell(now: number): { row: number; col: number; dx: number; dy: number } | undefined {
+    this._jitterAnims = this._jitterAnims.filter(j => now - j.startedAt < MapScreenBase.JITTER_DURATION_MS);
+    if (this._jitterAnims.length === 0) return undefined;
+    const anim = this._jitterAnims[this._jitterAnims.length - 1];
+    const t = (now - anim.startedAt) / MapScreenBase.JITTER_DURATION_MS;
+    const amp = MapScreenBase.JITTER_AMPLITUDE * (1 - t);
+    const dx = Math.round(amp * Math.sin(t * MapScreenBase.JITTER_CYCLES * 2 * Math.PI));
+    return { row: anim.row, col: anim.col, dx, dy: 0 };
   }
 
   /**
