@@ -1029,57 +1029,77 @@ export class InputHandler {
     if (!board || this._cb.getGameState() !== GameState.Playing) return;
 
     // ── Horizontal-swipe rotation (only before placing / drag-painting starts) ──
-    // Swipe: horizontal movement > 40 px AND vertical movement < 30 px.
-    if (!this._swipeRotated && !this._longPressTriggered &&
-        Math.abs(dx) > 40 && Math.abs(dy) < 30) {
-      this._swipeRotated = true;
-      this._clearLongPressTimer();
-      if (this._cb.getSelectedShape() !== null) {
-        // Rotate the pending placement piece.
-        if (dx > 0) {
-          this._rotatePendingCW();
-        } else {
-          this._rotatePendingCCW();
-        }
-      } else {
-        // Rotate a placed non-fixed tile at the touch-start position.
-        const startPos = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
-        const startTile = board.getTile(startPos);
-        if (startTile && !isEmptyFloor(startTile.shape) &&
-            !startTile.isFixed && !SPIN_PIPE_SHAPES.has(startTile.shape)) {
-          const filledBefore = board.getFilledPositions();
-          const oldRotation = startTile.rotation;
-          const rotResult = dx > 0
-            ? board.rotateTileBy(startPos, 1)
-            : board.rotateTileBy(startPos, 3);
-          if (rotResult.success) {
-            this._cb.afterTileRotated(filledBefore, rotResult, {
-              row: startPos.row, col: startPos.col, oldRotation,
-            });
-            this._cb.refreshUI();
-            this._cb.checkWinLose();
-          } else if (rotResult.error) {
-            this._cb.handleBoardError(rotResult);
-          }
-        }
-      }
-      return;
-    }
+    if (this._handleTouchSwipeRotation(dx, dy, board)) return;
 
     // ── Drag-paint (only when a shape is selected and finger has clearly moved) ──
-    if (this._touchMoved && this._cb.getSelectedShape() !== null && !this._swipeRotated) {
-      const newPos = this._getGridPosFromClientXY(touch.clientX, touch.clientY);
-      const last = this._touchDragLastTile;
-      if (last && (newPos.row !== last.row || newPos.col !== last.col)) {
-        // Paint the cell we just left.
-        const oldTile = board.getTile(last);
-        if (oldTile) {
-          const filledBefore = board.getFilledPositions();
-          this._cb.tryPlaceOrReplace(last, oldTile, filledBefore);
-        }
-        this._touchDragLastTile = newPos;
-      }
+    this._handleTouchDragPaint(touch, board);
+  }
+
+  /**
+   * Swipe: horizontal movement > 40 px AND vertical movement < 30 px. Rotates the pending
+   * placement piece, or a placed non-fixed tile at the touch-start position. Returns whether
+   * the gesture was recognized (and thus handled) as a swipe-rotation.
+   */
+  private _handleTouchSwipeRotation(dx: number, dy: number, board: Board): boolean {
+    if (!this._isSwipeRotationGesture(dx, dy)) return false;
+    this._swipeRotated = true;
+    this._clearLongPressTimer();
+    if (this._cb.getSelectedShape() !== null) {
+      this._rotatePendingByDragDirection(dx);
+    } else {
+      this._rotatePlacedTileAtTouchStart(dx, board);
     }
+    return true;
+  }
+
+  private _isSwipeRotationGesture(dx: number, dy: number): boolean {
+    return !this._swipeRotated && !this._longPressTriggered && Math.abs(dx) > 40 && Math.abs(dy) < 30;
+  }
+
+  private _rotatePendingByDragDirection(dx: number): void {
+    if (dx > 0) {
+      this._rotatePendingCW();
+    } else {
+      this._rotatePendingCCW();
+    }
+  }
+
+  private _rotatePlacedTileAtTouchStart(dx: number, board: Board): void {
+    const startPos = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
+    const startTile = board.getTile(startPos);
+    if (!startTile || isEmptyFloor(startTile.shape) || startTile.isFixed || SPIN_PIPE_SHAPES.has(startTile.shape)) {
+      return;
+    }
+    const filledBefore = board.getFilledPositions();
+    const oldRotation = startTile.rotation;
+    const rotResult = dx > 0
+      ? board.rotateTileBy(startPos, 1)
+      : board.rotateTileBy(startPos, 3);
+    if (rotResult.success) {
+      this._cb.afterTileRotated(filledBefore, rotResult, {
+        row: startPos.row, col: startPos.col, oldRotation,
+      });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (rotResult.error) {
+      this._cb.handleBoardError(rotResult);
+    }
+  }
+
+  /** Drag-paint: only when a shape is selected and the finger has clearly moved without swipe-rotating. */
+  private _handleTouchDragPaint(touch: Touch, board: Board): void {
+    if (!this._touchMoved || this._cb.getSelectedShape() === null || this._swipeRotated) return;
+    const newPos = this._getGridPosFromClientXY(touch.clientX, touch.clientY);
+    const last = this._touchDragLastTile;
+    if (!last || (newPos.row === last.row && newPos.col === last.col)) return;
+
+    // Paint the cell we just left.
+    const oldTile = board.getTile(last);
+    if (oldTile) {
+      const filledBefore = board.getFilledPositions();
+      this._cb.tryPlaceOrReplace(last, oldTile, filledBefore);
+    }
+    this._touchDragLastTile = newPos;
   }
 
   private _handleCanvasTouchEnd(e: TouchEvent): void {
