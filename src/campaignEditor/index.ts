@@ -106,6 +106,37 @@ function _applyOptionalLevelDefFields(def: LevelDef, state: LevelEditorState, st
   if (state.levelStyle) def.style = state.levelStyle;
 }
 
+/**
+ * While dragging a tile that is also the linked tile, the link should visually follow the
+ * drag to its destination cell rather than staying anchored at the tile's pre-drag position.
+ */
+function _computeEditorLinkedTilePos(
+  drag: DragState | null,
+  linkedTilePos: { row: number; col: number } | null,
+): { row: number; col: number } | null {
+  if (
+    drag &&
+    linkedTilePos &&
+    linkedTilePos.row === drag.fromPos.row &&
+    linkedTilePos.col === drag.fromPos.col
+  ) {
+    return drag.toPos;
+  }
+  return linkedTilePos;
+}
+
+/** Builds the hover overlay (erase-preview or placement-preview) shown when not dragging. */
+function _computeEditorHoverOverlay(state: LevelEditorState, drag: DragState | null): HoverOverlay | null {
+  if (drag) return null;
+  if (!state.hover) return null;
+  if (state.palette === 'erase') {
+    const isEmptyCell = (state.grid[state.hover.row]?.[state.hover.col] ?? null) === null;
+    return { pos: state.hover, def: null, alpha: isEmptyCell ? 0.2 : 1 };
+  }
+  // Placement preview: transparent tile at hover
+  return { pos: state.hover, def: state.buildTileDef(), alpha: 0.55 };
+}
+
 /** Builds the "author · N chapters · M levels [· progress]" meta line for a campaign list row. */
 function _buildCampaignMetaText(campaign: CampaignDef, isOfficial: boolean, levelCount: number): string {
   // Compute play completion percentage for non-official campaigns
@@ -196,14 +227,7 @@ export class CampaignEditor {
       getActiveChapterIdx: () => this._activeChapterIdx,
       touchCampaign: (campaign) => this._touchCampaign(campaign),
       saveCampaigns: () => this._saveCampaigns(),
-      openLevelEditor: (levelIdx, readOnly) => {
-        const campaign = this._getActiveCampaign();
-        const chapter = campaign?.chapters[this._activeChapterIdx];
-        const level = chapter?.levels[levelIdx];
-        if (!level) return;
-        this._activeLevelIdx = levelIdx;
-        this._openLevelEditor(level, readOnly);
-      },
+      openLevelEditor: (levelIdx, readOnly) => this._openLevelEditorFromChapterMap(levelIdx, readOnly),
     };
     this._chapterMapEditor = new ChapterMapEditorSection(chapterCallbacks);
 
@@ -243,41 +267,61 @@ export class CampaignEditor {
     this._dialogs = new EditorDialogs(this._el, this._btn.bind(this));
 
     // Global keyboard handler for shortcuts (guarded by active screen)
-    this._keydownHandler = (e: KeyboardEvent) => {
-      if (this._el.style.display === 'none') return;
-      // Chapter map editor: Q/W rotation
-      if (this._screen === EditorScreen.Chapter) {
-        this._chapterMapEditor.handleChapterEditorKeyDown(e);
-        return;
-      }
-      // Campaign map editor: Q/W rotation + Ctrl+Z/Y undo/redo
-      if (this._screen === EditorScreen.Campaign) {
-        this._campaignMapEditor.handleCampaignEditorKeyDown(e);
-        return;
-      }
-      if (this._screen !== EditorScreen.LevelEditor) return;
-      if (commandKeyManager.matches('undo', e)) { e.preventDefault(); this._editorUndo(); }
-      if (commandKeyManager.matches('redo', e)) { e.preventDefault(); this._editorRedo(); }
-      if (e.key === 'Escape' && this._state.linkedTilePos !== null) {
-        // Unlink the linked tile
-        e.preventDefault();
-        this._state.clearLink();
-        this._renderEditorCanvas();
-      }
-      // Q = rotate counter-clockwise, W = rotate clockwise (mirrors in-game mouse wheel)
-      if (!e.altKey && !isTextEntryShortcutTarget(e)) {
-        const isCcw = commandKeyManager.matches('rotateCCW', e);
-        const isCw = commandKeyManager.matches('rotateCW', e);
-        if (isCcw || isCw) {
-          e.preventDefault();
-          this._state.rotatePalette(isCw);
-          if (this._state.linkedTilePos) this._state.applyParamsToLinkedTile();
-          this._refreshPaletteUI();
-          this._renderEditorCanvas();
-        }
-      }
-    };
+    this._keydownHandler = this._handleGlobalKeydown.bind(this);
     this._attachKeydownHandler();
+  }
+
+  /** Resolves and opens the level targeted by the chapter map editor's "edit level" action. */
+  private _openLevelEditorFromChapterMap(levelIdx: number, readOnly: boolean): void {
+    const campaign = this._getActiveCampaign();
+    const chapter = campaign?.chapters[this._activeChapterIdx];
+    const level = chapter?.levels[levelIdx];
+    if (!level) return;
+    this._activeLevelIdx = levelIdx;
+    this._openLevelEditor(level, readOnly);
+  }
+
+  /** Global keydown handler for editor shortcuts, guarded by the active screen. */
+  private _handleGlobalKeydown(e: KeyboardEvent): void {
+    if (this._el.style.display === 'none') return;
+    // Chapter map editor: Q/W rotation
+    if (this._screen === EditorScreen.Chapter) {
+      this._chapterMapEditor.handleChapterEditorKeyDown(e);
+      return;
+    }
+    // Campaign map editor: Q/W rotation + Ctrl+Z/Y undo/redo
+    if (this._screen === EditorScreen.Campaign) {
+      this._campaignMapEditor.handleCampaignEditorKeyDown(e);
+      return;
+    }
+    if (this._screen !== EditorScreen.LevelEditor) return;
+    this._handleLevelEditorKeydown(e);
+  }
+
+  /** Level-editor-screen keyboard shortcuts: undo/redo, escape-to-unlink, and tile rotation. */
+  private _handleLevelEditorKeydown(e: KeyboardEvent): void {
+    if (commandKeyManager.matches('undo', e)) { e.preventDefault(); this._editorUndo(); }
+    if (commandKeyManager.matches('redo', e)) { e.preventDefault(); this._editorRedo(); }
+    if (e.key === 'Escape' && this._state.linkedTilePos !== null) {
+      // Unlink the linked tile
+      e.preventDefault();
+      this._state.clearLink();
+      this._renderEditorCanvas();
+    }
+    this._handleRotateShortcut(e);
+  }
+
+  /** Q = rotate counter-clockwise, W = rotate clockwise (mirrors in-game mouse wheel). */
+  private _handleRotateShortcut(e: KeyboardEvent): void {
+    if (e.altKey || isTextEntryShortcutTarget(e)) return;
+    const isCcw = commandKeyManager.matches('rotateCCW', e);
+    const isCw = commandKeyManager.matches('rotateCW', e);
+    if (!isCcw && !isCw) return;
+    e.preventDefault();
+    this._state.rotatePalette(isCw);
+    if (this._state.linkedTilePos) this._state.applyParamsToLinkedTile();
+    this._refreshPaletteUI();
+    this._renderEditorCanvas();
   }
 
   /** Show the campaign editor (campaign list screen). */
@@ -1405,24 +1449,9 @@ export class CampaignEditor {
     const ctx = this._editorCtx;
     if (!ctx) return;
 
-    let overlay: HoverOverlay | null = null;
     const drag: DragState | null = this._editorInput?.dragState ?? null;
-    const linkedTilePos = drag &&
-      this._state.linkedTilePos &&
-      this._state.linkedTilePos.row === drag.fromPos.row &&
-      this._state.linkedTilePos.col === drag.fromPos.col
-      ? drag.toPos
-      : this._state.linkedTilePos;
-
-    if (!drag && this._state.hover) {
-      if (this._state.palette === 'erase') {
-        const isEmptyCell = (this._state.grid[this._state.hover.row]?.[this._state.hover.col] ?? null) === null;
-        overlay = { pos: this._state.hover, def: null, alpha: isEmptyCell ? 0.2 : 1 };
-      } else {
-        // Placement preview: transparent tile at hover
-        overlay = { pos: this._state.hover, def: this._state.buildTileDef(), alpha: 0.55 };
-      }
-    }
+    const linkedTilePos = _computeEditorLinkedTilePos(drag, this._state.linkedTilePos);
+    const overlay = _computeEditorHoverOverlay(this._state, drag);
 
     renderEditorCanvas(ctx, this._state.grid, this._state.rows, this._state.cols, overlay, drag, linkedTilePos, undefined, undefined, undefined, this._state.levelStyle);
   }
