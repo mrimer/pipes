@@ -865,35 +865,37 @@ export class InputHandler {
 
     if (commandKeyManager.matches('rotateCCW', e)) {
       e.preventDefault();
-      if (this._cb.getGameState() !== GameState.Playing) return;
-      // 3 CW steps = 1 CCW step; spinner takes priority over pending piece rotation
-      if (!this._tryRotateHoverSpinner(3)) {
-        if (this._cb.getSelectedShape() !== null) {
-          this._rotatePendingCCW();
-        } else {
-          this._tryRotateHoverPipe(3);
-        }
-      }
+      // 3 CW steps = 1 CCW step
+      this._handleRotateShortcut(3, true);
       return;
     }
     if (commandKeyManager.matches('rotateCW', e)) {
       e.preventDefault();
-      if (this._cb.getGameState() !== GameState.Playing) return;
-      // Spinner takes priority over pending piece rotation
-      if (!this._tryRotateHoverSpinner(1)) {
-        if (this._cb.getSelectedShape() !== null) {
-          this._rotatePendingCW();
-        } else {
-          this._tryRotateHoverPipe(1);
-        }
-      }
+      this._handleRotateShortcut(1, false);
       return;
     }
-    switch (e.key) {
-      case 'Escape':
-        this._cb.handleEscapeKey();
-        break;
+    if (e.key === 'Escape') {
+      this._cb.handleEscapeKey();
     }
+    this._handleRestartLevelShortcut(e);
+  }
+
+  /** Spinner takes priority over pending piece rotation, which takes priority over rotating a placed pipe. */
+  private _handleRotateShortcut(steps: number, ccw: boolean): void {
+    if (this._cb.getGameState() !== GameState.Playing) return;
+    if (this._tryRotateHoverSpinner(steps)) return;
+    if (this._cb.getSelectedShape() !== null) {
+      if (ccw) {
+        this._rotatePendingCCW();
+      } else {
+        this._rotatePendingCW();
+      }
+    } else {
+      this._tryRotateHoverPipe(steps);
+    }
+  }
+
+  private _handleRestartLevelShortcut(e: KeyboardEvent): void {
     if (commandKeyManager.matches('restartLevel', e) && this._cb.getGameState() === GameState.Playing) {
       this._cb.retryLevel();
     }
