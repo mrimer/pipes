@@ -1835,25 +1835,30 @@ export abstract class MapScreenBase {
     const sourcePos = findMapTile(chapter.grid, rows, cols, PipeShape.Source);
     if (!sourcePos) return new Set();
 
-    const getConns = (def: TileDef, isEntry: boolean): Set<Direction> => {
-      if (def.shape === PipeShape.Chamber) {
-        const isCompleted = this._isChamberEntityCompleted(def);
-        // Water enters the chamber regardless; exits only if completed
-        if (!isCompleted && !isEntry) return new Set();
-        if (def.connections) return new Set(def.connections);
-        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-      }
-      if (def.connections) return new Set(def.connections);
-      if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink) {
-        return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-      }
-      if (PIPE_SHAPES.has(def.shape)) {
-        return tileDefConnections(def);
-      }
-      return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
-    };
+    return computeMapReachable(
+      chapter.grid, rows, cols, sourcePos,
+      (def, isEntry) => this._computeReachabilityConnections(def, isEntry),
+    );
+  }
 
-    return computeMapReachable(chapter.grid, rows, cols, sourcePos, getConns);
+  private _computeReachabilityConnections(def: TileDef, isEntry: boolean): Set<Direction> {
+    if (def.shape === PipeShape.Chamber) return this._chamberReachabilityConnections(def, isEntry);
+    if (def.connections) return new Set(def.connections);
+    if (def.shape === PipeShape.Source || def.shape === PipeShape.Sink) {
+      return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+    }
+    if (PIPE_SHAPES.has(def.shape)) {
+      return tileDefConnections(def);
+    }
+    return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
+  }
+
+  private _chamberReachabilityConnections(def: TileDef, isEntry: boolean): Set<Direction> {
+    const isCompleted = this._isChamberEntityCompleted(def);
+    // Water enters the chamber regardless; exits only if completed
+    if (!isCompleted && !isEntry) return new Set();
+    if (def.connections) return new Set(def.connections);
+    return new Set([Direction.North, Direction.East, Direction.South, Direction.West]);
   }
 
   // ─── Animation loop ──────────────────────────────────────────────────────────
