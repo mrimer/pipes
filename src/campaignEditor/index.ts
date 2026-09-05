@@ -9,7 +9,7 @@
  *   levelEditor – full level-editing canvas with tile palette, parameters, and validation
  */
 
-import type { CampaignDef, LevelDef, TileDef} from '../types';
+import type { CampaignDef, ChapterDef, LevelDef, TileDef} from '../types';
 import { PipeShape } from '../types';
 import {
   loadCampaignProgress,
@@ -1035,26 +1035,44 @@ export class CampaignEditor {
       'width:100%;max-width:1200px;padding:20px;box-sizing:border-box;display:flex;' +
       'flex-direction:column;gap:16px;';
 
-    if (!isOfficial) {
-      // Chapter name field
-      const nameWrap = document.createElement('div');
-      nameWrap.style.cssText =
-        `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;`;
-      nameWrap.appendChild(buildLocalizedTextInput(
-        t('editor.chapter.name'),
-        {
-          get: () => chapter.name,
-          set: (v) => { this._service.renameChapter(campaign, this._activeChapterIdx, v ?? ''); },
-        },
-        EDITOR_FLEX_ROW_CSS,
-      ));
-      content.appendChild(nameWrap);
-    }
+    this._appendChapterNameField(content, campaign, chapter, isOfficial);
 
     // Chapter map grid editor section
     content.appendChild(this._chapterMapEditor.buildSection(campaign, chapter, isOfficial));
 
-    // Levels section
+    this._appendChapterLevelsSection(content, campaign, chapter, isOfficial);
+
+    this._el.appendChild(content);
+
+    // Resize canvas after layout is in the DOM
+    requestAnimationFrame(() => {
+      this._chapterMapEditor.updateCanvasDisplaySize();
+      this._chapterMapEditor.renderCanvas();
+      this._chapterMapEditor.syncUndoRedoButtons();
+      this._chapterMapEditor.startSeaAnimationLoop();
+    });
+  }
+
+  /** Appends the editable chapter name field (non-official chapters only). */
+  private _appendChapterNameField(content: HTMLElement, campaign: CampaignDef, chapter: ChapterDef, isOfficial: boolean): void {
+    if (isOfficial) return;
+
+    const nameWrap = document.createElement('div');
+    nameWrap.style.cssText =
+      `background:${UI_BG};border:1px solid ${UI_BORDER};border-radius:8px;padding:16px;`;
+    nameWrap.appendChild(buildLocalizedTextInput(
+      t('editor.chapter.name'),
+      {
+        get: () => chapter.name,
+        set: (v) => { this._service.renameChapter(campaign, this._activeChapterIdx, v ?? ''); },
+      },
+      EDITOR_FLEX_ROW_CSS,
+    ));
+    content.appendChild(nameWrap);
+  }
+
+  /** Appends the levels header (+ add-level button), level rows, and the empty-state message. */
+  private _appendChapterLevelsSection(content: HTMLElement, campaign: CampaignDef, chapter: ChapterDef, isOfficial: boolean): void {
     const levelsHeader = document.createElement('div');
     levelsHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const lvlTitle = document.createElement('h3');
@@ -1079,16 +1097,6 @@ export class CampaignEditor {
       empty.textContent = t('editor.chapter.noLevels');
       content.appendChild(empty);
     }
-
-    this._el.appendChild(content);
-
-    // Resize canvas after layout is in the DOM
-    requestAnimationFrame(() => {
-      this._chapterMapEditor.updateCanvasDisplaySize();
-      this._chapterMapEditor.renderCanvas();
-      this._chapterMapEditor.syncUndoRedoButtons();
-      this._chapterMapEditor.startSeaAnimationLoop();
-    });
   }
 
 
