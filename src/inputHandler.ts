@@ -468,16 +468,24 @@ export class InputHandler {
   private _handleCanvasMouseDown(e: MouseEvent): void {
     if (this._isInputLocked()) return;
     if (e.button === 2) {
-      if (this._cb.getScreen() !== GameScreen.Play) return;
-      if (this._cb.getGameState() !== GameState.Playing) return;
-      if (!this._cb.getBoard()) return;
-      const { row, col } = this._getGridPosFromEvent(e);
-      this._isRightDragging = true;
-      this._rightDragLastTile = { row, col };
-      this._suppressNextContextMenu = false;
+      this._handleRightMouseDown(e);
       return;
     }
     if (e.button !== 0) return;
+    this._handleLeftMouseDown(e);
+  }
+
+  private _handleRightMouseDown(e: MouseEvent): void {
+    if (this._cb.getScreen() !== GameScreen.Play) return;
+    if (this._cb.getGameState() !== GameState.Playing) return;
+    if (!this._cb.getBoard()) return;
+    const { row, col } = this._getGridPosFromEvent(e);
+    this._isRightDragging = true;
+    this._rightDragLastTile = { row, col };
+    this._suppressNextContextMenu = false;
+  }
+
+  private _handleLeftMouseDown(e: MouseEvent): void {
     if (this._cb.getScreen() !== GameScreen.Play) return;
     if (this._cb.getGameState() !== GameState.Playing) return;
     if (this._cb.getSelectedShape() === null) return; // No shape selected; click/rotation handled separately
