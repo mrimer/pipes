@@ -1649,20 +1649,30 @@ export class Board {
    */
   getCurrentWater(): number {
     const filled = this.getFilledPositions();
-    const lockedWaterImpact = this._turnState.lockedWaterImpact;
-
-    // ── Incremental path (normal gameplay) ──────────────────────────────────
     // lockedWaterImpact is non-empty once applyTurnDelta() has been called
     // (at minimum the source tile is always present).
-    if (lockedWaterImpact.size > 0) {
-      let total = this.sourceCapacity;
-      for (const key of filled) {
-        total += lockedWaterImpact.get(key) ?? 0;
-      }
-      return total - this._turnState.leakyPermanentLoss;
+    if (this._turnState.lockedWaterImpact.size > 0) {
+      return this._computeIncrementalWater(filled);
     }
+    return this._computeDynamicWater(filled);
+  }
 
-    // ── Dynamic fallback (test/legacy path) ─────────────────────────────────
+  /** Incremental path (normal gameplay): sum each filled tile's locked-in water impact. */
+  private _computeIncrementalWater(filled: Set<string>): number {
+    const lockedWaterImpact = this._turnState.lockedWaterImpact;
+    let total = this.sourceCapacity;
+    for (const key of filled) {
+      total += lockedWaterImpact.get(key) ?? 0;
+    }
+    return total - this._turnState.leakyPermanentLoss;
+  }
+
+  /**
+   * Dynamic fallback (test/legacy path): recompute every filled tile's water
+   * cost/gain from the current temperature and pressure, identical to the
+   * pre-incremental behavior so existing tests remain valid.
+   */
+  private _computeDynamicWater(filled: Set<string>): number {
     const connectionTurn = this._turnState.connectionTurn;
     const currentTemp = this._thermo.computeTemperature(filled, connectionTurn);
     const currentPressure = this._thermo.computePressure(filled, connectionTurn);
@@ -1673,39 +1683,59 @@ export class Board {
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
       if (!tile) continue;
-      if (PIPE_SHAPES.has(tile.shape)) {
-        pipeCost++;
-      } else if (tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'tank') {
-          tankGain += tile.capacity;
-        } else if (tile.chamberContent === 'dirt') {
-          pipeCost += tile.cost;
-        } else if (tile.chamberContent === 'ice') {
-          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-          pipeCost += tile.cost * deltaTemp;
-        } else if (tile.chamberContent === 'snow') {
-          const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-          pipeCost += snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
-        } else if (tile.chamberContent === 'sandstone') {
-          const { shatterOverride, deltaDamage, costPerDeltaTemp } =
-            sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-          if (!shatterOverride) {
-            const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-            // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
-            pipeCost += deltaDamage >= 1
-              ? costPerDeltaTemp * deltaTemp
-              : this.sourceCapacity + 1;
-          }
-        } else if (tile.chamberContent === 'hot_plate') {
-          const effectiveCost = tile.cost * (tile.temperature + currentTemp);
-          const waterGain = Math.min(this._turnState.frozen, effectiveCost);
-          const waterLoss = Math.max(0, effectiveCost - waterGain);
-          // Net effect: gain from frozen minus direct water loss
-          pipeCost += waterLoss - waterGain;
-        }
-      }
+      const delta = this._computeTileWaterDelta(tile, currentTemp, currentPressure);
+      pipeCost += delta.pipeCost;
+      tankGain += delta.tankGain;
     }
     return this.sourceCapacity - pipeCost + tankGain - this._turnState.leakyPermanentLoss;
+  }
+
+  /** Dispatch a single filled tile to its water cost/gain (pipes vs. chamber contents). */
+  private _computeTileWaterDelta(tile: Tile, currentTemp: number, currentPressure: number): { pipeCost: number; tankGain: number } {
+    if (PIPE_SHAPES.has(tile.shape)) return { pipeCost: 1, tankGain: 0 };
+    if (tile.shape !== PipeShape.Chamber) return { pipeCost: 0, tankGain: 0 };
+    return this._computeChamberWaterDelta(tile, currentTemp, currentPressure);
+  }
+
+  /** Water cost/gain for one Chamber tile, keyed by its content type. */
+  private _computeChamberWaterDelta(tile: Tile, currentTemp: number, currentPressure: number): { pipeCost: number; tankGain: number } {
+    switch (tile.chamberContent) {
+      case 'tank':
+        return { pipeCost: 0, tankGain: tile.capacity };
+      case 'dirt':
+        return { pipeCost: tile.cost, tankGain: 0 };
+      case 'ice':
+        return { pipeCost: tile.cost * computeDeltaTemp(tile.temperature, currentTemp), tankGain: 0 };
+      case 'snow':
+        return {
+          pipeCost: snowCostPerDeltaTemp(tile.cost, currentPressure) * computeDeltaTemp(tile.temperature, currentTemp),
+          tankGain: 0,
+        };
+      case 'sandstone':
+        return { pipeCost: this._computeSandstoneWaterCost(tile, currentTemp, currentPressure), tankGain: 0 };
+      case 'hot_plate':
+        return { pipeCost: this._computeHotPlateWaterCost(tile, currentTemp), tankGain: 0 };
+      default:
+        return { pipeCost: 0, tankGain: 0 };
+    }
+  }
+
+  /** Sandstone's water cost: full drain on an invalid shatter state, otherwise cost-per-delta-temp. */
+  private _computeSandstoneWaterCost(tile: Tile, currentTemp: number, currentPressure: number): number {
+    const { shatterOverride, deltaDamage, costPerDeltaTemp } =
+      sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
+    if (shatterOverride) return 0;
+    const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
+    // deltaDamage <= 0 is an invalid play state: drain all water to force immediate failure.
+    return deltaDamage >= 1 ? costPerDeltaTemp * deltaTemp : this.sourceCapacity + 1;
+  }
+
+  /** Hot-plate's net water effect: gain from frozen minus direct water loss. */
+  private _computeHotPlateWaterCost(tile: Tile, currentTemp: number): number {
+    const effectiveCost = tile.cost * (tile.temperature + currentTemp);
+    const waterGain = Math.min(this._turnState.frozen, effectiveCost);
+    const waterLoss = Math.max(0, effectiveCost - waterGain);
+    return waterLoss - waterGain;
   }
 
   /**
