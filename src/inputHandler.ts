@@ -190,6 +190,12 @@ export class InputHandler {
   /** Grid position recorded at the start of a touch drag-paint gesture. */
   private _touchDragLastTile: GridPos | null = null;
 
+  // ── Inventory item touch-drag state ────────────────────────────────────────
+  /** Floating ghost element following the finger during an inventory-item touch drag. */
+  private _invDragGhostEl: HTMLElement | null = null;
+  /** Whether an inventory-item touch drag is currently in progress. */
+  private _invDragActive = false;
+
   constructor(canvas: HTMLCanvasElement, cb: InputCallbacks) {
     this._canvas = canvas;
     this._cb = cb;
@@ -893,88 +899,91 @@ export class InputHandler {
     shape: PipeShape,
     effectiveCount: number,
   ): void {
-    let ghostEl: HTMLElement | null = null;
-    let dragActive = false;
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (this._cb.getGameState() !== GameState.Playing) return;
-      if (e.touches.length !== 1) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-
-      // Create a floating ghost that follows the finger.
-      ghostEl = document.createElement('div');
-      ghostEl.style.cssText =
-        'position:fixed;pointer-events:none;z-index:200;' +
-        `background:${UI_BG};border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
-        'padding:6px 8px;opacity:0.85;font-size:1rem;color:#eee;white-space:nowrap;' +
-        `left:${touch.clientX + 12}px;top:${touch.clientY + 12}px;`;
-      ghostEl.replaceChildren(...Array.from(el.childNodes, (n) => n.cloneNode(true)));
-      document.body.appendChild(ghostEl);
-      dragActive = true;
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (!dragActive || !ghostEl || e.touches.length !== 1) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      ghostEl.style.left = `${touch.clientX + 12}px`;
-      ghostEl.style.top  = `${touch.clientY + 12}px`;
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      if (!dragActive) return;
-      e.preventDefault();
-      dragActive = false;
-
-      // Remove the ghost element.
-      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
-
-      // Determine if the finger was released over the game canvas.
-      const changedTouch = e.changedTouches[0];
-      if (!changedTouch) {
-        // No valid endpoint — treat as a tap to select.
-        this.handleInventoryClick(shape, effectiveCount);
-        return;
-      }
-
-      const canvasRect = this._canvas.getBoundingClientRect();
-      const cx = changedTouch.clientX;
-      const cy = changedTouch.clientY;
-
-      if (
-        cx >= canvasRect.left && cx <= canvasRect.right &&
-        cy >= canvasRect.top  && cy <= canvasRect.bottom
-      ) {
-        // Dropped onto the canvas — select this shape and place it at the cell.
-        const board = this._cb.getBoard();
-        if (board && this._cb.getGameState() === GameState.Playing) {
-          // Select the shape with its last-used rotation.
-          this._cb.setSelectedShape(shape);
-          this._cb.setPendingRotation(this.lastPlacedRotations.get(shape) ?? 0);
-          this._cb.renderInventoryBar();
-          // Compute grid position from the drop coordinates.
-          const col = Math.floor((cx - canvasRect.left) * board.cols / canvasRect.width);
-          const row = Math.floor((cy - canvasRect.top)  * board.rows / canvasRect.height);
-          const pos = { row, col };
-          const tile = board.getTile(pos);
-          if (tile) {
-            const filledBefore = board.getFilledPositions();
-            if (this._cb.tryPlaceOrReplace(pos, tile, filledBefore)) {
-              // Placement was handled; afterTilePlaced called by tryPlaceOrReplace chain.
-              sfxManager.play(SfxId.PipePlacement);
-            }
-          }
-        }
-      } else {
-        // Released outside the canvas — treat as a tap to select/deselect.
-        this.handleInventoryClick(shape, effectiveCount);
-      }
-    };
+    const onTouchStart = (e: TouchEvent) => this._onInventoryItemTouchStart(e, el);
+    const onTouchMove = (e: TouchEvent) => this._onInventoryItemTouchMove(e);
+    const onTouchEnd = (e: TouchEvent) => this._onInventoryItemTouchEnd(e, shape, effectiveCount);
 
     el.addEventListener('touchstart', onTouchStart, { passive: false });
     el.addEventListener('touchmove',  onTouchMove,  { passive: false });
     el.addEventListener('touchend',   onTouchEnd,   { passive: false });
+  }
+
+  private _onInventoryItemTouchStart(e: TouchEvent, el: HTMLElement): void {
+    if (this._cb.getGameState() !== GameState.Playing) return;
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+
+    // Create a floating ghost that follows the finger.
+    const ghostEl = document.createElement('div');
+    ghostEl.style.cssText =
+      'position:fixed;pointer-events:none;z-index:200;' +
+      `background:${UI_BG};border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
+      'padding:6px 8px;opacity:0.85;font-size:1rem;color:#eee;white-space:nowrap;' +
+      `left:${touch.clientX + 12}px;top:${touch.clientY + 12}px;`;
+    ghostEl.replaceChildren(...Array.from(el.childNodes, (n) => n.cloneNode(true)));
+    document.body.appendChild(ghostEl);
+    this._invDragGhostEl = ghostEl;
+    this._invDragActive = true;
+  }
+
+  private _onInventoryItemTouchMove(e: TouchEvent): void {
+    if (!this._invDragActive || !this._invDragGhostEl || e.touches.length !== 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    this._invDragGhostEl.style.left = `${touch.clientX + 12}px`;
+    this._invDragGhostEl.style.top  = `${touch.clientY + 12}px`;
+  }
+
+  private _onInventoryItemTouchEnd(e: TouchEvent, shape: PipeShape, effectiveCount: number): void {
+    if (!this._invDragActive) return;
+    e.preventDefault();
+    this._invDragActive = false;
+
+    // Remove the ghost element.
+    if (this._invDragGhostEl) { this._invDragGhostEl.remove(); this._invDragGhostEl = null; }
+
+    // Determine if the finger was released over the game canvas.
+    const changedTouch = e.changedTouches[0];
+    if (!changedTouch) {
+      // No valid endpoint — treat as a tap to select.
+      this.handleInventoryClick(shape, effectiveCount);
+      return;
+    }
+
+    const canvasRect = this._canvas.getBoundingClientRect();
+    if (this._isTouchOverRect(changedTouch, canvasRect)) {
+      // Dropped onto the canvas — select this shape and place it at the cell.
+      this._dropInventoryItemOnCanvas(shape, changedTouch, canvasRect);
+    } else {
+      // Released outside the canvas — treat as a tap to select/deselect.
+      this.handleInventoryClick(shape, effectiveCount);
+    }
+  }
+
+  private _isTouchOverRect(touch: Touch, rect: DOMRect): boolean {
+    return touch.clientX >= rect.left && touch.clientX <= rect.right &&
+      touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+  }
+
+  private _dropInventoryItemOnCanvas(shape: PipeShape, touch: Touch, canvasRect: DOMRect): void {
+    const board = this._cb.getBoard();
+    if (!board || this._cb.getGameState() !== GameState.Playing) return;
+    // Select the shape with its last-used rotation.
+    this._cb.setSelectedShape(shape);
+    this._cb.setPendingRotation(this.lastPlacedRotations.get(shape) ?? 0);
+    this._cb.renderInventoryBar();
+    // Compute grid position from the drop coordinates.
+    const col = Math.floor((touch.clientX - canvasRect.left) * board.cols / canvasRect.width);
+    const row = Math.floor((touch.clientY - canvasRect.top)  * board.rows / canvasRect.height);
+    const pos = { row, col };
+    const tile = board.getTile(pos);
+    if (!tile) return;
+    const filledBefore = board.getFilledPositions();
+    if (this._cb.tryPlaceOrReplace(pos, tile, filledBefore)) {
+      // Placement was handled; afterTilePlaced called by tryPlaceOrReplace chain.
+      sfxManager.play(SfxId.PipePlacement);
+    }
   }
 
   // ── Touch helpers ─────────────────────────────────────────────────────────
