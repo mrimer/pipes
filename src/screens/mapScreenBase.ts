@@ -897,25 +897,7 @@ export abstract class MapScreenBase {
     const el = this.screenEl;
     el.innerHTML = '';
 
-    // Header: campaign name, chapter number and name
-    const header = document.createElement('div');
-    header.style.cssText = 'text-align:center;width:100%;max-width:900px;';
-    const campaignName = document.createElement('div');
-    campaignName.style.cssText = 'font-size:0.9rem;color:#aaa;';
-    campaignName.textContent = resolveLocalizedText(campaign.name);
-    header.appendChild(campaignName);
-    const customChapterTitle = this._formatChapterTitle(campaign, chapterIdx, chapter);
-    const chapterTitleText =
-      customChapterTitle === undefined
-        ? `Chapter ${chapterIdx + 1}: ${resolveLocalizedText(chapter.name)}`
-        : customChapterTitle;
-    if (chapterTitleText !== null) {
-      const chapterTitle = document.createElement('h2');
-      chapterTitle.textContent = chapterTitleText;
-      chapterTitle.style.cssText = `margin:4px 0;font-size:1.4rem;color:${FOCUS_COLOR};`;
-      header.appendChild(chapterTitle);
-    }
-    el.appendChild(header);
+    this._appendMapHeader(el, campaign, chapterIdx, chapter);
 
     // Stats row
     const statsEl = document.createElement('div');
@@ -946,207 +928,32 @@ export abstract class MapScreenBase {
     const ctx = canvas.getContext('2d');
     if (ctx) this._ctx = ctx;
 
-    const { oldTileSize } = this._applyViewSizing(chapter);
+    this._initOrUpdatePan(chapter);
 
-    // Compute or preserve pan position.
-    if (!this._panInitialized) {
-      this._computeInitialSnap(chapter, this._viewRows, this._viewCols);
-      this._panInitialized = true;
-    } else {
-      // On resize (repopulate with same map), rescale the pan pixel offset so
-      // tile positions stay consistent with the new tile size.
-      if (oldTileSize !== TILE_SIZE && oldTileSize > 0) {
-        this._panPixelX = this._panPixelX * TILE_SIZE / oldTileSize;
-        this._panPixelY = this._panPixelY * TILE_SIZE / oldTileSize;
-      }
-      this._clampPan(chapter, this._viewRows, this._viewCols);
-    }
-    if (oldTileSize !== TILE_SIZE && oldTileSize > 0) {
-      this._reflowCloudShadows(chapter.style);
-    }
-
-    const getDefaultCursor = (): string => (this._isPannable(chapter) ? 'grab' : 'pointer');
     canvas.style.cssText =
       `border:2px solid ${UI_BORDER};border-radius:${RADIUS_MD};` +
-      `cursor:${getDefaultCursor()};` +
+      `cursor:${this._getDefaultCursor(chapter)};` +
       'display:block;max-width:100%;height:auto;margin:0 auto;';
 
     // ── Mouse events ──────────────────────────────────────────────────────────
 
-    canvas.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
-      this._panDrag = {
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startPanX: this._panPixelX,
-        startPanY: this._panPixelY,
-        moved: false,
-      };
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-      this._mouseClientPos = { x: e.clientX, y: e.clientY };
-
-      // Handle pan drag.
-      if (this._panDrag) {
-        const dx = e.clientX - this._panDrag.startClientX;
-        const dy = e.clientY - this._panDrag.startClientY;
-        if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-          this._panDrag.moved = true;
-        }
-        if (this._panDrag.moved) {
-          const cp = this._clientToCanvasPx(e.clientX, e.clientY);
-          if (cp) {
-            this._panPixelX = this._panDrag.startPanX - dx * cp.scaleX;
-            this._panPixelY = this._panDrag.startPanY - dy * cp.scaleY;
-          }
-          this._clampPan(chapter, this._viewRows, this._viewCols);
-          this._hover = null;
-          this._render(chapter);
-          canvas.style.cursor = 'grabbing';
-          return;
-        }
-      }
-
-      this._onMouseMove(e, chapter);
-      // Update native title for non-Ctrl hover and custom tooltip for Ctrl+hover
-      const pos = this._canvasPos(e, chapter);
-      if (pos) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- grid is verified to exist before the mouse-event handler is active
-        const def = chapter.grid![pos.row]?.[pos.col];
-        canvas.title = this._chapterNodeTooltip(chapter, def, pos.row, pos.col);
-      } else {
-        canvas.title = '';
-      }
-      if (this._ctrlHeld) {
-        this._showTooltip(e.clientX, e.clientY);
-      }
-    });
-
-    canvas.addEventListener('mouseup', (e) => {
-      if (e.button !== 0) return;
-      if (this._panDrag?.moved) {
-        canvas.style.cursor = getDefaultCursor();
-      }
-      // Click handling is deferred to the 'click' event so the browser can
-      // fire it; we only use mouseup to restore the cursor.
-    });
-
-    canvas.addEventListener('mouseleave', () => {
-      this._panDrag = null;
-      this._mouseClientPos = null;
-      this._hover = null;
-      this._hideTooltip();
-      canvas.style.cursor = getDefaultCursor();
-      this._render(chapter);
-    });
-
-    canvas.addEventListener('click', (e) => {
-      if (this._panDrag?.moved) {
-        // A click fired after a drag – suppress it.
-        this._panDrag = null;
-        return;
-      }
-      this._panDrag = null;
-      this._onClick(e, campaign, chapter);
-    });
-
-    canvas.addEventListener('wheel', (e) => {
-      if (!this._isCampaignZoomEnabled()) return;
-      const cp = this._clientToCanvasPx(e.clientX, e.clientY);
-      if (!cp) return;
-      e.preventDefault();
-      this._updateCampaignZoomFromWheel(chapter, e.deltaY, cp.px, cp.py);
-      canvas.style.cursor = getDefaultCursor();
-    }, { passive: false });
+    canvas.addEventListener('mousedown', (e) => this._onCanvasMouseDown(e));
+    canvas.addEventListener('mousemove', (e) => this._onCanvasMouseMove(e, chapter, canvas));
+    canvas.addEventListener('mouseup', (e) => this._onCanvasMouseUp(e, chapter, canvas));
+    canvas.addEventListener('mouseleave', () => this._onCanvasMouseLeave(chapter, canvas));
+    canvas.addEventListener('click', (e) => this._onCanvasClick(e, campaign, chapter));
+    canvas.addEventListener('wheel', (e) => this._onCanvasWheel(e, chapter, canvas), { passive: false });
 
     // ── Touch events for mobile/tablet devices ────────────────────────────────
     canvas.style.touchAction = 'none'; // prevent scroll/zoom on the canvas
-    canvas.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      this._touchStartX = touch.clientX;
-      this._touchStartY = touch.clientY;
-      this._touchPanStartPanX = this._panPixelX;
-      this._touchPanStartPanY = this._panPixelY;
-      this._touchMoved = false;
-      // Start long-press timer to show tooltip (500 ms).
-      if (this._touchLongPressTimer !== null) clearTimeout(this._touchLongPressTimer);
-      this._touchLongPressTimer = setTimeout(() => {
-        this._touchLongPressTimer = null;
-        if (!this._touchMoved) {
-          this._showTooltip(this._touchStartX, this._touchStartY);
-        }
-      }, 500);
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-      if (e.touches.length !== 1) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      const dx = touch.clientX - this._touchStartX;
-      const dy = touch.clientY - this._touchStartY;
-      if (Math.sqrt(dx * dx + dy * dy) > 8) {
-        this._touchMoved = true;
-        if (this._touchLongPressTimer !== null) {
-          clearTimeout(this._touchLongPressTimer);
-          this._touchLongPressTimer = null;
-        }
-        this._hideTooltip();
-        // Pan the map when the current zoom level does not fit the full map.
-        if (this._isPannable(chapter)) {
-          const cp = this._clientToCanvasPx(touch.clientX, touch.clientY);
-          if (cp) {
-            this._panPixelX = this._touchPanStartPanX - dx * cp.scaleX;
-            this._panPixelY = this._touchPanStartPanY - dy * cp.scaleY;
-          }
-          this._clampPan(chapter, this._viewRows, this._viewCols);
-          this._hover = null;
-          this._render(chapter);
-        }
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      if (this._touchLongPressTimer !== null) {
-        clearTimeout(this._touchLongPressTimer);
-        this._touchLongPressTimer = null;
-      }
-      if (this._touchMoved) return; // was a scroll/swipe/pan, not a tap
-      const changedTouch = e.changedTouches[0];
-      if (!changedTouch) return;
-      // Synthesize a click at the touch coordinates.
-      const pos = this._canvasPosFromCoords(changedTouch.clientX, changedTouch.clientY, chapter);
-      if (!pos || !chapter.grid) return;
-      const def = chapter.grid[pos.row]?.[pos.col];
-      if (!def) return;
-      if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return;
-      const levelIdx = def.levelIdx;
-      if (levelIdx === undefined) return;
-      const filledKeys = this._computeFilledCells();
-      if (!filledKeys.has(`${pos.row},${pos.col}`)) {
-        this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
-        sfxManager.play(SfxId.InvalidSelection);
-        return;
-      }
-      sfxManager.play(SfxId.LevelSelect);
-      this._onChamberSelected(def, levelIdx);
-    }, { passive: false });
+    canvas.addEventListener('touchstart', (e) => this._onCanvasTouchStart(e), { passive: false });
+    canvas.addEventListener('touchmove', (e) => this._onCanvasTouchMove(e, chapter), { passive: false });
+    canvas.addEventListener('touchend', (e) => this._onCanvasTouchEnd(e, chapter), { passive: false });
 
     canvasWrap.appendChild(canvas);
     el.appendChild(canvasWrap);
 
-    // Instruction text
-    const instruction = document.createElement('p');
-    instruction.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:0;';
-    const baseInstruction = this._formatInstructionText() ?? 'Click on an accessible level';
-    const instructionParts = [baseInstruction];
-    if (this._isPannable(chapter)) instructionParts.push('Drag with the mouse to pan around the map.');
-    if (this._isCampaignZoomEnabled()) instructionParts.push('Roll the mouse wheel over the map to zoom.');
-    instruction.textContent = instructionParts.join(' ');
-    el.appendChild(instruction);
+    this._appendInstructionText(el, chapter);
 
     // Status text (shown when the sink is filled / chapter complete)
     const statusEl = document.createElement('div');
@@ -1156,6 +963,248 @@ export abstract class MapScreenBase {
 
     // Render the chapter map
     this._render(chapter);
+  }
+
+  /** Header: campaign name, chapter number and name. */
+  private _appendMapHeader(el: HTMLElement, campaign: CampaignDef, chapterIdx: number, chapter: ChapterDef): void {
+    const header = document.createElement('div');
+    header.style.cssText = 'text-align:center;width:100%;max-width:900px;';
+    const campaignName = document.createElement('div');
+    campaignName.style.cssText = 'font-size:0.9rem;color:#aaa;';
+    campaignName.textContent = resolveLocalizedText(campaign.name);
+    header.appendChild(campaignName);
+    const customChapterTitle = this._formatChapterTitle(campaign, chapterIdx, chapter);
+    const chapterTitleText =
+      customChapterTitle === undefined
+        ? `Chapter ${chapterIdx + 1}: ${resolveLocalizedText(chapter.name)}`
+        : customChapterTitle;
+    if (chapterTitleText !== null) {
+      const chapterTitle = document.createElement('h2');
+      chapterTitle.textContent = chapterTitleText;
+      chapterTitle.style.cssText = `margin:4px 0;font-size:1.4rem;color:${FOCUS_COLOR};`;
+      header.appendChild(chapterTitle);
+    }
+    el.appendChild(header);
+  }
+
+  /** Computes or preserves the pan position across a (re)populate call. */
+  private _initOrUpdatePan(chapter: ChapterDef): void {
+    const { oldTileSize } = this._applyViewSizing(chapter);
+    if (!this._panInitialized) {
+      this._computeInitialSnap(chapter, this._viewRows, this._viewCols);
+      this._panInitialized = true;
+    } else {
+      // On resize (repopulate with same map), rescale the pan pixel offset so
+      // tile positions stay consistent with the new tile size.
+      this._rescalePanForTileSizeChange(oldTileSize);
+      this._clampPan(chapter, this._viewRows, this._viewCols);
+    }
+    if (this._tileSizeChanged(oldTileSize)) {
+      this._reflowCloudShadows(chapter.style);
+    }
+  }
+
+  private _tileSizeChanged(oldTileSize: number): boolean {
+    return oldTileSize !== TILE_SIZE && oldTileSize > 0;
+  }
+
+  private _rescalePanForTileSizeChange(oldTileSize: number): void {
+    if (!this._tileSizeChanged(oldTileSize)) return;
+    this._panPixelX = this._panPixelX * TILE_SIZE / oldTileSize;
+    this._panPixelY = this._panPixelY * TILE_SIZE / oldTileSize;
+  }
+
+  private _getDefaultCursor(chapter: ChapterDef): string {
+    return this._isPannable(chapter) ? 'grab' : 'pointer';
+  }
+
+  private _onCanvasMouseDown(e: MouseEvent): void {
+    if (e.button !== 0) return;
+    this._panDrag = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPanX: this._panPixelX,
+      startPanY: this._panPixelY,
+      moved: false,
+    };
+  }
+
+  private _onCanvasMouseMove(e: MouseEvent, chapter: ChapterDef, canvas: HTMLCanvasElement): void {
+    this._mouseClientPos = { x: e.clientX, y: e.clientY };
+    if (this._handleCanvasPanDrag(e, chapter, canvas)) return;
+    this._updateCanvasHoverTooltip(e, chapter, canvas);
+  }
+
+  /** Handle pan drag. Returns true when the event was fully handled (drag in progress). */
+  private _handleCanvasPanDrag(e: MouseEvent, chapter: ChapterDef, canvas: HTMLCanvasElement): boolean {
+    if (!this._panDrag) return false;
+    const dx = e.clientX - this._panDrag.startClientX;
+    const dy = e.clientY - this._panDrag.startClientY;
+    if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      this._panDrag.moved = true;
+    }
+    if (!this._panDrag.moved) return false;
+    const cp = this._clientToCanvasPx(e.clientX, e.clientY);
+    if (cp) {
+      this._panPixelX = this._panDrag.startPanX - dx * cp.scaleX;
+      this._panPixelY = this._panDrag.startPanY - dy * cp.scaleY;
+    }
+    this._clampPan(chapter, this._viewRows, this._viewCols);
+    this._hover = null;
+    this._render(chapter);
+    canvas.style.cursor = 'grabbing';
+    return true;
+  }
+
+  /** Update native title for non-Ctrl hover and custom tooltip for Ctrl+hover. */
+  private _updateCanvasHoverTooltip(e: MouseEvent, chapter: ChapterDef, canvas: HTMLCanvasElement): void {
+    this._onMouseMove(e, chapter);
+    const pos = this._canvasPos(e, chapter);
+    if (pos) {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- grid is verified to exist before the mouse-event handler is active
+      const def = chapter.grid![pos.row]?.[pos.col];
+      canvas.title = this._chapterNodeTooltip(chapter, def, pos.row, pos.col);
+    } else {
+      canvas.title = '';
+    }
+    if (this._ctrlHeld) {
+      this._showTooltip(e.clientX, e.clientY);
+    }
+  }
+
+  private _onCanvasMouseUp(e: MouseEvent, chapter: ChapterDef, canvas: HTMLCanvasElement): void {
+    if (e.button !== 0) return;
+    if (this._panDrag?.moved) {
+      canvas.style.cursor = this._getDefaultCursor(chapter);
+    }
+    // Click handling is deferred to the 'click' event so the browser can
+    // fire it; we only use mouseup to restore the cursor.
+  }
+
+  private _onCanvasMouseLeave(chapter: ChapterDef, canvas: HTMLCanvasElement): void {
+    this._panDrag = null;
+    this._mouseClientPos = null;
+    this._hover = null;
+    this._hideTooltip();
+    canvas.style.cursor = this._getDefaultCursor(chapter);
+    this._render(chapter);
+  }
+
+  private _onCanvasClick(e: MouseEvent, campaign: CampaignDef, chapter: ChapterDef): void {
+    if (this._panDrag?.moved) {
+      // A click fired after a drag – suppress it.
+      this._panDrag = null;
+      return;
+    }
+    this._panDrag = null;
+    this._onClick(e, campaign, chapter);
+  }
+
+  private _onCanvasWheel(e: WheelEvent, chapter: ChapterDef, canvas: HTMLCanvasElement): void {
+    if (!this._isCampaignZoomEnabled()) return;
+    const cp = this._clientToCanvasPx(e.clientX, e.clientY);
+    if (!cp) return;
+    e.preventDefault();
+    this._updateCampaignZoomFromWheel(chapter, e.deltaY, cp.px, cp.py);
+    canvas.style.cursor = this._getDefaultCursor(chapter);
+  }
+
+  private _onCanvasTouchStart(e: TouchEvent): void {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    this._touchStartX = touch.clientX;
+    this._touchStartY = touch.clientY;
+    this._touchPanStartPanX = this._panPixelX;
+    this._touchPanStartPanY = this._panPixelY;
+    this._touchMoved = false;
+    // Start long-press timer to show tooltip (500 ms).
+    if (this._touchLongPressTimer !== null) clearTimeout(this._touchLongPressTimer);
+    this._touchLongPressTimer = setTimeout(() => this._onMapTouchLongPress(), 500);
+  }
+
+  private _onMapTouchLongPress(): void {
+    this._touchLongPressTimer = null;
+    if (!this._touchMoved) {
+      this._showTooltip(this._touchStartX, this._touchStartY);
+    }
+  }
+
+  private _onCanvasTouchMove(e: TouchEvent, chapter: ChapterDef): void {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dx = touch.clientX - this._touchStartX;
+    const dy = touch.clientY - this._touchStartY;
+    if (Math.sqrt(dx * dx + dy * dy) <= 8) return;
+    this._touchMoved = true;
+    if (this._touchLongPressTimer !== null) {
+      clearTimeout(this._touchLongPressTimer);
+      this._touchLongPressTimer = null;
+    }
+    this._hideTooltip();
+    // Pan the map when the current zoom level does not fit the full map.
+    if (!this._isPannable(chapter)) return;
+    const cp = this._clientToCanvasPx(touch.clientX, touch.clientY);
+    if (cp) {
+      this._panPixelX = this._touchPanStartPanX - dx * cp.scaleX;
+      this._panPixelY = this._touchPanStartPanY - dy * cp.scaleY;
+    }
+    this._clampPan(chapter, this._viewRows, this._viewCols);
+    this._hover = null;
+    this._render(chapter);
+  }
+
+  private _onCanvasTouchEnd(e: TouchEvent, chapter: ChapterDef): void {
+    e.preventDefault();
+    if (this._touchLongPressTimer !== null) {
+      clearTimeout(this._touchLongPressTimer);
+      this._touchLongPressTimer = null;
+    }
+    if (this._touchMoved) return; // was a scroll/swipe/pan, not a tap
+    const tapped = this._resolveTouchTappedChamber(e, chapter);
+    if (!tapped) return;
+    this._commitTouchTapChamberSelection(tapped.pos, tapped.def, tapped.levelIdx);
+  }
+
+  /** Synthesizes a click target at the touch-end coordinates: a level chamber, or null if not tappable. */
+  private _resolveTouchTappedChamber(
+    e: TouchEvent,
+    chapter: ChapterDef,
+  ): { pos: { row: number; col: number }; def: TileDef; levelIdx: number } | null {
+    const changedTouch = e.changedTouches[0];
+    if (!changedTouch) return null;
+    const pos = this._canvasPosFromCoords(changedTouch.clientX, changedTouch.clientY, chapter);
+    if (!pos || !chapter.grid) return null;
+    const def = chapter.grid[pos.row]?.[pos.col];
+    if (!def) return null;
+    if (def.shape !== PipeShape.Chamber || def.chamberContent !== 'level') return null;
+    const levelIdx = def.levelIdx;
+    if (levelIdx === undefined) return null;
+    return { pos, def, levelIdx };
+  }
+
+  private _commitTouchTapChamberSelection(pos: { row: number; col: number }, def: TileDef, levelIdx: number): void {
+    const filledKeys = this._computeFilledCells();
+    if (!filledKeys.has(`${pos.row},${pos.col}`)) {
+      this._jitterAnims.push({ row: pos.row, col: pos.col, startedAt: performance.now() });
+      sfxManager.play(SfxId.InvalidSelection);
+      return;
+    }
+    sfxManager.play(SfxId.LevelSelect);
+    this._onChamberSelected(def, levelIdx);
+  }
+
+  /** Instruction text (varies with pan/zoom capability). */
+  private _appendInstructionText(el: HTMLElement, chapter: ChapterDef): void {
+    const instruction = document.createElement('p');
+    instruction.style.cssText = 'color:#aaa;font-size:0.9rem;text-align:center;margin:0;';
+    const baseInstruction = this._formatInstructionText() ?? 'Click on an accessible level';
+    const instructionParts = [baseInstruction];
+    if (this._isPannable(chapter)) instructionParts.push('Drag with the mouse to pan around the map.');
+    if (this._isCampaignZoomEnabled()) instructionParts.push('Roll the mouse wheel over the map to zoom.');
+    instruction.textContent = instructionParts.join(' ');
+    el.appendChild(instruction);
   }
 
   // ─── Private – interaction ──────────────────────────────────────────────────
