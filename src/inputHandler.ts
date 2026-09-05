@@ -1053,28 +1053,40 @@ export class InputHandler {
 
     // Start long-press timer for reclaim gesture (500 ms).
     this._clearLongPressTimer();
-    this._longPressTimer = setTimeout(() => {
-      this._longPressTimer = null;
-      if (!this._touchMoved && this._cb.getScreen() === GameScreen.Play &&
-          this._cb.getGameState() === GameState.Playing) {
-        const board = this._cb.getBoard();
-        if (!board) return;
-        const lp = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
-        const tile = board.getTile(lp);
-        if (tile && !isEmptyFloor(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-          this._longPressTriggered = true;
-          // Optional haptic feedback.
-          if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
-          this._cb.reclaimTileAt(lp);
-        } else if (this._cb.getSelectedShape() !== null) {
-          // Long-press on empty/spinner with a shape selected → deselect.
-          this._longPressTriggered = true;
-          this._cb.setSelectedShape(null);
-          this._cb.renderInventoryBar();
-          sfxManager.play(SfxId.InventoryUnselect);
-        }
-      }
-    }, 500);
+    this._longPressTimer = setTimeout(() => this._onLongPressTimeout(), 500);
+  }
+
+  private _onLongPressTimeout(): void {
+    this._longPressTimer = null;
+    if (this._touchMoved || this._cb.getScreen() !== GameScreen.Play || this._cb.getGameState() !== GameState.Playing) return;
+    const board = this._cb.getBoard();
+    if (!board) return;
+    const lp = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
+    const tile = board.getTile(lp);
+    if (this._isLongPressReclaimableTile(tile)) {
+      this._triggerLongPressReclaim(lp);
+    } else if (this._cb.getSelectedShape() !== null) {
+      // Long-press on empty/spinner with a shape selected → deselect.
+      this._triggerLongPressDeselect();
+    }
+  }
+
+  private _isLongPressReclaimableTile(tile: Tile | null): tile is Tile {
+    return !!tile && !isEmptyFloor(tile.shape) && !SPIN_PIPE_SHAPES.has(tile.shape);
+  }
+
+  private _triggerLongPressReclaim(lp: GridPos): void {
+    this._longPressTriggered = true;
+    // Optional haptic feedback.
+    if (typeof navigator.vibrate === 'function') navigator.vibrate(50);
+    this._cb.reclaimTileAt(lp);
+  }
+
+  private _triggerLongPressDeselect(): void {
+    this._longPressTriggered = true;
+    this._cb.setSelectedShape(null);
+    this._cb.renderInventoryBar();
+    sfxManager.play(SfxId.InventoryUnselect);
   }
 
   private _handleCanvasTouchMove(e: TouchEvent): void {
