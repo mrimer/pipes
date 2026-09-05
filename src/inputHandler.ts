@@ -485,51 +485,65 @@ export class InputHandler {
   private _handleCanvasMouseUp(e: MouseEvent): void {
     if (this._isInputLocked()) { this._cancelDrag(); this._cancelRightDrag(); return; }
     if (e.button === 2) {
-      if (!this._isRightDragging) return;
-      // Remove the tile at the final (current) position and suppress the contextmenu event.
-      const board = this._cb.getBoard();
-      if (this._rightDragLastTile && board &&
-          this._cb.getGameState() === GameState.Playing &&
-          this._cb.getScreen() === GameScreen.Play) {
-        const pos = this._rightDragLastTile;
-        const tile = board.getTile(pos);
-        const shouldDeselect = !!tile && (
-          isEmptyFloor(tile.shape) ||
-          SPIN_PIPE_SHAPES.has(tile.shape) ||
-          (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
-        );
-        if (shouldDeselect) {
-          // Right-clicking a tile that cannot accept the selected shape: clear the pending selection.
-          this._clearSelectedShape();
-        } else {
-          this._cb.reclaimTileAt(pos);
-        }
-      }
-      this._suppressNextContextMenu = true;
-      this._cancelRightDrag();
+      this._handleRightMouseUp();
       return;
     }
     if (e.button !== 0) return;
-    if (!this._isDragging) return;
+    this._handleLeftMouseUp();
+  }
 
-    // If the drag moved to at least one new tile the final hovered tile is still
-    // a "pending preview" – place it now and suppress the click event that follows.
+  /** Right mouse-up: commit (reclaim or clear-selection) the tile at the final drag-erase position. */
+  private _handleRightMouseUp(): void {
+    if (!this._isRightDragging) return;
+    // Remove the tile at the final (current) position and suppress the contextmenu event.
+    const pos = this._rightDragLastTile;
     const board = this._cb.getBoard();
-    if (this._dragLastTile && this._cb.getSelectedShape() !== null &&
-        board && this._cb.getGameState() === GameState.Playing &&
-        this._cb.getScreen() === GameScreen.Play) {
-      const pos = this._dragLastTile;
-      const tile = board.getTile(pos);
-      // Spinner tiles cannot be replaced; skip placement so the click event can rotate them.
-      if (tile && !SPIN_PIPE_SHAPES.has(tile.shape)) {
-        const filledBefore = board.getFilledPositions();
-        if (this._cb.tryPlaceOrReplace(pos, tile, filledBefore)) {
-          this._suppressNextClick = true;
-        }
+    if (pos && board && this._cb.getGameState() === GameState.Playing && this._cb.getScreen() === GameScreen.Play) {
+      this._commitRightDragTile(pos, board);
+    }
+    this._suppressNextContextMenu = true;
+    this._cancelRightDrag();
+  }
+
+  private _commitRightDragTile(pos: GridPos, board: Board): void {
+    const tile = board.getTile(pos);
+    const shouldDeselect = !!tile && (
+      isEmptyFloor(tile.shape) ||
+      SPIN_PIPE_SHAPES.has(tile.shape) ||
+      (this._cb.getSelectedShape() !== null && this._isUnavailablePlacementTile(tile))
+    );
+    if (shouldDeselect) {
+      // Right-clicking a tile that cannot accept the selected shape: clear the pending selection.
+      this._clearSelectedShape();
+    } else {
+      this._cb.reclaimTileAt(pos);
+    }
+  }
+
+  /**
+   * Left mouse-up: if the drag moved to at least one new tile the final hovered tile is still
+   * a "pending preview" – place it now and suppress the click event that follows.
+   */
+  private _handleLeftMouseUp(): void {
+    if (!this._isDragging) return;
+    const pos = this._dragLastTile;
+    const board = this._cb.getBoard();
+    if (pos && this._cb.getSelectedShape() !== null && board &&
+        this._cb.getGameState() === GameState.Playing && this._cb.getScreen() === GameScreen.Play) {
+      this._commitLeftDragTile(pos, board);
+    }
+    this._cancelDrag();
+  }
+
+  private _commitLeftDragTile(pos: GridPos, board: Board): void {
+    const tile = board.getTile(pos);
+    // Spinner tiles cannot be replaced; skip placement so the click event can rotate them.
+    if (tile && !SPIN_PIPE_SHAPES.has(tile.shape)) {
+      const filledBefore = board.getFilledPositions();
+      if (this._cb.tryPlaceOrReplace(pos, tile, filledBefore)) {
+        this._suppressNextClick = true;
       }
     }
-
-    this._cancelDrag();
   }
 
   private _handleCanvasClick(e: MouseEvent): void {
