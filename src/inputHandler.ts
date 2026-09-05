@@ -737,41 +737,54 @@ export class InputHandler {
     if (this._cb.getScreen() !== GameScreen.Play) return;
     if (this._cb.getGameState() !== GameState.Playing) return;
     const board = this._cb.getBoard();
-    if (this.mouseCanvasPos && board) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mouseCanvasPos check above ensures _getHoverGridPos returns non-null
-      const hPos = this._getHoverGridPos()!;
-      const hTile = board.getTile(hPos);
-      if (hTile && SPIN_PIPE_SHAPES.has(hTile.shape)) {
-        // Spin pipes always take priority: scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
-        const steps = e.deltaY > 0 ? 1 : 3;
-        const filledBefore = board.getFilledPositions();
-        const oldRotation = hTile.rotation;
-        const wheelResult = board.rotateTileBy(hPos, steps);
-        if (wheelResult.success) {
-          e.preventDefault();
-          this._cb.afterTileRotated(filledBefore, wheelResult, { row: hPos.row, col: hPos.col, oldRotation });
-          this._cb.refreshUI();
-          this._cb.checkWinLose();
-        } else if (wheelResult.error) {
-          this._cb.handleBoardError(wheelResult);
-        }
-        return;
-      }
-    }
+    if (this._handleSpinPipeWheel(e, board)) return;
+
     if (this._cb.getSelectedShape() !== null) {
       e.preventDefault();
       // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise
-      if (e.deltaY > 0) {
-        this._rotatePendingCW();
-      } else {
-        this._rotatePendingCCW();
-      }
+      this._rotatePendingByWheelDirection(e.deltaY);
     } else if (this.mouseCanvasPos && board) {
       // No inventory selected and not a spin pipe: preview rotation on hovered tile.
-      // Scroll down → rotate clockwise; scroll up → rotate counter-clockwise.
-      const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
-      if (changed) e.preventDefault();
+      this._previewHoverRotationOnWheel(e);
     }
+  }
+
+  /** Scroll down → rotate clockwise; scroll up → rotate counter-clockwise. */
+  private _previewHoverRotationOnWheel(e: WheelEvent): void {
+    const changed = this._tryAdjustHoverRotation(e.deltaY > 0 ? 1 : -1);
+    if (changed) e.preventDefault();
+  }
+
+  private _rotatePendingByWheelDirection(deltaY: number): void {
+    if (deltaY > 0) {
+      this._rotatePendingCW();
+    } else {
+      this._rotatePendingCCW();
+    }
+  }
+
+  /** Spin pipes always take priority when hovered: wheel rotates them directly. Returns whether handled. */
+  private _handleSpinPipeWheel(e: WheelEvent, board: Board | null): boolean {
+    if (!this.mouseCanvasPos || !board) return false;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- mouseCanvasPos check above ensures _getHoverGridPos returns non-null
+    const hPos = this._getHoverGridPos()!;
+    const hTile = board.getTile(hPos);
+    if (!hTile || !SPIN_PIPE_SHAPES.has(hTile.shape)) return false;
+
+    // Scroll down → CW (1 step), scroll up → CCW (3 steps = -1 mod 4)
+    const steps = e.deltaY > 0 ? 1 : 3;
+    const filledBefore = board.getFilledPositions();
+    const oldRotation = hTile.rotation;
+    const wheelResult = board.rotateTileBy(hPos, steps);
+    if (wheelResult.success) {
+      e.preventDefault();
+      this._cb.afterTileRotated(filledBefore, wheelResult, { row: hPos.row, col: hPos.col, oldRotation });
+      this._cb.refreshUI();
+      this._cb.checkWinLose();
+    } else if (wheelResult.error) {
+      this._cb.handleBoardError(wheelResult);
+    }
+    return true;
   }
 
   private _handleDocKeyDown(e: KeyboardEvent): void {
