@@ -1740,40 +1740,69 @@ export abstract class MapScreenBase {
     }
 
     const filledKeys = this._computeFilledCells();
+    const target = this._findInitialSnapTarget(grid, rows, cols, filledKeys);
+    if (!target) {
+      this._panPixelX = 0;
+      this._panPixelY = 0;
+      return;
+    }
 
-    // Find the highest-numbered accessible chamber tile to snap to.
+    this._snapPanToTarget(target, rows, cols, viewRows, viewCols);
+  }
+
+  /** Finds the highest-numbered accessible chamber tile to snap to, falling back to the source tile. */
+  private _findInitialSnapTarget(
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+  ): { row: number; col: number } | null {
+    const chamberTarget = this._findHighestChamberSnapTarget(grid, rows, cols, filledKeys);
+    if (chamberTarget) return chamberTarget;
+    // No accessible chamber; center the source tile if available.
+    return findMapTile(grid, rows, cols, PipeShape.Source);
+  }
+
+  private _findHighestChamberSnapTarget(
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+  ): { row: number; col: number } | null {
     let targetRow = -1, targetCol = -1, highestNum = -1;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (!filledKeys.has(`${r},${c}`)) continue;
         const def = grid[r]?.[c];
-        if (def?.shape === PipeShape.Chamber) {
-          const num = this._getChamberSnapNum(def);
-          if (num !== null && num > highestNum) {
-            highestNum = num;
-            targetRow = r;
-            targetCol = c;
-          }
-        }
+        if (def?.shape !== PipeShape.Chamber) continue;
+        const num = this._getChamberSnapNum(def);
+        if (num === null || num <= highestNum) continue;
+        highestNum = num;
+        targetRow = r;
+        targetCol = c;
       }
     }
+    return targetRow >= 0 ? { row: targetRow, col: targetCol } : null;
+  }
 
-    if (targetRow < 0) {
-      // No accessible chamber; center the source tile if available.
-      const sourcePos = findMapTile(grid, rows, cols, PipeShape.Source);
-      if (sourcePos) { targetRow = sourcePos.row; targetCol = sourcePos.col; }
-      else { this._panPixelX = 0; this._panPixelY = 0; return; }
-    }
-
-    // Center the target tile in the view window, clamped to the edge bounds only
-    // (no bbox clamping here – bbox constraints apply only during interactive
-    // dragging so that the initial view is as centred as possible).
+  /**
+   * Centers the target tile in the view window, clamped to the edge bounds only
+   * (no bbox clamping here – bbox constraints apply only during interactive
+   * dragging so that the initial view is as centred as possible).
+   */
+  private _snapPanToTarget(
+    target: { row: number; col: number },
+    rows: number,
+    cols: number,
+    viewRows: number,
+    viewCols: number,
+  ): void {
     const maxPanX = Math.max(0, (cols - viewCols) * TILE_SIZE);
     const maxPanY = Math.max(0, (rows - viewRows) * TILE_SIZE);
     this._panPixelX = Math.max(0, Math.min(maxPanX,
-      (targetCol + 0.5) * TILE_SIZE - (viewCols * TILE_SIZE) / 2));
+      (target.col + 0.5) * TILE_SIZE - (viewCols * TILE_SIZE) / 2));
     this._panPixelY = Math.max(0, Math.min(maxPanY,
-      (targetRow + 0.5) * TILE_SIZE - (viewRows * TILE_SIZE) / 2));
+      (target.row + 0.5) * TILE_SIZE - (viewRows * TILE_SIZE) / 2));
   }
 
   /**
