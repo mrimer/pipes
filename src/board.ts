@@ -126,6 +126,11 @@ function _orDefault<T>(v: T | null | undefined, fallback: T): T {
   return v ?? fallback;
 }
 
+/** True for a Chamber tile with tank content — used by {@link Board.validateGrid}. */
+function _isTankLikeTile(t: Tile): boolean {
+  return t.shape === PipeShape.Chamber && t.chamberContent === 'tank';
+}
+
 /**
  * Returns true when shape is any empty floor type (Summer, Fall, Dark, Winter, or Spring).
  * Use this instead of `=== PipeShape.Empty` for all game-rule checks so that
@@ -2058,47 +2063,52 @@ export class Board {
    */
   validateGrid(): string[] {
     const errors: string[] = [];
-
-    const isTankLike = (t: Tile) =>
-      t.shape === PipeShape.Chamber && t.chamberContent === 'tank';
-
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const tile = this.grid[r][c];
-        if (!isTankLike(tile)) continue;
+        if (!_isTankLikeTile(tile)) continue;
+        errors.push(...this._collectTankEdgeErrors(r, c, tile));
+        errors.push(...this._collectTankAdjacencySymmetryErrors(r, c, tile));
+      }
+    }
+    return errors;
+  }
 
-        const label = 'Chamber(tank)';
+  /** Errors for any access point on a border tank-like tile that leads off-grid. */
+  private _collectTankEdgeErrors(r: number, c: number, tile: Tile): string[] {
+    const errors: string[] = [];
+    const label = 'Chamber(tank)';
+    for (const dir of DIRECTIONS) {
+      if (!tile.connections.has(dir)) continue;
+      const delta = NEIGHBOUR_DELTA[dir];
+      const nr = r + delta.row;
+      const nc = c + delta.col;
+      if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) {
+        errors.push(
+          `${label} at (${r},${c}) has an access point facing ${dir} which leads off the grid.`,
+        );
+      }
+    }
+    return errors;
+  }
 
-        // ── Edge check: no access point may lead off-grid ──────────────
-        for (const dir of DIRECTIONS) {
-          if (!tile.connections.has(dir)) continue;
-          const delta = NEIGHBOUR_DELTA[dir];
-          const nr = r + delta.row;
-          const nc = c + delta.col;
-          if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) {
-            errors.push(
-              `${label} at (${r},${c}) has an access point facing ${dir} which leads off the grid.`,
-            );
-          }
-        }
+  /** Errors for any adjacent tank-like tile pair with mismatched connections on their shared edge. */
+  private _collectTankAdjacencySymmetryErrors(r: number, c: number, tile: Tile): string[] {
+    const errors: string[] = [];
+    for (const dir of DIRECTIONS) {
+      const delta = NEIGHBOUR_DELTA[dir];
+      const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
+      const neighbor = this.getTile(neighborPos);
+      if (!neighbor || !_isTankLikeTile(neighbor)) continue;
 
-        // ── Adjacent tank-like symmetry check ────────────────────────────────────
-        for (const dir of DIRECTIONS) {
-          const delta = NEIGHBOUR_DELTA[dir];
-          const neighborPos: GridPos = { row: r + delta.row, col: c + delta.col };
-          const neighbor = this.getTile(neighborPos);
-          if (!neighbor || !isTankLike(neighbor)) continue;
+      const thisConnects = tile.connections.has(dir);
+      const neighborConnects = neighbor.connections.has(oppositeDirection(dir));
 
-          const thisConnects = tile.connections.has(dir);
-          const neighborConnects = neighbor.connections.has(oppositeDirection(dir));
-
-          if (thisConnects !== neighborConnects) {
-            errors.push(
-              `Adjacent tanks at (${r},${c}) and (${neighborPos.row},${neighborPos.col}) ` +
-              `have mismatched connections on the ${dir} edge.`,
-            );
-          }
-        }
+      if (thisConnects !== neighborConnects) {
+        errors.push(
+          `Adjacent tanks at (${r},${c}) and (${neighborPos.row},${neighborPos.col}) ` +
+          `have mismatched connections on the ${dir} edge.`,
+        );
       }
     }
     return errors;
