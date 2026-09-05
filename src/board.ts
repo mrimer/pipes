@@ -131,6 +131,11 @@ function _isTankLikeTile(t: Tile): boolean {
   return t.shape === PipeShape.Chamber && t.chamberContent === 'tank';
 }
 
+/** True when a one-way tile facing `owDir` blocks flow traveling in `dir` (its opposite direction). */
+function _oneWayBlocksDir(owDir: Direction | undefined, dir: Direction): boolean {
+  return owDir !== undefined && dir === oppositeDirection(owDir);
+}
+
 /**
  * Returns true when shape is any empty floor type (Summer, Fall, Dark, Winter, or Spring).
  * Use this instead of `=== PipeShape.Empty` for all game-rule checks so that
@@ -984,11 +989,21 @@ export class Board {
    * redo entry and silently corrupt the redo chain. Extend the comparison then.
    */
   private _liveBoardMatchesSnapshot(snap: Snapshot): boolean {
+    return this._inventoryMatchesSnapshot(snap) && this._gridMatchesSnapshot(snap);
+  }
+
+  /** True when the live inventory has the same shape+count sequence as `snap`. */
+  private _inventoryMatchesSnapshot(snap: Snapshot): boolean {
     if (this.inventory.length !== snap.inventory.length) return false;
     for (let i = 0; i < this.inventory.length; i++) {
       if (this.inventory[i].shape !== snap.inventory[i].shape) return false;
       if (this.inventory[i].count !== snap.inventory[i].count) return false;
     }
+    return true;
+  }
+
+  /** True when every live grid cell has the same shape+rotation as `snap`. */
+  private _gridMatchesSnapshot(snap: Snapshot): boolean {
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.grid[r][c].shape    !== snap.grid[r][c].shape)    return false;
@@ -1317,16 +1332,16 @@ export class Board {
       if (afterFilled.has(key)) continue;
       const [r, c] = parseKey(key);
       const t = this.grid[r]?.[c];
-      if (
-        t?.shape === PipeShape.Chamber &&
-        t.chamberContent === 'item' &&
-        t.itemShape === shape &&
-        t.itemCount > 0
-      ) {
+      if (this._isPositiveItemChamberFor(t, shape)) {
         disconnectedPositions.push({ row: r, col: c });
       }
     }
     return disconnectedPositions;
+  }
+
+  /** True when `t` is a connected, positive-count item chamber granting `shape`. */
+  private _isPositiveItemChamberFor(t: Tile | undefined, shape: PipeShape): boolean {
+    return t?.shape === PipeShape.Chamber && t.chamberContent === 'item' && t.itemShape === shape && t.itemCount > 0;
   }
 
   /**
@@ -2414,21 +2429,15 @@ export class Board {
     const delta = NEIGHBOUR_DELTA[dir];
     const toPos: GridPos = { row: fromPos.row + delta.row, col: fromPos.col + delta.col };
     const to = this.getTile(toPos);
-    if (!to) return false;
-
-    if (!to.connections.has(oppositeDirection(dir))) return false;
+    if (!to || !to.connections.has(oppositeDirection(dir))) return false;
 
     // One-way tile at fromPos: water cannot exit in the direction opposite the arrow.
-    const fromKey = posKey(fromPos.row, fromPos.col);
-    const fromOwDir = this.oneWayData.get(fromKey);
-    if (fromOwDir !== undefined && dir === oppositeDirection(fromOwDir)) return false;
+    const fromOwDir = this.oneWayData.get(posKey(fromPos.row, fromPos.col));
+    if (_oneWayBlocksDir(fromOwDir, dir)) return false;
 
     // One-way tile at toPos: water cannot enter traveling in the direction opposite the arrow.
-    const toKey = posKey(toPos.row, toPos.col);
-    const toOwDir = this.oneWayData.get(toKey);
-    if (toOwDir !== undefined && dir === oppositeDirection(toOwDir)) return false;
-
-    return true;
+    const toOwDir = this.oneWayData.get(posKey(toPos.row, toPos.col));
+    return !_oneWayBlocksDir(toOwDir, dir);
   }
 
   /**
@@ -2518,27 +2527,39 @@ export class Board {
     if (!tile) return null;
 
     for (const dir of tile.connections) {
-      const delta = NEIGHBOUR_DELTA[dir];
-      const neighborPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
-      const neighborKey = posKey(neighborPos.row, neighborPos.col);
-      const neighborTile = this.getTile(neighborPos);
-      if (!neighborTile || !neighborTile.firstConnections || neighborTile.firstConnections.size === 0) continue;
-
-      // Check mutual connection
-      if (!neighborTile.connections.has(oppositeDirection(dir))) continue;
-
-      // `dir` is the direction from `pos` toward `neighbor`.
-      // From the neighbor's perspective, the arrival direction is `opposite(dir)`.
-      const arrivalDir = oppositeDirection(dir);
-
-      // Only block when arriving via a non-valve side.
-      if (neighborTile.firstConnections.has(arrivalDir)) continue;
-
-      // Block if the neighbor chamber was not already source-connected before this move.
-      if (!filledBefore.has(neighborKey)) {
-        return { success: false, error: ERR_VALVE, errorTilePositions: [neighborPos] };
+      const violatingNeighbor = this._findValveViolationNeighbor(pos, dir, filledBefore);
+      if (violatingNeighbor) {
+        return { success: false, error: ERR_VALVE, errorTilePositions: [violatingNeighbor] };
       }
     }
     return null;
+  }
+
+  /**
+   * Checks the single neighbor in direction `dir` from `pos` for a valve violation:
+   * a mutually-connected valve chamber, arrived at via a non-valve side, that was
+   * not already source-connected before this move. Returns the neighbor's position
+   * when that's the case, otherwise `null`.
+   */
+  private _findValveViolationNeighbor(pos: GridPos, dir: Direction, filledBefore: Set<string>): GridPos | null {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const neighborPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
+    const neighborTile = this.getTile(neighborPos);
+    if (!neighborTile || !neighborTile.firstConnections || neighborTile.firstConnections.size === 0) return null;
+
+    // Check mutual connection
+    if (!neighborTile.connections.has(oppositeDirection(dir))) return null;
+
+    // `dir` is the direction from `pos` toward `neighbor`.
+    // From the neighbor's perspective, the arrival direction is `opposite(dir)`.
+    const arrivalDir = oppositeDirection(dir);
+
+    // Only block when arriving via a non-valve side.
+    if (neighborTile.firstConnections.has(arrivalDir)) return null;
+
+    // Block if the neighbor chamber was not already source-connected before this move.
+    const neighborKey = posKey(neighborPos.row, neighborPos.col);
+    if (filledBefore.has(neighborKey)) return null;
+    return neighborPos;
   }
 }
