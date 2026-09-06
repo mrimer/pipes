@@ -798,101 +798,105 @@ export class CampaignService {
   ): Map<string, Map<string, number>> {
     const issues = new Map<string, Map<string, number>>();
 
-    const tally = (recordType: string, field: string): void => {
-      let m = issues.get(recordType);
-      if (!m) { m = new Map(); issues.set(recordType, m); }
-      m.set(field, (m.get(field) ?? 0) + 1);
-    };
-
-    const checkKeys = (
-      obj: Record<string, unknown>,
-      validKeys: ReadonlySet<string>,
-      recordType: string,
-    ): void => {
-      for (const key of Object.keys(obj)) {
-        if (!validKeys.has(key)) {
-          tally(recordType, key);
-          if (!dryRun) delete obj[key];
-        }
-      }
-    };
-
-    /** Check and fix a style field on a record. */
-    const checkStyle = (obj: Record<string, unknown>, recordType: string): void => {
-      const style = obj['style'];
-      if (style === undefined) return;
-      if (style === 'Grass') {
-        tally(recordType, 'style:Grass→Summer');
-        if (!dryRun) obj['style'] = 'Summer';
-      } else if (style === 'Dirt') {
-        tally(recordType, 'style:Dirt→Fall');
-        if (!dryRun) obj['style'] = 'Fall';
-      } else if (typeof style === 'string' && !LEVEL_STYLES.has(style as never)) {
-        tally(recordType, `style:${style}`);
-        if (!dryRun) delete obj['style'];
-      }
-    };
-
-    /** Check and fix tile shape fields that contain legacy values. */
-    const checkTileShape = (tile: Record<string, unknown>, recordType: string): void => {
-      if (tile['shape'] === 'EMPTY_DIRT') {
-        tally(recordType, 'shape:EMPTY_DIRT→EMPTY_FALL');
-        if (!dryRun) tile['shape'] = 'EMPTY_FALL';
-      }
-    };
-
-    checkKeys(campaign as unknown as Record<string, unknown>, VALID_CAMPAIGN_KEYS, 'Campaign');
-    checkStyle(campaign as unknown as Record<string, unknown>, 'Campaign');
-
-    if (campaign.grid) {
-      for (const row of campaign.grid) {
-        for (const tile of row) {
-          if (!tile) continue;
-          const tileRec = tile as unknown as Record<string, unknown>;
-          checkKeys(tileRec, getValidCampaignMapTileDefKeys(tile), 'CampaignMapTile');
-          checkTileShape(tileRec, 'CampaignMapTile');
-        }
-      }
-    }
+    this._checkKeys(issues, dryRun, campaign as unknown as Record<string, unknown>, VALID_CAMPAIGN_KEYS, 'Campaign');
+    this._checkStyle(issues, dryRun, campaign as unknown as Record<string, unknown>, 'Campaign');
+    this._scanCampaignGrid(issues, dryRun, campaign);
 
     for (const chapter of campaign.chapters) {
-      checkKeys(chapter as unknown as Record<string, unknown>, VALID_CHAPTER_KEYS, 'Chapter');
-      checkStyle(chapter as unknown as Record<string, unknown>, 'Chapter');
-
-      if (chapter.grid) {
-        for (const row of chapter.grid) {
-          for (const tile of row) {
-            if (!tile) continue;
-            const tileRec = tile as unknown as Record<string, unknown>;
-            checkKeys(tileRec, getValidChapterMapTileDefKeys(tile), 'ChapterMapTile');
-            checkTileShape(tileRec, 'ChapterMapTile');
-          }
-        }
-      }
-
-      for (const level of chapter.levels) {
-        checkKeys(level as unknown as Record<string, unknown>, VALID_LEVEL_KEYS, 'Level');
-        checkStyle(level as unknown as Record<string, unknown>, 'Level');
-
-        for (const row of level.grid) {
-          for (const tile of row) {
-            if (!tile) continue;
-            const tileRec = tile as unknown as Record<string, unknown>;
-            checkKeys(tileRec, getValidTileDefKeys(tile), 'Tile');
-            checkTileShape(tileRec, 'Tile');
-          }
-        }
-
-        for (const item of level.inventory) {
-          checkKeys(
-            item as unknown as Record<string, unknown>,
-            VALID_INVENTORY_ITEM_KEYS,
-            'InventoryItem',
-          );
-        }
-      }
+      this._scanChapter(issues, dryRun, chapter);
     }
 
     return issues;
+  }
+
+  private _tallyDataIssue(issues: Map<string, Map<string, number>>, recordType: string, field: string): void {
+    let m = issues.get(recordType);
+    if (!m) { m = new Map(); issues.set(recordType, m); }
+    m.set(field, (m.get(field) ?? 0) + 1);
+  }
+
+  private _checkKeys(
+    issues: Map<string, Map<string, number>>,
+    dryRun: boolean,
+    obj: Record<string, unknown>,
+    validKeys: ReadonlySet<string>,
+    recordType: string,
+  ): void {
+    for (const key of Object.keys(obj)) {
+      if (!validKeys.has(key)) {
+        this._tallyDataIssue(issues, recordType, key);
+        if (!dryRun) delete obj[key];
+      }
+    }
+  }
+
+  /** Resolves a legacy style value to its migration (new value, or undefined to delete the field), or null if the value is fine as-is. */
+  private _resolveLegacyStyleFix(style: unknown): { issueKey: string; newValue: string | undefined } | null {
+    if (style === 'Grass') return { issueKey: 'style:Grass→Summer', newValue: 'Summer' };
+    if (style === 'Dirt') return { issueKey: 'style:Dirt→Fall', newValue: 'Fall' };
+    if (typeof style === 'string' && !LEVEL_STYLES.has(style as never)) {
+      return { issueKey: `style:${style}`, newValue: undefined };
+    }
+    return null;
+  }
+
+  /** Check and fix a style field on a record. */
+  private _checkStyle(issues: Map<string, Map<string, number>>, dryRun: boolean, obj: Record<string, unknown>, recordType: string): void {
+    const style = obj['style'];
+    if (style === undefined) return;
+    const fix = this._resolveLegacyStyleFix(style);
+    if (!fix) return;
+    this._tallyDataIssue(issues, recordType, fix.issueKey);
+    if (dryRun) return;
+    if (fix.newValue === undefined) delete obj['style'];
+    else obj['style'] = fix.newValue;
+  }
+
+  /** Check and fix tile shape fields that contain legacy values. */
+  private _checkTileShape(issues: Map<string, Map<string, number>>, dryRun: boolean, tile: Record<string, unknown>, recordType: string): void {
+    if (tile['shape'] !== 'EMPTY_DIRT') return;
+    this._tallyDataIssue(issues, recordType, 'shape:EMPTY_DIRT→EMPTY_FALL');
+    if (!dryRun) tile['shape'] = 'EMPTY_FALL';
+  }
+
+  /** Shared walk for campaign/chapter/level tile grids (all three had identical loop bodies). */
+  private _scanTileGrid(
+    issues: Map<string, Map<string, number>>,
+    dryRun: boolean,
+    grid: (TileDef | null)[][] | undefined,
+    recordType: string,
+    getValidKeys: (tile: TileDef) => ReadonlySet<string>,
+  ): void {
+    if (!grid) return;
+    for (const row of grid) {
+      for (const tile of row) {
+        if (!tile) continue;
+        const tileRec = tile as unknown as Record<string, unknown>;
+        this._checkKeys(issues, dryRun, tileRec, getValidKeys(tile), recordType);
+        this._checkTileShape(issues, dryRun, tileRec, recordType);
+      }
+    }
+  }
+
+  private _scanCampaignGrid(issues: Map<string, Map<string, number>>, dryRun: boolean, campaign: CampaignDef): void {
+    this._scanTileGrid(issues, dryRun, campaign.grid, 'CampaignMapTile', getValidCampaignMapTileDefKeys);
+  }
+
+  private _scanChapter(issues: Map<string, Map<string, number>>, dryRun: boolean, chapter: ChapterDef): void {
+    this._checkKeys(issues, dryRun, chapter as unknown as Record<string, unknown>, VALID_CHAPTER_KEYS, 'Chapter');
+    this._checkStyle(issues, dryRun, chapter as unknown as Record<string, unknown>, 'Chapter');
+    this._scanTileGrid(issues, dryRun, chapter.grid, 'ChapterMapTile', getValidChapterMapTileDefKeys);
+    for (const level of chapter.levels) {
+      this._scanLevel(issues, dryRun, level);
+    }
+  }
+
+  private _scanLevel(issues: Map<string, Map<string, number>>, dryRun: boolean, level: LevelDef): void {
+    this._checkKeys(issues, dryRun, level as unknown as Record<string, unknown>, VALID_LEVEL_KEYS, 'Level');
+    this._checkStyle(issues, dryRun, level as unknown as Record<string, unknown>, 'Level');
+    this._scanTileGrid(issues, dryRun, level.grid, 'Tile', getValidTileDefKeys);
+    for (const item of level.inventory) {
+      this._checkKeys(issues, dryRun, item as unknown as Record<string, unknown>, VALID_INVENTORY_ITEM_KEYS, 'InventoryItem');
+    }
   }
 }
