@@ -2377,19 +2377,13 @@ export function drawTile(ctx: CanvasRenderingContext2D, opts: DrawTileOptions): 
  * the gold-space constraint is satisfied, and the result would actually differ
  * from the current tile (different shape or different rotation).
  */
-function isReplaceableByShape(
-  tile: Tile,
-  selectedShape: PipeShape,
-  pendingRotation: number,
-  selectedIsGold: boolean,
-  isGoldCell: boolean,
-): boolean {
+function isReplaceableByShape(tile: Tile, sel: PlacementSelection): boolean {
   return (
     !tile.isFixed &&
     !SPIN_PIPE_SHAPES.has(tile.shape) &&
     (PIPE_SHAPES.has(tile.shape) || GOLD_PIPE_SHAPES.has(tile.shape)) &&
-    (tile.shape !== selectedShape || tile.rotation !== pendingRotation) &&
-    (!isGoldCell || selectedIsGold)
+    (tile.shape !== sel.selectedShape || tile.rotation !== sel.pendingRotation) &&
+    (!sel.isGoldCell || sel.selectedIsGold)
   );
 }
 
@@ -3147,15 +3141,15 @@ function _computeBlockedWaterDir(board: Board, filled: Set<string>, r: number, c
 
 /** Draw a tile, applying an active shake and/or scale-pop transform when present. */
 function _drawPipeTileWithOverrides(
-  ctx: CanvasRenderingContext2D, x: number, y: number, drawOpts: DrawTileOptions,
+  ctx: CanvasRenderingContext2D, drawOpts: DrawTileOptions,
   scaleOverride: number | undefined, shakeOffset: number | undefined,
 ): void {
   if (scaleOverride === undefined && shakeOffset === undefined) {
     drawTile(ctx, drawOpts);
     return;
   }
-  const cx = x + TILE_SIZE / 2;
-  const cy = y + TILE_SIZE / 2;
+  const cx = drawOpts.x + TILE_SIZE / 2;
+  const cy = drawOpts.y + TILE_SIZE / 2;
   ctx.save();
   if (shakeOffset !== undefined) ctx.translate(shakeOffset, 0);
   if (scaleOverride !== undefined) {
@@ -3167,13 +3161,18 @@ function _drawPipeTileWithOverrides(
   ctx.restore();
 }
 
-function _computeHoverGridPos(mouseCanvasPos: { x: number; y: number } | null): { hoverRow: number; hoverCol: number } {
+interface HoverGridPos {
+  hoverRow: number;
+  hoverCol: number;
+}
+
+function _computeHoverGridPos(mouseCanvasPos: { x: number; y: number } | null): HoverGridPos {
   if (!mouseCanvasPos) return { hoverRow: -1, hoverCol: -1 };
   return { hoverRow: Math.floor(mouseCanvasPos.y / TILE_SIZE), hoverCol: Math.floor(mouseCanvasPos.x / TILE_SIZE) };
 }
 
-function _isHoveredSpinnableTile(r: number, c: number, hoverRow: number, hoverCol: number, shape: PipeShape): boolean {
-  return r === hoverRow && c === hoverCol && SPIN_PIPE_SHAPES.has(shape);
+function _isHoveredSpinnableTile(r: number, c: number, hoverPos: HoverGridPos, shape: PipeShape): boolean {
+  return r === hoverPos.hoverRow && c === hoverPos.hoverCol && SPIN_PIPE_SHAPES.has(shape);
 }
 
 function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3PipeTilesOptions): void {
@@ -3181,7 +3180,7 @@ function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3P
     board, filled, currentWater, shiftHeld, currentTemp, currentPressure,
     mouseCanvasPos, now, rotationOverrides, scaleOverrides, shakeOffsets,
   } = opts;
-  const { hoverRow, hoverCol } = _computeHoverGridPos(mouseCanvasPos);
+  const hoverPos = _computeHoverGridPos(mouseCanvasPos);
 
   for (let r = 0; r < board.rows; r++) {
     for (let c = 0; c < board.cols; c++) {
@@ -3191,7 +3190,7 @@ function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3P
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
       const isWater = filled.has(posKey(r, c));
-      const isHovered = _isHoveredSpinnableTile(r, c, hoverRow, hoverCol, tile.shape);
+      const isHovered = _isHoveredSpinnableTile(r, c, hoverPos, tile.shape);
       const blockedWaterDir = _computeBlockedWaterDir(board, filled, r, c);
 
       // Apply any active rotation animation override for this tile.
@@ -3202,7 +3201,7 @@ function _renderPass3PipeTiles(ctx: CanvasRenderingContext2D, opts: RenderPass3P
       // Determine which arm directions need a flat (butt) end cap.
       const buttEndDirs = _computeButtEndDirs(board, r, c);
 
-      _drawPipeTileWithOverrides(ctx, x, y, {
+      _drawPipeTileWithOverrides(ctx, {
         x, y, tile, isWater, currentWater, shiftHeld, currentTemp, currentPressure,
         isHovered, blockedWaterDir, rotationDegOverride: rotOverride, buttEndDirs, nowMs: now,
       }, scaleOverride, shakeOffset);
@@ -3462,7 +3461,7 @@ interface PlacementSelection {
 
 function _canPlaceOrReplaceHoverPreview(hoverTile: Tile, sel: PlacementSelection): boolean {
   const canPlace = isEmptyFloor(hoverTile.shape) && (!sel.isGoldCell || sel.selectedIsGold);
-  const canReplace = isReplaceableByShape(hoverTile, sel.selectedShape, sel.pendingRotation, sel.selectedIsGold, sel.isGoldCell);
+  const canReplace = isReplaceableByShape(hoverTile, sel);
   return canPlace || canReplace;
 }
 
