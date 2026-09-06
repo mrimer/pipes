@@ -369,34 +369,45 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const toggleBtn = this._cbs.buildBtn(
       this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse'),
       MUTED_BTN_BG, '#aaa',
-      () => {
-        this._mapBoxCollapsed = !this._mapBoxCollapsed;
-        saveCampaignEditorMapBoxCollapsed(this._mapBoxCollapsed);
-        toggleBtn.textContent = this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse');
-        body.style.display = this._mapBoxCollapsed ? 'none' : '';
-        if (!this._mapBoxCollapsed) {
-          requestAnimationFrame(() => {
-            this._updateCanvasDisplaySize();
-            this._renderCanvas();
-          });
-        }
-      },
+      () => this._onToggleMapBoxCollapsed(toggleBtn, body),
       true,
     );
     header.appendChild(toggleBtn);
     section.appendChild(header);
 
     if (isOfficial) {
-      const msg = document.createElement('p');
-      msg.style.cssText = 'color:#888;font-size:0.85rem;';
-      msg.textContent = t('editor.campaignMap.readOnly');
-      body.appendChild(msg);
-      body.appendChild(this._buildCanvas(campaign, true));
+      this._appendReadOnlyMapBody(body, campaign);
       section.appendChild(body);
       return section;
     }
 
-    // 3-column layout: [palette+style] [canvas+toolbar] [chapter inventory+grid size]
+    body.appendChild(this._buildEditableMapLayout(campaign, validationWarningIcon));
+    section.appendChild(body);
+    return section;
+  }
+
+  private _onToggleMapBoxCollapsed(toggleBtn: HTMLElement, body: HTMLElement): void {
+    this._mapBoxCollapsed = !this._mapBoxCollapsed;
+    saveCampaignEditorMapBoxCollapsed(this._mapBoxCollapsed);
+    toggleBtn.textContent = this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse');
+    body.style.display = this._mapBoxCollapsed ? 'none' : '';
+    if (this._mapBoxCollapsed) return;
+    requestAnimationFrame(() => {
+      this._updateCanvasDisplaySize();
+      this._renderCanvas();
+    });
+  }
+
+  private _appendReadOnlyMapBody(body: HTMLElement, campaign: CampaignDef): void {
+    const msg = document.createElement('p');
+    msg.style.cssText = 'color:#888;font-size:0.85rem;';
+    msg.textContent = t('editor.campaignMap.readOnly');
+    body.appendChild(msg);
+    body.appendChild(this._buildCanvas(campaign, true));
+  }
+
+  /** 3-column layout: [palette+style] [canvas+toolbar] [chapter inventory+grid size]. */
+  private _buildEditableMapLayout(campaign: CampaignDef, validationWarningIcon: HTMLElement): HTMLElement {
     const layout = document.createElement('div');
     layout.style.cssText = 'display:flex;flex-wrap:nowrap;gap:12px;align-items:flex-start;';
     this._mainLayout = layout;
@@ -408,6 +419,18 @@ export class CampaignMapEditorSection extends MapEditorBase {
     leftCol.appendChild(this._buildTileParamsPanel(campaign));
     layout.appendChild(leftCol);
 
+    layout.appendChild(this._buildMapToolbarAndCanvasCol(campaign, validationWarningIcon));
+
+    const rightCol = document.createElement('div');
+    rightCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:210px;';
+    rightCol.appendChild(this._buildChapterInventoryPanel(campaign));
+    rightCol.appendChild(this._buildGridSizePanel(campaign));
+    layout.appendChild(rightCol);
+
+    return layout;
+  }
+
+  private _buildMapToolbarAndCanvasCol(campaign: CampaignDef, validationWarningIcon: HTMLElement): HTMLElement {
     const midCol = document.createElement('div');
     midCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;';
 
@@ -422,37 +445,26 @@ export class CampaignMapEditorSection extends MapEditorBase {
     redoBtn.id = 'campaign-map-redo-btn';
     toolbar.appendChild(redoBtn);
 
-    // Helper: update the validate button and warning icon to reflect a validation result.
-    const applyValidationState = (ok: boolean) =>
-      applyMapValidationState(validateBtn, validationWarningIcon, ok);
-
-    const validateBtn = this._cbs.buildBtn(t('editor.common.validateOk'), UI_BG, '#7ed321', () => {
-      const c = this._cbs.getActiveCampaign();
-      if (!c) return;
-      const result = validateCampaignMap(this._gridState.grid, this._gridState.rows, this._gridState.cols, c);
-      const icon = result.ok ? '✅' : '❌';
-      this._showValidationModal(t('editor.campaignMap.validationTitle'), icon, result.messages);
-      applyValidationState(result.ok);
-    });
+    const validateBtn = this._cbs.buildBtn(t('editor.common.validateOk'), UI_BG, '#7ed321',
+      () => this._onValidateMapClick(validateBtn, validationWarningIcon));
     toolbar.appendChild(validateBtn);
 
     // Auto-validate on screen activation.
     const initResult = validateCampaignMap(this._gridState.grid, this._gridState.rows, this._gridState.cols, campaign);
-    applyValidationState(initResult.ok);
+    applyMapValidationState(validateBtn, validationWarningIcon, initResult.ok);
 
     midCol.appendChild(toolbar);
     midCol.appendChild(this._buildCanvas(campaign, false));
-    layout.appendChild(midCol);
+    return midCol;
+  }
 
-    const rightCol = document.createElement('div');
-    rightCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:210px;';
-    rightCol.appendChild(this._buildChapterInventoryPanel(campaign));
-    rightCol.appendChild(this._buildGridSizePanel(campaign));
-    layout.appendChild(rightCol);
-
-    body.appendChild(layout);
-    section.appendChild(body);
-    return section;
+  private _onValidateMapClick(validateBtn: HTMLButtonElement, validationWarningIcon: HTMLElement): void {
+    const c = this._cbs.getActiveCampaign();
+    if (!c) return;
+    const result = validateCampaignMap(this._gridState.grid, this._gridState.rows, this._gridState.cols, c);
+    const icon = result.ok ? '✅' : '❌';
+    this._showValidationModal(t('editor.campaignMap.validationTitle'), icon, result.messages);
+    applyMapValidationState(validateBtn, validationWarningIcon, result.ok);
   }
 
   // ── Private: panel builders ────────────────────────────────────────────────
