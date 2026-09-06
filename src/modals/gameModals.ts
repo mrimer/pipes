@@ -1121,14 +1121,127 @@ const IMPORT_RESULT_MODAL_OVERLAY_ALPHA = 0.7;
  * @param importedPlayerName  - Name of the player from the imported file.  When provided
  *                              and `isNewSlot` is true, the name is displayed in the modal.
  */
-export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], isNewSlot: boolean, importedPlayerName?: string): void {
-  // Format "N noun[s]" — noun/verb args are i18n keys; emoji args pass through (t() returns the key when not found).
-  const statLine = (n: number, singularKey: string, pluralKey: string, verbKey: string): string => {
-    const noun = t(n === 1 ? singularKey : pluralKey);
-    const verb = isNewSlot ? '' : ` ${t(verbKey)}`;
-    return `${n} ${noun}${verb}`;
-  };
+// Format "N noun[s]" — noun/verb args are i18n keys; emoji args pass through (t() returns the key when not found).
+function _formatImportStatLine(n: number, singularKey: string, pluralKey: string, verbKey: string, isNewSlot: boolean): string {
+  const noun = t(n === 1 ? singularKey : pluralKey);
+  const verb = isNewSlot ? '' : ` ${t(verbKey)}`;
+  return `${n} ${noun}${verb}`;
+}
 
+function _appendImportedPlayerName(box: HTMLElement, isNewSlot: boolean, importedPlayerName: string | undefined): void {
+  if (!isNewSlot || !importedPlayerName) return;
+  const nameEl = document.createElement('p');
+  nameEl.style.cssText = 'margin:2px 0;font-size:0.9rem;color:#eee;';
+  nameEl.textContent = t('import.complete.player', { name: importedPlayerName });
+  box.appendChild(nameEl);
+}
+
+function _computeMergedCampaignStats(o: Extract<CampaignImportOutcome, { status: 'merged' }>, isNewSlot: boolean): string[] {
+  const stats: string[] = [];
+  if (o.newLevelsCompleted > 0)
+    stats.push(_formatImportStatLine(o.newLevelsCompleted, 'import.stats.levelWord', 'import.stats.levelsWord', 'import.stats.completedVerb', isNewSlot));
+  if (o.newChaptersCompleted > 0)
+    stats.push(_formatImportStatLine(o.newChaptersCompleted, 'import.stats.chapterWord', 'import.stats.chaptersWord', 'import.stats.completedVerb', isNewSlot));
+  if (o.newStars > 0)
+    stats.push(_formatImportStatLine(o.newStars, '⭐', '⭐', 'import.stats.addedVerb', isNewSlot));
+  if (o.newWater > 0)
+    stats.push(_formatImportStatLine(o.newWater, '💧', '💧', 'import.stats.addedVerb', isNewSlot));
+  if (o.newRecordings > 0)
+    stats.push(t(o.newRecordings === 1 ? 'import.stats.recordingImported' : 'import.stats.recordingsImported', { count: o.newRecordings }));
+  return stats;
+}
+
+function _buildMergedCampaignListItem(o: Extract<CampaignImportOutcome, { status: 'merged' }>, isNewSlot: boolean): HTMLLIElement {
+  const li = document.createElement('li');
+  li.style.cssText = 'font-size:0.85rem;color:#ddd;';
+  const namePart = document.createElement('strong');
+  namePart.textContent = o.campaignName;
+  li.appendChild(namePart);
+
+  const stats = _computeMergedCampaignStats(o, isNewSlot);
+  const detail = document.createElement('span');
+  if (stats.length > 0) {
+    detail.style.cssText = 'color:#aaa;';
+    detail.textContent = ' — ' + stats.join(', ');
+  } else {
+    detail.style.cssText = 'color:#a0a0a0;';
+    detail.textContent = isNewSlot
+      ? ` — ${t('import.stats.noCampaignProgress')}`
+      : ` — ${t('import.stats.alreadyUpToDate')}`;
+  }
+  li.appendChild(detail);
+  return li;
+}
+
+function _appendNoMergedMessage(box: HTMLElement, isNewSlot: boolean): void {
+  const none = document.createElement('p');
+  none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#a0a0a0;';
+  none.textContent = isNewSlot ? t('import.noProgress') : t('import.noneMerged');
+  box.appendChild(none);
+}
+
+function _appendMergedSection(
+  box: HTMLElement,
+  merged: Extract<CampaignImportOutcome, { status: 'merged' }>[],
+  isNewSlot: boolean,
+): void {
+  if (merged.length === 0) {
+    _appendNoMergedMessage(box, isNewSlot);
+    return;
+  }
+  const mergedHeader = document.createElement('h3');
+  mergedHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#7ed321;';
+  mergedHeader.textContent = isNewSlot
+    ? t('import.progressHeader.imported')
+    : t('import.progressHeader.merged');
+  box.appendChild(mergedHeader);
+
+  const ul = document.createElement('ul');
+  ul.style.cssText = 'margin:4px 0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px;';
+  for (const o of merged) {
+    ul.appendChild(_buildMergedCampaignListItem(o, isNewSlot));
+  }
+  box.appendChild(ul);
+}
+
+function _appendIgnoredSection(box: HTMLElement, ignored: Extract<CampaignImportOutcome, { status: 'ignored' }>[]): void {
+  if (ignored.length === 0) return;
+  const ignoredHeader = document.createElement('h3');
+  ignoredHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#f0c040;';
+  ignoredHeader.textContent = t('import.skippedCampaigns');
+  box.appendChild(ignoredHeader);
+  const ul = document.createElement('ul');
+  ul.style.cssText = 'margin:4px 0 0 16px;padding:0;';
+  for (const o of ignored) {
+    const li = document.createElement('li');
+    li.style.cssText = 'font-size:0.85rem;color:#ddd;margin:2px 0;';
+    li.textContent = o.campaignName;
+    ul.appendChild(li);
+  }
+  box.appendChild(ul);
+}
+
+function _appendImportNote(box: HTMLElement, isNewSlot: boolean, hasMerged: boolean): void {
+  const note = document.createElement('p');
+  note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';
+  note.textContent = isNewSlot
+    ? t(hasMerged ? 'import.note.new' : 'import.note.newNoProgress')
+    : t(hasMerged ? 'import.note.merge' : 'import.note.mergeNoProgress');
+  box.appendChild(note);
+}
+
+function _appendImportResultCloseButton(el: HTMLElement, box: HTMLElement, title: HTMLElement): void {
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = t('common.close');
+  closeBtn.style.cssText =
+    `align-self:flex-end;padding:8px 24px;font-size:0.95rem;background:${MUTED_BTN_BG};` +
+    `color:#eee;border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;margin-top:4px;`;
+  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
+  closeBtn.addEventListener('click', () => { closeModal(); });
+  box.appendChild(closeBtn);
+}
+
+export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], isNewSlot: boolean, importedPlayerName?: string): void {
   const el = createModalOverlay(IMPORT_RESULT_MODAL_OVERLAY_ALPHA);
   const box = document.createElement('div');
   box.style.cssText =
@@ -1141,12 +1254,7 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
   title.textContent = t('import.complete.title');
   box.appendChild(title);
 
-  if (isNewSlot && importedPlayerName) {
-    const nameEl = document.createElement('p');
-    nameEl.style.cssText = 'margin:2px 0;font-size:0.9rem;color:#eee;';
-    nameEl.textContent = t('import.complete.player', { name: importedPlayerName });
-    box.appendChild(nameEl);
-  }
+  _appendImportedPlayerName(box, isNewSlot, importedPlayerName);
 
   const merged  = outcomes.filter(
     (o): o is Extract<CampaignImportOutcome, { status: 'merged' }> => o.status === 'merged',
@@ -1155,90 +1263,10 @@ export function showPlayerImportResultModal(outcomes: CampaignImportOutcome[], i
     (o): o is Extract<CampaignImportOutcome, { status: 'ignored' }> => o.status === 'ignored',
   );
 
-  if (merged.length > 0) {
-    const mergedHeader = document.createElement('h3');
-    mergedHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#7ed321;';
-    mergedHeader.textContent = isNewSlot
-      ? t('import.progressHeader.imported')
-      : t('import.progressHeader.merged');
-    box.appendChild(mergedHeader);
-
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'margin:4px 0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px;';
-    for (const o of merged) {
-      const li = document.createElement('li');
-      li.style.cssText = 'font-size:0.85rem;color:#ddd;';
-      const namePart = document.createElement('strong');
-      namePart.textContent = o.campaignName;
-      li.appendChild(namePart);
-
-      const stats: string[] = [];
-      if (o.newLevelsCompleted > 0)
-        stats.push(statLine(o.newLevelsCompleted, 'import.stats.levelWord', 'import.stats.levelsWord', 'import.stats.completedVerb'));
-      if (o.newChaptersCompleted > 0)
-        stats.push(statLine(o.newChaptersCompleted, 'import.stats.chapterWord', 'import.stats.chaptersWord', 'import.stats.completedVerb'));
-      if (o.newStars > 0)
-        stats.push(statLine(o.newStars, '⭐', '⭐', 'import.stats.addedVerb'));
-      if (o.newWater > 0)
-        stats.push(statLine(o.newWater, '💧', '💧', 'import.stats.addedVerb'));
-      if (o.newRecordings > 0)
-        stats.push(t(o.newRecordings === 1 ? 'import.stats.recordingImported' : 'import.stats.recordingsImported', { count: o.newRecordings }));
-
-      if (stats.length > 0) {
-        const detail = document.createElement('span');
-        detail.style.cssText = 'color:#aaa;';
-        detail.textContent = ' — ' + stats.join(', ');
-        li.appendChild(detail);
-      } else {
-        const detail = document.createElement('span');
-        detail.style.cssText = 'color:#a0a0a0;';
-        detail.textContent = isNewSlot
-          ? ` — ${t('import.stats.noCampaignProgress')}`
-          : ` — ${t('import.stats.alreadyUpToDate')}`;
-        li.appendChild(detail);
-      }
-      ul.appendChild(li);
-    }
-    box.appendChild(ul);
-  } else {
-    const none = document.createElement('p');
-    none.style.cssText = 'margin:2px 0;font-size:0.85rem;color:#a0a0a0;';
-    none.textContent = isNewSlot ? t('import.noProgress') : t('import.noneMerged');
-    box.appendChild(none);
-  }
-
-  if (ignored.length > 0) {
-    const ignoredHeader = document.createElement('h3');
-    ignoredHeader.style.cssText = 'margin:4px 0 0;font-size:0.95rem;color:#f0c040;';
-    ignoredHeader.textContent = t('import.skippedCampaigns');
-    box.appendChild(ignoredHeader);
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'margin:4px 0 0 16px;padding:0;';
-    for (const o of ignored) {
-      const li = document.createElement('li');
-      li.style.cssText = 'font-size:0.85rem;color:#ddd;margin:2px 0;';
-      li.textContent = o.campaignName;
-      ul.appendChild(li);
-    }
-    box.appendChild(ul);
-  }
-
-  const note = document.createElement('p');
-  note.style.cssText = 'margin:4px 0 0;font-size:0.8rem;color:#aaa;';
-  const hasMerged = merged.length > 0;
-  note.textContent = isNewSlot
-    ? t(hasMerged ? 'import.note.new' : 'import.note.newNoProgress')
-    : t(hasMerged ? 'import.note.merge' : 'import.note.mergeNoProgress');
-  box.appendChild(note);
-
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = t('common.close');
-  closeBtn.style.cssText =
-    `align-self:flex-end;padding:8px 24px;font-size:0.95rem;background:${MUTED_BTN_BG};` +
-    `color:#eee;border:1px solid #555;border-radius:${RADIUS_MD};cursor:pointer;margin-top:4px;`;
-  const { closeModal } = setupModal(el, { titleEl: title, onClose: () => { el.remove(); } });
-  closeBtn.addEventListener('click', () => { closeModal(); });
-  box.appendChild(closeBtn);
+  _appendMergedSection(box, merged, isNewSlot);
+  _appendIgnoredSection(box, ignored);
+  _appendImportNote(box, isNewSlot, merged.length > 0);
+  _appendImportResultCloseButton(el, box, title);
 
   el.appendChild(box);
   document.body.appendChild(el);
