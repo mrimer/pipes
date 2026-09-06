@@ -268,7 +268,10 @@ export function drawSpinArrow(ctx: CanvasRenderingContext2D, ccw = false): void 
  * @param isSource  When true triangles point outward (away from centre);
  *                  when false they point inward (toward centre).
  */
-function drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number, half: number, isSource: boolean): void {
+function drawArmTriangles(
+  ctx: CanvasRenderingContext2D, nx: number, ny: number, opts: Pick<DrawSourceOrSinkOptions, 'half' | 'isSource'>,
+): void {
+  const { half, isSource } = opts;
   const depth = half * CONNECTOR_TRI_DEPTH;
   const wing  = half * CONNECTOR_TRI_WING;
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -404,10 +407,8 @@ function _drawSourceOrSinkArmOutlines(
 }
 
 /** Pass 2: all arm coloured fills + landing-strip triangles, then the coloured filled centre cap. */
-function _drawSourceOrSinkArmFills(
-  ctx: CanvasRenderingContext2D, connections: ReadonlySet<Direction>, buttEndDirs: Set<Direction> | undefined,
-  half: number, color: string, isSource: boolean,
-): void {
+function _drawSourceOrSinkArmFills(ctx: CanvasRenderingContext2D, opts: DrawSourceOrSinkOptions): void {
+  const { connections, buttEndDirs, half, color } = opts;
   ctx.lineWidth = LINE_WIDTH;
   ctx.strokeStyle = color;
   for (const [dir, nx, ny] of CARDINAL_DIRS) {
@@ -418,7 +419,7 @@ function _drawSourceOrSinkArmFills(
     ctx.lineTo(nx * half, ny * half);
     ctx.stroke();
     // 3 small dark triangles along the arm (landing-strip base markers)
-    drawArmTriangles(ctx, nx, ny, half, isSource);
+    drawArmTriangles(ctx, nx, ny, opts);
   }
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -506,7 +507,7 @@ export function drawSourceOrSink(ctx: CanvasRenderingContext2D, opts: DrawSource
   // coloured fills) so that no arm's black outline overwrites an already-painted
   // arm's colour at the centre junction, which would leave visible black artefacts.
   _drawSourceOrSinkArmOutlines(ctx, connections, buttEndDirs, half);
-  _drawSourceOrSinkArmFills(ctx, connections, buttEndDirs, half, color, isSource);
+  _drawSourceOrSinkArmFills(ctx, opts);
 
   if (isSource) {
     _drawSourceCenterDecoration(ctx, half, color);
