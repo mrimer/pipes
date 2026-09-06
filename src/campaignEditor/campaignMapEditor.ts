@@ -1477,16 +1477,22 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const tile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
     if (tile && PIPE_SHAPES.has(tile.shape)) {
       this._rotateTileAt(pos, e.deltaY > 0);
-    } else if (tile && (
-      tile.shape === PipeShape.Source ||
-      tile.shape === PipeShape.Sink ||
-      (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter')
-    )) {
+    } else if (tile && this._isSourceSinkOrChapterChamber(tile)) {
       this._rotateSourceSinkAt(pos, e.deltaY > 0);
     } else if (PIPE_SHAPES.has(this._palette as PipeShape)) {
-      this._rotatePalette(e.deltaY > 0);
-      sfxManager.play(e.deltaY > 0 ? SfxId.PendingCW : SfxId.PendingCCW);
+      this._rotatePendingPaletteByWheel(e.deltaY);
     }
+  }
+
+  private _isSourceSinkOrChapterChamber(tile: TileDef): boolean {
+    return tile.shape === PipeShape.Source ||
+      tile.shape === PipeShape.Sink ||
+      (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter');
+  }
+
+  private _rotatePendingPaletteByWheel(deltaY: number): void {
+    this._rotatePalette(deltaY > 0);
+    sfxManager.play(deltaY > 0 ? SfxId.PendingCW : SfxId.PendingCCW);
   }
 
   private _playPlacementSfx(pos: { row: number; col: number }): void {
