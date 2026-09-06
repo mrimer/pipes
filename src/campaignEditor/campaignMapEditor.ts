@@ -510,34 +510,10 @@ export class CampaignMapEditorSection extends MapEditorBase {
     ];
 
     // Auto-expand section containing the currently selected palette item.
-    if (FLOOR_ITEMS.some(i => i.palette === this._palette)) this._floorSectionExpanded = true;
-    if (PIPES_ITEMS.some(i => i.palette === this._palette)) this._pipesSectionExpanded = true;
+    this._autoExpandPaletteSectionForSelection(FLOOR_ITEMS, PIPES_ITEMS);
 
-    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = item.label;
-      const isSelected = this._palette === item.palette;
-      btn.style.cssText =
-        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
-        (indent ? 'margin-left:12px;' : '') +
-        'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
-        'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
-        'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
-      btn.addEventListener('click', () => {
-        const changed = this._palette !== item.palette;
-        this._palette = item.palette;
-        this._selectedChapterIdx = null;
-        if (changed) sfxManager.play(SfxId.InventorySelect);
-        panel.replaceWith(this._buildPalettePanel(campaign));
-        document.getElementById('campaign-map-tile-params-panel')
-          ?.replaceWith(this._buildTileParamsPanel(campaign));
-        document.getElementById('campaign-map-chapter-inventory')
-          ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-        this._renderCanvas();
-      });
-      return btn;
-    };
+    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement =>
+      this._buildPaletteItemButton(panel, campaign, item, indent);
 
     // Source and Sink at the top
     for (const item of [
@@ -565,6 +541,54 @@ export class CampaignMapEditorSection extends MapEditorBase {
     );
 
     return panel;
+  }
+
+  private _autoExpandPaletteSectionForSelection(
+    floorItems: Array<{ palette: EditorPalette; label: string }>,
+    pipesItems: Array<{ palette: EditorPalette; label: string }>,
+  ): void {
+    if (floorItems.some(i => i.palette === this._palette)) this._floorSectionExpanded = true;
+    if (pipesItems.some(i => i.palette === this._palette)) this._pipesSectionExpanded = true;
+  }
+
+  private _buildPaletteItemButton(
+    panel: HTMLElement,
+    campaign: CampaignDef,
+    item: { palette: EditorPalette; label: string },
+    indent = false,
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = item.label;
+    const isSelected = this._palette === item.palette;
+    btn.style.cssText = this._buildPaletteItemStyle(indent, isSelected);
+    btn.addEventListener('click', () => this._onPaletteItemButtonClick(item, campaign, panel));
+    return btn;
+  }
+
+  private _buildPaletteItemStyle(indent: boolean, isSelected: boolean): string {
+    return `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
+      (indent ? 'margin-left:12px;' : '') +
+      'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
+      'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
+      'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
+  }
+
+  private _onPaletteItemButtonClick(
+    item: { palette: EditorPalette; label: string },
+    campaign: CampaignDef,
+    panel: HTMLElement,
+  ): void {
+    const changed = this._palette !== item.palette;
+    this._palette = item.palette;
+    this._selectedChapterIdx = null;
+    if (changed) sfxManager.play(SfxId.InventorySelect);
+    panel.replaceWith(this._buildPalettePanel(campaign));
+    document.getElementById('campaign-map-tile-params-panel')
+      ?.replaceWith(this._buildTileParamsPanel(campaign));
+    document.getElementById('campaign-map-chapter-inventory')
+      ?.replaceWith(this._buildChapterInventoryPanel(campaign));
+    this._renderCanvas();
   }
 
   private _buildChapterInventoryPanel(campaign: CampaignDef): HTMLElement {
