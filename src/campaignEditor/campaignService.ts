@@ -712,46 +712,78 @@ export class CampaignService {
     const overwrite = options?.overwrite === true;
     const result: TextPackMergeResult = { campaign, locale: pack.locale, added: 0, skipped: 0, overwritten: 0, unmatchedNodes: 0 };
 
-    const mergeField = (
-      current: string | LocalizedText | undefined,
-      packValue: string,
-    ): string | LocalizedText | undefined => {
-      const alreadyPresent = typeof current === 'object' && current[pack.locale] !== undefined;
-      if (alreadyPresent && !overwrite) {
-        result.skipped++;
-        return current;
-      }
-      if (alreadyPresent) result.overwritten++;
-      else result.added++;
-      return writeLocalizedText(current, pack.locale, packValue);
-    };
-
-    campaign.name = mergeField(campaign.name, pack.campaign.name) ?? campaign.name;
+    campaign.name = this._mergeTextField(result, pack.locale, overwrite, campaign.name, pack.campaign.name) ?? campaign.name;
 
     for (const packChapter of pack.chapters) {
-      const chapter = campaign.chapters.find((c) => c.id === packChapter.id);
-      if (!chapter) { result.unmatchedNodes++; continue; }
-      chapter.name = mergeField(chapter.name, packChapter.name) ?? chapter.name;
-
-      for (const packLevel of packChapter.levels) {
-        const level = chapter.levels.find((l) => l.id === packLevel.id);
-        if (!level) { result.unmatchedNodes++; continue; }
-        level.name = mergeField(level.name, packLevel.name) ?? level.name;
-        if (packLevel.note !== undefined) {
-          level.note = mergeField(level.note, packLevel.note);
-        }
-        if (packLevel.hints !== undefined && level.hints !== undefined) {
-          const count = Math.min(packLevel.hints.length, level.hints.length);
-          for (let i = 0; i < count; i++) {
-            level.hints[i] = mergeField(level.hints[i], packLevel.hints[i]) ?? level.hints[i];
-          }
-        }
-      }
+      this._mergeTextPackChapter(campaign, pack.locale, overwrite, result, packChapter);
     }
 
     this.touch(campaign);
     this.save();
     return result;
+  }
+
+  private _mergeTextField(
+    result: TextPackMergeResult,
+    locale: string,
+    overwrite: boolean,
+    current: string | LocalizedText | undefined,
+    packValue: string,
+  ): string | LocalizedText | undefined {
+    const alreadyPresent = typeof current === 'object' && current[locale] !== undefined;
+    if (alreadyPresent && !overwrite) {
+      result.skipped++;
+      return current;
+    }
+    if (alreadyPresent) result.overwritten++;
+    else result.added++;
+    return writeLocalizedText(current, locale, packValue);
+  }
+
+  private _mergeTextPackChapter(
+    campaign: CampaignDef,
+    locale: string,
+    overwrite: boolean,
+    result: TextPackMergeResult,
+    packChapter: TextPackChapter,
+  ): void {
+    const chapter = campaign.chapters.find((c) => c.id === packChapter.id);
+    if (!chapter) { result.unmatchedNodes++; return; }
+    chapter.name = this._mergeTextField(result, locale, overwrite, chapter.name, packChapter.name) ?? chapter.name;
+
+    for (const packLevel of packChapter.levels) {
+      this._mergeTextPackLevel(chapter, locale, overwrite, result, packLevel);
+    }
+  }
+
+  private _mergeTextPackLevel(
+    chapter: ChapterDef,
+    locale: string,
+    overwrite: boolean,
+    result: TextPackMergeResult,
+    packLevel: TextPackLevel,
+  ): void {
+    const level = chapter.levels.find((l) => l.id === packLevel.id);
+    if (!level) { result.unmatchedNodes++; return; }
+    level.name = this._mergeTextField(result, locale, overwrite, level.name, packLevel.name) ?? level.name;
+    if (packLevel.note !== undefined) {
+      level.note = this._mergeTextField(result, locale, overwrite, level.note, packLevel.note);
+    }
+    this._mergeTextPackHints(locale, overwrite, result, level, packLevel);
+  }
+
+  private _mergeTextPackHints(
+    locale: string,
+    overwrite: boolean,
+    result: TextPackMergeResult,
+    level: LevelDef,
+    packLevel: TextPackLevel,
+  ): void {
+    if (packLevel.hints === undefined || level.hints === undefined) return;
+    const count = Math.min(packLevel.hints.length, level.hints.length);
+    for (let i = 0; i < count; i++) {
+      level.hints[i] = this._mergeTextField(result, locale, overwrite, level.hints[i], packLevel.hints[i]) ?? level.hints[i];
+    }
   }
 
   // ── Data validation ──────────────────────────────────────────────────────────
