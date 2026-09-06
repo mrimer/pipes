@@ -172,7 +172,14 @@ export function scalePx(n: number): number {
  *                          e.g. on the level editor screen where the board
  *                          can scroll vertically.
  */
-export function computeTileSize(rows: number, cols: number, vOverhead = 0, hOverhead = 0, constrainVertical = true): number {
+export interface TileSizeOptions {
+  vOverhead?: number;
+  hOverhead?: number;
+  constrainVertical?: boolean;
+}
+
+export function computeTileSize(rows: number, cols: number, opts: TileSizeOptions = {}): number {
+  const { vOverhead = 0, hOverhead = 0, constrainVertical = true } = opts;
   if (typeof window === 'undefined') return BASE_TILE_SIZE;
   const avW = window.innerWidth - hOverhead;
   const maxFitW = Math.floor(avW / cols);
@@ -1533,7 +1540,15 @@ function _drawPipeArmInRotatedFrame(ctx: CanvasRenderingContext2D, opts: DrawPip
  *   the tile.  Only hardened tiles display the "X"; otherwise the numeric value
  *   (including "0") is shown.
  */
-export function drawCementLabel(ctx: CanvasRenderingContext2D, x: number, y: number, dryingTime: number, isHardened: boolean): void {
+export interface CementLabelOptions {
+  x: number;
+  y: number;
+  dryingTime: number;
+  isHardened: boolean;
+}
+
+export function drawCementLabel(ctx: CanvasRenderingContext2D, opts: CementLabelOptions): void {
+  const { x, y, dryingTime, isHardened } = opts;
   const label = isHardened ? 'X' : String(dryingTime);
   const fontSize = _s(18);
   ctx.save();
@@ -1821,7 +1836,6 @@ function _buildCrossPath(
  * @param ctx              Canvas 2D context (translated + rotated to tile centre).
  * @param shape            Any PipeShape value in PIPE_SHAPES.
  * @param half             Distance from tile centre to tile edge in pixels.
- * @param lw2              Half the pipe tube width (= LINE_WIDTH / 2).
  * @param localButtEndDirs Directions in the LOCAL frame whose tile-edge end
  *                         should be flat (butt) rather than rounded.
  */
@@ -1829,9 +1843,9 @@ function buildPipeBodyPath(
   ctx: CanvasRenderingContext2D,
   shape: PipeShape,
   half: number,
-  lw2: number,
   localButtEndDirs?: ReadonlySet<Direction>,
 ): void {
+  const lw2 = LINE_WIDTH / 2;
   ctx.beginPath();
   switch (_pipeStructuralType(shape)) {
     case 'straight': _buildStraightPath(ctx, half, lw2, localButtEndDirs); break;
@@ -1885,14 +1899,15 @@ function _computePipeBodyClipRect(
   };
 }
 
-export function drawPipeBody(
-  ctx: CanvasRenderingContext2D,
-  shape: PipeShape,
-  half: number,
-  localButtEndDirs: ReadonlySet<Direction> | undefined,
-  fillColor: string,
-): void {
-  const lw2 = LINE_WIDTH / 2;
+export interface PipeBodyOptions {
+  shape: PipeShape;
+  half: number;
+  localButtEndDirs: ReadonlySet<Direction> | undefined;
+  fillColor: string;
+}
+
+export function drawPipeBody(ctx: CanvasRenderingContext2D, opts: PipeBodyOptions): void {
+  const { shape, half, localButtEndDirs, fillColor } = opts;
   // When a shadow (e.g. the ghost-placement glow) is active, expand the free
   // edges by the blur radius so the glow is not clipped.
   const shadowClipExpansion = ctx.shadowBlur;
@@ -1904,7 +1919,7 @@ export function drawPipeBody(
   ctx.clip();
   // Build the pipe body path AFTER clipping so ctx.beginPath() for the clip
   // rect does not erase the pipe path before stroke/fill.
-  buildPipeBodyPath(ctx, shape, half, lw2, localButtEndDirs);
+  buildPipeBodyPath(ctx, shape, half, localButtEndDirs);
   // Stroke outline first; fill covers the inner half of the stroke so only
   // the outer border remains visible.
   ctx.lineWidth = _s(3);
@@ -2265,7 +2280,7 @@ function _drawUnifiedPipeBody(ctx: CanvasRenderingContext2D, c: {
   // endpoints land precisely on the tile edge at every tile size.
   const pathHalf = TILE_SIZE / 2;
   const localButtEndDirs = _resolveLocalButtEndDirs(c.effectiveButtEndDirs, c.effectiveRotation);
-  drawPipeBody(ctx, c.shape, pathHalf, localButtEndDirs, c.color);
+  drawPipeBody(ctx, { shape: c.shape, half: pathHalf, localButtEndDirs, fillColor: c.color });
   if (LEAKY_PIPE_SHAPES.has(c.shape)) {
     _drawLeakyRustSpots(ctx, c.tile, c.half, null);
   }
@@ -3222,7 +3237,7 @@ function _renderPass4CementLabels(ctx: CanvasRenderingContext2D, board: Board): 
       const y = r * TILE_SIZE;
       // A tile is "hardened" (shows 'X') whenever dryingTime is 0.
       const isHardened = dryingTime === 0;
-      drawCementLabel(ctx, x, y, dryingTime, isHardened);
+      drawCementLabel(ctx, { x, y, dryingTime, isHardened });
     }
   }
 }

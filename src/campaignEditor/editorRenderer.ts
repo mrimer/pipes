@@ -420,7 +420,7 @@ function _drawSpinCementOverlay(ctx: CanvasRenderingContext2D, x: number, y: num
   }
   ctx.globalAlpha = 1;
   ctx.restore();
-  drawCementLabel(ctx, x, y, dryingTime, dryingTime === 0);
+  drawCementLabel(ctx, { x, y, dryingTime, isHardened: dryingTime === 0 });
 }
 
 /** Draw a single editor tile (from TileDef) at canvas pixel (x, y). */

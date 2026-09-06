@@ -773,7 +773,7 @@ function _renderChapterMapPass3PipeTiles(
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(tileRotation * Math.PI / 180);
-      drawPipeBody(ctx, def.shape, CELL / 2, localButtEndDirs, pipeColor);
+      drawPipeBody(ctx, { shape: def.shape, half: CELL / 2, localButtEndDirs, fillColor: pipeColor });
       ctx.restore();
     }
   }

@@ -831,7 +831,7 @@ export abstract class MapScreenBase {
     const oldViewWidthPx = this._viewCols * oldTileSize;
     const oldViewHeightPx = this._viewRows * oldTileSize;
 
-    const defaultTileSize = computeTileSize(baseViewRows, baseViewCols, CHAPTER_MAP_GRID_OVERHEAD);
+    const defaultTileSize = computeTileSize(baseViewRows, baseViewCols, { vOverhead: CHAPTER_MAP_GRID_OVERHEAD });
     let tileSize = defaultTileSize;
     let viewRows = baseViewRows;
     let viewCols = baseViewCols;

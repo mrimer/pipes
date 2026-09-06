@@ -846,12 +846,10 @@ export class Game implements InputCallbacks {
     if (!this._canRenderBoard()) return;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- currentLevel is non-null here, guarded by _canRenderBoard() above
     const level = this.currentLevel!;
-    setTileSize(computeTileSize(
-      level.rows,
-      level.cols,
-      this._computePlayOverhead(level),
-      PLAY_CANVAS_BORDER_W,
-    ));
+    setTileSize(computeTileSize(level.rows, level.cols, {
+      vOverhead: this._computePlayOverhead(level),
+      hOverhead: PLAY_CANVAS_BORDER_W,
+    }));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
     this._fireflies.resetForLevel(
@@ -905,7 +903,10 @@ export class Game implements InputCallbacks {
     this.pendingRotation = 0;
     this._input.hoverRotationDelta = 0;
 
-    setTileSize(computeTileSize(level.rows, level.cols, this._computePlayOverhead(level), PLAY_CANVAS_BORDER_W));
+    setTileSize(computeTileSize(level.rows, level.cols, {
+      vOverhead: this._computePlayOverhead(level),
+      hOverhead: PLAY_CANVAS_BORDER_W,
+    }));
     this.canvas.width  = level.cols * TILE_SIZE;
     this.canvas.height = level.rows * TILE_SIZE;
 

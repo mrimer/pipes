@@ -594,7 +594,7 @@ export function showIntroTitleScreen(): Promise<void> {
         const fillColor = isFilled
           ? (cell.letterIndex < COOL_LETTER_COUNT ? LABEL_COLOR : WATER_COLOR)
           : PIPE_COLOR;
-        drawPipeBody(ctx, cell.shape, half - pad, undefined, fillColor);
+        drawPipeBody(ctx, { shape: cell.shape, half: half - pad, localButtEndDirs: undefined, fillColor });
         ctx.restore();
       }
 
