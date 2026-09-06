@@ -2797,10 +2797,22 @@ function _resolveGinghamColor(floorShape: PipeShape, r: number, c: number): stri
   return gcMid;
 }
 
+/** Per-cell context shared by every Pass-1 background drawer, built once per grid cell. */
+interface BackgroundCellContext {
+  ctx: CanvasRenderingContext2D;
+  board: Board;
+  tile: Tile;
+  r: number;
+  c: number;
+  x: number;
+  y: number;
+  isGoldCell: boolean;
+  shimmerAlpha: number;
+}
+
 /** One-way cell: gingham background (inferred floor type) + directional arrow on top. */
-function _drawOneWayCellBackground(
-  ctx: CanvasRenderingContext2D, board: Board, r: number, c: number, x: number, y: number, oneWayDir: Direction,
-): void {
+function _drawOneWayCellBackground(cell: BackgroundCellContext, oneWayDir: Direction): void {
+  const { ctx, board, r, c, x, y } = cell;
   const floorType = board.floorTypes.get(posKey(r, c)) ?? PipeShape.Empty;
   ctx.fillStyle = _resolveGinghamColor(floorType, r, c);
   ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
@@ -2808,7 +2820,8 @@ function _drawOneWayCellBackground(
 }
 
 /** Cement cell: always show cement background regardless of tile on top. */
-function _drawCementCellBackground(ctx: CanvasRenderingContext2D, board: Board, r: number, c: number, x: number, y: number): void {
+function _drawCementCellBackground(cell: BackgroundCellContext): void {
+  const { ctx, board, r, c, x, y } = cell;
   const dryingTime = board.cementData.get(posKey(r, c)) as number;
   _drawCementBackground(ctx, x, y, dryingTime === 0);
 }
@@ -2828,23 +2841,19 @@ function _drawGoldEmptyCellBackground(ctx: CanvasRenderingContext2D, x: number, 
 }
 
 /** Gingham background plus any ambient decoration for a plain (non-gold) empty cell. */
-function _drawPlainEmptyCellBackground(
-  ctx: CanvasRenderingContext2D, board: Board, tile: Tile, r: number, c: number, x: number, y: number,
-): void {
+function _drawPlainEmptyCellBackground(cell: BackgroundCellContext): void {
+  const { ctx, board, tile, r, c, x, y } = cell;
   ctx.fillStyle = _resolveGinghamColor(tile.shape, r, c);
   ctx.fillRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
   const dec = board.ambientDecorations.get(posKey(r, c));
   if (dec) drawAmbientDecoration(ctx, dec);
 }
 
-function _drawEmptyFloorBackground(
-  ctx: CanvasRenderingContext2D, board: Board, tile: Tile, r: number, c: number, x: number, y: number,
-  isGoldCell: boolean, shimmerAlpha: number,
-): void {
-  if (isGoldCell) {
-    _drawGoldEmptyCellBackground(ctx, x, y, shimmerAlpha);
+function _drawEmptyFloorBackground(cell: BackgroundCellContext): void {
+  if (cell.isGoldCell) {
+    _drawGoldEmptyCellBackground(cell.ctx, cell.x, cell.y, cell.shimmerAlpha);
   } else {
-    _drawPlainEmptyCellBackground(ctx, board, tile, r, c, x, y);
+    _drawPlainEmptyCellBackground(cell);
   }
 }
 
@@ -2867,11 +2876,11 @@ function _drawPlainNonEmptyCellBackground(ctx: CanvasRenderingContext2D, tile: T
   ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
 }
 
-function _drawNonEmptyTileBackground(ctx: CanvasRenderingContext2D, tile: Tile, x: number, y: number, isGoldCell: boolean): void {
-  if (isGoldCell) {
-    _drawGoldNonEmptyCellBackground(ctx, x, y);
+function _drawNonEmptyTileBackground(cell: BackgroundCellContext): void {
+  if (cell.isGoldCell) {
+    _drawGoldNonEmptyCellBackground(cell.ctx, cell.x, cell.y);
   } else {
-    _drawPlainNonEmptyCellBackground(ctx, tile, x, y);
+    _drawPlainNonEmptyCellBackground(cell.ctx, cell.tile, cell.x, cell.y);
   }
 }
 
@@ -2888,16 +2897,17 @@ function _renderPass1Backgrounds(ctx: CanvasRenderingContext2D, opts: RenderPass
       const isGoldCell = board.goldSpaces.has(posKey(r, c));
       const isCementCell = board.cementData.has(posKey(r, c));
       const oneWayDir = board.oneWayData.get(posKey(r, c));
+      const cell: BackgroundCellContext = { ctx, board, tile, r, c, x, y, isGoldCell, shimmerAlpha };
 
       // Tile background
       if (oneWayDir !== undefined) {
-        _drawOneWayCellBackground(ctx, board, r, c, x, y, oneWayDir);
+        _drawOneWayCellBackground(cell, oneWayDir);
       } else if (isCementCell) {
-        _drawCementCellBackground(ctx, board, r, c, x, y);
+        _drawCementCellBackground(cell);
       } else if (isEmptyFloor(tile.shape)) {
-        _drawEmptyFloorBackground(ctx, board, tile, r, c, x, y, isGoldCell, shimmerAlpha);
+        _drawEmptyFloorBackground(cell);
       } else {
-        _drawNonEmptyTileBackground(ctx, tile, x, y, isGoldCell);
+        _drawNonEmptyTileBackground(cell);
       }
     }
   }
