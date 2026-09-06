@@ -1061,9 +1061,17 @@ export class CampaignMapEditorSection extends MapEditorBase {
     // Ensure we clicked within the visible view area.
     const viewCol = Math.floor(canvasPxX / TILE_SIZE);
     const viewRow = Math.floor(canvasPxY / TILE_SIZE);
-    if (viewRow < 0 || viewRow >= this._viewRows || viewCol < 0 || viewCol >= this._viewCols) return null;
-    if (row < 0 || row >= this._gridState.rows || col < 0 || col >= this._gridState.cols) return null;
+    if (this._isOutsideCampaignViewBounds(viewRow, viewCol)) return null;
+    if (this._isOutsideCampaignGridBounds(row, col)) return null;
     return { row, col };
+  }
+
+  private _isOutsideCampaignViewBounds(viewRow: number, viewCol: number): boolean {
+    return viewRow < 0 || viewRow >= this._viewRows || viewCol < 0 || viewCol >= this._viewCols;
+  }
+
+  private _isOutsideCampaignGridBounds(row: number, col: number): boolean {
+    return row < 0 || row >= this._gridState.rows || col < 0 || col >= this._gridState.cols;
   }
 
   /** Return the canvas-intrinsic pixel scale (intrinsic / CSS) in both axes. */
