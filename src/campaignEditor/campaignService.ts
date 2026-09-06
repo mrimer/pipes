@@ -587,21 +587,31 @@ export class CampaignService {
   parseImport(json: string): ImportResult {
     const raw = JSON.parse(json) as Record<string, unknown>;
 
-    // Enforce the type identifier when it is present.
-    if ('type' in raw) {
-      if (raw['type'] !== FILE_TYPE_CAMPAIGN) {
-        const got = raw['type'] === FILE_TYPE_PLAYER
-          ? 'a player profile'
-          : `"${String(raw['type'])}"`;
-        throw new Error(
-          `Wrong file type: expected a campaign file, got ${got}. ` +
-          'Use "Import Progress" in the main menu to import player profiles.',
-        );
-      }
-      // Remove the envelope key before treating the object as a CampaignDef.
-      delete raw['type'];
-    }
+    this._enforceCampaignFileType(raw);
+    this._validateCampaignShape(raw);
 
+    const data = migrateCampaign(raw as unknown as CampaignDef);
+    this._sanitizeImportedCampaignData(data);
+
+    return this._resolveImportConflict(data);
+  }
+
+  /** Enforce the type identifier when it is present, then remove the envelope key. */
+  private _enforceCampaignFileType(raw: Record<string, unknown>): void {
+    if (!('type' in raw)) return;
+    if (raw['type'] !== FILE_TYPE_CAMPAIGN) {
+      const got = raw['type'] === FILE_TYPE_PLAYER
+        ? 'a player profile'
+        : `"${String(raw['type'])}"`;
+      throw new Error(
+        `Wrong file type: expected a campaign file, got ${got}. ` +
+        'Use "Import Progress" in the main menu to import player profiles.',
+      );
+    }
+    delete raw['type'];
+  }
+
+  private _validateCampaignShape(raw: Record<string, unknown>): void {
     if (
       typeof raw['id'] !== 'string'
       || !isLocalizedTextShape(raw['name'])
@@ -609,7 +619,9 @@ export class CampaignService {
     ) {
       throw new Error('Invalid campaign file format.');
     }
-    const data = migrateCampaign(raw as unknown as CampaignDef);
+  }
+
+  private _sanitizeImportedCampaignData(data: CampaignDef): void {
     // Silently remap the reserved "official" ID to avoid collision with the
     // built-in official campaign.
     if (data.id === 'official') {
@@ -620,18 +632,20 @@ export class CampaignService {
     if (data.official) {
       data.official = undefined;
     }
+  }
+
+  private _resolveImportConflict(data: CampaignDef): ImportResult {
     const existingIdx = this._findMatchingCampaignIndex(data);
-    if (existingIdx !== -1) {
-      const existing = this._campaigns[existingIdx];
-      const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
-      const importedTime = data.lastUpdated   ? new Date(data.lastUpdated).getTime()   : 0;
-      if (existingTime === importedTime) {
-        return { campaign: data, conflict: 'same_version', existing };
-      }
-      const isNewer = importedTime > existingTime;
-      return { campaign: data, conflict: 'version_conflict', existing, isNewer };
+    if (existingIdx === -1) return { campaign: data, conflict: 'none' };
+
+    const existing = this._campaigns[existingIdx];
+    const existingTime = existing.lastUpdated ? new Date(existing.lastUpdated).getTime() : 0;
+    const importedTime = data.lastUpdated ? new Date(data.lastUpdated).getTime() : 0;
+    if (existingTime === importedTime) {
+      return { campaign: data, conflict: 'same_version', existing };
     }
-    return { campaign: data, conflict: 'none' };
+    const isNewer = importedTime > existingTime;
+    return { campaign: data, conflict: 'version_conflict', existing, isNewer };
   }
 
   /**
