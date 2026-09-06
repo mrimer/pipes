@@ -765,7 +765,7 @@ export class AnimationManager {
       const color = sourceIsFilled ? SOURCE_WATER_CONNECTOR_LIT : SOURCE_CONNECTOR_LIT;
       const cx = source.col * TILE_SIZE + TILE_SIZE / 2;
       const cy = source.row * TILE_SIZE + TILE_SIZE / 2;
-      drawConnectorGlow(this.ctx, cx, cy, sourceTile.connections, true, color, half, litIndex);
+      drawConnectorGlow(this.ctx, cx, cy, { connections: sourceTile.connections, isSource: true, brightColor: color, half, litIndex });
     }
 
     const sinkTile = board.grid[sink.row]?.[sink.col];
@@ -774,7 +774,7 @@ export class AnimationManager {
       const color = sinkIsFilled ? SINK_WATER_CONNECTOR_LIT : SINK_CONNECTOR_LIT;
       const cx = sink.col * TILE_SIZE + TILE_SIZE / 2;
       const cy = sink.row * TILE_SIZE + TILE_SIZE / 2;
-      drawConnectorGlow(this.ctx, cx, cy, sinkTile.connections, false, color, half, litIndex);
+      drawConnectorGlow(this.ctx, cx, cy, { connections: sinkTile.connections, isSource: false, brightColor: color, half, litIndex });
     }
   }
 

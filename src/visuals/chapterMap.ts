@@ -991,11 +991,11 @@ export function renderChapterMapConnectorLights(
   if (positions.source) {
     const src = positions.source;
     const color = src.isFilled ? SOURCE_WATER_CONNECTOR_LIT : SOURCE_CONNECTOR_LIT;
-    drawConnectorGlow(ctx, src.x, src.y, src.connections, true, color, half, litIndex);
+    drawConnectorGlow(ctx, src.x, src.y, { connections: src.connections, isSource: true, brightColor: color, half, litIndex });
   }
   for (const sink of positions.sinks) {
     const color = sink.isFilled ? SINK_WATER_CONNECTOR_LIT : SINK_CONNECTOR_LIT;
-    drawConnectorGlow(ctx, sink.x, sink.y, sink.connections, false, color, half, litIndex);
+    drawConnectorGlow(ctx, sink.x, sink.y, { connections: sink.connections, isSource: false, brightColor: color, half, litIndex });
   }
 }
 

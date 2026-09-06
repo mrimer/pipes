@@ -297,16 +297,21 @@ function drawArmTriangles(ctx: CanvasRenderingContext2D, nx: number, ny: number,
  * @param half        Half the tile size in canvas pixels.
  * @param litIndex    Which step of the sequence is lit (0, 1, or 2).
  */
+export interface ConnectorGlowOptions {
+  connections: Set<Direction>;
+  isSource: boolean;
+  brightColor: string;
+  half: number;
+  litIndex: number;
+}
+
 export function drawConnectorGlow(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
-  connections: Set<Direction>,
-  isSource: boolean,
-  brightColor: string,
-  half: number,
-  litIndex: number,
+  opts: ConnectorGlowOptions,
 ): void {
+  const { connections, isSource, brightColor, half, litIndex } = opts;
   const depth = half * CONNECTOR_TRI_DEPTH;
   const wing  = half * CONNECTOR_TRI_WING;
   // Source: sequence moves outward (0→1→2 maps to nearest→farthest).
@@ -2208,8 +2213,8 @@ function _drawBlockedPipeTile(ctx: CanvasRenderingContext2D, c: BlockedPipeTileC
   const dryColor = resolveTileColor(c.tile, false, c.currentPressure);
   // Sort blocked arm first so the dominant (water) color is painted last.
   const sortedArms = _sortArmsBlockedFirst(c.tile.connections, c.effectiveBlockedWaterDir);
-  _drawPipeArmOutlines(ctx, c.tile.connections, c.rotation, c.half, c.effectiveButtEndDirs);
-  _drawPipeArmFills(ctx, sortedArms, c.rotation, c.half, c.color, dryColor, c.effectiveBlockedWaterDir, c.effectiveButtEndDirs);
+  _drawPipeArmOutlines(ctx, c.tile.connections, c);
+  _drawPipeArmFills(ctx, sortedArms, dryColor, c);
   if (LEAKY_PIPE_SHAPES.has(c.shape)) {
     _drawLeakyRustSpots(ctx, c.tile, c.half, c.effectiveBlockedWaterDir);
   }
@@ -2225,30 +2230,24 @@ function _sortArmsBlockedFirst(connections: ReadonlySet<Direction>, blockedDir: 
  * buttEnd is true.  The natural round caps from all arms together cover the
  * centre junction without visible seaming.
  */
-function _drawPipeArmOutlines(
-  ctx: CanvasRenderingContext2D, connections: ReadonlySet<Direction>, rotation: number, half: number,
-  effectiveButtEndDirs: Set<Direction> | undefined,
-): void {
+function _drawPipeArmOutlines(ctx: CanvasRenderingContext2D, connections: ReadonlySet<Direction>, c: BlockedPipeTileContext): void {
   ctx.lineWidth = LINE_WIDTH + _s(3);
   for (const armDir of connections) {
     _drawPipeArmInRotatedFrame(ctx, {
-      absDir: armDir, tileRotation: rotation, half, color: 'black',
-      buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
+      absDir: armDir, tileRotation: c.rotation, half: c.half, color: 'black',
+      buttEnd: c.effectiveButtEndDirs?.has(armDir) ?? false,
     });
   }
 }
 
 /** All arm color fills (blocked arm first; dominant water color last). */
-function _drawPipeArmFills(
-  ctx: CanvasRenderingContext2D, sortedArms: Direction[], rotation: number, half: number,
-  color: string, dryColor: string, blockedDir: Direction | null, effectiveButtEndDirs: Set<Direction> | undefined,
-): void {
+function _drawPipeArmFills(ctx: CanvasRenderingContext2D, sortedArms: Direction[], dryColor: string, c: BlockedPipeTileContext): void {
   ctx.lineWidth = LINE_WIDTH;
   for (const armDir of sortedArms) {
-    const armColor = armDir === blockedDir ? dryColor : color;
+    const armColor = armDir === c.effectiveBlockedWaterDir ? dryColor : c.color;
     _drawPipeArmInRotatedFrame(ctx, {
-      absDir: armDir, tileRotation: rotation, half, color: armColor,
-      buttEnd: effectiveButtEndDirs?.has(armDir) ?? false,
+      absDir: armDir, tileRotation: c.rotation, half: c.half, color: armColor,
+      buttEnd: c.effectiveButtEndDirs?.has(armDir) ?? false,
     });
   }
 }
@@ -2442,14 +2441,22 @@ const BOLT_CORNERS: readonly BoltCorner[] = [
   { rowOffset: 1, colOffset: 1 },   // bottom-right
 ];
 
+interface BoltTileContext {
+  ctx: CanvasRenderingContext2D;
+  board: Board;
+  r: number;
+  c: number;
+  x: number;
+  y: number;
+  inset: number;
+}
+
 /**
  * Draw one corner's bolt, unless either adjacent tile sharing that corner's
  * two edges is itself a fixed pipe tile.
  */
-function _drawFixedPipeBoltForCorner(
-  ctx: CanvasRenderingContext2D, board: Board, r: number, c: number, x: number, y: number,
-  inset: number, corner: BoltCorner,
-): void {
+function _drawFixedPipeBoltForCorner(tile: BoltTileContext, corner: BoltCorner): void {
+  const { ctx, board, r, c, x, y, inset } = tile;
   if (_isFixedPipeTile(board, r + corner.rowOffset, c) || _isFixedPipeTile(board, r, c + corner.colOffset)) return;
   const bx = corner.colOffset < 0 ? x + inset : x + TILE_SIZE - inset;
   const by = corner.rowOffset < 0 ? y + inset : y + TILE_SIZE - inset;
@@ -2466,8 +2473,9 @@ function _renderPass5FixedPipeBolts(ctx: CanvasRenderingContext2D, board: Board)
       if (!tile.isFixed || !PIPE_SHAPES.has(tile.shape)) continue;
       const x = c * TILE_SIZE;
       const y = r * TILE_SIZE;
+      const boltTile: BoltTileContext = { ctx, board, r, c, x, y, inset };
       for (const corner of BOLT_CORNERS) {
-        _drawFixedPipeBoltForCorner(ctx, board, r, c, x, y, inset, corner);
+        _drawFixedPipeBoltForCorner(boltTile, corner);
       }
     }
   }
