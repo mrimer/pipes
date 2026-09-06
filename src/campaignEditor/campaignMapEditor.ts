@@ -644,32 +644,50 @@ export class CampaignMapEditorSection extends MapEditorBase {
     titleEl.textContent = t('editor.params.title');
     panel.appendChild(titleEl);
 
-    const focusedTile = this._gridState.focusedTilePos
-      ? this._gridState.grid[this._gridState.focusedTilePos.row]?.[this._gridState.focusedTilePos.col] ?? null
-      : null;
-    const isFocusedChapterChamber =
-      focusedTile?.shape === PipeShape.Chamber && focusedTile.chamberContent === 'chapter';
-    const isFocusedSourceOrSink =
-      focusedTile?.shape === PipeShape.Source || focusedTile?.shape === PipeShape.Sink;
+    const focusedTile = this._getFocusedTile();
 
-    if ((isFocusedChapterChamber || isFocusedSourceOrSink) && focusedTile) {
-      panel.appendChild(this._buildFocusedConnectionsWidget(panel, focusedTile, campaign));
-      if (focusedTile.shape === PipeShape.Sink) {
-        panel.appendChild(this._buildFocusedSinkCompletionWidget(panel, focusedTile, campaign));
-      }
+    if (this._isConnectableFocusedTile(focusedTile)) {
+      this._appendFocusedTileParams(panel, focusedTile, campaign);
     } else if (this._palette === PipeShape.Source || this._palette === PipeShape.Sink) {
-      panel.appendChild(this._buildPaletteConnectionsWidget(panel, campaign));
-      if (this._palette === PipeShape.Sink) {
-        panel.appendChild(this._buildSinkCompletionWidget(panel, campaign));
-      }
+      this._appendPaletteTileParams(panel, campaign);
     } else {
-      const note = document.createElement('div');
-      note.style.cssText = 'font-size:0.78rem;color:#555;';
-      note.textContent = t('editor.params.noneForTile');
-      panel.appendChild(note);
+      this._appendNoParamsNote(panel);
     }
 
     return panel;
+  }
+
+  private _getFocusedTile(): TileDef | null {
+    const pos = this._gridState.focusedTilePos;
+    if (!pos) return null;
+    return this._gridState.grid[pos.row]?.[pos.col] ?? null;
+  }
+
+  private _isConnectableFocusedTile(tile: TileDef | null): tile is TileDef {
+    if (!tile) return false;
+    return (tile.shape === PipeShape.Chamber && tile.chamberContent === 'chapter') ||
+      tile.shape === PipeShape.Source || tile.shape === PipeShape.Sink;
+  }
+
+  private _appendFocusedTileParams(panel: HTMLElement, focusedTile: TileDef, campaign: CampaignDef): void {
+    panel.appendChild(this._buildFocusedConnectionsWidget(panel, focusedTile, campaign));
+    if (focusedTile.shape === PipeShape.Sink) {
+      panel.appendChild(this._buildFocusedSinkCompletionWidget(panel, focusedTile, campaign));
+    }
+  }
+
+  private _appendPaletteTileParams(panel: HTMLElement, campaign: CampaignDef): void {
+    panel.appendChild(this._buildPaletteConnectionsWidget(panel, campaign));
+    if (this._palette === PipeShape.Sink) {
+      panel.appendChild(this._buildSinkCompletionWidget(panel, campaign));
+    }
+  }
+
+  private _appendNoParamsNote(panel: HTMLElement): void {
+    const note = document.createElement('div');
+    note.style.cssText = 'font-size:0.78rem;color:#555;';
+    note.textContent = t('editor.params.noneForTile');
+    panel.appendChild(note);
   }
 
   private _buildGridSizePanel(campaign: CampaignDef): HTMLElement {
