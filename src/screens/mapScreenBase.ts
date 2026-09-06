@@ -427,13 +427,22 @@ export abstract class MapScreenBase {
     const filledKeys = this._computeFilledCells();
     const rows = chapter.rows ?? 3;
     const cols = chapter.cols ?? 6;
-    const grid = chapter.grid;
+    return this._isFilledSinkComplete(chapter, chapter.grid, rows, cols, filledKeys, displayProgress);
+  }
+
+  private _isFilledSinkComplete(
+    chapter: ChapterDef,
+    grid: (TileDef | null)[][],
+    rows: number,
+    cols: number,
+    filledKeys: Set<string>,
+    displayProgress: Set<number>,
+  ): boolean {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const tileDef = grid[r]?.[c];
-        if (tileDef?.shape === PipeShape.Sink && filledKeys.has(`${r},${c}`)) {
-          return this._sinkRemaining(tileDef, chapter, displayProgress) <= 0;
-        }
+        if (tileDef?.shape !== PipeShape.Sink || !filledKeys.has(`${r},${c}`)) continue;
+        return this._sinkRemaining(tileDef, chapter, displayProgress) <= 0;
       }
     }
     return false;
