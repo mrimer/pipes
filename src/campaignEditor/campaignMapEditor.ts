@@ -828,40 +828,8 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const ctx = this._ctx;
     if (!ctx) return;
 
-    let overlay: HoverOverlay | null = null;
-    let drag: DragState | null = null;
-
-    if (this._dragState) {
-      drag = {
-        fromPos: this._dragState.startPos,
-        toPos: this._dragState.currentPos,
-        tile: this._dragState.tile,
-      };
-    }
-
-    if (!drag && this._hover) {
-      const hover = this._hover;
-      if (this._palette === 'erase') {
-        const cell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
-        overlay = { pos: hover, def: null, alpha: cell === null ? 0.2 : 1 };
-      } else if (this._selectedChapterIdx !== null) {
-        const cell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
-        const isEmpty = cell === null || (cell !== null && isEmptyFloor(cell.shape));
-        if (isEmpty) {
-          overlay = {
-            pos: hover,
-            def: { shape: PipeShape.Chamber, chamberContent: 'chapter', chapterIdx: this._selectedChapterIdx },
-            alpha: 0.55,
-          };
-        }
-      } else {
-        const cell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
-        const isEmpty = cell === null || (cell !== null && isEmptyFloor(cell.shape));
-        if (isEmpty) {
-          overlay = { pos: hover, def: this._buildTileDef(), alpha: 0.55 };
-        }
-      }
-    }
+    const drag = this._computeCanvasDrag();
+    const overlay = drag ? null : this._computeHoverOverlay();
 
     const filledKeys = this._computeFilledCells();
 
@@ -905,6 +873,47 @@ export class CampaignMapEditorSection extends MapEditorBase {
     drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);
 
     ctx.restore();
+  }
+
+  private _computeCanvasDrag(): DragState | null {
+    if (!this._dragState) return null;
+    return {
+      fromPos: this._dragState.startPos,
+      toPos: this._dragState.currentPos,
+      tile: this._dragState.tile,
+    };
+  }
+
+  private _computeHoverOverlay(): HoverOverlay | null {
+    const hover = this._hover;
+    if (!hover) return null;
+    if (this._palette === 'erase') return this._computeEraseHoverOverlay(hover);
+    if (this._selectedChapterIdx !== null) return this._computeChapterPlacementHoverOverlay(hover, this._selectedChapterIdx);
+    return this._computeTilePlacementHoverOverlay(hover);
+  }
+
+  private _computeEraseHoverOverlay(hover: { row: number; col: number }): HoverOverlay {
+    const cell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
+    return { pos: hover, def: null, alpha: cell === null ? 0.2 : 1 };
+  }
+
+  private _isHoverCellEmpty(hover: { row: number; col: number }): boolean {
+    const cell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
+    return cell === null || isEmptyFloor(cell.shape);
+  }
+
+  private _computeChapterPlacementHoverOverlay(hover: { row: number; col: number }, chapterIdx: number): HoverOverlay | null {
+    if (!this._isHoverCellEmpty(hover)) return null;
+    return {
+      pos: hover,
+      def: { shape: PipeShape.Chamber, chamberContent: 'chapter', chapterIdx },
+      alpha: 0.55,
+    };
+  }
+
+  private _computeTilePlacementHoverOverlay(hover: { row: number; col: number }): HoverOverlay | null {
+    if (!this._isHoverCellEmpty(hover)) return null;
+    return { pos: hover, def: this._buildTileDef(), alpha: 0.55 };
   }
 
   /** RAF callback that keeps animated sea tiles updating while this editor is active. */
