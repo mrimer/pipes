@@ -3272,20 +3272,23 @@ function _oneWayBlocksDir(owDir: Direction | undefined, dir: Direction): boolean
   return owDir !== undefined && dir === oppositeDirection(owDir);
 }
 
-function _wouldConnectToNeighbor(
-  previewTile: Tile, neighbor: Tile, dir: Direction, oppDir: Direction, neighborOwDir: Direction | undefined,
-): boolean {
-  // The preview tile carries no one-way property, but the neighbor may block entry.
-  // In areMutuallyConnected the "to" (neighbor) one-way blocks when dir === opposite(toOwDir).
-  return previewTile.connections.has(dir) && neighbor.connections.has(oppDir) && !_oneWayBlocksDir(neighborOwDir, dir);
+interface NeighborEdge {
+  neighbor: Tile;
+  dir: Direction;
+  oppDir: Direction;
+  neighborOwDir: Direction | undefined;
 }
 
-function _isCurrentlyConnectedToNeighbor(
-  currentTile: Tile, neighbor: Tile, dir: Direction, oppDir: Direction,
-  hoverOwDir: Direction | undefined, neighborOwDir: Direction | undefined,
-): boolean {
-  return currentTile.connections.has(dir) && neighbor.connections.has(oppDir)
-    && !_oneWayBlocksDir(hoverOwDir, dir) && !_oneWayBlocksDir(neighborOwDir, dir);
+function _wouldConnectToNeighbor(previewTile: Tile, edge: NeighborEdge): boolean {
+  // The preview tile carries no one-way property, but the neighbor may block entry.
+  // In areMutuallyConnected the "to" (neighbor) one-way blocks when dir === opposite(toOwDir).
+  return previewTile.connections.has(edge.dir) && edge.neighbor.connections.has(edge.oppDir)
+    && !_oneWayBlocksDir(edge.neighborOwDir, edge.dir);
+}
+
+function _isCurrentlyConnectedToNeighbor(currentTile: Tile, edge: NeighborEdge, hoverOwDir: Direction | undefined): boolean {
+  return currentTile.connections.has(edge.dir) && edge.neighbor.connections.has(edge.oppDir)
+    && !_oneWayBlocksDir(hoverOwDir, edge.dir) && !_oneWayBlocksDir(edge.neighborOwDir, edge.dir);
 }
 
 function _resolveConnectionPreviewColor(wouldDisconnect: boolean, isNeighborFilled: boolean): string {
@@ -3334,8 +3337,9 @@ function _resolveConnectionPreviewColorForDir(dir: Direction, c: ConnectionPrevi
   const neighborKey = posKey(pos.nr, pos.nc);
   const neighborOwDir = c.board.oneWayData.get(neighborKey);
 
-  const wouldConnect = _wouldConnectToNeighbor(c.previewTile, neighbor, dir, oppDir, neighborOwDir);
-  const currentlyConnected = _isCurrentlyConnectedToNeighbor(c.currentTile, neighbor, dir, oppDir, c.hoverOwDir, neighborOwDir);
+  const edge: NeighborEdge = { neighbor, dir, oppDir, neighborOwDir };
+  const wouldConnect = _wouldConnectToNeighbor(c.previewTile, edge);
+  const currentlyConnected = _isCurrentlyConnectedToNeighbor(c.currentTile, edge, c.hoverOwDir);
   const wouldDisconnect = currentlyConnected && !wouldConnect;
   if (!wouldConnect && !wouldDisconnect) return null;
 
@@ -3363,9 +3367,16 @@ function _traceConnectionPreviewEdgePath(ctx: CanvasRenderingContext2D, dir: Dir
   }
 }
 
+interface ConnectionPreviewEdgeGeom {
+  px: number;
+  py: number;
+  alpha: number;
+}
+
 function _strokeConnectionPreviewEdge(
-  ctx: CanvasRenderingContext2D, dir: Direction, px: number, py: number, color: string, alpha: number,
+  ctx: CanvasRenderingContext2D, dir: Direction, color: string, geom: ConnectionPreviewEdgeGeom,
 ): void {
+  const { px, py, alpha } = geom;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
@@ -3397,10 +3408,11 @@ function _renderConnectionPreview(ctx: CanvasRenderingContext2D, geom: HoverPrev
     board, hoverRow, hoverCol, previewTile, currentTile, hoverOwDir, filledPositions,
   };
 
+  const edgeGeom: ConnectionPreviewEdgeGeom = { px, py, alpha };
   for (const [dir] of CARDINAL_DIRS) {
     const color = _resolveConnectionPreviewColorForDir(dir, neighborCtx);
     if (color === null) continue;
-    _strokeConnectionPreviewEdge(ctx, dir, px, py, color, alpha);
+    _strokeConnectionPreviewEdge(ctx, dir, color, edgeGeom);
   }
 }
 
