@@ -1278,71 +1278,89 @@ export class CampaignMapEditorSection extends MapEditorBase {
   }
 
   private _onMouseMove(e: MouseEvent): void {
-    // Handle pan drag (middle-mouse).
-    if (this._panDrag && this._advancePanDrag(this._panDrag, e)) {
-      this._renderCanvas();
-      return;
-    }
-
-    // Shift+left-drag pan: the candidate may have been started without a dragState
-    // (e.g. on an empty cell), so allow pan to begin as soon as the pointer moves
-    // far enough, regardless of whether _dragState is set.
-    if (this._leftPanCandidate) {
-      if (this._advancePanDrag(this._leftPanCandidate, e)) {
-        this._dragState = null;
-        this._hover = null;
-        this._renderCanvas();
-        return;
-      }
-    }
+    if (this._advanceActivePanDrags(e)) return;
 
     const pos = this._canvasPos(e);
     this._hover = pos;
-
-    if (this._canvas) {
-      const tile = pos ? (this._gridState.grid[pos.row]?.[pos.col] ?? null) : null;
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'chapter' && tile.chapterIdx !== undefined) {
-        const camp = this._cbs.getActiveCampaign();
-        const chapter = camp?.chapters[tile.chapterIdx];
-        this._canvas.title = chapter
-          ? `Ch-${tile.chapterIdx + 1}: ${resolveLocalizedText(chapter.name)}`
-          : `Chapter ${tile.chapterIdx + 1}`;
-      } else {
-        this._canvas.title = '';
-      }
-    }
-
-    if (this._paintDragActive && pos) {
-      const cur = this._gridState.grid[pos.row]?.[pos.col] ?? null;
-      const canOverwriteTree = cur !== null &&
-        REPEATABLE_EDITOR_TILES.has(this._palette) &&
-        isTreeShape(this._palette as PipeShape) &&
-        isTreeShape(cur.shape);
-      if (cur === null || isEmptyFloor(cur.shape) || canOverwriteTree) {
-        this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
-      }
-    } else if (this._rightEraseDragActive && pos) {
-      if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) !== null) {
-        this._gridState.grid[pos.row][pos.col] = null;
-        this._gridState.clearFocusIfAt(pos);
-        this._rightEraseChanged = true;
-      }
-    } else if (this._dragState && pos) {
-      const { startPos, currentPos } = this._dragState;
-      if (pos.row !== currentPos.row || pos.col !== currentPos.col) {
-        if (pos.row === startPos.row && pos.col === startPos.col) {
-          this._dragState.currentPos = pos;
-          this._dragState.moved = false;
-        } else {
-          const targetTile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
-          if (targetTile === null || isEmptyFloor(targetTile.shape)) {
-            this._dragState.currentPos = pos;
-            this._dragState.moved = true;
-          }
-        }
-      }
-    }
+    this._updateHoverTooltip(pos);
+    this._advanceActiveEditGesture(pos);
     this._renderCanvas();
+  }
+
+  /** Advances a middle-mouse pan drag or a shift+left-drag pan candidate. Returns whether the move was fully handled. */
+  private _advanceActivePanDrags(e: MouseEvent): boolean {
+    if (this._panDrag && this._advancePanDrag(this._panDrag, e)) {
+      this._renderCanvas();
+      return true;
+    }
+    // Shift+left-drag pan: the candidate may have been started without a dragState
+    // (e.g. on an empty cell), so allow pan to begin as soon as the pointer moves
+    // far enough, regardless of whether _dragState is set.
+    if (this._leftPanCandidate && this._advancePanDrag(this._leftPanCandidate, e)) {
+      this._dragState = null;
+      this._hover = null;
+      this._renderCanvas();
+      return true;
+    }
+    return false;
+  }
+
+  private _updateHoverTooltip(pos: { row: number; col: number } | null): void {
+    if (!this._canvas) return;
+    const tile = pos ? (this._gridState.grid[pos.row]?.[pos.col] ?? null) : null;
+    if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'chapter' && tile.chapterIdx !== undefined) {
+      this._canvas.title = this._formatChapterTileTitle(tile.chapterIdx);
+    } else {
+      this._canvas.title = '';
+    }
+  }
+
+  private _formatChapterTileTitle(chapterIdx: number): string {
+    const camp = this._cbs.getActiveCampaign();
+    const chapter = camp?.chapters[chapterIdx];
+    return chapter
+      ? `Ch-${chapterIdx + 1}: ${resolveLocalizedText(chapter.name)}`
+      : `Chapter ${chapterIdx + 1}`;
+  }
+
+  private _advanceActiveEditGesture(pos: { row: number; col: number } | null): void {
+    if (!pos) return;
+    if (this._paintDragActive) { this._advancePaintDrag(pos); return; }
+    if (this._rightEraseDragActive) { this._advanceEraseDrag(pos); return; }
+    if (this._dragState) this._advanceTileDrag(pos, this._dragState);
+  }
+
+  private _advancePaintDrag(pos: { row: number; col: number }): void {
+    const cur = this._gridState.grid[pos.row]?.[pos.col] ?? null;
+    const canOverwriteTree = cur !== null &&
+      REPEATABLE_EDITOR_TILES.has(this._palette) &&
+      isTreeShape(this._palette as PipeShape) &&
+      isTreeShape(cur.shape);
+    if (cur === null || isEmptyFloor(cur.shape) || canOverwriteTree) {
+      this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
+    }
+  }
+
+  private _advanceEraseDrag(pos: { row: number; col: number }): void {
+    if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) === null) return;
+    this._gridState.grid[pos.row][pos.col] = null;
+    this._gridState.clearFocusIfAt(pos);
+    this._rightEraseChanged = true;
+  }
+
+  private _advanceTileDrag(pos: { row: number; col: number }, dragState: CampaignDragState): void {
+    const { startPos, currentPos } = dragState;
+    if (pos.row === currentPos.row && pos.col === currentPos.col) return;
+    if (pos.row === startPos.row && pos.col === startPos.col) {
+      dragState.currentPos = pos;
+      dragState.moved = false;
+      return;
+    }
+    const targetTile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
+    if (targetTile === null || isEmptyFloor(targetTile.shape)) {
+      dragState.currentPos = pos;
+      dragState.moved = true;
+    }
   }
 
   private _onRightClick(e: MouseEvent, campaign: CampaignDef): void {
