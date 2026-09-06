@@ -4,7 +4,7 @@
  * write only to the supplied CanvasRenderingContext2D.
  */
 
-import type { TileDef, LevelDef, Rotation, LevelStyle } from '../types';
+import type { TileDef, LevelDef, Rotation, LevelStyle, ChamberContent } from '../types';
 import { PipeShape, Direction } from '../types';
 import type { SeaNeighbors} from '../renderer';
 import { TILE_SIZE, LINE_WIDTH, drawSpinArrow, scalePx as _s, drawSea, computeSeaNeighbors, seaFillColor, drawOneWayArrow, drawCementLabel, drawTree, drawTree2, drawTree3, drawTree4 } from '../renderer';
@@ -429,134 +429,178 @@ export function drawEditorTile(ctx: CanvasRenderingContext2D, x: number, y: numb
   const { shape } = def;
   const chamberContent = def.chamberContent ?? 'tank';
 
-  // Level chambers are handled separately – delegate to drawLevelChamberTile.
-  if (shape === PipeShape.Chamber && chamberContent === 'level') {
-    const connections = def.connections ? new Set(def.connections) : new Set([
-      Direction.North, Direction.East, Direction.South, Direction.West,
-    ]);
-    drawLevelChamberTile(ctx, x, y, undefined, (def.levelIdx ?? 0) + 1, connections);
-    return;
-  }
+  if (_tryDrawChamberTile(ctx, x, y, shape, chamberContent, def)) return;
+  if (_tryDrawEmptyFloorLabelTile(ctx, x, y, shape)) return;
+  if (_tryDrawPlainEmptyTile(ctx, x, y, shape)) return;
 
-  // Chapter chambers (campaign map editor) – render identically to level chambers,
-  // using chapterIdx + 1 as the display number.
-  if (shape === PipeShape.Chamber && chamberContent === 'chapter') {
-    const connections = def.connections ? new Set(def.connections) : new Set([
-      Direction.North, Direction.East, Direction.South, Direction.West,
-    ]);
-    drawLevelChamberTile(ctx, x, y, undefined, (def.chapterIdx ?? 0) + 1, connections);
-    return;
-  }
-
-  // EmptyFall/EmptyDark/EmptyWinter/EmptySpring: render as empty cell with label
-  if (isEmptyFloor(shape) && shape !== PipeShape.Empty) {
-    ctx.fillStyle = '#1a2840';
-    ctx.fillRect(x, y, CELL, CELL);
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#2a3a5e';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#2a3a5e';
-    ctx.beginPath();
-    ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
-    ctx.fill();
-    const label = shape === PipeShape.EmptyFall ? 'Fall'
-                : shape === PipeShape.EmptyWinter ? 'Winter'
-                : shape === PipeShape.EmptySpring ? 'Spring'
-                : 'Dark';
-    ctx.save();
-    ctx.font = `bold ${_s(8)}px Arial`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = shape === PipeShape.EmptyFall ? '#c4926a'
-                  : shape === PipeShape.EmptyWinter ? '#8ab0cc'
-                  : shape === PipeShape.EmptySpring ? '#7ab060'
-                  : '#8888aa';
-    ctx.fillText(label, x + _s(3), y + _s(3));
-    ctx.restore();
-    return;
-  }
-
-  // PipeShape.Empty: render as empty cell (no label)
-  if (shape === PipeShape.Empty) {
-    ctx.fillStyle = '#1a2840';
-    ctx.fillRect(x, y, CELL, CELL);
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#2a3a5e';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
-    ctx.setLineDash([]);
-    return;
-  }
-
-  // Background color
-  let bgColor: string;
-  if (shape === PipeShape.Chamber) {
-    bgColor = chamberColor(chamberContent);
-  } else if (shape === PipeShape.GoldSpace) {
-    bgColor = '#b8860b';
-  } else if (shape === PipeShape.OneWay) {
-    bgColor = ONE_WAY_BG_COLOR;
-  } else if (shape === PipeShape.Cement) {
-    bgColor = CEMENT_FILL_COLOR;
-  } else if (SPIN_CEMENT_SHAPES.has(shape)) {
-    bgColor = CEMENT_FILL_COLOR;
-  } else if (shape === PipeShape.Granite) {
-    bgColor = '#4a5568';
-  } else if (shape === PipeShape.Tree) {
-    bgColor = '#1a2840';
-  } else if (shape === PipeShape.Tree2 || shape === PipeShape.Tree3 || shape === PipeShape.Tree4) {
-    bgColor = '#1a2840';
-  } else if (shape === PipeShape.Sea) {
-    bgColor = seaFillColor(style);
-  } else {
-    bgColor = EDITOR_COLORS[shape] ?? '#4a90d9';
-  }
-
-  ctx.fillStyle = bgColor;
+  ctx.fillStyle = _resolveEditorTileBgColor(shape, chamberContent, style);
   ctx.fillRect(x, y, CELL, CELL);
 
-  // Handle OneWay: dark-red background with a direction arrow
-  if (shape === PipeShape.OneWay) {
-    _drawOneWayEditorTile(ctx, x, y, def.rotation ?? 0);
-    return;
-  }
-
-  // Handle Cement directly (no Tile construction needed)
-  if (shape === PipeShape.Cement) {
-    _drawCementEditorTile(ctx, x, y, def.dryingTime ?? 0);
-    return;
-  }
+  if (_tryDrawOneWayOrCementTile(ctx, x, y, def, shape)) return;
 
   // Draw the tile as a Tile object using existing drawTile infrastructure
   // We construct a temporary Tile to render it
-  const rot = (def.rotation ?? 0);
-  const customConns = def.connections ? new Set(def.connections) : null;
-  const firstConns = (def.firstConnections && def.firstConnections.length > 0) ? new Set(def.firstConnections) : null;
-  const tile = new Tile(
-    shape,
-    rot,
-    true,
-    def.capacity ?? 0,
-    def.cost ?? 0,
-    def.itemShape ?? null,
-    def.itemCount ?? 1,
-    customConns,
-    def.chamberContent ?? null,
-    def.temperature ?? 0,
-    def.pressure ?? 0,
-    def.hardness ?? 0,
-    def.shatter ?? 0,
-    firstConns,
-  );
-
+  const tile = _buildEditorTileFromDef(shape, def);
   drawTileOnEditor(ctx, x, y, tile, def, isChapterMap, style, buttEndDirs);
 
   // For spin-cement tiles, draw the cement wavy-line overlay and drying-time label on top.
   if (SPIN_CEMENT_SHAPES.has(shape)) {
     _drawSpinCementOverlay(ctx, x, y, def.dryingTime ?? 0);
   }
+}
+
+/**
+ * Level chambers and chapter chambers (campaign map editor) render identically –
+ * delegates to drawLevelChamberTile, using levelIdx+1 or chapterIdx+1 as the
+ * display number. Returns whether the tile was handled.
+ */
+function _tryDrawChamberTile(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  shape: PipeShape,
+  chamberContent: ChamberContent,
+  def: TileDef,
+): boolean {
+  if (shape !== PipeShape.Chamber) return false;
+  if (chamberContent !== 'level' && chamberContent !== 'chapter') return false;
+  const connections = def.connections ? new Set(def.connections) : new Set([
+    Direction.North, Direction.East, Direction.South, Direction.West,
+  ]);
+  const displayNum = chamberContent === 'level' ? (def.levelIdx ?? 0) + 1 : (def.chapterIdx ?? 0) + 1;
+  drawLevelChamberTile(ctx, x, y, undefined, displayNum, connections);
+  return true;
+}
+
+function _resolveEmptyFloorLabel(shape: PipeShape): string {
+  if (shape === PipeShape.EmptyFall) return 'Fall';
+  if (shape === PipeShape.EmptyWinter) return 'Winter';
+  if (shape === PipeShape.EmptySpring) return 'Spring';
+  return 'Dark';
+}
+
+function _resolveEmptyFloorLabelColor(shape: PipeShape): string {
+  if (shape === PipeShape.EmptyFall) return '#c4926a';
+  if (shape === PipeShape.EmptyWinter) return '#8ab0cc';
+  if (shape === PipeShape.EmptySpring) return '#7ab060';
+  return '#8888aa';
+}
+
+/** EmptyFall/EmptyDark/EmptyWinter/EmptySpring: render as empty cell with a label. Returns whether handled. */
+function _tryDrawEmptyFloorLabelTile(ctx: CanvasRenderingContext2D, x: number, y: number, shape: PipeShape): boolean {
+  if (!isEmptyFloor(shape) || shape === PipeShape.Empty) return false;
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = '#1a2840';
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#2a3a5e';
+  ctx.beginPath();
+  ctx.arc(x + CELL / 2, y + CELL / 2, _s(3), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.font = `bold ${_s(8)}px Arial`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = _resolveEmptyFloorLabelColor(shape);
+  ctx.fillText(_resolveEmptyFloorLabel(shape), x + _s(3), y + _s(3));
+  ctx.restore();
+  return true;
+}
+
+/** PipeShape.Empty: render as empty cell (no label). Returns whether handled. */
+function _tryDrawPlainEmptyTile(ctx: CanvasRenderingContext2D, x: number, y: number, shape: PipeShape): boolean {
+  if (shape !== PipeShape.Empty) return false;
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = '#1a2840';
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, CELL - 1, CELL - 1);
+  ctx.setLineDash([]);
+  return true;
+}
+
+function _isFlatDarkBgShape(shape: PipeShape): boolean {
+  return shape === PipeShape.Tree || shape === PipeShape.Tree2 || shape === PipeShape.Tree3 || shape === PipeShape.Tree4;
+}
+
+/** Static (non-dynamic) editor tile background colors, or null if this shape needs a dynamic color. */
+function _resolveStaticEditorBgColor(shape: PipeShape): string | null {
+  if (shape === PipeShape.GoldSpace) return '#b8860b';
+  if (shape === PipeShape.OneWay) return ONE_WAY_BG_COLOR;
+  if (shape === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(shape)) return CEMENT_FILL_COLOR;
+  if (shape === PipeShape.Granite) return '#4a5568';
+  if (_isFlatDarkBgShape(shape)) return '#1a2840';
+  return null;
+}
+
+function _resolveEditorTileBgColor(shape: PipeShape, chamberContent: ChamberContent, style: LevelStyle | undefined): string {
+  if (shape === PipeShape.Chamber) return chamberColor(chamberContent);
+  const staticColor = _resolveStaticEditorBgColor(shape);
+  if (staticColor !== null) return staticColor;
+  if (shape === PipeShape.Sea) return seaFillColor(style);
+  return EDITOR_COLORS[shape] ?? '#4a90d9';
+}
+
+/** Handles OneWay (dark-red bg + direction arrow) and Cement (no Tile construction needed). Returns whether handled. */
+function _tryDrawOneWayOrCementTile(ctx: CanvasRenderingContext2D, x: number, y: number, def: TileDef, shape: PipeShape): boolean {
+  if (shape === PipeShape.OneWay) {
+    _drawOneWayEditorTile(ctx, x, y, def.rotation ?? 0);
+    return true;
+  }
+  if (shape === PipeShape.Cement) {
+    _drawCementEditorTile(ctx, x, y, def.dryingTime ?? 0);
+    return true;
+  }
+  return false;
+}
+
+function _resolveEditorTileDefaultsA(def: TileDef): { capacity: number; cost: number; itemShape: PipeShape | null; itemCount: number } {
+  return {
+    capacity: def.capacity ?? 0,
+    cost: def.cost ?? 0,
+    itemShape: def.itemShape ?? null,
+    itemCount: def.itemCount ?? 1,
+  };
+}
+
+function _resolveEditorTileDefaultsB(def: TileDef): { chamberContent: ChamberContent | null; temperature: number; pressure: number; hardness: number; shatter: number } {
+  return {
+    chamberContent: def.chamberContent ?? null,
+    temperature: def.temperature ?? 0,
+    pressure: def.pressure ?? 0,
+    hardness: def.hardness ?? 0,
+    shatter: def.shatter ?? 0,
+  };
+}
+
+function _buildEditorTileFromDef(shape: PipeShape, def: TileDef): Tile {
+  const rot = (def.rotation ?? 0);
+  const customConns = def.connections ? new Set(def.connections) : null;
+  const firstConns = (def.firstConnections && def.firstConnections.length > 0) ? new Set(def.firstConnections) : null;
+  const a = _resolveEditorTileDefaultsA(def);
+  const b = _resolveEditorTileDefaultsB(def);
+  return new Tile(
+    shape,
+    rot,
+    true,
+    a.capacity,
+    a.cost,
+    a.itemShape,
+    a.itemCount,
+    customConns,
+    b.chamberContent,
+    b.temperature,
+    b.pressure,
+    b.hardness,
+    b.shatter,
+    firstConns,
+  );
 }
 
 /** Chamber content types whose tile label/detail text is rendered 1pt larger than the default. */
