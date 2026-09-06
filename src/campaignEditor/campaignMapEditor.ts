@@ -578,13 +578,27 @@ export class CampaignMapEditorSection extends MapEditorBase {
     panel.appendChild(titleEl);
 
     if (campaign.chapters.length === 0) {
-      const msg = document.createElement('div');
-      msg.style.cssText = 'font-size:0.8rem;color:#555;';
-      msg.textContent = t('editor.campaignMap.addChaptersHint');
-      panel.appendChild(msg);
+      this._appendNoChaptersHint(panel);
       return panel;
     }
 
+    const placedChapters = this._computePlacedChapterIndices();
+
+    for (let ci = 0; ci < campaign.chapters.length; ci++) {
+      panel.appendChild(this._buildChapterInventoryButton(panel, campaign, ci, placedChapters));
+    }
+
+    return panel;
+  }
+
+  private _appendNoChaptersHint(panel: HTMLElement): void {
+    const msg = document.createElement('div');
+    msg.style.cssText = 'font-size:0.8rem;color:#555;';
+    msg.textContent = t('editor.campaignMap.addChaptersHint');
+    panel.appendChild(msg);
+  }
+
+  private _computePlacedChapterIndices(): Set<number> {
     const placedChapters = new Set<number>();
     for (const row of this._gridState.grid) {
       for (const tile of row) {
@@ -593,45 +607,52 @@ export class CampaignMapEditorSection extends MapEditorBase {
         }
       }
     }
+    return placedChapters;
+  }
 
-    for (let ci = 0; ci < campaign.chapters.length; ci++) {
-      const chapter = campaign.chapters[ci];
-      const isPlaced = placedChapters.has(ci);
-      const isSelected = this._selectedChapterIdx === ci;
+  private _buildChapterInventoryButton(
+    panel: HTMLElement,
+    campaign: CampaignDef,
+    ci: number,
+    placedChapters: Set<number>,
+  ): HTMLButtonElement {
+    const chapter = campaign.chapters[ci];
+    const isPlaced = placedChapters.has(ci);
+    const isSelected = this._selectedChapterIdx === ci;
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = `Ch-${ci + 1}: ${resolveLocalizedText(chapter.name)}${isPlaced ? ' ✓' : ''}`;
-      btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.campaignMap.selectToPlaceChapter', { index: ci + 1 });
-      btn.disabled = isPlaced;
-      btn.style.cssText =
-        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};` +
-        (isPlaced
-          ? 'border:1px solid #555;background:#1a1a1a;color:#555;cursor:default;opacity:0.6;'
-          : isSelected
-            ? 'border:1px solid #f0c040;background:#2a2a10;color:#f0c040;cursor:pointer;'
-            : 'border:1px solid #4a90d9;background:#0a1520;color:#7ed321;cursor:pointer;');
-      if (!isPlaced) {
-        btn.addEventListener('mousedown', () => {
-          if (this._selectedChapterIdx === ci) {
-            this._selectedChapterIdx = null;
-          } else {
-            this._selectedChapterIdx = ci;
-            // Clear any active palette tool selection so the palette panel
-            // reflects "no tile active" while the chapter placement is pending.
-            this._palette = CHAPTER_CHAMBER_PALETTE;
-            document.getElementById('campaign-map-palette-panel')
-              ?.replaceWith(this._buildPalettePanel(campaign));
-            sfxManager.play(SfxId.LevelSelect);
-          }
-          panel.replaceWith(this._buildChapterInventoryPanel(campaign));
-          this._renderCanvas();
-        });
-      }
-      panel.appendChild(btn);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `Ch-${ci + 1}: ${resolveLocalizedText(chapter.name)}${isPlaced ? ' ✓' : ''}`;
+    btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.campaignMap.selectToPlaceChapter', { index: ci + 1 });
+    btn.disabled = isPlaced;
+    btn.style.cssText = this._chapterInventoryButtonStyle(isPlaced, isSelected);
+    if (!isPlaced) {
+      btn.addEventListener('mousedown', () => this._onChapterInventoryButtonClick(ci, campaign, panel));
     }
+    return btn;
+  }
 
-    return panel;
+  private _chapterInventoryButtonStyle(isPlaced: boolean, isSelected: boolean): string {
+    const base = `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};`;
+    if (isPlaced) return base + 'border:1px solid #555;background:#1a1a1a;color:#555;cursor:default;opacity:0.6;';
+    if (isSelected) return base + 'border:1px solid #f0c040;background:#2a2a10;color:#f0c040;cursor:pointer;';
+    return base + 'border:1px solid #4a90d9;background:#0a1520;color:#7ed321;cursor:pointer;';
+  }
+
+  private _onChapterInventoryButtonClick(ci: number, campaign: CampaignDef, panel: HTMLElement): void {
+    if (this._selectedChapterIdx === ci) {
+      this._selectedChapterIdx = null;
+    } else {
+      this._selectedChapterIdx = ci;
+      // Clear any active palette tool selection so the palette panel
+      // reflects "no tile active" while the chapter placement is pending.
+      this._palette = CHAPTER_CHAMBER_PALETTE;
+      document.getElementById('campaign-map-palette-panel')
+        ?.replaceWith(this._buildPalettePanel(campaign));
+      sfxManager.play(SfxId.LevelSelect);
+    }
+    panel.replaceWith(this._buildChapterInventoryPanel(campaign));
+    this._renderCanvas();
   }
 
   private _buildTileParamsPanel(campaign: CampaignDef): HTMLElement {
