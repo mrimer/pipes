@@ -800,11 +800,13 @@ export function drawTree(ctx: CanvasRenderingContext2D, half: number, style?: Le
  * Draw a clipped circular shadow for a tree canopy.
  * Skipped for Dark style (no strong light source).
  */
-function _drawTreeCircleShadow(
+/** Shared clip/fill setup for a tree's ground shadow; drawShape draws the actual arc/ellipse path. */
+function _drawTreeShadow(
   ctx: CanvasRenderingContext2D,
   half: number,
   r: number,
   style: LevelStyle | undefined,
+  drawShape: (ctx: CanvasRenderingContext2D, shadowOff: number, r: number) => void,
 ): void {
   if (style === 'Dark') return;
   const shadowOff = half * 0.18;
@@ -814,9 +816,18 @@ function _drawTreeCircleShadow(
   ctx.clip();
   ctx.fillStyle = TREE_SHADOW_COLOR;
   ctx.beginPath();
-  ctx.arc(shadowOff, shadowOff, r, 0, Math.PI * 2);
+  drawShape(ctx, shadowOff, r);
   ctx.fill();
   ctx.restore();
+}
+
+function _drawTreeCircleShadow(
+  ctx: CanvasRenderingContext2D,
+  half: number,
+  r: number,
+  style: LevelStyle | undefined,
+): void {
+  _drawTreeShadow(ctx, half, r, style, (c, off, radius) => c.arc(off, off, radius, 0, Math.PI * 2));
 }
 
 /**
@@ -841,17 +852,7 @@ function _drawTreeEllipseShadow(
   r: number,
   style: LevelStyle | undefined,
 ): void {
-  if (style === 'Dark') return;
-  const shadowOff = half * 0.18;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-half, -half, half * 2, half * 2);
-  ctx.clip();
-  ctx.fillStyle = TREE_SHADOW_COLOR;
-  ctx.beginPath();
-  ctx.ellipse(shadowOff, shadowOff, r * 1.05, r * 0.95, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  _drawTreeShadow(ctx, half, r, style, (c, off, radius) => c.ellipse(off, off, radius * 1.05, radius * 0.95, 0, 0, Math.PI * 2));
 }
 
 /**
