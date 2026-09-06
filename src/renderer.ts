@@ -3241,14 +3241,8 @@ function _computePreviewPulseAlpha(now: number): number {
  * Applies a slowly-pulsing alpha and a yellow glow so the preview is visually
  * distinct from a live tile without obscuring what is beneath it.
  */
-function _drawPreviewTile(
-  ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
-  previewTile: Tile,
-  currentWater: number,
-  now: number,
-): void {
+function _drawPreviewTile(ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom, previewTile: Tile): void {
+  const { px, py, currentWater, now } = geom;
   ctx.save();
   ctx.globalAlpha = _computePreviewPulseAlpha(now);
   ctx.shadowColor = PREVIEW_SHADOW_COLOR;
@@ -3447,22 +3441,24 @@ interface HoverPreviewGeom {
   now: number;
 }
 
-function _canPlaceOrReplaceHoverPreview(
-  hoverTile: Tile, selectedShape: PipeShape, pendingRotation: number, selectedIsGold: boolean, isGoldCell: boolean,
-): boolean {
-  const canPlace = isEmptyFloor(hoverTile.shape) && (!isGoldCell || selectedIsGold);
-  const canReplace = isReplaceableByShape(hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
+interface PlacementSelection {
+  selectedShape: PipeShape;
+  pendingRotation: number;
+  selectedIsGold: boolean;
+  isGoldCell: boolean;
+}
+
+function _canPlaceOrReplaceHoverPreview(hoverTile: Tile, sel: PlacementSelection): boolean {
+  const canPlace = isEmptyFloor(hoverTile.shape) && (!sel.isGoldCell || sel.selectedIsGold);
+  const canReplace = isReplaceableByShape(hoverTile, sel.selectedShape, sel.pendingRotation, sel.selectedIsGold, sel.isGoldCell);
   return canPlace || canReplace;
 }
 
 /** Inventory item placement preview: the tile that would result from placing/replacing at the hovered cell. */
-function _renderPlacementHoverPreview(
-  ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom,
-  selectedShape: PipeShape, pendingRotation: number, selectedIsGold: boolean, isGoldCell: boolean,
-): void {
-  if (!_canPlaceOrReplaceHoverPreview(geom.hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell)) return;
-  const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
-  _drawPreviewTile(ctx, geom.px, geom.py, previewTile, geom.currentWater, geom.now);
+function _renderPlacementHoverPreview(ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom, sel: PlacementSelection): void {
+  if (!_canPlaceOrReplaceHoverPreview(geom.hoverTile, sel)) return;
+  const previewTile = new Tile(sel.selectedShape, ((sel.pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
+  _drawPreviewTile(ctx, geom, previewTile);
   _renderConnectionPreview(ctx, geom, previewTile);
 }
 
@@ -3483,7 +3479,7 @@ function _buildRotationPreviewTile(hoverTile: Tile, hoverRotationDelta: number):
 function _renderRotationHoverPreview(ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom, hoverRotationDelta: number): void {
   if (!_canShowRotationHoverPreview(geom.hoverTile)) return;
   const previewTile = _buildRotationPreviewTile(geom.hoverTile, hoverRotationDelta);
-  _drawPreviewTile(ctx, geom.px, geom.py, previewTile, geom.currentWater, geom.now);
+  _drawPreviewTile(ctx, geom, previewTile);
   _renderConnectionPreview(ctx, geom, previewTile);
 }
 
@@ -3506,7 +3502,7 @@ function _renderHoverPreview(ctx: CanvasRenderingContext2D, opts: RenderHoverPre
   };
 
   if (selectedShape !== null) {
-    _renderPlacementHoverPreview(ctx, geom, selectedShape, pendingRotation, selectedIsGold, isGoldCell);
+    _renderPlacementHoverPreview(ctx, geom, { selectedShape, pendingRotation, selectedIsGold, isGoldCell });
   } else if (hoverRotationDelta > 0) {
     _renderRotationHoverPreview(ctx, geom, hoverRotationDelta);
   }
