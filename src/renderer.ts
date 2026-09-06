@@ -1373,6 +1373,11 @@ export function drawGoldKeyholeGlyph(
  *  - Cement cells without a pipe or spin pipe (tracked in board.cementData)
  *  - One-way cells             (tracked separately in board.oneWayData)
  */
+/** True when (r, c) falls outside the board's grid bounds. */
+function _isOutOfBoundsCell(board: Board, r: number, c: number): boolean {
+  return r < 0 || r >= board.rows || c < 0 || c >= board.cols;
+}
+
 function _isOpenFloorCell(board: Board, nr: number, nc: number): boolean {
   return isEmptyFloor(board.grid[nr][nc].shape);
 }
@@ -1417,7 +1422,7 @@ function _computeButtEndDirs(board: Board, r: number, c: number): Set<Direction>
   return computeButtEndDirs(tile.connections, (dir) => {
     const delta = NEIGHBOUR_DELTA[dir];
     const nr = r + delta.row, nc = c + delta.col;
-    if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) return null;
+    if (_isOutOfBoundsCell(board, nr, nc)) return null;
     if (_isOpenFloorCell(board, nr, nc)) return null;
     const t = board.grid[nr][nc];
     return { shape: t.shape, connections: t.connections };
@@ -2420,7 +2425,7 @@ function _drawHexBoltHead(ctx: CanvasRenderingContext2D, bx: number, by: number)
  */
 /** True when the cell at (nr, nc) is a fixed pipe tile. */
 function _isFixedPipeTile(board: Board, nr: number, nc: number): boolean {
-  if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) return false;
+  if (_isOutOfBoundsCell(board, nr, nc)) return false;
   const t = board.grid[nr][nc];
   return t.isFixed && PIPE_SHAPES.has(t.shape);
 }
@@ -2488,7 +2493,7 @@ function _renderPass6ErrorHighlights(
   ctx.lineWidth = 3;
   for (const key of highlightedPositions) {
     const [r, c] = parseKey(key);
-    if (r < 0 || r >= board.rows || c < 0 || c >= board.cols) continue;
+    if (_isOutOfBoundsCell(board, r, c)) continue;
     const x = c * TILE_SIZE;
     const y = r * TILE_SIZE;
     ctx.fillRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
@@ -2525,17 +2530,25 @@ function _needsEffectiveFilledOverride(fillExclude: Set<string> | undefined, dra
   return (fillExclude !== undefined && fillExclude.size > 0) || (drainInclude !== undefined && drainInclude.size > 0);
 }
 
+/** Remove every key in `keys` (if given) from `target`, in place. */
+function _removeKeysFromSet(target: Set<string>, keys: Set<string> | undefined): void {
+  if (!keys) return;
+  for (const k of keys) target.delete(k);
+}
+
+/** Add every key in `keys` (if given) to `target`, in place. */
+function _addKeysToSet(target: Set<string>, keys: Set<string> | undefined): void {
+  if (!keys) return;
+  for (const k of keys) target.add(k);
+}
+
 function _computeEffectiveFilledPositions(
   filled: Set<string>, fillExclude: Set<string> | undefined, drainInclude: Set<string> | undefined,
 ): Set<string> {
   if (!_needsEffectiveFilledOverride(fillExclude, drainInclude)) return filled;
   const effectiveFilled = new Set<string>(filled);
-  if (fillExclude) {
-    for (const k of fillExclude) effectiveFilled.delete(k);
-  }
-  if (drainInclude) {
-    for (const k of drainInclude) effectiveFilled.add(k);
-  }
+  _removeKeysFromSet(effectiveFilled, fillExclude);
+  _addKeysToSet(effectiveFilled, drainInclude);
   return effectiveFilled;
 }
 
@@ -2976,7 +2989,7 @@ function _computeSeaNeighborsForTile(board: Board, tile: Tile, r: number, c: num
   if (tile.shape !== PipeShape.Sea) return undefined;
   return computeSeaNeighbors((dr, dc) => {
     const nr = r + dr, nc = c + dc;
-    return nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols || board.grid[nr][nc].shape === PipeShape.Sea;
+    return _isOutOfBoundsCell(board, nr, nc) || board.grid[nr][nc].shape === PipeShape.Sea;
   });
 }
 
@@ -3274,7 +3287,7 @@ function _computeNeighborGridPos(
   const delta = NEIGHBOUR_DELTA[dir];
   const nr = hoverRow + delta.row;
   const nc = hoverCol + delta.col;
-  if (nr < 0 || nr >= board.rows || nc < 0 || nc >= board.cols) return null;
+  if (_isOutOfBoundsCell(board, nr, nc)) return null;
   return { nr, nc };
 }
 
@@ -3409,7 +3422,7 @@ function _computeHoverGridPosInBounds(
 ): { row: number; col: number } | null {
   const col = Math.floor(mouseCanvasPos.x / TILE_SIZE);
   const row = Math.floor(mouseCanvasPos.y / TILE_SIZE);
-  if (row < 0 || row >= board.rows || col < 0 || col >= board.cols) return null;
+  if (_isOutOfBoundsCell(board, row, col)) return null;
   return { row, col };
 }
 
