@@ -3394,18 +3394,9 @@ function _strokeConnectionPreviewEdge(
  * @param previewTile  - The tile that would be placed / result from rotation.
  * @param filledPositions - Set of posKey strings for water-filled cells.
  */
-function _renderConnectionPreview(
-  ctx: CanvasRenderingContext2D,
-  board: Board,
-  hoverRow: number,
-  hoverCol: number,
-  previewTile: Tile,
-  filledPositions: Set<string>,
-  now: number,
-): void {
+function _renderConnectionPreview(ctx: CanvasRenderingContext2D, geom: HoverPreviewGeom, previewTile: Tile): void {
+  const { board, hoverRow, hoverCol, px, py, filledPositions, now } = geom;
   const alpha = _computePreviewPulseAlpha(now);
-  const px = hoverCol * TILE_SIZE;
-  const py = hoverRow * TILE_SIZE;
   const currentTile = board.grid[hoverRow][hoverCol];
   const hoverOwDir = board.oneWayData.get(posKey(hoverRow, hoverCol));
   const neighborCtx: ConnectionPreviewNeighborContext = {
@@ -3472,7 +3463,7 @@ function _renderPlacementHoverPreview(
   if (!_canPlaceOrReplaceHoverPreview(geom.hoverTile, selectedShape, pendingRotation, selectedIsGold, isGoldCell)) return;
   const previewTile = new Tile(selectedShape, ((pendingRotation % 360 + 360) % 360) as 0 | 90 | 180 | 270);
   _drawPreviewTile(ctx, geom.px, geom.py, previewTile, geom.currentWater, geom.now);
-  _renderConnectionPreview(ctx, geom.board, geom.hoverRow, geom.hoverCol, previewTile, geom.filledPositions, geom.now);
+  _renderConnectionPreview(ctx, geom, previewTile);
 }
 
 function _canShowRotationHoverPreview(hoverTile: Tile): boolean {
@@ -3493,7 +3484,7 @@ function _renderRotationHoverPreview(ctx: CanvasRenderingContext2D, geom: HoverP
   if (!_canShowRotationHoverPreview(geom.hoverTile)) return;
   const previewTile = _buildRotationPreviewTile(geom.hoverTile, hoverRotationDelta);
   _drawPreviewTile(ctx, geom.px, geom.py, previewTile, geom.currentWater, geom.now);
-  _renderConnectionPreview(ctx, geom.board, geom.hoverRow, geom.hoverCol, previewTile, geom.filledPositions, geom.now);
+  _renderConnectionPreview(ctx, geom, previewTile);
 }
 
 function _renderHoverPreview(ctx: CanvasRenderingContext2D, opts: RenderHoverPreviewOptions): void {
