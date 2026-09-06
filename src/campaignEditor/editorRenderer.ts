@@ -1012,22 +1012,12 @@ function _drawButtEndPipeArms(
   ctx.lineCap = 'round';
   for (const dir of localConnections) {
     const isButtEnd = localButtEndDirs?.has(dir) ?? false;
-    let ex = 0;
-    let ey = 0;
-    if      (dir === Direction.North) { ex =  0; ey = -h; }
-    else if (dir === Direction.East)  { ex =  h; ey =  0; }
-    else if (dir === Direction.South) { ex =  0; ey =  h; }
-    else                              { ex = -h; ey =  0; }
+    const { ex, ey } = _directionEndpoint(dir, h);
     if (isButtEnd) {
       // Clip to the tile half-boundary so the round cap at the tile edge is
       // trimmed flat there; the centre cap is left unconstrained.
       ctx.save();
-      ctx.beginPath();
-      if      (ex > 0) ctx.rect(-LARGE, -LARGE, LARGE + h, LARGE * 2);
-      else if (ex < 0) ctx.rect(-h,     -LARGE, LARGE + h, LARGE * 2);
-      else if (ey > 0) ctx.rect(-LARGE, -LARGE, LARGE * 2, LARGE + h);
-      else             ctx.rect(-LARGE, -h,     LARGE * 2, LARGE + h);
-      ctx.clip();
+      _clipButtEndRect(ctx, ex, ey, h, LARGE);
     }
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -1035,6 +1025,22 @@ function _drawButtEndPipeArms(
     ctx.stroke();
     if (isButtEnd) ctx.restore();
   }
+}
+
+function _directionEndpoint(dir: Direction, h: number): { ex: number; ey: number } {
+  if (dir === Direction.North) return { ex: 0, ey: -h };
+  if (dir === Direction.East) return { ex: h, ey: 0 };
+  if (dir === Direction.South) return { ex: 0, ey: h };
+  return { ex: -h, ey: 0 };
+}
+
+function _clipButtEndRect(ctx: CanvasRenderingContext2D, ex: number, ey: number, h: number, large: number): void {
+  ctx.beginPath();
+  if (ex > 0) ctx.rect(-large, -large, large + h, large * 2);
+  else if (ex < 0) ctx.rect(-h, -large, large + h, large * 2);
+  else if (ey > 0) ctx.rect(-large, -large, large * 2, large + h);
+  else ctx.rect(-large, -h, large * 2, large + h);
+  ctx.clip();
 }
 
 /**
