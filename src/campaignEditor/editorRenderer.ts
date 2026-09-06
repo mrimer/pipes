@@ -1057,21 +1057,17 @@ function _drawChapterEditorPipeTile(
   const cy = y + CELL / 2;
   const shape = def.shape;
 
-  const isGold = shape === PipeShape.GoldStraight || shape === PipeShape.GoldElbow ||
-                 shape === PipeShape.GoldTee || shape === PipeShape.GoldCross;
+  const isGold = _isGoldPipeShape(shape);
   const isSpin = SPIN_PIPE_SHAPES.has(shape);
   const isLeaky = LEAKY_PIPE_SHAPES.has(shape);
   const isSpinCement = SPIN_CEMENT_SHAPES.has(shape);
 
   // Background fill
-  ctx.fillStyle = isSpinCement ? CEMENT_FILL_COLOR : isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
+  ctx.fillStyle = _resolveChapterPipeBgColor(isSpinCement, isSpin, isGold, isLeaky);
   ctx.fillRect(x, y, CELL, CELL);
 
   // Pipe arm color – matches the gameplay chapter map colors (isFilled → water color, else dry color)
-  const pipeColor = isSpin ? (isFilled ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_BODY_COLOR)
-                 : isGold  ? (isFilled ? GOLD_PIPE_WATER_COLOR  : GOLD_PIPE_COLOR)
-                 : isLeaky ? (isFilled ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
-                 : (isFilled ? WATER_COLOR : PIPE_COLOR);
+  const pipeColor = _resolveChapterPipeArmColor(isSpin, isGold, isLeaky, isFilled);
 
   // Draw arms: chapter map pipes use absolute directions (no tile rotation), so
   // local canvas frame = absolute frame; pass connections directly to the helper.
@@ -1081,4 +1077,24 @@ function _drawChapterEditorPipeTile(
   ctx.translate(cx, cy);
   _drawButtEndPipeArms(ctx, connections, buttEndDirs, CELL / 2);
   ctx.restore();
+}
+
+function _isGoldPipeShape(shape: PipeShape): boolean {
+  return shape === PipeShape.GoldStraight || shape === PipeShape.GoldElbow ||
+    shape === PipeShape.GoldTee || shape === PipeShape.GoldCross;
+}
+
+function _resolveChapterPipeBgColor(isSpinCement: boolean, isSpin: boolean, isGold: boolean, isLeaky: boolean): string {
+  if (isSpinCement) return CEMENT_FILL_COLOR;
+  if (isSpin) return '#192640';
+  if (isGold) return '#b8860b';
+  if (isLeaky) return '#1a0c08';
+  return '#1a2a4e';
+}
+
+function _resolveChapterPipeArmColor(isSpin: boolean, isGold: boolean, isLeaky: boolean, isFilled: boolean): string {
+  if (isSpin) return isFilled ? FIXED_PIPE_WATER_COLOR : FIXED_PIPE_BODY_COLOR;
+  if (isGold) return isFilled ? GOLD_PIPE_WATER_COLOR : GOLD_PIPE_COLOR;
+  if (isLeaky) return isFilled ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
+  return isFilled ? WATER_COLOR : PIPE_COLOR;
 }
