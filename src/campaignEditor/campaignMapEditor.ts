@@ -1236,54 +1236,68 @@ export class CampaignMapEditorSection extends MapEditorBase {
       this._panDrag = null;
       return;
     }
-    if (e.button === 0) {
-      const leftPanMoved = this._leftPanCandidate?.moved === true;
-      this._leftPanCandidate = null;
-      if (leftPanMoved) return;
-    }
-    if (e.button === 2) {
-      if (!this._rightEraseDragActive) return;
-      this._rightEraseDragActive = false;
-      this._suppressContextMenu = true;
-      if (this._rightEraseChanged) {
-        document.getElementById('campaign-map-chapter-inventory')
-          ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-        this._recordSnapshot();
-        this._saveGrid();
-      }
-      this._rightEraseChanged = false;
-      this._renderCanvas();
-      return;
-    }
+    if (e.button === 0 && this._releaseLeftPanCandidate()) return;
+    if (e.button === 2) { this._handleRightEraseMouseUp(campaign); return; }
     if (e.button !== 0) return;
+    if (this._paintDragActive) { this._finishPaintDrag(); return; }
+    this._finishTileDrag(e, campaign);
+  }
 
-    if (this._paintDragActive) {
-      this._paintDragActive = false;
+  /** Releases the shift+left pan candidate. Returns whether it had already started panning. */
+  private _releaseLeftPanCandidate(): boolean {
+    const leftPanMoved = this._leftPanCandidate?.moved === true;
+    this._leftPanCandidate = null;
+    return leftPanMoved;
+  }
+
+  private _handleRightEraseMouseUp(campaign: CampaignDef): void {
+    if (!this._rightEraseDragActive) return;
+    this._rightEraseDragActive = false;
+    this._suppressContextMenu = true;
+    if (this._rightEraseChanged) {
+      document.getElementById('campaign-map-chapter-inventory')
+        ?.replaceWith(this._buildChapterInventoryPanel(campaign));
       this._recordSnapshot();
       this._saveGrid();
-      this._renderCanvas();
-      return;
     }
+    this._rightEraseChanged = false;
+    this._renderCanvas();
+  }
 
+  private _finishPaintDrag(): void {
+    this._paintDragActive = false;
+    this._recordSnapshot();
+    this._saveGrid();
+    this._renderCanvas();
+  }
+
+  private _finishTileDrag(e: MouseEvent, campaign: CampaignDef): void {
     if (!this._dragState) return;
     const { startPos, tile, currentPos, moved } = this._dragState;
     this._dragState = null;
 
     if (moved) {
-      this._gridState.grid[startPos.row][startPos.col] = null;
-      this._gridState.grid[currentPos.row][currentPos.col] = tile;
-      this._gridState.focusedTilePos = currentPos;
-      document.getElementById('campaign-map-tile-params-panel')
-        ?.replaceWith(this._buildTileParamsPanel(campaign));
-      this._recordSnapshot();
-      this._saveGrid();
-    } else {
-      if (PIPE_SHAPES.has(tile.shape)) {
-        this._rotateTileAt(startPos, !e.shiftKey);
-        return;
-      }
+      this._commitTileDragMove(startPos, currentPos, tile, campaign);
+    } else if (PIPE_SHAPES.has(tile.shape)) {
+      this._rotateTileAt(startPos, !e.shiftKey);
+      return;
     }
     this._renderCanvas();
+  }
+
+  private _commitTileDragMove(
+    startPos: { row: number; col: number },
+    currentPos: { row: number; col: number },
+    tile: TileDef,
+    campaign: CampaignDef,
+  ): void {
+    this._gridState.grid[startPos.row][startPos.col] = null;
+    this._gridState.grid[currentPos.row][currentPos.col] = tile;
+    this._gridState.focusedTilePos = currentPos;
+    document.getElementById('campaign-map-tile-params-panel')
+      ?.replaceWith(this._buildTileParamsPanel(campaign));
+    this._recordSnapshot();
+    this._saveGrid();
   }
 
   private _onMouseMove(e: MouseEvent): void {
