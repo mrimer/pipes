@@ -1025,12 +1025,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
   private _detachInput(): void {
     if (this._canvas) {
-      if (this._mouseDownHandler) this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
-      if (this._mouseMoveHandler) this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
-      if (this._dblClickHandler) this._canvas.removeEventListener('dblclick', this._dblClickHandler);
-      if (this._contextMenuHandler) this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
-      if (this._mouseLeaveHandler) this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
-      if (this._wheelHandler) this._canvas.removeEventListener('wheel', this._wheelHandler);
+      this._removeCanvasInputListeners(this._canvas);
     }
     this._mouseDownHandler = null;
     this._mouseMoveHandler = null;
@@ -1045,6 +1040,15 @@ export class CampaignMapEditorSection extends MapEditorBase {
     // Note: _canvas and _ctx are NOT nulled here — _detachInput only removes
     // event listeners. Canvas/ctx teardown is handled by the caller (init) so
     // that _attachInput → _detachInput does not wipe out the canvas reference.
+  }
+
+  private _removeCanvasInputListeners(canvas: HTMLCanvasElement): void {
+    if (this._mouseDownHandler) canvas.removeEventListener('mousedown', this._mouseDownHandler);
+    if (this._mouseMoveHandler) canvas.removeEventListener('mousemove', this._mouseMoveHandler);
+    if (this._dblClickHandler) canvas.removeEventListener('dblclick', this._dblClickHandler);
+    if (this._contextMenuHandler) canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+    if (this._mouseLeaveHandler) canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
+    if (this._wheelHandler) canvas.removeEventListener('wheel', this._wheelHandler);
   }
 
   private _canvasPos(e: MouseEvent): { row: number; col: number } | null {
