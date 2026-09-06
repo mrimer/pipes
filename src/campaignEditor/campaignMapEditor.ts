@@ -1006,37 +1006,42 @@ export class CampaignMapEditorSection extends MapEditorBase {
   }
 
   private _onMouseDown(e: MouseEvent, campaign: CampaignDef): void {
-    // Middle-mouse button starts pan drag.
-    if (e.button === 1) {
-      this._leftPanCandidate = null;
-      e.preventDefault();
-      this._panDrag = {
-        startClientX: e.clientX,
-        startClientY: e.clientY,
-        startPanX: this._panPixelX,
-        startPanY: this._panPixelY,
-        moved: false,
-      };
-      return;
-    }
-    if (e.button === 2) {
-      this._leftPanCandidate = null;
-      this._panDrag = null;
-      const pos = this._canvasPos(e);
-      if (!pos) return;
-      this._rightEraseDragActive = true;
-      this._rightEraseChanged = false;
-      this._suppressContextMenu = false;
-      if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) !== null) {
-        this._gridState.grid[pos.row][pos.col] = null;
-        this._gridState.clearFocusIfAt(pos);
-        this._rightEraseChanged = true;
-        sfxManager.play(SfxId.Delete);
-        this._renderCanvas();
-      }
-      return;
-    }
+    if (e.button === 1) { this._startMiddlePanDrag(e); return; }
+    if (e.button === 2) { this._handleRightEraseMouseDown(e); return; }
     if (e.button !== 0) return;
+    this._handleLeftMouseDown(e, campaign);
+  }
+
+  /** Middle-mouse button starts pan drag. */
+  private _startMiddlePanDrag(e: MouseEvent): void {
+    this._leftPanCandidate = null;
+    e.preventDefault();
+    this._panDrag = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startPanX: this._panPixelX,
+      startPanY: this._panPixelY,
+      moved: false,
+    };
+  }
+
+  private _handleRightEraseMouseDown(e: MouseEvent): void {
+    this._leftPanCandidate = null;
+    this._panDrag = null;
+    const pos = this._canvasPos(e);
+    if (!pos) return;
+    this._rightEraseDragActive = true;
+    this._rightEraseChanged = false;
+    this._suppressContextMenu = false;
+    if ((this._gridState.grid[pos.row]?.[pos.col] ?? null) === null) return;
+    this._gridState.grid[pos.row][pos.col] = null;
+    this._gridState.clearFocusIfAt(pos);
+    this._rightEraseChanged = true;
+    sfxManager.play(SfxId.Delete);
+    this._renderCanvas();
+  }
+
+  private _handleLeftMouseDown(e: MouseEvent, campaign: CampaignDef): void {
     this._leftPanCandidate = null;
 
     // Shift+left: pan the map (takes priority over all tile-editing operations).
@@ -1049,110 +1054,170 @@ export class CampaignMapEditorSection extends MapEditorBase {
     if (!pos) return;
 
     this._gridState.focusedTilePos = pos;
-
-    const tileAtPos = this._gridState.grid[pos.row]?.[pos.col] ?? null;
-    const preserveTreePaletteSelection =
-      tileAtPos !== null &&
-      isTreeShape(this._palette as PipeShape) &&
-      isTreeShape(tileAtPos.shape);
-    if (tileAtPos !== null) {
-      const paletteForTile: EditorPalette | null =
-        tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'chapter'
-          ? CHAPTER_CHAMBER_PALETTE
-          : tileAtPos.shape === PipeShape.Chamber
-            ? null  // Non-chapter chamber (e.g. stray 'level' content): don't corrupt the palette
-            : tileAtPos.shape;
-      if (paletteForTile !== null && !preserveTreePaletteSelection) {
-        this._palette = paletteForTile;
-        document.getElementById('campaign-map-palette-panel')
-          ?.replaceWith(this._buildPalettePanel(campaign));
-      }
-    }
-
-    document.getElementById('campaign-map-tile-params-panel')
-      ?.replaceWith(this._buildTileParamsPanel(campaign));
+    this._syncPaletteAndParamsPanelsForTile(pos, campaign);
 
     const existingTile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
 
     if (this._selectedChapterIdx !== null) {
-      // Place onto empty cells AND empty-floor tiles, matching the placement
-      // ghost (see _computeOverlay: isEmpty = null || isEmptyFloor).  Gating on
-      // `=== null` alone left empty-floor clicks as a silent no-op despite the
-      // ghost inviting placement there.
-      if (existingTile === null || isEmptyFloor(existingTile.shape)) {
-        this._gridState.grid[pos.row][pos.col] = {
-          shape: PipeShape.Chamber,
-          chamberContent: 'chapter',
-          chapterIdx: this._selectedChapterIdx,
-          connections: [Direction.East, Direction.West],
-        };
-        this._selectedChapterIdx = null;
-        this._palette = CHAPTER_CHAMBER_PALETTE;
-        document.getElementById('campaign-map-palette-panel')
-          ?.replaceWith(this._buildPalettePanel(campaign));
-        document.getElementById('campaign-map-tile-params-panel')
-          ?.replaceWith(this._buildTileParamsPanel(campaign));
-        this._recordSnapshot();
-        this._saveGrid();
-        document.getElementById('campaign-map-chapter-inventory')
-          ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-        this._renderCanvas();
-      } else if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'chapter') {
-        this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-        this._renderCanvas();
-      }
+      this._handleChapterPlacementMouseDown(pos, existingTile, this._selectedChapterIdx, campaign);
       return;
     }
 
     if (this._palette === CHAPTER_CHAMBER_PALETTE) {
-      if (existingTile !== null) {
-        this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
-        this._renderCanvas();
-      }
+      this._handleChapterChamberDragStart(pos, existingTile);
       return;
     }
 
-    const palette = this._palette;
-    const isEmptyFloorPalette = palette !== 'erase' && EMPTY_FLOOR_SHAPES.includes(palette as PipeShape);
-    const existingIsEmptyFloor = existingTile === null ||
-      (existingTile !== null && isEmptyFloor(existingTile.shape));
-    const canOverwriteTree =
-      existingTile !== null &&
+    this._handleTilePlacementMouseDown(pos, existingTile, campaign);
+  }
+
+  /** Switches the palette to match the clicked tile (unless a tree selection should be preserved), and rebuilds the tile-params panel. */
+  private _syncPaletteAndParamsPanelsForTile(pos: { row: number; col: number }, campaign: CampaignDef): void {
+    const tileAtPos = this._gridState.grid[pos.row]?.[pos.col] ?? null;
+    if (tileAtPos !== null) {
+      this._maybeSwitchPaletteForTile(tileAtPos, campaign);
+    }
+    document.getElementById('campaign-map-tile-params-panel')
+      ?.replaceWith(this._buildTileParamsPanel(campaign));
+  }
+
+  private _maybeSwitchPaletteForTile(tileAtPos: TileDef, campaign: CampaignDef): void {
+    const preserveTreePaletteSelection =
+      isTreeShape(this._palette as PipeShape) && isTreeShape(tileAtPos.shape);
+    const paletteForTile: EditorPalette | null =
+      tileAtPos.shape === PipeShape.Chamber && tileAtPos.chamberContent === 'chapter'
+        ? CHAPTER_CHAMBER_PALETTE
+        : tileAtPos.shape === PipeShape.Chamber
+          ? null  // Non-chapter chamber (e.g. stray 'level' content): don't corrupt the palette
+          : tileAtPos.shape;
+    if (paletteForTile === null || preserveTreePaletteSelection) return;
+    this._palette = paletteForTile;
+    document.getElementById('campaign-map-palette-panel')
+      ?.replaceWith(this._buildPalettePanel(campaign));
+  }
+
+  private _handleChapterPlacementMouseDown(
+    pos: { row: number; col: number },
+    existingTile: TileDef | null,
+    chapterIdx: number,
+    campaign: CampaignDef,
+  ): void {
+    // Place onto empty cells AND empty-floor tiles, matching the placement
+    // ghost (see _computeOverlay: isEmpty = null || isEmptyFloor).  Gating on
+    // `=== null` alone left empty-floor clicks as a silent no-op despite the
+    // ghost inviting placement there.
+    if (existingTile === null || isEmptyFloor(existingTile.shape)) {
+      this._placeChapterChamber(pos, chapterIdx, campaign);
+      return;
+    }
+    if (existingTile.shape === PipeShape.Chamber && existingTile.chamberContent === 'chapter') {
+      this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+      this._renderCanvas();
+    }
+  }
+
+  private _placeChapterChamber(pos: { row: number; col: number }, chapterIdx: number, campaign: CampaignDef): void {
+    this._gridState.grid[pos.row][pos.col] = {
+      shape: PipeShape.Chamber,
+      chamberContent: 'chapter',
+      chapterIdx,
+      connections: [Direction.East, Direction.West],
+    };
+    this._selectedChapterIdx = null;
+    this._palette = CHAPTER_CHAMBER_PALETTE;
+    document.getElementById('campaign-map-palette-panel')
+      ?.replaceWith(this._buildPalettePanel(campaign));
+    document.getElementById('campaign-map-tile-params-panel')
+      ?.replaceWith(this._buildTileParamsPanel(campaign));
+    this._recordSnapshot();
+    this._saveGrid();
+    document.getElementById('campaign-map-chapter-inventory')
+      ?.replaceWith(this._buildChapterInventoryPanel(campaign));
+    this._renderCanvas();
+  }
+
+  private _handleChapterChamberDragStart(pos: { row: number; col: number }, existingTile: TileDef | null): void {
+    if (existingTile === null) return;
+    this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+    this._renderCanvas();
+  }
+
+  private _isEmptyFloorTile(existingTile: TileDef | null): boolean {
+    return existingTile === null || isEmptyFloor(existingTile.shape);
+  }
+
+  private _isEmptyFloorPalette(palette: EditorPalette): boolean {
+    return palette !== 'erase' && EMPTY_FLOOR_SHAPES.includes(palette as PipeShape);
+  }
+
+  private _canOverwriteTreeAt(existingTile: TileDef | null, palette: EditorPalette): boolean {
+    return existingTile !== null &&
       REPEATABLE_EDITOR_TILES.has(palette) &&
       isTreeShape(palette as PipeShape) &&
       isTreeShape(existingTile.shape);
+  }
 
-    if (existingTile !== null && !existingIsEmptyFloor && palette !== 'erase' && !isEmptyFloorPalette && !canOverwriteTree) {
+  private _shouldStartTileDragForExistingTile(
+    existingIsEmptyFloor: boolean,
+    palette: EditorPalette,
+    canOverwriteTree: boolean,
+  ): boolean {
+    return !existingIsEmptyFloor && palette !== 'erase' &&
+      !this._isEmptyFloorPalette(palette) && !canOverwriteTree;
+  }
+
+  private _handleTilePlacementMouseDown(pos: { row: number; col: number }, existingTile: TileDef | null, campaign: CampaignDef): void {
+    const palette = this._palette;
+    const existingIsEmptyFloor = this._isEmptyFloorTile(existingTile);
+    const canOverwriteTree = this._canOverwriteTreeAt(existingTile, palette);
+
+    if (existingTile !== null && this._shouldStartTileDragForExistingTile(existingIsEmptyFloor, palette, canOverwriteTree)) {
       this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
       this._renderCanvas();
-    } else {
-      if (palette === PipeShape.Source && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Source)) {
-        return;
-      }
-      if (palette === PipeShape.Sink && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Sink)) {
-        this._showSinkError();
-        return;
-      }
-      if ((existingIsEmptyFloor || canOverwriteTree) && REPEATABLE_EDITOR_TILES.has(palette)) {
-        this._paintDragActive = true;
-        this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
-        this._playPlacementSfx(pos);
-        this._renderCanvas();
-        return;
-      }
-      if (palette === 'erase' || palette === PipeShape.Empty) {
-        if (existingTile !== null) sfxManager.play(SfxId.Delete);
-        this._gridState.grid[pos.row][pos.col] = null;
-        this._gridState.clearFocusIfAt(pos);
-        document.getElementById('campaign-map-chapter-inventory')
-          ?.replaceWith(this._buildChapterInventoryPanel(campaign));
-      } else {
-        this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
-        this._playPlacementSfx(pos);
-      }
-      this._recordSnapshot();
-      this._saveGrid();
+      return;
+    }
+
+    this._placeOrEraseTile(pos, existingTile, existingIsEmptyFloor, canOverwriteTree, palette, campaign);
+  }
+
+  private _placeOrEraseTile(
+    pos: { row: number; col: number },
+    existingTile: TileDef | null,
+    existingIsEmptyFloor: boolean,
+    canOverwriteTree: boolean,
+    palette: EditorPalette,
+    campaign: CampaignDef,
+  ): void {
+    if (palette === PipeShape.Source && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Source)) {
+      return;
+    }
+    if (palette === PipeShape.Sink && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Sink)) {
+      this._showSinkError();
+      return;
+    }
+    if ((existingIsEmptyFloor || canOverwriteTree) && REPEATABLE_EDITOR_TILES.has(palette)) {
+      this._paintDragActive = true;
+      this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
+      this._playPlacementSfx(pos);
       this._renderCanvas();
+      return;
+    }
+    this._eraseOrPlaceTile(pos, existingTile, palette, campaign);
+    this._recordSnapshot();
+    this._saveGrid();
+    this._renderCanvas();
+  }
+
+  private _eraseOrPlaceTile(pos: { row: number; col: number }, existingTile: TileDef | null, palette: EditorPalette, campaign: CampaignDef): void {
+    if (palette === 'erase' || palette === PipeShape.Empty) {
+      if (existingTile !== null) sfxManager.play(SfxId.Delete);
+      this._gridState.grid[pos.row][pos.col] = null;
+      this._gridState.clearFocusIfAt(pos);
+      document.getElementById('campaign-map-chapter-inventory')
+        ?.replaceWith(this._buildChapterInventoryPanel(campaign));
+    } else {
+      this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
+      this._playPlacementSfx(pos);
     }
   }
 
