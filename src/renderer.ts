@@ -1148,8 +1148,16 @@ export function drawSea(
   _drawSeaLandBorder(ctx, half, neighbors);
 
   // ── Ripple effects ──────────────────────────────────────────────────────
-  _drawSeaRipple(ctx, half, -half * 0.3, -half * 0.25, now, 0);
-  _drawSeaRipple(ctx, half, half * 0.2, half * 0.3, now, 800);
+  _drawSeaRipple(ctx, { half, ox: -half * 0.3, oy: -half * 0.25, now, phaseOffset: 0 });
+  _drawSeaRipple(ctx, { half, ox: half * 0.2, oy: half * 0.3, now, phaseOffset: 800 });
+}
+
+interface SeaRippleOptions {
+  half: number;
+  ox: number;
+  oy: number;
+  now: number;
+  phaseOffset: number;
 }
 
 /**
@@ -1157,14 +1165,8 @@ export function drawSea(
  * The ripple oscillates between a flat line and rising pointy waves,
  * creating a gentle in-place ambient water motion effect.
  */
-function _drawSeaRipple(
-  ctx: CanvasRenderingContext2D,
-  half: number,
-  ox: number,
-  oy: number,
-  now: number,
-  phaseOffset: number,
-): void {
+function _drawSeaRipple(ctx: CanvasRenderingContext2D, opts: SeaRippleOptions): void {
+  const { half, ox, oy, now, phaseOffset } = opts;
   const rw = half * 0.5;                       // ripple width
   const maxH = _s(2.5);                        // max wave peak height
   // Oscillate between flat (0) and peaked (1)
@@ -1954,12 +1956,14 @@ function _localDirToUnitDelta(localDir: Direction): { dx: number; dy: number } {
 }
 
 /** Two rust spots along one arm: one at 1/3 of the arm, one at 2/3. */
-function _drawRustSpotsAlongArm(ctx: CanvasRenderingContext2D, dx: number, dy: number, half: number, spotR: number): void {
+function _drawRustSpotsAlongArm(
+  ctx: CanvasRenderingContext2D, dx: number, dy: number, geom: { half: number; spotR: number },
+): void {
   for (const frac of [0.33, 0.67]) {
-    const sx = dx * half * frac;
-    const sy = dy * half * frac;
+    const sx = dx * geom.half * frac;
+    const sy = dy * geom.half * frac;
     ctx.beginPath();
-    ctx.arc(sx, sy, spotR, 0, Math.PI * 2);
+    ctx.arc(sx, sy, geom.spotR, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -1980,11 +1984,12 @@ function _drawLeakyRustSpots(
   // direction to the local (pre-rotation) frame before using it as a drawing offset,
   // mirroring the same un-rotation logic used by _drawPipeArmInRotatedFrame.
   const rotSteps = tile.rotation / 90;
+  const geom = { half, spotR };
   for (const dir of tile.connections) {
     if (dir === blockedDir) continue;
     const localDir = _rotateDirectionCCW(dir, rotSteps);
     const { dx, dy } = _localDirToUnitDelta(localDir);
-    _drawRustSpotsAlongArm(ctx, dx, dy, half, spotR);
+    _drawRustSpotsAlongArm(ctx, dx, dy, geom);
   }
   ctx.restore();
 }
@@ -2668,10 +2673,8 @@ function _computeFillAnimClipRect(
   }
 }
 
-function _renderOneContainerFillAnim(
-  ctx: CanvasRenderingContext2D, board: Board, anim: PipeFillAnim, now: number,
-  drawOpts: { currentWater: number; shiftHeld: boolean; currentTemp: number; currentPressure: number },
-): void {
+function _renderOneContainerFillAnim(ctx: CanvasRenderingContext2D, opts: ContainerFillAnimsOptions, anim: PipeFillAnim): void {
+  const { board, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
   if (!anim.isContainer) return;
   const elapsed = now - anim.startTime;
   if (elapsed < 0) return; // not started yet
@@ -2699,17 +2702,16 @@ function _renderOneContainerFillAnim(
   ctx.clip();
   // Draw the tile in its connected (water) state within the clip region.
   drawTile(ctx, {
-    x, y, tile, isWater: true, currentWater: drawOpts.currentWater, shiftHeld: drawOpts.shiftHeld,
-    currentTemp: drawOpts.currentTemp, currentPressure: drawOpts.currentPressure,
+    x, y, tile, isWater: true, currentWater, shiftHeld,
+    currentTemp, currentPressure,
     lockedCost, lockedGain, buttEndDirs,
   });
   ctx.restore();
 }
 
 export function renderContainerFillAnims(ctx: CanvasRenderingContext2D, opts: ContainerFillAnimsOptions): void {
-  const { board, anims, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
-  for (const anim of anims) {
-    _renderOneContainerFillAnim(ctx, board, anim, now, { currentWater, shiftHeld, currentTemp, currentPressure });
+  for (const anim of opts.anims) {
+    _renderOneContainerFillAnim(ctx, opts, anim);
   }
 }
 
@@ -2755,10 +2757,8 @@ function _computeDrainAnimClipRect(
   }
 }
 
-function _renderOneContainerDrainAnim(
-  ctx: CanvasRenderingContext2D, board: Board, anim: PipeDrainAnim, now: number,
-  drawOpts: { currentWater: number; shiftHeld: boolean; currentTemp: number; currentPressure: number },
-): void {
+function _renderOneContainerDrainAnim(ctx: CanvasRenderingContext2D, opts: ContainerDrainAnimsOptions, anim: PipeDrainAnim): void {
+  const { board, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
   if (!anim.isContainer) return;
   const elapsed = now - anim.startTime;
   if (elapsed < 0 || elapsed >= FILL_ANIM_DURATION) return;
@@ -2781,17 +2781,16 @@ function _renderOneContainerDrainAnim(
   ctx.rect(clip.x, clip.y, clip.w, clip.h);
   ctx.clip();
   drawTile(ctx, {
-    x, y, tile, isWater: true, currentWater: drawOpts.currentWater, shiftHeld: drawOpts.shiftHeld,
-    currentTemp: drawOpts.currentTemp, currentPressure: drawOpts.currentPressure,
+    x, y, tile, isWater: true, currentWater, shiftHeld,
+    currentTemp, currentPressure,
     lockedCost, lockedGain, buttEndDirs,
   });
   ctx.restore();
 }
 
 export function renderContainerDrainAnims(ctx: CanvasRenderingContext2D, opts: ContainerDrainAnimsOptions): void {
-  const { board, anims, currentWater, shiftHeld, currentTemp, currentPressure, now } = opts;
-  for (const anim of anims) {
-    _renderOneContainerDrainAnim(ctx, board, anim, now, { currentWater, shiftHeld, currentTemp, currentPressure });
+  for (const anim of opts.anims) {
+    _renderOneContainerDrainAnim(ctx, opts, anim);
   }
 }
 
