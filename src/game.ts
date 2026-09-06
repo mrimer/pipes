@@ -349,42 +349,26 @@ export class Game implements InputCallbacks {
     this.undoBtnEl = undoBtnEl;
     this.redoBtnEl = redoBtnEl;
     this.exitBtnEl = exitBtnEl;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- win-next-btn is always present in the win modal HTML
-    this.winNextBtnEl = winModalEl.querySelector<HTMLButtonElement>('#win-next-btn')!;
+    this.winNextBtnEl = this._queryRequiredButton(winModalEl, '#win-next-btn');
     this.winChallengeEl = winModalEl.querySelector<HTMLElement>('#win-challenge');
     this.winWaterEl = winModalEl.querySelector<HTMLElement>('#win-water');
     this.winStarsEl = winModalEl.querySelector<HTMLElement>('#win-stars');
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- gameover-menu-btn is always present in the gameover modal HTML
-    this.gameoverMenuBtnEl = gameoverModalEl.querySelector<HTMLButtonElement>('#gameover-menu-btn')!;
+    this.gameoverMenuBtnEl = this._queryRequiredButton(gameoverModalEl, '#gameover-menu-btn');
 
     // Create the tooltip manager for Ctrl+hover grid coordinates
     this._tooltip = TooltipManager.create();
-
     // Create the metrics display manager (HUD stats, inventory bar, best-score box)
-    const bestScoreBoxEl = document.getElementById('best-score-box') as HTMLElement;
-    this._metrics = new MetricsDisplay(waterDisplayEl, inventoryBarEl, bestScoreBoxEl);
-
-    // Create the note box (appended to the play screen, shown beneath the grid)
-    this.noteBoxEl = document.createElement('div');
-    this.noteBoxEl.style.cssText = NOTE_BOX_CSS;
-    playScreenEl.appendChild(this.noteBoxEl);
-
-    // Create the hint box (appended to the play screen after the note box, collapsible)
-    this.hintBoxEl = document.createElement('div');
-    this.hintBoxEl.style.cssText = HINT_BOX_CSS;
-    playScreenEl.appendChild(this.hintBoxEl);
-
+    this._metrics = this._buildMetricsDisplay(waterDisplayEl, inventoryBarEl);
+    // Create the note/hint boxes (appended to the play screen, shown beneath the grid)
+    this.noteBoxEl = this._buildAppendedDiv(NOTE_BOX_CSS, playScreenEl);
+    this.hintBoxEl = this._buildAppendedDiv(HINT_BOX_CSS, playScreenEl);
     // Create the error-flash element for brief action-blocked messages.
-    // role="status" makes flashed error text announced by screen readers.
-    this.errorFlashEl = document.createElement('div');
-    this.errorFlashEl.setAttribute('role', 'status');
-    this.errorFlashEl.style.cssText = ERROR_FLASH_CSS;
-    document.body.appendChild(this.errorFlashEl);
+    this.errorFlashEl = this._buildErrorFlashEl();
 
     // Create the reset-progress confirmation modal
     const resetModal = buildResetModal(
-      () => { this._campaign.resetProgress(); this._closeModal(this.resetConfirmModalEl); },
-      () => { this._closeModal(this.resetConfirmModalEl); },
+      () => this._onResetConfirm(),
+      () => this._onResetCancel(),
     );
     this.resetConfirmModalEl = resetModal.el;
     this._updateResetModalInfo = resetModal.updateInfo;
@@ -394,61 +378,123 @@ export class Game implements InputCallbacks {
     this._creditsModalEl = createCreditsModal();
 
     // Create the save-progress notice modal (shown when the player exits a level mid-game)
-    this._exitConfirmModalEl = buildSaveProgressNoticeModal(
-      (dontShowAgain) => {
-        if (dontShowAgain) saveSaveNoticeSuppressed(true);
-        this._closeModal(this._exitConfirmModalEl);
-        this.exitToMenu();
-      },
-    );
+    this._exitConfirmModalEl = buildSaveProgressNoticeModal((dontShowAgain) => this._onExitConfirmClose(dontShowAgain));
 
     // Create the unplayable-level modal (shown when a level starts already lost)
-    this._unplayableModalEl = buildUnplayableModal(
-      () => { this._closeModal(this._unplayableModalEl); this.exitToMenu(); },
-    );
+    this._unplayableModalEl = buildUnplayableModal(() => this._onUnplayableModalClose());
 
     // Create the settings modal (SFX/music volume control, etc.)
     this._settingsModalEl = this._buildSettingsModal();
 
     // Create the campaign editor (appends its own overlay to document.body)
-    this.campaignEditor = new CampaignEditor(
-      () => this._showLevelSelect(false),             // onClose: return to level select (no stopAll – no game audio playing in editor)
-      (level) => this._campaign.playtestLevel(level), // onPlaytest: start the level in play mode
-      (campaign) => this._campaign.activate(campaign), // onPlayCampaign: activate campaign for play
-    );
+    this.campaignEditor = this._buildCampaignEditor();
 
     // Create the player-profile selection screen (appends itself to document.body).
     this._profileScreen = new PlayerProfileScreen();
-    this._profileScreen.onProfileSelected = (slotIndex) => {
-      // Update settings that depend on the newly active slot.
-      // These load* calls are slot-prefixed in persistence.ts, so activate the
-      // selected slot first to read the correct profile's settings.
-      setActiveSlotIndex(slotIndex);
-      const backgroundEnabled = loadBackgroundEnabled();
-      const environmentalEnabled = loadEnvironmentalEnabled();
-      sfxManager.setVolume(loadSfxVolume());
-      musicManager.setVolume(loadMusicVolume());
-      musicManager.setMuteOnFocusLoss(loadMusicMuteOnFocusLoss());
-      setGlobalBackgroundPatternEnabled(backgroundEnabled);
-      setEnvironmentalEnabled(environmentalEnabled);
-      saveActiveSlotIndex(slotIndex);
-      // Restore the active campaign from the new slot's persisted state, then
-      // show the level-select screen.
-      this._campaign.restoreFromPersistence();
-      this._showLevelSelect(false);
-    };
-    this._profileScreen.onReturnToMenu = () => {
-      this._showLevelSelect(false);
-    };
+    this._wireProfileScreenCallbacks();
 
     // Create the campaign manager and restore persisted campaign state
-    const campaignCallbacks: CampaignCallbacks = this._buildCampaignCallbacks();
-    this._campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
-    this._campaign.restoreFromPersistence();
+    this._campaign = this._buildCampaignManager();
 
     // Create the input handler – registers all event listeners on canvas/window/document.
     this._input = new InputHandler(canvas, this);
 
+    this._initResizeHandler();
+    this._initMusicSettings();
+    this._showInitialScreenAndStartLoop();
+    this._wireRecordingButtons();
+
+    // Initialize the playback screen controller.
+    this._playbackScreen = new PlaybackScreen(this._buildPlaybackCallbacks());
+  }
+
+  /** querySelector for a button guaranteed present in the modal's static HTML. */
+  private _queryRequiredButton(root: HTMLElement, selector: string): HTMLButtonElement {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- caller guarantees selector matches a static modal element
+    return root.querySelector<HTMLButtonElement>(selector)!;
+  }
+
+  private _buildMetricsDisplay(waterDisplayEl: HTMLElement, inventoryBarEl: HTMLElement): MetricsDisplay {
+    const bestScoreBoxEl = document.getElementById('best-score-box') as HTMLElement;
+    return new MetricsDisplay(waterDisplayEl, inventoryBarEl, bestScoreBoxEl);
+  }
+
+  private _buildAppendedDiv(cssText: string, parent: HTMLElement): HTMLElement {
+    const el = document.createElement('div');
+    el.style.cssText = cssText;
+    parent.appendChild(el);
+    return el;
+  }
+
+  private _buildErrorFlashEl(): HTMLElement {
+    // role="status" makes flashed error text announced by screen readers.
+    const el = document.createElement('div');
+    el.setAttribute('role', 'status');
+    el.style.cssText = ERROR_FLASH_CSS;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  private _onResetConfirm(): void {
+    this._campaign.resetProgress();
+    this._closeModal(this.resetConfirmModalEl);
+  }
+
+  private _onResetCancel(): void {
+    this._closeModal(this.resetConfirmModalEl);
+  }
+
+  private _onExitConfirmClose(dontShowAgain: boolean): void {
+    if (dontShowAgain) saveSaveNoticeSuppressed(true);
+    this._closeModal(this._exitConfirmModalEl);
+    this.exitToMenu();
+  }
+
+  private _onUnplayableModalClose(): void {
+    this._closeModal(this._unplayableModalEl);
+    this.exitToMenu();
+  }
+
+  private _buildCampaignEditor(): CampaignEditor {
+    return new CampaignEditor(
+      () => this._showLevelSelect(false),             // onClose: return to level select (no stopAll – no game audio playing in editor)
+      (level) => this._campaign.playtestLevel(level), // onPlaytest: start the level in play mode
+      (campaign) => this._campaign.activate(campaign), // onPlayCampaign: activate campaign for play
+    );
+  }
+
+  private _wireProfileScreenCallbacks(): void {
+    this._profileScreen.onProfileSelected = (slotIndex) => this._handleProfileSelected(slotIndex);
+    this._profileScreen.onReturnToMenu = () => this._showLevelSelect(false);
+  }
+
+  private _handleProfileSelected(slotIndex: number): void {
+    // Update settings that depend on the newly active slot.
+    // These load* calls are slot-prefixed in persistence.ts, so activate the
+    // selected slot first to read the correct profile's settings.
+    setActiveSlotIndex(slotIndex);
+    const backgroundEnabled = loadBackgroundEnabled();
+    const environmentalEnabled = loadEnvironmentalEnabled();
+    sfxManager.setVolume(loadSfxVolume());
+    musicManager.setVolume(loadMusicVolume());
+    musicManager.setMuteOnFocusLoss(loadMusicMuteOnFocusLoss());
+    setGlobalBackgroundPatternEnabled(backgroundEnabled);
+    setEnvironmentalEnabled(environmentalEnabled);
+    saveActiveSlotIndex(slotIndex);
+    // Restore the active campaign from the new slot's persisted state, then
+    // show the level-select screen.
+    this._campaign.restoreFromPersistence();
+    this._showLevelSelect(false);
+  }
+
+  private _buildCampaignManager(): CampaignManager {
+    const campaignCallbacks: CampaignCallbacks = this._buildCampaignCallbacks();
+    const campaign = new CampaignManager(campaignCallbacks, this.campaignEditor);
+    campaign.restoreFromPersistence();
+    return campaign;
+  }
+
+  private _initResizeHandler(): void {
     // Re-layout on orientation change / window resize (debounced at 100 ms).
     this._resizeHandler = () => {
       if (this._resizeTimer !== null) clearTimeout(this._resizeTimer);
@@ -458,11 +504,15 @@ export class Game implements InputCallbacks {
       }, 100);
     };
     window.addEventListener('resize', this._resizeHandler);
+  }
 
+  private _initMusicSettings(): void {
     // Initialize music volume and focus-loss mute setting from persistence.
     musicManager.setVolume(loadMusicVolume());
     musicManager.setMuteOnFocusLoss(loadMusicMuteOnFocusLoss());
+  }
 
+  private _showInitialScreenAndStartLoop(): void {
     // Show the level-select screen or, if no profile slot is active, show the
     // profile screen so the player can choose or create a profile first.
     if (getActiveSlotIndex() !== null) {
@@ -471,8 +521,9 @@ export class Game implements InputCallbacks {
       this._showPlayerProfileScreen();
     }
     this._loop();
+  }
 
-    // Wire the recording HUD buttons
+  private _wireRecordingButtons(): void {
     const recordBtn = document.getElementById('record-btn') as HTMLButtonElement | null;
     const playbackBtn = document.getElementById('playback-btn') as HTMLButtonElement | null;
     if (recordBtn) {
@@ -481,9 +532,6 @@ export class Game implements InputCallbacks {
     if (playbackBtn) {
       playbackBtn.addEventListener('click', () => this._openPlaybackListModal());
     }
-
-    // Initialize the playback screen controller.
-    this._playbackScreen = new PlaybackScreen(this._buildPlaybackCallbacks());
   }
 
   private _buildSettingsModal(): HTMLElement {
