@@ -105,6 +105,9 @@ export interface TextPackMergeResult {
   unmatchedNodes: number;
 }
 
+/** Result of remapping a chapter/level index reference after a delete, insert, or reorder. */
+type IdxRemapResult = { action: 'keep' } | { action: 'set'; value: number } | { action: 'delete' };
+
 // ─── CampaignService ──────────────────────────────────────────────────────────
 
 export class CampaignService {
@@ -133,90 +136,106 @@ export class CampaignService {
     const cols = campaign.cols;
     const grid = campaign.grid;
 
-    if (
-      typeof rows !== 'number' || typeof cols !== 'number' ||
-      !Number.isInteger(rows) || !Number.isInteger(cols) ||
-      rows <= 0 || cols <= 0 ||
-      !Array.isArray(grid) || grid.length !== rows
-    ) {
-      return false;
-    }
+    if (!this._isValidGridDimension(rows) || !this._isValidGridDimension(cols)) return false;
+    if (!Array.isArray(grid) || grid.length !== rows) return false;
 
-    return grid.every((row) => Array.isArray(row) && row.length === cols);
+    return grid.every((row) => this._isGridRowValid(row, cols as number));
+  }
+
+  private _isValidGridDimension(n: unknown): boolean {
+    return typeof n === 'number' && Number.isInteger(n) && n > 0;
+  }
+
+  private _isGridRowValid(row: unknown, cols: number): boolean {
+    return Array.isArray(row) && row.length === cols;
+  }
+
+  /** True when tile is a Chamber whose chamberContent matches (e.g. a chapter- or level-reference chamber). */
+  private _isChamberTileWithContent(tile: TileDef | null, chamberContent: 'chapter' | 'level'): tile is TileDef {
+    return tile?.shape === PipeShape.Chamber && tile.chamberContent === chamberContent;
+  }
+
+  private _remapIdxOnDelete(idx: number, deletedIdx: number): IdxRemapResult {
+    if (idx === deletedIdx) return { action: 'delete' };
+    if (idx > deletedIdx) return { action: 'set', value: idx - 1 };
+    return { action: 'keep' };
+  }
+
+  private _remapIdxOnInsert(idx: number, insertIdx: number): IdxRemapResult {
+    if (idx >= insertIdx) return { action: 'set', value: idx + 1 };
+    return { action: 'keep' };
+  }
+
+  private _remapIdxOnReorder(idx: number, fromIdx: number, toIdx: number): IdxRemapResult {
+    if (idx === fromIdx) return { action: 'set', value: toIdx };
+    if (fromIdx < toIdx && idx > fromIdx && idx <= toIdx) return { action: 'set', value: idx - 1 };
+    if (fromIdx > toIdx && idx >= toIdx && idx < fromIdx) return { action: 'set', value: idx + 1 };
+    return { action: 'keep' };
+  }
+
+  /**
+   * Shared walk for remapping chapter/level index references on chamber tiles
+   * (campaign-map chapter-chambers and chapter-map level-chambers use the exact
+   * same delete/insert/reorder remapping logic, only the idx field differs).
+   */
+  private _applyChamberIdxRemap(
+    grid: (TileDef | null)[][] | undefined,
+    chamberContent: 'chapter' | 'level',
+    getIdx: (tile: TileDef) => number | undefined,
+    setIdx: (tile: TileDef, value: number) => void,
+    remap: (idx: number) => IdxRemapResult,
+  ): void {
+    if (!grid) return;
+    for (const row of grid) {
+      for (const [col, tile] of row.entries()) {
+        if (!this._isChamberTileWithContent(tile, chamberContent)) continue;
+        const idx = getIdx(tile);
+        if (idx === undefined) continue;
+        const result = remap(idx);
+        if (result.action === 'delete') row[col] = null;
+        else if (result.action === 'set') setIdx(tile, result.value);
+      }
+    }
   }
 
   private _remapChapterRefsOnCampaignDelete(campaign: CampaignDef, deletedChapterIdx: number): void {
-    if (!campaign.grid) return;
-    for (const row of campaign.grid) {
-      for (const [col, tile] of row.entries()) {
-        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'chapter' || tile.chapterIdx === undefined) continue;
-        if (tile.chapterIdx === deletedChapterIdx) {
-          row[col] = null;
-        } else if (tile.chapterIdx > deletedChapterIdx) {
-          tile.chapterIdx -= 1;
-        }
-      }
-    }
+    this._applyChamberIdxRemap(
+      campaign.grid, 'chapter',
+      (t) => t.chapterIdx, (t, v) => { t.chapterIdx = v; },
+      (idx) => this._remapIdxOnDelete(idx, deletedChapterIdx),
+    );
   }
 
   private _remapChapterRefsOnCampaignReorder(campaign: CampaignDef, fromIdx: number, toIdx: number): void {
-    if (!campaign.grid) return;
-    for (const row of campaign.grid) {
-      for (const tile of row) {
-        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'chapter' || tile.chapterIdx === undefined) continue;
-        const i = tile.chapterIdx;
-        if (i === fromIdx) {
-          tile.chapterIdx = toIdx;
-        } else if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
-          tile.chapterIdx = i - 1;
-        } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
-          tile.chapterIdx = i + 1;
-        }
-      }
-    }
+    this._applyChamberIdxRemap(
+      campaign.grid, 'chapter',
+      (t) => t.chapterIdx, (t, v) => { t.chapterIdx = v; },
+      (idx) => this._remapIdxOnReorder(idx, fromIdx, toIdx),
+    );
   }
 
   private _remapLevelRefsOnDelete(chapter: ChapterDef, deletedLevelIdx: number): void {
-    if (!chapter.grid) return;
-    for (const row of chapter.grid) {
-      for (const [col, tile] of row.entries()) {
-        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
-        if (tile.levelIdx === deletedLevelIdx) {
-          row[col] = null;
-        } else if (tile.levelIdx > deletedLevelIdx) {
-          tile.levelIdx -= 1;
-        }
-      }
-    }
+    this._applyChamberIdxRemap(
+      chapter.grid, 'level',
+      (t) => t.levelIdx, (t, v) => { t.levelIdx = v; },
+      (idx) => this._remapIdxOnDelete(idx, deletedLevelIdx),
+    );
   }
 
   private _remapLevelRefsOnInsert(chapter: ChapterDef, insertIdx: number): void {
-    if (!chapter.grid) return;
-    for (const row of chapter.grid) {
-      for (const tile of row) {
-        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
-        if (tile.levelIdx >= insertIdx) {
-          tile.levelIdx += 1;
-        }
-      }
-    }
+    this._applyChamberIdxRemap(
+      chapter.grid, 'level',
+      (t) => t.levelIdx, (t, v) => { t.levelIdx = v; },
+      (idx) => this._remapIdxOnInsert(idx, insertIdx),
+    );
   }
 
   private _remapLevelRefsOnReorder(chapter: ChapterDef, fromIdx: number, toIdx: number): void {
-    if (!chapter.grid) return;
-    for (const row of chapter.grid) {
-      for (const tile of row) {
-        if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'level' || tile.levelIdx === undefined) continue;
-        const i = tile.levelIdx;
-        if (i === fromIdx) {
-          tile.levelIdx = toIdx;
-        } else if (fromIdx < toIdx && i > fromIdx && i <= toIdx) {
-          tile.levelIdx = i - 1;
-        } else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) {
-          tile.levelIdx = i + 1;
-        }
-      }
-    }
+    this._applyChamberIdxRemap(
+      chapter.grid, 'level',
+      (t) => t.levelIdx, (t, v) => { t.levelIdx = v; },
+      (idx) => this._remapIdxOnReorder(idx, fromIdx, toIdx),
+    );
   }
 
   /** Ensure every campaign has at least a default empty campaign map. */
