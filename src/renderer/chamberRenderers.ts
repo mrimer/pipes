@@ -161,65 +161,85 @@ function _drawChamberDirtContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   ctx.fillText(`-${tile.cost}`, 0, 0);
 }
 
-function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
-  // Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box
-  const isGoldItem = itemShape !== null && GOLD_PIPE_SHAPES.has(itemShape);
-  const isLeakyItem = itemShape !== null && LEAKY_PIPE_SHAPES.has(itemShape);
-  const itemColor = isGoldItem ? (isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR)
-    : isLeakyItem ? (isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR)
-    : (isWater ? WATER_COLOR : PIPE_COLOR);
-  if (itemShape !== null) {
-    let drawShape = itemShape;
-    if (itemShape === PipeShape.GoldStraight) drawShape = PipeShape.Straight;
-    else if (itemShape === PipeShape.GoldElbow) drawShape = PipeShape.Elbow;
-    else if (itemShape === PipeShape.GoldTee) drawShape = PipeShape.Tee;
-    else if (itemShape === PipeShape.GoldCross) drawShape = PipeShape.Cross;
-    else if (itemShape === PipeShape.LeakyStraight) drawShape = PipeShape.Straight;
-    else if (itemShape === PipeShape.LeakyElbow) drawShape = PipeShape.Elbow;
-    else if (itemShape === PipeShape.LeakyTee) drawShape = PipeShape.Tee;
-    else if (itemShape === PipeShape.LeakyCross) drawShape = PipeShape.Cross;
-    ctx.save();
-    // Clip to the inner box so the pipe image never bleeds onto the connection stubs
+/** Gold/leaky item variants draw as their plain base shape (Straight/Elbow/Tee/Cross). */
+const ITEM_SHAPE_TO_BASE_SHAPE: Partial<Record<PipeShape, PipeShape>> = {
+  [PipeShape.GoldStraight]: PipeShape.Straight,
+  [PipeShape.GoldElbow]: PipeShape.Elbow,
+  [PipeShape.GoldTee]: PipeShape.Tee,
+  [PipeShape.GoldCross]: PipeShape.Cross,
+  [PipeShape.LeakyStraight]: PipeShape.Straight,
+  [PipeShape.LeakyElbow]: PipeShape.Elbow,
+  [PipeShape.LeakyTee]: PipeShape.Tee,
+  [PipeShape.LeakyCross]: PipeShape.Cross,
+};
+
+/** Stroke color for the mini item-pipe drawing, by variant. */
+function _resolveItemColor(itemShape: PipeShape, isWater: boolean): string {
+  if (GOLD_PIPE_SHAPES.has(itemShape)) return isWater ? CONTAINER_WATER_COLOR : CONTAINER_COLOR;
+  if (LEAKY_PIPE_SHAPES.has(itemShape)) return isWater ? LEAKY_PIPE_WATER_COLOR : LEAKY_PIPE_COLOR;
+  return isWater ? WATER_COLOR : PIPE_COLOR;
+}
+
+/** Stroke the mini pipe-shape glyph (already scaled/positioned by the caller). */
+function _drawMiniPipeShape(ctx: CanvasRenderingContext2D, shape: PipeShape, half: number): void {
+  if (shape === PipeShape.Straight) {
+    ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+  } else if (shape === PipeShape.Elbow) {
     ctx.beginPath();
-    ctx.rect(-bw, -bh, bw * 2, bh * 2);
-    ctx.clip();
-    // Scale item to 75% of box size so it doesn't touch the chamber box edge
-    const scale = (bw * 0.75) / half;
-    ctx.scale(scale, scale);
-    ctx.strokeStyle = itemColor;
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.lineCap = 'round';
-    if (drawShape === PipeShape.Straight) {
-      ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
-    } else if (drawShape === PipeShape.Elbow) {
-      ctx.beginPath();
-      ctx.moveTo(0, -half); ctx.lineTo(0, 0); ctx.lineTo(half, 0);
-      ctx.stroke();
-    } else if (drawShape === PipeShape.Tee) {
-      ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
-    } else if (drawShape === PipeShape.Cross) {
-      ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
-    }
-    ctx.restore();
+    ctx.moveTo(0, -half); ctx.lineTo(0, 0); ctx.lineTo(half, 0);
+    ctx.stroke();
+  } else if (shape === PipeShape.Tee) {
+    ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(half, 0); ctx.stroke();
+  } else if (shape === PipeShape.Cross) {
+    ctx.beginPath(); ctx.moveTo(0, -half); ctx.lineTo(0, half); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-half, 0); ctx.lineTo(half, 0); ctx.stroke();
   }
-  // Draw quantity number in the inner top-left corner, with a 1px black outline
-  if (itemCount !== 1) {
-    const countLabel = String(itemCount);
-    let countColor: string;
-    if (itemCount < 0) countColor = ANIM_NEGATIVE_COLOR;
-    else if (itemCount === 0) countColor = ANIM_ZERO_COLOR;
-    else countColor = 'white';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.font = `bold ${_s(20)}px Arial`;
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = _s(1);
-    ctx.strokeText(countLabel, -bw + _s(3), -bh + _s(2));
-    ctx.fillStyle = countColor;
-    ctx.fillText(countLabel, -bw + _s(3), -bh + _s(2));
-  }
+}
+
+/** Draw a mini version of the item pipe shape scaled to fit snugly inside the chamber box. */
+function _drawMiniItemShape(ctx: CanvasRenderingContext2D, itemShape: PipeShape, isWater: boolean, bw: number, bh: number, half: number): void {
+  const itemColor = _resolveItemColor(itemShape, isWater);
+  const drawShape = ITEM_SHAPE_TO_BASE_SHAPE[itemShape] ?? itemShape;
+  ctx.save();
+  // Clip to the inner box so the pipe image never bleeds onto the connection stubs
+  ctx.beginPath();
+  ctx.rect(-bw, -bh, bw * 2, bh * 2);
+  ctx.clip();
+  // Scale item to 75% of box size so it doesn't touch the chamber box edge
+  const scale = (bw * 0.75) / half;
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = itemColor;
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.lineCap = 'round';
+  _drawMiniPipeShape(ctx, drawShape, half);
+  ctx.restore();
+}
+
+/** Text color for the item-count label, by sign. */
+function _resolveItemCountColor(itemCount: number): string {
+  if (itemCount < 0) return ANIM_NEGATIVE_COLOR;
+  if (itemCount === 0) return ANIM_ZERO_COLOR;
+  return 'white';
+}
+
+/** Draw the quantity number in the inner top-left corner, with a 1px black outline. */
+function _drawItemCountLabel(ctx: CanvasRenderingContext2D, itemCount: number, bw: number, bh: number): void {
+  if (itemCount === 1) return;
+  const countLabel = String(itemCount);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${_s(20)}px Arial`;
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = _s(1);
+  ctx.strokeText(countLabel, -bw + _s(3), -bh + _s(2));
+  ctx.fillStyle = _resolveItemCountColor(itemCount);
+  ctx.fillText(countLabel, -bw + _s(3), -bh + _s(2));
+}
+
+function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeShape | null, itemCount: number, bw: number, bh: number, isWater: boolean, half: number): void {
+  if (itemShape !== null) _drawMiniItemShape(ctx, itemShape, isWater, bw, bh, half);
+  _drawItemCountLabel(ctx, itemCount, bw, bh);
 }
 
 interface HeaterLineGeom {
