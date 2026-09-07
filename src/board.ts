@@ -520,6 +520,14 @@ export function generateAmbientDecorations(
   return map;
 }
 
+/** Live water/temperature/pressure/frozen values, threaded through the regulator-check family. */
+interface RegulatorLiveStats {
+  water: number;
+  temperature: number;
+  pressure: number;
+  frozen: number;
+}
+
 /**
  * The game board – a 2-D grid of {@link Tile} objects.
  * Contains all game logic for path-finding, water tracking and win detection.
@@ -753,6 +761,11 @@ export class Board {
   }
 
   /** Pre-compute the floor type (Empty/EmptyFall/EmptyDark/EmptyWinter/EmptySpring) for every cell. */
+  /** True for cells whose runtime shape is stored as Empty but which carry special data (gold/one-way/cement) that overrides the inferred floor type. */
+  private _isSpecialFloorlessCell(key: string): boolean {
+    return this.goldSpaces.has(key) || this.oneWayData.has(key) || this.cementData.has(key);
+  }
+
   private _computeFloorTypes(): ReadonlyMap<string, PipeShape> {
     return computeFloorTypesFromGrid(this.rows, this.cols, (r, c) => {
       const key = posKey(r, c);
@@ -761,7 +774,7 @@ export class Board {
       // (Empty / EmptyFall / EmptyDark / EmptyWinter / EmptySpring) via BFS propagation from neighbours.
       // Fixed pipe tile types (Source, Sink, Straight, etc.) also return null
       // here so that BFS propagates the correct floor type to them.
-      if (this.goldSpaces.has(key) || this.oneWayData.has(key) || this.cementData.has(key)) {
+      if (this._isSpecialFloorlessCell(key)) {
         return null;
       }
       const shape = this.grid[r][c].shape;
@@ -1128,6 +1141,13 @@ export class Board {
   }
 
   /** Reclaim-specific variant of the disconnected-constraint-position scan: excludes the reclaimed cell itself. */
+  /** True when `k` was newly disconnected by the reclaim and is one of the caller's tracked positions. */
+  private _isDisconnectedReclaimCandidate(
+    k: string, reclaimedKey: string, filledAfter: Set<string>, positionKeys: Set<string> | null,
+  ): boolean {
+    return k !== reclaimedKey && !filledAfter.has(k) && (positionKeys?.has(k) ?? false);
+  }
+
   private _computeReclaimDisconnectedConstraintPositions(
     pos: GridPos, filledBefore: Set<string>, filledAfter: Set<string>, positions: GridPos[] | null,
   ): GridPos[] | undefined {
@@ -1135,7 +1155,7 @@ export class Board {
     const positionKeys = positions ? new Set(positions.map(p => posKey(p.row, p.col))) : null;
     const disconnected: GridPos[] = [];
     for (const k of filledBefore) {
-      if (k !== reclaimedKey && !filledAfter.has(k) && positionKeys?.has(k)) {
+      if (this._isDisconnectedReclaimCandidate(k, reclaimedKey, filledAfter, positionKeys)) {
         const [r, c] = parseKey(k);
         disconnected.push({ row: r, col: c });
       }
@@ -1164,14 +1184,12 @@ export class Board {
     filledBefore: Set<string>,
     filled: Set<string>,
   ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
-    return this._checkRegulators(
-      filledBefore,
-      filled,
-      this.getCurrentWater(),
-      this.getCurrentTemperature(filledBefore),
-      this.getCurrentPressure(filledBefore),
-      this._turnState.frozen,
-    );
+    return this._checkRegulators(filledBefore, filled, {
+      water: this.getCurrentWater(),
+      temperature: this.getCurrentTemperature(filledBefore),
+      pressure: this.getCurrentPressure(filledBefore),
+      frozen: this._turnState.frozen,
+    });
   }
 
   /**
@@ -1362,6 +1380,11 @@ export class Board {
    * Returns the per-shape item bonuses contributed by item chambers that were in
    * `beforeFilled` but are absent from `afterFilled`.
    */
+  /** True for a Chamber tile holding a countable item (itemShape/itemCount both meaningful). */
+  private _isItemChamberTile(tile: Tile | undefined): tile is Tile & { itemShape: PipeShape } {
+    return tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null;
+  }
+
   private _getDisconnectedItemChamberBonuses(
     beforeFilled: Set<string>,
     afterFilled: Set<string>,
@@ -1371,7 +1394,7 @@ export class Board {
       if (afterFilled.has(key)) continue;
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null) {
+      if (this._isItemChamberTile(tile)) {
         bonuses.set(tile.itemShape, (bonuses.get(tile.itemShape) ?? 0) + tile.itemCount);
       }
     }
@@ -1640,7 +1663,7 @@ export class Board {
     for (const key of filledSet) {
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
-      if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null) {
+      if (this._isItemChamberTile(tile)) {
         bonuses.set(tile.itemShape, (bonuses.get(tile.itemShape) ?? 0) + tile.itemCount);
       }
     }
@@ -1947,30 +1970,31 @@ export class Board {
    * @param pressure - Pressure stat value to test against the threshold.
    * @param frozen - Frozen stat value to test against the threshold.
    */
+  /** True for a Chamber tile whose chamberContent is 'regulator'. */
+  private _isRegulatorTile(tile: Tile | undefined): tile is Tile {
+    return !!tile && tile.shape === PipeShape.Chamber && tile.chamberContent === 'regulator';
+  }
+
   private _checkRegulators(
     preFilled: Set<string>,
     newFilled: Set<string>,
-    water: number,
-    temperature: number,
-    pressure: number,
-    frozen: number,
+    stats: RegulatorLiveStats,
   ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     for (const key of newFilled) {
       if (preFilled.has(key)) continue; // skip previously-connected tiles
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
-      if (!tile || tile.shape !== PipeShape.Chamber || tile.chamberContent !== 'regulator') continue;
+      if (!this._isRegulatorTile(tile)) continue;
 
-      const result = this._checkRegulatorTile(tile, r, c, water, temperature, pressure, frozen);
+      const result = this._checkRegulatorTile(tile, r, c, stats);
       if (result) return result;
     }
     return { error: null, params: null, positions: null };
   }
 
   /** Resolve which live stat value a regulator's `stat` field refers to. */
-  private _resolveRegulatorStatValue(
-    stat: RegulatorStat, water: number, temperature: number, pressure: number, frozen: number,
-  ): number {
+  private _resolveRegulatorStatValue(stat: RegulatorStat, stats: RegulatorLiveStats): number {
+    const { water, temperature, pressure, frozen } = stats;
     switch (stat) {
       case 'water':       return water;
       case 'frozen':      return frozen;
@@ -1996,12 +2020,12 @@ export class Board {
 
   /** Check one newly-connected regulator tile; returns the rejection result, or `null` if it passes. */
   private _checkRegulatorTile(
-    tile: Tile, r: number, c: number, water: number, temperature: number, pressure: number, frozen: number,
+    tile: Tile, r: number, c: number, stats: RegulatorLiveStats,
   ): { error: string; params: TranslationParams; positions: GridPos[] } | null {
     const stat = _orDefault(tile.regulatorStat, 'water' as RegulatorStat);
     const op = _orDefault(tile.regulatorOperator, '>' as RegulatorOperator);
     const threshold = tile.cost;
-    const statValue = this._resolveRegulatorStatValue(stat, water, temperature, pressure, frozen);
+    const statValue = this._resolveRegulatorStatValue(stat, stats);
     const passes = this._evaluateRegulatorOperator(op, statValue, threshold);
     if (passes) return null;
     return {
@@ -2044,14 +2068,12 @@ export class Board {
   ): { error: string | null; params: TranslationParams | null; positions: GridPos[] | null } {
     const savedTurnState = this._turnState.captureSnapshot();
     this.applyTurnDelta();
-    const result = this._checkRegulators(
-      preFilled,
-      newFilled,
-      this.getCurrentWater(),
-      this.getCurrentTemperature(newFilled),
-      this.getCurrentPressure(newFilled),
-      this._turnState.frozen,
-    );
+    const result = this._checkRegulators(preFilled, newFilled, {
+      water: this.getCurrentWater(),
+      temperature: this.getCurrentTemperature(newFilled),
+      pressure: this.getCurrentPressure(newFilled),
+      frozen: this._turnState.frozen,
+    });
     this._turnState.restoreSnapshot(savedTurnState);
     return result;
   }
@@ -2061,15 +2083,20 @@ export class Board {
    * replaced by the player.  A tile passes this check when it is non-fixed,
    * non-empty, and is not a Source, Sink, Chamber, obstacle, or spinner pipe.
    */
+  /** True for a shape that can never be replaced by inventory placement, regardless of fixed/empty state. */
+  private _isNonReplaceableShape(shape: PipeShape): boolean {
+    return (
+      shape === PipeShape.Source ||
+      shape === PipeShape.Sink ||
+      shape === PipeShape.Chamber ||
+      isObstacleTile(shape) ||
+      SPIN_PIPE_SHAPES.has(shape)
+    );
+  }
+
   private _isReplaceableTile(tile: Tile | null | undefined): tile is Tile {
     if (!tile || tile.isFixed || isEmptyFloor(tile.shape)) return false;
-    return (
-      tile.shape !== PipeShape.Source &&
-      tile.shape !== PipeShape.Sink &&
-      tile.shape !== PipeShape.Chamber &&
-      !isObstacleTile(tile.shape) &&
-      !SPIN_PIPE_SHAPES.has(tile.shape)
-    );
+    return !this._isNonReplaceableShape(tile.shape);
   }
 
   /**
@@ -2168,7 +2195,7 @@ export class Board {
       const delta = NEIGHBOUR_DELTA[dir];
       const nr = r + delta.row;
       const nc = c + delta.col;
-      if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) {
+      if (!_isInBoundsCell(nr, nc, this)) {
         errors.push(
           `${label} at (${r},${c}) has an access point facing ${dir} which leads off the grid.`,
         );
@@ -2313,9 +2340,14 @@ export class Board {
    * pipes (silently rejected), the cement constraint, and the steps===0 no-op.
    * Returns a `MoveResult` when rotation should not proceed, `null` to continue.
    */
+  /** True for a fixed non-spinner tile, or an empty floor cell — neither can be rotated. */
+  private _isNonRotatableTile(tile: Tile): boolean {
+    return (tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || isEmptyFloor(tile.shape);
+  }
+
   private _rotationPrecheckResult(pos: GridPos, tile: Tile, normalizedSteps: number): MoveResult | null {
     // Spinner pipes are pre-placed fixed tiles that the player is allowed to rotate.
-    if ((tile.isFixed && !SPIN_PIPE_SHAPES.has(tile.shape)) || isEmptyFloor(tile.shape)) {
+    if (this._isNonRotatableTile(tile)) {
       return { success: false };
     }
     // Cross pipes face all four directions and rotating them is not a valid move.
@@ -2555,11 +2587,16 @@ export class Board {
    * not already source-connected before this move. Returns the neighbor's position
    * when that's the case, otherwise `null`.
    */
+  /** True for a tile with a non-empty firstConnections set (a valve chamber that has locked its entry side). */
+  private _hasValveFirstConnections(tile: Tile | null): tile is Tile & { firstConnections: Set<Direction> } {
+    return !!tile && !!tile.firstConnections && tile.firstConnections.size > 0;
+  }
+
   private _findValveViolationNeighbor(pos: GridPos, dir: Direction, filledBefore: Set<string>): GridPos | null {
     const delta = NEIGHBOUR_DELTA[dir];
     const neighborPos: GridPos = { row: pos.row + delta.row, col: pos.col + delta.col };
     const neighborTile = this.getTile(neighborPos);
-    if (!neighborTile || !neighborTile.firstConnections || neighborTile.firstConnections.size === 0) return null;
+    if (!this._hasValveFirstConnections(neighborTile)) return null;
 
     // Check mutual connection
     if (!neighborTile.connections.has(oppositeDirection(dir))) return null;
