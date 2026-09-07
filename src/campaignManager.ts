@@ -787,33 +787,38 @@ export class CampaignManager {
   // ── Public API: level header & context ───────────────────────────────────
 
   /** Update the level-header element with chapter, level number, and level name. */
-  updateLevelHeader(levelId: number): void {
-    const el = this._callbacks.levelHeaderEl;
-    const chapters = this._activeCampaign?.chapters ?? [];
+  /** Locate the chapter (and its index within `chapters`) containing `levelId`, or null if none does. */
+  private _findChapterContainingLevel(chapters: ChapterDef[], levelId: number): { chapter: ChapterDef; ci: number; idx: number } | null {
     for (let ci = 0; ci < chapters.length; ci++) {
-      const chapter = chapters[ci];
-      const idx = chapter.levels.findIndex((l) => l.id === levelId);
-      if (idx !== -1) {
-        this.currentChapterId = chapter.id;
-        const level = chapter.levels[idx];
-        const chapterNumber = ci + 1;
-        const challengeSuffix = level.challenge ? '  💀' : '';
-        el.replaceChildren();
-        if (this._activeCampaign) {
-          const line1 = document.createElement('div');
-          line1.style.cssText = 'font-size:0.9rem;color:#aaa;';
-          line1.textContent = resolveLocalizedText(this._activeCampaign.name);
-          el.appendChild(line1);
-        }
-        const line2 = document.createElement('div');
-        line2.style.cssText = 'font-size:1rem;color:#f0c040;';
-        line2.textContent =
-          `Chapter ${chapterNumber}: ${resolveLocalizedText(chapter.name)}  ·  Level ${idx + 1}: ${resolveLocalizedText(level.name)}${challengeSuffix}`;
-        el.appendChild(line2);
-        return;
-      }
+      const idx = chapters[ci].levels.findIndex((l) => l.id === levelId);
+      if (idx !== -1) return { chapter: chapters[ci], ci, idx };
     }
-    // Fallback if level isn't in any chapter (non-campaign play)
+    return null;
+  }
+
+  /** Render the level header for a level found within a campaign chapter. */
+  private _renderLevelHeaderForChapter(el: HTMLElement, found: { chapter: ChapterDef; ci: number; idx: number }): void {
+    const { chapter, ci, idx } = found;
+    this.currentChapterId = chapter.id;
+    const level = chapter.levels[idx];
+    const chapterNumber = ci + 1;
+    const challengeSuffix = level.challenge ? '  💀' : '';
+    el.replaceChildren();
+    if (this._activeCampaign) {
+      const line1 = document.createElement('div');
+      line1.style.cssText = 'font-size:0.9rem;color:#aaa;';
+      line1.textContent = resolveLocalizedText(this._activeCampaign.name);
+      el.appendChild(line1);
+    }
+    const line2 = document.createElement('div');
+    line2.style.cssText = 'font-size:1rem;color:#f0c040;';
+    line2.textContent =
+      `Chapter ${chapterNumber}: ${resolveLocalizedText(chapter.name)}  ·  Level ${idx + 1}: ${resolveLocalizedText(level.name)}${challengeSuffix}`;
+    el.appendChild(line2);
+  }
+
+  /** Render the level header when the level isn't in any chapter (non-campaign play). */
+  private _renderLevelHeaderFallback(el: HTMLElement, chapters: ChapterDef[], levelId: number): void {
     this.currentChapterId = 0;
     const allLevels = chapters.flatMap((ch) => ch.levels);
     const level = allLevels.find((l) => l.id === levelId);
@@ -823,6 +828,17 @@ export class CampaignManager {
     line2.style.cssText = 'font-size:1rem;color:#f0c040;';
     line2.textContent = level ? `Level ${levelId}: ${resolveLocalizedText(level.name)}${challengeSuffix}` : '';
     el.appendChild(line2);
+  }
+
+  updateLevelHeader(levelId: number): void {
+    const el = this._callbacks.levelHeaderEl;
+    const chapters = this._activeCampaign?.chapters ?? [];
+    const found = this._findChapterContainingLevel(chapters, levelId);
+    if (found) {
+      this._renderLevelHeaderForChapter(el, found);
+      return;
+    }
+    this._renderLevelHeaderFallback(el, chapters, levelId);
   }
 
   // ── Public API: persistence (campaign-scoped) ────────────────────────────
@@ -1112,40 +1128,53 @@ export class CampaignManager {
     this._callbacks.triggerModalSparkle(this._newChapterModalEl, 'sparkle-blue');
   }
 
+  /** If the pending challenge level already has in-progress moves saved, resume it directly. @returns true when it did (caller should stop). */
+  private _resumePartialChallengeIfAny(): boolean {
+    const pendingLevelId = this._pendingLevelId;
+    if (pendingLevelId === null) return false;
+    const partial = getPartialProgressFor(this._activeCampaign?.id ?? '', pendingLevelId);
+    if (!partial || partial.moves.length === 0) return false;
+    this.playChallengeLevel();
+    return true;
+  }
+
+  /**
+   * canSkip=true (sequential): show the message and both action buttons so the
+   * player must click to proceed. canSkip=false (directly selected): hide them
+   * all and let the auto-fade sequence advance to the level.
+   */
+  private _setChallengeModalControlsVisible(canSkip: boolean): void {
+    const display = canSkip ? '' : 'none';
+    this._challengeMsgEl.style.display = display;
+    this._challengePlayBtnEl.style.display = display;
+    this._challengeSkipBtnEl.style.display = display;
+  }
+
+  /** Auto-advance after 2s display + 1s fade, for a directly-selected (non-skippable) challenge level. */
+  private _scheduleChallengeAutoAdvance(): void {
+    this._challengeFadeTimerId = setTimeout(() => {
+      this._challengeFadeTimerId = null;
+      this._challengeModalEl.style.transition = 'opacity 1s ease-out';
+      this._challengeModalEl.style.opacity = '0';
+      this._challengeCloseTimerId = setTimeout(() => {
+        this._challengeCloseTimerId = null;
+        this.playChallengeLevel();
+      }, 1000);
+    }, 2000);
+  }
+
   private _showChallengeLevelModal(canSkip: boolean): void {
     this._cancelChallengeAutoPlay();
-    const pendingLevelId = this._pendingLevelId;
-    if (pendingLevelId !== null) {
-      const partial = getPartialProgressFor(this._activeCampaign?.id ?? '', pendingLevelId);
-      if (partial && partial.moves.length > 0) {
-        this.playChallengeLevel();
-        return;
-      }
-    }
-    // canSkip=true (sequential): show the message and both action buttons so the
-    // player must click to proceed.  canSkip=false (directly selected): hide
-    // them all and let the auto-fade sequence advance to the level.
-    this._challengeMsgEl.style.display     = canSkip ? '' : 'none';
-    this._challengePlayBtnEl.style.display = canSkip ? '' : 'none';
-    this._challengeSkipBtnEl.style.display = canSkip ? '' : 'none';
+    if (this._resumePartialChallengeIfAny()) return;
+
+    this._setChallengeModalControlsVisible(canSkip);
     // Reset opacity and transition from any previous auto-dismiss sequence.
     this._challengeModalEl.style.opacity = '1';
     this._challengeModalEl.style.transition = '';
     this._challengeModalEl.style.display = 'flex';
     sfxManager.play(SfxId.Challenge);
     this._callbacks.triggerModalSparkle(this._challengeModalEl, 'sparkle-yellow');
-    // When directly selected (canSkip=false) auto-advance after 2 s display + 1 s fade.
-    if (!canSkip) {
-      this._challengeFadeTimerId = setTimeout(() => {
-        this._challengeFadeTimerId = null;
-        this._challengeModalEl.style.transition = 'opacity 1s ease-out';
-        this._challengeModalEl.style.opacity = '0';
-        this._challengeCloseTimerId = setTimeout(() => {
-          this._challengeCloseTimerId = null;
-          this.playChallengeLevel();
-        }, 1000);
-      }, 2000);
-    }
+    if (!canSkip) this._scheduleChallengeAutoAdvance();
   }
 
   /** Cancel any pending challenge auto-dismiss timers and reset opacity styles. */
@@ -1185,24 +1214,34 @@ export class CampaignManager {
    * Removes stale completion records when edited content makes the chapter incomplete,
    * then independently recognizes first-time completion and first-time mastery.
    */
+  /** True when the chapter map reports this chapter no longer complete (its completion/mastery flags need clearing). */
+  private _shouldResetChapterCompletion(chapter: ChapterDef): boolean {
+    return chapter.id !== undefined && !!this._chapterMapScreen && !this._chapterMapScreen.isChapterComplete();
+  }
+
+  /** True when a chapter just became mastered and its mastery sequence hasn't been shown yet. */
+  private _shouldShowChapterMasterySequence(chapter: ChapterDef): boolean {
+    return (
+      chapter.id !== undefined &&
+      this._isCampaignChapterMastered(chapter) &&
+      !this._activeCampaignMasteredChaptersShown.has(chapter.id)
+    );
+  }
+
   private _recognizeChapterProgress(chapterIdx: number): void {
     const campaign = this._activeCampaign;
     if (!campaign) return;
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
 
-    if (chapter.id !== undefined && this._chapterMapScreen && !this._chapterMapScreen.isChapterComplete()) {
+    if (this._shouldResetChapterCompletion(chapter)) {
       removeChapterCompleted(campaign.id, chapter.id, this._activeCampaignCompletedChapters);
       removeMasteredChapterShown(campaign.id, chapter.id, this._activeCampaignMasteredChaptersShown);
     }
 
     this._checkAutoCompleteChapter(chapterIdx);
 
-    if (
-      chapter.id !== undefined &&
-      this._isCampaignChapterMastered(chapter) &&
-      !this._activeCampaignMasteredChaptersShown.has(chapter.id)
-    ) {
+    if (this._shouldShowChapterMasterySequence(chapter)) {
       this._showMasterySequence(chapterIdx, campaign, () => {});
     }
   }
@@ -1259,6 +1298,15 @@ export class CampaignManager {
    * Clears stale completion flags when the map is no longer complete, then independently
    * recognizes first-time campaign completion and first-time full-campaign mastery.
    */
+  /** True when the campaign map is complete, every chapter is mastered, and the mastery sequence hasn't been shown yet. */
+  private _shouldShowCampaignMasterySequence(campaign: CampaignDef): boolean {
+    return (
+      !!this._campaignMapScreen?.isCampaignComplete() &&
+      campaign.chapters.every((chapter) => this._isCampaignChapterMastered(chapter)) &&
+      !this._campaignMasteredShown
+    );
+  }
+
   private _recognizeCampaignProgress(): void {
     const campaign = this._activeCampaign;
     if (!campaign?.grid || !this._campaignMapScreen) return;
@@ -1270,11 +1318,7 @@ export class CampaignManager {
 
     this._checkAutoCompleteCampaign();
 
-    if (
-      this._campaignMapScreen.isCampaignComplete() &&
-      campaign.chapters.every((chapter) => this._isCampaignChapterMastered(chapter)) &&
-      !this._campaignMasteredShown
-    ) {
+    if (this._shouldShowCampaignMasterySequence(campaign)) {
       this._showCampaignMasterySequence();
     }
   }
