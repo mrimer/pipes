@@ -902,14 +902,16 @@ export class Board {
    * history, and each restart boundary snapshot has `move = undefined`, so the
    * scan naturally stops at the most recent session's origin.
    */
-  getMoveSequence(): string[] {
-    let startIdx = 0;
+  /** Index of the first move after the most recent history reset (undefined-move marker), or 0 if none. */
+  private _findMoveSequenceStart(): number {
     for (let i = this._historyIndex; i >= 0; i--) {
-      if (this._history[i].move === undefined) {
-        startIdx = i + 1;
-        break;
-      }
+      if (this._history[i].move === undefined) return i + 1;
     }
+    return 0;
+  }
+
+  getMoveSequence(): string[] {
+    const startIdx = this._findMoveSequenceStart();
     const moves: string[] = [];
     for (let i = startIdx; i <= this._historyIndex; i++) {
       const m = this._history[i].move;
