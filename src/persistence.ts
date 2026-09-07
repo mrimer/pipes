@@ -1,6 +1,6 @@
 /** Helpers for persisting long-term player progress in localStorage. */
 
-import type { CampaignDef, PartialPlayProgress, PlaySequenceRecord, RecordingSettings } from './types';
+import type { CampaignDef, ChapterDef, LevelDef, PartialPlayProgress, PlaySequenceRecord, RecordingSettings, TileDef } from './types';
 import { isLocalizedTextShape } from './types';
 import { getActiveSlotPrefix } from './profile/activeProfile';
 import type { GnomeAppearance } from './profile/gnomeAppearance';
@@ -29,68 +29,66 @@ const CAMPAIGNS_STORAGE_KEY = 'pipes_campaigns';
  *   - style 'Dirt' → 'Fall'               (renamed in the v2026-04 refactor)
  *   - style 'Grass' → 'Summer'            (renamed in the v2026-06 refactor)
  */
+/** In-place: rename the deprecated 'Dirt'/'Grass' style values on any record carrying a `style` field. */
+function _migrateStyleField(rec: Record<string, unknown>): void {
+  if (rec['style'] === 'Dirt') rec['style'] = 'Fall';
+  if (rec['style'] === 'Grass') rec['style'] = 'Summer';
+}
+
+/** In-place: rename the deprecated 'EMPTY_DIRT' tile shape to 'EMPTY_FALL'. */
+function _migrateGridTileShape(tile: TileDef | null): void {
+  const rec = tile as unknown as Record<string, unknown> | null;
+  if (rec && rec['shape'] === 'EMPTY_DIRT') rec['shape'] = 'EMPTY_FALL';
+}
+
+/** In-place: apply the tile-shape rename to every cell of a chapter/campaign map grid. */
+function _migrateMapGrid(grid: (TileDef | null)[][] | undefined): void {
+  if (!grid) return;
+  for (const row of grid) {
+    for (const tile of row) _migrateGridTileShape(tile);
+  }
+}
+
+/** In-place: apply both tile-level migrations (weak_ice→snow, EMPTY_DIRT→EMPTY_FALL) to one level-grid cell. */
+function _migrateLevelGridTile(tile: TileDef | null): void {
+  if (!tile) return;
+  if ((tile.chamberContent as unknown as string) === 'weak_ice') {
+    (tile.chamberContent as unknown as string) = 'snow';
+  }
+  _migrateGridTileShape(tile);
+}
+
+/** In-place: migrate the deprecated single-string `hint` field to the `hints` array. */
+function _migrateLevelHint(level: LevelDef): void {
+  const levelRec = level as unknown as Record<string, unknown>;
+  if (typeof levelRec['hint'] !== 'string') return;
+  const hintStr = levelRec['hint'];
+  if (!level.hints?.length && hintStr.trim()) {
+    level.hints = [hintStr];
+  }
+  delete levelRec['hint'];
+}
+
+/** In-place: apply every level-level migration (style, hint, grid tiles). */
+function _migrateLevel(level: LevelDef): void {
+  _migrateStyleField(level as unknown as Record<string, unknown>);
+  _migrateLevelHint(level);
+  for (const row of level.grid) {
+    for (const tile of row) _migrateLevelGridTile(tile);
+  }
+}
+
+/** In-place: apply every chapter-level migration (style, map grid, then every level). */
+function _migrateChapter(chapter: ChapterDef): void {
+  _migrateStyleField(chapter as unknown as Record<string, unknown>);
+  _migrateMapGrid(chapter.grid);
+  for (const level of chapter.levels) _migrateLevel(level);
+}
+
 export function migrateCampaign(campaign: CampaignDef): CampaignDef {
-  // Migrate campaign-level style
-  const campaignRec = campaign as unknown as Record<string, unknown>;
-  if (campaignRec['style'] === 'Dirt') campaignRec['style'] = 'Fall';
-  if (campaignRec['style'] === 'Grass') campaignRec['style'] = 'Summer';
-
-  for (const chapter of campaign.chapters) {
-    // Migrate chapter-level style
-    const chapterRec = chapter as unknown as Record<string, unknown>;
-    if (chapterRec['style'] === 'Dirt') chapterRec['style'] = 'Fall';
-    if (chapterRec['style'] === 'Grass') chapterRec['style'] = 'Summer';
-
-    // Migrate chapter map grid tile shapes
-    if (chapter.grid) {
-      for (const row of chapter.grid) {
-        for (const tile of row) {
-          if (tile && (tile as unknown as Record<string, unknown>)['shape'] === 'EMPTY_DIRT') {
-            (tile as unknown as Record<string, unknown>)['shape'] = 'EMPTY_FALL';
-          }
-        }
-      }
-    }
-
-    for (const level of chapter.levels) {
-      // Migrate level-level style
-      const levelRec = level as unknown as Record<string, unknown>;
-      if (levelRec['style'] === 'Dirt') levelRec['style'] = 'Fall';
-      if (levelRec['style'] === 'Grass') levelRec['style'] = 'Summer';
-
-      // Migrate deprecated single-string `hint` to the `hints` array.
-      if (typeof levelRec['hint'] === 'string') {
-        const hintStr = levelRec['hint'];
-        if (!level.hints?.length && hintStr.trim()) {
-          level.hints = [hintStr];
-        }
-        delete levelRec['hint'];
-      }
-      for (const row of level.grid) {
-        for (let i = 0; i < row.length; i++) {
-          const tile = row[i];
-          if (tile && (tile.chamberContent as unknown as string) === 'weak_ice') {
-            (tile.chamberContent as unknown as string) = 'snow';
-          }
-          if (tile && (tile as unknown as Record<string, unknown>)['shape'] === 'EMPTY_DIRT') {
-            (tile as unknown as Record<string, unknown>)['shape'] = 'EMPTY_FALL';
-          }
-        }
-      }
-    }
-  }
-
-  // Migrate campaign map grid tile shapes
-  if (campaign.grid) {
-    for (const row of campaign.grid) {
-      for (const tile of row) {
-        if (tile && (tile as unknown as Record<string, unknown>)['shape'] === 'EMPTY_DIRT') {
-          (tile as unknown as Record<string, unknown>)['shape'] = 'EMPTY_FALL';
-        }
-      }
-    }
-  }
-
+  _migrateStyleField(campaign as unknown as Record<string, unknown>);
+  for (const chapter of campaign.chapters) _migrateChapter(chapter);
+  _migrateMapGrid(campaign.grid);
   return campaign;
 }
 
