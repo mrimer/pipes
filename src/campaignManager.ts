@@ -147,6 +147,17 @@ interface ChapterCompleteStats {
   isMastered: boolean;
 }
 
+/** Aggregated stats shown on the campaign-complete modal. */
+interface CampaignCompleteStats {
+  chaptersDone: number;
+  chaptersTotal: number;
+  waterTotal: number;
+  starsCollected: number;
+  starsTotal: number;
+  challengesDone: number;
+  challengesTotal: number;
+}
+
 /**
  * Owns campaign state, chapter progression, chapter map screen, and
  * campaign-scoped persistence.  Communicates with the rest of the game
@@ -1268,81 +1279,95 @@ export class CampaignManager {
     }
   }
 
+  /** Aggregate a campaign's chapters/stars/water/challenge totals for the campaign-complete modal. */
+  private _computeCampaignCompleteStats(campaign: CampaignDef): CampaignCompleteStats {
+    const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
+    const levelStars = loadLevelStars(campaign.id);
+    const levelWater = loadLevelWater(campaign.id);
+    return {
+      chaptersDone: campaign.chapters.reduce((sum, ch) => sum + (this._activeCampaignCompletedChapters.has(ch.id) ? 1 : 0), 0),
+      chaptersTotal: campaign.chapters.length,
+      starsCollected: allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0),
+      starsTotal: allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0),
+      waterTotal: allLevels.reduce((sum, l) => sum + (this._activeCampaignProgress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0),
+      challengesDone: allLevels.filter(l => l.challenge && this._activeCampaignProgress.has(l.id)).length,
+      challengesTotal: allLevels.filter(l => l.challenge).length,
+    };
+  }
+
+  /** Build the campaign-complete modal's stats row: chapters (always shown) + the 3 optional stat spans. */
+  private _buildCampaignCompleteStatsDiv(stats: CampaignCompleteStats): HTMLElement {
+    const statsDiv = document.createElement('div');
+    statsDiv.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:1rem;margin-bottom:16px;';
+    const chaptersEl = document.createElement('span');
+    chaptersEl.style.color = '#7ed321';
+    chaptersEl.textContent = `📘 ${stats.chaptersDone}/${stats.chaptersTotal}`;
+    statsDiv.appendChild(chaptersEl);
+    this._appendChapterCompleteStat(statsDiv, { total: stats.waterTotal, color: '#4fc3f7', text: `💧 ${stats.waterTotal}` });
+    this._appendChapterCompleteStat(statsDiv, { total: stats.starsTotal, color: '#f0c040', text: `⭐ ${stats.starsCollected}/${stats.starsTotal}` });
+    this._appendChapterCompleteStat(statsDiv, { total: stats.challengesTotal, color: ERROR_COLOR, text: `💀 ${stats.challengesDone}/${stats.challengesTotal}` });
+    return statsDiv;
+  }
+
+  /** Show the campaign-complete modal (final celebration screen after finishing every chapter). */
+  private _showCampaignCompleteModal(campaign: CampaignDef): void {
+    const stats = this._computeCampaignCompleteStats(campaign);
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:100;`;
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:430px;width:90%;text-align:center;';
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = t('campaign.complete.title');
+    titleEl.style.cssText = 'color:#7ed321;margin:0 0 8px;font-size:1.5rem;';
+    box.appendChild(titleEl);
+
+    const msgEl = document.createElement('p');
+    msgEl.textContent = t('modal.campaignComplete.message');
+    msgEl.style.cssText = 'color:#ccc;margin:0 0 16px;font-size:0.95rem;';
+    box.appendChild(msgEl);
+
+    box.appendChild(this._buildCampaignCompleteStatsDiv(stats));
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;justify-content:center;gap:8px;flex-wrap:wrap;';
+    const remainBtn = document.createElement('button');
+    remainBtn.textContent = t('campaign.complete.remainHere');
+    remainBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#7ed321;`;
+    remainBtn.addEventListener('click', () => modal.remove());
+    const menuBtn = document.createElement('button');
+    menuBtn.textContent = t('campaign.complete.mainMenu');
+    menuBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#aaa;`;
+    menuBtn.addEventListener('click', () => { modal.remove(); this._callbacks.showLevelSelect(); });
+    btnRow.appendChild(menuBtn);
+    btnRow.appendChild(remainBtn);
+    box.appendChild(btnRow);
+    modal.appendChild(box);
+    document.body.appendChild(modal);
+    sfxManager.play(SfxId.WinCampaign);
+    spawnConfetti(() => {});
+    spawnBalloons(() => {});
+  }
+
+  /** Play the campaign-map win animation (or its sfx fallback) then show the campaign-complete modal. */
+  private _playCampaignWinThenModal(campaign: CampaignDef): void {
+    const showModal = () => this._showCampaignCompleteModal(campaign);
+    if (this._campaignMapScreen) {
+      this._campaignMapScreen.playWinAnimation(showModal);
+    } else {
+      sfxManager.play(SfxId.WinChapter);
+      showModal();
+    }
+  }
+
   private _completeCampaign(): void {
     const campaign = this._activeCampaign;
     if (!campaign || this._campaignCompleteShown) return;
     this._campaignCompleteShown = true;
     markCampaignCompleteShown(campaign.id);
 
-    const showModal = () => {
-      const allLevels = campaign.chapters.flatMap((ch) => ch.levels);
-      const levelStars = loadLevelStars(campaign.id);
-      const levelWater = loadLevelWater(campaign.id);
-      const chaptersDone = campaign.chapters.reduce(
-        (sum, ch) => sum + (this._activeCampaignCompletedChapters.has(ch.id) ? 1 : 0),
-        0,
-      );
-      const starsCollected = allLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
-      const starsTotal = allLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
-      const waterTotal = allLevels.reduce((sum, l) => sum + (this._activeCampaignProgress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);
-      const challengesDone = allLevels.filter(l => l.challenge && this._activeCampaignProgress.has(l.id)).length;
-      const challengesTotal = allLevels.filter(l => l.challenge).length;
-
-      const modal = document.createElement('div');
-      modal.style.cssText = `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:100;`;
-      const box = document.createElement('div');
-      box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:430px;width:90%;text-align:center;';
-      const titleEl = document.createElement('h2');
-      titleEl.textContent = t('campaign.complete.title');
-      titleEl.style.cssText = 'color:#7ed321;margin:0 0 8px;font-size:1.5rem;';
-      box.appendChild(titleEl);
-
-      const msgEl = document.createElement('p');
-      msgEl.textContent = t('modal.campaignComplete.message');
-      msgEl.style.cssText = 'color:#ccc;margin:0 0 16px;font-size:0.95rem;';
-      box.appendChild(msgEl);
-
-      const stats = document.createElement('div');
-      stats.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:1rem;margin-bottom:16px;';
-      const ch = document.createElement('span');
-      ch.style.color = '#7ed321';
-      ch.textContent = `📘 ${chaptersDone}/${campaign.chapters.length}`;
-      stats.appendChild(ch);
-      if (waterTotal > 0) { const el = document.createElement('span'); el.style.color = '#4fc3f7'; el.textContent = `💧 ${waterTotal}`; stats.appendChild(el); }
-      if (starsTotal > 0) { const el = document.createElement('span'); el.style.color = '#f0c040'; el.textContent = `⭐ ${starsCollected}/${starsTotal}`; stats.appendChild(el); }
-      if (challengesTotal > 0) { const el = document.createElement('span'); el.style.color = ERROR_COLOR; el.textContent = `💀 ${challengesDone}/${challengesTotal}`; stats.appendChild(el); }
-      box.appendChild(stats);
-
-      const btnRow = document.createElement('div');
-      btnRow.style.cssText = 'display:flex;justify-content:center;gap:8px;flex-wrap:wrap;';
-      const remainBtn = document.createElement('button');
-      remainBtn.textContent = t('campaign.complete.remainHere');
-      remainBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#7ed321;`;
-      remainBtn.addEventListener('click', () => modal.remove());
-      const menuBtn = document.createElement('button');
-      menuBtn.textContent = t('campaign.complete.mainMenu');
-      menuBtn.style.cssText = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid ${UI_BORDER};background:${UI_BG};color:#aaa;`;
-      menuBtn.addEventListener('click', () => { modal.remove(); this._callbacks.showLevelSelect(); });
-      btnRow.appendChild(menuBtn);
-      btnRow.appendChild(remainBtn);
-      box.appendChild(btnRow);
-      modal.appendChild(box);
-      document.body.appendChild(modal);
-      sfxManager.play(SfxId.WinCampaign);
-      spawnConfetti(() => {});
-      spawnBalloons(() => {});
-    };
-
     const allChaptersMastered = campaign.chapters.every((ch) => this._isCampaignChapterMastered(ch));
-
-    const playWinThenModal = () => {
-      if (this._campaignMapScreen) {
-        this._campaignMapScreen.playWinAnimation(showModal);
-      } else {
-        sfxManager.play(SfxId.WinChapter);
-        showModal();
-      }
-    };
+    const playWinThenModal = () => this._playCampaignWinThenModal(campaign);
 
     if (allChaptersMastered && !this._campaignMasteredShown) {
       this._showCampaignMasterySequence(playWinThenModal);
