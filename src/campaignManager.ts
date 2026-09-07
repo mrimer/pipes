@@ -865,23 +865,57 @@ export class CampaignManager {
   // ── Public API: level-select rendering ──────────────────────────────────
 
   /** Re-render the level list on the level-select screen. */
+  /** Summary info for the active-campaign header row, or undefined when no campaign is active. */
+  private _buildActiveCampaignInfo(): { name: string; author: string; completionPct: number } | undefined {
+    if (!this._activeCampaign) return undefined;
+    return {
+      name: resolveLocalizedText(this._activeCampaign.name),
+      author: this._activeCampaign.author,
+      completionPct: computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress),
+    };
+  }
+
+  /**
+   * Clicking a chapter navigates to that chapter's own map when it has one —
+   * regardless of completion state. Only fall back to the campaign map when
+   * the chapter itself has no map but the campaign does. No else branch: the
+   * chapter header only wires this callback when a map exists (campaign grid
+   * or chapter grid), so a "no map anywhere" click never reaches here.
+   */
+  private _handleChapterHeaderClick(chapterIdx: number): void {
+    const chapter = this._activeCampaign?.chapters[chapterIdx];
+    if (chapter?.grid) {
+      this.showChapterMap(chapterIdx, true, true);
+    } else if (this._activeCampaign?.grid) {
+      this.showCampaignMap(true);
+    }
+  }
+
+  /** Reset-progress confirmation info for the active campaign, or null when no campaign is active. */
+  private _buildResetInfoOrNull(
+    displayProgress: Set<number>, levelStars: Record<number, number>, levelWater: Record<number, number>,
+  ): ResetProgressInfo | null {
+    if (!this._activeCampaign) return null;
+    return this._buildResetProgressInfo(this._activeCampaign, displayProgress, levelStars, levelWater);
+  }
+
+  /** Callback that shows the campaign-mastery sequence, or undefined once it's already been shown. */
+  private _buildOnShowCampaignMastery(): (() => void) | undefined {
+    return this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence();
+  }
+
+  /** Callback that resumes a partially-played level, or undefined when the host doesn't support it. */
+  private _buildOnStartLevelFromPartial(): ((id: number) => void) | undefined {
+    if (!this._callbacks.startLevelFromPartial) return undefined;
+    return (id: number) => this._callbacks.startLevelFromPartial?.(id);
+  }
+
   renderLevelList(): void {
     const campaignChapters = this._activeCampaign?.chapters ?? [];
     const displayProgress = this._activeCampaignProgress;
     const levelStars = loadLevelStars(this._activeCampaign?.id);
     const levelWater = loadLevelWater(this._activeCampaign?.id);
-    let activeCampaignInfo: { name: string; author: string; completionPct: number } | undefined;
-    if (this._activeCampaign) {
-      const pct = computeCampaignCompletionPct(this._activeCampaign, this._activeCampaignProgress);
-      activeCampaignInfo = {
-        name: resolveLocalizedText(this._activeCampaign.name),
-        author: this._activeCampaign.author,
-        completionPct: pct,
-      };
-    }
-    const resetInfo = this._activeCampaign
-      ? this._buildResetProgressInfo(this._activeCampaign, displayProgress, levelStars, levelWater)
-      : null;
+    const resetInfo = this._buildResetInfoOrNull(displayProgress, levelStars, levelWater);
     renderLevelList(
       this._callbacks.levelListEl,
       displayProgress,
@@ -890,33 +924,20 @@ export class CampaignManager {
       () => this._callbacks.showRules(),
       () => this._openCampaignEditor(),
       () => this.unlockAll(),
-      activeCampaignInfo,
+      this._buildActiveCampaignInfo(),
       campaignChapters,
       levelStars,
       levelWater,
-      (ci) => {
-        // Clicking a chapter navigates to that chapter's own map when it has
-        // one — regardless of completion state.  Only fall back to the campaign
-        // map when the chapter itself has no map but the campaign does.
-        const chapter = this._activeCampaign?.chapters[ci];
-        if (chapter?.grid) {
-          this.showChapterMap(ci, true, true);
-        } else if (this._activeCampaign?.grid) {
-          this.showCampaignMap(true);
-        }
-        // No else: the chapter header only wires this callback when a map
-        // exists (campaign grid or chapter grid), so a "no map anywhere" click
-        // never reaches here.
-      },
+      (ci) => this._handleChapterHeaderClick(ci),
       this._activeCampaignCompletedChapters,
       () => this._callbacks.showSettings(),
-      this._campaignMasteredShown ? undefined : () => this._showCampaignMasterySequence(),
+      this._buildOnShowCampaignMastery(),
       this._activeCampaign?.grid !== undefined,
       () => this.showCampaignMap(true),
       () => this._callbacks.showPlayerProfile(),
       this._callbacks.getPlayerName() ?? undefined,
       () => this._callbacks.showCredits(),
-      this._callbacks.startLevelFromPartial ? (id: number) => this._callbacks.startLevelFromPartial?.(id) : undefined,
+      this._buildOnStartLevelFromPartial(),
       this._callbacks.getPartialLevelId?.() ?? null,
       loadGnomeAppearance(),
     );
