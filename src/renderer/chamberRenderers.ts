@@ -524,16 +524,21 @@ export function sandstoneColorState(
   };
 }
 
-function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, sandstoneColor: string, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null): void {
-  // When hardness >= pressure, use darker color and show hardness.
-  // When shatter is active and pressure reaches the shatter threshold, use lighter color.
-  // When connected, show the locked effective cost value.
-  // Otherwise show cost display lines.
-  const { shatterOverride, deltaDamage, costPerDeltaTemp } =
-    sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-  const shatterActive = tile.shatter > tile.hardness;
-  const isHard = tile.hardness >= currentPressure;
-  // Draw 2 wavy lines near the bottom inside the box (sandstone layers)
+interface SandstoneDrawContext {
+  ctx: CanvasRenderingContext2D;
+  tile: Tile;
+  isWater: boolean;
+  sandstoneColor: string;
+  shiftHeld: boolean;
+  currentTemp: number;
+  lockedCost: number | null;
+  bw: number;
+  bh: number;
+}
+
+/** Draw the 2 wavy "sandstone layer" lines near the bottom of the box. */
+function _drawSandstoneWavyLines(c: SandstoneDrawContext): void {
+  const { ctx, sandstoneColor, bw, bh } = c;
   ctx.strokeStyle = sandstoneColor;
   ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
@@ -550,6 +555,97 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
     ctx.quadraticCurveTo(sLineMid + sLineQuart, sLineY + _s(2.5), sLineRight, sLineY);
     ctx.stroke();
   }
+}
+
+/** Show the hardness number in the top-left corner when pressure > hardness, or when connected (locked cost). */
+function _shouldShowSandstoneHardnessLabel(isHard: boolean, shatterActive: boolean, lockedCost: number | null): boolean {
+  if (lockedCost !== null) return true;
+  return !isHard && !shatterActive;
+}
+
+function _drawSandstoneHardnessLabel(c: SandstoneDrawContext, isHard: boolean, shatterActive: boolean): void {
+  if (!_shouldShowSandstoneHardnessLabel(isHard, shatterActive, c.lockedCost)) return;
+  const { ctx, tile, isWater, bw, bh } = c;
+  ctx.save();
+  ctx.fillStyle = isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${_s(9)}px Arial`;
+  ctx.fillText(`${tile.hardness}H`, -bw + _s(2), -bh + _s(2));
+  ctx.restore();
+}
+
+/** The raw temperature when shift is held, otherwise the delta-adjusted value. */
+function _resolveSandstoneTemp(tile: Tile, shiftHeld: boolean, currentTemp: number): number {
+  return shiftHeld ? tile.temperature : computeDeltaTemp(tile.temperature, currentTemp);
+}
+
+/** Connected: locked effective cost, centered in the full chamber rectangle. */
+function _drawSandstoneLockedCostLabel(ctx: CanvasRenderingContext2D, lockedCost: number): void {
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.fillText(String(-lockedCost), 0, 0);
+}
+
+/** Unconnected, pressure <= hardness: show hardness/H and "temperature x cost". */
+function _drawSandstoneHardDisplay(c: SandstoneDrawContext, textCenterY: number): void {
+  const { ctx, tile, shiftHeld, currentTemp } = c;
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.fillText(`${tile.hardness}H`, 0, textCenterY - _s(4));
+  // When shift is held, show the raw (unadjusted) temperature.
+  const sandstoneTemp = _resolveSandstoneTemp(tile, shiftHeld, currentTemp);
+  ctx.font = (sandstoneTemp < 10 && tile.cost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+  ctx.fillText(`-${sandstoneTemp}° x ${tile.cost}`, 0, textCenterY + _s(10));
+}
+
+function _drawSandstoneShatterCostDisplay(
+  ctx: CanvasRenderingContext2D, tile: Tile, sandstoneTemp: number, sandstoneCost: number, shatterOverride: boolean, textCenterY: number,
+): void {
+  const displayCost = shatterOverride ? 0 : sandstoneCost;
+  ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
+  ctx.fillText(shatterOverride ? t('tile.sandstone.weak') : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
+  ctx.font = (sandstoneTemp < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
+  ctx.fillText(`-${sandstoneTemp}° x ${displayCost}`, 0, textCenterY + _s(7));
+}
+
+function _drawSandstonePlainCostDisplay(ctx: CanvasRenderingContext2D, sandstoneTemp: number, sandstoneCost: number, textCenterY: number): void {
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.fillText(`-${sandstoneTemp}°`, 0, textCenterY - _s(5));
+  ctx.font = `bold ${_s(9)}px Arial`;
+  ctx.fillText('x', 0, textCenterY + _s(4));
+  ctx.font = `bold ${_s(14)}px Arial`;
+  ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(14));
+}
+
+/**
+ * Unconnected: show cost display. deltaDamage = Pressure - Hardness is used as
+ * the cost divisor. When shift is held, show the raw (unadjusted) values.
+ */
+function _drawSandstoneCostDisplay(
+  c: SandstoneDrawContext, shatterActive: boolean, shatterOverride: boolean, deltaDamage: number, costPerDeltaTemp: number, textCenterY: number,
+): void {
+  const { ctx, tile, shiftHeld, currentTemp } = c;
+  const sandstoneTemp = _resolveSandstoneTemp(tile, shiftHeld, currentTemp);
+  const sandstoneCost = shiftHeld ? tile.cost : Math.max(1, deltaDamage >= 1 ? costPerDeltaTemp : tile.cost);
+  if (shatterActive) {
+    _drawSandstoneShatterCostDisplay(ctx, tile, sandstoneTemp, sandstoneCost, shatterOverride, textCenterY);
+  } else {
+    _drawSandstonePlainCostDisplay(ctx, sandstoneTemp, sandstoneCost, textCenterY);
+  }
+}
+
+function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, sandstoneColor: string, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null): void {
+  // When hardness >= pressure, use darker color and show hardness.
+  // When shatter is active and pressure reaches the shatter threshold, use lighter color.
+  // When connected, show the locked effective cost value.
+  // Otherwise show cost display lines.
+  const { shatterOverride, deltaDamage, costPerDeltaTemp } =
+    sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
+  const shatterActive = tile.shatter > tile.hardness;
+  const isHard = tile.hardness >= currentPressure;
+  const c: SandstoneDrawContext = { ctx, tile, isWater, sandstoneColor, shiftHeld, currentTemp, lockedCost, bw, bh };
+
+  _drawSandstoneWavyLines(c);
+
   // Vertically center text between the rect top (−bh) and the top of the wavy lines.
   const wavesTop = bh - _s(11.5);
   const textCenterY = (-bh + wavesTop) / 2;
@@ -558,55 +654,15 @@ function _drawChamberSandstoneContent(ctx: CanvasRenderingContext2D, tile: Tile,
   ctx.fillStyle = isHard ? (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR) : sandstoneColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // When pressure > hardness, or when connected (locked cost), show the hardness number
-  // in the top-left corner for reference
-  if ((!isHard && !shatterActive) || lockedCost !== null) {
-    ctx.save();
-    ctx.fillStyle = isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.font = `bold ${_s(9)}px Arial`;
-    ctx.fillText(`${tile.hardness}H`, -bw + _s(2), -bh + _s(2));
-    ctx.restore();
-  }
+
+  _drawSandstoneHardnessLabel(c, isHard, shatterActive);
+
   if (lockedCost !== null) {
-    // Connected: locked effective cost is centered in the full chamber rectangle.
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(String(-lockedCost), 0, 0);
+    _drawSandstoneLockedCostLabel(ctx, lockedCost);
   } else if (isHard) {
-    // Unconnected and pressure <= hardness: show hardness/H and "temperature x cost"
-    ctx.font = `bold ${_s(14)}px Arial`;
-    ctx.fillText(`${tile.hardness}H`, 0, textCenterY - _s(4));
-    // When shift is held, show the raw (unadjusted) temperature.
-    const sandstoneTemp = shiftHeld
-      ? tile.temperature
-      : computeDeltaTemp(tile.temperature, currentTemp);
-    ctx.font = (sandstoneTemp < 10 && tile.cost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
-    ctx.fillText(`-${sandstoneTemp}° x ${tile.cost}`, 0, textCenterY + _s(10));
+    _drawSandstoneHardDisplay(c, textCenterY);
   } else {
-    // Unconnected: show cost display.
-    // deltaDamage = Pressure − Hardness is used as the cost divisor.
-    // When shift is held, show the raw (unadjusted) values.
-    const sandstoneTemp = shiftHeld
-      ? tile.temperature
-      : computeDeltaTemp(tile.temperature, currentTemp);
-    const sandstoneCost = shiftHeld
-      ? tile.cost
-      : Math.max(1, deltaDamage >= 1 ? costPerDeltaTemp : tile.cost);
-    if (shatterActive) {
-      const displayCost = shatterOverride ? 0 : sandstoneCost;
-      ctx.font = tile.shatter < 10 ? `bold ${_s(12)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(shatterOverride ? t('tile.sandstone.weak') : `S @ ${tile.shatter}P`, 0, textCenterY - _s(7));
-      ctx.font = (sandstoneTemp < 10 && displayCost < 10) ? `bold ${_s(11)}px Arial` : `bold ${_s(9)}px Arial`;
-      ctx.fillText(`-${sandstoneTemp}° x ${displayCost}`, 0, textCenterY + _s(7));
-    } else {
-      ctx.font = `bold ${_s(14)}px Arial`;
-      ctx.fillText(`-${sandstoneTemp}°`, 0, textCenterY - _s(5));
-      ctx.font = `bold ${_s(9)}px Arial`;
-      ctx.fillText('x', 0, textCenterY + _s(4));
-      ctx.font = `bold ${_s(14)}px Arial`;
-      ctx.fillText(String(sandstoneCost), 0, textCenterY + _s(14));
-    }
+    _drawSandstoneCostDisplay(c, shatterActive, shatterOverride, deltaDamage, costPerDeltaTemp, textCenterY);
   }
 }
 
