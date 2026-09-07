@@ -391,8 +391,81 @@ function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: n
   }
 }
 
+/** Vacuum: simple vortex swirl near the top, animated (water-filled) version. */
+function _drawVacuumAnimatedSwirl(ctx: CanvasRenderingContext2D, bh: number): void {
+  const swirlY = -bh + _s(9);
+  const SWIRL_PERIOD_MS = 3000;
+  const rotAngle = (Date.now() % SWIRL_PERIOD_MS) / SWIRL_PERIOD_MS * Math.PI * 2;
+  ctx.beginPath();
+  ctx.arc(0, swirlY, _s(7), rotAngle, rotAngle + Math.PI * 1.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, swirlY, _s(3.5), rotAngle + Math.PI * 0.5, rotAngle + Math.PI * 2);
+  ctx.stroke();
+}
+
+/** Vacuum: simple vortex swirl near the top, static (dry) version. */
+function _drawVacuumStaticSwirl(ctx: CanvasRenderingContext2D, bh: number): void {
+  const swirlY = -bh + _s(9);
+  ctx.beginPath();
+  ctx.arc(0, swirlY, _s(7), 0, Math.PI * 1.5);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, swirlY, _s(3.5), Math.PI * 0.5, Math.PI * 2);
+  ctx.stroke();
+}
+
+function _strokeChevron(ctx: CanvasRenderingContext2D, chx: number, chevY: number, chevH: number): void {
+  ctx.beginPath();
+  ctx.moveTo(chx - _s(2.5), chevY - chevH);
+  ctx.lineTo(chx + _s(2.5), chevY);
+  ctx.lineTo(chx - _s(2.5), chevY + chevH);
+  ctx.stroke();
+}
+
+/** Pump: series of thin chevrons in a horizontal line near the top, animated (water-filled): scroll right, wrap within the tile. */
+function _drawPumpAnimatedChevrons(ctx: CanvasRenderingContext2D, bw: number, bh: number): void {
+  const chevY = -bh + _s(7);
+  const chevH = _s(4);
+  const chevSpacing = _s(7);
+  const PUMP_SCROLL_MS = 1500;
+  const offset = (Date.now() % PUMP_SCROLL_MS) / PUMP_SCROLL_MS * chevSpacing;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-bw + _s(2), chevY - chevH - _s(2), bw * 2 - _s(4), chevH * 2 + _s(4));
+  ctx.clip();
+  const visibleWidth = bw * 2 - _s(4);
+  const numDraw = Math.ceil(visibleWidth / chevSpacing) + 2;
+  const startX = -bw + _s(2) - chevSpacing + offset;
+  for (let i = 0; i < numDraw; i++) {
+    _strokeChevron(ctx, startX + i * chevSpacing, chevY, chevH);
+  }
+  ctx.restore();
+}
+
+/** Pump: series of thin chevrons in a horizontal line near the top, static (dry) version. */
+function _drawPumpStaticChevrons(ctx: CanvasRenderingContext2D, bh: number): void {
+  const chevY = -bh + _s(7);
+  const chevH = _s(4);
+  const chevSpacing = _s(7);
+  const numChev = 4;
+  const chevStartX = -(numChev - 1) * chevSpacing / 2;
+  for (let i = 0; i < numChev; i++) {
+    _strokeChevron(ctx, chevStartX + i * chevSpacing, chevY, chevH);
+  }
+}
+
+/** Draw the pressure-bonus label (no plus sign for negative values) at the box centre. */
+function _drawPumpPressureLabel(ctx: CanvasRenderingContext2D, tile: Tile, color: string): void {
+  ctx.fillStyle = color;
+  ctx.font = `bold ${_s(13)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const pressStr = tile.pressure >= 0 ? `+${tile.pressure}P` : `${tile.pressure}P`;
+  ctx.fillText(pressStr, 0, 0);
+}
+
 function _drawChamberPumpContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
-  // Show pressure bonus (no plus sign for negative values)
   const isVacuum = tile.pressure < 0;
   const pumpBaseColor = isVacuum
     ? (isWater ? VACUUM_WATER_COLOR : VACUUM_COLOR)
@@ -402,72 +475,11 @@ function _drawChamberPumpContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: 
   ctx.lineWidth = _s(1.5);
   ctx.lineCap = 'round';
   if (isVacuum) {
-    // Vacuum: simple vortex swirl near the top
-    const swirlY = -bh + _s(9);
-    if (isWater) {
-      // Animated: swirl arcs rotate slowly in place
-      const SWIRL_PERIOD_MS = 3000;
-      const rotAngle = (Date.now() % SWIRL_PERIOD_MS) / SWIRL_PERIOD_MS * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(0, swirlY, _s(7), rotAngle, rotAngle + Math.PI * 1.5);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(0, swirlY, _s(3.5), rotAngle + Math.PI * 0.5, rotAngle + Math.PI * 2);
-      ctx.stroke();
-    } else {
-      // Static swirl
-      ctx.beginPath();
-      ctx.arc(0, swirlY, _s(7), 0, Math.PI * 1.5);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(0, swirlY, _s(3.5), Math.PI * 0.5, Math.PI * 2);
-      ctx.stroke();
-    }
+    if (isWater) _drawVacuumAnimatedSwirl(ctx, bh); else _drawVacuumStaticSwirl(ctx, bh);
   } else {
-    // Pump: series of thin chevrons in a horizontal line near the top
-    const chevY = -bh + _s(7);
-    const chevH = _s(4);
-    const chevSpacing = _s(7);
-    const numChev = 4;
-    if (isWater) {
-      // Animated: chevrons scroll slowly to the right and wrap horizontally within the tile
-      const PUMP_SCROLL_MS = 1500;
-      const offset = (Date.now() % PUMP_SCROLL_MS) / PUMP_SCROLL_MS * chevSpacing;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(-bw + _s(2), chevY - chevH - _s(2), bw * 2 - _s(4), chevH * 2 + _s(4));
-      ctx.clip();
-      const visibleWidth = bw * 2 - _s(4);
-      const numDraw = Math.ceil(visibleWidth / chevSpacing) + 2;
-      const startX = -bw + _s(2) - chevSpacing + offset;
-      for (let i = 0; i < numDraw; i++) {
-        const chx = startX + i * chevSpacing;
-        ctx.beginPath();
-        ctx.moveTo(chx - _s(2.5), chevY - chevH);
-        ctx.lineTo(chx + _s(2.5), chevY);
-        ctx.lineTo(chx - _s(2.5), chevY + chevH);
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else {
-      // Static chevrons
-      const chevStartX = -(numChev - 1) * chevSpacing / 2;
-      for (let i = 0; i < numChev; i++) {
-        const chx = chevStartX + i * chevSpacing;
-        ctx.beginPath();
-        ctx.moveTo(chx - _s(2.5), chevY - chevH);
-        ctx.lineTo(chx + _s(2.5), chevY);
-        ctx.lineTo(chx - _s(2.5), chevY + chevH);
-        ctx.stroke();
-      }
-    }
+    if (isWater) _drawPumpAnimatedChevrons(ctx, bw, bh); else _drawPumpStaticChevrons(ctx, bh);
   }
-  ctx.fillStyle = pumpBaseColor;
-  ctx.font = `bold ${_s(13)}px Arial`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const pressStr = tile.pressure >= 0 ? `+${tile.pressure}P` : `${tile.pressure}P`;
-  ctx.fillText(pressStr, 0, 0);
+  _drawPumpPressureLabel(ctx, tile, pumpBaseColor);
 }
 
 function _drawChamberSnowContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, currentPressure: number, lockedCost: number | null): void {
@@ -959,13 +971,8 @@ function _drawConnectedStarBurst(ctx: CanvasRenderingContext2D, tile: Tile, half
   }
 }
 
-function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null, lockedGain: number | null): void {
-  // Draw a small flame icon in the top-right inside corner
-  const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
-  ctx.strokeStyle = hotColor;
-  ctx.lineWidth = _s(1.5);
-  ctx.lineCap = 'round';
-  // Flame: a simple upward-pointing flame shape
+/** Small upward-pointing flame icon in the top-right inside corner. */
+function _drawHotPlateFlameIcon(ctx: CanvasRenderingContext2D, bw: number, bh: number): void {
   const fx = bw - _s(8);
   const fy = -bh + _s(9);
   const fr = _s(5);
@@ -974,38 +981,54 @@ function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, 
   ctx.bezierCurveTo(fx - fr, fy, fx - fr * 0.5, fy - fr * 1.2, fx, fy - fr);
   ctx.bezierCurveTo(fx + fr * 0.5, fy - fr * 1.2, fx + fr, fy, fx, fy + fr);
   ctx.stroke();
+}
+
+/** Connected: show gain in green and/or loss in red. */
+function _drawHotPlateConnectedLabel(ctx: CanvasRenderingContext2D, hotColor: string, lockedGain: number | null, lockedCost: number | null): void {
+  const gain = lockedGain ?? 0;
+  const loss = lockedCost ?? 0;
+  ctx.font = `bold ${_s(12)}px Arial`;
+  if (gain > 0 && loss > 0) {
+    // Both gain and loss: show each in its own color, offset vertically
+    ctx.fillStyle = ANIM_POSITIVE_COLOR;
+    ctx.fillText(`+${gain}`, 0, -_s(6));
+    ctx.fillStyle = ANIM_NEGATIVE_COLOR;
+    ctx.fillText(`-${loss}`, 0, _s(6));
+  } else if (gain > 0) {
+    ctx.fillStyle = ANIM_POSITIVE_COLOR;
+    ctx.fillText(`+${gain}`, 0, 0);
+  } else if (loss > 0) {
+    ctx.fillStyle = ANIM_NEGATIVE_COLOR;
+    ctx.fillText(`-${loss}`, 0, 0);
+  } else {
+    ctx.fillStyle = hotColor;
+    ctx.fillText('0', 0, 0);
+  }
+}
+
+/**
+ * Unconnected: show boiling temp and mass. When shift is held, show the raw
+ * temp parameter; otherwise show tile.temperature + currentTemp.
+ */
+function _drawHotPlateUnconnectedLabel(ctx: CanvasRenderingContext2D, tile: Tile, hotColor: string, shiftHeld: boolean, currentTemp: number): void {
+  const deltaTemp = shiftHeld ? tile.temperature : tile.temperature + currentTemp;
+  ctx.fillStyle = hotColor;
+  _drawDeltaTempCostFormula(ctx, `${deltaTemp}°`, String(tile.cost));
+}
+
+function _drawChamberHotPlateContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null, lockedGain: number | null): void {
+  const hotColor = isWater ? HOT_PLATE_WATER_COLOR : HOT_PLATE_COLOR;
+  ctx.strokeStyle = hotColor;
+  ctx.lineWidth = _s(1.5);
+  ctx.lineCap = 'round';
+  _drawHotPlateFlameIcon(ctx, bw, bh);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (lockedGain !== null || lockedCost !== null) {
-    // Connected: show gain in green and/or loss in red
-    const gain = lockedGain ?? 0;
-    const loss = lockedCost ?? 0;
-    ctx.font = `bold ${_s(12)}px Arial`;
-    if (gain > 0 && loss > 0) {
-      // Both gain and loss: show each in its own color, offset vertically
-      ctx.fillStyle = ANIM_POSITIVE_COLOR;
-      ctx.fillText(`+${gain}`, 0, -_s(6));
-      ctx.fillStyle = ANIM_NEGATIVE_COLOR;
-      ctx.fillText(`-${loss}`, 0, _s(6));
-    } else if (gain > 0) {
-      ctx.fillStyle = ANIM_POSITIVE_COLOR;
-      ctx.fillText(`+${gain}`, 0, 0);
-    } else if (loss > 0) {
-      ctx.fillStyle = ANIM_NEGATIVE_COLOR;
-      ctx.fillText(`-${loss}`, 0, 0);
-    } else {
-      ctx.fillStyle = hotColor;
-      ctx.fillText('0', 0, 0);
-    }
+    _drawHotPlateConnectedLabel(ctx, hotColor, lockedGain, lockedCost);
   } else {
-    // Unconnected: show boiling temp and mass.
-    // When shift is held, show the raw temp parameter; otherwise show tile.temperature + currentTemp.
-    const deltaTemp = shiftHeld
-      ? tile.temperature
-      : tile.temperature + currentTemp;
-    ctx.fillStyle = hotColor;
-    _drawDeltaTempCostFormula(ctx, `${deltaTemp}°`, String(tile.cost));
+    _drawHotPlateUnconnectedLabel(ctx, tile, hotColor, shiftHeld, currentTemp);
   }
 }
 
