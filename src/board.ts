@@ -168,36 +168,47 @@ export function isEmptyFloor(shape: PipeShape): boolean {
 /** Cardinal-neighbour offsets, shared by every helper below. */
 const CARDINAL_OFFSETS: readonly [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
+/** Grid dimensions shared by every bounds-check helper below. */
+interface GridBounds {
+  rows: number;
+  cols: number;
+}
+
+/** True when (r, c) falls inside a grid of the given bounds. */
+function _isInBoundsCell(r: number, c: number, bounds: GridBounds): boolean {
+  return r >= 0 && r < bounds.rows && c >= 0 && c < bounds.cols;
+}
+
 /** Invoke `cb` for every in-bounds cardinal neighbour of (r, c). */
 function _forEachInBoundsNeighbor(
-  r: number, c: number, rows: number, cols: number,
-  cb: (nr: number, nc: number) => void,
+  r: number, c: number, bounds: GridBounds, cb: (nr: number, nc: number) => void,
 ): void {
   for (const [dr, dc] of CARDINAL_OFFSETS) {
     const nr = r + dr, nc = c + dc;
-    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) cb(nr, nc);
+    if (_isInBoundsCell(nr, nc, bounds)) cb(nr, nc);
   }
 }
 
 /** True when (r, c) has at least one cardinal neighbour already resolved in `map`. */
-function _hasResolvedNeighbor(
-  r: number, c: number, rows: number, cols: number, map: ReadonlyMap<string, PipeShape>,
-): boolean {
+function _hasResolvedNeighbor(r: number, c: number, bounds: GridBounds, map: ReadonlyMap<string, PipeShape>): boolean {
   for (const [dr, dc] of CARDINAL_OFFSETS) {
     const nr = r + dr, nc = c + dc;
-    if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && map.has(posKey(nr, nc))) return true;
+    if (_isInBoundsCell(nr, nc, bounds) && map.has(posKey(nr, nc))) return true;
   }
   return false;
 }
 
+interface FloorNeighborContext {
+  bounds: GridBounds;
+  map: ReadonlyMap<string, PipeShape>;
+  getCellFloorType: (r: number, c: number) => PipeShape | null;
+}
+
 /** Majority vote over cardinal neighbours already resolved in `map`. */
-function _majorityFloorFromNeighbors(
-  r: number, c: number, rows: number, cols: number,
-  map: ReadonlyMap<string, PipeShape>,
-  getCellFloorType: (r: number, c: number) => PipeShape | null,
-): PipeShape {
+function _majorityFloorFromNeighbors(r: number, c: number, ctx: FloorNeighborContext): PipeShape {
+  const { bounds, map, getCellFloorType } = ctx;
   const counts = new Map<PipeShape, number>([[PipeShape.Empty, 0], [PipeShape.EmptyFall, 0], [PipeShape.EmptyDark, 0], [PipeShape.EmptyWinter, 0], [PipeShape.EmptySpring, 0]]);
-  _forEachInBoundsNeighbor(r, c, rows, cols, (nr, nc) => {
+  _forEachInBoundsNeighbor(r, c, bounds, (nr, nc) => {
     const ft = map.get(posKey(nr, nc)) ?? getCellFloorType(nr, nc);
     if (ft !== null) counts.set(ft, (counts.get(ft) ?? 0) + 1);
   });
@@ -228,11 +239,12 @@ function _seedResolvedFloorCells(
 function _buildInitialFloorBfsQueue(
   rows: number, cols: number, map: ReadonlyMap<string, PipeShape>,
 ): [number, number][] {
+  const bounds: GridBounds = { rows, cols };
   const queue: [number, number][] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (map.has(posKey(r, c))) continue;
-      if (_hasResolvedNeighbor(r, c, rows, cols, map)) queue.push([r, c]);
+      if (_hasResolvedNeighbor(r, c, bounds, map)) queue.push([r, c]);
     }
   }
   return queue;
@@ -240,10 +252,10 @@ function _buildInitialFloorBfsQueue(
 
 /** Push any still-unresolved neighbour of (r, c) onto `queue` for later BFS expansion. */
 function _enqueueUnresolvedNeighbors(
-  r: number, c: number, rows: number, cols: number,
+  r: number, c: number, bounds: GridBounds,
   map: ReadonlyMap<string, PipeShape>, queue: [number, number][],
 ): void {
-  _forEachInBoundsNeighbor(r, c, rows, cols, (nr, nc) => {
+  _forEachInBoundsNeighbor(r, c, bounds, (nr, nc) => {
     if (!map.has(posKey(nr, nc))) queue.push([nr, nc]);
   });
 }
@@ -254,13 +266,15 @@ function _expandFloorTypesByBfs(
   map: Map<string, PipeShape>,
   getCellFloorType: (r: number, c: number) => PipeShape | null,
 ): void {
+  const bounds: GridBounds = { rows, cols };
+  const ctx: FloorNeighborContext = { bounds, map, getCellFloorType };
   let qi = 0;
   while (qi < queue.length) {
     const [r, c] = queue[qi++];
     const key = posKey(r, c);
     if (map.has(key)) continue;
-    map.set(key, _majorityFloorFromNeighbors(r, c, rows, cols, map, getCellFloorType));
-    _enqueueUnresolvedNeighbors(r, c, rows, cols, map, queue);
+    map.set(key, _majorityFloorFromNeighbors(r, c, ctx));
+    _enqueueUnresolvedNeighbors(r, c, bounds, map, queue);
   }
 }
 
