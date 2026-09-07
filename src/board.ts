@@ -477,10 +477,15 @@ function _computeDecorationOffsetY(type: AmbientDecorationType): number {
   return 0.15 + Math.random() * 0.70;
 }
 
+interface AmbientDecorationSpec {
+  floorType: PipeShape;
+  type: AmbientDecorationType;
+  idx: number;
+}
+
 /** Build one fully-randomized ambient decoration for cell (r, c). */
-function _buildAmbientDecoration(
-  r: number, c: number, floorType: PipeShape, type: AmbientDecorationType, idx: number,
-): AmbientDecoration {
+function _buildAmbientDecoration(r: number, c: number, spec: AmbientDecorationSpec): AmbientDecoration {
+  const { floorType, type, idx } = spec;
   // Spring flowers are rendered brighter and fully opaque.
   const bright = (floorType === PipeShape.EmptySpring && type === 'flower') ? true : undefined;
   const baseAngle = Math.random() * 360;
@@ -514,7 +519,7 @@ export function generateAmbientDecorations(
       const type = _pickDecorationType(floorType);
       const idx = typeCount[type] ?? 0;
       typeCount[type] = idx + 1;
-      map.set(`${r},${c}`, _buildAmbientDecoration(r, c, floorType, type, idx));
+      map.set(`${r},${c}`, _buildAmbientDecoration(r, c, { floorType, type, idx }));
     }
   }
   return map;
@@ -1257,15 +1262,15 @@ export class Board {
    * @param finalBonuses - Container bonuses with the new tile in place.
    * @param rollback - Zero-arg function that reverts the board to its pre-replacement state.
    */
-  private _checkInventoryContainerDrops(
-    pos: GridPos,
-    tile: Tile,
-    newTileRef: Tile,
-    savedInventory: Array<{ shape: PipeShape; count: number }>,
-    finalFilled: Set<string>,
-    finalBonuses: Map<PipeShape, number>,
-    rollback: () => void,
-  ): MoveResult | null {
+  private _checkInventoryContainerDrops(check: {
+    pos: GridPos;
+    tile: Tile;
+    newTileRef: Tile;
+    savedInventory: Array<{ shape: PipeShape; count: number }>;
+    finalFilled: Set<string>;
+    finalBonuses: Map<PipeShape, number>;
+  }, rollback: () => void): MoveResult | null {
+    const { pos, tile, newTileRef, savedInventory, finalFilled, finalBonuses } = check;
     const hasNegativeEffectiveCount = this.inventory.some((item) => item.count + (finalBonuses.get(item.shape) ?? 0) < 0);
     if (!hasNegativeEffectiveCount) return null;
 
@@ -1515,14 +1520,14 @@ export class Board {
    * which case connecting new negative grants is allowed). Returns `null` to let
    * the replacement proceed.
    */
-  private _checkNewShapeAvailability(
-    newShape: PipeShape,
-    filledBeforeReplace: Set<string>,
-    filledWithNewTile: Set<string>,
-    baseCount: number,
-    bonuses: Map<PipeShape, number>,
-    rollback: () => void,
-  ): MoveResult | null {
+  private _checkNewShapeAvailability(check: {
+    newShape: PipeShape;
+    filledBeforeReplace: Set<string>;
+    filledWithNewTile: Set<string>;
+    baseCount: number;
+    bonuses: Map<PipeShape, number>;
+  }, rollback: () => void): MoveResult | null {
+    const { newShape, filledBeforeReplace, filledWithNewTile, baseCount, bonuses } = check;
     const effectiveCount = baseCount + (bonuses.get(newShape) ?? 0);
     if (effectiveCount > 0) return null;
 
@@ -1594,7 +1599,7 @@ export class Board {
     const bonuses = this.getContainerBonuses(filledWithNewTile);
 
     const availabilityFailure = this._checkNewShapeAvailability(
-      newShape, filledBeforeReplace, filledWithNewTile, baseCount, bonuses, rollback,
+      { newShape, filledBeforeReplace, filledWithNewTile, baseCount, bonuses }, rollback,
     );
     if (availabilityFailure) return availabilityFailure;
 
@@ -1623,7 +1628,7 @@ export class Board {
     const finalBonuses = this.getContainerBonuses(finalFilled);
     const newTileRef = this.grid[pos.row][pos.col];
     const containerDropFailure = this._checkInventoryContainerDrops(
-      pos, tile, newTileRef, savedInventory, finalFilled, finalBonuses, rollback,
+      { pos, tile, newTileRef, savedInventory, finalFilled, finalBonuses }, rollback,
     );
     if (containerDropFailure) return containerDropFailure;
 
@@ -2095,7 +2100,9 @@ export class Board {
   }
 
   private _isReplaceableTile(tile: Tile | null | undefined): tile is Tile {
-    if (!tile || tile.isFixed || isEmptyFloor(tile.shape)) return false;
+    if (!tile) return false;
+    if (tile.isFixed) return false;
+    if (isEmptyFloor(tile.shape)) return false;
     return !this._isNonReplaceableShape(tile.shape);
   }
 
