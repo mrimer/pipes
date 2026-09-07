@@ -137,6 +137,16 @@ function clearModalSparkle(modalEl: HTMLElement): void {
 
 // ─── CampaignManager ──────────────────────────────────────────────────────────
 
+/** Aggregated stats shown on the chapter-complete modal. */
+interface ChapterCompleteStats {
+  waterTotal: number;
+  starsCollected: number;
+  starsTotal: number;
+  challengesDone: number;
+  challengesTotal: number;
+  isMastered: boolean;
+}
+
 /**
  * Owns campaign state, chapter progression, chapter map screen, and
  * campaign-scoped persistence.  Communicates with the rest of the game
@@ -1390,68 +1400,45 @@ export class CampaignManager {
     return allLevelsCompleted && (starsTotal === 0 || starsCollected >= starsTotal);
   }
 
-  private _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void {
-    const existingModal = document.getElementById('chapter-complete-modal');
-    if (existingModal) existingModal.remove();
-
-    const chapter = campaign.chapters[chapterIdx];
-    const nextChapter = campaign.chapters[chapterIdx + 1] ?? null;
-
+  /** Aggregate a chapter's water/stars/challenge totals for the chapter-complete modal. */
+  private _computeChapterCompleteStats(chapter: ChapterDef, campaign: CampaignDef): ChapterCompleteStats {
     const progress = this._activeCampaignProgress;
     const levelStars = loadLevelStars(campaign.id);
     const levelWater = loadLevelWater(campaign.id);
-
     const chLevels = chapter.levels;
-    const waterTotal = chLevels.reduce((sum, l) => sum + (progress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0);
-    const starsCollected = chLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0);
-    const starsTotal = chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0);
-    const challengesDone = chLevels.filter(l => l.challenge && progress.has(l.id)).length;
-    const challengesTotal = chLevels.filter(l => l.challenge).length;
-    const isMastered = this._isCampaignChapterMastered(chapter);
+    return {
+      waterTotal: chLevels.reduce((sum, l) => sum + (progress.has(l.id) ? (levelWater[l.id] ?? 0) : 0), 0),
+      starsCollected: chLevels.reduce((sum, l) => sum + Math.min(levelStars[l.id] ?? 0, l.starCount ?? 0), 0),
+      starsTotal: chLevels.reduce((sum, l) => sum + (l.starCount ?? 0), 0),
+      challengesDone: chLevels.filter(l => l.challenge && progress.has(l.id)).length,
+      challengesTotal: chLevels.filter(l => l.challenge).length,
+      isMastered: this._isCampaignChapterMastered(chapter),
+    };
+  }
 
-    const modal = document.createElement('div');
-    modal.id = 'chapter-complete-modal';
-    modal.style.cssText = `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:100;`;
+  /** Append one stat span to `statsDiv` if its total is nonzero. */
+  private _appendChapterCompleteStat(statsDiv: HTMLElement, opts: { total: number; color: string; text: string }): void {
+    if (opts.total <= 0) return;
+    const span = document.createElement('span');
+    span.style.color = opts.color;
+    span.textContent = opts.text;
+    statsDiv.appendChild(span);
+  }
 
-    const box = document.createElement('div');
-    box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:400px;width:90%;text-align:center;';
-
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = isMastered ? t('campaign.chapterMastered.title') : t('campaign.chapterComplete.title');
-    titleEl.style.cssText = 'color:' + (isMastered ? '#f0c040' : '#7ed321') + ';margin:0 0 16px;font-size:1.5rem;';
-    box.appendChild(titleEl);
-
+  /** Build the stats row (water/stars/challenges), or nothing if all totals are zero. */
+  private _buildChapterCompleteStatsDiv(stats: ChapterCompleteStats): HTMLElement {
     const statsDiv = document.createElement('div');
     statsDiv.style.cssText = 'display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:1rem;margin-bottom:16px;';
-    if (waterTotal > 0) {
-      const w = document.createElement('span');
-      w.style.color = '#4fc3f7';
-      w.textContent = `💧 ${waterTotal}`;
-      statsDiv.appendChild(w);
-    }
-    if (starsTotal > 0) {
-      const s = document.createElement('span');
-      s.style.color = '#f0c040';
-      s.textContent = `⭐ ${starsCollected}/${starsTotal}`;
-      statsDiv.appendChild(s);
-    }
-    if (challengesTotal > 0) {
-      const c = document.createElement('span');
-      c.style.color = ERROR_COLOR;
-      c.textContent = `💀 ${challengesDone}/${challengesTotal}`;
-      statsDiv.appendChild(c);
-    }
-    if (statsDiv.children.length > 0) box.appendChild(statsDiv);
+    this._appendChapterCompleteStat(statsDiv, { total: stats.waterTotal, color: '#4fc3f7', text: `💧 ${stats.waterTotal}` });
+    this._appendChapterCompleteStat(statsDiv, { total: stats.starsTotal, color: '#f0c040', text: `⭐ ${stats.starsCollected}/${stats.starsTotal}` });
+    this._appendChapterCompleteStat(statsDiv, { total: stats.challengesTotal, color: ERROR_COLOR, text: `💀 ${stats.challengesDone}/${stats.challengesTotal}` });
+    return statsDiv;
+  }
 
-    const btnStyle = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid;margin:4px;`;
-
-    const remainBtn = document.createElement('button');
-    remainBtn.textContent = t('campaign.complete.remainHere');
-    remainBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#7ed321;`;
-    remainBtn.addEventListener('click', () => { modal.remove(); });
-
-    const menuBtn = document.createElement('button');
+  /** Build the "campaign map" / "main menu" button, whichever applies. */
+  private _buildChapterCompleteMenuButton(modal: HTMLElement, campaign: CampaignDef, btnStyle: string): HTMLButtonElement {
     const hasCampaignMap = !!campaign.grid;
+    const menuBtn = document.createElement('button');
     menuBtn.textContent = hasCampaignMap ? t('campaign.complete.campaignMap') : t('campaign.complete.mainMenu');
     menuBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#aaa;`;
     menuBtn.addEventListener('click', () => {
@@ -1462,26 +1449,71 @@ export class CampaignManager {
         this._callbacks.showLevelSelect();
       }
     });
+    return menuBtn;
+  }
+
+  /** Navigate to the next chapter after dismissing the chapter-complete modal. */
+  private _goToNextChapterFromCompleteModal(nextChapter: ChapterDef, chapterIdx: number): void {
+    if (nextChapter.grid) {
+      this.showChapterMap(chapterIdx + 1);
+      return;
+    }
+    this._callbacks.showLevelSelect();
+    const chapterBoxes = this._callbacks.levelListEl.querySelectorAll<HTMLElement>('.chapter-box');
+    chapterBoxes[chapterIdx + 1]?.scrollIntoView?.({ behavior: 'instant', block: 'center' });
+  }
+
+  /** Build the "next chapter" button, or null when this was the last chapter. */
+  private _buildChapterCompleteNextButton(
+    modal: HTMLElement, nextChapter: ChapterDef | null, chapterIdx: number, btnStyle: string,
+  ): HTMLButtonElement | null {
+    if (!nextChapter) return null;
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = t('campaign.complete.nextChapter');
+    nextBtn.style.cssText = btnStyle + 'background:#1a3a10;border-color:#7ed321;color:#7ed321;';
+    nextBtn.addEventListener('click', () => {
+      modal.remove();
+      this._goToNextChapterFromCompleteModal(nextChapter, chapterIdx);
+    });
+    return nextBtn;
+  }
+
+  private _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void {
+    const existingModal = document.getElementById('chapter-complete-modal');
+    if (existingModal) existingModal.remove();
+
+    const chapter = campaign.chapters[chapterIdx];
+    const nextChapter = campaign.chapters[chapterIdx + 1] ?? null;
+    const stats = this._computeChapterCompleteStats(chapter, campaign);
+
+    const modal = document.createElement('div');
+    modal.id = 'chapter-complete-modal';
+    modal.style.cssText = `position:fixed;inset:0;background:${UI_OVERLAY_BG};display:flex;align-items:center;justify-content:center;z-index:100;`;
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#0a0e1a;border:2px solid #f0c040;border-radius:12px;padding:24px;max-width:400px;width:90%;text-align:center;';
+
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = stats.isMastered ? t('campaign.chapterMastered.title') : t('campaign.chapterComplete.title');
+    titleEl.style.cssText = 'color:' + (stats.isMastered ? '#f0c040' : '#7ed321') + ';margin:0 0 16px;font-size:1.5rem;';
+    box.appendChild(titleEl);
+
+    const statsDiv = this._buildChapterCompleteStatsDiv(stats);
+    if (statsDiv.children.length > 0) box.appendChild(statsDiv);
+
+    const btnStyle = `padding:10px 20px;font-size:0.9rem;border-radius:${RADIUS_MD};cursor:pointer;border:1px solid;margin:4px;`;
+
+    const remainBtn = document.createElement('button');
+    remainBtn.textContent = t('campaign.complete.remainHere');
+    remainBtn.style.cssText = btnStyle + `background:${UI_BG};border-color:${UI_BORDER};color:#7ed321;`;
+    remainBtn.addEventListener('click', () => { modal.remove(); });
+
+    const menuBtn = this._buildChapterCompleteMenuButton(modal, campaign, btnStyle);
+    const nextBtn = this._buildChapterCompleteNextButton(modal, nextChapter, chapterIdx, btnStyle);
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;margin-top:16px;gap:8px;';
-
-    if (nextChapter) {
-      const nextBtn = document.createElement('button');
-      nextBtn.textContent = t('campaign.complete.nextChapter');
-      nextBtn.style.cssText = btnStyle + 'background:#1a3a10;border-color:#7ed321;color:#7ed321;';
-      nextBtn.addEventListener('click', () => {
-        modal.remove();
-        if (nextChapter.grid) {
-          this.showChapterMap(chapterIdx + 1);
-        } else {
-          this._callbacks.showLevelSelect();
-          const chapterBoxes = this._callbacks.levelListEl.querySelectorAll<HTMLElement>('.chapter-box');
-          chapterBoxes[chapterIdx + 1]?.scrollIntoView?.({ behavior: 'instant', block: 'center' });
-        }
-      });
-      btnRow.appendChild(nextBtn);
-    }
+    if (nextBtn) btnRow.appendChild(nextBtn);
     btnRow.appendChild(menuBtn);
     btnRow.appendChild(remainBtn);
 
