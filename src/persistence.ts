@@ -93,32 +93,31 @@ export function migrateCampaign(campaign: CampaignDef): CampaignDef {
 }
 
 /** Load user-created and imported campaigns from localStorage. */
+/** Minimal shape check for a campaign entry loaded from storage/import. */
+function _isValidCampaignEntry(entry: unknown): entry is CampaignDef {
+  if (!entry || typeof entry !== 'object') return false;
+  const rec = entry as Record<string, unknown>;
+  return typeof rec['id'] === 'string' && isLocalizedTextShape(rec['name']) && Array.isArray(rec['chapters']);
+}
+
 export function loadImportedCampaigns(): CampaignDef[] {
   try {
     const raw = localStorage.getItem(CAMPAIGNS_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return [];
-      const campaigns: CampaignDef[] = [];
-      for (const entry of parsed) {
-        if (
-          entry
-          && typeof entry === 'object'
-          && typeof (entry as Record<string, unknown>)['id'] === 'string'
-          && isLocalizedTextShape((entry as Record<string, unknown>)['name'])
-          && Array.isArray((entry as Record<string, unknown>)['chapters'])
-        ) {
-          campaigns.push(migrateCampaign(entry as CampaignDef));
-        } else {
-          console.warn('Dropping invalid imported campaign entry from storage.');
-        }
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const campaigns: CampaignDef[] = [];
+    for (const entry of parsed) {
+      if (!_isValidCampaignEntry(entry)) {
+        console.warn('Dropping invalid imported campaign entry from storage.');
+        continue;
       }
-      return campaigns;
+      campaigns.push(migrateCampaign(entry));
     }
+    return campaigns;
   } catch {
-    // ignore parse errors
+    return [];
   }
-  return [];
 }
 
 /** Save the full list of user campaigns to localStorage. */
@@ -498,12 +497,17 @@ export function saveLocale(locale: string): void {
  * Load the persisted SFX volume setting.
  * @returns An integer in [0, 100]; defaults to 100 when not yet set.
  */
+/** True for a finite number in [0, 100] (a valid volume percentage). */
+function _isValidPercent(v: number): boolean {
+  return !isNaN(v) && v >= 0 && v <= 100;
+}
+
 export function loadSfxVolume(): number {
   try {
     const raw = localStorage.getItem(SFX_VOLUME_KEY());
     if (raw !== null) {
       const v = Number(raw);
-      if (!isNaN(v) && v >= 0 && v <= 100) return Math.round(v);
+      if (_isValidPercent(v)) return Math.round(v);
     }
   } catch { /* ignore */ }
   return 100;
@@ -527,7 +531,7 @@ export function loadMusicVolume(): number {
     const raw = localStorage.getItem(MUSIC_VOLUME_KEY());
     if (raw !== null) {
       const v = Number(raw);
-      if (!isNaN(v) && v >= 0 && v <= 100) return Math.round(v);
+      if (_isValidPercent(v)) return Math.round(v);
     }
   } catch { /* ignore */ }
   return 50;
@@ -731,6 +735,74 @@ const RECORDING_SETTINGS_KEY = (): string => `pipes_${p()}recording_settings`;
 const SUPPORTED_RECORDING_FORMAT_VERSION = 1;
 
 /** Load all saved {@link PlaySequenceRecord} entries from localStorage. */
+/** id/campaignId/levelId are all present and well-typed (a recording with no campaign can never match a level for playback). */
+function _hasValidRecordingIdentity(candidate: Record<string, unknown>): boolean {
+  return (
+    typeof candidate['id'] === 'string' &&
+    typeof candidate['campaignId'] === 'string' &&
+    candidate['campaignId'] !== '' &&
+    typeof candidate['levelId'] === 'number'
+  );
+}
+
+/** `moves` is an array of strings. */
+function _hasValidRecordingMoves(candidate: Record<string, unknown>): boolean {
+  const moves = candidate['moves'];
+  return Array.isArray(moves) && moves.every((move) => typeof move === 'string');
+}
+
+/** `outcome` is one of the known outcome strings. */
+function _hasValidRecordingOutcome(candidate: Record<string, unknown>): boolean {
+  return typeof candidate['outcome'] === 'string' && ['success', 'failure', 'partial'].includes(candidate['outcome']);
+}
+
+/** Remaining scalar fields (autoRecorded/timestamp/playerName/corrupted) are all well-typed. */
+function _hasValidRecordingFlags(candidate: Record<string, unknown>): boolean {
+  return (
+    typeof candidate['autoRecorded'] === 'boolean' &&
+    typeof candidate['timestamp'] === 'number' &&
+    typeof candidate['playerName'] === 'string' &&
+    typeof candidate['corrupted'] === 'boolean'
+  );
+}
+
+/** Defends against manually-adjusted or corrupted recording data in localStorage. */
+function _isValidRecordingCandidate(entry: unknown): entry is Record<string, unknown> {
+  if (!entry || typeof entry !== 'object') return false;
+  const candidate = entry as Record<string, unknown>;
+  return (
+    _hasValidRecordingIdentity(candidate) &&
+    _hasValidRecordingMoves(candidate) &&
+    _hasValidRecordingOutcome(candidate) &&
+    _hasValidRecordingFlags(candidate)
+  );
+}
+
+/** Build a validated candidate into a PlaySequenceRecord, or null when its formatVersion is unsupported. */
+function _parseRecordingCandidate(candidate: Record<string, unknown>): PlaySequenceRecord | null {
+  const formatVersion = typeof candidate['formatVersion'] === 'number' ? candidate['formatVersion'] : 1;
+  if (formatVersion > SUPPORTED_RECORDING_FORMAT_VERSION) {
+    console.warn(`Dropping recording "${String(candidate['id'])}" with unsupported formatVersion ${formatVersion}.`);
+    return null;
+  }
+  return {
+    id: candidate['id'] as string,
+    campaignId: candidate['campaignId'] as string,
+    levelId: candidate['levelId'] as number,
+    moves: candidate['moves'] as string[],
+    outcome: candidate['outcome'] as 'success' | 'failure' | 'partial',
+    autoRecorded: candidate['autoRecorded'] as boolean,
+    timestamp: candidate['timestamp'] as number,
+    playerName: candidate['playerName'] as string,
+    corrupted: candidate['corrupted'] as boolean,
+    formatVersion,
+    playerGuid: typeof candidate['playerGuid'] === 'string' ? candidate['playerGuid'] : undefined,
+    waterScore: typeof candidate['waterScore'] === 'number' ? candidate['waterScore'] : undefined,
+    stars: typeof candidate['stars'] === 'number' ? candidate['stars'] : undefined,
+    annotation: typeof candidate['annotation'] === 'string' ? candidate['annotation'] : undefined,
+  };
+}
+
 export function loadAllRecordings(): PlaySequenceRecord[] {
   try {
     const raw = localStorage.getItem(RECORDINGS_KEY);
@@ -738,51 +810,9 @@ export function loadAllRecordings(): PlaySequenceRecord[] {
       const parsed = JSON.parse(raw) as unknown;
       if (!Array.isArray(parsed)) return [];
       return parsed.flatMap((entry): PlaySequenceRecord[] => {
-        const candidate = entry as Record<string, unknown>;
-        const moves = candidate['moves'];
-        if (
-          !entry
-          || typeof entry !== 'object'
-          || typeof candidate['id'] !== 'string'
-          || typeof candidate['campaignId'] !== 'string'
-          // A recording with no campaign can never match a level for playback;
-          // reject it (defends against manually-adjusted input data).
-          || candidate['campaignId'] === ''
-          || typeof candidate['levelId'] !== 'number'
-          || !Array.isArray(moves)
-          || !moves.every((move) => typeof move === 'string')
-          || typeof candidate['outcome'] !== 'string'
-          || !['success', 'failure', 'partial'].includes(candidate['outcome'])
-          || typeof candidate['autoRecorded'] !== 'boolean'
-          || typeof candidate['timestamp'] !== 'number'
-          || typeof candidate['playerName'] !== 'string'
-          || typeof candidate['corrupted'] !== 'boolean'
-        ) {
-          return [];
-        }
-        const formatVersion = typeof candidate['formatVersion'] === 'number' ? candidate['formatVersion'] : 1;
-        if (formatVersion > SUPPORTED_RECORDING_FORMAT_VERSION) {
-          console.warn(
-            `Dropping recording "${candidate['id']}" with unsupported formatVersion ${formatVersion}.`,
-          );
-          return [];
-        }
-        return [{
-          id: candidate['id'],
-          campaignId: candidate['campaignId'],
-          levelId: candidate['levelId'],
-          moves: candidate['moves'] as string[],
-          outcome: candidate['outcome'] as 'success' | 'failure' | 'partial',
-          autoRecorded: candidate['autoRecorded'],
-          timestamp: candidate['timestamp'],
-          playerName: candidate['playerName'],
-          corrupted: candidate['corrupted'],
-          formatVersion,
-          playerGuid: typeof candidate['playerGuid'] === 'string' ? candidate['playerGuid'] : undefined,
-          waterScore: typeof candidate['waterScore'] === 'number' ? candidate['waterScore'] : undefined,
-          stars: typeof candidate['stars'] === 'number' ? candidate['stars'] : undefined,
-          annotation: typeof candidate['annotation'] === 'string' ? candidate['annotation'] : undefined,
-        }];
+        if (!_isValidRecordingCandidate(entry)) return [];
+        const record = _parseRecordingCandidate(entry);
+        return record ? [record] : [];
       });
     }
   } catch { /* ignore parse errors */ }
