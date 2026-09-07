@@ -397,10 +397,9 @@ export class CampaignManager {
     const minimapRect = chapterIdx >= 0 && campaignMapScreen
       ? campaignMapScreen.getMinimapScreenRect(chapterIdx)
       : null;
-    if (!campaignMapScreen || !chapterSnapshot || !minimapRect) {
-      chapterMapScreen.hide();
-      return;
-    }
+    if (!campaignMapScreen) { chapterMapScreen.hide(); return; }
+    if (!chapterSnapshot) { chapterMapScreen.hide(); return; }
+    if (!minimapRect) { chapterMapScreen.hide(); return; }
     const chapterEl = chapterMapScreen.screenEl;
     const campaignEl = campaignMapScreen.screenEl;
     chapterEl.style.overflow = 'hidden';
@@ -609,11 +608,12 @@ export class CampaignManager {
    * the chapter map.
    */
   reshowChapterMap(): void {
-    if (this._chapterMapScreen && this._activeCampaign && this._chapterMapScreen.chapterIdx >= 0) {
-      const chapterIdx = this._chapterMapScreen.chapterIdx;
-      this._chapterMapScreen.show(this._activeCampaign, chapterIdx);
-      this._recognizeChapterProgress(chapterIdx);
-    }
+    if (!this._chapterMapScreen) return;
+    if (!this._activeCampaign) return;
+    if (this._chapterMapScreen.chapterIdx < 0) return;
+    const chapterIdx = this._chapterMapScreen.chapterIdx;
+    this._chapterMapScreen.show(this._activeCampaign, chapterIdx);
+    this._recognizeChapterProgress(chapterIdx);
   }
 
   /** Repopulate the chapter map with current progress (e.g. after undoing the winning move). */
@@ -897,17 +897,23 @@ export class CampaignManager {
   }
 
   /** Dev cheat: mark all levels completed and refresh the level list. */
+  /** Mark one level fully completed (and award its stars) for the "unlock all" debug/testing action. */
+  private _unlockLevel(campaignId: string, level: LevelDef): void {
+    markCampaignLevelCompleted(campaignId, level.id, this._activeCampaignProgress);
+    if ((level.starCount ?? 0) > 0) {
+      saveLevelStar(level.id, level.starCount ?? 0, campaignId);
+    }
+  }
+
+  /** Unlock every level of one chapter, then mark the chapter itself completed. */
+  private _unlockChapter(campaignId: string, chapter: ChapterDef): void {
+    for (const level of chapter.levels) this._unlockLevel(campaignId, level);
+    markChapterCompleted(campaignId, chapter.id, this._activeCampaignCompletedChapters);
+  }
+
   unlockAll(): void {
     if (this._activeCampaign) {
-      for (const chapter of this._activeCampaign.chapters) {
-        for (const level of chapter.levels) {
-          markCampaignLevelCompleted(this._activeCampaign.id, level.id, this._activeCampaignProgress);
-          if ((level.starCount ?? 0) > 0) {
-            saveLevelStar(level.id, level.starCount ?? 0, this._activeCampaign.id);
-          }
-        }
-        markChapterCompleted(this._activeCampaign.id, chapter.id, this._activeCampaignCompletedChapters);
-      }
+      for (const chapter of this._activeCampaign.chapters) this._unlockChapter(this._activeCampaign.id, chapter);
     }
     this.renderLevelList();
   }
@@ -1246,6 +1252,17 @@ export class CampaignManager {
     }
   }
 
+  /** Show the chapter-complete modal, first playing the mastery sequence if one is due. */
+  private _showChapterCompletionSequence(chapterIdx: number, campaign: CampaignDef, masterySequenceNeeded: boolean): void {
+    if (masterySequenceNeeded) {
+      this._showMasterySequence(chapterIdx, campaign, () => {
+        this._showChapterCompleteModal(chapterIdx, campaign);
+      });
+    } else {
+      this._showChapterCompleteModal(chapterIdx, campaign);
+    }
+  }
+
   private _completeChapter(chapterIdx: number): void {
     const campaign = this._activeCampaign;
     if (!campaign) return;
@@ -1264,23 +1281,9 @@ export class CampaignManager {
     // Start the win animation (plays WinChapter sfx internally)
     const chapterMapScreen = this._chapterMapScreen;
     if (chapterMapScreen) {
-      chapterMapScreen.playWinAnimation(() => {
-        if (masterySequenceNeeded) {
-          this._showMasterySequence(chapterIdx, campaign, () => {
-            this._showChapterCompleteModal(chapterIdx, campaign);
-          });
-        } else {
-          this._showChapterCompleteModal(chapterIdx, campaign);
-        }
-      });
+      chapterMapScreen.playWinAnimation(() => this._showChapterCompletionSequence(chapterIdx, campaign, masterySequenceNeeded));
     } else {
-      if (masterySequenceNeeded) {
-        this._showMasterySequence(chapterIdx, campaign, () => {
-          this._showChapterCompleteModal(chapterIdx, campaign);
-        });
-      } else {
-        this._showChapterCompleteModal(chapterIdx, campaign);
-      }
+      this._showChapterCompletionSequence(chapterIdx, campaign, masterySequenceNeeded);
     }
   }
 
