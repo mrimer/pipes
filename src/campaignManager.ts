@@ -366,80 +366,91 @@ export class CampaignManager {
    * Wiring its callbacks once here keeps every entry path (campaign map,
    * main-menu resume) sharing the same screen and listeners.
    */
+  /** Play the zoom-out transition from the chapter map back to the campaign map. */
+  private _playChapterToCampaignMapTransition(chapterMapScreen: ChapterMapScreen): void {
+    const chapterIdx = chapterMapScreen.chapterIdx;
+    const chapterSnapshot = chapterMapScreen.captureCanvasSnapshot();
+    this._ensureCampaignMapScreen();
+    this.reshowCampaignMap();
+    const campaignMapScreen = this._campaignMapScreen;
+    const minimapRect = chapterIdx >= 0 && campaignMapScreen
+      ? campaignMapScreen.getMinimapScreenRect(chapterIdx)
+      : null;
+    if (!campaignMapScreen || !chapterSnapshot || !minimapRect) {
+      chapterMapScreen.hide();
+      return;
+    }
+    const chapterEl = chapterMapScreen.screenEl;
+    const campaignEl = campaignMapScreen.screenEl;
+    chapterEl.style.overflow = 'hidden';
+    campaignEl.style.overflow = 'hidden';
+    // Stop the chapter map animation loop before the transition to prevent
+    // it from rendering at the (now campaign-map) TILE_SIZE and corrupting
+    // the destination canvas – mirrors stopAnimLoop() in the zoom-in path.
+    chapterMapScreen.stopAnimLoop();
+    playMapScreenExitTransition(
+      minimapRect,
+      chapterSnapshot,
+      chapterEl,
+      campaignEl,
+      () => {
+        chapterEl.style.overflow = '';
+        campaignEl.style.overflow = '';
+        chapterMapScreen.hide();
+      },
+    );
+  }
+
+  /** ChapterMapScreen's onShowLevelSelect callback: campaign has a map -> zoom out to it; otherwise go straight to level select. */
+  private _handleShowLevelSelectFromChapterMap(): void {
+    if (!this._activeCampaign?.grid) {
+      this._callbacks.showLevelSelect();
+      return;
+    }
+    const chapterMapScreen = this._chapterMapScreen;
+    if (!chapterMapScreen) return;
+    this._playChapterToCampaignMapTransition(chapterMapScreen);
+  }
+
+  /** ChapterMapScreen's onLevelSelected callback: start the level, playing the zoom-in transition when possible. */
+  private _handleLevelSelectedFromChapterMap(levelDef: LevelDef): void {
+    this._winFromChapterMap = true;
+    this._callbacks.exitBtnEl.textContent = t('campaign.nav.chapterMap');
+
+    // Capture minimap screen rect AND a canvas snapshot BEFORE startLevel
+    // hides the chapter map or changes TILE_SIZE.  The snapshot is used to
+    // create a precisely-aligned fade-out overlay during the transition.
+    const minimapRect = this._chapterMapScreen?.getMinimapScreenRect(levelDef) ?? null;
+    const chapterMapSnapshot = this._chapterMapScreen?.captureCanvasSnapshot() ?? null;
+
+    if (levelDef.challenge) {
+      this._pendingLevelId = levelDef.id;
+    }
+
+    this._callbacks.startLevel(levelDef.id);
+
+    if (minimapRect) {
+      this._callbacks.playLevelTransition(
+        minimapRect,
+        chapterMapSnapshot,
+        () => {
+          if (levelDef.challenge) {
+            this._showChallengeLevelModal(false);
+          }
+        },
+      );
+    } else if (levelDef.challenge) {
+      this._showChallengeLevelModal(false);
+    }
+  }
+
   private _ensureChapterMapScreen(): ChapterMapScreen {
     if (this._chapterMapScreen) return this._chapterMapScreen;
     this._chapterMapScreen = new ChapterMapScreen({
       getDisplayProgress: () => this._activeCampaignProgress,
       getActiveCampaignId: () => this._activeCampaign?.id ?? null,
-      onShowLevelSelect: () => {
-        if (this._activeCampaign?.grid) {
-          const chapterMapScreen = this._chapterMapScreen;
-          if (!chapterMapScreen) return;
-          const chapterIdx = chapterMapScreen.chapterIdx;
-          const chapterSnapshot = chapterMapScreen.captureCanvasSnapshot();
-          this._ensureCampaignMapScreen();
-          this.reshowCampaignMap();
-          const campaignMapScreen = this._campaignMapScreen;
-          const minimapRect = chapterIdx >= 0 && campaignMapScreen
-            ? campaignMapScreen.getMinimapScreenRect(chapterIdx)
-            : null;
-          if (!campaignMapScreen || !chapterSnapshot || !minimapRect) {
-            chapterMapScreen.hide();
-            return;
-          }
-          const chapterEl = chapterMapScreen.screenEl;
-          const campaignEl = campaignMapScreen.screenEl;
-          chapterEl.style.overflow = 'hidden';
-          campaignEl.style.overflow = 'hidden';
-          // Stop the chapter map animation loop before the transition to prevent
-          // it from rendering at the (now campaign-map) TILE_SIZE and corrupting
-          // the destination canvas – mirrors stopAnimLoop() in the zoom-in path.
-          chapterMapScreen.stopAnimLoop();
-          playMapScreenExitTransition(
-            minimapRect,
-            chapterSnapshot,
-            chapterEl,
-            campaignEl,
-            () => {
-              chapterEl.style.overflow = '';
-              campaignEl.style.overflow = '';
-              chapterMapScreen.hide();
-            },
-          );
-        } else {
-          this._callbacks.showLevelSelect();
-        }
-      },
-      onLevelSelected: (levelDef) => {
-        this._winFromChapterMap = true;
-        this._callbacks.exitBtnEl.textContent = t('campaign.nav.chapterMap');
-
-        // Capture minimap screen rect AND a canvas snapshot BEFORE startLevel
-        // hides the chapter map or changes TILE_SIZE.  The snapshot is used to
-        // create a precisely-aligned fade-out overlay during the transition.
-        const minimapRect = this._chapterMapScreen?.getMinimapScreenRect(levelDef) ?? null;
-        const chapterMapSnapshot = this._chapterMapScreen?.captureCanvasSnapshot() ?? null;
-
-        if (levelDef.challenge) {
-          this._pendingLevelId = levelDef.id;
-        }
-
-        this._callbacks.startLevel(levelDef.id);
-
-        if (minimapRect) {
-          this._callbacks.playLevelTransition(
-            minimapRect,
-            chapterMapSnapshot,
-            () => {
-              if (levelDef.challenge) {
-                this._showChallengeLevelModal(false);
-              }
-            },
-          );
-        } else if (levelDef.challenge) {
-          this._showChallengeLevelModal(false);
-        }
-      },
+      onShowLevelSelect: () => this._handleShowLevelSelectFromChapterMap(),
+      onLevelSelected: (levelDef) => this._handleLevelSelectedFromChapterMap(levelDef),
       getActiveCampaign: () => this._activeCampaign,
       getCompletedChapters: () => this._activeCampaignCompletedChapters,
     });
