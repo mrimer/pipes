@@ -221,8 +221,106 @@ function _drawChamberItemContent(ctx: CanvasRenderingContext2D, itemShape: PipeS
   }
 }
 
+interface HeaterLineGeom {
+  lineLeft: number;
+  lineRight: number;
+  lineSpan: number;
+  topY: number;
+  numLines: number;
+  lineSpacing: number;
+}
+
+/** Animated (water-filled) cooler: wind lines scroll downward, shrinking in width as they descend. */
+function _drawHeaterAnimatedCoolerLines(ctx: CanvasRenderingContext2D, geom: HeaterLineGeom): void {
+  const { lineLeft, lineSpan, topY, numLines, lineSpacing } = geom;
+  // A new line at full width appears at the top each time one exits the bottom.
+  const COOLER_SCROLL_MS = 2000;
+  const widthDelta = _s(5);
+  const offset = (Date.now() % COOLER_SCROLL_MS) / COOLER_SCROLL_MS * lineSpacing;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(lineLeft, topY - _s(1), lineSpan, (numLines - 1) * lineSpacing + _s(2));
+  ctx.clip();
+  // Draw numLines+1 lines: k=0 enters from above, k=numLines exits below.
+  for (let k = 0; k <= numLines; k++) {
+    const lineY = topY + (k - 1) * lineSpacing + offset;
+    const slotFrac = (lineY - topY) / lineSpacing;
+    const hw = (lineSpan - slotFrac * widthDelta) / 2;
+    if (hw <= 0) continue;
+    ctx.beginPath();
+    ctx.moveTo(-hw, lineY);
+    ctx.lineTo(hw, lineY);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Static (dry) cooler: thin horizontal wind lines near the top. */
+function _drawHeaterStaticCoolerLines(ctx: CanvasRenderingContext2D, geom: HeaterLineGeom): void {
+  const { lineSpan, topY, numLines, lineSpacing } = geom;
+  for (let i = 0; i < numLines; i++) {
+    const lineY = topY + i * lineSpacing;
+    const hw = (lineSpan - i * _s(5)) / 2;
+    ctx.beginPath();
+    ctx.moveTo(-hw, lineY);
+    ctx.lineTo(hw, lineY);
+    ctx.stroke();
+  }
+}
+
+/** Animated (water-filled) heater: wavy heat lines scroll upwards and wrap vertically within the region. */
+function _drawHeaterAnimatedHeatLines(ctx: CanvasRenderingContext2D, geom: HeaterLineGeom): void {
+  const { lineLeft, lineRight, lineSpan, topY, numLines, lineSpacing } = geom;
+  const xMid = 0;
+  const xQuart = lineSpan / 4;
+  const yWaveAmplitude = _s(2.5);
+  const HEATER_SCROLL_MS = 1500;
+  const offset = (Date.now() % HEATER_SCROLL_MS) / HEATER_SCROLL_MS * lineSpacing;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(lineLeft, topY, lineSpan, numLines * lineSpacing);
+  ctx.clip();
+  // Draw numLines+3 lines: k=-1 starts one lineSpacing above topY so the
+  // exiting sliver at the clip top is always present throughout the cycle
+  // (symmetric with k=numLines+1 which fills the entry gap at the bottom).
+  for (let k = -1; k <= numLines + 1; k++) {
+    const lineY = topY + k * lineSpacing - offset;
+    ctx.beginPath();
+    ctx.moveTo(lineLeft, lineY);
+    ctx.quadraticCurveTo(lineLeft + xQuart, lineY - yWaveAmplitude, xMid, lineY);
+    ctx.quadraticCurveTo(xMid + xQuart, lineY + yWaveAmplitude, lineRight, lineY);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Static (dry) heater: 3 thin wavy heat lines near the top. */
+function _drawHeaterStaticHeatLines(ctx: CanvasRenderingContext2D, geom: HeaterLineGeom): void {
+  const { lineLeft, lineRight, lineSpan, topY, numLines, lineSpacing } = geom;
+  const xMid = 0;
+  const xQuart = lineSpan / 4;
+  const yWaveAmplitude = _s(2.5);
+  for (let i = 0; i < numLines; i++) {
+    const lineY = topY + yWaveAmplitude + i * lineSpacing;
+    ctx.beginPath();
+    ctx.moveTo(lineLeft, lineY);
+    ctx.quadraticCurveTo(lineLeft + xQuart, lineY - yWaveAmplitude, xMid, lineY);
+    ctx.quadraticCurveTo(xMid + xQuart, lineY + yWaveAmplitude, lineRight, lineY);
+    ctx.stroke();
+  }
+}
+
+/** Draw the temperature-bonus label (no plus sign for negative values) at the box centre. */
+function _drawHeaterTempLabel(ctx: CanvasRenderingContext2D, tile: Tile, color: string): void {
+  ctx.fillStyle = color;
+  ctx.font = `bold ${_s(13)}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const tempStr = tile.temperature >= 0 ? `+${tile.temperature}°` : `${tile.temperature}°`;
+  ctx.fillText(tempStr, 0, 0);
+}
+
 function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean): void {
-  // Show temperature bonus (no plus sign for negative values)
   const isCooler = tile.temperature < 0;
   const heaterBaseColor = isCooler
     ? (isWater ? COOLER_WATER_COLOR : COOLER_COLOR)
@@ -233,86 +331,15 @@ function _drawChamberHeaterContent(ctx: CanvasRenderingContext2D, tile: Tile, bw
   ctx.lineCap = 'round';
   const lineLeft = -bw + _s(4);
   const lineRight = bw - _s(4);
-  const lineSpan = lineRight - lineLeft;
-  const numLines = 3;
-  const lineSpacing = _s(3.5);
-  const topY = -bh + _s(4);
+  const geom: HeaterLineGeom = {
+    lineLeft, lineRight, lineSpan: lineRight - lineLeft, topY: -bh + _s(4), numLines: 3, lineSpacing: _s(3.5),
+  };
   if (isCooler) {
-    if (isWater) {
-      // Animated: wind lines scroll downward, shrinking in width as they descend.
-      // A new line at full width appears at the top each time one exits the bottom.
-      const COOLER_SCROLL_MS = 2000;
-      const widthDelta = _s(5);
-      const offset = (Date.now() % COOLER_SCROLL_MS) / COOLER_SCROLL_MS * lineSpacing;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(lineLeft, topY - _s(1), lineSpan, (numLines - 1) * lineSpacing + _s(2));
-      ctx.clip();
-      // Draw numLines+1 lines: k=0 enters from above, k=numLines exits below.
-      for (let k = 0; k <= numLines; k++) {
-        const lineY = topY + (k - 1) * lineSpacing + offset;
-        const slotFrac = (lineY - topY) / lineSpacing;
-        const hw = (lineSpan - slotFrac * widthDelta) / 2;
-        if (hw <= 0) continue;
-        ctx.beginPath();
-        ctx.moveTo(-hw, lineY);
-        ctx.lineTo(hw, lineY);
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else {
-      // Static: thin horizontal wind lines near top
-      for (let i = 0; i < numLines; i++) {
-        const lineY = topY + i * lineSpacing;
-        const hw = (lineSpan - i * _s(5)) / 2;
-        ctx.beginPath();
-        ctx.moveTo(-hw, lineY);
-        ctx.lineTo(hw, lineY);
-        ctx.stroke();
-      }
-    }
+    if (isWater) _drawHeaterAnimatedCoolerLines(ctx, geom); else _drawHeaterStaticCoolerLines(ctx, geom);
   } else {
-    const xMid = 0;
-    const xQuart = lineSpan / 4;
-    const yWaveAmplitude = _s(2.5);
-    if (isWater) {
-      // Animated: wavy heat lines scroll upwards and wrap vertically within the region.
-      const HEATER_SCROLL_MS = 1500;
-      const offset = (Date.now() % HEATER_SCROLL_MS) / HEATER_SCROLL_MS * lineSpacing;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(lineLeft, topY, lineSpan, numLines * lineSpacing);
-      ctx.clip();
-      // Draw numLines+3 lines: k=-1 starts one lineSpacing above topY so the
-      // exiting sliver at the clip top is always present throughout the cycle
-      // (symmetric with k=numLines+1 which fills the entry gap at the bottom).
-      for (let k = -1; k <= numLines + 1; k++) {
-        const lineY = topY + k * lineSpacing - offset;
-        ctx.beginPath();
-        ctx.moveTo(lineLeft, lineY);
-        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - yWaveAmplitude, xMid, lineY);
-        ctx.quadraticCurveTo(xMid + xQuart, lineY + yWaveAmplitude, lineRight, lineY);
-        ctx.stroke();
-      }
-      ctx.restore();
-    } else {
-      // Static: 3 thin wavy heat lines near the top
-      for (let i = 0; i < numLines; i++) {
-        const lineY = topY + yWaveAmplitude + i * lineSpacing;
-        ctx.beginPath();
-        ctx.moveTo(lineLeft, lineY);
-        ctx.quadraticCurveTo(lineLeft + xQuart, lineY - yWaveAmplitude, xMid, lineY);
-        ctx.quadraticCurveTo(xMid + xQuart, lineY + yWaveAmplitude, lineRight, lineY);
-        ctx.stroke();
-      }
-    }
+    if (isWater) _drawHeaterAnimatedHeatLines(ctx, geom); else _drawHeaterStaticHeatLines(ctx, geom);
   }
-  ctx.fillStyle = heaterBaseColor;
-  ctx.font = `bold ${_s(13)}px Arial`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const tempStr = tile.temperature >= 0 ? `+${tile.temperature}°` : `${tile.temperature}°`;
-  ctx.fillText(tempStr, 0, 0);
+  _drawHeaterTempLabel(ctx, tile, heaterBaseColor);
 }
 
 function _drawChamberIceContent(ctx: CanvasRenderingContext2D, tile: Tile, bw: number, bh: number, isWater: boolean, shiftHeld: boolean, currentTemp: number, lockedCost: number | null): void {
