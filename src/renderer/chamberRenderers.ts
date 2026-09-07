@@ -6,6 +6,7 @@
 import { GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from '../board';
 import type { Tile } from '../tile';
 import { PipeShape, Direction } from '../types';
+import type { ChamberContent } from '../types';
 import {
   TANK_COLOR, TANK_WATER_COLOR,
   DIRT_WATER_COLOR, DIRT_COST_COLOR,
@@ -1093,6 +1094,93 @@ function _drawChamberDisconnectedStubs(
  * The canvas origin must already be translated to the tile center before
  * calling this function.
  */
+interface ChamberDrawContext {
+  ctx: CanvasRenderingContext2D;
+  tile: Tile;
+  color: string;
+  isWater: boolean;
+  half: number;
+  bw: number;
+  bh: number;
+  br: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  lockedCost: number | null;
+  lockedGain: number | null;
+}
+
+/** True for a water-filled 'item' chamber holding a gold pipe piece (eligible for the periodic shine highlight). */
+function _isGoldItemChamber(tile: Tile, isWater: boolean): boolean {
+  if (!isWater) return false;
+  if (tile.chamberContent !== 'item') return false;
+  return tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape);
+}
+
+/** Periodic shine highlight for a connected gold-item chamber. */
+function _drawChamberGoldShineIfNeeded(c: ChamberDrawContext): void {
+  if (!_isGoldItemChamber(c.tile, c.isWater)) return;
+  _drawGoldItemShine(c.ctx, c.bw, c.bh, c.br);
+}
+
+/**
+ * Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
+ * Only shown when the chamber is not connected (no water flowing through it).
+ */
+function _drawChamberFrostHaloIfNeeded(c: ChamberDrawContext): void {
+  if (c.isWater) return;
+  if (c.tile.chamberContent !== 'ice' && c.tile.chamberContent !== 'snow') return;
+  _drawChamberFrostHalo(c.ctx, c.color, c.bw, c.bh, c.br);
+}
+
+/** Resolve the sandstone fill color for its current shatter/hardness state. */
+function _resolveSandstoneColor(tile: Tile, isWater: boolean, currentPressure: number): string {
+  const { isShatterTriggered, isHard } = sandstoneColorState(tile, currentPressure);
+  if (isShatterTriggered) return isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR;
+  if (isHard) return isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR;
+  return isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR;
+}
+
+/** Star content plus its connected-water particle burst (or clearing the burst state when disconnected). */
+function _drawChamberStarWithBurst(ctx: CanvasRenderingContext2D, tile: Tile, isWater: boolean, half: number): void {
+  _drawChamberStarContent(ctx, isWater, half);
+  if (isWater) {
+    _drawConnectedStarBurst(ctx, tile, half);
+  } else {
+    _starBurstStates.delete(tile);
+  }
+}
+
+type ChamberContentDrawer = (c: ChamberDrawContext) => void;
+
+/** One drawer per chamberContent variant that has visible inner content ('level'/'chapter' draw nothing here). */
+const CHAMBER_CONTENT_DRAWERS: Partial<Record<ChamberContent, ChamberContentDrawer>> = {
+  tank: (c) => _drawChamberTankContent(c.ctx, c.tile, c.bw, c.bh, c.isWater),
+  dirt: (c) => _drawChamberDirtContent(c.ctx, c.tile, c.bw, c.bh, c.isWater),
+  item: (c) => _drawChamberItemContent(c.ctx, c.tile.itemShape, c.tile.itemCount, c.bw, c.bh, c.isWater, c.half),
+  heater: (c) => _drawChamberHeaterContent(c.ctx, c.tile, c.bw, c.bh, c.isWater),
+  ice: (c) => _drawChamberIceContent(c.ctx, c.tile, c.bw, c.bh, c.isWater, c.shiftHeld, c.currentTemp, c.lockedCost),
+  pump: (c) => _drawChamberPumpContent(c.ctx, c.tile, c.bw, c.bh, c.isWater),
+  snow: (c) => _drawChamberSnowContent(c.ctx, c.tile, c.bw, c.bh, c.isWater, c.shiftHeld, c.currentTemp, c.currentPressure, c.lockedCost),
+  sandstone: (c) => _drawChamberSandstoneContent(
+    c.ctx, c.tile, c.bw, c.bh, c.isWater,
+    _resolveSandstoneColor(c.tile, c.isWater, c.currentPressure),
+    c.shiftHeld, c.currentTemp, c.currentPressure, c.lockedCost,
+  ),
+  star: (c) => _drawChamberStarWithBurst(c.ctx, c.tile, c.isWater, c.half),
+  regulator: (c) => _drawChamberRegulatorContent(c.ctx, c.tile, c.isWater),
+  gel: (c) => _drawChamberGelContent(c.ctx, c.bw, c.bh, c.isWater, c.lockedCost),
+  siphon: (c) => _drawChamberSiphonContent(c.ctx, c.bw, c.bh, c.isWater, c.lockedGain),
+  hot_plate: (c) => _drawChamberHotPlateContent(c.ctx, c.tile, c.bw, c.bh, c.isWater, c.shiftHeld, c.currentTemp, c.lockedCost, c.lockedGain),
+};
+
+/** Dispatch to the drawer for this tile's chamberContent, if any. */
+function _drawChamberContent(c: ChamberDrawContext): void {
+  const content = c.tile.chamberContent;
+  if (content === null) return;
+  CHAMBER_CONTENT_DRAWERS[content]?.(c);
+}
+
 export function drawChamber(
   ctx: CanvasRenderingContext2D,
   tile: Tile,
@@ -1123,54 +1211,10 @@ export function drawChamber(
   ctx.rect(-half, -half, half * 2, half * 2);
   ctx.clip();
   drawChamberBox(ctx, bw, bh, br, isWater ? CHAMBER_FILL_WATER_COLOR : CHAMBER_FILL_COLOR, color);
-  if (isWater && tile.chamberContent === 'item' && tile.itemShape !== null && GOLD_PIPE_SHAPES.has(tile.itemShape)) {
-    _drawGoldItemShine(ctx, bw, bh, br);
-  }
-  // Draw inner content based on chamberContent
-  const { chamberContent } = tile;
-  // Frost halo: drawn after the border stroke, before content, so text/decorations sit on top.
-  // Only shown when the chamber is not connected (no water flowing through it).
-  if (!isWater && (chamberContent === 'ice' || chamberContent === 'snow')) {
-    _drawChamberFrostHalo(ctx, color, bw, bh, br);
-  }
-  if (chamberContent === 'tank') {
-    _drawChamberTankContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'dirt') {
-    _drawChamberDirtContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'item') {
-    _drawChamberItemContent(ctx, tile.itemShape, tile.itemCount, bw, bh, isWater, half);
-  } else if (chamberContent === 'heater') {
-    _drawChamberHeaterContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'ice') {
-    _drawChamberIceContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost);
-  } else if (chamberContent === 'pump') {
-    _drawChamberPumpContent(ctx, tile, bw, bh, isWater);
-  } else if (chamberContent === 'snow') {
-    _drawChamberSnowContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, currentPressure, lockedCost);
-  } else if (chamberContent === 'sandstone') {
-    const { isShatterTriggered, isHard } = sandstoneColorState(tile, currentPressure);
-    const sandstoneColor = isShatterTriggered
-      ? (isWater ? SANDSTONE_SHATTER_WATER_COLOR : SANDSTONE_SHATTER_COLOR)
-      : isHard
-        ? (isWater ? SANDSTONE_HARD_WATER_COLOR : SANDSTONE_HARD_COLOR)
-        : (isWater ? SANDSTONE_WATER_COLOR : SANDSTONE_COLOR);
-    _drawChamberSandstoneContent(ctx, tile, bw, bh, isWater, sandstoneColor, shiftHeld, currentTemp, currentPressure, lockedCost);
-  } else if (chamberContent === 'star') {
-    _drawChamberStarContent(ctx, isWater, half);
-    if (isWater) {
-      _drawConnectedStarBurst(ctx, tile, half);
-    } else {
-      _starBurstStates.delete(tile);
-    }
-  } else if (chamberContent === 'regulator') {
-    _drawChamberRegulatorContent(ctx, tile, isWater);
-  } else if (chamberContent === 'gel') {
-    _drawChamberGelContent(ctx, bw, bh, isWater, lockedCost);
-  } else if (chamberContent === 'siphon') {
-    _drawChamberSiphonContent(ctx, bw, bh, isWater, lockedGain);
-  } else if (chamberContent === 'hot_plate') {
-    _drawChamberHotPlateContent(ctx, tile, bw, bh, isWater, shiftHeld, currentTemp, lockedCost, lockedGain);
-  }
+  const geom: ChamberDrawContext = { ctx, tile, color, isWater, half, bw, bh, br, shiftHeld, currentTemp, currentPressure, lockedCost, lockedGain };
+  _drawChamberGoldShineIfNeeded(geom);
+  _drawChamberFrostHaloIfNeeded(geom);
+  _drawChamberContent(geom);
   // Connection stubs that use a flat (butt) end cap are drawn inside the clip so
   // the end sits exactly flush with the tile edge and does not bleed into
   // adjacent tiles.  When buttEndDirs is undefined all stubs use butt caps
