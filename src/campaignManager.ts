@@ -618,6 +618,47 @@ export class CampaignManager {
    * Advance to the next level after the level with the given ID.
    * Called by Game.nextLevel() which knows the current level ID.
    */
+  /** True when `currentLevelId`'s chapter just finished and had its own grid map (go to the chapter map, not the next level). */
+  private _isLastLevelOfGridChapter(
+    currentChapter: ChapterDef | undefined, nextChapter: ChapterDef | undefined,
+  ): currentChapter is ChapterDef {
+    return !!currentChapter?.grid && !!nextChapter && currentChapter !== nextChapter;
+  }
+
+  /** True when `nextLevelDef` is the first level of a chapter different from the one just completed. */
+  private _isFirstLevelOfNewChapter(
+    currentChapter: ChapterDef | undefined, nextChapter: ChapterDef | undefined, nextLevelDef: LevelDef,
+  ): nextChapter is ChapterDef {
+    return (
+      currentChapter !== undefined &&
+      nextChapter !== undefined &&
+      currentChapter !== nextChapter &&
+      nextChapter.levels[0].id === nextLevelDef.id
+    );
+  }
+
+  /** The chapter just completed had its own grid map: show it instead of continuing to the next level. */
+  private _advanceToChapterMap(chapters: ChapterDef[], currentChapter: ChapterDef): void {
+    this._pendingLevelId = null;
+    this._callbacks.winModalEl.style.display = 'none';
+    this._winFromChapterMap = true;
+    this.showChapterMap(chapters.indexOf(currentChapter));
+  }
+
+  /** `nextLevelDef` starts a new chapter: show its map (if it has one) or start the level, then the new-chapter modal. */
+  private _advanceToNewChapter(chapters: ChapterDef[], nextChapter: ChapterDef, nextLevelDef: LevelDef): void {
+    const chapterIdx = chapters.indexOf(nextChapter);
+    if (nextChapter.grid) {
+      this._pendingLevelId = null;
+      this._callbacks.winModalEl.style.display = 'none';
+      this._winFromChapterMap = true;
+      this.showChapterMap(chapterIdx);
+    } else {
+      this._callbacks.startLevel(nextLevelDef.id);
+    }
+    this._showNewChapterModal(chapterIdx, nextChapter);
+  }
+
   nextLevelFrom(currentLevelId: number): void {
     if (!this._activeCampaign) { this._callbacks.exitToMenu(); return; }
     const chapters = this._activeCampaign.chapters;
@@ -635,31 +676,13 @@ export class CampaignManager {
     const nextChapter = chapters.find((ch) => ch.levels.some((l) => l.id === nextLevelDef.id));
 
     // If the last level of a grid-map chapter was just completed, go to the chapter map
-    if (currentChapter?.grid && nextChapter && currentChapter !== nextChapter) {
-      this._pendingLevelId = null;
-      this._callbacks.winModalEl.style.display = 'none';
-      this._winFromChapterMap = true;
-      this.showChapterMap(chapters.indexOf(currentChapter));
+    if (this._isLastLevelOfGridChapter(currentChapter, nextChapter)) {
+      this._advanceToChapterMap(chapters, currentChapter);
       return;
     }
 
-    if (
-      currentChapter !== undefined &&
-      nextChapter !== undefined &&
-      currentChapter !== nextChapter &&
-      nextChapter.levels[0].id === nextLevelDef.id
-    ) {
-      const chapterIdx = chapters.indexOf(nextChapter);
-      if (nextChapter.grid) {
-        this._pendingLevelId = null;
-        this._callbacks.winModalEl.style.display = 'none';
-        this._winFromChapterMap = true;
-        this.showChapterMap(chapterIdx);
-        this._showNewChapterModal(chapterIdx, nextChapter);
-      } else {
-        this._callbacks.startLevel(nextLevelDef.id);
-        this._showNewChapterModal(chapterIdx, nextChapter);
-      }
+    if (this._isFirstLevelOfNewChapter(currentChapter, nextChapter, nextLevelDef)) {
+      this._advanceToNewChapter(chapters, nextChapter, nextLevelDef);
     } else if (nextLevelDef.challenge) {
       this._callbacks.startLevel(nextLevelDef.id);
       this._showChallengeLevelModal(/* canSkip */ true);
