@@ -1257,11 +1257,13 @@ export class Game implements InputCallbacks {
     // Draw fill-animation overlays on top of the board (tiles rendered as dry above).
     this._animMgr.renderFillEffects(
       this.board,
-      this.board.getCurrentWater(),
-      this._input.shiftHeld,
-      currentTemp,
-      currentPressure,
-      now,
+      {
+        water: this.board.getCurrentWater(),
+        shiftHeld: this._input.shiftHeld,
+        currentTemp,
+        currentPressure,
+        now,
+      },
     );
 
     if (isEnvironmentalEnabled()) {

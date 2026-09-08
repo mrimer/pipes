@@ -84,6 +84,22 @@ export interface AnimSparkleCallbacks {
   zero(shape: PipeShape): void;
 }
 
+/** Position and pre-reclaim data for a tile just removed by a reclaim action. */
+interface ReclaimedTileInfo {
+  row: number;
+  col: number;
+  tile: Tile;
+}
+
+/** Frame-local game state {@link AnimationManager.renderFillEffects} needs to color fill/drain overlays. */
+interface FillEffectsFrameContext {
+  water: number;
+  shiftHeld: boolean;
+  currentTemp: number;
+  currentPressure: number;
+  now: number;
+}
+
 /**
  * Owns all canvas-based visual effects: floating tile-label animations, pipe
  * rotation and fill animations, source-spray / dry-puff particles, win-flow
@@ -247,11 +263,12 @@ export class AnimationManager {
     const now = performance.now();
     const currentTemp = board.getCurrentTemperature(filledAfter);
     const currentPressure = board.getCurrentPressure(filledAfter);
+    const reclaimed = AnimationManager._buildReclaimedTileInfo(reclaimedRow, reclaimedCol, reclaimedTile);
 
     for (const key of filledBefore) {
       if (filledAfter.has(key)) continue;
       const [r, c] = parseKey(key);
-      const tile = this._resolveReclaimAwareTile(board, r, c, reclaimedRow, reclaimedCol, reclaimedTile);
+      const tile = this._resolveReclaimAwareTile(board, r, c, reclaimed);
       if (!tile) continue;
       this._pushTileAnimLabels(
         board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle,
@@ -270,14 +287,31 @@ export class AnimationManager {
     board: Board,
     r: number,
     c: number,
-    reclaimedRow: number | undefined,
-    reclaimedCol: number | undefined,
-    reclaimedTile: Tile | undefined,
+    reclaimed: ReclaimedTileInfo | undefined,
   ): Tile | undefined {
-    if (reclaimedRow !== undefined && reclaimedCol !== undefined && r === reclaimedRow && c === reclaimedCol) {
-      return reclaimedTile;
-    }
+    if (this._isReclaimedCell(r, c, reclaimed)) return reclaimed.tile;
     return board.grid[r]?.[c];
+  }
+
+  /** True when (r, c) is the cell the just-reclaimed tile used to occupy. */
+  private _isReclaimedCell(
+    r: number,
+    c: number,
+    reclaimed: ReclaimedTileInfo | undefined,
+  ): reclaimed is ReclaimedTileInfo {
+    return reclaimed !== undefined && r === reclaimed.row && c === reclaimed.col;
+  }
+
+  /** Bundles the reclaim trio into one object, or undefined when any part is missing. */
+  private static _buildReclaimedTileInfo(
+    row: number | undefined,
+    col: number | undefined,
+    tile: Tile | undefined,
+  ): ReclaimedTileInfo | undefined {
+    if (row === undefined) return undefined;
+    if (col === undefined) return undefined;
+    if (tile === undefined) return undefined;
+    return { row, col, tile };
   }
 
   /** Locked-delta lookup for a key, or null when the map is absent or has no entry for it. */
@@ -545,14 +579,8 @@ export class AnimationManager {
    * Render pipe-fill animation overlays on top of the board.
    * Call after `renderBoard()` so the overlays appear above the base board tiles.
    */
-  renderFillEffects(
-    board: Board,
-    water: number,
-    shiftHeld: boolean,
-    currentTemp: number,
-    currentPressure: number,
-    now: number,
-  ): void {
+  renderFillEffects(board: Board, ctx: FillEffectsFrameContext): void {
+    const { water, shiftHeld, currentTemp, currentPressure, now } = ctx;
     if (this._fillAnims.length === 0 && this._drainAnims.length === 0) return;
     // Build a shared connections map covering both fill and drain animating tiles.
     const tileConnectionsMap = new Map<string, Set<Direction>>();
@@ -812,20 +840,28 @@ export class AnimationManager {
     const sx = board.source.col * TILE_SIZE + TILE_SIZE / 2;
     const sy = board.source.row * TILE_SIZE + TILE_SIZE / 2;
     if (gameState === GameState.GameOver) {
-      // Tank ran dry: show puffs of dry air bursting from the source.
-      if (now - this._lastSpraySpawn >= DRY_PUFF_SPAWN_INTERVAL_MS) {
-        spawnDryPuff(this._dryPuffs);
-        this._lastSpraySpawn = now;
-      }
-      renderDryPuffs(this.ctx, this._dryPuffs, sx, sy);
+      this._tickDryPuffSpray(now, sx, sy);
     } else {
-      // Normal play: show water drops spraying from the source.
-      if (now - this._lastSpraySpawn >= SPRAY_SPAWN_INTERVAL_MS) {
-        spawnSourceSprayDrop(this._sourceSprayDrops);
-        this._lastSpraySpawn = now;
-      }
-      renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
+      this._tickWaterSpray(now, sx, sy);
     }
+  }
+
+  /** Tank ran dry: show puffs of dry air bursting from the source. */
+  private _tickDryPuffSpray(now: number, sx: number, sy: number): void {
+    if (now - this._lastSpraySpawn >= DRY_PUFF_SPAWN_INTERVAL_MS) {
+      spawnDryPuff(this._dryPuffs);
+      this._lastSpraySpawn = now;
+    }
+    renderDryPuffs(this.ctx, this._dryPuffs, sx, sy);
+  }
+
+  /** Normal play: show water drops spraying from the source. */
+  private _tickWaterSpray(now: number, sx: number, sy: number): void {
+    if (now - this._lastSpraySpawn >= SPRAY_SPAWN_INTERVAL_MS) {
+      spawnSourceSprayDrop(this._sourceSprayDrops);
+      this._lastSpraySpawn = now;
+    }
+    renderSourceSpray(this.ctx, this._sourceSprayDrops, sx, sy, WATER_COLOR);
   }
 
   /**
@@ -994,20 +1030,27 @@ export class AnimationManager {
       return;
     }
     const now = performance.now();
+    this._maybeStartIdlePulse(board, now);
+    this._renderActiveIdlePulse(now);
+  }
 
-    if (!this._activePulse && now - this._lastActionTime >= 5000 && now >= this._nextPulseTime) {
-      const layers = computePulseLayers(board);
-      if (layers.length > 0) {
-        const maxDepth = layers.reduce((max, l) => Math.max(max, l.depth), 0);
-        this._activePulse = { layers, maxDepth, startTime: now };
-        this._nextPulseTime = now + 5000;
-      }
-    }
+  private _shouldStartIdlePulse(now: number): boolean {
+    return !this._activePulse && now - this._lastActionTime >= 5000 && now >= this._nextPulseTime;
+  }
 
-    if (this._activePulse) {
-      const stillActive = renderIdlePulse(this.ctx, this._activePulse, now);
-      if (!stillActive) this._activePulse = null;
-    }
+  private _maybeStartIdlePulse(board: Board, now: number): void {
+    if (!this._shouldStartIdlePulse(now)) return;
+    const layers = computePulseLayers(board);
+    if (layers.length === 0) return;
+    const maxDepth = layers.reduce((max, l) => Math.max(max, l.depth), 0);
+    this._activePulse = { layers, maxDepth, startTime: now };
+    this._nextPulseTime = now + 5000;
+  }
+
+  private _renderActiveIdlePulse(now: number): void {
+    if (!this._activePulse) return;
+    const stillActive = renderIdlePulse(this.ctx, this._activePulse, now);
+    if (!stillActive) this._activePulse = null;
   }
 
   /**
