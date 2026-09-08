@@ -82,6 +82,15 @@ export interface InputCallbacks {
   isResuming(): boolean;
 }
 
+/** Shared context for a canvas click landing on an existing tile (spin or rotate). */
+interface ClickTileContext {
+  pos: GridPos;
+  tile: Tile;
+  board: Board;
+  filledBefore: Set<string>;
+  e: MouseEvent;
+}
+
 /**
  * Owns all input state and event-handling logic.
  * Calls back into Game via {@link InputCallbacks} for board mutations and UI effects.
@@ -465,6 +474,16 @@ export class InputHandler {
     return this._cb.isResuming();
   }
 
+  /** True while the player is actively playing a level (not paused, won, lost, or on another screen). */
+  private _isPlayableState(): boolean {
+    return this._cb.getScreen() === GameScreen.Play && this._cb.getGameState() === GameState.Playing;
+  }
+
+  /** True when two grid positions refer to the same cell. */
+  private _isSameGridPos(a: GridPos, b: GridPos): boolean {
+    return a.row === b.row && a.col === b.col;
+  }
+
   private _handleCanvasMouseDown(e: MouseEvent): void {
     if (this._isInputLocked()) return;
     if (e.button === 2) {
@@ -512,8 +531,10 @@ export class InputHandler {
     // Remove the tile at the final (current) position and suppress the contextmenu event.
     const pos = this._rightDragLastTile;
     const board = this._cb.getBoard();
-    if (pos && board && this._cb.getGameState() === GameState.Playing && this._cb.getScreen() === GameScreen.Play) {
-      this._commitRightDragTile(pos, board);
+    if (pos && board) {
+      if (this._isPlayableState()) {
+        this._commitRightDragTile(pos, board);
+      }
     }
     this._suppressNextContextMenu = true;
     this._cancelRightDrag();
@@ -546,9 +567,10 @@ export class InputHandler {
     if (!this._isDragging) return;
     const pos = this._dragLastTile;
     const board = this._cb.getBoard();
-    if (pos && this._cb.getSelectedShape() !== null && board &&
-        this._cb.getGameState() === GameState.Playing && this._cb.getScreen() === GameScreen.Play) {
-      this._commitLeftDragTile(pos, board);
+    if (pos && board) {
+      if (this._cb.getSelectedShape() !== null && this._isPlayableState()) {
+        this._commitLeftDragTile(pos, board);
+      }
     }
     this._cancelDrag();
   }
@@ -582,14 +604,14 @@ export class InputHandler {
 
     if (SPIN_PIPE_SHAPES.has(tile.shape)) {
       // Spinnable pipes are always rotated on click (cannot be replaced or removed).
-      this._spinTileOnClick(pos, tile, board, filledBefore, e);
+      this._spinTileOnClick({ pos, tile, board, filledBefore, e });
     } else if (this._shouldPlaceOrReplaceTile(tile)) {
       // Place on an empty cell or replace a tile with a different shape/rotation.
       // When tile already matches exactly (same shape+rotation), fall through to rotate.
       this._cb.tryPlaceOrReplace(pos, tile, filledBefore);
     } else if (!isEmptyFloor(tile.shape)) {
       // Rotate existing pipe (no inventory item selected, or same shape+rotation as selected).
-      this._rotateTileOnClick(pos, tile, board, filledBefore, e);
+      this._rotateTileOnClick({ pos, tile, board, filledBefore, e });
     }
   }
 
@@ -602,7 +624,8 @@ export class InputHandler {
   }
 
   /** Shift+click rotates CCW (3 steps); plain click rotates CW (1 step). */
-  private _spinTileOnClick(pos: GridPos, tile: Tile, board: Board, filledBefore: Set<string>, e: MouseEvent): void {
+  private _spinTileOnClick(ctx: ClickTileContext): void {
+    const { pos, tile, board, filledBefore, e } = ctx;
     const steps = e.shiftKey ? 3 : 1;
     const oldRotation = tile.rotation;
     const spinResult = board.rotateTileBy(pos, steps);
@@ -624,7 +647,8 @@ export class InputHandler {
    * single game turn; otherwise fall back to a standard single 90° rotation (Shift+click
    * rotates CCW by 3 steps, matching the spin-tile shortcut above).
    */
-  private _rotateTileOnClick(pos: GridPos, tile: Tile, board: Board, filledBefore: Set<string>, e: MouseEvent): void {
+  private _rotateTileOnClick(ctx: ClickTileContext): void {
+    const { pos, tile, board, filledBefore, e } = ctx;
     const delta = this.hoverRotationDelta;
     this.hoverRotationDelta = 0;
     const oldRotation = tile.rotation;
@@ -716,7 +740,8 @@ export class InputHandler {
     if (!this._isDragPaintActive(board)) return;
     const { row, col } = newPos;
     const last = this._dragLastTile;
-    if (!last || (row === last.row && col === last.col)) return;
+    if (!last) return;
+    if (this._isSameGridPos(newPos, last)) return;
     // Moved to a new tile: place at the tile we just left.
     this._paintOldDragTile(last, board);
     this._dragLastTile = { row, col };
@@ -739,7 +764,8 @@ export class InputHandler {
     if (!this._isDragEraseActive(board)) return;
     const { row, col } = newPos;
     const last = this._rightDragLastTile;
-    if (!last || (row === last.row && col === last.col)) return;
+    if (!last) return;
+    if (this._isSameGridPos(newPos, last)) return;
     // Moved to a new tile: reclaim the tile we just left.
     this._cb.reclaimTileAt(last);
     this._rightDragLastTile = { row, col };
@@ -831,10 +857,9 @@ export class InputHandler {
   private _handleShiftKeyDown(e: KeyboardEvent): void {
     if (e.key !== 'Shift' || this.shiftHeld) return;
     this.shiftHeld = true;
-    if (this._cb.getScreen() === GameScreen.Play && this._cb.getGameState() === GameState.Playing &&
-        !commandKeyManager.isShiftUsedAsModifier()) {
-      this._cb.selectNextAvailableInventory();
-    }
+    if (!this._isPlayableState()) return;
+    if (commandKeyManager.isShiftUsedAsModifier()) return;
+    this._cb.selectNextAvailableInventory();
   }
 
   private _handleUndoKeyDown(e: KeyboardEvent): void {
@@ -852,11 +877,16 @@ export class InputHandler {
   private _handleBackspaceKeyDown(e: KeyboardEvent): void {
     if (e.key !== 'Backspace' || this._cb.getScreen() !== GameScreen.Play) return;
     e.preventDefault();
-    if (this._cb.getGameState() === GameState.Playing ||
-        this._cb.getGameState() === GameState.GameOver ||
-        this._cb.getGameState() === GameState.Won) {
+    if (this._isUndoableGameState()) {
       this._cb.performUndo();
     }
+  }
+
+  /** Backspace-to-undo is allowed while playing and also after the level has ended (win or loss). */
+  private _isUndoableGameState(): boolean {
+    return this._cb.getGameState() === GameState.Playing ||
+      this._cb.getGameState() === GameState.GameOver ||
+      this._cb.getGameState() === GameState.Won;
   }
 
   private _handleDocKeyUp(e: KeyboardEvent): void {
@@ -955,7 +985,9 @@ export class InputHandler {
   }
 
   private _onInventoryItemTouchMove(e: TouchEvent): void {
-    if (!this._invDragActive || !this._invDragGhostEl || e.touches.length !== 1) return;
+    if (!this._invDragActive) return;
+    if (!this._invDragGhostEl) return;
+    if (e.touches.length !== 1) return;
     e.preventDefault();
     const touch = e.touches[0];
     this._invDragGhostEl.style.left = `${touch.clientX + 12}px`;
@@ -1085,7 +1117,8 @@ export class InputHandler {
 
   private _onLongPressTimeout(): void {
     this._longPressTimer = null;
-    if (this._touchMoved || this._cb.getScreen() !== GameScreen.Play || this._cb.getGameState() !== GameState.Playing) return;
+    if (this._touchMoved) return;
+    if (!this._isPlayableState()) return;
     const board = this._cb.getBoard();
     if (!board) return;
     const lp = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
@@ -1177,9 +1210,10 @@ export class InputHandler {
   private _rotatePlacedTileAtTouchStart(dx: number, board: Board): void {
     const startPos = this._getGridPosFromClientXY(this._touchStartX, this._touchStartY);
     const startTile = board.getTile(startPos);
-    if (!startTile || isEmptyFloor(startTile.shape) || startTile.isFixed || SPIN_PIPE_SHAPES.has(startTile.shape)) {
-      return;
-    }
+    if (!startTile) return;
+    if (isEmptyFloor(startTile.shape)) return;
+    if (startTile.isFixed) return;
+    if (SPIN_PIPE_SHAPES.has(startTile.shape)) return;
     const filledBefore = board.getFilledPositions();
     const oldRotation = startTile.rotation;
     const rotResult = dx > 0
@@ -1198,10 +1232,13 @@ export class InputHandler {
 
   /** Drag-paint: only when a shape is selected and the finger has clearly moved without swipe-rotating. */
   private _handleTouchDragPaint(touch: Touch, board: Board): void {
-    if (!this._touchMoved || this._cb.getSelectedShape() === null || this._swipeRotated) return;
+    if (!this._touchMoved) return;
+    if (this._cb.getSelectedShape() === null) return;
+    if (this._swipeRotated) return;
     const newPos = this._getGridPosFromClientXY(touch.clientX, touch.clientY);
     const last = this._touchDragLastTile;
-    if (!last || (newPos.row === last.row && newPos.col === last.col)) return;
+    if (!last) return;
+    if (this._isSameGridPos(newPos, last)) return;
 
     // Paint the cell we just left.
     const oldTile = board.getTile(last);
