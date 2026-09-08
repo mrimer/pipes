@@ -42,6 +42,38 @@ const ROTATION_SHAPES: ReadonlySet<PipeShape> = new Set([
   PipeShape.OneWay,
 ]);
 
+/** Cement-drying pipe variants that share Cement's `dryingTime` field. */
+const SPIN_CEMENT_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
+]);
+
+/** Add the valid field names implied by an exact chamber-content match. */
+function _addChamberContentExactKeys(valid: Set<string>, cc: ChamberContent | undefined): void {
+  if (cc === 'tank') valid.add('capacity');
+  if (cc === 'item') { valid.add('itemShape'); valid.add('itemCount'); }
+  if (cc === 'pump') valid.add('pressure');
+  if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
+  if (cc === 'level') valid.add('levelIdx');
+  if (cc === 'chapter') valid.add('chapterIdx');
+  if (cc === 'regulator') { valid.add('cost'); valid.add('regulatorStat'); valid.add('regulatorOperator'); }
+}
+
+/** Add the valid field names implied by chamber-content group membership (cost/temperature). */
+function _addChamberContentGroupKeys(valid: Set<string>, cc: ChamberContent | undefined): void {
+  if (cc !== undefined && COST_CHAMBER_CONTENTS.has(cc)) valid.add('cost');
+  if (cc !== undefined && TEMP_RELEVANT_CONTENTS.has(cc)) valid.add('temperature');
+}
+
+/** Add the Chamber-content-dependent valid field names to `valid`, mutating it in place. */
+function _addChamberValidKeys(valid: Set<string>, tile: TileDef): void {
+  valid.add('chamberContent');
+  valid.add('connections');
+  valid.add('firstConnections');
+  const cc = tile.chamberContent;
+  _addChamberContentExactKeys(valid, cc);
+  _addChamberContentGroupKeys(valid, cc);
+}
+
 /**
  * Return the set of valid TileDef field names for the given tile definition,
  * based on the tile's shape and (for Chamber tiles) chamber content type.
@@ -60,22 +92,10 @@ export function getValidTileDefKeys(tile: TileDef): ReadonlySet<string> {
   } else if (shape === PipeShape.Sink) {
     valid.add('connections');
   } else if (shape === PipeShape.Chamber) {
-    valid.add('chamberContent');
-    valid.add('connections');
-    valid.add('firstConnections');
-    const cc = tile.chamberContent;
-    if (cc === 'tank') valid.add('capacity');
-    if (cc !== undefined && COST_CHAMBER_CONTENTS.has(cc)) valid.add('cost');
-    if (cc === 'item') { valid.add('itemShape'); valid.add('itemCount'); }
-    if (cc !== undefined && TEMP_RELEVANT_CONTENTS.has(cc)) valid.add('temperature');
-    if (cc === 'pump') valid.add('pressure');
-    if (cc === 'sandstone') { valid.add('hardness'); valid.add('shatter'); }
-    if (cc === 'level') valid.add('levelIdx');
-    if (cc === 'chapter') valid.add('chapterIdx');
-    if (cc === 'regulator') { valid.add('cost'); valid.add('regulatorStat'); valid.add('regulatorOperator'); }
+    _addChamberValidKeys(valid, tile);
   } else if (shape === PipeShape.Cement) {
     valid.add('dryingTime');
-  } else if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement || shape === PipeShape.SpinTeeCement) {
+  } else if (SPIN_CEMENT_SHAPES.has(shape)) {
     valid.add('dryingTime');
   }
 
@@ -244,6 +264,49 @@ export function createDefaultParams(): TileParams {
 
 // ─── Shared tile-def builder ──────────────────────────────────────────────────
 
+/** Empty/floor palette entries that map directly to a fixed no-param TileDef. */
+const EMPTY_PALETTE_SHAPES: ReadonlySet<EditorPalette> = new Set([
+  PipeShape.EmptyFall, PipeShape.EmptyDark, PipeShape.EmptyWinter, PipeShape.EmptySpring, PipeShape.Empty,
+]);
+
+/** Shapes that carry no `rotation` field even though they aren't handled above. */
+const NO_ROTATION_TILE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4, PipeShape.Granite, PipeShape.Sea,
+]);
+
+/** Build the `Direction[]` connection list implied by a `TileParams.connections` toggle set. */
+function _collectConnDirs(connections: TileParams['connections']): Direction[] {
+  const connDirs: Direction[] = [];
+  if (connections.N) connDirs.push(Direction.North);
+  if (connections.E) connDirs.push(Direction.East);
+  if (connections.S) connDirs.push(Direction.South);
+  if (connections.W) connDirs.push(Direction.West);
+  return connDirs;
+}
+
+/**
+ * Build the hover-ghost TileDef for a chamber palette selection.
+ * Chamber placement itself bypasses this path (uses hardcoded [E, W] connections),
+ * but this is reached for the hover-ghost when the chamber palette is active
+ * without a pending chapter/level selection.
+ */
+function _buildChamberGhostTileDef(palette: ChamberPalette, params: TileParams): TileDef {
+  const chamberContent = chamberPaletteContent(palette);
+  const connDirs = _collectConnDirs(params.connections);
+  const chamberDef: TileDef = { shape: PipeShape.Chamber, chamberContent };
+  if (connDirs.length < 4) chamberDef.connections = connDirs;
+  return chamberDef;
+}
+
+/** Build a TileDef for a Source/Sink palette selection. */
+function _buildConnectableTileDef(shape: PipeShape.Source | PipeShape.Sink, params: TileParams): TileDef {
+  const connDirs = _collectConnDirs(params.connections);
+  const def: TileDef = { shape };
+  if (shape === PipeShape.Sink && params.completion > 0) def.completion = params.completion;
+  if (connDirs.length < 4) def.connections = connDirs;
+  return def;
+}
+
 /**
  * Build a TileDef from the current palette selection and tile parameters.
  * Pure function – contains no class or module state.
@@ -251,43 +314,11 @@ export function createDefaultParams(): TileParams {
  */
 export function buildMapTileDef(palette: EditorPalette, params: TileParams): TileDef {
   if (palette === 'erase') return { shape: PipeShape.Empty };
-  if (palette === PipeShape.EmptyFall)   return { shape: PipeShape.EmptyFall };
-  if (palette === PipeShape.EmptyDark)   return { shape: PipeShape.EmptyDark };
-  if (palette === PipeShape.EmptyWinter) return { shape: PipeShape.EmptyWinter };
-  if (palette === PipeShape.EmptySpring) return { shape: PipeShape.EmptySpring };
-  if (palette === PipeShape.Empty)       return { shape: PipeShape.Empty };
-  if (isChamberPalette(palette)) {
-    // Chamber placement bypasses this path (uses hardcoded [E, W] connections),
-    // but this branch is reached for the hover-ghost when the chamber palette is
-    // active without a pending chapter/level selection.  Return a valid TileDef
-    // so the ghost renders as a chamber instead of a fallback tile.
-    const chamberContent = chamberPaletteContent(palette);
-    const connDirs: Direction[] = [];
-    if (params.connections.N) connDirs.push(Direction.North);
-    if (params.connections.E) connDirs.push(Direction.East);
-    if (params.connections.S) connDirs.push(Direction.South);
-    if (params.connections.W) connDirs.push(Direction.West);
-    const chamberDef: TileDef = { shape: PipeShape.Chamber, chamberContent };
-    if (connDirs.length < 4) chamberDef.connections = connDirs;
-    return chamberDef;
-  }
-  const shape = palette as PipeShape;
-  const needsConn = shape === PipeShape.Source || shape === PipeShape.Sink;
-  if (needsConn) {
-    const connDirs: Direction[] = [];
-    if (params.connections.N) connDirs.push(Direction.North);
-    if (params.connections.E) connDirs.push(Direction.East);
-    if (params.connections.S) connDirs.push(Direction.South);
-    if (params.connections.W) connDirs.push(Direction.West);
-    const def: TileDef = { shape };
-    if (shape === PipeShape.Sink && params.completion > 0) def.completion = params.completion;
-    if (connDirs.length < 4) def.connections = connDirs;
-    return def;
-  }
-  if (shape === PipeShape.Tree || shape === PipeShape.Tree2 || shape === PipeShape.Tree3
-      || shape === PipeShape.Tree4 || shape === PipeShape.Granite || shape === PipeShape.Sea) {
-    return { shape };
-  }
+  if (EMPTY_PALETTE_SHAPES.has(palette)) return { shape: palette as PipeShape };
+  if (isChamberPalette(palette)) return _buildChamberGhostTileDef(palette, params);
+  const shape = palette;
+  if (shape === PipeShape.Source || shape === PipeShape.Sink) return _buildConnectableTileDef(shape, params);
+  if (NO_ROTATION_TILE_SHAPES.has(shape)) return { shape };
   return { shape, rotation: params.rotation };
 }
 
@@ -347,23 +378,24 @@ export const EDITOR_COLORS: Partial<Record<PipeShape, string>> = {
   [PipeShape.LeakyCross]:    '#8b5c2a',
 };
 
+const CHAMBER_CONTENT_COLORS: Readonly<Record<string, string>> = {
+  tank: '#74b9ff',
+  dirt: DIRT_COLOR,
+  item: '#ffd700',
+  heater: '#e17055',
+  ice: ICE_COLOR,
+  pump: '#a8e063',
+  snow: '#b0d8f8',
+  sandstone: '#c2a26e',
+  star: '#f0c040',
+  hot_plate: '#e44',
+  regulator: REGULATOR_COLOR,
+  level: '#2a3a5e',
+  chapter: '#5a2a5e',
+};
+
 export function chamberColor(content: string): string {
-  switch (content) {
-    case 'tank':     return '#74b9ff';
-    case 'dirt':     return DIRT_COLOR;
-    case 'item':     return '#ffd700';
-    case 'heater':   return '#e17055';
-    case 'ice':      return ICE_COLOR;
-    case 'pump':     return '#a8e063';
-    case 'snow':     return '#b0d8f8';
-    case 'sandstone': return '#c2a26e';
-    case 'star':      return '#f0c040';
-    case 'hot_plate': return '#e44';
-    case 'regulator': return REGULATOR_COLOR;
-    case 'level':    return '#2a3a5e';
-    case 'chapter':  return '#5a2a5e';
-    default:         return '#b2bec3';
-  }
+  return CHAMBER_CONTENT_COLORS[content] ?? '#b2bec3';
 }
 
 // ─── Shared editor UI constants ───────────────────────────────────────────────
@@ -593,22 +625,20 @@ export function rotatePositionBy90(
     ? { row: pos.col, col: oldRows - 1 - pos.row }
     : { row: oldCols - 1 - pos.col, col: pos.row };
 }
+const CW_DIRECTION_ROTATION: Readonly<Record<Direction, Direction>> = {
+  [Direction.North]: Direction.East,
+  [Direction.East]:  Direction.South,
+  [Direction.South]: Direction.West,
+  [Direction.West]:  Direction.North,
+};
+const CCW_DIRECTION_ROTATION: Readonly<Record<Direction, Direction>> = {
+  [Direction.North]: Direction.West,
+  [Direction.West]:  Direction.South,
+  [Direction.South]: Direction.East,
+  [Direction.East]:  Direction.North,
+};
 function rotateDirectionBy90(dir: Direction, clockwise: boolean): Direction {
-  if (clockwise) {
-    switch (dir) {
-      case Direction.North: return Direction.East;
-      case Direction.East:  return Direction.South;
-      case Direction.South: return Direction.West;
-      case Direction.West:  return Direction.North;
-    }
-  } else {
-    switch (dir) {
-      case Direction.North: return Direction.West;
-      case Direction.West:  return Direction.South;
-      case Direction.South: return Direction.East;
-      case Direction.East:  return Direction.North;
-    }
-  }
+  return clockwise ? CW_DIRECTION_ROTATION[dir] : CCW_DIRECTION_ROTATION[dir];
 }
 
 /**
