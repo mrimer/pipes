@@ -10,6 +10,7 @@
 
 import type { Board} from '../board';
 import { NEIGHBOUR_DELTA, LEAKY_PIPE_SHAPES, PIPE_SHAPES, GOLD_PIPE_SHAPES, SPIN_PIPE_SHAPES, parseKey } from '../board';
+import type { Tile } from '../tile';
 import { oppositeDirection } from '../tile';
 import type { GridPos, TileDef } from '../types';
 import { Direction, DIRECTIONS } from '../types';
@@ -202,34 +203,90 @@ function _oppositeDir(dir: Direction): Direction {
  * if the neighbor N reached by going in direction `d` has at least one good
  * outgoing direction that does not return straight back to T.
  */
-export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
-  const goodDirs = new Map<string, Set<Direction>>();
+/** Look up (or lazily create) the good-directions set for a grid position. */
+function _getOrCreateGoodDirs(goodDirs: Map<string, Set<Direction>>, pos: GridPos): Set<Direction> {
+  const key = `${pos.row},${pos.col}`;
+  let dirs = goodDirs.get(key);
+  if (!dirs) { dirs = new Set(); goodDirs.set(key, dirs); }
+  return dirs;
+}
 
-  function getDirs(pos: GridPos): Set<Direction> {
-    const key = `${pos.row},${pos.col}`;
-    let dirs = goodDirs.get(key);
-    if (!dirs) { dirs = new Set(); goodDirs.set(key, dirs); }
-    return dirs;
-  }
-
-  const queue: GridPos[] = [];
-  let qi = 0;
-
-  // Seed: for each tile adjacent to the sink that is mutually connected to it,
-  // the direction from that tile towards the sink is "good".
+/**
+ * Seed `goodDirs`/`queue`: for each tile adjacent to the sink that is mutually
+ * connected to it, the direction from that tile towards the sink is "good".
+ */
+function _seedFlowGoodDirsFromSink(
+  board: Board, goodDirs: Map<string, Set<Direction>>, queue: GridPos[],
+): void {
   for (const dir of DIRECTIONS) {
     const delta = NEIGHBOUR_DELTA[dir];
     const neighbor: GridPos = { row: board.sink.row + delta.row, col: board.sink.col + delta.col };
     // Direction from neighbor to sink is the opposite of `dir`
     const dirToSink = _oppositeDir(dir);
     if (board.areMutuallyConnected(neighbor, dirToSink)) {
-      const set = getDirs(neighbor);
+      const set = _getOrCreateGoodDirs(goodDirs, neighbor);
       if (!set.has(dirToSink)) {
         set.add(dirToSink);
         queue.push(neighbor);
       }
     }
   }
+}
+
+/**
+ * Whether `current` has at least one good direction that does NOT immediately
+ * return to `neighbor` (which would be a pointless U-turn ending in `neighbor`
+ * again) — i.e. whether going from `neighbor` towards `current` is useful.
+ */
+function _hasUsefulExit(currentDirs: Set<Direction>, dirToNeighbor: Direction): boolean {
+  for (const d of currentDirs) {
+    if (d !== dirToNeighbor) return true;
+  }
+  return false;
+}
+
+/**
+ * Backward-BFS step: from `current`, try to mark the direction from `neighbor`
+ * (reached via `dirToNeighbor`) toward `current` as "good", enqueueing
+ * `neighbor` if this is the first good direction found for it.
+ */
+function _expandFlowGoodDirsFromNeighbor(
+  board: Board,
+  current: GridPos,
+  dirToNeighbor: Direction,
+  currentDirs: Set<Direction>,
+  goodDirs: Map<string, Set<Direction>>,
+  queue: GridPos[],
+): void {
+  const delta = NEIGHBOUR_DELTA[dirToNeighbor];
+  const neighbor: GridPos = { row: current.row + delta.row, col: current.col + delta.col };
+
+  // Direction from neighbor toward current (the forward-flow direction for
+  // water to travel from neighbor to current).
+  const dirToCurrent = _oppositeDir(dirToNeighbor);
+
+  // A valid connection from neighbor to current requires areMutuallyConnected
+  // from the neighbor's perspective going toward current.
+  if (!board.areMutuallyConnected(neighbor, dirToCurrent)) return;
+
+  // Skip the sink itself – drops are removed on arrival, no need to track it.
+  if (neighbor.row === board.sink.row && neighbor.col === board.sink.col) return;
+
+  if (!_hasUsefulExit(currentDirs, dirToNeighbor)) return;
+
+  const neighborDirs = _getOrCreateGoodDirs(goodDirs, neighbor);
+  if (!neighborDirs.has(dirToCurrent)) {
+    neighborDirs.add(dirToCurrent);
+    queue.push(neighbor);
+  }
+}
+
+export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
+  const goodDirs = new Map<string, Set<Direction>>();
+  const queue: GridPos[] = [];
+  let qi = 0;
+
+  _seedFlowGoodDirsFromSink(board, goodDirs, queue);
 
   // BFS backwards: propagate "good" directions through mutual connections.
   // We check areMutuallyConnected from the *neighbor* going *toward* current
@@ -246,37 +303,10 @@ export function computeFlowGoodDirs(board: Board): Map<string, Set<Direction>> {
     // re-enter the source before reaching the sink.
     if (current.row === board.source.row && current.col === board.source.col) continue;
 
-    const currentDirs = getDirs(current);
+    const currentDirs = _getOrCreateGoodDirs(goodDirs, current);
 
     for (const dirToNeighbor of DIRECTIONS) {
-      const delta = NEIGHBOUR_DELTA[dirToNeighbor];
-      const neighbor: GridPos = { row: current.row + delta.row, col: current.col + delta.col };
-
-      // Direction from neighbor toward current (the forward-flow direction for
-      // water to travel from neighbor to current).
-      const dirToCurrent = _oppositeDir(dirToNeighbor);
-
-      // A valid connection from neighbor to current requires areMutuallyConnected
-      // from the neighbor's perspective going toward current.
-      if (!board.areMutuallyConnected(neighbor, dirToCurrent)) continue;
-
-      // Skip the sink itself – drops are removed on arrival, no need to track it.
-      if (neighbor.row === board.sink.row && neighbor.col === board.sink.col) continue;
-
-      // Going from `neighbor` towards `current` is only useful if `current` has
-      // at least one good direction that does NOT immediately return to `neighbor`
-      // (which would be a pointless U-turn ending in `neighbor` again).
-      let hasUsefulExit = false;
-      for (const d of currentDirs) {
-        if (d !== dirToNeighbor) { hasUsefulExit = true; break; }
-      }
-      if (!hasUsefulExit) continue;
-
-      const neighborDirs = getDirs(neighbor);
-      if (!neighborDirs.has(dirToCurrent)) {
-        neighborDirs.add(dirToCurrent);
-        queue.push(neighbor);
-      }
+      _expandFlowGoodDirsFromNeighbor(board, current, dirToNeighbor, currentDirs, goodDirs, queue);
     }
   }
 
@@ -763,6 +793,41 @@ export interface LeakySprayCandidate {
  * pipe arms. Cached by the animation owner and rebuilt only when fill state or
  * board state changes.
  */
+/** Unit offset and outward arm angle for a leaky-pipe rust-spot direction. */
+function _leakyArmOffset(dir: Direction): { dx: number; dy: number; armAngle: number } {
+  switch (dir) {
+    case Direction.North: return { dx:  0, dy: -1, armAngle: -Math.PI / 2 };
+    case Direction.South: return { dx:  0, dy:  1, armAngle:  Math.PI / 2 };
+    case Direction.East:  return { dx:  1, dy:  0, armAngle:  0 };
+    case Direction.West:  return { dx: -1, dy:  0, armAngle:  Math.PI };
+    default:              return { dx:  0, dy:  0, armAngle:  0 };
+  }
+}
+
+/** Push a rust-spot spray candidate for each unblocked connection arm of `tile`. */
+function _pushLeakySprayCandidatesForTile(
+  tile: Tile,
+  tileCx: number,
+  tileCy: number,
+  half: number,
+  blockedDir: Direction | null,
+  candidates: LeakySprayCandidate[],
+): void {
+  for (const dir of tile.connections) {
+    if (dir === blockedDir) continue;
+
+    const { dx, dy, armAngle } = _leakyArmOffset(dir);
+
+    for (const frac of LEAKY_RUST_SPOT_FRACTIONS) {
+      candidates.push({
+        cx: tileCx + dx * half * frac,
+        cy: tileCy + dy * half * frac,
+        armAngle,
+      });
+    }
+  }
+}
+
 export function buildLeakySprayCandidates(
   board: Board,
   filledPositions: ReadonlySet<string>,
@@ -781,25 +846,7 @@ export function buildLeakySprayCandidates(
     const owDir = board.oneWayData.get(key);
     const blockedDir = owDir !== undefined ? oppositeDirection(owDir) : null;
 
-    for (const dir of tile.connections) {
-      if (dir === blockedDir) continue;
-
-      let dx = 0, dy = 0, armAngle = 0;
-      switch (dir) {
-        case Direction.North: dx =  0; dy = -1; armAngle = -Math.PI / 2; break;
-        case Direction.South: dx =  0; dy =  1; armAngle =  Math.PI / 2; break;
-        case Direction.East:  dx =  1; dy =  0; armAngle =  0;           break;
-        case Direction.West:  dx = -1; dy =  0; armAngle =  Math.PI;     break;
-      }
-
-      for (const frac of LEAKY_RUST_SPOT_FRACTIONS) {
-        candidates.push({
-          cx: tileCx + dx * half * frac,
-          cy: tileCy + dy * half * frac,
-          armAngle,
-        });
-      }
-    }
+    _pushLeakySprayCandidatesForTile(tile, tileCx, tileCy, half, blockedDir, candidates);
   }
 
   return candidates;
