@@ -4012,6 +4012,26 @@ describe('Chamber tile (sandstone shatter)', () => {
 
 // ─── Ambient decorations ──────────────────────────────────────────────────────
 
+function _findBoardDecorations(maxAttempts: number): ReadonlyMap<string, AmbientDecoration> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const level = LEVELS[0];
+    const board = new Board(level.rows, level.cols, level);
+    if (board.ambientDecorations.size > 0) return board.ambientDecorations;
+  }
+  return new Map();
+}
+
+function _collectCrystalDecorations(maxAttempts: number, minCount: number): AmbientDecoration[] {
+  const crystals: AmbientDecoration[] = [];
+  for (let i = 0; i < maxAttempts && crystals.length < minCount; i++) {
+    const decorations = _findBoardDecorations(1);
+    for (const dec of decorations.values()) {
+      if (dec.type === 'crystal') crystals.push(dec);
+    }
+  }
+  return crystals;
+}
+
 describe('Board ambientDecorations', () => {
   it('is an empty map for boards constructed without a level', () => {
     const board = new Board(3, 3);
@@ -4020,29 +4040,13 @@ describe('Board ambientDecorations', () => {
 
   it('is populated when a level is provided', () => {
     // Run several seeds to account for random density (~30 %)
-    let found = false;
-    for (let i = 0; i < 20; i++) {
-      const level = LEVELS[0];
-      const board = new Board(level.rows, level.cols, level);
-      if (board.ambientDecorations.size > 0) {
-        found = true;
-        break;
-      }
-    }
-    expect(found).toBe(true);
+    const decorations = _findBoardDecorations(20);
+    expect(decorations.size > 0).toBe(true);
   });
 
   it('each decoration has valid fields', () => {
     // Build boards until we get at least one decoration
-    let decorations: ReadonlyMap<string, AmbientDecoration> = new Map();
-    for (let i = 0; i < 30; i++) {
-      const level = LEVELS[0];
-      const board = new Board(level.rows, level.cols, level);
-      if (board.ambientDecorations.size > 0) {
-        decorations = board.ambientDecorations;
-        break;
-      }
-    }
+    const decorations = _findBoardDecorations(30);
     if (decorations.size === 0) return; // extremely unlikely; skip rather than fail
 
     for (const dec of decorations.values()) {
@@ -4067,14 +4071,7 @@ describe('Board ambientDecorations', () => {
 
   it('crystal decorations have count 1 or 2', () => {
     // Build many boards to ensure we encounter at least one crystal decoration
-    const crystals: AmbientDecoration[] = [];
-    for (let i = 0; i < 100 && crystals.length < 5; i++) {
-      const level = LEVELS[0];
-      const board = new Board(level.rows, level.cols, level);
-      for (const dec of board.ambientDecorations.values()) {
-        if (dec.type === 'crystal') crystals.push(dec);
-      }
-    }
+    const crystals = _collectCrystalDecorations(100, 5);
     if (crystals.length === 0) return; // extremely unlikely; skip rather than fail
     for (const dec of crystals) {
       expect(dec.count === 1 || dec.count === 2).toBe(true);
@@ -4646,10 +4643,11 @@ describe('Chamber tile (hot_plate content)', () => {
    * Build a board: Source → Ice → HotPlate → Sink with initHistory.
    * Ice fills frozen first; hot_plate then consumes from that frozen.
    */
-  function makeIcePlusHotPlateBoard(
-    cap: number, iceCost: number, iceTemp: number,
-    mass: number, hpTemp: number, sourceTemp = 0,
-  ): Board {
+  function makeIcePlusHotPlateBoard(opts: {
+    cap: number; iceCost: number; iceTemp: number;
+    mass: number; hpTemp: number; sourceTemp?: number;
+  }): Board {
+    const { cap, iceCost, iceTemp, mass, hpTemp, sourceTemp = 0 } = opts;
     const board = new Board(1, 4);
     board.source = { row: 0, col: 0 };
     board.sink   = { row: 0, col: 3 };
@@ -4712,7 +4710,7 @@ describe('Chamber tile (hot_plate content)', () => {
     // Ice: cost=2, iceTemp=5, sourceTemp=0 → effectiveCost=2*5=10, impact=-10, frozen=10
     // HotPlate: mass=1, hpTemp=3 → effectiveCost=1*(3+0)=3, waterGain=min(10,3)=3, waterLoss=0 → impact=+3, frozen=7
     // water = 20 - 10 + 3 = 13
-    const board = makeIcePlusHotPlateBoard(20, 2, 5, 1, 3, 0);
+    const board = makeIcePlusHotPlateBoard({ cap: 20, iceCost: 2, iceTemp: 5, mass: 1, hpTemp: 3, sourceTemp: 0 });
     expect(board.getCurrentWater()).toBe(13);
     expect(board.frozen).toBe(7);
     expect(board.getLockedWaterImpact({ row: 0, col: 2 })).toBe(3);
