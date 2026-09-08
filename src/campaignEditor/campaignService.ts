@@ -108,6 +108,13 @@ export interface TextPackMergeResult {
 /** Result of remapping a chapter/level index reference after a delete, insert, or reorder. */
 type IdxRemapResult = { action: 'keep' } | { action: 'set'; value: number } | { action: 'delete' };
 
+/** Shared, unchanging state threaded through one {@link CampaignService.mergeTextPack} call's chapter/level/hint walk. */
+interface TextPackMergeContext {
+  locale: string;
+  overwrite: boolean;
+  result: TextPackMergeResult;
+}
+
 // ─── CampaignService ──────────────────────────────────────────────────────────
 
 export class CampaignService {
@@ -168,9 +175,24 @@ export class CampaignService {
 
   private _remapIdxOnReorder(idx: number, fromIdx: number, toIdx: number): IdxRemapResult {
     if (idx === fromIdx) return { action: 'set', value: toIdx };
-    if (fromIdx < toIdx && idx > fromIdx && idx <= toIdx) return { action: 'set', value: idx - 1 };
-    if (fromIdx > toIdx && idx >= toIdx && idx < fromIdx) return { action: 'set', value: idx + 1 };
+    if (this._movedForwardPastTarget(idx, fromIdx, toIdx)) return { action: 'set', value: idx - 1 };
+    if (this._movedBackwardPastTarget(idx, fromIdx, toIdx)) return { action: 'set', value: idx + 1 };
     return { action: 'keep' };
+  }
+
+  /** True when idx sat between the reorder's source and destination (moving forward) and must shift back one. */
+  private _movedForwardPastTarget(idx: number, fromIdx: number, toIdx: number): boolean {
+    return fromIdx < toIdx && idx > fromIdx && idx <= toIdx;
+  }
+
+  /** True when idx sat between the reorder's destination and source (moving backward) and must shift forward one. */
+  private _movedBackwardPastTarget(idx: number, fromIdx: number, toIdx: number): boolean {
+    return fromIdx > toIdx && idx >= toIdx && idx < fromIdx;
+  }
+
+  /** True when idx lies outside [0, length). */
+  private _isIndexOutOfBounds(idx: number, length: number): boolean {
+    return idx < 0 || idx >= length;
   }
 
   /**
@@ -296,8 +318,13 @@ export class CampaignService {
     const byId = this._campaigns.findIndex((c) => c.id === data.id);
     if (byId === -1) return -1;
     const candidate = this._campaigns[byId];
-    if (data.guid && candidate.guid && candidate.guid !== data.guid) return -1;
+    if (this._isDefinitelyDifferentCampaign(data, candidate)) return -1;
     return byId;
+  }
+
+  /** True when both sides have a guid and it differs — a definitive "not the same campaign" signal. */
+  private _isDefinitelyDifferentCampaign(data: { guid?: string }, candidate: CampaignDef): boolean {
+    return !!data.guid && !!candidate.guid && candidate.guid !== data.guid;
   }
 
   /**
@@ -411,10 +438,8 @@ export class CampaignService {
    */
   reorderChapters(campaign: CampaignDef, fromIdx: number, toIdx: number): void {
     const chapters = campaign.chapters;
-    if (
-      fromIdx < 0 || fromIdx >= chapters.length ||
-      toIdx   < 0 || toIdx   >= chapters.length
-    ) return;
+    if (this._isIndexOutOfBounds(fromIdx, chapters.length)) return;
+    if (this._isIndexOutOfBounds(toIdx, chapters.length)) return;
     const [moved] = chapters.splice(fromIdx, 1);
     chapters.splice(toIdx, 0, moved);
     this._remapChapterRefsOnCampaignReorder(campaign, fromIdx, toIdx);
@@ -547,10 +572,8 @@ export class CampaignService {
     const chapter = campaign.chapters[chapterIdx];
     if (!chapter) return;
     const levels = chapter.levels;
-    if (
-      fromIdx < 0 || fromIdx >= levels.length ||
-      toIdx   < 0 || toIdx   >= levels.length
-    ) return;
+    if (this._isIndexOutOfBounds(fromIdx, levels.length)) return;
+    if (this._isIndexOutOfBounds(toIdx, levels.length)) return;
     const [moved] = levels.splice(fromIdx, 1);
     levels.splice(toIdx, 0, moved);
     this._remapLevelRefsOnReorder(chapter, fromIdx, toIdx);
@@ -612,13 +635,9 @@ export class CampaignService {
   }
 
   private _validateCampaignShape(raw: Record<string, unknown>): void {
-    if (
-      typeof raw['id'] !== 'string'
-      || !isLocalizedTextShape(raw['name'])
-      || !Array.isArray(raw['chapters'])
-    ) {
-      throw new Error('Invalid campaign file format.');
-    }
+    if (typeof raw['id'] !== 'string') throw new Error('Invalid campaign file format.');
+    if (!isLocalizedTextShape(raw['name'])) throw new Error('Invalid campaign file format.');
+    if (!Array.isArray(raw['chapters'])) throw new Error('Invalid campaign file format.');
   }
 
   private _sanitizeImportedCampaignData(data: CampaignDef): void {
@@ -660,7 +679,7 @@ export class CampaignService {
       // Matched via guid but the id drifted (e.g. a hand-edited file, or two
       // installs that diverged before ever syncing) — keep the local id so
       // progress/star/water records keyed under it stay attached.
-      if (existing.guid && campaign.guid === existing.guid && campaign.id !== existing.id) {
+      if (this._shouldAdoptLocalIdOnGuidMatch(existing, campaign)) {
         campaign.id = existing.id;
       }
       this._campaigns[existingIdx] = campaign;
@@ -668,6 +687,11 @@ export class CampaignService {
       this._campaigns.push(campaign);
     }
     this.save();
+  }
+
+  /** True when both sides share a guid but the id drifted — keep the local id so existing records stay attached. */
+  private _shouldAdoptLocalIdOnGuidMatch(existing: CampaignDef, campaign: CampaignDef): boolean {
+    return !!existing.guid && campaign.guid === existing.guid && campaign.id !== existing.id;
   }
 
   // ── Text-pack (translation-only) import/export ───────────────────────────────
@@ -713,15 +737,15 @@ export class CampaignService {
     if (raw['type'] !== FILE_TYPE_CAMPAIGN_TEXT_PACK) {
       throw new Error('Wrong file type: expected a campaign text-pack file.');
     }
-    if (
-      typeof raw['campaignGuid'] !== 'string'
-      || typeof raw['locale'] !== 'string'
-      || !Array.isArray(raw['chapters'])
-    ) {
-      throw new Error('Invalid campaign text-pack file format.');
-    }
+    this._validateTextPackShape(raw);
     delete raw['type'];
     return raw as unknown as CampaignTextPack;
+  }
+
+  private _validateTextPackShape(raw: Record<string, unknown>): void {
+    if (typeof raw['campaignGuid'] !== 'string') throw new Error('Invalid campaign text-pack file format.');
+    if (typeof raw['locale'] !== 'string') throw new Error('Invalid campaign text-pack file format.');
+    if (!Array.isArray(raw['chapters'])) throw new Error('Invalid campaign text-pack file format.');
   }
 
   /**
@@ -744,11 +768,12 @@ export class CampaignService {
     }
     const overwrite = options?.overwrite === true;
     const result: TextPackMergeResult = { campaign, locale: pack.locale, added: 0, skipped: 0, overwritten: 0, unmatchedNodes: 0 };
+    const ctx: TextPackMergeContext = { locale: pack.locale, overwrite, result };
 
     campaign.name = this._mergeTextField(result, pack.locale, overwrite, campaign.name, pack.campaign.name) ?? campaign.name;
 
     for (const packChapter of pack.chapters) {
-      this._mergeTextPackChapter(campaign, pack.locale, overwrite, result, packChapter);
+      this._mergeTextPackChapter(campaign, ctx, packChapter);
     }
 
     this.touch(campaign);
@@ -773,45 +798,30 @@ export class CampaignService {
     return writeLocalizedText(current, locale, packValue);
   }
 
-  private _mergeTextPackChapter(
-    campaign: CampaignDef,
-    locale: string,
-    overwrite: boolean,
-    result: TextPackMergeResult,
-    packChapter: TextPackChapter,
-  ): void {
+  private _mergeTextPackChapter(campaign: CampaignDef, ctx: TextPackMergeContext, packChapter: TextPackChapter): void {
+    const { locale, overwrite, result } = ctx;
     const chapter = campaign.chapters.find((c) => c.id === packChapter.id);
     if (!chapter) { result.unmatchedNodes++; return; }
     chapter.name = this._mergeTextField(result, locale, overwrite, chapter.name, packChapter.name) ?? chapter.name;
 
     for (const packLevel of packChapter.levels) {
-      this._mergeTextPackLevel(chapter, locale, overwrite, result, packLevel);
+      this._mergeTextPackLevel(chapter, ctx, packLevel);
     }
   }
 
-  private _mergeTextPackLevel(
-    chapter: ChapterDef,
-    locale: string,
-    overwrite: boolean,
-    result: TextPackMergeResult,
-    packLevel: TextPackLevel,
-  ): void {
+  private _mergeTextPackLevel(chapter: ChapterDef, ctx: TextPackMergeContext, packLevel: TextPackLevel): void {
+    const { locale, overwrite, result } = ctx;
     const level = chapter.levels.find((l) => l.id === packLevel.id);
     if (!level) { result.unmatchedNodes++; return; }
     level.name = this._mergeTextField(result, locale, overwrite, level.name, packLevel.name) ?? level.name;
     if (packLevel.note !== undefined) {
       level.note = this._mergeTextField(result, locale, overwrite, level.note, packLevel.note);
     }
-    this._mergeTextPackHints(locale, overwrite, result, level, packLevel);
+    this._mergeTextPackHints(ctx, level, packLevel);
   }
 
-  private _mergeTextPackHints(
-    locale: string,
-    overwrite: boolean,
-    result: TextPackMergeResult,
-    level: LevelDef,
-    packLevel: TextPackLevel,
-  ): void {
+  private _mergeTextPackHints(ctx: TextPackMergeContext, level: LevelDef, packLevel: TextPackLevel): void {
+    const { locale, overwrite, result } = ctx;
     if (packLevel.hints === undefined || level.hints === undefined) return;
     const count = Math.min(packLevel.hints.length, level.hints.length);
     for (let i = 0; i < count; i++) {
