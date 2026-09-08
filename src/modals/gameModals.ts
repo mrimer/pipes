@@ -294,6 +294,33 @@ export function buildSaveProgressNoticeModal(
   return el;
 }
 
+/** Builds the Settings modal's language-selection row (label + locale `<select>`). */
+function _buildSettingsLanguageRow(): HTMLElement {
+  const languageRow = document.createElement('label');
+  languageRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;';
+
+  const languageLabelText = document.createElement('span');
+  languageLabelText.textContent = t('settings.language');
+  languageLabelText.style.cssText = 'color:#eee;font-size:0.9rem;';
+
+  const languageSelect = document.createElement('select');
+  languageSelect.dataset.localeSelect = '1';
+  languageSelect.style.cssText =
+    `font-size:0.9rem;color:#ddd;background:${EDITOR_INPUT_BG};border:1px solid ${UI_INPUT_BORDER};` +
+    'border-radius:6px;padding:4px 8px;';
+  for (const { code, nativeName } of SUPPORTED_LOCALES) {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = nativeName;
+    if (code === getLocale()) opt.selected = true;
+    languageSelect.appendChild(opt);
+  }
+
+  languageRow.appendChild(languageLabelText);
+  languageRow.appendChild(languageSelect);
+  return languageRow;
+}
+
 /**
  * Build and attach the Settings modal.
  *
@@ -338,30 +365,7 @@ export function buildSettingsModal(
   title.textContent = t('settings.title');
   box.appendChild(title);
 
-  // ── Language row ──────────────────────────────────────────────────────────
-  const languageRow = document.createElement('label');
-  languageRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;';
-
-  const languageLabelText = document.createElement('span');
-  languageLabelText.textContent = t('settings.language');
-  languageLabelText.style.cssText = 'color:#eee;font-size:0.9rem;';
-
-  const languageSelect = document.createElement('select');
-  languageSelect.dataset.localeSelect = '1';
-  languageSelect.style.cssText =
-    `font-size:0.9rem;color:#ddd;background:${EDITOR_INPUT_BG};border:1px solid ${UI_INPUT_BORDER};` +
-    'border-radius:6px;padding:4px 8px;';
-  for (const { code, nativeName } of SUPPORTED_LOCALES) {
-    const opt = document.createElement('option');
-    opt.value = code;
-    opt.textContent = nativeName;
-    if (code === getLocale()) opt.selected = true;
-    languageSelect.appendChild(opt);
-  }
-
-  languageRow.appendChild(languageLabelText);
-  languageRow.appendChild(languageSelect);
-  box.appendChild(languageRow);
+  box.appendChild(_buildSettingsLanguageRow());
 
   // ── Sound Effects row ────────────────────────────────────────────────────
   const sfxSection = document.createElement('div');
