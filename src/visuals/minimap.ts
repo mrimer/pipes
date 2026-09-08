@@ -158,85 +158,66 @@ function containerColor(tile: TileDef): string {
     ? CONTAINER_COLOR : PIPE_COLOR;
 }
 
+/** Chamber outline colors keyed by chamberContent, for the contents with a fixed (non-computed) color. */
+const CHAMBER_OUTLINE_COLOR_BY_CONTENT: Partial<Record<string, string>> = {
+  tank: TANK_COLOR,
+  dirt: DIRT_COLOR,
+  heater: HEATER_COLOR,
+  ice: ICE_COLOR,
+  pump: PUMP_COLOR,
+  snow: SNOW_COLOR,
+  hot_plate: HOT_PLATE_COLOR,
+  sandstone: SANDSTONE_COLOR,
+  star: STAR_COLOR,
+};
+
 /** Returns the stroke outline color used to draw any Chamber tile on the minimap.
  *  Matches the color used for the chamber type rectangle on the level screen.
  */
 function chamberOutlineColor(tile: TileDef): string {
-  switch (tile.chamberContent) {
-    case 'tank':      return TANK_COLOR;
-    case 'dirt':      return DIRT_COLOR;
-    case 'item':      return containerColor(tile);
-    case 'heater':    return HEATER_COLOR;
-    case 'ice':       return ICE_COLOR;
-    case 'pump':      return PUMP_COLOR;
-    case 'snow':      return SNOW_COLOR;
-    case 'hot_plate': return HOT_PLATE_COLOR;
-    case 'sandstone': return SANDSTONE_COLOR;
-    case 'star':      return STAR_COLOR;
-    default:          return CHAMBER_COLOR;
-  }
+  if (tile.chamberContent === 'item') return containerColor(tile);
+  return CHAMBER_OUTLINE_COLOR_BY_CONTENT[tile.chamberContent ?? ''] ?? CHAMBER_COLOR;
 }
+
+/** Fixed per-shape fill colors for shapes that don't need floor/chamber-content context. */
+const TILE_COLOR_BY_SHAPE: Partial<Record<PipeShape, string>> = {
+  [PipeShape.Straight]: FIXED_PIPE_BODY_COLOR,
+  [PipeShape.Elbow]: FIXED_PIPE_BODY_COLOR,
+  [PipeShape.Tee]: FIXED_PIPE_BODY_COLOR,
+  [PipeShape.Cross]: FIXED_PIPE_BODY_COLOR,
+  [PipeShape.SpinStraight]: SPINNER_PIPE_BODY_COLOR,
+  [PipeShape.SpinElbow]: SPINNER_PIPE_BODY_COLOR,
+  [PipeShape.SpinTee]: SPINNER_PIPE_BODY_COLOR,
+  [PipeShape.SpinStraightCement]: SPINNER_PIPE_BODY_COLOR,
+  [PipeShape.SpinElbowCement]: SPINNER_PIPE_BODY_COLOR,
+  [PipeShape.SpinTeeCement]: SPINNER_PIPE_BODY_COLOR,
+  [PipeShape.LeakyStraight]: LEAKY_PIPE_COLOR,
+  [PipeShape.LeakyElbow]: LEAKY_PIPE_COLOR,
+  [PipeShape.LeakyTee]: LEAKY_PIPE_COLOR,
+  [PipeShape.LeakyCross]: LEAKY_PIPE_COLOR,
+  [PipeShape.Source]: SOURCE_COLOR,
+  [PipeShape.Sink]: SINK_COLOR,
+  [PipeShape.Granite]: GRANITE_FILL_COLOR,
+  [PipeShape.Cement]: CEMENT_FILL_COLOR,
+  [PipeShape.GoldSpace]: GOLD_SPACE_BASE_COLOR,
+  [PipeShape.GoldStraight]: GOLD_PIPE_COLOR,
+  [PipeShape.GoldElbow]: GOLD_PIPE_COLOR,
+  [PipeShape.GoldTee]: GOLD_PIPE_COLOR,
+  [PipeShape.GoldCross]: GOLD_PIPE_COLOR,
+};
 
 /** Returns the fill color to use for a grid tile on the minimap.
  * Used for drawing a uniform pixel when tile size < MIN_PX_FOR_LINES.
  */
 function tileColor(tile: TileDef | null, r: number, c: number, floorType: PipeShape): string {
-  if (!tile) return ginghamShadeForCell(r, c, floorType);
-  if (isEmptyFloor(tile.shape)) return ginghamShadeForCell(r, c, floorType);
-  switch (tile.shape) {
-    case PipeShape.Straight:
-    case PipeShape.Elbow:
-    case PipeShape.Tee:
-    case PipeShape.Cross:
-      return FIXED_PIPE_BODY_COLOR;
-    case PipeShape.SpinStraight:
-    case PipeShape.SpinElbow:
-    case PipeShape.SpinTee:
-    case PipeShape.SpinStraightCement:
-    case PipeShape.SpinElbowCement:
-    case PipeShape.SpinTeeCement:
-      return SPINNER_PIPE_BODY_COLOR;
-    case PipeShape.LeakyStraight:
-    case PipeShape.LeakyElbow:
-    case PipeShape.LeakyTee:
-    case PipeShape.LeakyCross:
-      return LEAKY_PIPE_COLOR;
-    case PipeShape.Source:
-      return SOURCE_COLOR;
-    case PipeShape.Sink:
-      return SINK_COLOR;
-    case PipeShape.Chamber:
-      switch (tile.chamberContent) {
-        case 'tank':      return TANK_COLOR;
-        case 'dirt':      return DIRT_COLOR;
-        case 'item':      return containerColor(tile);
-        case 'heater':    return HEATER_COLOR;
-        case 'ice':       return ICE_COLOR;
-        case 'pump':      return PUMP_COLOR;
-        case 'snow':      return SNOW_COLOR;
-        case 'hot_plate': return HOT_PLATE_COLOR;
-        case 'sandstone': return SANDSTONE_COLOR;
-        case 'star':      return STAR_COLOR;
-        default:          return CHAMBER_COLOR;
-      }
-    case PipeShape.Granite:
-      return GRANITE_FILL_COLOR;
-    case PipeShape.Sea:
-      return seaColor(floorType);
-    case PipeShape.Cement:
-      return CEMENT_FILL_COLOR;
-    case PipeShape.OneWay:
-      return ginghamShadeForCell(r, c, floorType);
-    case PipeShape.GoldSpace:
-      return GOLD_SPACE_BASE_COLOR;
-    case PipeShape.GoldStraight:
-    case PipeShape.GoldElbow:
-    case PipeShape.GoldTee:
-    case PipeShape.GoldCross:
-      return GOLD_PIPE_COLOR;
-    default:
-      return BG_COLOR;
+  // Empty cells, empty-floor shapes, and OneWay (drawn via its own chevron helper
+  // when large enough, gingham background otherwise) all fall back to gingham.
+  if (!tile || isEmptyFloor(tile.shape) || tile.shape === PipeShape.OneWay) {
+    return ginghamShadeForCell(r, c, floorType);
   }
+  if (tile.shape === PipeShape.Chamber) return chamberOutlineColor(tile);
+  if (tile.shape === PipeShape.Sea) return seaColor(floorType);
+  return TILE_COLOR_BY_SHAPE[tile.shape] ?? BG_COLOR;
 }
 
 /** Minimum tile size (px) needed to draw pipe connection lines instead of a flat fill. */
@@ -308,27 +289,28 @@ function drawOneWayChevron(
   ctx.stroke();
 }
 
+const GOLD_LINE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross,
+]);
+const SPIN_LINE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.SpinStraight, PipeShape.SpinElbow, PipeShape.SpinTee,
+]);
+const SPIN_CEMENT_LINE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.SpinStraightCement, PipeShape.SpinElbowCement, PipeShape.SpinTeeCement,
+]);
+const LEAKY_LINE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.LeakyStraight, PipeShape.LeakyElbow, PipeShape.LeakyTee, PipeShape.LeakyCross,
+]);
+
 /**
  * Returns the background fill and line stroke colors for a pipe tile that will
  * be drawn as connection-line art on the minimap.
  */
 function pipeLineColors(shape: PipeShape): { bg: string; line: string } {
-  if (shape === PipeShape.GoldStraight || shape === PipeShape.GoldElbow ||
-      shape === PipeShape.GoldTee || shape === PipeShape.GoldCross) {
-    return { bg: GOLD_SPACE_BASE_COLOR, line: GOLD_PIPE_COLOR };
-  }
-  if (shape === PipeShape.SpinStraight || shape === PipeShape.SpinElbow ||
-      shape === PipeShape.SpinTee) {
-    return { bg: EMPTY_COLOR, line: SPINNER_PIPE_BODY_COLOR };
-  }
-  if (shape === PipeShape.SpinStraightCement || shape === PipeShape.SpinElbowCement ||
-      shape === PipeShape.SpinTeeCement) {
-    return { bg: CEMENT_FILL_COLOR, line: SPINNER_PIPE_BODY_COLOR };
-  }
-  if (shape === PipeShape.LeakyStraight || shape === PipeShape.LeakyElbow ||
-      shape === PipeShape.LeakyTee || shape === PipeShape.LeakyCross) {
-    return { bg: EMPTY_COLOR, line: LEAKY_PIPE_COLOR };
-  }
+  if (GOLD_LINE_SHAPES.has(shape)) return { bg: GOLD_SPACE_BASE_COLOR, line: GOLD_PIPE_COLOR };
+  if (SPIN_LINE_SHAPES.has(shape)) return { bg: EMPTY_COLOR, line: SPINNER_PIPE_BODY_COLOR };
+  if (SPIN_CEMENT_LINE_SHAPES.has(shape)) return { bg: CEMENT_FILL_COLOR, line: SPINNER_PIPE_BODY_COLOR };
+  if (LEAKY_LINE_SHAPES.has(shape)) return { bg: EMPTY_COLOR, line: LEAKY_PIPE_COLOR };
   return { bg: TILE_BG, line: PIPE_COLOR };
 }
 
@@ -410,6 +392,65 @@ function drawContainer(
   ctx.stroke();
 }
 
+const TREE_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
+]);
+
+/** The style-dependent main color for a Tree/Tree2/Tree3/Tree4 tile. */
+function resolveTreeDrawColor(shape: PipeShape, style: LevelStyle | undefined): string {
+  if (shape === PipeShape.Tree) return treeColor(style);
+  return treeVariantColor(shape, style);
+}
+
+function _isPipeLineTile(tile: TileDef, px: number): boolean {
+  return px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape);
+}
+
+function _isOneWayLineTile(tile: TileDef, px: number): boolean {
+  return px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay;
+}
+
+function _isContainerLineTile(tile: TileDef, px: number): boolean {
+  return px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.Chamber;
+}
+
+/**
+ * Draws `tile` using one of the special-cased renderers (pipe connection-line
+ * art, one-way chevron, tree circle, container outline) when it qualifies for
+ * one. Returns whether it was handled; the caller falls back to a uniform
+ * pixel (`tileColor`) when this returns false.
+ */
+function _drawSpecialMinimapTile(ctx: CanvasRenderingContext2D, tile: TileDef, tx: number, ty: number, px: number, r: number, c: number, floorType: PipeShape, style: LevelStyle | undefined): boolean {
+  if (_isPipeLineTile(tile, px)) {
+    drawPipeLines(ctx, tx, ty, px, tile.shape, tile.rotation ?? 0);
+    return true;
+  }
+  if (_isOneWayLineTile(tile, px)) {
+    drawOneWayChevron(ctx, tx, ty, px, tile.rotation ?? 0, ginghamShadeForCell(r, c, floorType));
+    return true;
+  }
+  if (TREE_SHAPES.has(tile.shape)) {
+    // Fill the cell with the gingham background color first, then draw a circle on top.
+    ctx.fillStyle = ginghamShadeForCell(r, c, floorType);
+    ctx.fillRect(tx, ty, px, px);
+    drawTree(ctx, tx, ty, px, resolveTreeDrawColor(tile.shape, style));
+    return true;
+  }
+  if (_isContainerLineTile(tile, px)) {
+    drawContainer(ctx, tx, ty, px, chamberOutlineColor(tile));
+    return true;
+  }
+  return false;
+}
+
+/** Draws one grid cell of the minimap: a special-cased renderer if the tile qualifies, else a uniform pixel. */
+function drawMinimapTile(ctx: CanvasRenderingContext2D, tile: TileDef | null, tx: number, ty: number, px: number, r: number, c: number, floorType: PipeShape, style: LevelStyle | undefined): void {
+  if (tile !== null && _drawSpecialMinimapTile(ctx, tile, tx, ty, px, r, c, floorType, style)) return;
+  // Draw the tile as a uniform pixel.
+  ctx.fillStyle = tileColor(tile, r, c, floorType);
+  ctx.fillRect(tx, ty, px, px);
+}
+
 /**
  * Render a minimap preview for the given level definition.
  *
@@ -454,26 +495,7 @@ export function renderMinimap(level: LevelDef): HTMLCanvasElement {
       const tx = c * px;
       const ty = r * px;
       const floorType = floorTypes.get(posKey(r, c)) ?? defaultFloor;
-      if (tile && px >= MIN_PX_FOR_LINES && PIPE_SHAPES.has(tile.shape)) {
-        drawPipeLines(ctx, tx, ty, px, tile.shape, (tile.rotation ?? 0));
-      } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.OneWay) {
-        drawOneWayChevron(ctx, tx, ty, px, (tile.rotation ?? 0), ginghamShadeForCell(r, c, floorType));
-      } else if (tile && tile.shape === PipeShape.Tree) {
-        // Fill the cell with the gingham background color first, then draw a circle on top.
-        ctx.fillStyle = ginghamShadeForCell(r, c, floorType);
-        ctx.fillRect(tx, ty, px, px);
-        drawTree(ctx, tx, ty, px, treeColor(style));
-      } else if (tile && (tile.shape === PipeShape.Tree2 || tile.shape === PipeShape.Tree3 || tile.shape === PipeShape.Tree4)) {
-        ctx.fillStyle = ginghamShadeForCell(r, c, floorType);
-        ctx.fillRect(tx, ty, px, px);
-        drawTree(ctx, tx, ty, px, treeVariantColor(tile.shape, style));
-      } else if (tile && px >= MIN_PX_FOR_LINES && tile.shape === PipeShape.Chamber) {
-        drawContainer(ctx, tx, ty, px, chamberOutlineColor(tile));
-      } else {
-        // Draw the tile as a uniform pixel.
-        ctx.fillStyle = tileColor(tile, r, c, floorType);
-        ctx.fillRect(tx, ty, px, px);
-      }
+      drawMinimapTile(ctx, tile, tx, ty, px, r, c, floorType, style);
     }
   }
 
