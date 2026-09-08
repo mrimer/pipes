@@ -2213,7 +2213,7 @@ export abstract class MapScreenBase {
         ? 1 - (age - fadeStart) / MapScreenBase.FLOWER_FADE_MS
         : 1;
       const scale = Math.min(1, age / MapScreenBase.FLOWER_GROW_MS);
-      drawEdgeFlower(ctx, f.x, f.y, f.variant, scale, alpha, swayAngle, f.baseRotation);
+      drawEdgeFlower(ctx, { x: f.x, y: f.y, variant: f.variant, scale, alpha, swayAngle, baseRotation: f.baseRotation });
       i++;
     }
   }

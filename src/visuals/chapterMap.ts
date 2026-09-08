@@ -110,10 +110,12 @@ function _drawLockIcon(
 const _minimapRectCache = new Map<string, { x: number; y: number; width: number; height: number }>();
 
 /** Encode the cache inputs as a single collision-free string key for the minimap rect cache. */
-function _minimapRectKey(tileSize: number, cellX: number, cellY: number, rows: number, cols: number): string {
+function _minimapRectKey(
+  key: { tileSize: number; cellX: number; cellY: number; rows: number; cols: number },
+): string {
   // A string key sidesteps the MAX_SAFE_INTEGER limit a 5-field integer pack
   // would hit (tileSize × cellX magnitudes exceed 2^53).
-  return `${tileSize}:${cellX}:${cellY}:${rows}:${cols}`;
+  return `${key.tileSize}:${key.cellX}:${key.cellY}:${key.rows}:${key.cols}`;
 }
 
 /** Discard all cached {@link computeMinimapRect} entries.
@@ -139,7 +141,7 @@ export function computeMinimapRect(
   cellY: number,
   levelDef: LevelDef,
 ): { x: number; y: number; width: number; height: number } {
-  const cacheKey = _minimapRectKey(TILE_SIZE, cellX, cellY, levelDef.rows, levelDef.cols);
+  const cacheKey = _minimapRectKey({ tileSize: TILE_SIZE, cellX, cellY, rows: levelDef.rows, cols: levelDef.cols });
   const cached = _minimapRectCache.get(cacheKey);
   if (cached) return cached;
 
@@ -202,7 +204,7 @@ export function drawLevelChamberTile(
 
   const isChallenge = levelDef?.challenge ?? false;
 
-  _drawLevelChamberBoxAndStubs(ctx, x, y, cx, cy, half, bw, bh, connections, isFilled, isCompleted, floorType);
+  _drawLevelChamberBoxAndStubs(ctx, { x, y, cx, cy, half, bw, bh, connections, isFilled, isCompleted, floorType });
 
   // Label row height (for the level number text inside the chamber box)
   const labelH = _s(16);
@@ -216,21 +218,21 @@ export function drawLevelChamberTile(
 
   // Level number, optional star icon, optional water score, and optional skull icon in the label row.
   const { showWater, labelColor, showHollowStar, showFilledStar } =
-    _computeLevelChamberLabelState(isCompleted, totalStars, starsCollected, waterScored, isChallenge);
+    _computeLevelChamberLabelState({ isCompleted, totalStars, starsCollected, waterScored, isChallenge });
 
   // Level number text (no "L-" prefix)
   const numText = `${levelNum}`;
 
   const { labelFontSize, waterFontSize } = _fitLevelChamberLabelFontSizes(
-    ctx, bw, numText, isChallenge, showWater, showFilledStar, showHollowStar, starsCollected, waterScored,
+    ctx, { bw, numText, isChallenge, showWater, showFilledStar, showHollowStar, starsCollected, waterScored },
   );
 
-  _drawLevelChamberLabelRow(
-    ctx, boxLeft, boxTop, boxRight, cx, labelFontSize, waterFontSize, labelColor, numText,
+  _drawLevelChamberLabelRow(ctx, {
+    boxLeft, boxTop, boxRight, cx, labelFontSize, waterFontSize, labelColor, numText,
     showFilledStar, showHollowStar, starsCollected, showWater, waterScored, isChallenge,
-  );
+  });
 
-  _drawLevelChamberContent(ctx, x, y, cx, contentY, contentH, isFilled, levelDef);
+  _drawLevelChamberContent(ctx, { x, y, cx, contentY, contentH, isFilled, levelDef });
 }
 
 /**
@@ -239,12 +241,12 @@ export function drawLevelChamberTile(
  * default), and which star icon (hollow takes priority over filled) to show.
  */
 function _computeLevelChamberLabelState(
-  isCompleted: boolean,
-  totalStars: number,
-  starsCollected: number,
-  waterScored: number | undefined,
-  isChallenge: boolean,
+  state: {
+    isCompleted: boolean; totalStars: number; starsCollected: number;
+    waterScored: number | undefined; isChallenge: boolean;
+  },
 ): { showWater: boolean; labelColor: string; showHollowStar: boolean; showFilledStar: boolean } {
+  const { isCompleted, totalStars, starsCollected, waterScored, isChallenge } = state;
   const allStars = totalStars > 0 && starsCollected >= totalStars;
   const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
   const labelColor = _levelChamberLabelColor(allStars, isChallenge);
@@ -273,18 +275,12 @@ function _levelChamberStarFlags(
 /** Draw the chapter-map background/gingham floor and the chamber box + connection stubs. */
 function _drawLevelChamberBoxAndStubs(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  cx: number,
-  cy: number,
-  half: number,
-  bw: number,
-  bh: number,
-  connections: Set<Direction>,
-  isFilled: boolean,
-  isCompleted: boolean,
-  floorType: PipeShape,
+  opts: {
+    x: number; y: number; cx: number; cy: number; half: number; bw: number; bh: number;
+    connections: Set<Direction>; isFilled: boolean; isCompleted: boolean; floorType: PipeShape;
+  },
 ): void {
+  const { x, y, cx, cy, half, bw, bh, connections, isFilled, isCompleted, floorType } = opts;
   const CELL = TILE_SIZE;
   const br = _s(3);
 
@@ -320,15 +316,13 @@ function _drawLevelChamberBoxAndStubs(
  */
 function _fitLevelChamberLabelFontSizes(
   ctx: CanvasRenderingContext2D,
-  bw: number,
-  numText: string,
-  isChallenge: boolean,
-  showWater: boolean,
-  showFilledStar: boolean,
-  showHollowStar: boolean,
-  starsCollected: number,
-  waterScored: number | undefined,
+  opts: {
+    bw: number; numText: string; isChallenge: boolean; showWater: boolean;
+    showFilledStar: boolean; showHollowStar: boolean; starsCollected: number;
+    waterScored: number | undefined;
+  },
 ): { labelFontSize: number; waterFontSize: number } {
+  const { bw, numText, isChallenge, showWater, showFilledStar, showHollowStar, starsCollected, waterScored } = opts;
   let labelFontSize = _s(10);
   let waterFontSize = _s(8);
   if (!showWater && !isChallenge) return { labelFontSize, waterFontSize };
@@ -341,7 +335,7 @@ function _fitLevelChamberLabelFontSizes(
     const starText = showHollowStar ? '☆' : (starsCollected > 1 ? `⭐×${starsCollected}` : '⭐');
     leftW += _s(1) + ctx.measureText(starText).width;
   }
-  const fits = _levelChamberLabelFits(ctx, bw, leftW, labelFontSize, waterFontSize, isChallenge, showWater, waterScored);
+  const fits = _levelChamberLabelFits(ctx, { bw, leftW, labelFontSize, waterFontSize, isChallenge, showWater, waterScored });
   if (!fits) {
     labelFontSize = _s(8);
     waterFontSize = _s(7);
@@ -352,14 +346,12 @@ function _fitLevelChamberLabelFontSizes(
 /** Whether the label row's elements fit the box width at the given (not-yet-shrunk) font sizes. */
 function _levelChamberLabelFits(
   ctx: CanvasRenderingContext2D,
-  bw: number,
-  leftW: number,
-  labelFontSize: number,
-  waterFontSize: number,
-  isChallenge: boolean,
-  showWater: boolean,
-  waterScored: number | undefined,
+  opts: {
+    bw: number; leftW: number; labelFontSize: number; waterFontSize: number;
+    isChallenge: boolean; showWater: boolean; waterScored: number | undefined;
+  },
 ): boolean {
+  const { bw, leftW, labelFontSize, waterFontSize, isChallenge, showWater, waterScored } = opts;
   if (isChallenge && showWater) {
     ctx.font = `${waterFontSize}px Arial`;
     const halfWaterW = ctx.measureText(`💧${waterScored}`).width / 2;
@@ -380,24 +372,58 @@ function _levelChamberLabelFits(
   return true;
 }
 
+/** Draw the star icon inline after the level number, using the ctx's current font to measure numText. */
+function _drawLevelChamberStarIcon(
+  ctx: CanvasRenderingContext2D,
+  opts: { boxLeft: number; boxTop: number; numText: string; showHollowStar: boolean; starsCollected: number },
+): void {
+  const { boxLeft, boxTop, numText, showHollowStar, starsCollected } = opts;
+  const numWidth = ctx.measureText(numText).width;
+  ctx.font = `bold ${_s(9)}px Arial`;
+  if (showHollowStar) {
+    ctx.fillStyle = '#ddd';
+    ctx.fillText('☆', boxLeft + _s(2) + numWidth + _s(1), boxTop + _s(2));
+  } else {
+    ctx.fillStyle = FOCUS_COLOR;
+    const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
+    ctx.fillText(starText, boxLeft + _s(2) + numWidth + _s(1), boxTop + _s(2));
+  }
+}
+
+/** Draw the water score "💧N" – center when skull present, right-aligned otherwise. */
+function _drawLevelChamberWaterScore(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    boxRight: number; boxTop: number; cx: number; waterFontSize: number;
+    isChallenge: boolean; waterScored: number | undefined;
+  },
+): void {
+  const { boxRight, boxTop, cx, waterFontSize, isChallenge, waterScored } = opts;
+  ctx.font = `${waterFontSize}px Arial`;
+  ctx.fillStyle = '#7ec8e3';
+  if (isChallenge) {
+    ctx.textAlign = 'center';
+    ctx.fillText(`💧${waterScored}`, cx, boxTop + _s(2));
+  } else {
+    ctx.textAlign = 'right';
+    ctx.fillText(`💧${waterScored}`, boxRight - _s(2), boxTop + _s(2));
+  }
+}
+
 /** Draw the level number, optional star icon, optional water score, and optional skull icon. */
 function _drawLevelChamberLabelRow(
   ctx: CanvasRenderingContext2D,
-  boxLeft: number,
-  boxTop: number,
-  boxRight: number,
-  cx: number,
-  labelFontSize: number,
-  waterFontSize: number,
-  labelColor: string,
-  numText: string,
-  showFilledStar: boolean,
-  showHollowStar: boolean,
-  starsCollected: number,
-  showWater: boolean,
-  waterScored: number | undefined,
-  isChallenge: boolean,
+  opts: {
+    boxLeft: number; boxTop: number; boxRight: number; cx: number;
+    labelFontSize: number; waterFontSize: number; labelColor: string; numText: string;
+    showFilledStar: boolean; showHollowStar: boolean; starsCollected: number;
+    showWater: boolean; waterScored: number | undefined; isChallenge: boolean;
+  },
 ): void {
+  const {
+    boxLeft, boxTop, boxRight, cx, labelFontSize, waterFontSize, labelColor, numText,
+    showFilledStar, showHollowStar, starsCollected, showWater, waterScored, isChallenge,
+  } = opts;
   ctx.save();
   ctx.textBaseline = 'top';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
@@ -411,29 +437,12 @@ function _drawLevelChamberLabelRow(
 
   // Star icon inline after the level number
   if (showFilledStar || showHollowStar) {
-    const numWidth = ctx.measureText(numText).width;
-    ctx.font = `bold ${_s(9)}px Arial`;
-    if (showHollowStar) {
-      ctx.fillStyle = '#ddd';
-      ctx.fillText('☆', boxLeft + _s(2) + numWidth + _s(1), boxTop + _s(2));
-    } else {
-      ctx.fillStyle = FOCUS_COLOR;
-      const starText = starsCollected > 1 ? `⭐×${starsCollected}` : '⭐';
-      ctx.fillText(starText, boxLeft + _s(2) + numWidth + _s(1), boxTop + _s(2));
-    }
+    _drawLevelChamberStarIcon(ctx, { boxLeft, boxTop, numText, showHollowStar, starsCollected });
   }
 
   // Water score "💧N" – center when skull present, right-aligned otherwise
   if (showWater) {
-    ctx.font = `${waterFontSize}px Arial`;
-    ctx.fillStyle = '#7ec8e3';
-    if (isChallenge) {
-      ctx.textAlign = 'center';
-      ctx.fillText(`💧${waterScored}`, cx, boxTop + _s(2));
-    } else {
-      ctx.textAlign = 'right';
-      ctx.fillText(`💧${waterScored}`, boxRight - _s(2), boxTop + _s(2));
-    }
+    _drawLevelChamberWaterScore(ctx, { boxRight, boxTop, cx, waterFontSize, isChallenge, waterScored });
   }
 
   // Skull icon at top-right for challenge levels
@@ -450,14 +459,12 @@ function _drawLevelChamberLabelRow(
 /** Draw the chamber's content area: lock icon (inaccessible), minimap, or a placeholder. */
 function _drawLevelChamberContent(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  cx: number,
-  contentY: number,
-  contentH: number,
-  isFilled: boolean,
-  levelDef: LevelDef | undefined,
+  opts: {
+    x: number; y: number; cx: number; contentY: number; contentH: number;
+    isFilled: boolean; levelDef: LevelDef | undefined;
+  },
 ): void {
+  const { x, y, cx, contentY, contentH, isFilled, levelDef } = opts;
   // Inaccessible chamber: lock icon instead of minimap.
   if (!isFilled) {
     _drawLockIcon(ctx, cx, contentY + contentH / 2, _s(20));
@@ -496,15 +503,12 @@ function _drawLevelChamberContent(
 
 function drawMapChamberTile(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  _half: number,
-  chamberInfo: MapChamberInfo,
-  connections: Set<Direction>,
-  _buttEndDirs?: ReadonlySet<Direction>,
-  filled = false,
-  floorType: PipeShape = PipeShape.Empty,
+  opts: {
+    x: number; y: number; _half: number; chamberInfo: MapChamberInfo; connections: Set<Direction>;
+    _buttEndDirs?: ReadonlySet<Direction>; filled?: boolean; floorType?: PipeShape;
+  },
 ): void {
+  const { x, y, chamberInfo, connections, filled = false, floorType = PipeShape.Empty } = opts;
   const minimap = chamberInfo.minimap;
   const pseudoLevel: LevelDef | undefined = minimap ? {
     id: -1,
@@ -570,17 +574,13 @@ export function computeChapterFloorTypes(
  */
 function _drawChapterMapEndpointTile(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  r: number,
-  c: number,
-  connections: Set<Direction>,
-  color: string,
-  isSource: boolean,
-  buttEndDirs: Set<Direction> | undefined,
-  centerLabel: { text: string; color: string },
-  floorType: PipeShape = PipeShape.Empty,
+  opts: {
+    x: number; y: number; r: number; c: number; connections: Set<Direction>; color: string;
+    isSource: boolean; buttEndDirs: Set<Direction> | undefined;
+    centerLabel: { text: string; color: string }; floorType?: PipeShape;
+  },
 ): void {
+  const { x, y, r, c, connections, color, isSource, buttEndDirs, centerLabel, floorType = PipeShape.Empty } = opts;
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_TILE_BG;
   ctx.fillRect(x, y, CELL, CELL);
@@ -628,7 +628,10 @@ function _drawChapterMapGranite(
 }
 
 /** Draw Tree tile like in-game. */
-function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+type ChapterMapTreeOpts = { x: number; y: number; r: number; c: number; floorType?: PipeShape; style?: LevelStyle };
+
+function _drawChapterMapTree(ctx: CanvasRenderingContext2D, opts: ChapterMapTreeOpts): void {
+  const { x, y, r, c, floorType = PipeShape.Empty, style } = opts;
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
@@ -640,7 +643,8 @@ function _drawChapterMapTree(ctx: CanvasRenderingContext2D, x: number, y: number
 }
 
 /** Draw Tree 2 tile like in-game. */
-function _drawChapterMapTree2(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+function _drawChapterMapTree2(ctx: CanvasRenderingContext2D, opts: ChapterMapTreeOpts): void {
+  const { x, y, r, c, floorType = PipeShape.Empty, style } = opts;
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
@@ -652,7 +656,8 @@ function _drawChapterMapTree2(ctx: CanvasRenderingContext2D, x: number, y: numbe
 }
 
 /** Draw Tree 3 tile like in-game. */
-function _drawChapterMapTree3(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+function _drawChapterMapTree3(ctx: CanvasRenderingContext2D, opts: ChapterMapTreeOpts): void {
+  const { x, y, r, c, floorType = PipeShape.Empty, style } = opts;
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
@@ -664,7 +669,8 @@ function _drawChapterMapTree3(ctx: CanvasRenderingContext2D, x: number, y: numbe
 }
 
 /** Draw Tree 4 tile like in-game. */
-function _drawChapterMapTree4(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: number, floorType: PipeShape = PipeShape.Empty, style?: LevelStyle): void {
+function _drawChapterMapTree4(ctx: CanvasRenderingContext2D, opts: ChapterMapTreeOpts): void {
+  const { x, y, r, c, floorType = PipeShape.Empty, style } = opts;
   const CELL = TILE_SIZE;
   ctx.fillStyle = CHAPTER_MAP_EMPTY_BG;
   ctx.fillRect(x, y, CELL, CELL);
@@ -709,11 +715,9 @@ function _drawChapterMapSea(
 /** Draw the chapter map grid lines beneath all tile objects. */
 function _renderChapterMapGridLines(
   ctx: CanvasRenderingContext2D,
-  rMin: number,
-  rMax: number,
-  cMin: number,
-  cMax: number,
+  opts: { rMin: number; rMax: number; cMin: number; cMax: number },
 ): void {
+  const { rMin, rMax, cMin, cMax } = opts;
   const CELL = TILE_SIZE;
   ctx.strokeStyle = 'rgba(74,144,217,0.12)';
   ctx.lineWidth = 1;
@@ -820,13 +824,16 @@ function _renderChapterMapPass2NonPipeTiles(
           isAccessible: isFilled,
           bgVariant: levelDef?.challenge ? 'challenge' : totalStars > 0 && stars >= totalStars ? 'gold' : 'default',
         };
-        drawMapChamberTile(ctx, x, y, TILE_SIZE / 2, chamberInfo, connections, undefined, isFilled, floorType);
+        drawMapChamberTile(ctx, { x, y, _half: TILE_SIZE / 2, chamberInfo, connections, _buttEndDirs: undefined, filled: isFilled, floorType });
         if (isJittered) ctx.restore();
       } else if (def.shape === PipeShape.Source) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
         const color = isFilled ? SOURCE_WATER_COLOR : SOURCE_COLOR;
-        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, true, buttEndDirs, { text: String(completedLevelCount), color: '#fff' }, floorType);
+        _drawChapterMapEndpointTile(ctx, {
+          x, y, r, c, connections, color, isSource: true, buttEndDirs,
+          centerLabel: { text: String(completedLevelCount), color: '#fff' }, floorType,
+        });
       } else if (def.shape === PipeShape.Sink) {
         const connections = tileDefConnections(def);
         const buttEndDirs = computeChapterButtEndDirs(grid, rows, cols, r, c, connections);
@@ -835,17 +842,17 @@ function _renderChapterMapPass2NonPipeTiles(
         const centerLabel = remaining === 0 && isFilled
           ? { text: '★', color: '#f0c040' }
           : { text: String(remaining), color: '#fff' };
-        _drawChapterMapEndpointTile(ctx, x, y, r, c, connections, color, false, buttEndDirs, centerLabel, floorType);
+        _drawChapterMapEndpointTile(ctx, { x, y, r, c, connections, color, isSource: false, buttEndDirs, centerLabel, floorType });
       } else if (def.shape === PipeShape.Granite) {
         _drawChapterMapGranite(ctx, x, y, grid, rows, cols, r, c, floorType);
       } else if (def.shape === PipeShape.Tree) {
-        _drawChapterMapTree(ctx, x, y, r, c, floorType, style);
+        _drawChapterMapTree(ctx, { x, y, r, c, floorType, style });
       } else if (def.shape === PipeShape.Tree2) {
-        _drawChapterMapTree2(ctx, x, y, r, c, floorType, style);
+        _drawChapterMapTree2(ctx, { x, y, r, c, floorType, style });
       } else if (def.shape === PipeShape.Tree3) {
-        _drawChapterMapTree3(ctx, x, y, r, c, floorType, style);
+        _drawChapterMapTree3(ctx, { x, y, r, c, floorType, style });
       } else if (def.shape === PipeShape.Tree4) {
-        _drawChapterMapTree4(ctx, x, y, r, c, floorType, style);
+        _drawChapterMapTree4(ctx, { x, y, r, c, floorType, style });
       } else if (def.shape === PipeShape.Sea) {
         _drawChapterMapSea(ctx, x, y, grid, rows, cols, r, c, style);
       }
@@ -944,7 +951,7 @@ export function renderChapterMapCanvas(
   const cMin = viewBounds?.cMin ?? 0;
   const cMax = viewBounds ? Math.min(cols - 1, viewBounds.cMax) : cols - 1;
 
-  _renderChapterMapGridLines(ctx, rMin, rMax, cMin, cMax);
+  _renderChapterMapGridLines(ctx, { rMin, rMax, cMin, cMax });
   _renderChapterMapPass1Backgrounds(ctx, grid, rows, cols, decorations, floorTypes, rMin, rMax, cMin, cMax);
   _renderChapterMapPass2NonPipeTiles(
     ctx, grid, rows, cols, levelDefs, filledKeys, progress, completedLevelCount, jitterCell, floorTypes, style,
@@ -1028,14 +1035,12 @@ const EDGE_FLOWER_CENTER_COLOR = 'rgba(255,230,120,1)';
  */
 export function drawEdgeFlower(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  variant: number,
-  scale: number,
-  alpha: number,
-  swayAngle: number,
-  baseRotation: number,
+  opts: {
+    x: number; y: number; variant: number; scale: number;
+    alpha: number; swayAngle: number; baseRotation: number;
+  },
 ): void {
+  const { x, y, variant, scale, alpha, swayAngle, baseRotation } = opts;
   if (alpha <= 0 || scale <= 0) return;
   const petalColor = EDGE_FLOWER_PETAL_COLORS[variant % EDGE_FLOWER_PETAL_COLORS.length];
   const petals = 5;
