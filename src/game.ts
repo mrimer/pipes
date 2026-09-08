@@ -1160,12 +1160,14 @@ export class Game implements InputCallbacks {
     this._metrics.renderInventoryBar(
       this.board,
       this.selectedShape,
-      (shape, count) => this._input.handleInventoryClick(shape, count),
-      () => this._input.handleInventoryRightClick(),
-      (el, shape, count) => this._input.attachInventoryItemTouchHandlers(el, shape, count),
-      (el, shape) => {
-        el.addEventListener('mousemove', (e) => { this._input.setInventoryHover(shape, e.clientX, e.clientY); });
-        el.addEventListener('mouseleave', () => { this._input.clearInventoryHover(); });
+      {
+        onItemClick: (shape, count) => this._input.handleInventoryClick(shape, count),
+        onItemRightClick: () => this._input.handleInventoryRightClick(),
+        onItemTouch: (el, shape, count) => this._input.attachInventoryItemTouchHandlers(el, shape, count),
+        onItemMouseHandlers: (el, shape) => {
+          el.addEventListener('mousemove', (e) => { this._input.setInventoryHover(shape, e.clientX, e.clientY); });
+          el.addEventListener('mouseleave', () => { this._input.clearInventoryHover(); });
+        },
       },
     );
   }

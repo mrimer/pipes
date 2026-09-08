@@ -15,6 +15,14 @@ const METRIC_SPARKLE_BLUE: readonly string[] = ['#add8e6', '#87ceeb', '#b0e0e6',
 /** Sparkle color palette for frozen metric decreases (red). */
 const METRIC_SPARKLE_RED:  readonly string[] = ['#ff4444', '#ff7777', '#ff9999', '#ff6666', '#ffaaaa', '#cc3333'];
 
+/** Callbacks wired into the inventory bar's item elements by {@link MetricsDisplay.renderInventoryBar}. */
+export interface InventoryBarCallbacks {
+  onItemClick: (shape: PipeShape, count: number) => void;
+  onItemRightClick: () => void;
+  onItemTouch?: (el: HTMLElement, shape: PipeShape, effectiveCount: number) => void;
+  onItemMouseHandlers?: (el: HTMLElement, shape: PipeShape) => void;
+}
+
 /**
  * Manages the play-screen HUD metric displays (water, temperature, frozen, pressure),
  * the best-score box, and the inventory bar (including pending CSS sparkle sets).
@@ -228,17 +236,14 @@ export class MetricsDisplay {
   renderInventoryBar(
     board: Board,
     selectedShape: PipeShape | null,
-    onItemClick: (shape: PipeShape, count: number) => void,
-    onItemRightClick: () => void,
-    onItemTouch?: (el: HTMLElement, shape: PipeShape, effectiveCount: number) => void,
-    onItemMouseHandlers?: (el: HTMLElement, shape: PipeShape) => void,
+    callbacks: InventoryBarCallbacks,
   ): void {
     // Detect inventory items that just dropped to zero effective count.
     const bonuses = board.getContainerBonuses();
     for (const item of board.inventory) {
       const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
       const prev = this._prevInvCounts.get(item.shape) ?? null;
-      if (prev !== null && prev >= 1 && effectiveCount <= 0) {
+      if (MetricsDisplay._justDepletedToZero(prev, effectiveCount)) {
         this._pendingDepletedShapes.add(item.shape);
       }
       this._prevInvCounts.set(item.shape, effectiveCount);
@@ -248,66 +253,52 @@ export class MetricsDisplay {
       this.inventoryBarEl,
       board,
       selectedShape,
-      onItemClick,
-      onItemRightClick,
-      onItemTouch,
-      onItemMouseHandlers,
+      callbacks.onItemClick,
+      callbacks.onItemRightClick,
+      callbacks.onItemTouch,
+      callbacks.onItemMouseHandlers,
     );
-    if (this.pendingSparkleShapes.size > 0) {
-      for (const shape of this.pendingSparkleShapes) {
-        const el = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"]`);
-        if (el) {
-          el.classList.remove('sparkle');
-          void el.offsetWidth; // force reflow to restart the CSS animation
-          el.classList.add('sparkle');
-        }
+    this._applyPendingCssAnim(this.pendingSparkleShapes, (s) => MetricsDisplay._itemSelector(s), 'sparkle');
+    this._applyPendingCssAnim(this.pendingRedSparkleShapes, (s) => MetricsDisplay._itemSelector(s), 'sparkle-red');
+    this._applyPendingCssAnim(this.pendingGraySparkleShapes, (s) => MetricsDisplay._itemSelector(s), 'sparkle-gray');
+    this._applyPendingCssAnim(this._pendingBounceShapes, (s) => MetricsDisplay._itemCountSelector(s), 'inv-count-bounce');
+    this._applyPendingCssAnim(this._pendingDepletedShapes, (s) => MetricsDisplay._itemCountSelector(s), 'inv-count-depleted');
+  }
+
+  /** True when an inventory item's effective count just fell from ≥1 to ≤0. */
+  private static _justDepletedToZero(prevCount: number | null, effectiveCount: number): boolean {
+    return prevCount !== null && prevCount >= 1 && effectiveCount <= 0;
+  }
+
+  /** CSS selector for an inventory item element by shape. */
+  private static _itemSelector(shape: PipeShape): string {
+    return `[data-shape="${shape}"]`;
+  }
+
+  /** CSS selector for an inventory item's count span by shape. */
+  private static _itemCountSelector(shape: PipeShape): string {
+    return `[data-shape="${shape}"] .inv-count`;
+  }
+
+  /**
+   * Restart a CSS animation class on the element matching `selectorFor(shape)`
+   * for every shape in `shapes`, then clear the set.
+   */
+  private _applyPendingCssAnim(
+    shapes: Set<PipeShape>,
+    selectorFor: (shape: PipeShape) => string,
+    className: string,
+  ): void {
+    if (shapes.size === 0) return;
+    for (const shape of shapes) {
+      const el = this.inventoryBarEl.querySelector<HTMLElement>(selectorFor(shape));
+      if (el) {
+        el.classList.remove(className);
+        void el.offsetWidth; // force reflow to restart the CSS animation
+        el.classList.add(className);
       }
-      this.pendingSparkleShapes.clear();
     }
-    if (this.pendingRedSparkleShapes.size > 0) {
-      for (const shape of this.pendingRedSparkleShapes) {
-        const el = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"]`);
-        if (el) {
-          el.classList.remove('sparkle-red');
-          void el.offsetWidth; // force reflow to restart the CSS animation
-          el.classList.add('sparkle-red');
-        }
-      }
-      this.pendingRedSparkleShapes.clear();
-    }
-    if (this.pendingGraySparkleShapes.size > 0) {
-      for (const shape of this.pendingGraySparkleShapes) {
-        const el = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"]`);
-        if (el) {
-          el.classList.remove('sparkle-gray');
-          void el.offsetWidth; // force reflow to restart the CSS animation
-          el.classList.add('sparkle-gray');
-        }
-      }
-      this.pendingGraySparkleShapes.clear();
-    }
-    if (this._pendingBounceShapes.size > 0) {
-      for (const shape of this._pendingBounceShapes) {
-        const span = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"] .inv-count`);
-        if (span) {
-          span.classList.remove('inv-count-bounce');
-          void span.offsetWidth; // force reflow to restart animation
-          span.classList.add('inv-count-bounce');
-        }
-      }
-      this._pendingBounceShapes.clear();
-    }
-    if (this._pendingDepletedShapes.size > 0) {
-      for (const shape of this._pendingDepletedShapes) {
-        const span = this.inventoryBarEl.querySelector<HTMLElement>(`[data-shape="${shape}"] .inv-count`);
-        if (span) {
-          span.classList.remove('inv-count-depleted');
-          void span.offsetWidth;
-          span.classList.add('inv-count-depleted');
-        }
-      }
-      this._pendingDepletedShapes.clear();
-    }
+    shapes.clear();
   }
 
   /**
@@ -320,53 +311,87 @@ export class MetricsDisplay {
     this._suppressNextMetricSparkles = false;
 
     const w = board.getCurrentWater();
-    this.waterValueEl.textContent = `${w}`;
-    let waterColor: string;
-    if (w <= 0)      waterColor = LOW_WATER_COLOR;
-    else if (w <= 5) waterColor = MEDIUM_WATER_COLOR;
-    else             waterColor = WATER_COLOR;
-    this.waterDisplayEl.style.color = waterColor;
-    if (!suppressSparkles && this._prevWater !== null) {
-      if (w > this._prevWater) {
-        // Per design: water sparkles only on increase (water can't meaningfully "decrease" as a good event).
-        MetricsDisplay._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
-      }
-      if (w !== this._prevWater) MetricsDisplay._triggerValueBounce(this.waterValueEl);
-    }
+    this._updateWaterMetric(w, suppressSparkles);
     this._prevWater = w;
 
     const tempValue = board.hasTempRelevantTiles() ? board.getCurrentTemperature() : null;
-    MetricsDisplay._showStatRow(this.tempDisplayEl, this.tempValueEl, tempValue);
-    if (!suppressSparkles && tempValue !== null && this._prevTemp !== null && tempValue !== this._prevTemp) {
-      if (tempValue > this._prevTemp)      MetricsDisplay._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_GOLD);
-      else if (tempValue < this._prevTemp) MetricsDisplay._spawnMetricSparkles(this.tempDisplayEl, METRIC_SPARKLE_BLUE);
-      MetricsDisplay._triggerValueBounce(this.tempValueEl);
-    }
+    this._updateGoldBlueMetricRow(
+      { rowEl: this.tempDisplayEl, valueEl: this.tempValueEl }, tempValue, this._prevTemp, suppressSparkles,
+    );
     this._prevTemp = tempValue;
 
     const frozenValue = board.frozen > 0 ? board.frozen : null;
-    MetricsDisplay._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
-    if (!suppressSparkles) {
-      if (frozenValue !== null && this._prevFrozen !== null && frozenValue !== this._prevFrozen) {
-        if (frozenValue > this._prevFrozen)      MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
-        else if (frozenValue < this._prevFrozen) MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
-        MetricsDisplay._triggerValueBounce(this.frozenValueEl);
-      } else if (frozenValue !== null && this._prevFrozen === null) {
-        // Row just became visible (frozen increased from 0): show sparkle and bounce.
-        MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
-        MetricsDisplay._triggerValueBounce(this.frozenValueEl);
-      }
-    }
+    this._updateFrozenMetricRow(frozenValue, suppressSparkles);
     this._prevFrozen = frozenValue;
 
     const pressureValue = board.hasPressureRelevantTiles() ? board.getCurrentPressure() : null;
-    MetricsDisplay._showStatRow(this.pressureDisplayEl, this.pressureValueEl, pressureValue);
-    if (!suppressSparkles && pressureValue !== null && this._prevPressure !== null && pressureValue !== this._prevPressure) {
-      if (pressureValue > this._prevPressure)      MetricsDisplay._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_GOLD);
-      else if (pressureValue < this._prevPressure) MetricsDisplay._spawnMetricSparkles(this.pressureDisplayEl, METRIC_SPARKLE_BLUE);
-      MetricsDisplay._triggerValueBounce(this.pressureValueEl);
-    }
+    this._updateGoldBlueMetricRow(
+      { rowEl: this.pressureDisplayEl, valueEl: this.pressureValueEl }, pressureValue, this._prevPressure, suppressSparkles,
+    );
     this._prevPressure = pressureValue;
+  }
+
+  /** Water color for the current water count (low/medium/normal threshold). */
+  private static _waterColorFor(w: number): string {
+    if (w <= 0) return LOW_WATER_COLOR;
+    if (w <= 5) return MEDIUM_WATER_COLOR;
+    return WATER_COLOR;
+  }
+
+  /**
+   * Update the water value text/color and its sparkle/bounce (water only sparkles
+   * on increase — per design, water can't meaningfully "decrease" as a good event).
+   */
+  private _updateWaterMetric(w: number, suppressSparkles: boolean): void {
+    this.waterValueEl.textContent = `${w}`;
+    this.waterDisplayEl.style.color = MetricsDisplay._waterColorFor(w);
+    if (suppressSparkles || this._prevWater === null) return;
+    if (w > this._prevWater) MetricsDisplay._spawnMetricSparkles(this.waterDisplayEl, METRIC_SPARKLE_GOLD);
+    if (w !== this._prevWater) MetricsDisplay._triggerValueBounce(this.waterValueEl);
+  }
+
+  /** True when a metric has a comparable prior value it actually changed from (and sparkles aren't suppressed). */
+  private static _hasMetricChange(
+    m: { value: number | null; prevValue: number | null },
+    suppressSparkles: boolean,
+  ): m is { value: number; prevValue: number } {
+    return !suppressSparkles && m.value !== null && m.prevValue !== null && m.value !== m.prevValue;
+  }
+
+  /**
+   * Show/hide a stat row and, on change, spawn a gold sparkle for an increase or
+   * a blue sparkle for a decrease (temperature and pressure share this behavior).
+   */
+  private _updateGoldBlueMetricRow(
+    row: { rowEl: HTMLElement; valueEl: HTMLElement },
+    value: number | null,
+    prevValue: number | null,
+    suppressSparkles: boolean,
+  ): void {
+    MetricsDisplay._showStatRow(row.rowEl, row.valueEl, value);
+    const m = { value, prevValue };
+    if (!MetricsDisplay._hasMetricChange(m, suppressSparkles)) return;
+    if (m.value > m.prevValue)      MetricsDisplay._spawnMetricSparkles(row.rowEl, METRIC_SPARKLE_GOLD);
+    else if (m.value < m.prevValue) MetricsDisplay._spawnMetricSparkles(row.rowEl, METRIC_SPARKLE_BLUE);
+    MetricsDisplay._triggerValueBounce(row.valueEl);
+  }
+
+  /**
+   * Show/hide the frozen stat row and, on change, spawn a blue sparkle for an
+   * increase or a red sparkle for a decrease; also sparkles when the row first
+   * becomes visible (frozen increased from 0).
+   */
+  private _updateFrozenMetricRow(frozenValue: number | null, suppressSparkles: boolean): void {
+    MetricsDisplay._showStatRow(this.frozenDisplayEl, this.frozenValueEl, frozenValue);
+    if (suppressSparkles || frozenValue === null) return;
+    if (this._prevFrozen !== null && frozenValue !== this._prevFrozen) {
+      if (frozenValue > this._prevFrozen)      MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+      else if (frozenValue < this._prevFrozen) MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_RED);
+      MetricsDisplay._triggerValueBounce(this.frozenValueEl);
+    } else if (this._prevFrozen === null) {
+      MetricsDisplay._spawnMetricSparkles(this.frozenDisplayEl, METRIC_SPARKLE_BLUE);
+      MetricsDisplay._triggerValueBounce(this.frozenValueEl);
+    }
   }
 
   /**
