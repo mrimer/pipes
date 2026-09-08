@@ -441,8 +441,12 @@ function canvasPosWithPan(
   const row = Math.floor(gridPxY / tileSize);
   const viewCol = Math.floor(canvasPxX / tileSize);
   const viewRow = Math.floor(canvasPxY / tileSize);
-  if (viewRow < 0 || viewRow >= viewRows || viewCol < 0 || viewCol >= viewCols) return null;
+  if (_isOutOfView(viewRow, viewCol, viewRows, viewCols)) return null;
   return { row, col };
+}
+
+function _isOutOfView(viewRow: number, viewCol: number, viewRows: number, viewCols: number): boolean {
+  return viewRow < 0 || viewRow >= viewRows || viewCol < 0 || viewCol >= viewCols;
 }
 
 describe('pan-aware hit test (pure logic)', () => {
