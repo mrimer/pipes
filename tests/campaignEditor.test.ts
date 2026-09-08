@@ -4305,14 +4305,16 @@ describe('CampaignMapEditorSection – campaign-map canvas context is wired afte
     });
   });
 
+  function _isMockClearable(v: unknown): v is jest.Mock {
+    return v !== null && typeof v === 'function' && 'mockClear' in v;
+  }
+
   beforeEach(() => {
     localStorage.clear();
     document.body.innerHTML = '';
     // Reset all spy call histories before each test.
     Object.values(MOCK_CTX).forEach(v => {
-      if (v !== null && typeof v === 'function' && 'mockClear' in v) {
-        (v as jest.Mock).mockClear();
-      }
+      if (_isMockClearable(v)) v.mockClear();
     });
   });
 
