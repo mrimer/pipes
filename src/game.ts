@@ -1087,7 +1087,9 @@ export class Game implements InputCallbacks {
 
   /** Start the resume-replay driver when a partial-progress entry exists for this level (skipped on restarts/playtesting). */
   private _maybeStartResumeReplay(isUserRestart: boolean, levelId: number): void {
-    if (isUserRestart || this._campaign.isPlaytesting || !this.board) return;
+    if (isUserRestart) return;
+    if (this._campaign.isPlaytesting) return;
+    if (!this.board) return;
     const campaignId = this._campaign.activeCampaign?.id ?? '';
     const partial = getPartialProgressFor(campaignId, levelId);
     if (!partial || partial.moves.length === 0) return;
@@ -2067,18 +2069,20 @@ export class Game implements InputCallbacks {
     let hasPickup = false;
     for (const key of filledAfter) {
       if (filledBefore.has(key)) continue;
-      const [r, c] = parseKey(key);
-      const tile = board.grid[r]?.[c];
-      if (this._isPickupableItemTile(tile)) {
-        if (GOLD_PIPE_SHAPES.has(tile.itemShape!)) { // eslint-disable-line @typescript-eslint/no-non-null-assertion -- itemShape is non-null here, guarded by _isPickupableItemTile() above
-          sfxManager.play(SfxId.Gold);
-          return;
-        } else if (tile.itemCount > 0) {
-          hasPickup = true;
-        }
-      }
+      const outcome = this._classifyNewlyConnectedPickup(board, key);
+      if (outcome === 'gold') { sfxManager.play(SfxId.Gold); return; }
+      if (outcome === 'pickup') hasPickup = true;
     }
     if (hasPickup) sfxManager.play(SfxId.Pickup);
+  }
+
+  /** Classify a newly-connected board position for {@link _playGoldSfxIfNeeded}'s gold-vs-pickup sfx choice. */
+  private _classifyNewlyConnectedPickup(board: Board, key: string): 'gold' | 'pickup' | 'none' {
+    const [r, c] = parseKey(key);
+    const tile = board.grid[r]?.[c];
+    if (!this._isPickupableItemTile(tile)) return 'none';
+    if (GOLD_PIPE_SHAPES.has(tile.itemShape!)) return 'gold'; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- itemShape is non-null here, guarded by _isPickupableItemTile() above
+    return tile.itemCount > 0 ? 'pickup' : 'none';
   }
 
   /**
@@ -2161,25 +2165,34 @@ export class Game implements InputCallbacks {
   /** Ordered list of selectable shapes (positive effective count), matching the inventory bar's visual order. */
   private _buildAvailableInventoryShapes(board: Board): PipeShape[] {
     const bonuses = board.getContainerBonuses();
+    const seen = new Set<PipeShape>();
 
     // Build the ordered list of selectable shapes, exactly as rendered by the
     // inventory bar, so the visual order and the cycling order agree.
     // Shapes with a zero or negative effective count are skipped.
-    const available: PipeShape[] = [];
-    const seen = new Set<PipeShape>();
+    const available = this._collectBaseInventoryShapes(board, bonuses, seen);
+    available.push(...this._collectBonusOnlyShapes(bonuses, seen));
+    return available;
+  }
 
+  /** Base-inventory shapes with positive effective count, recording each shape into `seen`. */
+  private _collectBaseInventoryShapes(board: Board, bonuses: Map<PipeShape, number>, seen: Set<PipeShape>): PipeShape[] {
+    const available: PipeShape[] = [];
     for (const item of board.inventory) {
       seen.add(item.shape);
       const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
       if (effectiveCount > 0) available.push(item.shape);
     }
+    return available;
+  }
 
-    // Shapes that are only available via container bonuses (not in base inventory).
+  /** Shapes that are only available via container bonuses (not in base inventory). */
+  private _collectBonusOnlyShapes(bonuses: Map<PipeShape, number>, seen: Set<PipeShape>): PipeShape[] {
+    const available: PipeShape[] = [];
     for (const [bonusShape, bonusCount] of bonuses) {
       if (seen.has(bonusShape)) continue;
       if (bonusCount > 0) available.push(bonusShape);
     }
-
     return available;
   }
 
@@ -2519,20 +2532,35 @@ export class Game implements InputCallbacks {
 
   /** Diff two placed-tile snapshots and spawn undo/redo flash effects on changed tiles. */
   private _spawnUndoFlashes(before: Set<string>, after: Set<string>): void {
-    const flashes: Array<{ row: number; col: number; type: 'add' | 'remove' }> = [];
+    const flashes: Array<{ row: number; col: number; type: 'add' | 'remove' }> = [
+      ...this._collectRemovedTileFlashes(before, after),
+      ...this._collectAddedTileFlashes(before, after),
+    ];
+    if (flashes.length > 0) this._animMgr.spawnUndoFlashes(flashes);
+  }
+
+  /** Flashes for tiles present in `before` but no longer in `after`. */
+  private _collectRemovedTileFlashes(before: Set<string>, after: Set<string>): Array<{ row: number; col: number; type: 'remove' }> {
+    const flashes: Array<{ row: number; col: number; type: 'remove' }> = [];
     for (const key of before) {
       if (!after.has(key)) {
         const [row, col] = parseKey(key);
         flashes.push({ row, col, type: 'remove' });
       }
     }
+    return flashes;
+  }
+
+  /** Flashes for tiles present in `after` but not in `before`. */
+  private _collectAddedTileFlashes(before: Set<string>, after: Set<string>): Array<{ row: number; col: number; type: 'add' }> {
+    const flashes: Array<{ row: number; col: number; type: 'add' }> = [];
     for (const key of after) {
       if (!before.has(key)) {
         const [row, col] = parseKey(key);
         flashes.push({ row, col, type: 'add' });
       }
     }
-    if (flashes.length > 0) this._animMgr.spawnUndoFlashes(flashes);
+    return flashes;
   }
 
   /**
