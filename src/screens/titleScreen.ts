@@ -194,6 +194,43 @@ function deltaForDirection(direction: Direction): readonly [number, number] {
   return DIRECTION_TO_DELTA.get(direction) ?? [0, 0];
 }
 
+/** degree === 3: exactly one of N/E/S/W is missing. */
+function _pipeShapeForDegree3(hasN: boolean, hasE: boolean, hasW: boolean): { shape: PipeShape; rotation: Rotation } {
+  if (!hasW) return { shape: PipeShape.Tee, rotation: 0 };
+  if (!hasN) return { shape: PipeShape.Tee, rotation: 90 };
+  if (!hasE) return { shape: PipeShape.Tee, rotation: 180 };
+  return { shape: PipeShape.Tee, rotation: 270 };
+}
+
+/** degree === 2: true for a straight-through pair (N+S or E+W), false for an elbow pair. */
+function _isStraightPairDegree2(hasN: boolean, hasS: boolean, hasE: boolean, hasW: boolean): boolean {
+  return (hasN && hasS) || (hasE && hasW);
+}
+
+/** degree === 2, elbow case: the rotation for whichever adjacent pair of directions is present. */
+function _elbowRotationForDegree2(hasN: boolean, hasE: boolean, hasS: boolean, hasW: boolean): Rotation {
+  if (hasN && hasE) return 0;
+  if (hasE && hasS) return 90;
+  if (hasS && hasW) return 180;
+  return 270;
+}
+
+/** degree === 2: either a straight-through pair (N+S or E+W) or an elbow pair. */
+function _pipeShapeForDegree2(hasN: boolean, hasE: boolean, hasS: boolean, hasW: boolean): { shape: PipeShape; rotation: Rotation } {
+  if (_isStraightPairDegree2(hasN, hasS, hasE, hasW)) {
+    return { shape: PipeShape.Straight, rotation: hasN ? 0 : 90 };
+  }
+  return { shape: PipeShape.Elbow, rotation: _elbowRotationForDegree2(hasN, hasE, hasS, hasW) };
+}
+
+/** degree <= 1: a single stub (or none), oriented horizontally or vertically. */
+function _pipeShapeForDegree1(hasE: boolean, hasW: boolean): { shape: PipeShape; rotation: Rotation } {
+  if (hasE || hasW) {
+    return { shape: PipeShape.Straight, rotation: 90 };
+  }
+  return { shape: PipeShape.Straight, rotation: 0 };
+}
+
 function pipeShapeFromDirections(directions: ReadonlySet<Direction>): { shape: PipeShape; rotation: Rotation } {
   const hasN = directions.has(Direction.North);
   const hasE = directions.has(Direction.East);
@@ -201,28 +238,48 @@ function pipeShapeFromDirections(directions: ReadonlySet<Direction>): { shape: P
   const hasW = directions.has(Direction.West);
   const degree = directions.size;
 
-  if (degree >= 4) {
-    return { shape: PipeShape.Cross, rotation: 0 };
-  }
-  if (degree === 3) {
-    if (!hasW) return { shape: PipeShape.Tee, rotation: 0 };
-    if (!hasN) return { shape: PipeShape.Tee, rotation: 90 };
-    if (!hasE) return { shape: PipeShape.Tee, rotation: 180 };
-    return { shape: PipeShape.Tee, rotation: 270 };
-  }
-  if (degree === 2) {
-    if ((hasN && hasS) || (hasE && hasW)) {
-      return { shape: PipeShape.Straight, rotation: hasN ? 0 : 90 };
+  if (degree >= 4) return { shape: PipeShape.Cross, rotation: 0 };
+  if (degree === 3) return _pipeShapeForDegree3(hasN, hasE, hasW);
+  if (degree === 2) return _pipeShapeForDegree2(hasN, hasE, hasS, hasW);
+  return _pipeShapeForDegree1(hasE, hasW);
+}
+
+/** The set of occupied glyph-bitmap cells for one letter, keyed by `key(row, col)` (col offset by `colOffset`). */
+function _buildOccupiedSetForGlyph(glyph: readonly string[], colOffset: number): Set<string> {
+  const occupied = new Set<string>();
+  for (let row = 0; row < glyph.length; row++) {
+    const rowText = glyph[row];
+    for (let col = 0; col < rowText.length; col++) {
+      if (rowText[col] === '1') {
+        occupied.add(key(row, colOffset + col));
+      }
     }
-    if (hasN && hasE) return { shape: PipeShape.Elbow, rotation: 0 };
-    if (hasE && hasS) return { shape: PipeShape.Elbow, rotation: 90 };
-    if (hasS && hasW) return { shape: PipeShape.Elbow, rotation: 180 };
-    return { shape: PipeShape.Elbow, rotation: 270 };
   }
-  if (hasE || hasW) {
-    return { shape: PipeShape.Straight, rotation: 90 };
+  return occupied;
+}
+
+/** Which cardinal directions have an occupied neighbor cell. */
+function _computeCellDirections(occupied: ReadonlySet<string>, row: number, col: number): Set<Direction> {
+  const directions = new Set<Direction>();
+  for (const [direction, dr, dc] of DIRECTION_DELTAS) {
+    if (occupied.has(key(row + dr, col + dc))) {
+      directions.add(direction);
+    }
   }
-  return { shape: PipeShape.Straight, rotation: 0 };
+  return directions;
+}
+
+/** Build all GlyphCells for one letter's occupied bitmap. */
+function _buildGlyphCellsForLetter(glyph: readonly string[], colOffset: number, letterIndex: number): GlyphCell[] {
+  const occupied = _buildOccupiedSetForGlyph(glyph, colOffset);
+  const cells: GlyphCell[] = [];
+  for (const posKey of occupied) {
+    const { row, col } = decodeKey(posKey);
+    const directions = _computeCellDirections(occupied, row, col);
+    const { shape, rotation } = pipeShapeFromDirections(directions);
+    cells.push({ row, col, letterIndex, directions, shape, rotation });
+  }
+  return cells;
 }
 
 export function buildTitleGlyphLayout(text = TITLE_TEXT): GlyphLayout {
@@ -246,27 +303,7 @@ export function buildTitleGlyphLayout(text = TITLE_TEXT): GlyphLayout {
     }
     seenLetter = true;
 
-    const occupied = new Set<string>();
-    for (let row = 0; row < glyph.length; row++) {
-      const rowText = glyph[row];
-      for (let col = 0; col < rowText.length; col++) {
-        if (rowText[col] === '1') {
-          occupied.add(key(row, colOffset + col));
-        }
-      }
-    }
-
-    for (const posKey of occupied) {
-      const { row, col } = decodeKey(posKey);
-      const directions = new Set<Direction>();
-      for (const [direction, dr, dc] of DIRECTION_DELTAS) {
-        if (occupied.has(key(row + dr, col + dc))) {
-          directions.add(direction);
-        }
-      }
-      const { shape, rotation } = pipeShapeFromDirections(directions);
-      cells.push({ row, col, letterIndex, directions, shape, rotation });
-    }
+    cells.push(..._buildGlyphCellsForLetter(glyph, colOffset, letterIndex));
 
     letterIndex++;
     colOffset += glyph[0]?.length ?? 0;
@@ -280,6 +317,63 @@ export function buildTitleGlyphLayout(text = TITLE_TEXT): GlyphLayout {
   };
 }
 
+/** Append `value` to the array stored at `key` in `map`, creating it if absent. */
+function _pushToBucket<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const existing = map.get(key);
+  if (existing) {
+    existing.push(value);
+  } else {
+    map.set(key, [value]);
+  }
+}
+
+/** True when `neighbor` is reachable from `current` by traversing `direction` (same letter, connections match up). */
+function _isTraversableNeighbor(current: GlyphCell, neighbor: GlyphCell | undefined, direction: Direction): boolean {
+  return (
+    !!neighbor &&
+    neighbor.letterIndex === current.letterIndex &&
+    neighbor.directions.has(oppositeDirection(direction))
+  );
+}
+
+/**
+ * BFS outward from one letter's top-left-most cell along its pipe connections,
+ * recording each reached cell's depth. Used to stagger the fill animation.
+ */
+function _computeLetterCellDepths(
+  letterCells: readonly GlyphCell[],
+  cellLookup: ReadonlyMap<string, GlyphCell>,
+): { depths: Map<string, number>; maxDepth: number } {
+  const depths = new Map<string, number>();
+  if (letterCells.length === 0) return { depths, maxDepth: 0 };
+
+  const sorted = [...letterCells].sort((a, b) => (a.row - b.row) || (a.col - b.col));
+  const start = sorted[0];
+  const startKey = key(start.row, start.col);
+  const queue: Array<{ encoded: string; depth: number }> = [{ encoded: startKey, depth: 0 }];
+  const seen = new Set<string>([startKey]);
+  let maxDepth = 0;
+
+  for (let qi = 0; qi < queue.length; qi++) {
+    const { encoded, depth } = queue[qi];
+    depths.set(encoded, depth);
+    if (depth > maxDepth) maxDepth = depth;
+    const current = cellLookup.get(encoded);
+    if (!current) continue;
+    for (const direction of current.directions) {
+      const [dr, dc] = deltaForDirection(direction);
+      const nextKey = key(current.row + dr, current.col + dc);
+      if (seen.has(nextKey)) continue;
+      const neighbor = cellLookup.get(nextKey);
+      if (!_isTraversableNeighbor(current, neighbor, direction)) continue;
+      seen.add(nextKey);
+      queue.push({ encoded: nextKey, depth: depth + 1 });
+    }
+  }
+
+  return { depths, maxDepth };
+}
+
 function buildLetterDepthMap(layout: GlyphLayout): {
   readonly depths: Map<string, number>;
   readonly letterStarts: readonly number[];
@@ -287,12 +381,7 @@ function buildLetterDepthMap(layout: GlyphLayout): {
 } {
   const byLetter = new Map<number, GlyphCell[]>();
   for (const cell of layout.cells) {
-    const existing = byLetter.get(cell.letterIndex);
-    if (existing) {
-      existing.push(cell);
-    } else {
-      byLetter.set(cell.letterIndex, [cell]);
-    }
+    _pushToBucket(byLetter, cell.letterIndex, cell);
   }
 
   const cellLookup = new Map<string, GlyphCell>();
@@ -306,33 +395,11 @@ function buildLetterDepthMap(layout: GlyphLayout): {
   for (let i = 0; i < layout.letterCount; i++) {
     letterStarts.push(currentStart);
     const letterCells = byLetter.get(i) ?? [];
-    if (letterCells.length === 0) continue;
-    const sorted = [...letterCells].sort((a, b) => (a.row - b.row) || (a.col - b.col));
-    const start = sorted[0];
-    const startKey = key(start.row, start.col);
-    const queue: Array<{ encoded: string; depth: number }> = [{ encoded: startKey, depth: 0 }];
-    const seen = new Set<string>([startKey]);
-    let maxDepth = 0;
-
-    for (let qi = 0; qi < queue.length; qi++) {
-      const { encoded, depth } = queue[qi];
-      depths.set(encoded, depth);
-      if (depth > maxDepth) maxDepth = depth;
-      const current = cellLookup.get(encoded);
-      if (!current) continue;
-      for (const direction of current.directions) {
-        const [dr, dc] = deltaForDirection(direction);
-        const nextKey = key(current.row + dr, current.col + dc);
-        if (seen.has(nextKey)) continue;
-        const neighbor = cellLookup.get(nextKey);
-        if (!neighbor || neighbor.letterIndex !== i) continue;
-        if (!neighbor.directions.has(oppositeDirection(direction))) continue;
-        seen.add(nextKey);
-        queue.push({ encoded: nextKey, depth: depth + 1 });
-      }
+    const { depths: letterDepths, maxDepth } = _computeLetterCellDepths(letterCells, cellLookup);
+    for (const [encoded, depth] of letterDepths) depths.set(encoded, depth);
+    if (letterCells.length > 0) {
+      currentStart += (maxDepth + 1) * LETTER_FILL_STEP_MS + LETTER_GAP_MS;
     }
-
-    currentStart += (maxDepth + 1) * LETTER_FILL_STEP_MS + LETTER_GAP_MS;
   }
 
   return { depths, letterStarts, allLettersDoneAt: currentStart };
@@ -374,12 +441,7 @@ function collectLetterBottomCells(layout: GlyphLayout): Map<number, GlyphCell[]>
     if (cellLookup.has(below)) {
       continue;
     }
-    const existing = byLetter.get(cell.letterIndex);
-    if (existing) {
-      existing.push(cell);
-    } else {
-      byLetter.set(cell.letterIndex, [cell]);
-    }
+    _pushToBucket(byLetter, cell.letterIndex, cell);
   }
   return byLetter;
 }
@@ -536,11 +598,8 @@ export function showIntroTitleScreen(): Promise<void> {
       sfxManager.play(SfxId.UIConfirm);
     };
 
-    const draw = (now: number) => {
-      if (cleaned) return;
-      const dt = Math.max(0, Math.min(0.05, (now - lastFrameMs) / 1000));
-      lastFrameMs = now;
-      const elapsed = now - startMs;
+    /** Resize the backing canvas to the current viewport/DPR if needed; returns the CSS-pixel viewport size. */
+    const resizeCanvasIfNeeded = (): { width: number; height: number } => {
       const rawDpr = typeof window.devicePixelRatio === 'number' ? window.devicePixelRatio : 1;
       const dpr = Math.max(1, Math.floor(rawDpr));
       const width = Math.max(1, Math.floor(window.innerWidth));
@@ -549,14 +608,15 @@ export function showIntroTitleScreen(): Promise<void> {
         canvas.width = width * dpr;
         canvas.height = height * dpr;
       }
-
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = BG_COLOR;
-      ctx.fillRect(0, 0, width, height);
+      return { width, height };
+    };
 
-      // Logo is a single wide row – give it most of the viewport width and
-      // up to ~55% of the height so tiles can be generously sized on landscape.
+    /**
+     * Logo is a single wide row – give it most of the viewport width and
+     * up to ~55% of the height so tiles can be generously sized on landscape.
+     */
+    const computeLayoutGeometry = (width: number, height: number) => {
       const availableWidth = Math.max(1, width * 0.96);
       const availableHeight = Math.max(1, height * 0.55);
       const tileSize = Math.max(
@@ -577,27 +637,34 @@ export function showIntroTitleScreen(): Promise<void> {
       const originY = Math.floor(height * 0.16);
       const half = tileSize / 2;
       const pad = Math.max(1, Math.floor(tileSize * TILE_PADDING_RATIO));
+      return { tileSize, titleWidth, titleHeight, originX, originY, half, pad };
+    };
+    type FrameGeometry = ReturnType<typeof computeLayoutGeometry>;
 
+    const drawGlyphCells = (geom: FrameGeometry, elapsed: number): void => {
       for (const cell of layout.cells) {
         const cellKey = key(cell.row, cell.col);
         const depth = flow.depths.get(cellKey) ?? 0;
         const letterStart = flow.letterStarts[cell.letterIndex] ?? 0;
         const isFilled = elapsed >= letterStart + depth * LETTER_FILL_STEP_MS;
-        const x = originX + cell.col * tileSize;
-        const y = originY + cell.row * tileSize;
+        const x = geom.originX + cell.col * geom.tileSize;
+        const y = geom.originY + cell.row * geom.tileSize;
         ctx.fillStyle = TILE_BG;
-        ctx.fillRect(x + pad, y + pad, tileSize - pad * 2, tileSize - pad * 2);
+        ctx.fillRect(x + geom.pad, y + geom.pad, geom.tileSize - geom.pad * 2, geom.tileSize - geom.pad * 2);
 
         ctx.save();
-        ctx.translate(x + half, y + half);
+        ctx.translate(x + geom.half, y + geom.half);
         ctx.rotate((cell.rotation * Math.PI) / 180);
         const fillColor = isFilled
           ? (cell.letterIndex < COOL_LETTER_COUNT ? LABEL_COLOR : WATER_COLOR)
           : PIPE_COLOR;
-        drawPipeBody(ctx, { shape: cell.shape, half: half - pad, localButtEndDirs: undefined, fillColor });
+        drawPipeBody(ctx, { shape: cell.shape, half: geom.half - geom.pad, localButtEndDirs: undefined, fillColor });
         ctx.restore();
       }
+    };
 
+    /** Advance droplet physics and drop any that have fallen past the bottom of the viewport. */
+    const updateDroplets = (height: number, dt: number): void => {
       for (let i = droplets.length - 1; i >= 0; i--) {
         const droplet = droplets[i];
         droplet.vy += DROPLET_FALL_ACCEL_PX * dt;
@@ -606,91 +673,150 @@ export function showIntroTitleScreen(): Promise<void> {
           droplets.splice(i, 1);
         }
       }
+    };
 
-      for (const icicle of icicles) {
-        if (icicle.fallenOffscreen) continue;
-
-        const growth = clamp01((elapsed - icicle.growthStartMs) / Math.max(1, icicle.growthDurationMs));
-        const currentLength = Math.max(0, tileSize * icicle.maxLengthRatio * growth);
-        const currentHalfWidth = Math.max(0, tileSize * icicle.maxHalfWidthRatio * growth);
-        const anchorX = originX + (icicle.col + 0.5 + icicle.anchorOffsetRatio * 0.34) * tileSize;
-        const anchorY = originY + (icicle.row + 1) * tileSize - pad * 0.2;
-
-        if (exiting && !icicle.detached && elapsed >= exitElapsedMs + icicle.detachDelayMs) {
-          icicle.detached = true;
-          icicle.detachedAtMs = elapsed;
-          icicle.detachedX = anchorX;
-          icicle.detachedY = anchorY;
-          icicle.detachedLength = currentLength;
-          icicle.detachedHalfWidth = currentHalfWidth;
-        }
-
-        if (!icicle.detached) {
-          if (currentLength > 0.5 && currentHalfWidth > 0.5) {
-            ctx.fillStyle = LABEL_COLOR;
-            ctx.beginPath();
-            ctx.moveTo(anchorX - currentHalfWidth, anchorY);
-            ctx.lineTo(anchorX + currentHalfWidth, anchorY);
-            ctx.lineTo(anchorX, anchorY + currentLength);
-            ctx.closePath();
-            ctx.fill();
-          }
-
-          if (!exiting && growth >= 1) {
-            while (elapsed >= icicle.nextDropMs) {
-              droplets.push({
-                x: anchorX + randomRange(-DROPLET_MAX_JITTER_X_RATIO, DROPLET_MAX_JITTER_X_RATIO, random) * tileSize,
-                y: anchorY + currentLength,
-                vy: randomRange(DROPLET_MIN_SPEED_RATIO, DROPLET_MAX_SPEED_RATIO, random) * tileSize,
-                radius: randomRange(DROPLET_MIN_RADIUS_RATIO, DROPLET_MAX_RADIUS_RATIO, random) * tileSize,
-              });
-              icicle.nextDropMs += icicle.dropIntervalMs;
-            }
-          }
-          continue;
-        }
-
-        const fallSeconds = Math.max(0, (elapsed - icicle.detachedAtMs) / 1000);
-        const detachedX = icicle.detachedX + icicle.driftSpeedRatio * tileSize * fallSeconds;
-        const detachedY = icicle.detachedY
-          + (icicle.fallSpeedRatio * tileSize) * fallSeconds
-          + 0.5 * ICICLE_FALL_ACCEL_PX * fallSeconds * fallSeconds;
-        const detachedLength = Math.max(1, icicle.detachedLength);
-        const detachedHalfWidth = Math.max(1, icicle.detachedHalfWidth);
-        if (detachedY - detachedHalfWidth > height + detachedLength + ICICLE_OFFSCREEN_MARGIN) {
-          icicle.fallenOffscreen = true;
-          continue;
-        }
-        ctx.fillStyle = LABEL_COLOR;
+    const drawDroplets = (): void => {
+      if (droplets.length === 0) return;
+      ctx.fillStyle = WATER_COLOR;
+      for (const droplet of droplets) {
         ctx.beginPath();
-        ctx.moveTo(detachedX - detachedHalfWidth, detachedY);
-        ctx.lineTo(detachedX + detachedHalfWidth, detachedY);
-        ctx.lineTo(detachedX, detachedY + detachedLength);
-        ctx.closePath();
+        ctx.arc(droplet.x, droplet.y, droplet.radius, 0, Math.PI * 2);
         ctx.fill();
       }
+    };
 
-      if (droplets.length > 0) {
-        ctx.fillStyle = WATER_COLOR;
-        for (const droplet of droplets) {
-          ctx.beginPath();
-          ctx.arc(droplet.x, droplet.y, droplet.radius, 0, Math.PI * 2);
-          ctx.fill();
-        }
+    /** Transition an icicle from growing to detached-and-falling once the exit sequence reaches it. */
+    const maybeDetachIcicle = (
+      icicle: IntroIcicleState,
+      anchorX: number,
+      anchorY: number,
+      currentLength: number,
+      currentHalfWidth: number,
+      elapsed: number,
+    ): void => {
+      if (!exiting) return;
+      if (icicle.detached) return;
+      if (elapsed < exitElapsedMs + icicle.detachDelayMs) return;
+      icicle.detached = true;
+      icicle.detachedAtMs = elapsed;
+      icicle.detachedX = anchorX;
+      icicle.detachedY = anchorY;
+      icicle.detachedLength = currentLength;
+      icicle.detachedHalfWidth = currentHalfWidth;
+    };
+
+    const drawGrowingIcicle = (anchorX: number, anchorY: number, currentLength: number, currentHalfWidth: number): void => {
+      if (currentLength <= 0.5 || currentHalfWidth <= 0.5) return;
+      ctx.fillStyle = LABEL_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(anchorX - currentHalfWidth, anchorY);
+      ctx.lineTo(anchorX + currentHalfWidth, anchorY);
+      ctx.lineTo(anchorX, anchorY + currentLength);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const spawnDropletsFromIcicle = (
+      icicle: IntroIcicleState,
+      anchorX: number,
+      anchorY: number,
+      currentLength: number,
+      tileSize: number,
+      growth: number,
+      elapsed: number,
+    ): void => {
+      if (exiting) return;
+      if (growth < 1) return;
+      while (elapsed >= icicle.nextDropMs) {
+        droplets.push({
+          x: anchorX + randomRange(-DROPLET_MAX_JITTER_X_RATIO, DROPLET_MAX_JITTER_X_RATIO, random) * tileSize,
+          y: anchorY + currentLength,
+          vy: randomRange(DROPLET_MIN_SPEED_RATIO, DROPLET_MAX_SPEED_RATIO, random) * tileSize,
+          radius: randomRange(DROPLET_MIN_RADIUS_RATIO, DROPLET_MAX_RADIUS_RATIO, random) * tileSize,
+        });
+        icicle.nextDropMs += icicle.dropIntervalMs;
+      }
+    };
+
+    const drawFallingIcicle = (icicle: IntroIcicleState, height: number, tileSize: number, elapsed: number): void => {
+      const fallSeconds = Math.max(0, (elapsed - icicle.detachedAtMs) / 1000);
+      const detachedX = icicle.detachedX + icicle.driftSpeedRatio * tileSize * fallSeconds;
+      const detachedY = icicle.detachedY
+        + (icicle.fallSpeedRatio * tileSize) * fallSeconds
+        + 0.5 * ICICLE_FALL_ACCEL_PX * fallSeconds * fallSeconds;
+      const detachedLength = Math.max(1, icicle.detachedLength);
+      const detachedHalfWidth = Math.max(1, icicle.detachedHalfWidth);
+      if (detachedY - detachedHalfWidth > height + detachedLength + ICICLE_OFFSCREEN_MARGIN) {
+        icicle.fallenOffscreen = true;
+        return;
+      }
+      ctx.fillStyle = LABEL_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(detachedX - detachedHalfWidth, detachedY);
+      ctx.lineTo(detachedX + detachedHalfWidth, detachedY);
+      ctx.lineTo(detachedX, detachedY + detachedLength);
+      ctx.closePath();
+      ctx.fill();
+    };
+
+    const updateAndDrawIcicle = (icicle: IntroIcicleState, geom: FrameGeometry, height: number, elapsed: number): void => {
+      if (icicle.fallenOffscreen) return;
+
+      const growth = clamp01((elapsed - icicle.growthStartMs) / Math.max(1, icicle.growthDurationMs));
+      const currentLength = Math.max(0, geom.tileSize * icicle.maxLengthRatio * growth);
+      const currentHalfWidth = Math.max(0, geom.tileSize * icicle.maxHalfWidthRatio * growth);
+      const anchorX = geom.originX + (icicle.col + 0.5 + icicle.anchorOffsetRatio * 0.34) * geom.tileSize;
+      const anchorY = geom.originY + (icicle.row + 1) * geom.tileSize - geom.pad * 0.2;
+
+      maybeDetachIcicle(icicle, anchorX, anchorY, currentLength, currentHalfWidth, elapsed);
+
+      if (!icicle.detached) {
+        drawGrowingIcicle(anchorX, anchorY, currentLength, currentHalfWidth);
+        spawnDropletsFromIcicle(icicle, anchorX, anchorY, currentLength, geom.tileSize, growth, elapsed);
+        return;
       }
 
+      drawFallingIcicle(icicle, height, geom.tileSize, elapsed);
+    };
+
+    const updateAndDrawIcicles = (geom: FrameGeometry, height: number, elapsed: number): void => {
+      for (const icicle of icicles) {
+        updateAndDrawIcicle(icicle, geom, height, elapsed);
+      }
+    };
+
+    const drawPressPrompt = (geom: FrameGeometry, elapsed: number, width: number): void => {
       const pressFade = clamp01((elapsed - flow.allLettersDoneAt) / PROMPT_FADE_MS);
-      if (pressFade > 0 && !exiting) {
-        ctx.save();
-        ctx.globalAlpha = pressFade;
-        ctx.fillStyle = PRESS_PROMPT_COLOR;
-        const fontSize = Math.max(20, Math.floor(tileSize * PRESS_PROMPT_FONT_SIZE_RATIO));
-        ctx.font = `${PRESS_PROMPT_FONT_WEIGHT} ${fontSize}px ${PRESS_PROMPT_FONT_FAMILY}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.fillText(t('title.pressAnyKey'), Math.floor(width / 2), originY + titleHeight + Math.floor(tileSize * 1.6));
-        ctx.restore();
-      }
+      if (pressFade <= 0 || exiting) return;
+      ctx.save();
+      ctx.globalAlpha = pressFade;
+      ctx.fillStyle = PRESS_PROMPT_COLOR;
+      const fontSize = Math.max(20, Math.floor(geom.tileSize * PRESS_PROMPT_FONT_SIZE_RATIO));
+      ctx.font = `${PRESS_PROMPT_FONT_WEIGHT} ${fontSize}px ${PRESS_PROMPT_FONT_FAMILY}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(t('title.pressAnyKey'), Math.floor(width / 2), geom.originY + geom.titleHeight + Math.floor(geom.tileSize * 1.6));
+      ctx.restore();
+    };
+
+    const draw = (now: number) => {
+      if (cleaned) return;
+      const dt = Math.max(0, Math.min(0.05, (now - lastFrameMs) / 1000));
+      lastFrameMs = now;
+      const elapsed = now - startMs;
+
+      const { width, height } = resizeCanvasIfNeeded();
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = BG_COLOR;
+      ctx.fillRect(0, 0, width, height);
+
+      const geom = computeLayoutGeometry(width, height);
+
+      drawGlyphCells(geom, elapsed);
+      updateDroplets(height, dt);
+      updateAndDrawIcicles(geom, height, elapsed);
+      drawDroplets();
+      drawPressPrompt(geom, elapsed, width);
 
       if (!exiting && anyGamepadButtonPressed()) {
         onExitInput();
