@@ -3,7 +3,7 @@
  * editor.  Extracted from ChapterMapEditorSection to reduce file size.
  */
 
-import type { CampaignDef, ChapterDef, TileDef, LevelStyle } from '../types';
+import type { CampaignDef, ChapterDef, LevelDef, TileDef, LevelStyle } from '../types';
 import { PipeShape, Direction } from '../types';
 import type {
   EditorPalette,
@@ -29,6 +29,47 @@ import { resolveLocalizedText } from '../campaignLocalization';
 
 /** The palette entry used for level chamber tiles in the chapter map editor. */
 const LEVEL_CHAMBER_PALETTE: EditorPalette = 'chamber:level';
+
+/** True if `tile` is a level-chamber tile already placed on the board, with a known levelIdx. */
+function _isPlacedLevelTile(tile: TileDef | null): tile is TileDef & { levelIdx: number } {
+  return tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined;
+}
+
+/** Scan the edit grid for level-chamber tiles and collect the set of already-placed level indices. */
+function _findPlacedLevels(grid: (TileDef | null)[][]): Set<number> {
+  const placed = new Set<number>();
+  for (const row of grid) {
+    for (const tile of row) {
+      if (_isPlacedLevelTile(tile)) placed.add(tile.levelIdx);
+    }
+  }
+  return placed;
+}
+
+/** True if the tile-params panel should show the focused-tile connections/completion widgets. */
+function _hasFocusedTileParams(
+  isFocusedLevelChamber: boolean,
+  isFocusedSourceOrSink: boolean,
+  focusedPos: { row: number; col: number } | null,
+): boolean {
+  return (isFocusedLevelChamber || isFocusedSourceOrSink) && focusedPos !== null;
+}
+
+/** True if `palette` is the Source or Sink palette entry. */
+function _isSourceOrSinkPalette(palette: EditorPalette): boolean {
+  return palette === PipeShape.Source || palette === PipeShape.Sink;
+}
+
+/** Resolve the currently-focused tile (if any) and the flags derived from its shape. */
+function _computeFocusedTileFlags(
+  focusedPos: { row: number; col: number } | null,
+  grid: (TileDef | null)[][],
+): { focusedTile: TileDef | null; isFocusedLevelChamber: boolean; isFocusedSourceOrSink: boolean } {
+  const focusedTile = focusedPos ? grid[focusedPos.row]?.[focusedPos.col] ?? null : null;
+  const isFocusedLevelChamber = focusedTile?.shape === PipeShape.Chamber && focusedTile.chamberContent === 'level';
+  const isFocusedSourceOrSink = focusedTile?.shape === PipeShape.Source || focusedTile?.shape === PipeShape.Sink;
+  return { focusedTile, isFocusedLevelChamber, isFocusedSourceOrSink };
+}
 
 // ─── Shared widget builder ─────────────────────────────────────────────────────
 
@@ -174,30 +215,8 @@ export class ChapterEditorUI {
     if (FLOOR_ITEMS.some(i => i.palette === currentPalette)) this.floorSectionExpanded = true;
     if (PIPES_ITEMS.some(i => i.palette === currentPalette)) this.pipesSectionExpanded = true;
 
-    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = item.label;
-      const isSelected = currentPalette === item.palette;
-      btn.style.cssText =
-        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
-        (indent ? 'margin-left:12px;' : '') +
-        'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
-        'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
-        'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
-      btn.addEventListener('click', () => {
-        const changed = this._cb.getChapterPalette() !== item.palette;
-        this._cb.setChapterPalette(item.palette);
-        this._cb.setChapterSelectedLevelIdx(null);
-        if (changed) sfxManager.play(SfxId.InventorySelect);
-        panel.replaceWith(this.buildPalettePanel(chapter, campaign));
-        const existingParams = document.getElementById('chapter-tile-params-panel');
-        if (existingParams) existingParams.replaceWith(this.buildTileParamsPanel(chapter, campaign));
-        this.rebuildLevelInventory(chapter, campaign);
-        this._cb.renderCanvas();
-      });
-      return btn;
-    };
+    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement =>
+      this._buildPaletteItemBtn(panel, chapter, campaign, { item, indent, currentPalette });
 
     // Source and Sink at the top
     for (const item of [
@@ -227,6 +246,38 @@ export class ChapterEditorUI {
     return panel;
   }
 
+  /** Build one clickable palette item button, wired to select that palette entry on click. */
+  private _buildPaletteItemBtn(
+    panel: HTMLElement,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+    opts: { item: { palette: EditorPalette; label: string }; indent: boolean; currentPalette: EditorPalette },
+  ): HTMLButtonElement {
+    const { item, indent, currentPalette } = opts;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = item.label;
+    const isSelected = currentPalette === item.palette;
+    btn.style.cssText =
+      `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
+      (indent ? 'margin-left:12px;' : '') +
+      'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
+      'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
+      'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
+    btn.addEventListener('click', () => {
+      const changed = this._cb.getChapterPalette() !== item.palette;
+      this._cb.setChapterPalette(item.palette);
+      this._cb.setChapterSelectedLevelIdx(null);
+      if (changed) sfxManager.play(SfxId.InventorySelect);
+      panel.replaceWith(this.buildPalettePanel(chapter, campaign));
+      const existingParams = document.getElementById('chapter-tile-params-panel');
+      if (existingParams) existingParams.replaceWith(this.buildTileParamsPanel(chapter, campaign));
+      this.rebuildLevelInventory(chapter, campaign);
+      this._cb.renderCanvas();
+    });
+    return btn;
+  }
+
   /**
    * Build the chapter level inventory panel.
    * Shows each level in the chapter as a clickable item for placement on the board.
@@ -249,51 +300,55 @@ export class ChapterEditorUI {
       return panel;
     }
 
-    // Determine which levels are already placed on the board
-    const placedLevels = new Set<number>();
-    for (const row of this._cb.getChapterEditGrid()) {
-      for (const tile of row) {
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'level' && tile.levelIdx !== undefined) {
-          placedLevels.add(tile.levelIdx);
-        }
-      }
-    }
+    const placedLevels = _findPlacedLevels(this._cb.getChapterEditGrid());
 
     for (let li = 0; li < chapter.levels.length; li++) {
-      const level = chapter.levels[li];
-      const isPlaced = placedLevels.has(li);
-      const isSelected = this._cb.getChapterSelectedLevelIdx() === li;
-
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = `L-${li + 1}: ${resolveLocalizedText(level.name)}${level.challenge ? ' ☠' : ''}${isPlaced ? ' ✓' : ''}`;
-      btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.chapter.selectToPlaceLevel', { index: li + 1 });
-      btn.disabled = isPlaced;
-      btn.style.cssText =
-        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};` +
-        (isPlaced
-          ? 'border:1px solid #555;background:#1a1a1a;color:#555;cursor:default;opacity:0.6;'
-          : isSelected
-            ? 'border:1px solid #f0c040;background:#2a2a10;color:#f0c040;cursor:pointer;'
-            : 'border:1px solid #4a90d9;background:#0a1520;color:#7ed321;cursor:pointer;') ;
-      if (!isPlaced) {
-        btn.addEventListener('mousedown', () => {
-          if (this._cb.getChapterSelectedLevelIdx() === li) {
-            this._cb.setChapterSelectedLevelIdx(null);
-          } else {
-            this._cb.setChapterSelectedLevelIdx(li);
-            this._cb.setChapterPalette(PipeShape.Source); // deselect palette
-            this.rebuildPalette(chapter, campaign);
-            sfxManager.play(SfxId.LevelSelect);
-          }
-          panel.replaceWith(this.buildLevelInventoryPanel(chapter, campaign));
-          this._cb.renderCanvas();
-        });
-      }
-      panel.appendChild(btn);
+      panel.appendChild(this._buildLevelInventoryItemBtn(panel, chapter, campaign, {
+        li,
+        level: chapter.levels[li],
+        isPlaced: placedLevels.has(li),
+        isSelected: this._cb.getChapterSelectedLevelIdx() === li,
+      }));
     }
 
     return panel;
+  }
+
+  /** Build one clickable level-inventory button, wired to select/deselect that level for placement. */
+  private _buildLevelInventoryItemBtn(
+    panel: HTMLElement,
+    chapter: ChapterDef,
+    campaign: CampaignDef,
+    opts: { li: number; level: LevelDef; isPlaced: boolean; isSelected: boolean },
+  ): HTMLButtonElement {
+    const { li, level, isPlaced, isSelected } = opts;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `L-${li + 1}: ${resolveLocalizedText(level.name)}${level.challenge ? ' ☠' : ''}${isPlaced ? ' ✓' : ''}`;
+    btn.title = isPlaced ? t('editor.chapter.alreadyPlaced') : t('editor.chapter.selectToPlaceLevel', { index: li + 1 });
+    btn.disabled = isPlaced;
+    btn.style.cssText =
+      `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};` +
+      (isPlaced
+        ? 'border:1px solid #555;background:#1a1a1a;color:#555;cursor:default;opacity:0.6;'
+        : isSelected
+          ? 'border:1px solid #f0c040;background:#2a2a10;color:#f0c040;cursor:pointer;'
+          : 'border:1px solid #4a90d9;background:#0a1520;color:#7ed321;cursor:pointer;') ;
+    if (!isPlaced) {
+      btn.addEventListener('mousedown', () => {
+        if (this._cb.getChapterSelectedLevelIdx() === li) {
+          this._cb.setChapterSelectedLevelIdx(null);
+        } else {
+          this._cb.setChapterSelectedLevelIdx(li);
+          this._cb.setChapterPalette(PipeShape.Source); // deselect palette
+          this.rebuildPalette(chapter, campaign);
+          sfxManager.play(SfxId.LevelSelect);
+        }
+        panel.replaceWith(this.buildLevelInventoryPanel(chapter, campaign));
+        this._cb.renderCanvas();
+      });
+    }
+    return btn;
   }
 
   buildTileParamsPanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
@@ -307,26 +362,13 @@ export class ChapterEditorUI {
     panel.appendChild(title);
 
     const focusedPos = this._cb.getChapterFocusedTilePos();
-    const focusedTile = focusedPos
-      ? this._cb.getChapterEditGrid()[focusedPos.row]?.[focusedPos.col] ?? null
-      : null;
-    const isFocusedLevelChamber =
-      focusedTile?.shape === PipeShape.Chamber && focusedTile.chamberContent === 'level';
-    const isFocusedSourceOrSink =
-      focusedTile?.shape === PipeShape.Source || focusedTile?.shape === PipeShape.Sink;
+    const { focusedTile, isFocusedLevelChamber, isFocusedSourceOrSink } =
+      _computeFocusedTileFlags(focusedPos, this._cb.getChapterEditGrid());
 
-    if ((isFocusedLevelChamber || isFocusedSourceOrSink) && focusedPos) {
-      panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile, chapter, campaign));
-      // For focused Sink tile, also show completion param editor
-      if (focusedTile?.shape === PipeShape.Sink) {
-        panel.appendChild(this._buildFocusedSinkCompletionWidget(panel, focusedTile, chapter, campaign));
-      }
-    } else if (this._cb.getChapterPalette() === PipeShape.Source || this._cb.getChapterPalette() === PipeShape.Sink) {
-      panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
-      // For Sink palette, also show completion param
-      if (this._cb.getChapterPalette() === PipeShape.Sink) {
-        panel.appendChild(this._buildSinkCompletionParamWidget(panel, chapter, campaign));
-      }
+    if (_hasFocusedTileParams(isFocusedLevelChamber, isFocusedSourceOrSink, focusedPos)) {
+      this._appendFocusedTileParams(panel, focusedTile, chapter, campaign);
+    } else if (_isSourceOrSinkPalette(this._cb.getChapterPalette())) {
+      this._appendPaletteTileParams(panel, chapter, campaign);
     } else {
       const note = document.createElement('div');
       note.style.cssText = 'font-size:0.78rem;color:#555;';
@@ -335,6 +377,24 @@ export class ChapterEditorUI {
     }
 
     return panel;
+  }
+
+  /** For a focused level-chamber/Source/Sink tile: connections widget, plus completion param for Sink. */
+  private _appendFocusedTileParams(panel: HTMLElement, focusedTile: TileDef | null, chapter: ChapterDef, campaign: CampaignDef): void {
+    panel.appendChild(this._buildFocusedChamberConnectionsWidget(panel, focusedTile as TileDef, chapter, campaign));
+    // For focused Sink tile, also show completion param editor
+    if (focusedTile?.shape === PipeShape.Sink) {
+      panel.appendChild(this._buildFocusedSinkCompletionWidget(panel, focusedTile, chapter, campaign));
+    }
+  }
+
+  /** For the Source/Sink palette (no focused tile): connections widget, plus completion param for Sink. */
+  private _appendPaletteTileParams(panel: HTMLElement, chapter: ChapterDef, campaign: CampaignDef): void {
+    panel.appendChild(this._buildChapterConnectionsWidget(panel, chapter, campaign));
+    // For Sink palette, also show completion param
+    if (this._cb.getChapterPalette() === PipeShape.Sink) {
+      panel.appendChild(this._buildSinkCompletionParamWidget(panel, chapter, campaign));
+    }
   }
 
   buildGridSizePanel(chapter: ChapterDef, campaign: CampaignDef): HTMLElement {
