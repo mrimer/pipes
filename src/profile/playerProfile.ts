@@ -316,73 +316,150 @@ export interface PlayerFileSuccess {
 
 export type PlayerFileResult = PlayerFileSuccess | PlayerFileError;
 
-function hasValidRecordingsShape(value: unknown): boolean {
-  if (!Array.isArray(value)) return false;
-  return value.every((entry) => {
-    if (!entry || typeof entry !== 'object') return false;
-    const record = entry as Record<string, unknown>;
-    const moves = record['moves'];
-    // Enforce the SAME required-field contract that loadAllRecordings()
-    // (persistence.ts) enforces on read. If import accepted a weaker shape, a
-    // recording could be persisted here and then silently dropped on the next
-    // load — so reject it at the door instead of fabricating defaults.
-    if (
-      typeof record['id'] !== 'string'
-      || !Array.isArray(moves)
-      || !moves.every((move) => typeof move === 'string')
-      || typeof record['campaignId'] !== 'string'
-      || record['campaignId'] === ''
-      || typeof record['levelId'] !== 'number'
-      || typeof record['outcome'] !== 'string'
-      || !['success', 'failure', 'partial'].includes(record['outcome'])
-      || typeof record['autoRecorded'] !== 'boolean'
-      || typeof record['timestamp'] !== 'number'
-      || typeof record['playerName'] !== 'string'
-      || typeof record['corrupted'] !== 'boolean'
-    ) {
-      return false;
-    }
-    if ('stars' in record && record['stars'] !== undefined && typeof record['stars'] !== 'number') return false;
-    if ('waterScore' in record && record['waterScore'] !== undefined && typeof record['waterScore'] !== 'number') return false;
-    return true;
-  });
+/** id/campaignId/levelId identity fields of an imported recording. */
+function isValidRecordingIdentity(record: Record<string, unknown>): boolean {
+  return (
+    typeof record['id'] === 'string' &&
+    typeof record['campaignId'] === 'string' &&
+    record['campaignId'] !== '' &&
+    typeof record['levelId'] === 'number'
+  );
 }
 
-function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
+/** The recording's move-list field. */
+function isValidRecordingMoves(moves: unknown): boolean {
+  return Array.isArray(moves) && moves.every((move) => typeof move === 'string');
+}
+
+/** The recording's outcome field. */
+function isValidRecordingOutcome(record: Record<string, unknown>): boolean {
+  return (
+    typeof record['outcome'] === 'string' &&
+    ['success', 'failure', 'partial'].includes(record['outcome'])
+  );
+}
+
+/** autoRecorded/timestamp/playerName/corrupted fields of an imported recording. */
+function isValidRecordingFlags(record: Record<string, unknown>): boolean {
+  return (
+    typeof record['autoRecorded'] === 'boolean' &&
+    typeof record['timestamp'] === 'number' &&
+    typeof record['playerName'] === 'string' &&
+    typeof record['corrupted'] === 'boolean'
+  );
+}
+
+/** Optional stars/waterScore fields: valid when absent, undefined, or a number. */
+function isValidRecordingOptionalScores(record: Record<string, unknown>): boolean {
+  if ('stars' in record && record['stars'] !== undefined && typeof record['stars'] !== 'number') return false;
+  if ('waterScore' in record && record['waterScore'] !== undefined && typeof record['waterScore'] !== 'number') return false;
+  return true;
+}
+
+/**
+ * Enforce the SAME required-field contract that loadAllRecordings()
+ * (persistence.ts) enforces on read. If import accepted a weaker shape, a
+ * recording could be persisted here and then silently dropped on the next
+ * load — so reject it at the door instead of fabricating defaults.
+ */
+function isValidRecordingEntry(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false;
+  const record = entry as Record<string, unknown>;
+  return (
+    isValidRecordingIdentity(record) &&
+    isValidRecordingMoves(record['moves']) &&
+    isValidRecordingOutcome(record) &&
+    isValidRecordingFlags(record) &&
+    isValidRecordingOptionalScores(record)
+  );
+}
+
+function hasValidRecordingsShape(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.every(isValidRecordingEntry);
+}
+
+/** True when `v` is `null` or a `string`. */
+function isNullOrString(v: unknown): boolean {
+  return v === null || typeof v === 'string';
+}
+
+/** True when `v` is `null` or a `boolean`. */
+function isNullOrBoolean(v: unknown): boolean {
+  return v === null || typeof v === 'boolean';
+}
+
+/** True when `v` is `null` or an `object`. */
+function isNullOrObject(v: unknown): boolean {
+  return v === null || typeof v === 'object';
+}
+
+/** True when `key` is absent from `payload`, or present and `isValid` accepts its value. */
+function isValidOptionalField(payload: Record<string, unknown>, key: string, isValid: (v: unknown) => boolean): boolean {
+  return !(key in payload) || isValid(payload[key]);
+}
+
+/** Required core fields present on every player-profile payload version. */
+function isValidCorePayloadFields(payload: Record<string, unknown>): boolean {
   if (typeof payload['guid'] !== 'string') return false;
-  if (!(payload['lastPlayedAt'] === null || typeof payload['lastPlayedAt'] === 'string')) return false;
+  if (!isNullOrString(payload['lastPlayedAt'])) return false;
   if (typeof payload['playerName'] !== 'string') return false;
   if (typeof payload['sfxVolume'] !== 'number') return false;
-  if (!(payload['touchUiEnabled'] === null || typeof payload['touchUiEnabled'] === 'boolean')) return false;
-  if (!(payload['commandKeys'] === null || typeof payload['commandKeys'] === 'object')) return false;
+  if (!isNullOrBoolean(payload['touchUiEnabled'])) return false;
+  if (!isNullOrObject(payload['commandKeys'])) return false;
   if (!Array.isArray(payload['campaignProgress'])) return false;
-  if ('activeCampaignId' in payload && payload['activeCampaignId'] !== null && typeof payload['activeCampaignId'] !== 'string') return false;
-  if ('recordings' in payload && !hasValidRecordingsShape(payload['recordings'])) return false;
-  // musicVolume is optional for back-compat; reject only if present but not a number
-  if ('musicVolume' in payload && typeof payload['musicVolume'] !== 'number') return false;
-  // musicMuteOnFocusLoss is optional for back-compat; reject only if present but not a boolean
-  if ('musicMuteOnFocusLoss' in payload && typeof payload['musicMuteOnFocusLoss'] !== 'boolean') return false;
-  // partialProgress is optional for back-compat; reject only if present and malformed
-  if ('partialProgress' in payload) {
-    const pp = payload['partialProgress'];
-    if (!Array.isArray(pp)) return false;
-    for (const e of pp) {
-      if (e === null || typeof e !== 'object') return false;
-      if (typeof e['campaignId'] !== 'string') return false;
-      if (typeof e['levelId'] !== 'number') return false;
-      if (!Array.isArray(e['moves'])) return false;
-      if (typeof e['timestamp'] !== 'number') return false;
-    }
-  }
-  // saveNoticeSuppressed is optional for back-compat; reject only if present but not a boolean
-  if ('saveNoticeSuppressed' in payload && typeof payload['saveNoticeSuppressed'] !== 'boolean') return false;
-  // appearance is optional for back-compat; migrate older shapes (e.g. files exported
-  // before shoeShape existed) in place, then reject only if still malformed.
+  return true;
+}
+
+/** Fields that are optional for back-compat: valid when absent, rejected only when present and malformed. */
+function isValidOptionalScalarPayloadFields(payload: Record<string, unknown>): boolean {
+  return (
+    isValidOptionalField(payload, 'activeCampaignId', isNullOrString) &&
+    isValidOptionalField(payload, 'recordings', hasValidRecordingsShape) &&
+    isValidOptionalField(payload, 'musicVolume', (v) => typeof v === 'number') &&
+    isValidOptionalField(payload, 'musicMuteOnFocusLoss', (v) => typeof v === 'boolean') &&
+    isValidOptionalField(payload, 'saveNoticeSuppressed', (v) => typeof v === 'boolean')
+  );
+}
+
+/** A single entry of the optional `partialProgress` array. */
+function isValidPartialProgressEntry(e: unknown): boolean {
+  if (e === null || typeof e !== 'object') return false;
+  const entry = e as Record<string, unknown>;
+  if (typeof entry['campaignId'] !== 'string') return false;
+  if (typeof entry['levelId'] !== 'number') return false;
+  if (!Array.isArray(entry['moves'])) return false;
+  if (typeof entry['timestamp'] !== 'number') return false;
+  return true;
+}
+
+/** partialProgress is optional for back-compat; reject only if present and malformed. */
+function isValidPartialProgressShape(payload: Record<string, unknown>): boolean {
+  if (!('partialProgress' in payload)) return true;
+  const pp = payload['partialProgress'];
+  if (!Array.isArray(pp)) return false;
+  return pp.every(isValidPartialProgressEntry);
+}
+
+/**
+ * appearance is optional for back-compat; migrate older shapes (e.g. files exported
+ * before shoeShape existed) in place, then reject only if still malformed.
+ */
+function isValidAppearancePayloadField(payload: Record<string, unknown>): boolean {
   if ('appearance' in payload && payload['appearance'] !== undefined) {
     payload['appearance'] = migrateGnomeAppearance(payload['appearance']);
     if (!isValidGnomeAppearance(payload['appearance'])) return false;
   }
   return true;
+}
+
+function hasValidPayloadShape(payload: Record<string, unknown>): boolean {
+  return (
+    isValidCorePayloadFields(payload) &&
+    isValidOptionalScalarPayloadFields(payload) &&
+    isValidPartialProgressShape(payload) &&
+    isValidAppearancePayloadField(payload)
+  );
 }
 
 function migratePayloadV1ToV2(payload: Record<string, unknown>): Record<string, unknown> {
@@ -425,51 +502,45 @@ function migratePayloadV3ToV4(payload: Record<string, unknown>): Record<string, 
  * 3. Required fields (`payload`, `checksum`) must be present
  * 4. Checksum must match the payload
  */
-export function parsePlayerFile(json: string): PlayerFileResult {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return { ok: false, error: 'Invalid JSON – the file could not be read.' };
-  }
+/** True when `parsed` is a non-null object, i.e. eligible to be treated as a file record. */
+function isParsedObject(parsed: unknown): parsed is Record<string, unknown> {
+  return !!parsed && typeof parsed === 'object';
+}
 
-  if (!parsed || typeof parsed !== 'object') {
-    return { ok: false, error: 'Invalid file format.' };
-  }
-
-  const file = parsed as Record<string, unknown>;
-
-  if (file['type'] !== FILE_TYPE_PLAYER) {
-    if (file['type'] === FILE_TYPE_CAMPAIGN) {
-      return {
-        ok: false,
-        error: 'Wrong file type: this is a campaign file, not a player profile. ' +
-               'Use the Campaign Editor to import campaign files.',
-      };
-    }
+/** Validate the file's `type` field, distinguishing the campaign-file mixup from any other mismatch. */
+function validateFileType(file: Record<string, unknown>): PlayerFileError | null {
+  if (file['type'] === FILE_TYPE_PLAYER) return null;
+  if (file['type'] === FILE_TYPE_CAMPAIGN) {
     return {
       ok: false,
-      error: `Wrong file type: expected a player profile file (type "${FILE_TYPE_PLAYER}").`,
+      error: 'Wrong file type: this is a campaign file, not a player profile. ' +
+             'Use the Campaign Editor to import campaign files.',
     };
   }
+  return {
+    ok: false,
+    error: `Wrong file type: expected a player profile file (type "${FILE_TYPE_PLAYER}").`,
+  };
+}
 
-  const storedChecksum = file['checksum'];
-  const payload        = file['payload'];
-  const versionRaw     = file['version'];
+/** Validate that the stored checksum is well-formed and matches the payload. */
+function validateChecksum(storedChecksum: unknown, payload: unknown): PlayerFileError | null {
   if (typeof storedChecksum !== 'string' || !payload || typeof payload !== 'object') {
     return { ok: false, error: 'Invalid player profile file: missing required fields.' };
   }
-
-  const payloadJson       = JSON.stringify(payload);
-  const expectedChecksum  = computeChecksum(payloadJson);
+  const payloadJson      = JSON.stringify(payload);
+  const expectedChecksum = computeChecksum(payloadJson);
   if (storedChecksum !== expectedChecksum) {
     return {
       ok: false,
       error: 'File checksum mismatch – the file may be corrupted or has been modified.',
     };
   }
+  return null;
+}
 
-  const rawPayload = payload as Record<string, unknown>;
+/** Validate that the file's `version` field is a supported, finite number. */
+function validateVersion(versionRaw: unknown): PlayerFileError | null {
   if (typeof versionRaw !== 'number' || !Number.isFinite(versionRaw)) {
     return { ok: false, error: 'Invalid player profile file: missing or invalid version.' };
   }
@@ -479,7 +550,11 @@ export function parsePlayerFile(json: string): PlayerFileResult {
       error: `file from newer version (profile format ${versionRaw} > supported ${PROFILE_FORMAT_VERSION})`,
     };
   }
+  return null;
+}
 
+/** Step the payload forward, version by version, to {@link PROFILE_FORMAT_VERSION}, mutating it in place. */
+function migratePayloadToCurrentVersion(rawPayload: Record<string, unknown>, versionRaw: number): PlayerFileError | null {
   let payloadVersion = Math.floor(versionRaw);
   while (payloadVersion < PROFILE_FORMAT_VERSION) {
     if (payloadVersion === 1) {
@@ -500,6 +575,39 @@ export function parsePlayerFile(json: string): PlayerFileResult {
     // Guardrail for incomplete future migration chains during development.
     return { ok: false, error: `Unsupported player profile version: ${payloadVersion}` };
   }
+  return null;
+}
+
+export function parsePlayerFile(json: string): PlayerFileResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return { ok: false, error: 'Invalid JSON – the file could not be read.' };
+  }
+
+  if (!isParsedObject(parsed)) {
+    return { ok: false, error: 'Invalid file format.' };
+  }
+  const file = parsed;
+
+  const typeError = validateFileType(file);
+  if (typeError) return typeError;
+
+  const storedChecksum = file['checksum'];
+  const payload        = file['payload'];
+  const versionRaw     = file['version'];
+
+  const checksumError = validateChecksum(storedChecksum, payload);
+  if (checksumError) return checksumError;
+
+  const versionError = validateVersion(versionRaw);
+  if (versionError) return versionError;
+
+  const rawPayload = payload as Record<string, unknown>;
+  const migrationError = migratePayloadToCurrentVersion(rawPayload, versionRaw as number);
+  if (migrationError) return migrationError;
+
   if (!hasValidPayloadShape(rawPayload)) {
     return {
       ok: false,
