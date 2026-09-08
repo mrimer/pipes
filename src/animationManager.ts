@@ -251,17 +251,38 @@ export class AnimationManager {
     for (const key of filledBefore) {
       if (filledAfter.has(key)) continue;
       const [r, c] = parseKey(key);
-      const tile = (reclaimedRow !== undefined && reclaimedCol !== undefined &&
-                    r === reclaimedRow && c === reclaimedCol)
-        ? reclaimedTile
-        : board.grid[r]?.[c];
+      const tile = this._resolveReclaimAwareTile(board, r, c, reclaimedRow, reclaimedCol, reclaimedTile);
       if (!tile) continue;
       this._pushTileAnimLabels(
         board, tile, r, c, 'disconnect', currentTemp, currentPressure, now, sparkle,
-        lockedWaterImpactBefore?.get(key) ?? null,
-        lockedHotPlateGainBefore?.get(key) ?? null,
+        AnimationManager._lockedDeltaAt(lockedWaterImpactBefore, key),
+        AnimationManager._lockedDeltaAt(lockedHotPlateGainBefore, key),
       );
     }
+  }
+
+  /**
+   * Resolve the tile at (r, c) for disconnection-animation purposes, preferring
+   * the just-reclaimed tile's pre-reclaim data when (r, c) is the reclaimed cell
+   * (whose grid cell has already been replaced with Empty by the time this runs).
+   */
+  private _resolveReclaimAwareTile(
+    board: Board,
+    r: number,
+    c: number,
+    reclaimedRow: number | undefined,
+    reclaimedCol: number | undefined,
+    reclaimedTile: Tile | undefined,
+  ): Tile | undefined {
+    if (reclaimedRow !== undefined && reclaimedCol !== undefined && r === reclaimedRow && c === reclaimedCol) {
+      return reclaimedTile;
+    }
+    return board.grid[r]?.[c];
+  }
+
+  /** Locked-delta lookup for a key, or null when the map is absent or has no entry for it. */
+  private static _lockedDeltaAt(map: ReadonlyMap<string, number> | undefined, key: string): number | null {
+    return map?.get(key) ?? null;
   }
 
   /**
@@ -415,31 +436,33 @@ export class AnimationManager {
       const key = posKey(row, col);
       const isSink = key === sinkKey;
       const tile = board.getTile({ row, col });
+      const startTime = now + startDelay + depth * FILL_ANIM_DURATION;
       // Container tiles (Source, Chamber) are included in the animation so their
       // display is held at the pre-connected appearance (via fillExclude) until the
       // water-flow wave reaches them.  No water overlay is drawn on top of them;
       // they simply switch to their connected appearance once the entry expires.
-      const isContainer = tile !== null && !isSink &&
-        !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape) &&
-        !SPIN_PIPE_SHAPES.has(tile.shape) && !LEAKY_PIPE_SHAPES.has(tile.shape);
-      if (isContainer) {
-        this._fillAnims.push({
-          row, col, entryDir, blockedDir, isContainer: true,
-          startTime: now + startDelay + depth * FILL_ANIM_DURATION,
-        });
+      if (!isSink && AnimationManager._isNonPipeShapeTile(tile)) {
+        this._fillAnims.push({ row, col, entryDir, blockedDir, isContainer: true, startTime });
         continue;
       }
-      let waterColor: string | undefined;
-      if (tile) {
-        if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
-        else if (LEAKY_PIPE_SHAPES.has(tile.shape)) waterColor = LEAKY_PIPE_WATER_COLOR;
-        else if (SPIN_PIPE_SHAPES.has(tile.shape) || tile.isFixed) waterColor = WATER_COLOR;
-      }
-      this._fillAnims.push({
-        row, col, entryDir, blockedDir, isSink, waterColor,
-        startTime: now + startDelay + depth * FILL_ANIM_DURATION,
-      });
+      const waterColor = AnimationManager._fillWaterColorForTile(tile);
+      this._fillAnims.push({ row, col, entryDir, blockedDir, isSink, waterColor, startTime });
     }
+  }
+
+  /** True for tiles (Source/Sink/Chamber) that aren't rendered as a pipe shape at all. */
+  private static _isNonPipeShapeTile(tile: Tile | null): boolean {
+    return tile !== null && !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape) &&
+      !SPIN_PIPE_SHAPES.has(tile.shape) && !LEAKY_PIPE_SHAPES.has(tile.shape);
+  }
+
+  /** Fill-animation water overlay color for a tile, or undefined for a plain (non-special) pipe. */
+  private static _fillWaterColorForTile(tile: Tile | null): string | undefined {
+    if (!tile) return undefined;
+    if (GOLD_PIPE_SHAPES.has(tile.shape)) return GOLD_PIPE_WATER_COLOR;
+    if (LEAKY_PIPE_SHAPES.has(tile.shape)) return LEAKY_PIPE_WATER_COLOR;
+    if (SPIN_PIPE_SHAPES.has(tile.shape) || tile.isFixed) return WATER_COLOR;
+    return undefined;
   }
 
   /**
@@ -459,29 +482,34 @@ export class AnimationManager {
       const startTime = now + startDelay + depth * FILL_ANIM_DURATION;
       // Container tiles (non-pipe: Source, Sink, Chamber) switch appearance directly
       // on expiry — no overlay drawn, same as isContainer in fill.
-      const isContainer = tile !== null &&
-        !PIPE_SHAPES.has(tile.shape) && !GOLD_PIPE_SHAPES.has(tile.shape) &&
-        !SPIN_PIPE_SHAPES.has(tile.shape) && !LEAKY_PIPE_SHAPES.has(tile.shape);
-      if (isContainer) {
+      if (AnimationManager._isNonPipeShapeTile(tile)) {
         this._drainAnims.push({ row, col, exitDir, isContainer: true, startTime });
         continue;
       }
-      let waterColor: string | undefined;
-      if (tile) {
-        if (GOLD_PIPE_SHAPES.has(tile.shape)) waterColor = GOLD_PIPE_WATER_COLOR;
-        else if (LEAKY_PIPE_SHAPES.has(tile.shape)) waterColor = LEAKY_PIPE_WATER_COLOR;
-        else waterColor = WATER_COLOR;
-      }
+      const waterColor = AnimationManager._drainWaterColorForTile(tile);
       // Pre-compute mutual connections so the overlay can use lineCap='butt' for arms
       // that share an edge with a reciprocating adjacent tile arm (no nub past tile edge).
-      const mutualDirs = new Set<Direction>();
-      if (tile) {
-        for (const dir of tile.connections) {
-          if (board.areMutuallyConnected({ row, col }, dir)) mutualDirs.add(dir);
-        }
-      }
+      const mutualDirs = AnimationManager._computeMutualDirs(board, row, col, tile);
       this._drainAnims.push({ row, col, exitDir, waterColor, mutualDirs, startTime });
     }
+  }
+
+  /** Drain-animation water overlay color for a tile (always some color, unlike fill's plain-pipe case). */
+  private static _drainWaterColorForTile(tile: Tile | null): string | undefined {
+    if (!tile) return undefined;
+    if (GOLD_PIPE_SHAPES.has(tile.shape)) return GOLD_PIPE_WATER_COLOR;
+    if (LEAKY_PIPE_SHAPES.has(tile.shape)) return LEAKY_PIPE_WATER_COLOR;
+    return WATER_COLOR;
+  }
+
+  /** Directions of `tile`'s connections that are reciprocated by the adjacent tile. */
+  private static _computeMutualDirs(board: Board, row: number, col: number, tile: Tile | null): Set<Direction> {
+    const mutualDirs = new Set<Direction>();
+    if (!tile) return mutualDirs;
+    for (const dir of tile.connections) {
+      if (board.areMutuallyConnected({ row, col }, dir)) mutualDirs.add(dir);
+    }
+    return mutualDirs;
   }
 
   /**
@@ -890,13 +918,7 @@ export class AnimationManager {
     // Re-arm with a random interval of 1.5–3.75 s.
     this._nextGoldenTwinkle = now + 1500 + Math.random() * 2250;
 
-    // Collect all golden pipe tile positions on the board.
-    const goldPositions: Array<{ r: number; c: number }> = [];
-    for (let r = 0; r < board.rows; r++) {
-      for (let c = 0; c < board.cols; c++) {
-        if (GOLD_PIPE_SHAPES.has(board.grid[r][c].shape)) goldPositions.push({ r, c });
-      }
-    }
+    const goldPositions = AnimationManager._collectGoldPipePositions(board);
     if (goldPositions.length === 0) return;
 
     // Pick a random golden tile.
@@ -912,29 +934,46 @@ export class AnimationManager {
     const cx = (c + 0.5) * TILE_SIZE;
     const cy = (r + 0.5) * TILE_SIZE;
 
-    let tileX: number, tileY: number;
-    if (tile.connections.size > 0) {
-      const dirs = [...tile.connections];
-      const dir = dirs[Math.floor(Math.random() * dirs.length)];
-      // Place at a random point along the arm (avoiding the very center).
-      const t = 0.3 + Math.random() * 0.7;
-      // Perpendicular offset (±LINE_WIDTH/2) so the twinkle lands at the edge
-      // of the pipe stroke rather than on its center line where it would be
-      // obscured by the pipe fill color.
-      const edgeOffset = (LINE_WIDTH / 2) * (Math.random() < 0.5 ? 1 : -1);
-      switch (dir) {
-        case Direction.North: tileX = cx + edgeOffset; tileY = cy - t * half; break;
-        case Direction.South: tileX = cx + edgeOffset; tileY = cy + t * half; break;
-        case Direction.West:  tileX = cx - t * half; tileY = cy + edgeOffset; break;
-        case Direction.East:  tileX = cx + t * half; tileY = cy + edgeOffset; break;
-        default:              tileX = cx; tileY = cy;
-      }
-    } else {
-      tileX = cx;
-      tileY = cy;
-    }
+    const { tileX, tileY } = AnimationManager._resolveGoldTwinkleOffset(tile, cx, cy, half);
 
     spawnStarTwinkle(rect.left + tileX * scaleX, rect.top + tileY * scaleY);
+  }
+
+  /** Collect the (row, col) of every golden pipe tile on the board. */
+  private static _collectGoldPipePositions(board: Board): Array<{ r: number; c: number }> {
+    const positions: Array<{ r: number; c: number }> = [];
+    for (let r = 0; r < board.rows; r++) {
+      for (let c = 0; c < board.cols; c++) {
+        if (GOLD_PIPE_SHAPES.has(board.grid[r][c].shape)) positions.push({ r, c });
+      }
+    }
+    return positions;
+  }
+
+  /**
+   * Pick a random point along one of `tile`'s connection arms (offset toward
+   * the stroke edge so it doesn't get obscured by the pipe fill color), or the
+   * tile center when it has no connections.
+   */
+  private static _resolveGoldTwinkleOffset(
+    tile: Tile, cx: number, cy: number, half: number,
+  ): { tileX: number; tileY: number } {
+    if (tile.connections.size === 0) return { tileX: cx, tileY: cy };
+    const dirs = [...tile.connections];
+    const dir = dirs[Math.floor(Math.random() * dirs.length)];
+    // Place at a random point along the arm (avoiding the very center).
+    const t = 0.3 + Math.random() * 0.7;
+    // Perpendicular offset (±LINE_WIDTH/2) so the twinkle lands at the edge
+    // of the pipe stroke rather than on its center line where it would be
+    // obscured by the pipe fill color.
+    const edgeOffset = (LINE_WIDTH / 2) * (Math.random() < 0.5 ? 1 : -1);
+    switch (dir) {
+      case Direction.North: return { tileX: cx + edgeOffset, tileY: cy - t * half };
+      case Direction.South: return { tileX: cx + edgeOffset, tileY: cy + t * half };
+      case Direction.West:  return { tileX: cx - t * half, tileY: cy + edgeOffset };
+      case Direction.East:  return { tileX: cx + t * half, tileY: cy + edgeOffset };
+      default:              return { tileX: cx, tileY: cy };
+    }
   }
 
   /**
