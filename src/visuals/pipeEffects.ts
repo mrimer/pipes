@@ -218,53 +218,67 @@ export function computeFillOrder(
 
   while (qi < queue.length) {
     const cur = queue[qi++];
-
     for (const dir of DIRECTIONS) {
-      if (!board.areMutuallyConnected(cur, dir)) continue;
-      const delta = NEIGHBOUR_DELTA[dir];
-      const next = { row: cur.row + delta.row, col: cur.col + delta.col };
-      const nextKey = posKey(next.row, next.col);
-      if (bfsVisited.has(nextKey)) continue;
-
-      // Valve check: only enter a Chamber tile via one of its first-connection
-      // directions (matches the guard in Board.getFilledPositions).
-      // Must be done BEFORE marking visited so a chamber first reached via an
-      // invalid direction can still be entered later via a valid direction.
-      const nextTile = board.grid[next.row]?.[next.col];
-      if (nextTile?.firstConnections && nextTile.firstConnections.size > 0) {
-        const arrivalDir = oppositeDirection(dir);
-        if (!nextTile.firstConnections.has(arrivalDir)) continue;
-      }
-      bfsVisited.add(nextKey);
-
-      const nextIsNew = !filledBefore.has(nextKey);
-      // animDepth for the next tile:
-      //  already-filled tile       → -1 (continues traversal without incrementing)
-      //  newly-filled from already → 0  (first animation step)
-      //  newly-filled from newly   → cur.animDepth + 1
-      const nextAnimDepth = !nextIsNew ? -1 : cur.animDepth < 0 ? 0 : cur.animDepth + 1;
-
-      queue.push({ row: next.row, col: next.col, animDepth: nextAnimDepth });
-
-      // Only record if this tile is NEWLY filled (not already filled before the move).
-      if (nextIsNew) {
-        // entryDir = direction FROM WHICH water enters next tile = opposite of travel dir.
-        const entryDir = oppositeDirection(dir);
-
-        // Determine if the tile sits on a one-way cell that blocks an arm.
-        let blockedDir: Direction | null = null;
-        const owDir = board.oneWayData.get(nextKey);
-        if (owDir !== undefined) {
-          // The arm pointing OPPOSITE to the one-way direction is blocked.
-          blockedDir = oppositeDirection(owDir);
-        }
-
-        result.push({ row: next.row, col: next.col, entryDir, blockedDir, depth: nextAnimDepth });
-      }
+      _visitFillNeighbor(board, cur, dir, filledBefore, bfsVisited, queue, result);
     }
   }
 
   return result;
+}
+
+/** Whether `next` (reached from `dir`) may be entered — false only for a Chamber tile reached via a non-first-connection direction. */
+function _canEnterChamberFrom(board: Board, next: { row: number; col: number }, dir: Direction): boolean {
+  const nextTile = board.grid[next.row]?.[next.col];
+  if (!nextTile?.firstConnections || nextTile.firstConnections.size === 0) return true;
+  const arrivalDir = oppositeDirection(dir);
+  return nextTile.firstConnections.has(arrivalDir);
+}
+
+/** The arm blocked by a one-way cell at `key`, or null if the tile isn't one-way. */
+function _computeBlockedDir(board: Board, key: string): Direction | null {
+  const owDir = board.oneWayData.get(key);
+  return owDir === undefined ? null : oppositeDirection(owDir);
+}
+
+/** Visit one BFS neighbor of `cur` in direction `dir`, extending `queue`/`result`/`bfsVisited` in place when traversable. */
+function _visitFillNeighbor(
+  board: Board,
+  cur: { row: number; col: number; animDepth: number },
+  dir: Direction,
+  filledBefore: Set<string>,
+  bfsVisited: Set<string>,
+  queue: Array<{ row: number; col: number; animDepth: number }>,
+  result: Array<{ row: number; col: number; entryDir: Direction; blockedDir: Direction | null; depth: number }>,
+): void {
+  if (!board.areMutuallyConnected(cur, dir)) return;
+  const delta = NEIGHBOUR_DELTA[dir];
+  const next = { row: cur.row + delta.row, col: cur.col + delta.col };
+  const nextKey = posKey(next.row, next.col);
+  if (bfsVisited.has(nextKey)) return;
+
+  // Valve check: only enter a Chamber tile via one of its first-connection
+  // directions (matches the guard in Board.getFilledPositions).
+  // Must be done BEFORE marking visited so a chamber first reached via an
+  // invalid direction can still be entered later via a valid direction.
+  if (!_canEnterChamberFrom(board, next, dir)) return;
+  bfsVisited.add(nextKey);
+
+  const nextIsNew = !filledBefore.has(nextKey);
+  // animDepth for the next tile:
+  //  already-filled tile       → -1 (continues traversal without incrementing)
+  //  newly-filled from already → 0  (first animation step)
+  //  newly-filled from newly   → cur.animDepth + 1
+  const nextAnimDepth = !nextIsNew ? -1 : cur.animDepth < 0 ? 0 : cur.animDepth + 1;
+
+  queue.push({ row: next.row, col: next.col, animDepth: nextAnimDepth });
+
+  // Only record if this tile is NEWLY filled (not already filled before the move).
+  if (nextIsNew) {
+    // entryDir = direction FROM WHICH water enters next tile = opposite of travel dir.
+    const entryDir = oppositeDirection(dir);
+    const blockedDir = _computeBlockedDir(board, nextKey);
+    result.push({ row: next.row, col: next.col, entryDir, blockedDir, depth: nextAnimDepth });
+  }
 }
 
 // ─── Rendering ───────────────────────────────────────────────────────────────
@@ -375,58 +389,73 @@ function _drawFillOverlay(
  * parent, i.e. the direction water exits the tile toward the disconnection
  * source — and the BFS `depth` used to stagger animation start times.
  */
+function _computeDisconnectedSet(filledBefore: Set<string>, filledAfter: Set<string>): Set<string> {
+  const disconnected = new Set<string>();
+  for (const k of filledBefore) {
+    if (!filledAfter.has(k)) disconnected.add(k);
+  }
+  return disconnected;
+}
+
+type DrainQueueEntry = { row: number; col: number; exitDir: Direction; depth: number };
+
+/** Seed the drain BFS queue from tiles spatially adjacent to `origin` that are disconnected. */
+function _seedDrainQueueFromOrigin(origin: GridPos, disconnected: Set<string>, visited: Set<string>, queue: DrainQueueEntry[]): void {
+  for (const dir of DIRECTIONS) {
+    const delta = NEIGHBOUR_DELTA[dir];
+    const nr = origin.row + delta.row;
+    const nc = origin.col + delta.col;
+    const nk = posKey(nr, nc);
+    if (disconnected.has(nk) && !visited.has(nk)) {
+      visited.add(nk);
+      queue.push({ row: nr, col: nc, exitDir: oppositeDirection(dir), depth: 0 });
+    }
+  }
+}
+
+/** Fallback: if no adjacent disconnected tiles found, start from any disconnected tile. */
+function _seedDrainQueueFallback(board: Board, disconnected: Set<string>, visited: Set<string>, queue: DrainQueueEntry[]): void {
+  const firstKey = disconnected.values().next().value as string;
+  const [fr, fc] = parseKey(firstKey);
+  const fallbackTile = board.grid[fr]?.[fc];
+  const fallbackExitDir: Direction = (fallbackTile?.connections.values().next().value) ?? DIRECTIONS[0];
+  visited.add(firstKey);
+  queue.push({ row: fr, col: fc, exitDir: fallbackExitDir, depth: 0 });
+}
+
+function _expandDrainNeighbor(board: Board, cur: DrainQueueEntry, dir: Direction, disconnected: Set<string>, visited: Set<string>, queue: DrainQueueEntry[]): void {
+  if (!board.areMutuallyConnected(cur, dir)) return;
+  const delta = NEIGHBOUR_DELTA[dir];
+  const nr = cur.row + delta.row;
+  const nc = cur.col + delta.col;
+  const nk = posKey(nr, nc);
+  if (!disconnected.has(nk) || visited.has(nk)) return;
+  visited.add(nk);
+  queue.push({ row: nr, col: nc, exitDir: oppositeDirection(dir), depth: cur.depth + 1 });
+}
+
 export function computeDrainOrder(
   board: Board,
   filledBefore: Set<string>,
   origin?: GridPos,
 ): Array<{ row: number; col: number; exitDir: Direction; depth: number }> {
-  const filledAfter = board.getFilledPositions();
-  const disconnected = new Set<string>();
-  for (const k of filledBefore) {
-    if (!filledAfter.has(k)) disconnected.add(k);
-  }
+  const disconnected = _computeDisconnectedSet(filledBefore, board.getFilledPositions());
   if (disconnected.size === 0) return [];
 
-  const result: Array<{ row: number; col: number; exitDir: Direction; depth: number }> = [];
+  const result: DrainQueueEntry[] = [];
   const visited = new Set<string>();
-  const queue: Array<{ row: number; col: number; exitDir: Direction; depth: number }> = [];
+  const queue: DrainQueueEntry[] = [];
 
-  if (origin) {
-    for (const dir of DIRECTIONS) {
-      const delta = NEIGHBOUR_DELTA[dir];
-      const nr = origin.row + delta.row;
-      const nc = origin.col + delta.col;
-      const nk = posKey(nr, nc);
-      if (disconnected.has(nk) && !visited.has(nk)) {
-        visited.add(nk);
-        queue.push({ row: nr, col: nc, exitDir: oppositeDirection(dir), depth: 0 });
-      }
-    }
-  }
-
+  if (origin) _seedDrainQueueFromOrigin(origin, disconnected, visited, queue);
   // Fallback: if no adjacent disconnected tiles found, start from any disconnected tile.
-  if (queue.length === 0) {
-    const firstKey = disconnected.values().next().value as string;
-    const [fr, fc] = parseKey(firstKey);
-    const fallbackTile = board.grid[fr]?.[fc];
-    const fallbackExitDir: Direction = (fallbackTile?.connections.values().next().value) ?? DIRECTIONS[0];
-    visited.add(firstKey);
-    queue.push({ row: fr, col: fc, exitDir: fallbackExitDir, depth: 0 });
-  }
+  if (queue.length === 0) _seedDrainQueueFallback(board, disconnected, visited, queue);
 
   let qi = 0;
   while (qi < queue.length) {
     const cur = queue[qi++];
     result.push(cur);
     for (const dir of DIRECTIONS) {
-      if (!board.areMutuallyConnected(cur, dir)) continue;
-      const delta = NEIGHBOUR_DELTA[dir];
-      const nr = cur.row + delta.row;
-      const nc = cur.col + delta.col;
-      const nk = posKey(nr, nc);
-      if (!disconnected.has(nk) || visited.has(nk)) continue;
-      visited.add(nk);
-      queue.push({ row: nr, col: nc, exitDir: oppositeDirection(dir), depth: cur.depth + 1 });
+      _expandDrainNeighbor(board, cur, dir, disconnected, visited, queue);
     }
   }
 
@@ -446,6 +475,11 @@ export function computeDrainOrder(
  *
  * Expired entries are removed from `anims` in-place.
  */
+/** Started, not a container tile (which has no overlay), and has a water color to draw with. */
+function _hasDrainOverlayToDraw(elapsed: number, anim: PipeDrainAnim): anim is PipeDrainAnim & { waterColor: string } {
+  return elapsed >= 0 && !anim.isContainer && !!anim.waterColor;
+}
+
 export function renderDrainAnims(
   ctx: CanvasRenderingContext2D,
   anims: PipeDrainAnim[],
@@ -460,7 +494,7 @@ export function renderDrainAnims(
       anims.splice(i, 1);
       continue;
     }
-    if (elapsed < 0 || !!anim.isContainer || !anim.waterColor) continue;
+    if (!_hasDrainOverlayToDraw(elapsed, anim)) continue;
     const progress = elapsed / FILL_ANIM_DURATION;
     const connections = tileConnectionsMap.get(posKey(anim.row, anim.col));
     if (!connections) continue;
@@ -479,6 +513,11 @@ export function renderDrainAnims(
  * At progress=0 the overlay draws the full water fill, providing a seamless handoff from
  * the drainInclude base-board render.
  */
+/** Butt cap when the adjacent tile has a reciprocal arm (no nub past the tile edge), else round. */
+function _drainLineCapFor(dir: Direction, mutualDirs: Set<Direction> | undefined): CanvasLineCap {
+  return mutualDirs?.has(dir) ? 'butt' : 'round';
+}
+
 function _drawDrainOverlay(
   ctx: CanvasRenderingContext2D,
   anim: PipeDrainAnim,
@@ -506,37 +545,25 @@ function _drawDrainOverlay(
     const dx = NEIGHBOUR_DELTA[anim.exitDir].col;
     const dy = NEIGHBOUR_DELTA[anim.exitDir].row;
     // Butt cap when adjacent tile has a reciprocal arm (no nub past tile edge).
-    ctx.lineCap = mutualDirs?.has(anim.exitDir) ? 'butt' : 'round';
+    ctx.lineCap = _drainLineCapFor(anim.exitDir, mutualDirs);
     ctx.beginPath();
     ctx.moveTo(cx + dx * half * (1 - drainP), cy + dy * half * (1 - drainP));
     ctx.lineTo(cx, cy);
     ctx.stroke();
   }
 
-  if (drainP2 === 0) {
-    // Phase 1: other arms still fully water.
-    for (const dir of connections) {
-      if (dir === anim.exitDir) continue;
-      const dx = NEIGHBOUR_DELTA[dir].col;
-      const dy = NEIGHBOUR_DELTA[dir].row;
-      ctx.lineCap = mutualDirs?.has(dir) ? 'butt' : 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + dx * half, cy + dy * half);
-      ctx.stroke();
-    }
-  } else {
-    // Phase 2: each other arm shrinks — center end retreats toward tip, tip is last to drain.
-    for (const dir of connections) {
-      if (dir === anim.exitDir) continue;
-      const dx = NEIGHBOUR_DELTA[dir].col;
-      const dy = NEIGHBOUR_DELTA[dir].row;
-      ctx.lineCap = mutualDirs?.has(dir) ? 'butt' : 'round';
-      ctx.beginPath();
-      ctx.moveTo(cx + dx * half * drainP2, cy + dy * half * drainP2);
-      ctx.lineTo(cx + dx * half, cy + dy * half);
-      ctx.stroke();
-    }
+  // Other arms: Phase 1 (drainP2=0) draws them at full length from the center;
+  // Phase 2 shrinks the near end from center toward the tip as drainP2 grows.
+  // Both are the same formula — at drainP2=0 it reduces exactly to the Phase 1 case.
+  for (const dir of connections) {
+    if (dir === anim.exitDir) continue;
+    const dx = NEIGHBOUR_DELTA[dir].col;
+    const dy = NEIGHBOUR_DELTA[dir].row;
+    ctx.lineCap = _drainLineCapFor(dir, mutualDirs);
+    ctx.beginPath();
+    ctx.moveTo(cx + dx * half * drainP2, cy + dy * half * drainP2);
+    ctx.lineTo(cx + dx * half, cy + dy * half);
+    ctx.stroke();
   }
 
   ctx.restore();
