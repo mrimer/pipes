@@ -268,8 +268,7 @@ export class CloudShadowField {
    * Used for campaign map zoom so ambient clouds keep continuity.
    */
   reflowForScreen(width: number, height: number, tileSize: number, style?: LevelStyle): void {
-    const nextEnabled = style !== 'Dark' && width > 0 && height > 0;
-    if (!nextEnabled) {
+    if (!CloudShadowField._isReflowEnabled(width, height, style)) {
       this._width = width;
       this._height = height;
       this._tileSize = Math.max(1, tileSize);
@@ -278,7 +277,7 @@ export class CloudShadowField {
       this._lastNow = null;
       return;
     }
-    if (!this._enabled || this._width <= 0 || this._height <= 0 || this._tileSize <= 0) {
+    if (this._needsFullReset()) {
       this.resetForScreen(width, height, tileSize, this._preset, style);
       return;
     }
@@ -303,6 +302,16 @@ export class CloudShadowField {
         puff.radiusAcross *= scale;
       }
     }
+  }
+
+  /** Whether a reflow with these dimensions/style keeps the field enabled. */
+  private static _isReflowEnabled(width: number, height: number, style: LevelStyle | undefined): boolean {
+    return style !== 'Dark' && width > 0 && height > 0;
+  }
+
+  /** Whether the current field state is unusable and needs a full reset rather than a scaled reflow. */
+  private _needsFullReset(): boolean {
+    return !this._enabled || this._width <= 0 || this._height <= 0 || this._tileSize <= 0;
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {
@@ -724,8 +733,7 @@ export class CampaignBirdFlockField {
    * Used by campaign wheel zoom so birds stay aligned with the grid.
    */
   reflowForScreen(width: number, height: number, tileSize: number, style?: LevelStyle): void {
-    const nextEnabled = style !== 'Dark' && width > 0 && height > 0;
-    if (!nextEnabled) {
+    if (!CampaignBirdFlockField._isReflowEnabled(width, height, style)) {
       this._width = width;
       this._height = height;
       this._tileSize = Math.max(1, tileSize);
@@ -735,7 +743,7 @@ export class CampaignBirdFlockField {
       this._lastNow = null;
       return;
     }
-    if (!this._enabled || this._tileSize <= 0 || this._width <= 0 || this._height <= 0 || !this._flock) {
+    if (this._needsFullReset()) {
       this.resetForScreen(width, height, tileSize, style);
       return;
     }
@@ -749,6 +757,23 @@ export class CampaignBirdFlockField {
     this._birdCache = null;
 
     const flock = this._flock;
+    if (!flock) return; // unreachable: _needsFullReset() above already guards !this._flock
+    this._scaleFlockGeometry(flock, scale);
+    flock.boundingRadius = this._computeFlockBoundingRadius(flock);
+  }
+
+  /** Whether a reflow with these dimensions/style keeps the field enabled. */
+  private static _isReflowEnabled(width: number, height: number, style: LevelStyle | undefined): boolean {
+    return style !== 'Dark' && width > 0 && height > 0;
+  }
+
+  /** Whether the current field state is unusable and needs a full reset rather than a scaled reflow. */
+  private _needsFullReset(): boolean {
+    return !this._enabled || this._tileSize <= 0 || this._width <= 0 || this._height <= 0 || !this._flock;
+  }
+
+  /** Scale a flock's position/speed/size fields and every bird's per-bird geometry by `scale`. */
+  private _scaleFlockGeometry(flock: BirdFlock, scale: number): void {
     flock.x *= scale;
     flock.y *= scale;
     flock.speedPxPerMs *= scale;
@@ -760,7 +785,10 @@ export class CampaignBirdFlockField {
       bird.size *= scale;
       bird.strokeWidth *= scale;
     }
+  }
 
+  /** Recompute a flock's pixel-space bounding radius from its birds' current offsets/sizes. */
+  private _computeFlockBoundingRadius(flock: BirdFlock): number {
     let boundingRadius = 0;
     for (const bird of flock.birds) {
       const stampHalfSize = this._getRenderedBirdHalfSize(flock, bird);
@@ -769,7 +797,7 @@ export class CampaignBirdFlockField {
         Math.hypot(bird.offsetAlong, bird.offsetAcross) + stampHalfSize,
       );
     }
-    flock.boundingRadius = boundingRadius;
+    return boundingRadius;
   }
 
   updateAndRender(ctx: CanvasRenderingContext2D, now: number): void {
@@ -815,16 +843,7 @@ export class CampaignBirdFlockField {
     flock.x += flock.dirX * flock.speedPxPerMs * dt;
     flock.y += flock.dirY * flock.speedPxPerMs * dt;
 
-    const visibleMinX = -flock.boundingRadius;
-    const visibleMaxX = this._width + flock.boundingRadius;
-    const visibleMinY = -flock.boundingRadius;
-    const visibleMaxY = this._height + flock.boundingRadius;
-    if (
-      flock.x >= visibleMinX
-      && flock.x <= visibleMaxX
-      && flock.y >= visibleMinY
-      && flock.y <= visibleMaxY
-    ) {
+    if (this._isFlockInsideVisibleBounds(flock)) {
       flock.hasEntered = true;
     }
 
@@ -834,6 +853,16 @@ export class CampaignBirdFlockField {
         this._flock = this._spawnFlock();
       }
     }
+  }
+
+  /** Whether the flock's current position is within the visible area (expanded by its bounding radius). */
+  private _isFlockInsideVisibleBounds(flock: BirdFlock): boolean {
+    const visibleMinX = -flock.boundingRadius;
+    const visibleMaxX = this._width + flock.boundingRadius;
+    const visibleMinY = -flock.boundingRadius;
+    const visibleMaxY = this._height + flock.boundingRadius;
+    return flock.x >= visibleMinX && flock.x <= visibleMaxX &&
+      flock.y >= visibleMinY && flock.y <= visibleMaxY;
   }
 
   private _isFlockFullyOffscreen(flock: BirdFlock, margin: number): boolean {
