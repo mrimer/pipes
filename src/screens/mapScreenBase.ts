@@ -37,6 +37,15 @@ import { resolveLocalizedText } from '../campaignLocalization';
 
 // ─── Canvas border constants ──────────────────────────────────────────────────
 
+/** Shared per-tile context for computing a chapter-map sink node's tooltip text. */
+interface SinkTooltipContext {
+  chapter: ChapterDef;
+  displayProgress: Set<number>;
+  filledKeys: Set<string>;
+  row: number;
+  col: number;
+}
+
 /** CSS border-width (px) on the chapter map canvas element. */
 const CHAPTER_MAP_CANVAS_BORDER_PX = 2;
 /** Default CSS border-color on the chapter map canvas element. */
@@ -403,7 +412,9 @@ export abstract class MapScreenBase {
 
   private _onResizeTimeout(): void {
     this._resizeTimer = null;
-    if (this.screenEl.style.display === 'none' || !this._chapter || !this._campaign) return;
+    if (this.screenEl.style.display === 'none') return;
+    if (!this._chapter) return;
+    if (!this._campaign) return;
     this.repopulate(this._campaign);
   }
 
@@ -474,11 +485,9 @@ export abstract class MapScreenBase {
     // the transition falls back gracefully (no off-screen animation target).
     if (this._isOutsideViewWindow(canvasX, canvasY)) return null;
 
-    const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(
-      canvasX, canvasY, levelDef
-    );
+    const minimapRect = computeMinimapRect(canvasX, canvasY, levelDef);
 
-    return this._minimapRectToScreenSpace(canvas, mx, my, mw, mh);
+    return this._minimapRectToScreenSpace(canvas, minimapRect);
   }
 
   /** Finds the grid cell whose level chamber references levelDef, or null if not found. */
@@ -517,11 +526,9 @@ export abstract class MapScreenBase {
    */
   private _minimapRectToScreenSpace(
     canvas: HTMLCanvasElement,
-    mx: number,
-    my: number,
-    mw: number,
-    mh: number,
+    minimapRect: { x: number; y: number; width: number; height: number },
   ): { x: number; y: number; width: number; height: number } {
+    const { x: mx, y: my, width: mw, height: mh } = minimapRect;
     const rect = canvas.getBoundingClientRect();
     const border = CHAPTER_MAP_CANVAS_BORDER_PX;
     const contentW = rect.width - 2 * border;
@@ -547,7 +554,9 @@ export abstract class MapScreenBase {
    */
   captureCanvasSnapshot(): ChapterMapSnapshot | null {
     const canvas = this._canvas;
-    if (!canvas || canvas.width === 0 || canvas.height === 0) return null;
+    if (!canvas) return null;
+    if (canvas.width === 0) return null;
+    if (canvas.height === 0) return null;
     const fullRect = canvas.getBoundingClientRect();
 
     // Border thickness must match the actual CSS border width so the snapshot
@@ -1074,7 +1083,7 @@ export abstract class MapScreenBase {
     if (!this._panDrag) return false;
     const dx = e.clientX - this._panDrag.startClientX;
     const dy = e.clientY - this._panDrag.startClientY;
-    if (!this._panDrag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+    if (!this._panDrag.moved && this._isPanDragThresholdCrossed(dx, dy)) {
       this._panDrag.moved = true;
     }
     if (!this._panDrag.moved) return false;
@@ -1088,6 +1097,11 @@ export abstract class MapScreenBase {
     this._render(chapter);
     canvas.style.cursor = 'grabbing';
     return true;
+  }
+
+  /** True once the drag has moved past the small deadzone that distinguishes a pan gesture from a click. */
+  private _isPanDragThresholdCrossed(dx: number, dy: number): boolean {
+    return Math.abs(dx) > 4 || Math.abs(dy) > 4;
   }
 
   /** Update native title for non-Ctrl hover and custom tooltip for Ctrl+hover. */
@@ -1272,7 +1286,7 @@ export abstract class MapScreenBase {
     const filledKeys = this._computeFilledCells();
     if (this._isLevelChamberDef(def)) return this._levelChamberTooltip(def, filledKeys, row, col);
     if (def?.shape === PipeShape.Source) return this._sourceTooltip(displayProgress);
-    if (def?.shape === PipeShape.Sink) return this._sinkTooltip(def, chapter, displayProgress, filledKeys, row, col);
+    if (def?.shape === PipeShape.Sink) return this._sinkTooltip(def, { chapter, displayProgress, filledKeys, row, col });
     return '';
   }
 
@@ -1291,14 +1305,8 @@ export abstract class MapScreenBase {
     return t(count === 1 ? 'map.tooltip.completed.one' : 'map.tooltip.completed.other', { count });
   }
 
-  private _sinkTooltip(
-    def: TileDef,
-    chapter: ChapterDef,
-    displayProgress: Set<number>,
-    filledKeys: Set<string>,
-    row: number,
-    col: number,
-  ): string {
+  private _sinkTooltip(def: TileDef, ctx: SinkTooltipContext): string {
+    const { chapter, displayProgress, filledKeys, row, col } = ctx;
     const remaining = this._sinkRemaining(def, chapter, displayProgress);
     if (remaining > 0) return t(remaining === 1 ? 'map.tooltip.remaining.one' : 'map.tooltip.remaining.other', { count: remaining });
     if (filledKeys.has(`${row},${col}`)) return t('map.tooltip.chapterComplete');
@@ -1775,22 +1783,20 @@ export abstract class MapScreenBase {
     const cols = chapter.cols ?? 6;
     const grid = chapter.grid;
 
+    if (!grid) { this._resetPanToOrigin(); return; }
     // For maps that fit entirely within the view, no panning is needed.
-    if (!grid || (rows <= viewRows && cols <= viewCols)) {
-      this._panPixelX = 0;
-      this._panPixelY = 0;
-      return;
-    }
+    if (rows <= viewRows && cols <= viewCols) { this._resetPanToOrigin(); return; }
 
     const filledKeys = this._computeFilledCells();
     const target = this._findInitialSnapTarget(grid, rows, cols, filledKeys);
-    if (!target) {
-      this._panPixelX = 0;
-      this._panPixelY = 0;
-      return;
-    }
+    if (!target) { this._resetPanToOrigin(); return; }
 
-    this._snapPanToTarget(target, rows, cols, viewRows, viewCols);
+    this._snapPanToTarget(target, { rows, cols, viewRows, viewCols });
+  }
+
+  private _resetPanToOrigin(): void {
+    this._panPixelX = 0;
+    this._panPixelY = 0;
   }
 
   /** Finds the highest-numbered accessible chamber tile to snap to, falling back to the source tile. */
@@ -1835,11 +1841,9 @@ export abstract class MapScreenBase {
    */
   private _snapPanToTarget(
     target: { row: number; col: number },
-    rows: number,
-    cols: number,
-    viewRows: number,
-    viewCols: number,
+    dims: { rows: number; cols: number; viewRows: number; viewCols: number },
   ): void {
+    const { rows, cols, viewRows, viewCols } = dims;
     const maxPanX = Math.max(0, (cols - viewCols) * TILE_SIZE);
     const maxPanY = Math.max(0, (rows - viewRows) * TILE_SIZE);
     this._panPixelX = Math.max(0, Math.min(maxPanX,
@@ -2234,26 +2238,38 @@ export abstract class MapScreenBase {
   /** Remove an edge flower from the side-specific y-sorted index. */
   private _removeEdgeFlowerByY(flower: EdgeFlower): void {
     const sideFlowers = flower.isLeft ? this._leftEdgeFlowersByY : this._rightEdgeFlowersByY;
+    const low = this._findEdgeFlowerYLowerBound(sideFlowers, flower.y);
+    if (this._removeEdgeFlowerAtExactY(sideFlowers, flower, low)) return;
+    const fallbackIdx = sideFlowers.indexOf(flower);
+    if (fallbackIdx >= 0) {
+      sideFlowers.splice(fallbackIdx, 1);
+    }
+  }
+
+  /** Binary search for the first index in the y-sorted array whose y is >= the target y. */
+  private _findEdgeFlowerYLowerBound(sideFlowers: EdgeFlower[], y: number): number {
     let low = 0;
     let high = sideFlowers.length;
     while (low < high) {
       const mid = Math.floor((low + high) / 2);
-      if (sideFlowers[mid].y < flower.y) {
+      if (sideFlowers[mid].y < y) {
         low = mid + 1;
       } else {
         high = mid;
       }
     }
+    return low;
+  }
+
+  /** Removes flower from sideFlowers if found among the entries sharing its exact y (from `low` onward). */
+  private _removeEdgeFlowerAtExactY(sideFlowers: EdgeFlower[], flower: EdgeFlower, low: number): boolean {
     for (let i = low; i < sideFlowers.length && sideFlowers[i].y === flower.y; i++) {
       if (sideFlowers[i] === flower) {
         sideFlowers.splice(i, 1);
-        return;
+        return true;
       }
     }
-    const fallbackIdx = sideFlowers.indexOf(flower);
-    if (fallbackIdx >= 0) {
-      sideFlowers.splice(fallbackIdx, 1);
-    }
+    return false;
   }
 
   // ─── Abstract methods ─────────────────────────────────────────────────────
