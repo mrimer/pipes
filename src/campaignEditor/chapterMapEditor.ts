@@ -10,7 +10,7 @@ import type { CampaignDef, ChapterDef, LevelDef, TileDef, LevelStyle } from '../
 import { PipeShape } from '../types';
 import { isEmptyFloor } from '../board';
 import { TILE_SIZE, setTileSize, computeTileSize } from '../renderer';
-import type { HoverOverlay, DragState } from './editorRenderer';
+import type { HoverOverlay } from './editorRenderer';
 import { renderEditorCanvas } from './editorRenderer';
 import type {
   EditorSnapshot} from './types';
@@ -168,9 +168,11 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const campaign = this._callbacks.getActiveCampaign();
     const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
     const existing = document.getElementById('chapter-tile-params-panel');
-    if (existing && this._ui && campaign && chapter) {
-      existing.replaceWith(this._ui.buildTileParamsPanel(chapter, campaign));
-    }
+    if (!existing) return;
+    if (!this._ui) return;
+    if (!campaign) return;
+    if (!chapter) return;
+    existing.replaceWith(this._ui.buildTileParamsPanel(chapter, campaign));
   }
 
   protected _applySnapshot(snap: EditorSnapshot): void {
@@ -179,11 +181,12 @@ export class ChapterMapEditorSection extends MapEditorBase {
     this._applySnapshotBase(snap, (style) => {
       if (chapter) chapter.style = style;
     });
-    if (this._ui && campaign && chapter) {
-      this._ui.rebuildLevelInventory(chapter, campaign);
-      this._ui.rebuildGridSizePanel(chapter, campaign);
-      this._ui.rebuildStylePanel(chapter, campaign);
-    }
+    if (!this._ui) return;
+    if (!campaign) return;
+    if (!chapter) return;
+    this._ui.rebuildLevelInventory(chapter, campaign);
+    this._ui.rebuildGridSizePanel(chapter, campaign);
+    this._ui.rebuildStylePanel(chapter, campaign);
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
@@ -211,24 +214,38 @@ export class ChapterMapEditorSection extends MapEditorBase {
       `background:${EDITOR_INPUT_BG};border:1px solid #4a90d9;border-radius:8px;padding:16px;` +
       'display:flex;flex-direction:column;gap:12px;';
 
+    // Validation warning icon – stays in the header so it is visible even when the box is collapsed.
+    const validationWarningIcon = document.createElement('span');
+    validationWarningIcon.title = t('editor.chapterMap.validationErrors');
+    validationWarningIcon.style.cssText = 'display:none;font-size:1rem;cursor:default;';
+    validationWarningIcon.textContent = '⚠️';
+
+    // Collapsible body containing all map editor content
+    const body = document.createElement('div');
+    body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+    if (this._mapBoxCollapsed) body.style.display = 'none';
+
+    section.appendChild(this._buildChapterSectionHeader(body, validationWarningIcon));
+
+    if (isOfficial) {
+      this._appendReadOnlyChapterMapBody(body, campaign, chapter);
+    } else {
+      this._appendEditableChapterMapBody(body, campaign, chapter, validationWarningIcon);
+    }
+
+    section.appendChild(body);
+    return section;
+  }
+
+  /** Build the section header: title, validation warning icon, and collapse/expand toggle. */
+  private _buildChapterSectionHeader(body: HTMLElement, validationWarningIcon: HTMLElement): HTMLElement {
     const sectionHeader = document.createElement('div');
     sectionHeader.style.cssText = 'display:flex;align-items:center;gap:12px;';
     const sectionTitle = document.createElement('h3');
     sectionTitle.textContent = t('editor.chapterMap.title');
     sectionTitle.style.cssText = 'margin:0;font-size:1rem;color:#7ed321;flex:1;';
     sectionHeader.appendChild(sectionTitle);
-
-    // Validation warning icon – stays in the header so it is visible even when the box is collapsed.
-    const validationWarningIcon = document.createElement('span');
-    validationWarningIcon.title = t('editor.chapterMap.validationErrors');
-    validationWarningIcon.style.cssText = 'display:none;font-size:1rem;cursor:default;';
-    validationWarningIcon.textContent = '⚠️';
     sectionHeader.appendChild(validationWarningIcon);
-
-    // Collapsible body containing all map editor content
-    const body = document.createElement('div');
-    body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
-    if (this._mapBoxCollapsed) body.style.display = 'none';
 
     const toggleBtn = this._callbacks.buildBtn(
       this._mapBoxCollapsed ? t('editor.map.expand') : t('editor.map.collapse'),
@@ -248,33 +265,50 @@ export class ChapterMapEditorSection extends MapEditorBase {
       true,
     );
     sectionHeader.appendChild(toggleBtn);
-    section.appendChild(sectionHeader);
+    return sectionHeader;
+  }
 
-    if (isOfficial) {
-      const readonlyMsg = document.createElement('p');
-      readonlyMsg.style.cssText = 'color:#888;font-size:0.85rem;';
-      readonlyMsg.textContent = t('editor.chapterMap.readOnly');
-      body.appendChild(readonlyMsg);
-      // Still render the canvas in read-only mode
-      const canvas = this._buildChapterMapCanvas(campaign, chapter, true);
-      body.appendChild(canvas);
-      section.appendChild(body);
-      return section;
-    }
+  /** Append the read-only body content (message + canvas) for an official campaign's chapter map. */
+  private _appendReadOnlyChapterMapBody(body: HTMLElement, campaign: CampaignDef, chapter: ChapterDef): void {
+    const readonlyMsg = document.createElement('p');
+    readonlyMsg.style.cssText = 'color:#888;font-size:0.85rem;';
+    readonlyMsg.textContent = t('editor.chapterMap.readOnly');
+    body.appendChild(readonlyMsg);
+    // Still render the canvas in read-only mode
+    const canvas = this._buildChapterMapCanvas(campaign, chapter, true);
+    body.appendChild(canvas);
+  }
 
-    // 3-column layout: [palette] [canvas+validation] [level inventory + size]
+  /** Append the editable 3-column layout: [palette] [canvas+validation] [level inventory + size]. */
+  private _appendEditableChapterMapBody(
+    body: HTMLElement, campaign: CampaignDef, chapter: ChapterDef, validationWarningIcon: HTMLElement,
+  ): void {
     const layout = document.createElement('div');
     layout.style.cssText = 'display:flex;flex-wrap:nowrap;gap:12px;align-items:flex-start;';
     this._chapterEditorMainLayout = layout;
 
+    const { leftCol, ui } = this._buildChapterLeftColumn(campaign, chapter);
+    layout.appendChild(leftCol);
+    layout.appendChild(this._buildChapterMidColumn(campaign, chapter, validationWarningIcon));
+    layout.appendChild(this._buildChapterRightColumn(campaign, chapter, ui));
+
+    body.appendChild(layout);
+  }
+
+  /** Build the left column: style/palette/tile-params panels. Also (re)creates {@link _ui}. */
+  private _buildChapterLeftColumn(campaign: CampaignDef, chapter: ChapterDef): { leftCol: HTMLElement; ui: ChapterEditorUI } {
     const leftCol = document.createElement('div');
     leftCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:140px;';
-    this._ui = new ChapterEditorUI(this._makeUICallbacks());
-    leftCol.appendChild(this._ui.buildStylePanel(chapter, campaign));
-    leftCol.appendChild(this._ui.buildPalettePanel(chapter, campaign));
-    leftCol.appendChild(this._ui.buildTileParamsPanel(chapter, campaign));
-    layout.appendChild(leftCol);
+    const ui = new ChapterEditorUI(this._makeUICallbacks());
+    this._ui = ui;
+    leftCol.appendChild(ui.buildStylePanel(chapter, campaign));
+    leftCol.appendChild(ui.buildPalettePanel(chapter, campaign));
+    leftCol.appendChild(ui.buildTileParamsPanel(chapter, campaign));
+    return { leftCol, ui };
+  }
 
+  /** Build the middle column: undo/redo + validate toolbar, then the canvas. */
+  private _buildChapterMidColumn(campaign: CampaignDef, chapter: ChapterDef, validationWarningIcon: HTMLElement): HTMLElement {
     const midCol = document.createElement('div');
     midCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;';
 
@@ -310,19 +344,17 @@ export class ChapterMapEditorSection extends MapEditorBase {
     applyValidationState(initResult.ok);
 
     midCol.appendChild(midToolbar);
-
     midCol.appendChild(this._buildChapterMapCanvas(campaign, chapter, false));
-    layout.appendChild(midCol);
+    return midCol;
+  }
 
+  /** Build the right column: level inventory + grid size panels. */
+  private _buildChapterRightColumn(campaign: CampaignDef, chapter: ChapterDef, ui: ChapterEditorUI): HTMLElement {
     const rightCol = document.createElement('div');
     rightCol.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:210px;';
-    rightCol.appendChild(this._ui.buildLevelInventoryPanel(chapter, campaign));
-    rightCol.appendChild(this._ui.buildGridSizePanel(chapter, campaign));
-    layout.appendChild(rightCol);
-
-    body.appendChild(layout);
-    section.appendChild(body);
-    return section;
+    rightCol.appendChild(ui.buildLevelInventoryPanel(chapter, campaign));
+    rightCol.appendChild(ui.buildGridSizePanel(chapter, campaign));
+    return rightCol;
   }
 
   /** Build the callback object that wires ChapterEditorUI to this section's state. */
@@ -461,38 +493,8 @@ export class ChapterMapEditorSection extends MapEditorBase {
     const ctx = this._ctx;
     if (!ctx) return;
 
-    let overlay: HoverOverlay | null = null;
-    let drag: DragState | null = null;
-
-    const hover = this._input?.hover ?? null;
-    drag = this._input?.dragState ?? null;
-
-    if (!drag && hover) {
-      if (this._palette === 'erase') {
-        const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
-        const isEmpty = hoverCell === null;
-        overlay = { pos: hover, def: null, alpha: isEmpty ? 0.2 : 1 };
-      } else if (this._chapterSelectedLevelIdx !== null) {
-        // Preview: level chamber placeholder – only on empty cells
-        const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
-        const isEmpty = hoverCell === null || (hoverCell !== null && isEmptyFloor(hoverCell.shape));
-        if (isEmpty) {
-          const levelDef: TileDef = {
-            shape: PipeShape.Chamber,
-            chamberContent: 'level',
-            levelIdx: this._chapterSelectedLevelIdx,
-          };
-          overlay = { pos: hover, def: levelDef, alpha: 0.55 };
-        }
-      } else {
-        // Show placement ghost on empty or empty-floor cells
-        const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
-        const isEmpty = hoverCell === null || (hoverCell !== null && isEmptyFloor(hoverCell.shape));
-        if (isEmpty) {
-          overlay = { pos: hover, def: this._buildChapterTileDef(), alpha: 0.55 };
-        }
-      }
-    }
+    const overlay = this._computeChapterHoverOverlay();
+    const drag = this._input?.dragState ?? null;
 
     const campaign = this._callbacks.getActiveCampaign();
     const chapter = campaign?.chapters[this._callbacks.getActiveChapterIdx()];
@@ -518,14 +520,58 @@ export class ChapterMapEditorSection extends MapEditorBase {
     drawFocusedTileOverlay(ctx, this._gridState.focusedTilePos);
   }
 
+  /**
+   * Compute the hover-ghost overlay for the chapter map canvas (no overlay while
+   * dragging, or when nothing is hovered).
+   */
+  private _computeChapterHoverOverlay(): HoverOverlay | null {
+    const hover = this._input?.hover ?? null;
+    const drag = this._input?.dragState ?? null;
+    if (drag !== null || !hover) return null;
+
+    if (this._palette === 'erase') return this._computeEraseHoverOverlay(hover);
+    const selectedLevelIdx = this._chapterSelectedLevelIdx;
+    if (selectedLevelIdx !== null) return this._computeLevelChamberHoverOverlay(hover, selectedLevelIdx);
+    return this._computeTilePlacementHoverOverlay(hover);
+  }
+
+  /** Erase-palette hover ghost: dim on an already-empty cell, solid otherwise. */
+  private _computeEraseHoverOverlay(hover: { row: number; col: number }): HoverOverlay {
+    const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
+    const isEmpty = hoverCell === null;
+    return { pos: hover, def: null, alpha: isEmpty ? 0.2 : 1 };
+  }
+
+  /** Level-chamber placeholder hover ghost – only shown on empty/empty-floor cells. */
+  private _computeLevelChamberHoverOverlay(hover: { row: number; col: number }, levelIdx: number): HoverOverlay | null {
+    const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
+    const isEmpty = hoverCell === null || isEmptyFloor(hoverCell.shape);
+    if (!isEmpty) return null;
+    const levelDef: TileDef = { shape: PipeShape.Chamber, chamberContent: 'level', levelIdx };
+    return { pos: hover, def: levelDef, alpha: 0.55 };
+  }
+
+  /** Placement-ghost hover overlay for the current palette tile – only on empty/empty-floor cells. */
+  private _computeTilePlacementHoverOverlay(hover: { row: number; col: number }): HoverOverlay | null {
+    const hoverCell = this._gridState.grid[hover.row]?.[hover.col] ?? null;
+    const isEmpty = hoverCell === null || isEmptyFloor(hoverCell.shape);
+    if (!isEmpty) return null;
+    return { pos: hover, def: this._buildChapterTileDef(), alpha: 0.55 };
+  }
+
   /** RAF callback that keeps animated sea tiles updating while this editor is active. */
   private _seaAnimationTick = (token: number): void => {
     if (this._seaAnimationFrameId === null || token !== this._seaAnimationLoopToken) return;
-    if (this._canvas && this._ctx && !this._mapBoxCollapsed) {
+    if (this._canRenderSeaAnimationFrame()) {
       this._renderChapterCanvas();
     }
     this._seaAnimationFrameId = requestAnimationFrame(() => this._seaAnimationTick(token));
   };
+
+  /** Whether the sea-animation RAF loop should render this frame (canvas ready, box not collapsed). */
+  private _canRenderSeaAnimationFrame(): boolean {
+    return this._canvas !== null && this._ctx !== null && !this._mapBoxCollapsed;
+  }
 
   /** Build a TileDef from the current chapter palette selection and params. */
   private _buildChapterTileDef(): TileDef {
