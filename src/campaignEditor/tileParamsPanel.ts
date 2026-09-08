@@ -218,6 +218,27 @@ export function buildStyleSectionPanel(
   return panel;
 }
 
+/** Palette shapes that never show a parameter panel (fixed-appearance floor/decor tiles). */
+const NO_PARAM_SHAPES: ReadonlySet<PipeShape> = new Set([
+  PipeShape.Granite, PipeShape.Tree, PipeShape.Tree2, PipeShape.Tree3, PipeShape.Tree4,
+  PipeShape.Sea, PipeShape.GoldSpace, PipeShape.OneWay,
+]);
+
+/** Whether the given palette selection has no editable parameters at all. */
+function _hasNoParams(p: EditorPalette, isParamFreePipe: boolean): boolean {
+  return p === 'erase' || NO_PARAM_SHAPES.has(p as PipeShape) || isParamFreePipe;
+}
+
+/** Whether the palette selection is Cement or a spin-cement variant (Drying Time only). */
+function _isCementLike(p: EditorPalette): boolean {
+  return p === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(p as PipeShape);
+}
+
+/** Whether the palette selection needs the compass connections widget. */
+function _needsConnectionsWidget(p: EditorPalette, isChm: boolean): boolean {
+  return p === PipeShape.Source || p === PipeShape.Sink || isChm;
+}
+
 // ─── TileParamsPanel class ────────────────────────────────────────────────────
 
 export class TileParamsPanel {
@@ -281,55 +302,10 @@ export class TileParamsPanel {
     title.textContent = t('editor.palette.title');
     panel.appendChild(title);
 
-    const isGoldSelected = GOLD_PALETTE_ITEMS.some(i => i.palette === state.palette);
-    const isLeakySelected = LEAKY_PALETTE_ITEMS.some(i => i.palette === state.palette);
-    const isFloorSelected = FLOOR_PALETTE_ITEMS.some(i => i.palette === state.palette);
-    // Auto-expand the gold section if a gold item is currently selected
-    if (isGoldSelected) this.goldSectionExpanded = true;
-    // Auto-expand the leaky section if a leaky item is currently selected
-    if (isLeakySelected) this.leakySectionExpanded = true;
-    // Auto-expand the floor section if a floor item is currently selected
-    if (isFloorSelected) this.floorSectionExpanded = true;
-    // Auto-expand the chamber section if a chamber item is currently selected
-    if (isChamberPalette(state.palette)) this.chamberSectionExpanded = true;
-    // Auto-expand the pipes section if a pipe item is currently selected
-    if (PIPES_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.pipesSectionExpanded = true;
-    // Auto-expand the spin section if a spin item is currently selected
-    if (SPIN_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.spinSectionExpanded = true;
+    this._autoExpandSectionsForSelection(state);
 
-    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = item.label;
-      btn.dataset['palette'] = String(item.palette);
-      const isSelected = state.palette === item.palette;
-      btn.style.cssText =
-        `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
-        (indent ? 'margin-left:12px;' : '') +
-        'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
-        'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
-        'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
-
-      btn.addEventListener('click', () => {
-        const changed = state.palette !== item.palette;
-        state.palette = item.palette;
-        state.clearLink();
-        if (isChamberPalette(item.palette)) {
-          state.params.chamberContent = chamberPaletteContent(item.palette);
-        }
-        if (changed) sfxManager.play(SfxId.InventorySelect);
-        const newPanel = this.buildPalette();
-        panel.replaceWith(newPanel);
-        const paramPanel = document.getElementById('editor-param-panel');
-        if (paramPanel) {
-          const newParam = this.buildParamPanel();
-          newParam.id = 'editor-param-panel';
-          paramPanel.replaceWith(newParam);
-        }
-        this._cb.renderCanvas();
-      });
-      return btn;
-    };
+    const makeItemBtn = (item: { palette: EditorPalette; label: string }, indent = false): HTMLButtonElement =>
+      this._buildPaletteItemButton(panel, state, item, indent);
 
     for (const item of PALETTE_ITEMS) {
       panel.appendChild(makeItemBtn(item));
@@ -370,6 +346,62 @@ export class TileParamsPanel {
     return panel;
   }
 
+  /** Auto-expand each collapsible palette section that contains the currently selected item. */
+  private _autoExpandSectionsForSelection(state: LevelEditorState): void {
+    if (GOLD_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.goldSectionExpanded = true;
+    if (LEAKY_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.leakySectionExpanded = true;
+    if (FLOOR_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.floorSectionExpanded = true;
+    if (isChamberPalette(state.palette)) this.chamberSectionExpanded = true;
+    if (PIPES_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.pipesSectionExpanded = true;
+    if (SPIN_PALETTE_ITEMS.some(i => i.palette === state.palette)) this.spinSectionExpanded = true;
+  }
+
+  /** Build a single palette item button, styled selected/unselected, wired to `_onPaletteItemClick`. */
+  private _buildPaletteItemButton(
+    panel: HTMLElement,
+    state: LevelEditorState,
+    item: { palette: EditorPalette; label: string },
+    indent: boolean,
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = item.label;
+    btn.dataset['palette'] = String(item.palette);
+    const isSelected = state.palette === item.palette;
+    btn.style.cssText =
+      `padding:5px 8px;font-size:0.78rem;text-align:left;border-radius:${RADIUS_SM};cursor:pointer;` +
+      (indent ? 'margin-left:12px;' : '') +
+      'border:1px solid ' + (isSelected ? PALETTE_ITEM_SELECTED_BORDER : PALETTE_ITEM_UNSELECTED_BORDER) + ';' +
+      'background:' + (isSelected ? PALETTE_ITEM_SELECTED_BG : PALETTE_ITEM_UNSELECTED_BG) + ';' +
+      'color:' + (isSelected ? PALETTE_ITEM_SELECTED_COLOR : PALETTE_ITEM_UNSELECTED_COLOR) + ';';
+    btn.addEventListener('click', () => this._onPaletteItemClick(panel, state, item));
+    return btn;
+  }
+
+  /** Handle a palette item click: select it, rebuild the palette/param panels, re-render the canvas. */
+  private _onPaletteItemClick(
+    panel: HTMLElement,
+    state: LevelEditorState,
+    item: { palette: EditorPalette; label: string },
+  ): void {
+    const changed = state.palette !== item.palette;
+    state.palette = item.palette;
+    state.clearLink();
+    if (isChamberPalette(item.palette)) {
+      state.params.chamberContent = chamberPaletteContent(item.palette);
+    }
+    if (changed) sfxManager.play(SfxId.InventorySelect);
+    const newPanel = this.buildPalette();
+    panel.replaceWith(newPanel);
+    const paramPanel = document.getElementById('editor-param-panel');
+    if (paramPanel) {
+      const newParam = this.buildParamPanel();
+      newParam.id = 'editor-param-panel';
+      paramPanel.replaceWith(newParam);
+    }
+    this._cb.renderCanvas();
+  }
+
   /**
    * Build the parameter editing panel for the current palette selection.
    * The returned element has id='editor-param-panel'.
@@ -387,59 +419,49 @@ export class TileParamsPanel {
     panel.appendChild(title);
 
     const p = state.palette;
-    const isChm = isChamberPalette(p);
     // Spin-cement shapes are in PIPE_SHAPES but do have a parameter (Drying Time), so exclude them
     // from the "no parameters" early-return check.
     const isParamFreePipe = PIPE_SHAPES.has(p as PipeShape) && !SPIN_CEMENT_SHAPES.has(p as PipeShape);
-    if (p === 'erase' || p === PipeShape.Granite
-        || p === PipeShape.Tree || p === PipeShape.Tree2 || p === PipeShape.Tree3 || p === PipeShape.Tree4
-        || p === PipeShape.Sea || p === PipeShape.GoldSpace
-        || p === PipeShape.OneWay || isParamFreePipe) {
-      const none = document.createElement('div');
-      none.style.cssText = 'font-size:0.8rem;color:#555;';
-      none.textContent = t('editor.params.none');
-      panel.appendChild(none);
+    if (_hasNoParams(p, isParamFreePipe)) {
+      this._appendNoParamsMessage(panel);
       return panel;
     }
 
-    // Cement: show only Drying Time input.
-    // Spin-cement tiles: show Drying Time; rotation is adjusted via wheel/Q/W in the editor.
-    if (p === PipeShape.Cement || SPIN_CEMENT_SHAPES.has(p as PipeShape)) {
-      panel.appendChild(this.labeledInput(t('editor.params.dryingTime'), String(state.params.dryingTime), (v) => {
-        state.params.dryingTime = Math.max(0, parseInt(v) || 0);
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-      }, 'number', '90px'));
+    // Cement/spin-cement tiles: show only Drying Time; rotation is adjusted via wheel/Q/W in the editor.
+    if (_isCementLike(p)) {
+      this._appendDryingTimeInput(panel, state);
       return panel;
     }
 
-    // Source/Chamber(tank): capacity
+    this._appendSourceOrChamberParams(panel, state, p);
+    return panel;
+  }
+
+  /** Append the "no parameters" placeholder message to `panel`. */
+  private _appendNoParamsMessage(panel: HTMLElement): void {
+    const none = document.createElement('div');
+    none.style.cssText = 'font-size:0.8rem;color:#555;';
+    none.textContent = t('editor.params.none');
+    panel.appendChild(none);
+  }
+
+  /** Append the Drying Time input (Cement / spin-cement tiles) to `panel`. */
+  private _appendDryingTimeInput(panel: HTMLElement, state: LevelEditorState): void {
+    panel.appendChild(this.labeledInput(t('editor.params.dryingTime'), String(state.params.dryingTime), (v) => {
+      state.params.dryingTime = Math.max(0, parseInt(v) || 0);
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    }, 'number', '90px'));
+  }
+
+  /** Append the capacity/temperature/pressure/chamber-content/connections inputs to `panel`. */
+  private _appendSourceOrChamberParams(panel: HTMLElement, state: LevelEditorState, p: EditorPalette): void {
+    const isChm = isChamberPalette(p);
     const cc = isChm ? chamberPaletteContent(p) : null;
-    if (p === PipeShape.Source || cc === 'tank') {
-      panel.appendChild(this.labeledInput(t('editor.params.capacity'), String(state.params.capacity), (v) => {
-        state.params.capacity = Math.max(0, parseInt(v) || 0);
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-      }, 'number', '90px'));
-    }
 
-    // Source: temperature and pressure
-    if (p === PipeShape.Source) {
-      panel.appendChild(this.labeledInput(t('editor.params.baseTemp'), String(state.params.temperature), (v) => {
-        state.params.temperature = Math.max(0, parseInt(v) || 0);
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-      }, 'number', '90px'));
-      panel.appendChild(this.labeledInput(t('editor.params.basePressure'), String(state.params.pressure), (v) => {
-        state.params.pressure = Math.max(0, parseInt(v) || 0);
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-      }, 'number', '90px'));
-    }
+    this._appendCapacityInput(panel, state, p, cc);
+    if (p === PipeShape.Source) this._appendSourceTempAndPressureInputs(panel, state);
 
     // Chamber: content type selector + content-specific param inputs
     if (p === PipeShape.Chamber) {
@@ -450,11 +472,36 @@ export class TileParamsPanel {
     }
 
     // Connections (Source, Sink, Chamber) – positional compass layout
-    if (p === PipeShape.Source || p === PipeShape.Sink || isChm) {
+    if (_needsConnectionsWidget(p, isChm)) {
       panel.appendChild(this._buildConnectionsWidget(panel));
     }
+  }
 
-    return panel;
+  /** Append the capacity input for a Source tile or a Chamber/tank tile. */
+  private _appendCapacityInput(panel: HTMLElement, state: LevelEditorState, p: EditorPalette, cc: ChamberContent | null): void {
+    if (p !== PipeShape.Source && cc !== 'tank') return;
+    panel.appendChild(this.labeledInput(t('editor.params.capacity'), String(state.params.capacity), (v) => {
+      state.params.capacity = Math.max(0, parseInt(v) || 0);
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    }, 'number', '90px'));
+  }
+
+  /** Append the base temperature and base pressure inputs for a Source tile. */
+  private _appendSourceTempAndPressureInputs(panel: HTMLElement, state: LevelEditorState): void {
+    panel.appendChild(this.labeledInput(t('editor.params.baseTemp'), String(state.params.temperature), (v) => {
+      state.params.temperature = Math.max(0, parseInt(v) || 0);
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    }, 'number', '90px'));
+    panel.appendChild(this.labeledInput(t('editor.params.basePressure'), String(state.params.pressure), (v) => {
+      state.params.pressure = Math.max(0, parseInt(v) || 0);
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    }, 'number', '90px'));
   }
 
   /** Rebuild and replace both the palette and param panels in the DOM. */
@@ -556,14 +603,12 @@ export class TileParamsPanel {
       const o = document.createElement('option');
       o.value = opt;
       o.textContent = CHAMBER_DISPLAY_NAMES[opt] ?? opt;
-      if (state.params.chamberContent === opt) o.selected = true;
+      o.selected = state.params.chamberContent === opt;
       sel.appendChild(o);
     }
     sel.addEventListener('change', () => {
       state.params.chamberContent = sel.value as TileParams['chamberContent'];
-      if ((TEMP_CHAMBER_CONTENTS as ReadonlySet<string>).has(sel.value)) {
-        if (state.params.temperature === 0) state.params.temperature = 1;
-      }
+      this._maybeSeedDefaultTemperature(state, sel.value);
       state.applyParamsToLinkedTile();
       this._cb.updateUndoRedoButtons();
       this._cb.renderCanvas();
@@ -581,6 +626,13 @@ export class TileParamsPanel {
     return selWrap;
   }
 
+  /** Seed a sensible default temperature (1) the first time a temp-relevant content is selected. */
+  private _maybeSeedDefaultTemperature(state: LevelEditorState, value: string): void {
+    if (!(TEMP_CHAMBER_CONTENTS as ReadonlySet<string>).has(value)) return;
+    if (state.params.temperature !== 0) return;
+    state.params.temperature = 1;
+  }
+
   /**
    * Append content-type-specific parameter inputs for a Chamber tile to `parent`.
    * Called when the active palette is a `ChamberPalette` entry (not the generic
@@ -588,39 +640,49 @@ export class TileParamsPanel {
    */
   private _buildChamberContentParams(parent: HTMLElement, cc: ChamberContent): void {
     const state = this._cb.getState();
+    this._appendChamberDescriptorParams(parent, state, cc);
+    if (cc === 'item') this._appendItemChamberParams(parent, state);
+    if (cc === 'regulator') this._appendRegulatorChamberParams(parent, state);
+  }
+
+  /** Append the declarative numeric param inputs (from {@link CHAMBER_PARAM_DESCRIPTORS}) for `cc`. */
+  private _appendChamberDescriptorParams(parent: HTMLElement, state: LevelEditorState, cc: ChamberContent): void {
     const descriptors = CHAMBER_PARAM_DESCRIPTORS[cc];
-    if (descriptors) {
-      for (const { label, field, clampMin } of descriptors) {
-        parent.appendChild(this.labeledInput(t(label), String(state.params[field]), (v) => {
-          const parsed = parseInt(v) || 0;
-          state.params[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
-          state.applyParamsToLinkedTile();
-          this._cb.updateUndoRedoButtons();
-          this._cb.renderCanvas();
-        }, 'number', '90px'));
-      }
-    }
-    if (cc === 'item') {
-      parent.appendChild(this._buildItemShapeSelector());
-      parent.appendChild(this.labeledInput(t('editor.params.count'), String(state.params.itemCount), (v) => {
-        const parsed = parseInt(v);
-        state.params.itemCount = isNaN(parsed) ? 1 : parsed;
-        state.applyParamsToLinkedTile();
-        this._cb.updateUndoRedoButtons();
-        this._cb.renderCanvas();
-      }, 'number', '90px'));
-    }
-    if (cc === 'regulator') {
-      parent.appendChild(this._buildRegulatorStatSelector());
-      parent.appendChild(this._buildRegulatorOperatorSelector());
-      parent.appendChild(this.labeledInput(t('editor.params.threshold'), String(state.params.cost), (v) => {
+    if (!descriptors) return;
+    for (const { label, field, clampMin } of descriptors) {
+      parent.appendChild(this.labeledInput(t(label), String(state.params[field]), (v) => {
         const parsed = parseInt(v) || 0;
-        state.params.cost = parsed;
+        state.params[field] = clampMin !== undefined ? Math.max(clampMin, parsed) : parsed;
         state.applyParamsToLinkedTile();
         this._cb.updateUndoRedoButtons();
         this._cb.renderCanvas();
       }, 'number', '90px'));
     }
+  }
+
+  /** Append the item-shape selector and count input for a Chamber/item tile. */
+  private _appendItemChamberParams(parent: HTMLElement, state: LevelEditorState): void {
+    parent.appendChild(this._buildItemShapeSelector());
+    parent.appendChild(this.labeledInput(t('editor.params.count'), String(state.params.itemCount), (v) => {
+      const parsed = parseInt(v);
+      state.params.itemCount = isNaN(parsed) ? 1 : parsed;
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    }, 'number', '90px'));
+  }
+
+  /** Append the stat/operator selectors and threshold input for a Chamber/regulator tile. */
+  private _appendRegulatorChamberParams(parent: HTMLElement, state: LevelEditorState): void {
+    parent.appendChild(this._buildRegulatorStatSelector());
+    parent.appendChild(this._buildRegulatorOperatorSelector());
+    parent.appendChild(this.labeledInput(t('editor.params.threshold'), String(state.params.cost), (v) => {
+      const parsed = parseInt(v) || 0;
+      state.params.cost = parsed;
+      state.applyParamsToLinkedTile();
+      this._cb.updateUndoRedoButtons();
+      this._cb.renderCanvas();
+    }, 'number', '90px'));
   }
 
   /**
