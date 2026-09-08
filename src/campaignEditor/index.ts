@@ -68,6 +68,16 @@ const EDITOR_LAYOUT_PADDING = 16;
 const EDITOR_LAYOUT_GAP = 16;
 const EDITOR_BG_COLOR = '#0d1520';
 
+/** Context for building one level row in the chapter detail screen's level list. */
+interface LevelRowContext {
+  campaign: CampaignDef;
+  chapterIdx: number;
+  levelIdx: number;
+  chapter: ChapterDef;
+  level: LevelDef;
+  readOnly: boolean;
+}
+
 /** Counts chambers whose content is a star, across the whole grid. */
 function _countStarChambers(grid: (TileDef | null)[][]): number {
   let starCount = 0;
@@ -114,15 +124,17 @@ function _computeEditorLinkedTilePos(
   drag: DragState | null,
   linkedTilePos: { row: number; col: number } | null,
 ): { row: number; col: number } | null {
-  if (
-    drag &&
-    linkedTilePos &&
-    linkedTilePos.row === drag.fromPos.row &&
-    linkedTilePos.col === drag.fromPos.col
-  ) {
-    return drag.toPos;
-  }
+  if (_isDraggingTileAtLinkedPos(drag, linkedTilePos)) return drag.toPos;
   return linkedTilePos;
+}
+
+/** True when the tile being dragged is the one the link currently points at (link should follow the drag). */
+function _isDraggingTileAtLinkedPos(
+  drag: DragState | null,
+  linkedTilePos: { row: number; col: number } | null,
+): drag is DragState {
+  return drag !== null && linkedTilePos !== null &&
+    linkedTilePos.row === drag.fromPos.row && linkedTilePos.col === drag.fromPos.col;
 }
 
 /** Builds the hover overlay (erase-preview or placement-preview) shown when not dragging. */
@@ -956,7 +968,7 @@ export class CampaignEditor {
     meta.textContent = metaParts.join('  ');
     info.appendChild(name);
     info.appendChild(meta);
-    if (chapter.grid && chapter.rows && chapter.cols) {
+    if (this._hasChapterMapData(chapter)) {
       const pseudoLevel: LevelDef = {
         id: chapter.id,
         name: chapter.name,
@@ -998,6 +1010,13 @@ export class CampaignEditor {
     }
 
     return row;
+  }
+
+  /** True when chapter has a chapter map grid to render a minimap preview for. */
+  private _hasChapterMapData(
+    chapter: ChapterDef,
+  ): chapter is ChapterDef & { grid: (TileDef | null)[][]; rows: number; cols: number } {
+    return !!chapter.grid && !!chapter.rows && !!chapter.cols;
   }
 
   // ─── Screen: Chapter detail ───────────────────────────────────────────────
@@ -1108,8 +1127,18 @@ export class CampaignEditor {
   ): HTMLElement {
     const chapter = campaign.chapters[chapterIdx];
     const level = chapter.levels[levelIdx];
+    const ctx: LevelRowContext = { campaign, chapterIdx, levelIdx, chapter, level, readOnly };
     const { row, info, btns } = this._buildItemRow('#2a3a5e', '12px 16px', '6px');
 
+    this._appendLevelRowNameAndMinimap(info, ctx);
+    this._appendLevelRowEditButton(btns, ctx);
+    if (!readOnly) this._appendLevelRowEditingButtons(btns, ctx);
+
+    return row;
+  }
+
+  private _appendLevelRowNameAndMinimap(info: HTMLElement, ctx: LevelRowContext): void {
+    const { level, levelIdx, readOnly } = ctx;
     const name = document.createElement('div');
     name.style.cssText = 'font-size:0.95rem;font-weight:bold;';
     const starSuffix = (level.starCount ?? 0) > 0 ? ` ⭐×${level.starCount}` : '';
@@ -1127,66 +1156,73 @@ export class CampaignEditor {
     });
     info.appendChild(name);
     info.appendChild(minimap);
+  }
 
+  private _appendLevelRowEditButton(btns: HTMLElement, ctx: LevelRowContext): void {
+    const { level, levelIdx, readOnly } = ctx;
     const editOrViewLabel = readOnly ? t('editor.toolbar.view') : t('editor.toolbar.edit');
     btns.appendChild(this._btn(editOrViewLabel, UI_BG, '#f0c040', () => {
       this._activeLevelIdx = levelIdx;
       this._openLevelEditor(level, readOnly);
     }));
+  }
 
-    if (!readOnly) {
-      btns.appendChild(this._btn(t('editor.toolbar.duplicate'), UI_BG, '#aaa', () => {
-        this._service.duplicateLevel(campaign, chapterIdx, levelIdx);
+  private _appendLevelRowEditingButtons(btns: HTMLElement, ctx: LevelRowContext): void {
+    const { campaign, chapterIdx, levelIdx, chapter, level } = ctx;
+    btns.appendChild(this._btn(t('editor.toolbar.duplicate'), UI_BG, '#aaa', () => {
+      this._service.duplicateLevel(campaign, chapterIdx, levelIdx);
+      this._showChapterDetail();
+    }));
+
+    this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail(),
+      (fromIdx, toIdx) => this._service.reorderLevels(campaign, chapterIdx, fromIdx, toIdx));
+    btns.appendChild(this._btn(t('editor.toolbar.deleteIcon'), UI_BG, ERROR_COLOR, () => {
+      this._dialogs.showConfirm(
+        t('editor.level.deleteConfirm', { name: resolveLocalizedText(level.name) }),
+        () => {
+        this._service.deleteLevel(campaign, chapterIdx, levelIdx);
         this._showChapterDetail();
-      }));
+        },
+        t('editor.toolbar.delete'),
+        true,
+      );
+    }));
 
-      this._appendReorderButtons(btns, chapter.levels, levelIdx, campaign, () => this._showChapterDetail(),
-        (fromIdx, toIdx) => this._service.reorderLevels(campaign, chapterIdx, fromIdx, toIdx));
-      btns.appendChild(this._btn(t('editor.toolbar.deleteIcon'), UI_BG, ERROR_COLOR, () => {
-        this._dialogs.showConfirm(
-          t('editor.level.deleteConfirm', { name: resolveLocalizedText(level.name) }),
-          () => {
-          this._service.deleteLevel(campaign, chapterIdx, levelIdx);
-          this._showChapterDetail();
-          },
-          t('editor.toolbar.delete'),
-          true,
-        );
-      }));
-
-      if (campaign.chapters.length > 1) {
-        const sel = document.createElement('select');
-        sel.style.cssText =
-          `background:${UI_BG};color:#aaa;border:1px solid ${UI_BORDER};` +
-          `border-radius:${RADIUS_MD};padding:6px 8px;font-size:0.85rem;cursor:pointer;`;
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = t('editor.level.moveTo');
-        placeholder.disabled = true;
-        placeholder.selected = true;
-        sel.appendChild(placeholder);
-        campaign.chapters.forEach((ch, ci) => {
-          if (ci !== chapterIdx) {
-            const opt = document.createElement('option');
-            opt.value = String(ci);
-            opt.textContent = t('editor.level.moveToChapter', { index: ci + 1, name: resolveLocalizedText(ch.name) });
-            sel.appendChild(opt);
-          }
-        });
-        sel.addEventListener('change', () => {
-          const targetIdx = parseInt(sel.value, 10);
-          if (isNaN(targetIdx)) return;
-          this._service.moveLevel(
-            campaign, chapterIdx, levelIdx,
-            targetIdx, campaign.chapters[targetIdx].levels.length,
-          );
-          this._showChapterDetail();
-        });
-        btns.appendChild(sel);
-      }
+    if (campaign.chapters.length > 1) {
+      this._appendLevelMoveToChapterSelect(btns, ctx);
     }
+  }
 
-    return row;
+  private _appendLevelMoveToChapterSelect(btns: HTMLElement, ctx: LevelRowContext): void {
+    const { campaign, chapterIdx, levelIdx } = ctx;
+    const sel = document.createElement('select');
+    sel.style.cssText =
+      `background:${UI_BG};color:#aaa;border:1px solid ${UI_BORDER};` +
+      `border-radius:${RADIUS_MD};padding:6px 8px;font-size:0.85rem;cursor:pointer;`;
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = t('editor.level.moveTo');
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.appendChild(placeholder);
+    campaign.chapters.forEach((ch, ci) => {
+      if (ci !== chapterIdx) {
+        const opt = document.createElement('option');
+        opt.value = String(ci);
+        opt.textContent = t('editor.level.moveToChapter', { index: ci + 1, name: resolveLocalizedText(ch.name) });
+        sel.appendChild(opt);
+      }
+    });
+    sel.addEventListener('change', () => {
+      const targetIdx = parseInt(sel.value, 10);
+      if (isNaN(targetIdx)) return;
+      this._service.moveLevel(
+        campaign, chapterIdx, levelIdx,
+        targetIdx, campaign.chapters[targetIdx].levels.length,
+      );
+      this._showChapterDetail();
+    });
+    btns.appendChild(sel);
   }
 
   // ─── Screen: Level editor ─────────────────────────────────────────────────
@@ -1197,6 +1233,21 @@ export class CampaignEditor {
   }
 
   private _showLevelEditor(readOnly: boolean): void {
+    this._resetLevelEditorScreen();
+    this._playLevelEditorMusic();
+
+    const campaign = this._getActiveCampaign();
+    if (!campaign) { this._showCampaignList(); return; }
+    const chapter = campaign.chapters[this._activeChapterIdx];
+    if (!chapter) { this._showCampaignDetail(); return; }
+
+    const metadataPanel = this._buildLevelEditorMetadataPanel();
+    this._buildLevelEditorToolbarAndLayout(readOnly, campaign, metadataPanel);
+    this._finishLevelEditorSetup();
+  }
+
+  /** Tears down any prior editor screen state before building the level editor fresh. */
+  private _resetLevelEditorScreen(): void {
     this._stopEditorSeaAnimationLoops();
     this._clearSaveFeedbackTimer();
     // Clean up any existing input handler before building a new one.
@@ -1204,19 +1255,18 @@ export class CampaignEditor {
     this._editorInput = null;
     this._screen = EditorScreen.LevelEditor;
     this._el.innerHTML = '';
+  }
 
-    // Play music matching the level's style/challenge flag (Summer is the default for no style).
+  /** Plays music matching the level's style/challenge flag (Summer is the default for no style). */
+  private _playLevelEditorMusic(): void {
     musicManager.playGroup(selectGroupForContext({
       isChallenge: this._state.levelChallenge,
       style: this._state.levelStyle,
     }));
+  }
 
-    const campaign = this._getActiveCampaign();
-    if (!campaign) { this._showCampaignList(); return; }
-    const chapter = campaign.chapters[this._activeChapterIdx];
-    if (!chapter) { this._showCampaignDetail(); return; }
-
-    this._metadataPanel = new LevelMetadataPanel(
+  private _buildLevelEditorMetadataPanel(): LevelMetadataPanel {
+    const panel = new LevelMetadataPanel(
       {
         getState: () => this._state,
         renderCanvas: () => this._renderEditorCanvas(),
@@ -1236,7 +1286,11 @@ export class CampaignEditor {
       },
       this._btn.bind(this),
     );
+    this._metadataPanel = panel;
+    return panel;
+  }
 
+  private _buildLevelEditorToolbarAndLayout(readOnly: boolean, campaign: CampaignDef, metadataPanel: LevelMetadataPanel): void {
     const toolbar = this._buildToolbar(
       readOnly ? `👁 View Level: ${resolveLocalizedText(this._state.levelName)}` : `✏️ Level Editor (${this._activeChapterIdx + 1}-${this._activeLevelIdx + 1})`,
       () => this._handleLevelEditorBack(readOnly, campaign),
@@ -1268,9 +1322,9 @@ export class CampaignEditor {
     rightCol.style.cssText = 'display:flex;flex-direction:column;gap:12px;min-width:180px;';
 
     if (!readOnly) {
-      rightCol.appendChild(this._metadataPanel.buildInventoryEditor());
+      rightCol.appendChild(metadataPanel.buildInventoryEditor());
       rightCol.appendChild(this._paramsPanel.buildParamPanel());
-      rightCol.appendChild(this._metadataPanel.buildGridSizePanel());
+      rightCol.appendChild(metadataPanel.buildGridSizePanel());
     } else {
       rightCol.appendChild(this._buildInventoryReadonly());
     }
@@ -1287,7 +1341,9 @@ export class CampaignEditor {
     midRightWrapper.appendChild(rightCol);
     mainLayout.appendChild(midRightWrapper);
     this._el.appendChild(mainLayout);
+  }
 
+  private _finishLevelEditorSetup(): void {
     // Re-compute canvas display size now that the layout is in the DOM, so the
     // board can fill any available horizontal space.
     this._updateCanvasDisplaySize();
