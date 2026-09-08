@@ -1752,7 +1752,7 @@ export class Game implements InputCallbacks {
 
   showTooltip(clientX: number, clientY: number): void {
     if (!this._input.mouseCanvasPos || !this.board) return;
-    this._tooltip.show(clientX, clientY, this.board, this._input.mouseCanvasPos, this.screen);
+    this._tooltip.show({ clientX, clientY, board: this.board, mouseCanvasPos: this._input.mouseCanvasPos, screen: this.screen });
   }
 
   hideTooltip(): void {
