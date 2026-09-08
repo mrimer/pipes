@@ -348,22 +348,36 @@ class SfxManager {
    */
   preload(): void {
     if (this._getContext()) {
-      // Collect every unique URL across all effects and decode them all.
-      const urls = new Set<string>();
-      for (const files of Object.values(SFX_FILES)) {
-        for (const url of files) urls.add(url);
-      }
-      for (const url of urls) {
-        this._fetchBuffer(url).catch((err) => { this._warn(`Preload failed: ${url}`, err); });
-      }
+      this._preloadViaWebAudio();
     } else if (typeof Audio !== 'undefined') {
       // Web Audio unavailable – fall back to HTMLAudioElement preloading.
-      for (const files of Object.values(SFX_FILES)) {
-        for (const url of files) {
-          const audio = new Audio(url);
-          audio.preload = 'auto';
-          audio.load();
-        }
+      this._preloadViaHtmlAudioElements();
+    }
+  }
+
+  /** Collect every unique URL across all effects. */
+  private _collectAllSfxUrls(): Set<string> {
+    const urls = new Set<string>();
+    for (const files of Object.values(SFX_FILES)) {
+      for (const url of files) urls.add(url);
+    }
+    return urls;
+  }
+
+  /** Preload all sound effects via the Web Audio API (decode and cache each buffer). */
+  private _preloadViaWebAudio(): void {
+    for (const url of this._collectAllSfxUrls()) {
+      this._fetchBuffer(url).catch((err) => { this._warn(`Preload failed: ${url}`, err); });
+    }
+  }
+
+  /** Preload all sound effects via plain `<audio>` elements (Web Audio unavailable). */
+  private _preloadViaHtmlAudioElements(): void {
+    for (const files of Object.values(SFX_FILES)) {
+      for (const url of files) {
+        const audio = new Audio(url);
+        audio.preload = 'auto';
+        audio.load();
       }
     }
   }
@@ -381,40 +395,79 @@ class SfxManager {
 
     const files = SFX_FILES[id];
     if (!files || files.length === 0) return;
-
-    const idx = this._pickIndex(id, files.length);
-    this._lastIndex[id] = idx;
-    const url = files[idx];
+    const url = this._pickAndRecordUrl(id, files);
 
     const ctx = this._getContext();
     if (ctx && this._gainNode) {
-      // Resume a browser-suspended context before playing (browsers may
-      // suspend AudioContext when the page loses focus).
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch((err) => { this._warn('AudioContext resume failed', err); });
-      }
-      const buf = this._buffers.get(url);
-      if (buf) {
-        this._playBuffer(buf);
-      } else {
-        // Buffer not yet decoded; fetch, cache, then play.
-        this._fetchBuffer(url)
-          .then(b => { if (b) this._playBuffer(b); })
-          .catch((err) => { this._warn(`Playback fetch failed: ${url}`, err); });
-      }
-    } else if (typeof Audio !== 'undefined') {
+      this._playViaWebAudio(ctx, url);
+      return;
+    }
+    if (typeof Audio !== 'undefined') {
       // Web Audio unavailable – fall back to HTMLAudioElement.
-      const audio = new Audio(url);
-      audio.volume = this._volume;
-      try {
-        const playResult = audio.play();
-        if (playResult !== undefined) {
-          playResult.catch((err) => { this._warn('HTMLAudio play failed', err); });
-        }
-      } catch (err) {
-        // Ignore synchronous errors (e.g. not-implemented in test environments).
-        this._warn('HTMLAudio play threw synchronously', err);
+      this._playViaHtmlAudioElement(url);
+    }
+  }
+
+  /** Pick a random (non-repeating) variant for `id`, record it, and return its URL. */
+  private _pickAndRecordUrl(id: SfxId, files: string[]): string {
+    const idx = this._pickIndex(id, files.length);
+    this._lastIndex[id] = idx;
+    return files[idx];
+  }
+
+  /** Resume a browser-suspended context before playing (browsers may suspend AudioContext when the page loses focus). */
+  private _resumeIfSuspended(ctx: AudioContext): void {
+    if (ctx.state !== 'suspended') return;
+    ctx.resume().catch((err) => { this._warn('AudioContext resume failed', err); });
+  }
+
+  /**
+   * Play `url` via the Web Audio API (decoded {@link AudioBuffer}, fetching/decoding it
+   * first if needed).  When `onDone` is given, it fires once the source's `ended` event
+   * fires (or immediately, if decoding fails).
+   */
+  private _playViaWebAudio(ctx: AudioContext, url: string, onDone?: () => void): void {
+    this._resumeIfSuspended(ctx);
+    const buf = this._buffers.get(url);
+    if (buf) {
+      this._playBuffer(buf, onDone);
+      return;
+    }
+    // Buffer not yet decoded; fetch, cache, then play.
+    this._fetchBuffer(url)
+      .then(b => {
+        if (b) { this._playBuffer(b, onDone); }
+        else { onDone?.(); }
+      })
+      .catch((err) => { this._warn(`Playback fetch failed: ${url}`, err); onDone?.(); });
+  }
+
+  /**
+   * Play `url` via a plain `<audio>` element (Web Audio unavailable).  When `onDone` is
+   * given, it fires once (on `ended`, `error`, or a play() rejection/throw).
+   */
+  private _playViaHtmlAudioElement(url: string, onDone?: () => void): void {
+    const audio = new Audio(url);
+    audio.volume = this._volume;
+    let doneCalled = false;
+    const doneOnce = (): void => {
+      if (doneCalled) return;
+      doneCalled = true;
+      onDone?.();
+    };
+    if (onDone) {
+      audio.addEventListener('ended', doneOnce, { once: true });
+      audio.addEventListener('error', doneOnce, { once: true });
+    }
+    try {
+      const playResult = audio.play();
+      if (playResult !== undefined) {
+        playResult.catch((err) => { this._warn('HTMLAudio play failed', err); doneOnce(); });
       }
+    } catch (err) {
+      // Ignore synchronous errors (e.g. not-implemented in test environments).
+      this._warn('HTMLAudio play threw synchronously', err);
+      doneOnce();
     }
   }
 
@@ -430,50 +483,18 @@ class SfxManager {
 
     const files = SFX_FILES[id];
     if (!files || files.length === 0) { onDone(); return; }
-
-    const idx = this._pickIndex(id, files.length);
-    this._lastIndex[id] = idx;
-    const url = files[idx];
+    const url = this._pickAndRecordUrl(id, files);
 
     const ctx = this._getContext();
     if (ctx && this._gainNode) {
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch((err) => { this._warn('AudioContext resume failed', err); });
-      }
-      const buf = this._buffers.get(url);
-      if (buf) {
-        this._playBufferWithCallback(buf, onDone);
-      } else {
-        this._fetchBuffer(url)
-          .then(b => {
-            if (b) { this._playBufferWithCallback(b, onDone); }
-            else { onDone(); }
-          })
-          .catch((err) => { this._warn(`Playback fetch failed: ${url}`, err); onDone(); });
-      }
-    } else if (typeof Audio !== 'undefined') {
-      const audio = new Audio(url);
-      audio.volume = this._volume;
-      let doneCalled = false;
-      const doneOnce = () => {
-        if (doneCalled) return;
-        doneCalled = true;
-        onDone();
-      };
-      audio.addEventListener('ended', doneOnce, { once: true });
-      audio.addEventListener('error', doneOnce, { once: true });
-      try {
-        const playResult = audio.play();
-        if (playResult !== undefined) {
-          playResult.catch((err) => { this._warn('HTMLAudio play failed', err); doneOnce(); });
-        }
-      } catch (err) {
-        this._warn('HTMLAudio play threw synchronously', err);
-        doneOnce();
-      }
-    } else {
-      onDone();
+      this._playViaWebAudio(ctx, url, onDone);
+      return;
     }
+    if (typeof Audio !== 'undefined') {
+      this._playViaHtmlAudioElement(url, onDone);
+      return;
+    }
+    onDone();
   }
 
   /**
@@ -627,28 +648,14 @@ class SfxManager {
     }
   }
 
-  /** Schedule an {@link AudioBuffer} for immediate playback. */
-  private _playBuffer(buf: AudioBuffer): void {
-    const ctx = this._ctx;
-    const gainNode = this._gainNode;
-    if (!ctx || !gainNode) return;
-
-    const source = ctx.createBufferSource();
-    source.buffer = buf;
-    source.connect(gainNode);
-    this._activeSources.add(source);
-    source.onended = () => { this._activeSources.delete(source); };
-    source.start();
-  }
-
   /**
-   * Schedule an {@link AudioBuffer} for immediate playback, invoking
-   * {@link onDone} once the source node fires its `ended` event.
+   * Schedule an {@link AudioBuffer} for immediate playback.  When `onDone` is given,
+   * it fires once the source node fires its `ended` event.
    */
-  private _playBufferWithCallback(buf: AudioBuffer, onDone: () => void): void {
+  private _playBuffer(buf: AudioBuffer, onDone?: () => void): void {
     const ctx = this._ctx;
     const gainNode = this._gainNode;
-    if (!ctx || !gainNode) { onDone(); return; }
+    if (!ctx || !gainNode) { onDone?.(); return; }
 
     const source = ctx.createBufferSource();
     source.buffer = buf;
@@ -656,7 +663,7 @@ class SfxManager {
     this._activeSources.add(source);
     source.onended = () => {
       this._activeSources.delete(source);
-      onDone();
+      onDone?.();
     };
     source.start();
   }
