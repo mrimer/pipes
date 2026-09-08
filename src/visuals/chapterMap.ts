@@ -197,13 +197,95 @@ export function drawLevelChamberTile(
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
   const half = CELL / 2;
-
-  const isChallenge = levelDef?.challenge ?? false;
-  const allStars = totalStars > 0 && starsCollected >= totalStars;
-
-  // Draw chamber-style box (like in-game item chamber)
   const bw = half * 0.7 + 2;
   const bh = half * 0.7 + 2;
+
+  const isChallenge = levelDef?.challenge ?? false;
+
+  _drawLevelChamberBoxAndStubs(ctx, x, y, cx, cy, half, bw, bh, connections, isFilled, isCompleted, floorType);
+
+  // Label row height (for the level number text inside the chamber box)
+  const labelH = _s(16);
+  // Chamber box interior top-left in absolute coordinates
+  const boxTop = cy - bh;
+  const boxLeft = cx - bw;
+  const boxRight = cx + bw;
+  // Content area below the label row, clipped to the chamber box interior
+  const contentY = boxTop + labelH;
+  const contentH = bh * 2 - labelH;
+
+  // Level number, optional star icon, optional water score, and optional skull icon in the label row.
+  const { showWater, labelColor, showHollowStar, showFilledStar } =
+    _computeLevelChamberLabelState(isCompleted, totalStars, starsCollected, waterScored, isChallenge);
+
+  // Level number text (no "L-" prefix)
+  const numText = `${levelNum}`;
+
+  const { labelFontSize, waterFontSize } = _fitLevelChamberLabelFontSizes(
+    ctx, bw, numText, isChallenge, showWater, showFilledStar, showHollowStar, starsCollected, waterScored,
+  );
+
+  _drawLevelChamberLabelRow(
+    ctx, boxLeft, boxTop, boxRight, cx, labelFontSize, waterFontSize, labelColor, numText,
+    showFilledStar, showHollowStar, starsCollected, showWater, waterScored, isChallenge,
+  );
+
+  _drawLevelChamberContent(ctx, x, y, cx, contentY, contentH, isFilled, levelDef);
+}
+
+/**
+ * Compute the label-row display state: whether to show the water score, the
+ * level-number color (gold when all stars collected, else challenge-red or
+ * default), and which star icon (hollow takes priority over filled) to show.
+ */
+function _computeLevelChamberLabelState(
+  isCompleted: boolean,
+  totalStars: number,
+  starsCollected: number,
+  waterScored: number | undefined,
+  isChallenge: boolean,
+): { showWater: boolean; labelColor: string; showHollowStar: boolean; showFilledStar: boolean } {
+  const allStars = totalStars > 0 && starsCollected >= totalStars;
+  const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
+  const labelColor = _levelChamberLabelColor(allStars, isChallenge);
+  const { showHollowStar, showFilledStar } = _levelChamberStarFlags(isCompleted, totalStars, starsCollected);
+  return { showWater, labelColor, showHollowStar, showFilledStar };
+}
+
+/** Level-number color: gold when all stars collected, else challenge-red, else the default gray. */
+function _levelChamberLabelColor(allStars: boolean, isChallenge: boolean): string {
+  if (allStars) return FOCUS_COLOR;
+  if (isChallenge) return LOW_WATER_COLOR;
+  return '#ddd';
+}
+
+/** Star display: empty star takes priority; only show filled star when empty star is not shown. */
+function _levelChamberStarFlags(
+  isCompleted: boolean,
+  totalStars: number,
+  starsCollected: number,
+): { showHollowStar: boolean; showFilledStar: boolean } {
+  const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
+  const showFilledStar = starsCollected > 0 && !showHollowStar;
+  return { showHollowStar, showFilledStar };
+}
+
+/** Draw the chapter-map background/gingham floor and the chamber box + connection stubs. */
+function _drawLevelChamberBoxAndStubs(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  half: number,
+  bw: number,
+  bh: number,
+  connections: Set<Direction>,
+  isFilled: boolean,
+  isCompleted: boolean,
+  floorType: PipeShape,
+): void {
+  const CELL = TILE_SIZE;
   const br = _s(3);
 
   // Background fill
@@ -229,63 +311,93 @@ export function drawLevelChamberTile(
   drawChamberButtStubs(ctx, connections, bw, bh, half, chamberColor);
 
   ctx.restore();
+}
 
-  // Label row height (for the level number text inside the chamber box)
-  const labelH = _s(16);
-  // Chamber box interior top-left in absolute coordinates
-  const boxTop = cy - bh;
-  const boxLeft = cx - bw;
-  const boxRight = cx + bw;
-  // Content area below the label row, clipped to the chamber box interior
-  const contentY = boxTop + labelH;
-  const contentH = bh * 2 - labelH;
-
-  // Level number, optional star icon, optional water score, and optional skull icon in the label row.
-  const showWater = isCompleted && waterScored !== undefined && waterScored > 0;
-  const labelColor = allStars ? FOCUS_COLOR : isChallenge ? LOW_WATER_COLOR : '#ddd';
-
-  // Star display: empty star takes priority; only show filled star when empty star is not shown.
-  const showHollowStar = isCompleted && totalStars > 0 && starsCollected < totalStars;
-  const showFilledStar = starsCollected > 0 && !showHollowStar;
-
-  // Level number text (no "L-" prefix)
-  const numText = `${levelNum}`;
-
-  // Determine label and water font sizes.
-  // Start with the larger default sizes and reduce only when necessary to fit all elements in the box.
+/**
+ * Determine the label/water font sizes for the level-chamber label row.
+ * Starts with the larger default sizes and reduces only when necessary to
+ * fit all elements (number, star, water, skull) in the box.
+ */
+function _fitLevelChamberLabelFontSizes(
+  ctx: CanvasRenderingContext2D,
+  bw: number,
+  numText: string,
+  isChallenge: boolean,
+  showWater: boolean,
+  showFilledStar: boolean,
+  showHollowStar: boolean,
+  starsCollected: number,
+  waterScored: number | undefined,
+): { labelFontSize: number; waterFontSize: number } {
   let labelFontSize = _s(10);
   let waterFontSize = _s(8);
-  if (showWater || isChallenge) {
-    ctx.font = `bold ${labelFontSize}px Arial`;
-    const numW = ctx.measureText(numText).width;
-    let leftW = numW;
-    if (showFilledStar || showHollowStar) {
-      ctx.font = `bold ${_s(9)}px Arial`;
-      const starText = showHollowStar ? '☆' : (starsCollected > 1 ? `⭐×${starsCollected}` : '⭐');
-      leftW += _s(1) + ctx.measureText(starText).width;
-    }
-    let fits = true;
-    if (isChallenge && showWater) {
-      ctx.font = `${waterFontSize}px Arial`;
-      const halfWaterW = ctx.measureText(`💧${waterScored}`).width / 2;
-      ctx.font = `${labelFontSize}px Arial`;
-      const skullW = ctx.measureText('💀').width;
-      fits = leftW <= bw - _s(2) - halfWaterW && halfWaterW + skullW <= bw - _s(2);
-    } else if (isChallenge) {
-      ctx.font = `${labelFontSize}px Arial`;
-      const skullW = ctx.measureText('💀').width;
-      fits = leftW + skullW <= bw * 2 - _s(6);
-    } else if (showWater) {
-      ctx.font = `${waterFontSize}px Arial`;
-      const waterW = ctx.measureText(`💧${waterScored}`).width;
-      fits = leftW + waterW <= bw * 2 - _s(6);
-    }
-    if (!fits) {
-      labelFontSize = _s(8);
-      waterFontSize = _s(7);
-    }
-  }
+  if (!showWater && !isChallenge) return { labelFontSize, waterFontSize };
 
+  ctx.font = `bold ${labelFontSize}px Arial`;
+  const numW = ctx.measureText(numText).width;
+  let leftW = numW;
+  if (showFilledStar || showHollowStar) {
+    ctx.font = `bold ${_s(9)}px Arial`;
+    const starText = showHollowStar ? '☆' : (starsCollected > 1 ? `⭐×${starsCollected}` : '⭐');
+    leftW += _s(1) + ctx.measureText(starText).width;
+  }
+  const fits = _levelChamberLabelFits(ctx, bw, leftW, labelFontSize, waterFontSize, isChallenge, showWater, waterScored);
+  if (!fits) {
+    labelFontSize = _s(8);
+    waterFontSize = _s(7);
+  }
+  return { labelFontSize, waterFontSize };
+}
+
+/** Whether the label row's elements fit the box width at the given (not-yet-shrunk) font sizes. */
+function _levelChamberLabelFits(
+  ctx: CanvasRenderingContext2D,
+  bw: number,
+  leftW: number,
+  labelFontSize: number,
+  waterFontSize: number,
+  isChallenge: boolean,
+  showWater: boolean,
+  waterScored: number | undefined,
+): boolean {
+  if (isChallenge && showWater) {
+    ctx.font = `${waterFontSize}px Arial`;
+    const halfWaterW = ctx.measureText(`💧${waterScored}`).width / 2;
+    ctx.font = `${labelFontSize}px Arial`;
+    const skullW = ctx.measureText('💀').width;
+    return leftW <= bw - _s(2) - halfWaterW && halfWaterW + skullW <= bw - _s(2);
+  }
+  if (isChallenge) {
+    ctx.font = `${labelFontSize}px Arial`;
+    const skullW = ctx.measureText('💀').width;
+    return leftW + skullW <= bw * 2 - _s(6);
+  }
+  if (showWater) {
+    ctx.font = `${waterFontSize}px Arial`;
+    const waterW = ctx.measureText(`💧${waterScored}`).width;
+    return leftW + waterW <= bw * 2 - _s(6);
+  }
+  return true;
+}
+
+/** Draw the level number, optional star icon, optional water score, and optional skull icon. */
+function _drawLevelChamberLabelRow(
+  ctx: CanvasRenderingContext2D,
+  boxLeft: number,
+  boxTop: number,
+  boxRight: number,
+  cx: number,
+  labelFontSize: number,
+  waterFontSize: number,
+  labelColor: string,
+  numText: string,
+  showFilledStar: boolean,
+  showHollowStar: boolean,
+  starsCollected: number,
+  showWater: boolean,
+  waterScored: number | undefined,
+  isChallenge: boolean,
+): void {
   ctx.save();
   ctx.textBaseline = 'top';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
@@ -333,30 +445,25 @@ export function drawLevelChamberTile(
   }
 
   ctx.restore();
+}
 
+/** Draw the chamber's content area: lock icon (inaccessible), minimap, or a placeholder. */
+function _drawLevelChamberContent(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  cx: number,
+  contentY: number,
+  contentH: number,
+  isFilled: boolean,
+  levelDef: LevelDef | undefined,
+): void {
   // Inaccessible chamber: lock icon instead of minimap.
   if (!isFilled) {
     _drawLockIcon(ctx, cx, contentY + contentH / 2, _s(20));
-  } else if (levelDef) {
-    // Minimap (centered in the content area inside the chamber box)
-    try {
-      const minimap = renderMinimap(levelDef);
-      const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(x, y, levelDef);
-      // Draw a clean 1px white border around the minimap at canvas scale, independent of image scale
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(mx - 1, my - 1, mw + 2, mh + 2);
-      ctx.drawImage(minimap, mx, my, mw, mh);
-    } catch {
-      // If minimap rendering fails, show a placeholder
-      ctx.save();
-      ctx.font = `${_s(9)}px Arial`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#888';
-      ctx.fillText(t('map.unknownLevel'), cx, contentY + contentH / 2);
-      ctx.restore();
-    }
-  } else {
+    return;
+  }
+  if (!levelDef) {
     // No level def – show placeholder text
     ctx.save();
     ctx.font = `${_s(9)}px Arial`;
@@ -365,8 +472,26 @@ export function drawLevelChamberTile(
     ctx.fillStyle = '#888';
     ctx.fillText(t('map.noLevelDef'), cx, contentY + contentH / 2);
     ctx.restore();
+    return;
   }
-
+  // Minimap (centered in the content area inside the chamber box)
+  try {
+    const minimap = renderMinimap(levelDef);
+    const { x: mx, y: my, width: mw, height: mh } = computeMinimapRect(x, y, levelDef);
+    // Draw a clean 1px white border around the minimap at canvas scale, independent of image scale
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(mx - 1, my - 1, mw + 2, mh + 2);
+    ctx.drawImage(minimap, mx, my, mw, mh);
+  } catch {
+    // If minimap rendering fails, show a placeholder
+    ctx.save();
+    ctx.font = `${_s(9)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#888';
+    ctx.fillText(t('map.unknownLevel'), cx, contentY + contentH / 2);
+    ctx.restore();
+  }
 }
 
 function drawMapChamberTile(
