@@ -104,6 +104,16 @@ interface CampaignDragState {
   moved: boolean;
 }
 
+/** Context for a single click/paint placement or erase decision on the campaign map. */
+interface PlaceOrEraseTileContext {
+  pos: { row: number; col: number };
+  existingTile: TileDef | null;
+  existingIsEmptyFloor: boolean;
+  canOverwriteTree: boolean;
+  palette: EditorPalette;
+  campaign: CampaignDef;
+}
+
 // ─── Callback interface ────────────────────────────────────────────────────────
 
 export interface CampaignMapEditorCallbacks {
@@ -638,12 +648,17 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const placedChapters = new Set<number>();
     for (const row of this._gridState.grid) {
       for (const tile of row) {
-        if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'chapter' && tile.chapterIdx !== undefined) {
+        if (this._isChapterChamberTile(tile)) {
           placedChapters.add(tile.chapterIdx);
         }
       }
     }
     return placedChapters;
+  }
+
+  /** True when tile is a placed chapter-reference chamber (has a chapterIdx). */
+  private _isChapterChamberTile(tile: TileDef | null): tile is TileDef & { chapterIdx: number } {
+    return tile?.shape === PipeShape.Chamber && tile.chamberContent === 'chapter' && tile.chapterIdx !== undefined;
   }
 
   private _buildChapterInventoryButton(
@@ -886,7 +901,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
   ): boolean {
     const dx = e.clientX - drag.startClientX;
     const dy = e.clientY - drag.startClientY;
-    if (!drag.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+    if (!drag.moved && this._isPanDragThresholdCrossed(dx, dy)) {
       drag.moved = true;
     }
     if (!drag.moved) return false;
@@ -897,6 +912,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     }
     this._clampPan();
     return true;
+  }
+
+  /** True once the drag has moved past the small deadzone that distinguishes a pan gesture from a click. */
+  private _isPanDragThresholdCrossed(dx: number, dy: number): boolean {
+    return Math.abs(dx) > 4 || Math.abs(dy) > 4;
   }
 
   private _renderCampaignCanvas(): void {
@@ -994,11 +1014,15 @@ export class CampaignMapEditorSection extends MapEditorBase {
   /** RAF callback that keeps animated sea tiles updating while this editor is active. */
   private _seaAnimationTick = (token: number): void => {
     if (this._seaAnimationFrameId === null || token !== this._seaAnimationLoopToken) return;
-    if (this._canvas && this._ctx && !this._mapBoxCollapsed) {
+    if (this._canRenderCampaignCanvas()) {
       this._renderCampaignCanvas();
     }
     this._seaAnimationFrameId = requestAnimationFrame(() => this._seaAnimationTick(token));
   };
+
+  private _canRenderCampaignCanvas(): boolean {
+    return !!this._canvas && !!this._ctx && !this._mapBoxCollapsed;
+  }
 
   // ── Private: tile building ─────────────────────────────────────────────────
 
@@ -1273,17 +1297,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
       return;
     }
 
-    this._placeOrEraseTile(pos, existingTile, existingIsEmptyFloor, canOverwriteTree, palette, campaign);
+    this._placeOrEraseTile({ pos, existingTile, existingIsEmptyFloor, canOverwriteTree, palette, campaign });
   }
 
-  private _placeOrEraseTile(
-    pos: { row: number; col: number },
-    existingTile: TileDef | null,
-    existingIsEmptyFloor: boolean,
-    canOverwriteTree: boolean,
-    palette: EditorPalette,
-    campaign: CampaignDef,
-  ): void {
+  private _placeOrEraseTile(ctx: PlaceOrEraseTileContext): void {
+    const { pos, existingTile, existingIsEmptyFloor, canOverwriteTree, palette, campaign } = ctx;
     if (palette === PipeShape.Source && hasShapeElsewhere(this._gridState.grid, this._gridState.rows, this._gridState.cols, PipeShape.Source)) {
       return;
     }
@@ -1291,7 +1309,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
       this._showSinkError();
       return;
     }
-    if ((existingIsEmptyFloor || canOverwriteTree) && REPEATABLE_EDITOR_TILES.has(palette)) {
+    if (this._canRepeatPaintPlace(existingIsEmptyFloor, canOverwriteTree, palette)) {
       this._paintDragActive = true;
       this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
       this._playPlacementSfx(pos);
@@ -1302,6 +1320,11 @@ export class CampaignMapEditorSection extends MapEditorBase {
     this._recordSnapshot();
     this._saveGrid();
     this._renderCanvas();
+  }
+
+  /** True when a paint-drag can repeatedly place onto this cell without erasing first (empty/tree-overwrite + repeatable shape). */
+  private _canRepeatPaintPlace(existingIsEmptyFloor: boolean, canOverwriteTree: boolean, palette: EditorPalette): boolean {
+    return (existingIsEmptyFloor || canOverwriteTree) && REPEATABLE_EDITOR_TILES.has(palette);
   }
 
   private _eraseOrPlaceTile(pos: { row: number; col: number }, existingTile: TileDef | null, palette: EditorPalette, campaign: CampaignDef): void {
@@ -1418,7 +1441,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
   private _updateHoverTooltip(pos: { row: number; col: number } | null): void {
     if (!this._canvas) return;
     const tile = pos ? (this._gridState.grid[pos.row]?.[pos.col] ?? null) : null;
-    if (tile?.shape === PipeShape.Chamber && tile.chamberContent === 'chapter' && tile.chapterIdx !== undefined) {
+    if (this._isChapterChamberTile(tile)) {
       this._canvas.title = this._formatChapterTileTitle(tile.chapterIdx);
     } else {
       this._canvas.title = '';
@@ -1442,13 +1465,18 @@ export class CampaignMapEditorSection extends MapEditorBase {
 
   private _advancePaintDrag(pos: { row: number; col: number }): void {
     const cur = this._gridState.grid[pos.row]?.[pos.col] ?? null;
-    const canOverwriteTree = cur !== null &&
-      REPEATABLE_EDITOR_TILES.has(this._palette) &&
-      isTreeShape(this._palette as PipeShape) &&
-      isTreeShape(cur.shape);
-    if (cur === null || isEmptyFloor(cur.shape) || canOverwriteTree) {
+    if (this._canPaintDragOverwrite(cur)) {
       this._gridState.grid[pos.row][pos.col] = this._buildTileDef();
     }
+  }
+
+  /** True when a paint-drag may overwrite this cell: it's empty, empty-floor, or a same-family tree the palette can replace. */
+  private _canPaintDragOverwrite(cur: TileDef | null): boolean {
+    if (cur === null) return true;
+    if (isEmptyFloor(cur.shape)) return true;
+    return REPEATABLE_EDITOR_TILES.has(this._palette) &&
+      isTreeShape(this._palette as PipeShape) &&
+      isTreeShape(cur.shape);
   }
 
   private _advanceEraseDrag(pos: { row: number; col: number }): void {
@@ -1491,7 +1519,7 @@ export class CampaignMapEditorSection extends MapEditorBase {
     const pos = this._canvasPos(e);
     if (!pos) return;
     const tile = this._gridState.grid[pos.row]?.[pos.col] ?? null;
-    if (tile?.shape !== PipeShape.Chamber || tile.chamberContent !== 'chapter' || tile.chapterIdx === undefined) return;
+    if (!this._isChapterChamberTile(tile)) return;
     sfxManager.play(SfxId.LevelSelect);
     const readOnly = this._cbs.getActiveCampaign()?.official === true;
     this._cbs.openChapterEditor(tile.chapterIdx, readOnly);
