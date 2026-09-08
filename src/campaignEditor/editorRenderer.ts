@@ -656,316 +656,407 @@ function strokeFillText(ctx: CanvasRenderingContext2D, text: string, x: number, 
   ctx.restore();
 }
 
-/** Simplified tile drawing for the editor canvas. */
-function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false, style?: LevelStyle, buttEndDirs?: ReadonlySet<Direction>): void {
+/** Offset (as a unit vector) toward each compass direction, used to place per-arm decorations. */
+const DIRECTION_OFFSET: Readonly<Record<Direction, { dx: number; dy: number }>> = {
+  [Direction.North]: { dx: 0, dy: -1 },
+  [Direction.South]: { dx: 0, dy: 1 },
+  [Direction.East]:  { dx: 1, dy: 0 },
+  [Direction.West]:  { dx: -1, dy: 0 },
+};
+
+/** Shapes whose renderer draws by translating to the tile centre and calling a (ctx, radius, style) drawer. */
+const TRANSLATE_SHAPE_RENDERERS: Partial<Record<PipeShape, { draw: (ctx: CanvasRenderingContext2D, half: number, style?: LevelStyle) => void; label: string }>> = {
+  [PipeShape.Tree]:  { draw: drawTree, label: 'TREE' },
+  [PipeShape.Tree2]: { draw: drawTree2, label: 'TREE2' },
+  [PipeShape.Tree3]: { draw: drawTree3, label: 'TREE3' },
+  [PipeShape.Tree4]: { draw: drawTree4, label: 'TREE4' },
+  [PipeShape.Sea]: {
+    draw: (ctx, half, style) => {
+      // In editor, we don't have neighbor info in drawTileOnEditor; use default (no neighbors)
+      const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
+      drawSea(ctx, half, defaultNeighbors, seaFillColor(style));
+    },
+    label: 'SEA',
+  },
+};
+
+/** Renders shape via TRANSLATE_SHAPE_RENDERERS if it has an entry there. Returns whether handled. */
+function _tryDrawTranslatedShape(ctx: CanvasRenderingContext2D, shape: PipeShape, x: number, y: number, style?: LevelStyle): boolean {
+  const renderer = TRANSLATE_SHAPE_RENDERERS[shape];
+  if (!renderer) return false;
   const CELL = TILE_SIZE;
   const cx = x + CELL / 2;
   const cy = y + CELL / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  renderer.draw(ctx, CELL / 2, style);
+  ctx.restore();
+  ctx.fillStyle = '#fff';
+  strokeFillText(ctx, renderer.label, cx, cy);
+  return true;
+}
 
+/** Render granite as a textured block. */
+function _drawGraniteEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const CELL = TILE_SIZE;
+  ctx.fillStyle = '#636e72';
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.fillStyle = '#4a5568';
+  for (let i = 0; i < 3; i++) {
+    for (let j = 0; j < 3; j++) {
+      if ((i + j) % 2 === 0) {
+        ctx.fillRect(x + i * (CELL / 3), y + j * (CELL / 3), CELL / 3, CELL / 3);
+      }
+    }
+  }
+  ctx.fillStyle = '#fff';
+  strokeFillText(ctx, 'GRANITE', x + CELL / 2, y + CELL / 2);
+}
+
+function _drawGoldSpaceEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  ctx.fillStyle = '#b8860b';
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.fillStyle = '#ffd700';
+  strokeFillText(ctx, 'GOLD', cx, cy - _s(7));
+  strokeFillText(ctx, 'SPACE', cx, cy + _s(7));
+}
+
+function _drawSourceEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, isChapterMap: boolean): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  // Background fill
+  ctx.fillStyle = SOURCE_COLOR;
+  ctx.fillRect(x, y, CELL, CELL);
+  // Source motif: radial gradient circle + outer aperture ring
+  ctx.save();
+  ctx.translate(cx, cy);
+  const half = CELL / 2;
+  const circleR = half * 0.35;
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.5, SOURCE_COLOR);
+  grad.addColorStop(1, SOURCE_COLOR);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, circleR, 0, Math.PI * 2);
+  ctx.fill();
+  // Outer aperture ring: semi-transparent white so it shows against the solid bg
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  // Text labels overlaid on top
+  ctx.fillStyle = '#fff';
+  const lines: string[] = ['SOURCE'];
+  if (!isChapterMap) {
+    lines.push(`cap:${tile.capacity}`);
+    // Show temp/pressure params only when non-zero
+    if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
+    if (tile.pressure !== 0) lines.push(`${tile.pressure}P`);
+  }
+  const lineHeight = _s(12);
+  const totalH = (lines.length - 1) * lineHeight;
+  let lineY = cy - totalH / 2;
+  ctx.font = `bold ${_s(12)}px Arial`;
+  for (const line of lines) {
+    strokeFillText(ctx, line, cx, lineY);
+    ctx.font = `${_s(11)}px Arial`;
+    lineY += lineHeight;
+  }
+  // Draw connection lines
+  drawConnectionLines(ctx, x, y, tile);
+}
+
+/** Whether the sink's completion count should be shown (chapter map editor only, positive value). */
+function _hasVisibleSinkCompletion(isChapterMap: boolean, completionVal: number | undefined): completionVal is number {
+  return isChapterMap && completionVal !== undefined && completionVal > 0;
+}
+
+function _drawSinkEditorTile(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def: TileDef | undefined, isChapterMap: boolean): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  // Background fill
+  ctx.fillStyle = SINK_COLOR;
+  ctx.fillRect(x, y, CELL, CELL);
+  // Sink motif: bullseye / drain – concentric rings with solid innermost dot
+  ctx.save();
+  ctx.translate(cx, cy);
+  const half = CELL / 2;
+  // Concentric rings: semi-transparent white so they show against the solid bg
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = _s(1.5);
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath();
+  ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // Text labels overlaid on top
+  ctx.fillStyle = '#fff';
+  const completionVal = def?.completion;
+  if (_hasVisibleSinkCompletion(isChapterMap, completionVal)) {
+    ctx.font = `bold ${_s(12)}px Arial`;
+    strokeFillText(ctx, 'SINK', cx, cy - _s(6));
+    ctx.font = `${_s(10)}px Arial`;
+    strokeFillText(ctx, `comp:${completionVal}`, cx, cy + _s(6));
+  } else {
+    ctx.font = `bold ${_s(12)}px Arial`;
+    strokeFillText(ctx, 'SINK', cx, cy);
+  }
+  drawConnectionLines(ctx, x, y, tile);
+}
+
+function _drawSandstoneChamberDetails(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: Tile): void {
+  ctx.font = `${_s(9)}px Arial`;
+  strokeFillText(ctx, 'SANDSTONE', cx, cy - _s(10));
+  ctx.font = `${_s(10)}px Arial`;
+  strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(2));
+  const shatterActive = tile.shatter > tile.hardness;
+  strokeFillText(ctx, shatterActive ? `H:${tile.hardness} S:${tile.shatter}` : `H:${tile.hardness}`, cx, cy + _s(13));
+}
+
+/** Show regulator stat, operator, and threshold value. */
+function _drawRegulatorChamberDetails(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: Tile, def: TileDef | undefined): void {
+  const stat = def?.regulatorStat ?? 'water';
+  const op   = def?.regulatorOperator ?? '>';
+  ctx.font = `bold ${_s(11)}px Arial`;
+  strokeFillText(ctx, 'REGULATOR', cx, cy - _s(10));
+  ctx.font = `${_s(10)}px Arial`;
+  strokeFillText(ctx, stat, cx, cy + _s(1));
+  strokeFillText(ctx, `${op} ${tile.cost}`, cx, cy + _s(12));
+}
+
+function _resolveChamberDisplayLabel(cc: ChamberContent, isNegHeater: boolean, isNegPump: boolean): string {
+  if (isNegHeater) return 'COOLER';
+  if (isNegPump) return 'VACUUM';
+  if (cc === 'hot_plate') return 'HOT PLATE';
+  return cc.toUpperCase();
+}
+
+/** Per-chamber-content secondary stat line, keyed by chamberContent. Absent entries show no stat line. */
+const CHAMBER_STAT_LINE_RESOLVERS: Partial<Record<ChamberContent, (tile: Tile) => string>> = {
+  tank:      (t) => `cap:${t.capacity}`,
+  dirt:      (t) => `cost:${t.cost}`,
+  heater:    (t) => `${t.temperature >= 0 ? '+' : ''}${t.temperature}°`,
+  ice:       (t) => `${t.temperature}° x ${t.cost}`,
+  pump:      (t) => `${t.pressure >= 0 ? '+' : ''}${t.pressure}P`,
+  snow:      (t) => `${t.temperature}° x ${t.cost}`,
+  hot_plate: (t) => `${t.temperature}° x ${t.cost}`,
+  item:      (t) => `${t.itemShape !== null && t.itemShape !== undefined ? ITEM_SHAPE_LABEL[t.itemShape] : '?'}×${t.itemCount}`,
+};
+
+function _drawGenericChamberDetails(ctx: CanvasRenderingContext2D, cx: number, cy: number, cc: ChamberContent, tile: Tile, isNegHeater: boolean, isNegPump: boolean): void {
+  const displayLabel = _resolveChamberDisplayLabel(cc, isNegHeater, isNegPump);
+  const needsBigFont = CHAMBER_TYPES_WITH_LARGER_FONT.has(cc);
+  ctx.font = needsBigFont ? `bold ${_s(12)}px Arial` : `bold ${_s(11)}px Arial`;
+  strokeFillText(ctx, displayLabel, cx, cy - _s(6));
+  ctx.font = needsBigFont ? `${_s(11)}px Arial` : `${_s(10)}px Arial`;
+  const statLine = CHAMBER_STAT_LINE_RESOLVERS[cc]?.(tile);
+  if (statLine !== undefined) strokeFillText(ctx, statLine, cx, cy + _s(8));
+}
+
+/**
+ * Valve indicator: draw a small green ring with black outline along each
+ * first-connection direction, near the tile edge, to mark valve sides.
+ */
+function _drawChamberValveIndicators(ctx: CanvasRenderingContext2D, cx: number, cy: number, tile: Tile): void {
+  if (!tile.firstConnections || tile.firstConnections.size === 0) return;
+  const indicatorDist = TILE_SIZE / 2 - _s(7); // distance from tile center to indicator center
+  const indicatorR = _s(5);
+  for (const dir of tile.firstConnections) {
+    const { dx, dy } = DIRECTION_OFFSET[dir];
+    const ix = cx + dx * indicatorDist;
+    const iy = cy + dy * indicatorDist;
+    // Black outline
+    ctx.beginPath();
+    ctx.arc(ix, iy, indicatorR + _s(1.5), 0, Math.PI * 2);
+    ctx.fillStyle = 'black';
+    ctx.fill();
+    // Green ring (hollow circle)
+    ctx.beginPath();
+    ctx.arc(ix, iy, indicatorR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#00cc44';
+    ctx.lineWidth = _s(2.5);
+    ctx.stroke();
+  }
+}
+
+function _drawChamberEditorTileBody(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def: TileDef | undefined): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const cc = tile.chamberContent ?? 'tank';
+  const isNegHeater = cc === 'heater' && tile.temperature < 0;
+  const isNegPump = cc === 'pump' && tile.pressure < 0;
+  ctx.fillStyle = isNegHeater ? COOLER_COLOR : isNegPump ? VACUUM_COLOR : chamberColor(cc);
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.fillStyle = '#fff';
+  if (cc === 'sandstone') {
+    _drawSandstoneChamberDetails(ctx, cx, cy, tile);
+  } else if (cc === 'regulator') {
+    _drawRegulatorChamberDetails(ctx, cx, cy, tile, def);
+  } else {
+    _drawGenericChamberDetails(ctx, cx, cy, cc, tile, isNegHeater, isNegPump);
+  }
+  drawConnectionLines(ctx, x, y, tile);
+  _drawChamberValveIndicators(ctx, cx, cy, tile);
+}
+
+/** Shape groups sharing an arm-line pattern, used by _drawPipeLinesForShape. */
+const STRAIGHT_PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([PipeShape.Straight, PipeShape.GoldStraight, PipeShape.SpinStraight, PipeShape.LeakyStraight, PipeShape.SpinStraightCement]);
+const ELBOW_PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([PipeShape.Elbow, PipeShape.GoldElbow, PipeShape.SpinElbow, PipeShape.LeakyElbow, PipeShape.SpinElbowCement]);
+const TEE_PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([PipeShape.Tee, PipeShape.GoldTee, PipeShape.SpinTee, PipeShape.LeakyTee, PipeShape.SpinTeeCement]);
+const CROSS_PIPE_SHAPES: ReadonlySet<PipeShape> = new Set([PipeShape.Cross, PipeShape.GoldCross, PipeShape.LeakyCross]);
+
+/** Draw the arm lines (in local, un-rotated canvas space) for a fixed pipe shape. */
+function _drawPipeLinesForShape(ctx: CanvasRenderingContext2D, shape: PipeShape, h: number): void {
+  if (STRAIGHT_PIPE_SHAPES.has(shape)) {
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
+  } else if (ELBOW_PIPE_SHAPES.has(shape)) {
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
+  } else if (TEE_PIPE_SHAPES.has(shape)) {
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
+  } else if (CROSS_PIPE_SHAPES.has(shape)) {
+    ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
+  }
+}
+
+/**
+ * The canvas is already rotated by tile.rotation; un-rotate absolute
+ * directions CCW to the local canvas frame before delegating to the helper.
+ */
+function _drawRotatedButtEndPipeArms(ctx: CanvasRenderingContext2D, tile: Tile, buttEndDirs: ReadonlySet<Direction>, h: number): void {
+  const rotSteps = ((tile.rotation / 90) % 4 + 4) % 4;
+  const ccwSteps = (4 - rotSteps) % 4;
+  const toLocal = (dir: Direction): Direction => {
+    let ld = dir;
+    for (let i = 0; i < ccwSteps; i++) ld = rotateDirection(ld);
+    return ld;
+  };
+  _drawButtEndPipeArms(
+    ctx,
+    new Set([...tile.connections].map(toLocal)),
+    new Set([...buttEndDirs].map(toLocal)),
+    h,
+  );
+}
+
+/**
+ * Draw rust spots on leaky pipes (two dots along each arm at 1/3 and 2/3).
+ * `tile.connections` returns absolute (post-rotation) directions, but the
+ * canvas is already rotated. Un-rotate each direction to local frame first,
+ * mirroring the same logic used in renderer.ts _drawLeakyRustSpots.
+ */
+function _drawLeakyRustSpots(ctx: CanvasRenderingContext2D, tile: Tile, h: number): void {
+  ctx.fillStyle = '#7a2c10';
+  ctx.globalAlpha = 0.75;
+  const spotR = _s(3);
+  const rotSteps = tile.rotation / 90;
+  for (const dir of tile.connections) {
+    let localDir = dir;
+    for (let i = 0; i < rotSteps; i++) {
+      switch (localDir) {
+        case Direction.North: localDir = Direction.West;  break;
+        case Direction.West:  localDir = Direction.South; break;
+        case Direction.South: localDir = Direction.East;  break;
+        case Direction.East:  localDir = Direction.North; break;
+      }
+    }
+    const { dx, dy } = DIRECTION_OFFSET[localDir];
+    for (const frac of [0.33, 0.67]) {
+      ctx.beginPath();
+      ctx.arc(dx * h * frac, dy * h * frac, spotR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function _resolveFixedPipeBgColor(isSpinCement: boolean, isSpin: boolean, isGold: boolean, isLeaky: boolean): string {
+  if (isSpinCement) return CEMENT_FILL_COLOR;
+  if (isSpin) return '#192640';
+  if (isGold) return '#b8860b';
+  if (isLeaky) return '#1a0c08';
+  return '#1a2a4e';
+}
+
+function _resolveFixedPipeStrokeColor(isSpin: boolean, isGold: boolean, isLeaky: boolean): string {
+  if (isSpin) return '#7090c0';
+  if (isGold) return '#ffd700';
+  if (isLeaky) return '#8b5c2a';
+  return '#4a90d9';
+}
+
+/** Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants, Leaky variants). */
+function _drawFixedPipeShapeTile(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, buttEndDirs?: ReadonlySet<Direction>): void {
+  const CELL = TILE_SIZE;
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
+  const { shape } = tile;
+  const isGold = _isGoldPipeShape(shape);
+  const isSpinCement = SPIN_CEMENT_SHAPES.has(shape);
+  const isSpin = SPIN_PIPE_SHAPES.has(shape);
+  const isLeaky = LEAKY_PIPE_SHAPES.has(shape);
+  ctx.fillStyle = _resolveFixedPipeBgColor(isSpinCement, isSpin, isGold, isLeaky);
+  ctx.fillRect(x, y, CELL, CELL);
+  // Draw pipe lines
+  ctx.strokeStyle = _resolveFixedPipeStrokeColor(isSpin, isGold, isLeaky);
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate((tile.rotation * Math.PI) / 180);
+  const h = CELL / 2;
+  if (buttEndDirs !== undefined) {
+    _drawRotatedButtEndPipeArms(ctx, tile, buttEndDirs, h);
+  } else {
+    ctx.lineCap = 'round';
+    _drawPipeLinesForShape(ctx, shape, h);
+  }
+  if (isLeaky) _drawLeakyRustSpots(ctx, tile, h);
+  ctx.restore();
+
+  // CW rotation arrow overlay for spinnable pipes
+  if (isSpin) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    drawSpinArrow(ctx);
+    ctx.restore();
+  }
+}
+
+function _drawTileShapeBody(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def: TileDef | undefined, isChapterMap: boolean, style: LevelStyle | undefined, buttEndDirs: ReadonlySet<Direction> | undefined): void {
+  const { shape } = tile;
+  if (shape === PipeShape.Empty) return; // Already drawn as empty cell
+  if (shape === PipeShape.Granite) { _drawGraniteEditorTile(ctx, x, y); return; }
+  if (_tryDrawTranslatedShape(ctx, shape, x, y, style)) return;
+  if (shape === PipeShape.GoldSpace) { _drawGoldSpaceEditorTile(ctx, x, y); return; }
+  if (shape === PipeShape.Source) { _drawSourceEditorTile(ctx, x, y, tile, isChapterMap); return; }
+  if (shape === PipeShape.Sink) { _drawSinkEditorTile(ctx, x, y, tile, def, isChapterMap); return; }
+  if (shape === PipeShape.Chamber) { _drawChamberEditorTileBody(ctx, x, y, tile, def); return; }
+  _drawFixedPipeShapeTile(ctx, x, y, tile, buttEndDirs);
+}
+
+/** Simplified tile drawing for the editor canvas. */
+function drawTileOnEditor(ctx: CanvasRenderingContext2D, x: number, y: number, tile: Tile, def?: TileDef, isChapterMap = false, style?: LevelStyle, buttEndDirs?: ReadonlySet<Direction>): void {
   ctx.save();
   ctx.font = `bold ${_s(11)}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-
-  const shape = tile.shape;
-
-  if (shape === PipeShape.Empty) {
-    // Already drawn as empty cell
-  } else if (shape === PipeShape.Granite) {
-    // Render granite as a textured block
-    ctx.fillStyle = '#636e72';
-    ctx.fillRect(x, y, CELL, CELL);
-    ctx.fillStyle = '#4a5568';
-    for (let i = 0; i < 3; i++) {
-      for (let j = 0; j < 3; j++) {
-        if ((i + j) % 2 === 0) {
-          ctx.fillRect(x + i * (CELL / 3), y + j * (CELL / 3), CELL / 3, CELL / 3);
-        }
-      }
-    }
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'GRANITE', cx, cy);
-  } else if (shape === PipeShape.Tree) {
-    // Render tree using the shared drawTree function (same as in-game rendering)
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree(ctx, CELL / 2, style);
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'TREE', cx, cy);
-  } else if (shape === PipeShape.Tree2) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree2(ctx, CELL / 2, style);
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'TREE2', cx, cy);
-  } else if (shape === PipeShape.Tree3) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree3(ctx, CELL / 2, style);
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'TREE3', cx, cy);
-  } else if (shape === PipeShape.Tree4) {
-    ctx.save();
-    ctx.translate(cx, cy);
-    drawTree4(ctx, CELL / 2, style);
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'TREE4', cx, cy);
-  } else if (shape === PipeShape.Sea) {
-    // Render sea tile using the in-game drawSea function with a "SEA" label
-    ctx.save();
-    ctx.translate(cx, cy);
-    // In editor, we don't have neighbor info in drawTileOnEditor; use default (no neighbors)
-    const defaultNeighbors: SeaNeighbors = { north: false, east: false, south: false, west: false, nw: false, ne: false, sw: false, se: false };
-    drawSea(ctx, CELL / 2, defaultNeighbors, seaFillColor(style));
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    strokeFillText(ctx, 'SEA', cx, cy);
-  } else if (shape === PipeShape.GoldSpace) {
-    ctx.fillStyle = '#b8860b';
-    ctx.fillRect(x, y, CELL, CELL);
-    ctx.fillStyle = '#ffd700';
-    strokeFillText(ctx, 'GOLD', cx, cy - _s(7));
-    strokeFillText(ctx, 'SPACE', cx, cy + _s(7));
-  } else if (shape === PipeShape.Source) {
-    // Background fill
-    ctx.fillStyle = SOURCE_COLOR;
-    ctx.fillRect(x, y, CELL, CELL);
-    // Source motif: radial gradient circle + outer aperture ring
-    ctx.save();
-    ctx.translate(cx, cy);
-    const half = CELL / 2;
-    const circleR = half * 0.35;
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, circleR);
-    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-    grad.addColorStop(0.5, SOURCE_COLOR);
-    grad.addColorStop(1, SOURCE_COLOR);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, circleR, 0, Math.PI * 2);
-    ctx.fill();
-    // Outer aperture ring: semi-transparent white so it shows against the solid bg
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.5, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    // Text labels overlaid on top
-    ctx.fillStyle = '#fff';
-    const lines: string[] = ['SOURCE'];
-    if (!isChapterMap) {
-      lines.push(`cap:${tile.capacity}`);
-      // Show temp/pressure params only when non-zero
-      if (tile.temperature !== 0) lines.push(`${tile.temperature}°`);
-      if (tile.pressure !== 0) lines.push(`${tile.pressure}P`);
-    }
-    const lineHeight = _s(12);
-    const totalH = (lines.length - 1) * lineHeight;
-    let lineY = cy - totalH / 2;
-    ctx.font = `bold ${_s(12)}px Arial`;
-    for (const line of lines) {
-      strokeFillText(ctx, line, cx, lineY);
-      ctx.font = `${_s(11)}px Arial`;
-      lineY += lineHeight;
-    }
-    // Draw connection lines
-    drawConnectionLines(ctx, x, y, tile);
-  } else if (shape === PipeShape.Sink) {
-    // Background fill
-    ctx.fillStyle = SINK_COLOR;
-    ctx.fillRect(x, y, CELL, CELL);
-    // Sink motif: bullseye / drain – concentric rings with solid innermost dot
-    ctx.save();
-    ctx.translate(cx, cy);
-    const half = CELL / 2;
-    // Concentric rings: semi-transparent white so they show against the solid bg
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-    ctx.lineWidth = _s(1.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.45, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.30, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    // Text labels overlaid on top
-    ctx.fillStyle = '#fff';
-    const completionVal = def?.completion;
-    if (isChapterMap && completionVal !== undefined && completionVal > 0) {
-      ctx.font = `bold ${_s(12)}px Arial`;
-      strokeFillText(ctx, 'SINK', cx, cy - _s(6));
-      ctx.font = `${_s(10)}px Arial`;
-      strokeFillText(ctx, `comp:${completionVal}`, cx, cy + _s(6));
-    } else {
-      ctx.font = `bold ${_s(12)}px Arial`;
-      strokeFillText(ctx, 'SINK', cx, cy);
-    }
-    drawConnectionLines(ctx, x, y, tile);
-  } else if (shape === PipeShape.Chamber) {
-    const cc = tile.chamberContent ?? 'tank';
-    const isNegHeater = cc === 'heater' && tile.temperature < 0;
-    const isNegPump = cc === 'pump' && tile.pressure < 0;
-    ctx.fillStyle = isNegHeater ? COOLER_COLOR : isNegPump ? VACUUM_COLOR : chamberColor(cc);
-    ctx.fillRect(x, y, CELL, CELL);
-    ctx.fillStyle = '#fff';
-    if (cc === 'sandstone') {
-      ctx.font = `${_s(9)}px Arial`;
-      strokeFillText(ctx, 'SANDSTONE', cx, cy - _s(10));
-      ctx.font = `${_s(10)}px Arial`;
-      strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(2));
-      const shatterActive = tile.shatter > tile.hardness;
-      strokeFillText(ctx, shatterActive ? `H:${tile.hardness} S:${tile.shatter}` : `H:${tile.hardness}`, cx, cy + _s(13));
-    } else if (cc === 'regulator') {
-      // Show regulator stat, operator, and threshold value
-      const stat = def?.regulatorStat ?? 'water';
-      const op   = def?.regulatorOperator ?? '>';
-      ctx.font = `bold ${_s(11)}px Arial`;
-      strokeFillText(ctx, 'REGULATOR', cx, cy - _s(10));
-      ctx.font = `${_s(10)}px Arial`;
-      strokeFillText(ctx, stat, cx, cy + _s(1));
-      strokeFillText(ctx, `${op} ${tile.cost}`, cx, cy + _s(12));
-    } else {
-      let displayLabel: string;
-      if (isNegHeater) displayLabel = 'COOLER';
-      else if (isNegPump) displayLabel = 'VACUUM';
-      else if (cc === 'hot_plate') displayLabel = 'HOT PLATE';
-      else displayLabel = cc.toUpperCase();
-      const needsBigFont = CHAMBER_TYPES_WITH_LARGER_FONT.has(cc);
-      ctx.font = needsBigFont ? `bold ${_s(12)}px Arial` : `bold ${_s(11)}px Arial`;
-      strokeFillText(ctx, displayLabel, cx, cy - _s(6));
-      ctx.font = needsBigFont ? `${_s(11)}px Arial` : `${_s(10)}px Arial`;
-      if (cc === 'tank') strokeFillText(ctx, `cap:${tile.capacity}`, cx, cy + _s(8));
-      else if (cc === 'dirt') strokeFillText(ctx, `cost:${tile.cost}`, cx, cy + _s(8));
-      else if (cc === 'heater') strokeFillText(ctx, `${tile.temperature >= 0 ? '+' : ''}${tile.temperature}°`, cx, cy + _s(8));
-      else if (cc === 'ice') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
-      else if (cc === 'pump') strokeFillText(ctx, `${tile.pressure >= 0 ? '+' : ''}${tile.pressure}P`, cx, cy + _s(8));
-      else if (cc === 'snow') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
-      else if (cc === 'hot_plate') strokeFillText(ctx, `${tile.temperature}° x ${tile.cost}`, cx, cy + _s(8));
-      else if (cc === 'item') strokeFillText(ctx, `${tile.itemShape !== null && tile.itemShape !== undefined ? ITEM_SHAPE_LABEL[tile.itemShape] : '?'}×${tile.itemCount}`, cx, cy + _s(8));
-    }
-    drawConnectionLines(ctx, x, y, tile);
-    // Valve indicator: draw a small green ring with black outline along each
-    // first-connection direction, near the tile edge, to mark valve sides.
-    if (tile.firstConnections && tile.firstConnections.size > 0) {
-      const indicatorDist = CELL / 2 - _s(7); // distance from tile center to indicator center
-      const indicatorR = _s(5);
-      for (const dir of tile.firstConnections) {
-        let ix = cx, iy = cy;
-        if (dir === Direction.North) iy = cy - indicatorDist;
-        else if (dir === Direction.South) iy = cy + indicatorDist;
-        else if (dir === Direction.East)  ix = cx + indicatorDist;
-        else ix = cx - indicatorDist;
-        // Black outline
-        ctx.beginPath();
-        ctx.arc(ix, iy, indicatorR + _s(1.5), 0, Math.PI * 2);
-        ctx.fillStyle = 'black';
-        ctx.fill();
-        // Green ring (hollow circle)
-        ctx.beginPath();
-        ctx.arc(ix, iy, indicatorR, 0, Math.PI * 2);
-        ctx.strokeStyle = '#00cc44';
-        ctx.lineWidth = _s(2.5);
-        ctx.stroke();
-      }
-    }
-  } else {
-    // Fixed pipe shapes (Straight, Elbow, Tee, Cross, Gold variants, Spin variants, Leaky variants)
-    const isGold = [PipeShape.GoldStraight, PipeShape.GoldElbow, PipeShape.GoldTee, PipeShape.GoldCross].includes(shape);
-    const isSpinCement = SPIN_CEMENT_SHAPES.has(shape);
-    const isSpin = SPIN_PIPE_SHAPES.has(shape);
-    const isLeaky = LEAKY_PIPE_SHAPES.has(shape);
-    ctx.fillStyle = isSpinCement ? CEMENT_FILL_COLOR : isSpin ? '#192640' : isGold ? '#b8860b' : isLeaky ? '#1a0c08' : '#1a2a4e';
-    ctx.fillRect(x, y, CELL, CELL);
-    // Draw pipe lines
-    ctx.strokeStyle = isSpin ? '#7090c0' : isGold ? '#ffd700' : isLeaky ? '#8b5c2a' : '#4a90d9';
-    ctx.lineWidth = LINE_WIDTH;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate((tile.rotation * Math.PI) / 180);
-    const h = CELL / 2;
-    if (buttEndDirs !== undefined) {
-      // The canvas is already rotated by tile.rotation; un-rotate absolute
-      // directions CCW to the local canvas frame before delegating to the helper.
-      const rotSteps = ((tile.rotation / 90) % 4 + 4) % 4;
-      const ccwSteps = (4 - rotSteps) % 4;
-      const toLocal = (dir: Direction): Direction => {
-        let ld = dir;
-        for (let i = 0; i < ccwSteps; i++) ld = rotateDirection(ld);
-        return ld;
-      };
-      _drawButtEndPipeArms(
-        ctx,
-        new Set([...tile.connections].map(toLocal)),
-        new Set([...buttEndDirs].map(toLocal)),
-        h,
-      );
-    } else {
-      ctx.lineCap = 'round';
-      if (shape === PipeShape.Straight || shape === PipeShape.GoldStraight || shape === PipeShape.SpinStraight || shape === PipeShape.LeakyStraight || shape === PipeShape.SpinStraightCement) {
-        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-      } else if (shape === PipeShape.Elbow || shape === PipeShape.GoldElbow || shape === PipeShape.SpinElbow || shape === PipeShape.LeakyElbow || shape === PipeShape.SpinElbowCement) {
-        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-      } else if (shape === PipeShape.Tee || shape === PipeShape.GoldTee || shape === PipeShape.SpinTee || shape === PipeShape.LeakyTee || shape === PipeShape.SpinTeeCement) {
-        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(h, 0); ctx.stroke();
-      } else if (shape === PipeShape.Cross || shape === PipeShape.GoldCross || shape === PipeShape.LeakyCross) {
-        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, h); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-h, 0); ctx.lineTo(h, 0); ctx.stroke();
-      }
-    }
-    // Draw rust spots on leaky pipes (two dots along each arm at 1/3 and 2/3)
-    if (isLeaky) {
-      ctx.fillStyle = '#7a2c10';
-      ctx.globalAlpha = 0.75;
-      const spotR = _s(3);
-      // `tile.connections` returns absolute (post-rotation) directions, but the
-      // canvas is already rotated. Un-rotate each direction to local frame first,
-      // mirroring the same logic used in renderer.ts _drawLeakyRustSpots.
-      const rotSteps = tile.rotation / 90;
-      for (const dir of tile.connections) {
-        let localDir = dir;
-        for (let i = 0; i < rotSteps; i++) {
-          switch (localDir) {
-            case Direction.North: localDir = Direction.West;  break;
-            case Direction.West:  localDir = Direction.South; break;
-            case Direction.South: localDir = Direction.East;  break;
-            case Direction.East:  localDir = Direction.North; break;
-          }
-        }
-        let dx = 0, dy = 0;
-        switch (localDir) {
-          case Direction.North: dx =  0; dy = -1; break;
-          case Direction.South: dx =  0; dy =  1; break;
-          case Direction.East:  dx =  1; dy =  0; break;
-          case Direction.West:  dx = -1; dy =  0; break;
-        }
-        for (const frac of [0.33, 0.67]) {
-          ctx.beginPath();
-          ctx.arc(dx * h * frac, dy * h * frac, spotR, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      ctx.globalAlpha = 1;
-    }
-    ctx.restore();
-
-    // CW rotation arrow overlay for spinnable pipes
-    if (isSpin) {
-      ctx.save();
-      ctx.translate(cx, cy);
-      drawSpinArrow(ctx);
-      ctx.restore();
-    }
-  }
-
+  _drawTileShapeBody(ctx, x, y, tile, def, isChapterMap, style, buttEndDirs);
   ctx.restore();
 }
 
