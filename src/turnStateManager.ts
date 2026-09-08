@@ -262,20 +262,25 @@ export class TurnStateManager {
    */
   private _detectBeneficialDisconnect(filled: Set<string>): boolean {
     for (const key of this._lockedWaterImpact.keys()) {
-      if (!filled.has(key)) {
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (
-          tile?.shape === PipeShape.Chamber &&
-          tile.chamberContent !== null &&
-          ENV_MODIFIER_CONTENTS.has(tile.chamberContent) &&
-          this._isBeneficialEnvModifier(tile)
-        ) {
-          return true;
-        }
-      }
+      if (filled.has(key)) continue;
+      const [r, c] = parseKey(key);
+      const tile = this.grid[r]?.[c];
+      if (this._isBeneficialDisconnectCandidate(tile)) return true;
     }
     return false;
+  }
+
+  /**
+   * True when a disconnected tile was a heater/pump chamber whose effect was
+   * beneficial (>= 1), i.e. still-connected cost tiles must be re-evaluated.
+   */
+  private _isBeneficialDisconnectCandidate(tile: Tile | undefined): boolean {
+    return (
+      tile?.shape === PipeShape.Chamber &&
+      tile.chamberContent !== null &&
+      ENV_MODIFIER_CONTENTS.has(tile.chamberContent) &&
+      this._isBeneficialEnvModifier(tile)
+    );
   }
 
   /**
@@ -306,21 +311,25 @@ export class TurnStateManager {
       if (filled.has(key)) continue;
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live key from this._lockedWaterImpact.keys()
       const impact = this._lockedWaterImpact.get(key)!;
-      if (impact >= 0) continue; // Only care about tiles that froze water (negative impact).
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
-      if (
-        tile?.shape === PipeShape.Chamber &&
-        tile.chamberContent !== null &&
-        COLD_CHAMBER_CONTENTS.has(tile.chamberContent)
-      ) {
-        const turn = this._connectionTurn.get(key) ?? this._turnNumber;
-        if (minTurn === null || turn < minTurn) {
-          minTurn = turn;
-        }
+      if (!this._isFrozenColdChamberTile(tile, impact)) continue;
+      const turn = this._connectionTurn.get(key) ?? this._turnNumber;
+      if (minTurn === null || turn < minTurn) {
+        minTurn = turn;
       }
     }
     return minTurn;
+  }
+
+  /** True when `tile` is a cold chamber (ice/snow/sandstone) that froze water (negative impact). */
+  private _isFrozenColdChamberTile(tile: Tile | undefined, impact: number): boolean {
+    return (
+      impact < 0 &&
+      tile?.shape === PipeShape.Chamber &&
+      tile.chamberContent !== null &&
+      COLD_CHAMBER_CONTENTS.has(tile.chamberContent)
+    );
   }
 
   /**
@@ -344,7 +353,23 @@ export class TurnStateManager {
     minTurnX: number,
     changes: Array<{ row: number; col: number; delta: number }>,
   ): void {
-    // Collect qualifying hot_plate keys: connected, already locked, turn >= minTurnX.
+    const candidates = this._collectHotPlateCandidatesForFrozenLoss(filled, minTurnX);
+    if (candidates.length === 0) return;
+
+    // Pass 1: restore all qualifying hot_plate waterGains into frozen so the budget
+    // is non-negative before redistribution.
+    this._restoreFrozenBudgetForCandidates(candidates);
+
+    // Pass 2: redistribute frozen in ascending connection-turn order.
+    candidates.sort((a, b) => a.turn - b.turn);
+    this._redistributeFrozenToHotPlates(candidates, changes);
+  }
+
+  /** Collect qualifying hot_plate keys: connected, already locked, turn >= minTurnX. */
+  private _collectHotPlateCandidatesForFrozenLoss(
+    filled: Set<string>,
+    minTurnX: number,
+  ): Array<{ key: string; turn: number }> {
     const candidates: Array<{ key: string; turn: number }> = [];
     for (const key of filled) {
       if (!this._lockedWaterImpact.has(key)) continue;
@@ -356,11 +381,11 @@ export class TurnStateManager {
         candidates.push({ key, turn });
       }
     }
+    return candidates;
+  }
 
-    if (candidates.length === 0) return;
-
-    // Pass 1: restore all qualifying hot_plate waterGains into frozen so the budget
-    // is non-negative before redistribution.
+  /** Restore each candidate's previously-consumed waterGain into `frozen` before redistribution. */
+  private _restoreFrozenBudgetForCandidates(candidates: Array<{ key: string; turn: number }>): void {
     for (const { key } of candidates) {
       this.frozen += this._hotPlateWaterGain.get(key) ?? 0;
     }
@@ -368,10 +393,13 @@ export class TurnStateManager {
     // never be negative after restoring all gains, but guard against any future
     // bookkeeping bugs that could otherwise corrupt the frozen counter.
     if (this.frozen < 0) this.frozen = 0;
+  }
 
-    // Pass 2: redistribute frozen in ascending connection-turn order.
-    candidates.sort((a, b) => a.turn - b.turn);
-
+  /** Re-allocate the restored frozen budget across candidates, in ascending connection-turn order. */
+  private _redistributeFrozenToHotPlates(
+    candidates: Array<{ key: string; turn: number }>,
+    changes: Array<{ row: number; col: number; delta: number }>,
+  ): void {
     for (const { key } of candidates) {
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
@@ -406,31 +434,44 @@ export class TurnStateManager {
    */
   private _cleanupDisconnectedTiles(filled: Set<string>): void {
     for (const key of this._lockedWaterImpact.keys()) {
-      if (!filled.has(key)) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live key from this._lockedWaterImpact.keys()
-        const impact = this._lockedWaterImpact.get(key)!;
-        const [r, c] = parseKey(key);
-        const tile = this.grid[r]?.[c];
-        if (tile?.shape === PipeShape.Chamber) {
-          if (
-            tile.chamberContent !== null &&
-            COLD_CHAMBER_CONTENTS.has(tile.chamberContent) &&
-            impact < 0
-          ) {
-            // impact is negative (a cost); subtract it back out of frozen.
-            this.frozen += impact;
-          } else if (tile.chamberContent === 'hot_plate') {
-            // Restore the frozen water that was consumed when this hot_plate connected.
-            const waterGain = this._hotPlateWaterGain.get(key) ?? 0;
-            this.frozen += waterGain;
-            this._hotPlateWaterGain.delete(key);
-          }
-        }
-        this._lockedWaterImpact.delete(key);
-        this._connectionTurn.delete(key);
-        this._lockedConnectTemp.delete(key);
-        this._lockedConnectPressure.delete(key);
-      }
+      if (filled.has(key)) continue;
+      this._cleanupOneDisconnectedTile(key);
+    }
+  }
+
+  /** Restore frozen accounting for one disconnected tile, then drop its locked state. */
+  private _cleanupOneDisconnectedTile(key: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is a live key from this._lockedWaterImpact.keys()
+    const impact = this._lockedWaterImpact.get(key)!;
+    const [r, c] = parseKey(key);
+    const tile = this.grid[r]?.[c];
+    this._restoreFrozenForDisconnectedTile(tile, key, impact);
+    this._lockedWaterImpact.delete(key);
+    this._connectionTurn.delete(key);
+    this._lockedConnectTemp.delete(key);
+    this._lockedConnectPressure.delete(key);
+  }
+
+  /**
+   * Adjust the frozen counter for a disconnected cold-chamber or hot_plate tile
+   * so the resource accounting stays correct after disconnection.
+   */
+  private _restoreFrozenForDisconnectedTile(tile: Tile | undefined, key: string, impact: number): void {
+    if (tile?.shape !== PipeShape.Chamber) return;
+    if (
+      tile.chamberContent !== null &&
+      COLD_CHAMBER_CONTENTS.has(tile.chamberContent) &&
+      impact < 0
+    ) {
+      // impact is negative (a cost); subtract it back out of frozen.
+      this.frozen += impact;
+      return;
+    }
+    if (tile.chamberContent === 'hot_plate') {
+      // Restore the frozen water that was consumed when this hot_plate connected.
+      const waterGain = this._hotPlateWaterGain.get(key) ?? 0;
+      this.frozen += waterGain;
+      this._hotPlateWaterGain.delete(key);
     }
   }
 
@@ -452,8 +493,7 @@ export class TurnStateManager {
 
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
-      if (!tile || tile.shape !== PipeShape.Chamber) continue;
-      if (tile.chamberContent === null || !TEMP_CHAMBER_CONTENTS.has(tile.chamberContent)) continue;
+      if (!this._isTempChamberTile(tile)) continue;
 
       const tileConnectedTurn = this._connectionTurn.get(key) ?? this._turnNumber;
       const effectiveTemp = this.thermo.computeTemperature(
@@ -466,50 +506,91 @@ export class TurnStateManager {
       const oldImpact = this._lockedWaterImpact.get(key)!;
 
       if (tile.chamberContent === 'hot_plate') {
-        // Re-evaluate using historically-limited temperature at connection time.
-        const newEffectiveCost = tile.cost * (tile.temperature + effectiveTemp);
-        const oldWaterGain = this._hotPlateWaterGain.get(key) ?? 0;
-        // Restore the frozen water consumed at lock time, then re-apply with the
-        // new effective cost so the frozen counter stays accurate.
-        const restoredFrozen = this.frozen + oldWaterGain;
-        const { waterGain: newWaterGain, impact: hotPlateImpact } =
-          this.thermo.computeHotPlateWaterEffect(newEffectiveCost, restoredFrozen);
-        if (hotPlateImpact !== oldImpact) {
-          this.frozen = restoredFrozen - newWaterGain;
-          this._hotPlateWaterGain.set(key, newWaterGain);
-          this._lockedWaterImpact.set(key, hotPlateImpact);
-          changes.push({ row: r, col: c, delta: hotPlateImpact - oldImpact });
-        }
-        // Always update the locked stats so the tooltip formula stays consistent with the cost.
-        this._lockedConnectTemp.set(key, effectiveTemp);
-        this._lockedConnectPressure.set(key, effectivePressure);
-        continue; // Frozen and impact already updated above.
+        this._reEvaluateHotPlateConnectedTile(r, c, key, tile, effectiveTemp, effectivePressure, oldImpact, changes);
+      } else {
+        this._reEvaluateColdChamberConnectedTile(r, c, key, tile, effectiveTemp, effectivePressure, oldImpact, changes);
       }
-
-      // ice, snow, or sandstone: use historically-limited temp/pressure.
-      const result = this.thermo.computeColdChamberImpact(tile, effectiveTemp, effectivePressure);
-      if (result.kind === 'failure') {
-        // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
-        // connection time are now gone.  Force immediate failure.
-        const failureImpact = this._drainAllImpact;
-        if (failureImpact !== oldImpact) {
-          this._lockedWaterImpact.set(key, failureImpact);
-          changes.push({ row: r, col: c, delta: failureImpact - oldImpact });
-        }
-        continue;
-      }
-      const newImpact = result.kind === 'frozen' ? -result.frozenCost : 0;
-
-      if (newImpact !== oldImpact) {
-        // Adjust the frozen-water display counter by the change in cost.
-        this.frozen += oldImpact - newImpact;
-        this._lockedWaterImpact.set(key, newImpact);
-        changes.push({ row: r, col: c, delta: newImpact - oldImpact });
-      }
-      // Always update the locked stats so the tooltip formula stays consistent with the cost.
-      this._lockedConnectTemp.set(key, effectiveTemp);
-      this._lockedConnectPressure.set(key, effectivePressure);
     }
+  }
+
+  /** True when `tile` is a connected chamber with a temp-sensitive content (ice/snow/sandstone/hot_plate). */
+  private _isTempChamberTile(tile: Tile | undefined): tile is Tile {
+    return (
+      !!tile &&
+      tile.shape === PipeShape.Chamber &&
+      tile.chamberContent !== null &&
+      TEMP_CHAMBER_CONTENTS.has(tile.chamberContent)
+    );
+  }
+
+  /**
+   * Re-evaluate a still-connected hot_plate tile using historically-limited
+   * temperature at connection time.
+   */
+  private _reEvaluateHotPlateConnectedTile(
+    r: number,
+    c: number,
+    key: string,
+    tile: Tile,
+    effectiveTemp: number,
+    effectivePressure: number,
+    oldImpact: number,
+    changes: Array<{ row: number; col: number; delta: number }>,
+  ): void {
+    const newEffectiveCost = tile.cost * (tile.temperature + effectiveTemp);
+    const oldWaterGain = this._hotPlateWaterGain.get(key) ?? 0;
+    // Restore the frozen water consumed at lock time, then re-apply with the
+    // new effective cost so the frozen counter stays accurate.
+    const restoredFrozen = this.frozen + oldWaterGain;
+    const { waterGain: newWaterGain, impact: hotPlateImpact } =
+      this.thermo.computeHotPlateWaterEffect(newEffectiveCost, restoredFrozen);
+    if (hotPlateImpact !== oldImpact) {
+      this.frozen = restoredFrozen - newWaterGain;
+      this._hotPlateWaterGain.set(key, newWaterGain);
+      this._lockedWaterImpact.set(key, hotPlateImpact);
+      changes.push({ row: r, col: c, delta: hotPlateImpact - oldImpact });
+    }
+    // Always update the locked stats so the tooltip formula stays consistent with the cost.
+    this._lockedConnectTemp.set(key, effectiveTemp);
+    this._lockedConnectPressure.set(key, effectivePressure);
+  }
+
+  /**
+   * Re-evaluate a still-connected ice/snow/sandstone tile using
+   * historically-limited temp/pressure at connection time.
+   */
+  private _reEvaluateColdChamberConnectedTile(
+    r: number,
+    c: number,
+    key: string,
+    tile: Tile,
+    effectiveTemp: number,
+    effectivePressure: number,
+    oldImpact: number,
+    changes: Array<{ row: number; col: number; delta: number }>,
+  ): void {
+    const result = this.thermo.computeColdChamberImpact(tile, effectiveTemp, effectivePressure);
+    if (result.kind === 'failure') {
+      // Historical deltaDamage ≤ 0: the pump(s) that made sandstone viable at
+      // connection time are now gone.  Force immediate failure.
+      const failureImpact = this._drainAllImpact;
+      if (failureImpact !== oldImpact) {
+        this._lockedWaterImpact.set(key, failureImpact);
+        changes.push({ row: r, col: c, delta: failureImpact - oldImpact });
+      }
+      return;
+    }
+    const newImpact = result.kind === 'frozen' ? -result.frozenCost : 0;
+
+    if (newImpact !== oldImpact) {
+      // Adjust the frozen-water display counter by the change in cost.
+      this.frozen += oldImpact - newImpact;
+      this._lockedWaterImpact.set(key, newImpact);
+      changes.push({ row: r, col: c, delta: newImpact - oldImpact });
+    }
+    // Always update the locked stats so the tooltip formula stays consistent with the cost.
+    this._lockedConnectTemp.set(key, effectiveTemp);
+    this._lockedConnectPressure.set(key, effectivePressure);
   }
 
   /**
@@ -535,6 +616,31 @@ export class TurnStateManager {
     // First pass: all newly-connected tiles except hot_plate and Gel/Siphon.
     const newHotPlateKeys: string[] = [];
     const newGelSiphonKeys: string[] = [];
+    this._lockNewSimpleTiles(filled, currentTemp, currentPressure, newHotPlateKeys, newGelSiphonKeys);
+
+    // Second pass: lock hot_plate tiles after all ice/snow/sandstone have updated frozen.
+    this._lockNewHotPlateTiles(newHotPlateKeys, currentTemp, currentPressure);
+
+    // Third pass: Gel/Siphon tiles, processed after all other tiles are locked.
+    this._lockNewGelSiphonTiles(filled, newGelSiphonKeys, currentTemp, currentPressure);
+
+    // (changes is populated in _reEvaluateConnectedTiles and _applyLeakyPenalties;
+    // _lockNewTiles uses the parameter for API symmetry but emits nothing here
+    // because connection-time animations are handled separately by the caller.)
+    void changes;
+  }
+
+  /**
+   * Lock every newly-connected tile except hot_plate and Gel/Siphon (deferred to
+   * later passes so they see the frozen counter after ice/snow/sandstone updates it).
+   */
+  private _lockNewSimpleTiles(
+    filled: Set<string>,
+    currentTemp: number,
+    currentPressure: number,
+    newHotPlateKeys: string[],
+    newGelSiphonKeys: string[],
+  ): void {
     for (const key of filled) {
       if (this._lockedWaterImpact.has(key)) continue; // Already evaluated.
 
@@ -543,51 +649,77 @@ export class TurnStateManager {
       if (!tile) continue;
 
       // Defer hot_plate tiles to the second pass.
-      if (tile.shape === PipeShape.Chamber && tile.chamberContent === 'hot_plate') {
+      if (this._isHotPlateChamberTile(tile)) {
         newHotPlateKeys.push(key);
         continue;
       }
 
       // Defer Gel/Siphon tiles to the third pass.
-      if (tile.shape === PipeShape.Chamber && tile.chamberContent !== null && GEL_SIPHON_CONTENTS.has(tile.chamberContent)) {
+      if (this._isGelSiphonChamberTile(tile)) {
         newGelSiphonKeys.push(key);
         continue;
       }
 
-      let impact = 0;
-      if (PIPE_SHAPES.has(tile.shape)) {
-        impact = -1;
-      } else if (tile.shape === PipeShape.Chamber) {
-        if (tile.chamberContent === 'tank') {
-          impact = tile.capacity;
-        } else if (tile.chamberContent === 'dirt') {
-          impact = -tile.cost;
-        } else if (
-          tile.chamberContent !== null &&
-          COLD_CHAMBER_CONTENTS.has(tile.chamberContent)
-        ) {
-          // ice, snow, or sandstone: freeze water proportional to the cold delta
-          const result = this.thermo.computeColdChamberImpact(tile, currentTemp, currentPressure);
-          if (result.kind === 'frozen') {
-            impact = -result.frozenCost;
-            this.frozen += result.frozenCost;
-          } else if (result.kind === 'failure') {
-            // deltaDamage ≤ 0: invalid play state – drain all water to force immediate failure.
-            impact = this._drainAllImpact;
-          }
-          // 'zero' (sandstone shatter): impact stays 0, no frozen water consumed.
-        }
-        // 'heater', 'pump', 'item', 'star', 'level': no direct water impact.
-      }
-      // Source, Sink, Empty, Granite, Tree, Sea: no water impact.
-
+      const impact = this._computeNewTileImpact(tile, currentTemp, currentPressure);
       this._recordLockedTileState(key, impact, currentTemp, currentPressure);
       // Only emit a change entry for non-zero impacts (zero means no visible effect).
       // Note: changes for newly-connected tiles are not emitted here – callers use
       // connection-time animations instead.  This array is only for re-evaluation deltas.
     }
+  }
 
-    // Second pass: lock hot_plate tiles after all ice/snow/sandstone have updated frozen.
+  /** True when `tile` is a connected hot_plate chamber. */
+  private _isHotPlateChamberTile(tile: Tile): boolean {
+    return tile.shape === PipeShape.Chamber && tile.chamberContent === 'hot_plate';
+  }
+
+  /** True when `tile` is a connected gel or siphon chamber. */
+  private _isGelSiphonChamberTile(tile: Tile): boolean {
+    return (
+      tile.shape === PipeShape.Chamber &&
+      tile.chamberContent !== null &&
+      GEL_SIPHON_CONTENTS.has(tile.chamberContent)
+    );
+  }
+
+  /** Compute the one-time locked water impact for a newly-connected non-hot_plate, non-Gel/Siphon tile. */
+  private _computeNewTileImpact(tile: Tile, currentTemp: number, currentPressure: number): number {
+    if (PIPE_SHAPES.has(tile.shape)) return -1;
+    if (tile.shape !== PipeShape.Chamber) return 0; // Source, Sink, Empty, Granite, Tree, Sea: no water impact.
+    return this._computeNewChamberImpact(tile, currentTemp, currentPressure);
+  }
+
+  /** Compute the locked water impact for a newly-connected chamber tile. */
+  private _computeNewChamberImpact(tile: Tile, currentTemp: number, currentPressure: number): number {
+    if (tile.chamberContent === 'tank') return tile.capacity;
+    if (tile.chamberContent === 'dirt') return -tile.cost;
+    if (tile.chamberContent === null || !COLD_CHAMBER_CONTENTS.has(tile.chamberContent)) {
+      return 0; // 'heater', 'pump', 'item', 'star', 'level': no direct water impact.
+    }
+    // ice, snow, or sandstone: freeze water proportional to the cold delta.
+    return this._computeNewColdChamberImpact(tile, currentTemp, currentPressure);
+  }
+
+  /** Compute the locked water impact for a newly-connected ice/snow/sandstone tile. */
+  private _computeNewColdChamberImpact(tile: Tile, currentTemp: number, currentPressure: number): number {
+    const result = this.thermo.computeColdChamberImpact(tile, currentTemp, currentPressure);
+    if (result.kind === 'frozen') {
+      this.frozen += result.frozenCost;
+      return -result.frozenCost;
+    }
+    if (result.kind === 'failure') {
+      // deltaDamage ≤ 0: invalid play state – drain all water to force immediate failure.
+      return this._drainAllImpact;
+    }
+    return 0; // 'zero' (sandstone shatter): no frozen water consumed.
+  }
+
+  /** Lock hot_plate tiles after all ice/snow/sandstone have updated the frozen counter. */
+  private _lockNewHotPlateTiles(
+    newHotPlateKeys: string[],
+    currentTemp: number,
+    currentPressure: number,
+  ): void {
     for (const key of newHotPlateKeys) {
       const [r, c] = parseKey(key);
       const tile = this.grid[r]?.[c];
@@ -599,57 +731,73 @@ export class TurnStateManager {
       this._hotPlateWaterGain.set(key, waterGain);
       this._recordLockedTileState(key, impact, currentTemp, currentPressure);
     }
+  }
 
-    // Third pass: Gel/Siphon tiles, processed after all other tiles are locked.
-    // Compute the pre-multiplier base total so each tile's locked impact equals the
-    // one-time water delta it causes on connection (gain for Siphon, loss for Gel).
-    // These impacts are included in the normal sum in `getCurrentWater()` like any
-    // other chamber — the effect is applied once at connection time, not each turn.
-    if (newGelSiphonKeys.length > 0) {
-      // Build base total from sourceCapacity + all currently-locked impacts - leaky loss.
-      // Gel/Siphon locked impacts are plain numeric deltas (one-time effect at connection),
-      // so they are included here like any other chamber.
-      let runningTotal = this.getSourceCapacity() - this.leakyPermanentLoss;
-      for (const key of filled) {
-        if (!this._lockedWaterImpact.has(key)) continue;
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is from filled set filtered by has() on this._lockedWaterImpact
-        runningTotal += this._lockedWaterImpact.get(key)!;
-      }
-      // Process newly-connecting Siphons first (double or flat-add), then Gels (halve).
-      const newGelKeys: string[] = [];
-      for (const key of newGelSiphonKeys) {
-        const [r, c] = parseKey(key);
-        const t = this.grid[r]?.[c];
-        if (t?.chamberContent === 'siphon') {
-          const frozenGain = this._siphonLockedGain.get(key);
-          if (frozenGain !== undefined) {
-            // Reconnect: apply the previously-frozen flat gain; do NOT re-double.
-            this._recordLockedTileState(key, frozenGain, currentTemp, currentPressure);
-            runningTotal += frozenGain;
-          } else {
-            // First connect: double the running total and freeze that gain on the tile.
-            this._siphonLockedGain.set(key, runningTotal);
-            this._recordLockedTileState(key, runningTotal, currentTemp, currentPressure);
-            runningTotal *= 2;
-          }
-        } else {
-          newGelKeys.push(key);
-        }
-      }
-      for (const key of newGelKeys) {
-        // Clamp to 0: if water is already at or below zero, gel costs nothing.
-        const nonNegativeTotal = Math.max(0, runningTotal);
-        const halved = Math.floor(nonNegativeTotal / 2);
-        // Animation delta = water lost (negative, since it halves).
-        this._recordLockedTileState(key, halved - nonNegativeTotal, currentTemp, currentPressure);
-        runningTotal = halved;
+  /**
+   * Lock Gel/Siphon tiles last, so each sees the final pre-multiplier water total.
+   * Their locked impact is the one-time water delta applied at connection time
+   * (gain for Siphon, loss for Gel); it is included in the normal locked-impact sum
+   * in `getCurrentWater()` and does not re-apply on subsequent turns.
+   */
+  private _lockNewGelSiphonTiles(
+    filled: Set<string>,
+    newGelSiphonKeys: string[],
+    currentTemp: number,
+    currentPressure: number,
+  ): void {
+    if (newGelSiphonKeys.length === 0) return;
+
+    let runningTotal = this._computeGelSiphonBaseTotal(filled);
+
+    // Process newly-connecting Siphons first (double or flat-add), then Gels (halve).
+    const newGelKeys: string[] = [];
+    for (const key of newGelSiphonKeys) {
+      const [r, c] = parseKey(key);
+      const t = this.grid[r]?.[c];
+      if (t?.chamberContent === 'siphon') {
+        runningTotal = this._lockSiphonTile(key, runningTotal, currentTemp, currentPressure);
+      } else {
+        newGelKeys.push(key);
       }
     }
+    for (const key of newGelKeys) {
+      runningTotal = this._lockGelTile(key, runningTotal, currentTemp, currentPressure);
+    }
+  }
 
-    // (changes is populated in _reEvaluateConnectedTiles and _applyLeakyPenalties;
-    // _lockNewTiles uses the parameter for API symmetry but emits nothing here
-    // because connection-time animations are handled separately by the caller.)
-    void changes;
+  /** Base running total for Gel/Siphon locking: sourceCapacity + all currently-locked impacts - leaky loss. */
+  private _computeGelSiphonBaseTotal(filled: Set<string>): number {
+    let runningTotal = this.getSourceCapacity() - this.leakyPermanentLoss;
+    for (const key of filled) {
+      if (!this._lockedWaterImpact.has(key)) continue;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- key is from filled set filtered by has() on this._lockedWaterImpact
+      runningTotal += this._lockedWaterImpact.get(key)!;
+    }
+    return runningTotal;
+  }
+
+  /** Lock a newly-connecting siphon tile and return the updated running total. */
+  private _lockSiphonTile(key: string, runningTotal: number, currentTemp: number, currentPressure: number): number {
+    const frozenGain = this._siphonLockedGain.get(key);
+    if (frozenGain !== undefined) {
+      // Reconnect: apply the previously-frozen flat gain; do NOT re-double.
+      this._recordLockedTileState(key, frozenGain, currentTemp, currentPressure);
+      return runningTotal + frozenGain;
+    }
+    // First connect: double the running total and freeze that gain on the tile.
+    this._siphonLockedGain.set(key, runningTotal);
+    this._recordLockedTileState(key, runningTotal, currentTemp, currentPressure);
+    return runningTotal * 2;
+  }
+
+  /** Lock a newly-connecting gel tile and return the updated running total. */
+  private _lockGelTile(key: string, runningTotal: number, currentTemp: number, currentPressure: number): number {
+    // Clamp to 0: if water is already at or below zero, gel costs nothing.
+    const nonNegativeTotal = Math.max(0, runningTotal);
+    const halved = Math.floor(nonNegativeTotal / 2);
+    // Animation delta = water lost (negative, since it halves).
+    this._recordLockedTileState(key, halved - nonNegativeTotal, currentTemp, currentPressure);
+    return halved;
   }
 
   /**
