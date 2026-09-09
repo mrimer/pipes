@@ -234,6 +234,18 @@ Other top-level directories:
 ```
 tests/                           # Jest test suite (TypeScript, jsdom opt-in per file)
 ├── gameTestHelpers.ts            # Shared Game test fixtures (MOCK_CTX, makeGame, gameHooks) for tests/game/*.test.ts
+├── campaignEditorTestHelpers.ts  # Shared CampaignEditor test fixtures (makeEditor, viewport mock) for tests/campaignEditor/*.test.ts
+├── campaignEditor/               # campaignEditor.test.ts split by feature area (CodeScene hotspot split)
+│   ├── campaignPersistenceAndMigration.test.ts  # Campaign persistence helpers, migrateCampaign, weak_ice migration
+│   ├── campaignActiveButtonAndNoteHint.test.ts  # Active campaign Play button, note/hint level-definition fields
+│   ├── campaignExportImport.test.ts             # _exportCampaign, gzip import, import version comparison/activation
+│   ├── campaignChallengeAndValidation.test.ts   # Challenge flag in level definitions, Source tile parameter validation
+│   ├── campaignCanvasAndDragSnapshots.test.ts   # Canvas calibration, paint/erase/place drag undo-snapshot recording
+│   ├── campaignConstraintsAndToggles.test.ts    # Source tile placement constraint, Dev Official toggle, Escape unlink
+│   ├── campaignWheelAndValidation.test.ts       # Wheel-rotate linked tile, getValidTileDefKeys, _scanCampaignData
+│   ├── campaignBuildersAndPersistedState.test.ts # _buildTileDef/_buildCurrentLevelDef, palette state, unsaved-changes tracking
+│   ├── campaignMapUndoRedoAndTrees.test.ts      # Campaign/chapter map undo-redo, pan-drag precedence, tree overwrite
+│   └── campaignMapWiringAndMisc.test.ts         # CampaignMapEditorSection canvas wiring, import read errors, updateUndoRedoButtonPair
 ├── game/                         # game.test.ts split by feature area (CodeScene hotspot split)
 │   ├── gameScreensAndInventory.test.ts   # Screen transitions, playtest labels, inventory selection/shift-cycle, reset progress
 │   ├── gameRotationAndUndoLast.test.ts   # Chapter numbering, pendingRotation, undoLastMove, tile connection animations
