@@ -198,144 +198,45 @@ function getTouchControlRows(): ControlRow[] {
   ];
 }
 
+/** Build a {@link LegendRow} from an icon factory and an i18n key prefix (`<prefix>.name` / `<prefix>.description`). */
+function _legendRow(iconEl: () => SVGElement, i18nKeyPrefix: string): LegendRow {
+  return {
+    iconEl,
+    name: t(`${i18nKeyPrefix}.name`),
+    description: t(`${i18nKeyPrefix}.description`),
+  };
+}
+
 /** Legend rows covering every tile type players will encounter. */
 function getLegendRows(): LegendRow[] {
   return [
-  {
-    iconEl: () => colorCircle(SOURCE_COLOR),
-    name: t('rules.legend.source.name'),
-    description: t('rules.legend.source.description'),
-  },
-  {
-    iconEl: () => colorCircle(SINK_COLOR),
-    name: t('rules.legend.sink.name'),
-    description: t('rules.legend.sink.description'),
-  },
-  {
-    iconEl: () => colorSwatch(EMPTY_COLOR),
-    name: t('rules.legend.emptyCell.name'),
-    description: t('rules.legend.emptyCell.description'),
-  },
-  {
-    iconEl: () => buildShapeIcon(PipeShape.Straight, PIPE_COLOR),
-    name: t('rules.legend.straightPipe.name'),
-    description: t('rules.legend.straightPipe.description'),
-  },
-  {
-    iconEl: () => buildShapeIcon(PipeShape.Elbow, PIPE_COLOR),
-    name: t('rules.legend.elbowPipe.name'),
-    description: t('rules.legend.elbowPipe.description'),
-  },
-  {
-    iconEl: () => buildShapeIcon(PipeShape.Tee, PIPE_COLOR),
-    name: t('rules.legend.tJunction.name'),
-    description: t('rules.legend.tJunction.description'),
-  },
-  {
-    iconEl: () => buildShapeIcon(PipeShape.Cross, PIPE_COLOR),
-    name: t('rules.legend.crossJunction.name'),
-    description: t('rules.legend.crossJunction.description'),
-  },
-  {
-    iconEl: () => cementSwatch(),
-    name: t('rules.legend.cement.name'),
-    description: t('rules.legend.cement.description'),
-  },
-  {
-    iconEl: () => oneWaySwatch(),
-    name: t('rules.legend.oneWay.name'),
-    description: t('rules.legend.oneWay.description'),
-  },
-  {
-    iconEl: () => graniteSwatch(),
-    name: t('rules.legend.graniteBlock.name'),
-    description: t('rules.legend.graniteBlock.description'),
-  },
-  {
-    iconEl: () => treeSwatch(),
-    name: t('rules.legend.tree.name'),
-    description: t('rules.legend.tree.description'),
-  },
-  {
-    iconEl: () => goldSpaceSwatch(),
-    name: t('rules.legend.goldSpace.name'),
-    description: t('rules.legend.goldSpace.description'),
-  },
-  {
-    iconEl: () => buildShapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR),
-    name: t('rules.legend.goldPipe.name'),
-    description: t('rules.legend.goldPipe.description'),
-  },
-  {
-    iconEl: () => leakyPipeSwatch(),
-    name: t('rules.legend.leakyPipe.name'),
-    description: t('rules.legend.leakyPipe.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(TANK_COLOR, '~'),
-    name: t('rules.legend.tank.name'),
-    description: t('rules.legend.tank.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(DIRT_COST_COLOR, '−'),
-    name: t('rules.legend.dirt.name'),
-    description: t('rules.legend.dirt.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(PIPE_COLOR, '+'),
-    name: t('rules.legend.item.name'),
-    description: t('rules.legend.item.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(HEATER_COLOR, '+°'),
-    name: t('rules.legend.heater.name'),
-    description: t('rules.legend.heater.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(ICE_COLOR, '❄'),
-    name: t('rules.legend.ice.name'),
-    description: t('rules.legend.ice.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(PUMP_COLOR, '+P'),
-    name: t('rules.legend.pump.name'),
-    description: t('rules.legend.pump.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(SNOW_COLOR, '❄'),
-    name: t('rules.legend.snow.name'),
-    description: t('rules.legend.snow.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(SANDSTONE_COLOR, '≈'),
-    name: t('rules.legend.sandstone.name'),
-    description: t('rules.legend.sandstone.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(HOT_PLATE_COLOR, 'HP'),
-    name: t('rules.legend.hotPlate.name'),
-    description: t('rules.legend.hotPlate.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(REGULATOR_COLOR, '>N\u2026'),
-    name: t('rules.legend.regulator.name'),
-    description: t('rules.legend.regulator.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(STAR_COLOR, '★'),
-    name: t('rules.legend.star.name'),
-    description: t('rules.legend.star.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(GEL_COLOR, '\u00BD'),
-    name: t('rules.legend.gel.name'),
-    description: t('rules.legend.gel.description'),
-  },
-  {
-    iconEl: () => chamberSwatch(SIPHON_COLOR, '\u00D72'),
-    name: t('rules.legend.siphon.name'),
-    description: t('rules.legend.siphon.description'),
-  },
+    _legendRow(() => colorCircle(SOURCE_COLOR), 'rules.legend.source'),
+    _legendRow(() => colorCircle(SINK_COLOR), 'rules.legend.sink'),
+    _legendRow(() => colorSwatch(EMPTY_COLOR), 'rules.legend.emptyCell'),
+    _legendRow(() => buildShapeIcon(PipeShape.Straight, PIPE_COLOR), 'rules.legend.straightPipe'),
+    _legendRow(() => buildShapeIcon(PipeShape.Elbow, PIPE_COLOR), 'rules.legend.elbowPipe'),
+    _legendRow(() => buildShapeIcon(PipeShape.Tee, PIPE_COLOR), 'rules.legend.tJunction'),
+    _legendRow(() => buildShapeIcon(PipeShape.Cross, PIPE_COLOR), 'rules.legend.crossJunction'),
+    _legendRow(() => cementSwatch(), 'rules.legend.cement'),
+    _legendRow(() => oneWaySwatch(), 'rules.legend.oneWay'),
+    _legendRow(() => graniteSwatch(), 'rules.legend.graniteBlock'),
+    _legendRow(() => treeSwatch(), 'rules.legend.tree'),
+    _legendRow(() => goldSpaceSwatch(), 'rules.legend.goldSpace'),
+    _legendRow(() => buildShapeIcon(PipeShape.Straight, GOLD_PIPE_COLOR), 'rules.legend.goldPipe'),
+    _legendRow(() => leakyPipeSwatch(), 'rules.legend.leakyPipe'),
+    _legendRow(() => chamberSwatch(TANK_COLOR, '~'), 'rules.legend.tank'),
+    _legendRow(() => chamberSwatch(DIRT_COST_COLOR, '−'), 'rules.legend.dirt'),
+    _legendRow(() => chamberSwatch(PIPE_COLOR, '+'), 'rules.legend.item'),
+    _legendRow(() => chamberSwatch(HEATER_COLOR, '+°'), 'rules.legend.heater'),
+    _legendRow(() => chamberSwatch(ICE_COLOR, '❄'), 'rules.legend.ice'),
+    _legendRow(() => chamberSwatch(PUMP_COLOR, '+P'), 'rules.legend.pump'),
+    _legendRow(() => chamberSwatch(SNOW_COLOR, '❄'), 'rules.legend.snow'),
+    _legendRow(() => chamberSwatch(SANDSTONE_COLOR, '≈'), 'rules.legend.sandstone'),
+    _legendRow(() => chamberSwatch(HOT_PLATE_COLOR, 'HP'), 'rules.legend.hotPlate'),
+    _legendRow(() => chamberSwatch(REGULATOR_COLOR, '>N…'), 'rules.legend.regulator'),
+    _legendRow(() => chamberSwatch(STAR_COLOR, '★'), 'rules.legend.star'),
+    _legendRow(() => chamberSwatch(GEL_COLOR, '½'), 'rules.legend.gel'),
+    _legendRow(() => chamberSwatch(SIPHON_COLOR, '×2'), 'rules.legend.siphon'),
   ];
 }
 
@@ -389,6 +290,42 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
   controlsHeader.textContent = t('rules.controls.title');
 
   // ── Controls table ─────────────────────────────────────────────────────────
+  const controlsTable = _buildControlsTable(manager);
+
+  // ── Legend header ──────────────────────────────────────────────────────────
+  const legendHeader = document.createElement('h3');
+  legendHeader.style.cssText = 'font-size:1rem;color:#7ed321;margin-bottom:4px;';
+  legendHeader.textContent = t('rules.legend.title');
+
+  // ── Legend table ──────────────────────────────────────────────────────────
+  const table = _buildLegendTable();
+
+  // ── Close buttons ─────────────────────────────────────────────────────────
+  const topCloseBtn = createCloseButton();
+  const bottomCloseBtn = createCloseButton();
+
+  // Allow closing by clicking the backdrop
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeModal();
+  });
+
+  box.appendChild(title);
+  box.appendChild(topCloseBtn);
+  box.appendChild(summary);
+  box.appendChild(playLoop);
+  box.appendChild(controlsHeader);
+  box.appendChild(controlsTable);
+  box.appendChild(legendHeader);
+  box.appendChild(table);
+  box.appendChild(bottomCloseBtn);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  return overlay;
+}
+
+/** Build the controls-reference table for the rules modal. */
+function _buildControlsTable(manager: CommandKeyManager): HTMLTableElement {
   const controlsTable = document.createElement('table');
   controlsTable.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.88rem;';
 
@@ -411,16 +348,13 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     tr.appendChild(tdAction);
     controlsTable.appendChild(tr);
   }
+  return controlsTable;
+}
 
-  // ── Legend header ──────────────────────────────────────────────────────────
-  const legendHeader = document.createElement('h3');
-  legendHeader.style.cssText = 'font-size:1rem;color:#7ed321;margin-bottom:4px;';
-  legendHeader.textContent = t('rules.legend.title');
-
-  // ── Legend table ──────────────────────────────────────────────────────────
+/** Build the tile-legend table for the rules modal. */
+function _buildLegendTable(): HTMLTableElement {
   const table = document.createElement('table');
-  table.style.cssText =
-    'width:100%;border-collapse:collapse;font-size:0.88rem;';
+  table.style.cssText = 'width:100%;border-collapse:collapse;font-size:0.88rem;';
 
   for (const row of getLegendRows()) {
     const tr = document.createElement('tr');
@@ -445,29 +379,7 @@ export function createGameRulesModal(manager: CommandKeyManager = commandKeyMana
     tr.appendChild(tdDesc);
     table.appendChild(tr);
   }
-
-  // ── Close buttons ─────────────────────────────────────────────────────────
-  const topCloseBtn = createCloseButton();
-  const bottomCloseBtn = createCloseButton();
-
-  // Allow closing by clicking the backdrop
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeModal();
-  });
-
-  box.appendChild(title);
-  box.appendChild(topCloseBtn);
-  box.appendChild(summary);
-  box.appendChild(playLoop);
-  box.appendChild(controlsHeader);
-  box.appendChild(controlsTable);
-  box.appendChild(legendHeader);
-  box.appendChild(table);
-  box.appendChild(bottomCloseBtn);
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-
-  return overlay;
+  return table;
 }
 
 /** Refresh command-key rows in an existing rules modal after assignments change. */
