@@ -1546,15 +1546,14 @@ export class CampaignEditor {
 
   private _updateCanvasDisplaySize(): void {
     if (!this._editorCanvas) return;
-    updateCanvasDisplaySize(
-      this._editorCanvas,
-      this._state.rows,
-      this._state.cols,
-      this._editorMainLayout,
-      EDITOR_LAYOUT_GAP,
-      EDITOR_LAYOUT_PADDING,
-      false,
-    );
+    updateCanvasDisplaySize(this._editorCanvas, {
+      rows: this._state.rows,
+      cols: this._state.cols,
+      mainLayout: this._editorMainLayout,
+      layoutGap: EDITOR_LAYOUT_GAP,
+      layoutPadding: EDITOR_LAYOUT_PADDING,
+      constrainHeight: false,
+    });
   }
 
   // ─── Editor undo / redo ────────────────────────────────────────────────────

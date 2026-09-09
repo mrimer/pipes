@@ -45,6 +45,11 @@ export function buildCanvasWithErrorDiv(
   return { wrapper, errorEl };
 }
 
+/** True if the given grid cell falls outside the `rows` x `cols` bounds. */
+function _isOutsideGrid(row: number, col: number, rows: number, cols: number): boolean {
+  return row < 0 || row >= rows || col < 0 || col >= cols;
+}
+
 /**
  * Convert a mouse event to a grid cell position on the given canvas.
  * Returns `null` when the pointer is outside the grid bounds.
@@ -58,8 +63,19 @@ export function canvasPos(
   const rect = canvas.getBoundingClientRect();
   const col = Math.floor((e.clientX - rect.left) * cols / rect.width);
   const row = Math.floor((e.clientY - rect.top)  * rows / rect.height);
-  if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+  if (_isOutsideGrid(row, col, rows, cols)) return null;
   return { row, col };
+}
+
+/** Walk up the offsetParent chain to compute `el`'s absolute top position within the page. */
+function _computeAbsoluteTop(el: HTMLElement): number {
+  let absTop = 0;
+  let cur: HTMLElement | null = el;
+  while (cur) {
+    absTop += cur.offsetTop;
+    cur = cur.offsetParent as HTMLElement | null;
+  }
+  return absTop;
 }
 
 /**
@@ -68,69 +84,37 @@ export function canvasPos(
  * The tile size is expanded up to 128 px to fill the room, or scaled down
  * (CSS-only) when the grid would otherwise overflow the container.
  *
- * @param canvas           The canvas element to resize.
- * @param rows             Current grid row count.
- * @param cols             Current grid column count.
- * @param mainLayout       The flex-row container that holds the canvas alongside
- *                         its sibling panels.  When `null` the canvas falls back
- *                         to `MAX_EDITOR_CANVAS_PX`.
- * @param layoutGap        Gap (px) between flex columns in `mainLayout`.
- * @param layoutPadding    Extra horizontal padding (px) to deduct from layout
- *                         width (applied twice – once per side).
- * @param constrainHeight  When `true`, also constrains the canvas height to the
- *                         available viewport height below the canvas.
+ * @param canvas  The canvas element to resize.
+ * @param opts.rows             Current grid row count.
+ * @param opts.cols             Current grid column count.
+ * @param opts.mainLayout       The flex-row container that holds the canvas alongside
+ *                              its sibling panels.  When `null` the canvas falls back
+ *                              to `MAX_EDITOR_CANVAS_PX`.
+ * @param opts.layoutGap        Gap (px) between flex columns in `mainLayout`.
+ * @param opts.layoutPadding    Extra horizontal padding (px) to deduct from layout
+ *                              width (applied twice – once per side).
+ * @param opts.constrainHeight  When `true`, also constrains the canvas height to the
+ *                              available viewport height below the canvas.
  */
 export function updateCanvasDisplaySize(
   canvas: HTMLCanvasElement,
-  rows: number,
-  cols: number,
-  mainLayout: HTMLElement | null,
-  layoutGap: number,
-  layoutPadding: number,
-  constrainHeight: boolean,
+  opts: {
+    rows: number;
+    cols: number;
+    mainLayout: HTMLElement | null;
+    layoutGap: number;
+    layoutPadding: number;
+    constrainHeight: boolean;
+  },
 ): void {
+  const { rows, cols, mainLayout, layoutGap, layoutPadding, constrainHeight } = opts;
   const MAX_TILE_SIZE = 128;
   let availW = MAX_EDITOR_CANVAS_PX;
   let availH = MAX_EDITOR_CANVAS_PX;
 
   if (mainLayout) {
-    const layoutW = mainLayout.clientWidth;
-    let otherW = 0;
-    let colCount = 0;
-    for (const child of mainLayout.children) {
-      if (!child.contains(canvas)) {
-        otherW += (child as HTMLElement).offsetWidth;
-        colCount++;
-      } else {
-        // The canvas may be nested inside a sub-wrapper (e.g. midRightWrapper in
-        // the level editor).  Also account for any siblings of the canvas's
-        // direct parent within that wrapper.
-        for (const innerChild of child.children) {
-          if (!innerChild.contains(canvas)) {
-            otherW += (innerChild as HTMLElement).offsetWidth;
-            colCount++;
-          }
-        }
-      }
-    }
-    const computedAvailW =
-      layoutW - otherW - colCount * layoutGap - 2 * layoutPadding - 2 * EDITOR_CANVAS_BORDER;
-    if (computedAvailW > 0) availW = computedAvailW;
-
-    if (constrainHeight) {
-      let absTop = 0;
-      let el: HTMLElement | null = canvas;
-      while (el) {
-        absTop += el.offsetTop;
-        el = el.offsetParent as HTMLElement | null;
-      }
-      if (absTop > 0) {
-        const BOTTOM_MARGIN = 16;
-        const computedAvailH =
-          window.innerHeight + window.scrollY - absTop - 2 * EDITOR_CANVAS_BORDER - BOTTOM_MARGIN;
-        if (computedAvailH > 0) availH = computedAvailH;
-      }
-    }
+    availW = _computeAvailWidth(canvas, mainLayout, layoutGap, layoutPadding);
+    availH = _computeAvailHeight(canvas, constrainHeight);
   }
 
   // Choose the largest whole-pixel tile size that fills the available space,
@@ -154,6 +138,77 @@ export function updateCanvasDisplaySize(
     : Math.min(1, availW / intrinsicW);
   canvas.style.width  = Math.round(intrinsicW * scale) + 'px';
   canvas.style.height = Math.round(intrinsicH * scale) + 'px';
+}
+
+/** Resolve `availW` for `updateCanvasDisplaySize`: the horizontal room left after `mainLayout`'s other columns. */
+function _computeAvailWidth(
+  canvas: HTMLCanvasElement,
+  mainLayout: HTMLElement,
+  layoutGap: number,
+  layoutPadding: number,
+): number {
+  const { otherW, colCount } = _computeOtherColumnsWidth(mainLayout, canvas);
+  const computedAvailW =
+    mainLayout.clientWidth - otherW - colCount * layoutGap - 2 * layoutPadding - 2 * EDITOR_CANVAS_BORDER;
+  return computedAvailW > 0 ? computedAvailW : MAX_EDITOR_CANVAS_PX;
+}
+
+/** Resolve `availH` for `updateCanvasDisplaySize`: unconstrained unless `constrainHeight` says otherwise. */
+function _computeAvailHeight(canvas: HTMLCanvasElement, constrainHeight: boolean): number {
+  if (!constrainHeight) return MAX_EDITOR_CANVAS_PX;
+  return _computeConstrainedAvailHeight(canvas) ?? MAX_EDITOR_CANVAS_PX;
+}
+
+/** Sum the widths (and count) of `mainLayout`'s columns other than the one containing `canvas`. */
+function _computeOtherColumnsWidth(
+  mainLayout: HTMLElement,
+  canvas: HTMLCanvasElement,
+): { otherW: number; colCount: number } {
+  let otherW = 0;
+  let colCount = 0;
+  for (const child of mainLayout.children) {
+    if (!child.contains(canvas)) {
+      otherW += (child as HTMLElement).offsetWidth;
+      colCount++;
+    } else {
+      const inner = _computeInnerColumnsWidth(child, canvas);
+      otherW += inner.otherW;
+      colCount += inner.colCount;
+    }
+  }
+  return { otherW, colCount };
+}
+
+/**
+ * The canvas may be nested inside a sub-wrapper (e.g. midRightWrapper in the
+ * level editor). Sum the widths of any siblings of the canvas's direct parent
+ * within that wrapper.
+ */
+function _computeInnerColumnsWidth(
+  wrapper: Element,
+  canvas: HTMLCanvasElement,
+): { otherW: number; colCount: number } {
+  let otherW = 0;
+  let colCount = 0;
+  for (const innerChild of wrapper.children) {
+    if (!innerChild.contains(canvas)) {
+      otherW += (innerChild as HTMLElement).offsetWidth;
+      colCount++;
+    }
+  }
+  return { otherW, colCount };
+}
+
+/**
+ * Compute the available height below `canvas` (from its absolute page top to the
+ * viewport bottom), or `null` when the canvas isn't laid out yet or no room remains.
+ */
+function _computeConstrainedAvailHeight(canvas: HTMLCanvasElement): number | null {
+  const absTop = _computeAbsoluteTop(canvas);
+  if (absTop <= 0) return null;
+  const BOTTOM_MARGIN = 16;
+  const computedAvailH = window.innerHeight + window.scrollY - absTop - 2 * EDITOR_CANVAS_BORDER - BOTTOM_MARGIN;
+  return computedAvailH > 0 ? computedAvailH : null;
 }
 
 /**
@@ -184,23 +239,11 @@ export function updateMapEditorCanvas(
   let scale = 1;
 
   if (mainLayout && mainLayout.clientWidth > 0) {
-    let siblingW = 0;
-    let siblingCount = 0;
-    for (const child of mainLayout.children) {
-      if (!child.contains(canvas)) {
-        siblingW += (child as HTMLElement).offsetWidth;
-        siblingCount++;
-      }
-    }
+    const { siblingW, siblingCount } = _computeSiblingsWidth(mainLayout, canvas);
     const availW = mainLayout.clientWidth - siblingW - siblingCount * GAP - 2 * BORDER;
 
     let availH = Infinity;
-    let absTop = 0;
-    let el: HTMLElement | null = canvas;
-    while (el) {
-      absTop += el.offsetTop;
-      el = el.offsetParent as HTMLElement | null;
-    }
+    const absTop = _computeAbsoluteTop(canvas);
     if (absTop > 0) {
       const BOTTOM_MARGIN = 16;
       availH = window.innerHeight + window.scrollY - absTop - 2 * BORDER - BOTTOM_MARGIN;
@@ -226,4 +269,20 @@ export function updateMapEditorCanvas(
   canvas.height = rows * TILE_SIZE;
   canvas.style.width  = Math.round(cols * TILE_SIZE * scale) + 'px';
   canvas.style.height = Math.round(rows * TILE_SIZE * scale) + 'px';
+}
+
+/** Sum the widths (and count) of `mainLayout`'s direct-child columns other than the one containing `canvas`. */
+function _computeSiblingsWidth(
+  mainLayout: HTMLElement,
+  canvas: HTMLCanvasElement,
+): { siblingW: number; siblingCount: number } {
+  let siblingW = 0;
+  let siblingCount = 0;
+  for (const child of mainLayout.children) {
+    if (!child.contains(canvas)) {
+      siblingW += (child as HTMLElement).offsetWidth;
+      siblingCount++;
+    }
+  }
+  return { siblingW, siblingCount };
 }
