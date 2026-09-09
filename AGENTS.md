@@ -89,6 +89,7 @@ src/
 ├── renderer/
 │   ├── chamberRenderers.ts      # Chamber-content drawing (source, sink, chapter nodes…)
 │   ├── ambientDecoration.ts     # Grass/rock ambient sprites on empty tiles
+│   ├── graniteRenderer.ts       # Granite tile drawing (seamed border/fill geometry, split out of renderer.ts)
 │   ├── tileDisplayNames.ts      # Human-readable pipe-shape labels
 │   └── rendererState.ts        # Shared renderer state passed across render calls
 ├── inventoryRenderer.ts         # Draws the pipe inventory sidebar
@@ -342,6 +343,7 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 | Tile rendering (strokes, rotations) | `renderer.ts` |
 | Chamber node drawing | `renderer/chamberRenderers.ts` |
 | Ambient grass/rocks | `renderer/ambientDecoration.ts` |
+| Granite tile drawing | `renderer/graniteRenderer.ts` |
 | Modal dialogs (game) | `gameModals.ts`, `recordingModals.ts`, `rulesModal.ts` |
 | Modal accessibility plumbing | `modals/modalUtils.ts` |
 | Keyboard shortcuts | `commandKeyManager.ts` |
