@@ -78,25 +78,9 @@ export interface IdlePulse {
 export function computePulseLayers(board: Board): IdlePulseLayer[] {
   const result: IdlePulseLayer[] = [];
 
-  // Collect the source tile's mutually-connected directions.
-  const sourceConnections = new Set<Direction>();
-  for (const dir of DIRECTIONS) {
-    if (board.areMutuallyConnected(board.source, dir)) sourceConnections.add(dir);
-  }
-
+  const sourceConnections = _collectSourceConnections(board);
   if (sourceConnections.size > 0) {
-    const sourceTile = board.getTile(board.source);
-    const sourceIsGold = sourceTile !== null && GOLD_PIPE_SHAPES.has(sourceTile.shape);
-    // entryDir is unused for isSource layers; Direction.North is a placeholder.
-    result.push({
-      row: board.source.row,
-      col: board.source.col,
-      entryDir: Direction.North,
-      depth: -1,
-      connections: sourceConnections,
-      isGold: sourceIsGold,
-      isSource: true,
-    });
+    result.push(_buildSourceLayer(board, sourceConnections));
   }
 
   const sourceKey = posKey(board.source.row, board.source.col);
@@ -110,44 +94,93 @@ export function computePulseLayers(board: Board): IdlePulseLayer[] {
 
   while (qi < queue.length) {
     const cur = queue[qi++];
-
     for (const dir of DIRECTIONS) {
-      if (!board.areMutuallyConnected(cur, dir)) continue;
-      const delta = NEIGHBOUR_DELTA[dir];
-      const next = { row: cur.row + delta.row, col: cur.col + delta.col };
-      const nextKey = posKey(next.row, next.col);
-      if (bfsVisited.has(nextKey)) continue;
-      bfsVisited.add(nextKey);
-
-      const nextDepth = cur.depth < 0 ? 0 : cur.depth + 1;
-      queue.push({ row: next.row, col: next.col, depth: nextDepth });
-
-      // entryDir = direction FROM which the pulse enters the next tile.
-      const entryDir = oppositeDirection(dir);
-      const tile = board.getTile(next);
-      const rawConnections = tile ? new Set(tile.connections) : new Set<Direction>();
-
-      // Respect the one-way floor constraint at this tile.  If the cell sits on a
-      // one-way floor, water cannot exit in the direction opposite the arrow; remove
-      // that direction from the connections so the phase-2 glow doesn't animate
-      // outward against the arrow.  entryDir is always kept so that phase-1 can
-      // still draw the inward arm (entering via entryDir is what the BFS confirmed
-      // is valid, and the one-way only restricts exit, not this entry itself).
-      const nextOwDir = board.getOneWayDirection(next);
-      const blockedExit = nextOwDir !== null ? oppositeDirection(nextOwDir) : null;
-      const connections = new Set<Direction>();
-      for (const c of rawConnections) {
-        if (c === blockedExit && c !== entryDir) continue;
-        connections.add(c);
-      }
-
-      const isGold = tile !== null && GOLD_PIPE_SHAPES.has(tile.shape);
-
-      result.push({ row: next.row, col: next.col, entryDir, depth: nextDepth, connections, isGold });
+      _processBfsNeighbor(board, cur, dir, { bfsVisited, queue, result });
     }
   }
 
   return result;
+}
+
+/** Collect the source tile's mutually-connected directions. */
+function _collectSourceConnections(board: Board): Set<Direction> {
+  const sourceConnections = new Set<Direction>();
+  for (const dir of DIRECTIONS) {
+    if (board.areMutuallyConnected(board.source, dir)) sourceConnections.add(dir);
+  }
+  return sourceConnections;
+}
+
+/** Build the depth -1 pulse layer for the source tile itself. */
+function _buildSourceLayer(board: Board, sourceConnections: Set<Direction>): IdlePulseLayer {
+  const sourceTile = board.getTile(board.source);
+  const sourceIsGold = sourceTile !== null && GOLD_PIPE_SHAPES.has(sourceTile.shape);
+  return {
+    row: board.source.row,
+    col: board.source.col,
+    // entryDir is unused for isSource layers; Direction.North is a placeholder.
+    entryDir: Direction.North,
+    depth: -1,
+    connections: sourceConnections,
+    isGold: sourceIsGold,
+    isSource: true,
+  };
+}
+
+/**
+ * Respect the one-way floor constraint at a tile.  If the cell sits on a
+ * one-way floor, water cannot exit in the direction opposite the arrow; remove
+ * that direction from the connections so the phase-2 glow doesn't animate
+ * outward against the arrow.  `entryDir` is always kept so that phase-1 can
+ * still draw the inward arm (entering via entryDir is what the BFS confirmed
+ * is valid, and the one-way only restricts exit, not this entry itself).
+ */
+function _filterExitConnections(
+  rawConnections: Set<Direction>,
+  entryDir: Direction,
+  blockedExit: Direction | null,
+): Set<Direction> {
+  const connections = new Set<Direction>();
+  for (const c of rawConnections) {
+    if (c === blockedExit && c !== entryDir) continue;
+    connections.add(c);
+  }
+  return connections;
+}
+
+/** BFS step: if `cur`'s neighbour in `dir` is newly reachable, enqueue it and push its pulse layer. */
+function _processBfsNeighbor(
+  board: Board,
+  cur: { row: number; col: number; depth: number },
+  dir: Direction,
+  opts: {
+    bfsVisited: Set<string>;
+    queue: Array<{ row: number; col: number; depth: number }>;
+    result: IdlePulseLayer[];
+  },
+): void {
+  if (!board.areMutuallyConnected(cur, dir)) return;
+  const delta = NEIGHBOUR_DELTA[dir];
+  const next = { row: cur.row + delta.row, col: cur.col + delta.col };
+  const nextKey = posKey(next.row, next.col);
+  if (opts.bfsVisited.has(nextKey)) return;
+  opts.bfsVisited.add(nextKey);
+
+  const nextDepth = cur.depth < 0 ? 0 : cur.depth + 1;
+  opts.queue.push({ row: next.row, col: next.col, depth: nextDepth });
+
+  // entryDir = direction FROM which the pulse enters the next tile.
+  const entryDir = oppositeDirection(dir);
+  const tile = board.getTile(next);
+  const rawConnections = tile ? new Set(tile.connections) : new Set<Direction>();
+
+  const nextOwDir = board.getOneWayDirection(next);
+  const blockedExit = nextOwDir !== null ? oppositeDirection(nextOwDir) : null;
+  const connections = _filterExitConnections(rawConnections, entryDir, blockedExit);
+
+  const isGold = tile !== null && GOLD_PIPE_SHAPES.has(tile.shape);
+
+  opts.result.push({ row: next.row, col: next.col, entryDir, depth: nextDepth, connections, isGold });
 }
 
 // ─── Rendering ────────────────────────────────────────────────────────────────
@@ -192,7 +225,7 @@ export function renderIdlePulse(
     // Phase 2 (exit arms, outward): covers tileProgress 0.5 → 1.
     const phase2P = Math.max(0, (tileProgress - 0.5) * 2);
 
-    _drawLocalizedPulse(ctx, layer, alpha, phase1P, phase2P);
+    _drawLocalizedPulse(ctx, layer, { alpha, phase1P, phase2P });
   }
 
   return true;
@@ -237,22 +270,19 @@ function _brightRGB(baseHex: string): [number, number, number] {
  * Used to render win-level and chapter-complete flow pulses with the same
  * radial-glow visual as the in-game idle pulse.
  *
- * @param ctx          2D rendering context.
- * @param x            Canvas X coordinate of the glow centre.
- * @param y            Canvas Y coordinate of the glow centre.
- * @param baseColorHex Base pipe color as a `#rrggbb` hex string.
- *                     The color is brightened toward white before rendering.
- * @param alpha        Overall opacity in the range [0, 1].
+ * @param ctx            2D rendering context.
+ * @param opts.x         Canvas X coordinate of the glow centre.
+ * @param opts.y         Canvas Y coordinate of the glow centre.
+ * @param opts.baseColorHex Base pipe color as a `#rrggbb` hex string.
+ *                          The color is brightened toward white before rendering.
+ * @param opts.alpha     Overall opacity in the range [0, 1].
  */
 export function drawIdlePulseGlow(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  baseColorHex: string,
-  alpha: number,
+  opts: { x: number; y: number; baseColorHex: string; alpha: number },
 ): void {
-  const [r, g, b] = _brightRGB(baseColorHex);
-  _drawGlowAt(ctx, x, y, r, g, b, alpha);
+  const [r, g, b] = _brightRGB(opts.baseColorHex);
+  _drawGlowAt(ctx, { hx: opts.x, hy: opts.y, r, g, b, alpha: opts.alpha });
 }
 
 /**
@@ -271,13 +301,9 @@ export function drawIdlePulseGlow(
  */
 function _drawGlowAt(
   ctx: CanvasRenderingContext2D,
-  hx: number,
-  hy: number,
-  r: number,
-  g: number,
-  b: number,
-  alpha: number,
+  opts: { hx: number; hy: number; r: number; g: number; b: number; alpha: number },
 ): void {
+  const { hx, hy, r, g, b, alpha } = opts;
   const innerRadius = LINE_WIDTH * 0.625;
   const outerRadius = LINE_WIDTH * 1.0;
 
@@ -333,22 +359,23 @@ function _drawGlowAt(
  * each exit arm.  For the source tile (`isSource === true`) only the phase-2
  * outward spread is used, covering the full tile duration.
  *
- * @param phase1P - Phase-1 progress (0 → 1, entry arm inward).
- * @param phase2P - Phase-2 progress (0 → 1, exit arms outward).
+ * @param opts.alpha   - Overall opacity for this frame.
+ * @param opts.phase1P - Phase-1 progress (0 → 1, entry arm inward).
+ * @param opts.phase2P - Phase-2 progress (0 → 1, exit arms outward).
  */
 function _drawLocalizedPulse(
   ctx: CanvasRenderingContext2D,
   layer: IdlePulseLayer,
-  alpha: number,
-  phase1P: number,
-  phase2P: number,
+  opts: { alpha: number; phase1P: number; phase2P: number },
 ): void {
+  const { alpha, phase1P, phase2P } = opts;
   const cx = layer.col * TILE_SIZE + TILE_SIZE / 2;
   const cy = layer.row * TILE_SIZE + TILE_SIZE / 2;
   const half = TILE_SIZE / 2;
 
   const baseColor = layer.isGold ? GOLD_PIPE_WATER_COLOR : WATER_COLOR;
   const [r, g, b] = _brightRGB(baseColor);
+  const state: _PulseGlowState = { cx, cy, half, r, g, b, alpha, phase1P, phase2P };
 
   ctx.save();
   // Clip to this tile so the glow doesn't bleed into neighbouring tiles.
@@ -357,37 +384,67 @@ function _drawLocalizedPulse(
   ctx.clip();
 
   if (layer.isSource) {
-    // Source tile: no entry arm, so the glow spreads from center outward along
-    // every connected arm.  Both phases drive one continuous 0→1 sweep: phase 1
-    // covers the inner half (0→0.5) and phase 2 the outer half (0.5→1.0).  The
-    // two meet at 0.5 at the handoff, so the travel is seamless (no stutter).
-    for (const dir of layer.connections) {
-      const dx = NEIGHBOUR_DELTA[dir].col;
-      const dy = NEIGHBOUR_DELTA[dir].row;
-      const p = phase1P < 1 ? phase1P * 0.5 : 0.5 + phase2P * 0.5;
-      _drawGlowAt(ctx, cx + dx * half * p, cy + dy * half * p, r, g, b, alpha);
-    }
+    _drawSourcePulseGlow(ctx, layer, state);
   } else {
-    // Phase 1: glow head moves from entry-arm edge inward toward center.
-    if (phase1P > 0 && layer.connections.has(layer.entryDir)) {
-      const dx = NEIGHBOUR_DELTA[layer.entryDir].col;
-      const dy = NEIGHBOUR_DELTA[layer.entryDir].row;
-      // At phase1P=0 head is at the arm edge; at phase1P=1 it is at the center.
-      const hx = cx + dx * half * (1 - phase1P);
-      const hy = cy + dy * half * (1 - phase1P);
-      _drawGlowAt(ctx, hx, hy, r, g, b, alpha);
-    }
-
-    // Phase 2: glow heads move from center outward along each exit arm.
-    if (phase2P > 0) {
-      for (const dir of layer.connections) {
-        if (dir === layer.entryDir) continue;
-        const dx = NEIGHBOUR_DELTA[dir].col;
-        const dy = NEIGHBOUR_DELTA[dir].row;
-        _drawGlowAt(ctx, cx + dx * half * phase2P, cy + dy * half * phase2P, r, g, b, alpha);
-      }
-    }
+    _drawTilePulseGlow(ctx, layer, state);
   }
 
   ctx.restore();
+}
+
+/** Shared per-tile geometry/color/phase bundle passed to the `_draw*PulseGlow` helpers below. */
+interface _PulseGlowState {
+  cx: number;
+  cy: number;
+  half: number;
+  r: number;
+  g: number;
+  b: number;
+  alpha: number;
+  phase1P: number;
+  phase2P: number;
+}
+
+/**
+ * Source tile: no entry arm, so the glow spreads from center outward along
+ * every connected arm.  Both phases drive one continuous 0→1 sweep: phase 1
+ * covers the inner half (0→0.5) and phase 2 the outer half (0.5→1.0).  The
+ * two meet at 0.5 at the handoff, so the travel is seamless (no stutter).
+ */
+function _drawSourcePulseGlow(ctx: CanvasRenderingContext2D, layer: IdlePulseLayer, state: _PulseGlowState): void {
+  const { cx, cy, half, r, g, b, alpha, phase1P, phase2P } = state;
+  for (const dir of layer.connections) {
+    const dx = NEIGHBOUR_DELTA[dir].col;
+    const dy = NEIGHBOUR_DELTA[dir].row;
+    const p = phase1P < 1 ? phase1P * 0.5 : 0.5 + phase2P * 0.5;
+    _drawGlowAt(ctx, { hx: cx + dx * half * p, hy: cy + dy * half * p, r, g, b, alpha });
+  }
+}
+
+/** Non-source tile: phase 1 moves the glow inward along the entry arm, phase 2 outward along exit arms. */
+function _drawTilePulseGlow(ctx: CanvasRenderingContext2D, layer: IdlePulseLayer, state: _PulseGlowState): void {
+  const { cx, cy, half, r, g, b, alpha, phase1P, phase2P } = state;
+  // Phase 1: glow head moves from entry-arm edge inward toward center.
+  if (phase1P > 0 && layer.connections.has(layer.entryDir)) {
+    const dx = NEIGHBOUR_DELTA[layer.entryDir].col;
+    const dy = NEIGHBOUR_DELTA[layer.entryDir].row;
+    // At phase1P=0 head is at the arm edge; at phase1P=1 it is at the center.
+    const hx = cx + dx * half * (1 - phase1P);
+    const hy = cy + dy * half * (1 - phase1P);
+    _drawGlowAt(ctx, { hx, hy, r, g, b, alpha });
+  }
+
+  // Phase 2: glow heads move from center outward along each exit arm.
+  if (phase2P > 0) _drawExitArmGlows(ctx, layer, state);
+}
+
+/** Phase 2 of `_drawTilePulseGlow`: one outward-moving glow per non-entry exit arm. */
+function _drawExitArmGlows(ctx: CanvasRenderingContext2D, layer: IdlePulseLayer, state: _PulseGlowState): void {
+  const { cx, cy, half, r, g, b, alpha, phase2P } = state;
+  for (const dir of layer.connections) {
+    if (dir === layer.entryDir) continue;
+    const dx = NEIGHBOUR_DELTA[dir].col;
+    const dy = NEIGHBOUR_DELTA[dir].row;
+    _drawGlowAt(ctx, { hx: cx + dx * half * phase2P, hy: cy + dy * half * phase2P, r, g, b, alpha });
+  }
 }

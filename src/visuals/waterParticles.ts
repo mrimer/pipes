@@ -410,7 +410,7 @@ export function drawFlowDrop(
   const px     = curCx + (nxtCx - curCx) * drop.progress;
   const py     = curCy + (nxtCy - curCy) * drop.progress;
 
-  drawIdlePulseGlow(ctx, px, py, color, 0.85);
+  drawIdlePulseGlow(ctx, { x: px, y: py, baseColorHex: color, alpha: 0.85 });
 }
 
 /**
