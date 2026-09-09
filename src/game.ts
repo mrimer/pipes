@@ -1,9 +1,9 @@
 import type { MoveResult} from './board';
-import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors, isEmptyFloor, SPIN_PIPE_SHAPES } from './board';
+import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, isEmptyFloor, SPIN_PIPE_SHAPES } from './board';
 import type { Tile } from './tile';
 import type { ChapterMapScreen } from './screens/chapterMapScreen';
-import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord } from './types';
-import { GameScreen, GameState, PipeShape } from './types';
+import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord, PipeShape } from './types';
+import { GameScreen, GameState } from './types';
 import type { InputCallbacks} from './inputHandler';
 import { InputHandler } from './inputHandler';
 import { TILE_SIZE, renderBoard, setTileSize, computeTileSize, getInventoryItemDisplayName } from './renderer';
@@ -62,6 +62,7 @@ import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './visuals/levelTransition';
 import { sfxManager, SfxId } from './audio/sfxManager';
+import { playAfterTilePlacedSfx, playAfterTileRotatedSfx, playLeakSfxIfNeeded, playGoldSfxIfNeeded } from './gameConnectionSfx';
 import { musicManager, selectGroupForContext } from './audio/musicManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_OVERLAY_BG, UI_TEXT } from './uiConstants';
@@ -93,23 +94,6 @@ const _STAR_SFX_DELAY_MS = 500;
 const WIN_MODAL_FADE_MS = 900;
 /** Delay between each star popping in on the win modal (ms). */
 const STAR_STAGGER_MS = 200;
-/** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
-const ICE_SFX_THRESHOLD_MID = 5;
-/** Ice-sfx threshold: raw cost at or above this uses Ice3 sfx (instead of Ice2). */
-const ICE_SFX_THRESHOLD_HIGH = 10;
-/** Snow-sfx threshold: raw cost at or above this uses Snow2 sfx (instead of Snow1). */
-const SNOW_SFX_THRESHOLD_MID = 5;
-/** Snow-sfx threshold: raw cost at or above this uses Snow3 sfx (instead of Snow2). */
-const SNOW_SFX_THRESHOLD_HIGH = 10;
-/** Dirt-sfx threshold: dirt cost at or above this uses Dirt2 sfx (instead of Dirt1). */
-const DIRT_SFX_THRESHOLD_MID = 5;
-/** Dirt-sfx threshold: dirt cost at or above this uses Dirt3 sfx (instead of Dirt2). */
-const DIRT_SFX_THRESHOLD_HIGH = 10;
-/** Sandstone-sfx threshold: sandstone cost above this uses Sandstone2 sfx (instead of Sandstone1). */
-const SANDSTONE_SFX_THRESHOLD_MID = 5;
-/** Sandstone-sfx threshold: sandstone cost above this uses Sandstone3 sfx (instead of Sandstone2). */
-const SANDSTONE_SFX_THRESHOLD_HIGH = 10;
-
 /** CSS style for the toggle button of each hint in the hint box. */
 const HINT_TOGGLE_BTN_STYLE =
   'width:100%;padding:10px 16px;font-size:0.9rem;background:#1a1400;color:#f0c040;' +
@@ -1629,8 +1613,8 @@ export class Game implements InputCallbacks {
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = board.applyTurnDelta();
-    this._playLeakSfxIfNeeded(board, changes);
-    this._playGoldSfxIfNeeded(board, filledBefore);
+    playLeakSfxIfNeeded(board, changes);
+    playGoldSfxIfNeeded(board, filledBefore);
 
     // Record delete move before board.recordMove() increments historyIndex.
     board.recordMove(encodeDeleteMove(pos.row, pos.col));
@@ -1690,9 +1674,9 @@ export class Game implements InputCallbacks {
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
-    this._playLeakSfxIfNeeded(this.board, changes);
-    this._playGoldSfxIfNeeded(this.board, filledBefore);
-    this._playAfterTileRotatedSfx(this.board, filledBefore);
+    playLeakSfxIfNeeded(this.board, changes);
+    playGoldSfxIfNeeded(this.board, filledBefore);
+    playAfterTileRotatedSfx(this.board, filledBefore);
 
     // Compute the encoded move string and record the snapshot.
     this.board.recordMove(this._encodeRotationMove(tile, rotationInfo, delta));
@@ -1769,320 +1753,6 @@ export class Game implements InputCallbacks {
   private _showErrorFlash(message: string): void {
     if (this._errorFlashTimer !== null) clearTimeout(this._errorFlashTimer);
     this._errorFlashTimer = showTimedMessage(this.errorFlashEl, message, ERROR_DISPLAY_MS);
-  }
-
-  /**
-   * Map a connected ice chamber's highest raw cost this turn to its sfx tier.
-   */
-  private _iceSfxForRaw(raw: number): SfxId {
-    if (raw === 0) return SfxId.Ice0;
-    if (raw < ICE_SFX_THRESHOLD_MID) return SfxId.Ice1;
-    if (raw < ICE_SFX_THRESHOLD_HIGH) return SfxId.Ice2;
-    return SfxId.Ice3;
-  }
-
-  /**
-   * Map a connected snow chamber's highest raw cost this turn to its sfx tier.
-   */
-  private _snowSfxForRaw(raw: number): SfxId {
-    if (raw === 0) return SfxId.Snow0;
-    if (raw < SNOW_SFX_THRESHOLD_MID) return SfxId.Snow1;
-    if (raw < SNOW_SFX_THRESHOLD_HIGH) return SfxId.Snow2;
-    return SfxId.Snow3;
-  }
-
-  /**
-   * Map a connected dirt chamber's highest cost this turn to its sfx tier.
-   */
-  private _dirtSfxForCost(cost: number): SfxId {
-    if (cost < DIRT_SFX_THRESHOLD_MID) return SfxId.Dirt1;
-    if (cost < DIRT_SFX_THRESHOLD_HIGH) return SfxId.Dirt2;
-    return SfxId.Dirt3;
-  }
-
-  /**
-   * Map a connected sandstone chamber's highest-cost tile info this turn to its sfx tier.
-   * SandstoneShatter plays when the highest-cost tile was shattered (pressure ≥ shatter),
-   * overriding the cost-tier mapping.
-   */
-  private _sandstoneSfxFor(info: { cost: number; shattered: boolean }): SfxId {
-    if (info.shattered) return SfxId.SandstoneShatter;
-    if (info.cost < SANDSTONE_SFX_THRESHOLD_MID) return SfxId.Sandstone1;
-    if (info.cost < SANDSTONE_SFX_THRESHOLD_HIGH) return SfxId.Sandstone2;
-    return SfxId.Sandstone3;
-  }
-
-  /**
-   * Track at most one hot-plate sfx per turn. Sizzle overrides SizzleIce when
-   * both a frozen and a non-frozen hot-plate tile connect the same turn.
-   */
-  private _accumulateHotPlateTracker(opts: { board: Board; row: number; col: number; trackers: ConnectionSfxTrackers }): void {
-    const { board, row, col, trackers } = opts;
-    // Use getLockedHotPlateGain to check if frozen water was actually consumed
-    // when this hot plate's cost was computed during applyTurnDelta this turn.
-    const frozenGain = board.getLockedHotPlateGain({ row, col }) ?? 0;
-    const candidate = frozenGain > 0 ? SfxId.SizzleIce : SfxId.Sizzle;
-    if (candidate === SfxId.Sizzle || trackers.hotPlateSfx === null) trackers.hotPlateSfx = candidate;
-  }
-
-  /**
-   * Track the highest raw cost among ice chambers connected this turn.
-   */
-  private _accumulateIceTracker(tile: Tile, currentTemp: number, trackers: ConnectionSfxTrackers): void {
-    const rawIceCost = tile.cost * computeDeltaTemp(tile.temperature, currentTemp);
-    if (rawIceCost > trackers.maxIceRaw) trackers.maxIceRaw = rawIceCost;
-  }
-
-  /**
-   * Track the highest raw cost among snow chambers connected this turn.
-   * Snow cost is pressure-adjusted (unlike ice): snowCostPerDeltaTemp factors in
-   * the current pressure, which reduces the effective cost per deltaTemp unit.
-   */
-  private _accumulateSnowTracker(tile: Tile, currentTemp: number, currentPressure: number, trackers: ConnectionSfxTrackers): void {
-    const deltaTemp = computeDeltaTemp(tile.temperature, currentTemp);
-    const rawSnowCost = snowCostPerDeltaTemp(tile.cost, currentPressure) * deltaTemp;
-    if (rawSnowCost > trackers.maxSnowRaw) trackers.maxSnowRaw = rawSnowCost;
-  }
-
-  /**
-   * Track the highest cost among dirt chambers connected this turn.
-   */
-  private _accumulateDirtTracker(tile: Tile, trackers: ConnectionSfxTrackers): void {
-    if (tile.cost > trackers.maxDirtCost) trackers.maxDirtCost = tile.cost;
-  }
-
-  /**
-   * Track the sandstone tile with the highest base cost connected this turn,
-   * and whether it shattered.
-   */
-  private _accumulateSandstoneTracker(tile: Tile, currentPressure: number, trackers: ConnectionSfxTrackers): void {
-    const { shatterOverride } = sandstoneCostFactors(tile.cost, tile.hardness, tile.shatter, currentPressure);
-    if (trackers.maxSandstoneInfo === null || tile.cost > trackers.maxSandstoneInfo.cost) {
-      trackers.maxSandstoneInfo = { cost: tile.cost, shattered: shatterOverride };
-    }
-  }
-
-  /**
-   * Sfx for chamber content types that always play the same sound on connection,
-   * with no per-tile state to inspect. Used by {@link _immediateChamberSfx}.
-   */
-  private static readonly FIXED_CHAMBER_SFX: Partial<Record<string, SfxId>> = {
-    tank: SfxId.Tank,
-    star: SfxId.Star,
-    gel: SfxId.Gel,
-    siphon: SfxId.Siphon,
-  };
-
-  /**
-   * Return the sfx for a newly-connected item chamber, or null if it hasn't
-   * been assigned an item shape yet or its count is positive.
-   */
-  private _itemChamberSfx(tile: Tile): SfxId | null {
-    if (tile.itemShape === null) return null;
-    return tile.itemCount <= 0 ? SfxId.NegativeCount : null;
-  }
-
-  /**
-   * Return the sfx to play immediately for a chamber content type that plays
-   * at most once per tile per turn (as opposed to the cold/hot-plate content
-   * types, which track a running max/priority across all tiles connected
-   * this turn — see {@link _accumulateColdChamberTrackers}). Returns null for
-   * a content type not handled here (including a not-yet-fully-formed item
-   * chamber, and every cold/hot-plate content type).
-   */
-  private _immediateChamberSfx(tile: Tile): SfxId | null {
-    if (tile.chamberContent === null) return null;
-    const fixed = Game.FIXED_CHAMBER_SFX[tile.chamberContent];
-    if (fixed !== undefined) return fixed;
-    if (tile.chamberContent === 'item') return this._itemChamberSfx(tile);
-    if (tile.chamberContent === 'heater') return tile.temperature < 0 ? SfxId.Cooler : SfxId.Heater;
-    if (tile.chamberContent === 'pump') return tile.pressure < 0 ? SfxId.Vacuum : SfxId.Pump;
-    return null;
-  }
-
-  /**
-   * Dispatch a chamber tile to the tracker accumulator for its content type
-   * (hot_plate, ice, snow, dirt, sandstone). No-op for any other content type.
-   */
-  private _accumulateColdChamberTrackers(opts: {
-    board: Board; tile: Tile; row: number; col: number;
-    currentTemp: number; currentPressure: number; trackers: ConnectionSfxTrackers;
-  }): void {
-    const { board, tile, row, col, currentTemp, currentPressure, trackers } = opts;
-    if (tile.chamberContent === 'hot_plate') this._accumulateHotPlateTracker({ board, row, col, trackers });
-    else if (tile.chamberContent === 'ice') this._accumulateIceTracker(tile, currentTemp, trackers);
-    else if (tile.chamberContent === 'snow') this._accumulateSnowTracker(tile, currentTemp, currentPressure, trackers);
-    else if (tile.chamberContent === 'dirt') this._accumulateDirtTracker(tile, trackers);
-    else if (tile.chamberContent === 'sandstone') this._accumulateSandstoneTracker(tile, currentPressure, trackers);
-  }
-
-  /**
-   * Resolve and record the sfx for one newly-connected chamber tile: push an
-   * immediate sfx straight into `sfxToPlay`, or fold the tile into `trackers`
-   * for a cold/hot-plate content type. Used by {@link _collectConnectionSfx}'s
-   * scan loop.
-   */
-  private _collectChamberSfx(opts: {
-    board: Board; tile: Tile; row: number; col: number;
-    currentTemp: number; currentPressure: number;
-    trackers: ConnectionSfxTrackers; sfxToPlay: SfxId[];
-  }): void {
-    const { board, tile, row, col, currentTemp, currentPressure, trackers, sfxToPlay } = opts;
-    const immediate = this._immediateChamberSfx(tile);
-    if (immediate !== null) { sfxToPlay.push(immediate); return; }
-    this._accumulateColdChamberTrackers({ board, tile, row, col, currentTemp, currentPressure, trackers });
-  }
-
-  /**
-   * Push at most one sfx per accumulator category onto `sfxToPlay`, in this
-   * fixed order, once every newly-connected tile this turn has been scanned.
-   */
-  private _pushAccumulatedChamberSfx(trackers: ConnectionSfxTrackers, sfxToPlay: SfxId[]): void {
-    if (trackers.hotPlateSfx !== null) sfxToPlay.push(trackers.hotPlateSfx);
-    if (trackers.maxIceRaw >= 0) sfxToPlay.push(this._iceSfxForRaw(trackers.maxIceRaw));
-    if (trackers.maxSnowRaw >= 0) sfxToPlay.push(this._snowSfxForRaw(trackers.maxSnowRaw));
-    if (trackers.maxDirtCost >= 0) sfxToPlay.push(this._dirtSfxForCost(trackers.maxDirtCost));
-    if (trackers.maxSandstoneInfo !== null) sfxToPlay.push(this._sandstoneSfxFor(trackers.maxSandstoneInfo));
-  }
-
-  /**
-   * Collect the SFX IDs to play for all chamber tiles that became newly
-   * connected to the fill path since `filledBefore` was captured.
-   *
-   * Iterates over newly-connected tiles and collects one sfx per chamber type:
-   * - Per-tile sounds: Tank, Heater, Pump, Sizzle, Star, NegativeCount (item).
-   * - Single-per-turn sounds: one Ice (based on the highest raw ice cost) and
-   *   one Snow (based on the highest raw snow cost), one Dirt (based on the
-   *   highest dirt cost), and one Sandstone (based on the highest cost sandstone
-   *   or SandstoneShatter if the most costly tile was shattered this turn).
-   */
-  private _collectConnectionSfx(board: Board, filledBefore: Set<string>): SfxId[] {
-    const filledAfter = board.getFilledPositions();
-    const currentTemp = board.getCurrentTemperature(filledAfter);
-    const currentPressure = board.getCurrentPressure(filledAfter);
-
-    const trackers: ConnectionSfxTrackers = {
-      hotPlateSfx: null, maxIceRaw: -1, maxSnowRaw: -1, maxDirtCost: -1, maxSandstoneInfo: null,
-    };
-    const sfxToPlay: SfxId[] = [];
-
-    for (const key of filledAfter) {
-      if (filledBefore.has(key)) continue;
-      const [r, c] = parseKey(key);
-      const tile = board.grid[r]?.[c];
-      if (tile?.shape !== PipeShape.Chamber) continue;
-      this._collectChamberSfx({ board, tile, row: r, col: c, currentTemp, currentPressure, trackers, sfxToPlay });
-    }
-
-    this._pushAccumulatedChamberSfx(trackers, sfxToPlay);
-    return sfxToPlay;
-  }
-
-
-  /**
-   * Play all SFX for a tile-placement action.
-   *
-   * - When a leaky pipe tile is placed and immediately connected to the source,
-   *   plays only the Leak sound (suppresses PipePlacement and connection sounds).
-   * - Otherwise plays PipeConnected when the placed tile is connected to the source
-   *   (only when no chamber-connection sounds fire), or PipePlacement when it is not
-   *   connected to the source (only when no chamber-connection sounds fire),
-   *   Leak (if a leaky tile penalty was applied), Gold/Pickup (if applicable),
-   *   and all chamber-connection sounds collected by {@link _collectConnectionSfx}.
-   */
-  private _playAfterTilePlacedSfx(opts: PlayAfterTilePlacedSfxOptions): void {
-    const { board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey } = opts;
-    if (placedIsLeakyAndConnected) {
-      sfxManager.play(SfxId.Leak);
-      return;
-    }
-    const connectionSfx = this._collectConnectionSfx(board, filledBefore);
-    // Only play PipePlacement/PipeConnected when no chamber-connection sounds fire this turn.
-    if (connectionSfx.length === 0) {
-      const filledAfter = board.getFilledPositions();
-      const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
-      sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
-    }
-    this._playLeakSfxIfNeeded(board, changes);
-    this._playGoldSfxIfNeeded(board, filledBefore);
-    for (const sfx of connectionSfx) {
-      sfxManager.play(sfx);
-    }
-  }
-
-  /**
-   * Play connection and disconnection SFX after a tile rotation.
-   *
-   * - Plays the chamber-specific connection sound for each newly connected chamber.
-   * - Plays PipeConnected if any tile is newly connected and no chamber-specific sfx fired.
-   * - Plays Disconnect if any previously filled position is no longer filled.
-   */
-  private _playAfterTileRotatedSfx(board: Board, filledBefore: Set<string>): void {
-    const filledAfter = board.getFilledPositions();
-    const connectionSfx = this._collectConnectionSfx(board, filledBefore);
-    if (connectionSfx.length === 0 && this._hasSetDifference(filledAfter, filledBefore)) {
-      sfxManager.play(SfxId.PipeConnected);
-    }
-    if (this._hasSetDifference(filledBefore, filledAfter)) {
-      sfxManager.play(SfxId.Disconnect);
-    }
-    for (const sfx of connectionSfx) {
-      sfxManager.play(sfx);
-    }
-  }
-
-  /** True when `source` contains a key not present in `other` (early-exit set-difference check). */
-  private _hasSetDifference(source: Set<string>, other: Set<string>): boolean {
-    for (const key of source) {
-      if (!other.has(key)) return true;
-    }
-    return false;
-  }
-
-  /**
-   * Play the leak sound if any leaky-pipe penalty was applied in `changes`.
-   * Called once per board action so the sound plays at most once per turn.
-   */
-  private _playLeakSfxIfNeeded(board: Board, changes: Array<{ row: number; col: number; delta: number }>): void {
-    const hasLeak = changes.some(({ row, col }) =>
-      LEAKY_PIPE_SHAPES.has(board.grid[row]?.[col]?.shape),
-    );
-    if (hasLeak) sfxManager.play(SfxId.Leak);
-  }
-
-  /**
-   * True when `tile` is a chamber holding a pickupable item (gold or
-   * regular) — i.e. its item chamber content is populated with a shape.
-   */
-  private _isPickupableItemTile(tile: Tile | undefined): boolean {
-    return tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null;
-  }
-
-  /**
-   * Play the gold sound if any gold item chamber became newly connected since
-   * `filledBefore` was captured.  If no gold item connected but a positive-count
-   * non-gold item chamber did, play the pickup sound instead.
-   * Gold takes precedence over pickup.
-   */
-  private _playGoldSfxIfNeeded(board: Board, filledBefore: Set<string>): void {
-    const filledAfter = board.getFilledPositions();
-    let hasPickup = false;
-    for (const key of filledAfter) {
-      if (filledBefore.has(key)) continue;
-      const outcome = this._classifyNewlyConnectedPickup(board, key);
-      if (outcome === 'gold') { sfxManager.play(SfxId.Gold); return; }
-      if (outcome === 'pickup') hasPickup = true;
-    }
-    if (hasPickup) sfxManager.play(SfxId.Pickup);
-  }
-
-  /** Classify a newly-connected board position for {@link _playGoldSfxIfNeeded}'s gold-vs-pickup sfx choice. */
-  private _classifyNewlyConnectedPickup(board: Board, key: string): 'gold' | 'pickup' | 'none' {
-    const [r, c] = parseKey(key);
-    const tile = board.grid[r]?.[c];
-    if (!this._isPickupableItemTile(tile)) return 'none';
-    if (GOLD_PIPE_SHAPES.has(tile.itemShape!)) return 'gold'; // eslint-disable-line @typescript-eslint/no-non-null-assertion -- itemShape is non-null here, guarded by _isPickupableItemTile() above
-    return tile.itemCount > 0 ? 'pickup' : 'none';
   }
 
   /**
@@ -2243,7 +1913,7 @@ export class Game implements InputCallbacks {
     this._metrics.scheduleCountBounce(placedShape);
     if (replacedTile) this._metrics.scheduleCountBounce(replacedTile.shape);
 
-    this._playAfterTilePlacedSfx({ board: this.board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey: posKey });
+    playAfterTilePlacedSfx({ board: this.board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey: posKey });
 
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();
@@ -3165,24 +2835,6 @@ export class Game implements InputCallbacks {
   private _activateCampaign(campaign: CampaignDef): void { this._campaign.activate(campaign); }
   private _deactivateCampaign(): void { this._campaign.deactivate(); }
 
-}
-
-/** Running per-category accumulators for {@link Game._collectConnectionSfx}. */
-interface ConnectionSfxTrackers {
-  hotPlateSfx: SfxId | null;
-  maxIceRaw: number;
-  maxSnowRaw: number;
-  maxDirtCost: number;
-  maxSandstoneInfo: { cost: number; shattered: boolean } | null;
-}
-
-// Private interface for _playAfterTilePlacedSfx options
-interface PlayAfterTilePlacedSfxOptions {
-  board: Board;
-  filledBefore: Set<string>;
-  changes: Array<{ row: number; col: number; delta: number }>;
-  placedIsLeakyAndConnected: boolean;
-  placedPosKey: string | null;
 }
 
 // Exported interface for afterTilePlaced options

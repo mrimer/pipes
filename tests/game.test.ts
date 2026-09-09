@@ -16,6 +16,7 @@ import {
   saveEnvironmentalEnabled,
 } from '../src/persistence';
 import { sfxManager, SfxId } from '../src/audio/sfxManager';
+import { collectConnectionSfx as _collectConnectionSfx } from '../src/gameConnectionSfx';
 import { CloudShadowField } from '../src/visuals/cloudShadows';
 import { FireflyField } from '../src/visuals/fireflyField';
 import { ButterflyField } from '../src/visuals/butterflyField';
@@ -209,10 +210,9 @@ function makeChamberConnectionBoard(chamberTiles: Tile[]): Board {
   return board;
 }
 
-/** Call the private Game._collectConnectionSfx for a test. */
-function collectConnectionSfx(game: Game, board: Board): SfxId[] {
-  return (game as unknown as { _collectConnectionSfx(board: Board, filledBefore: Set<string>): SfxId[] })
-    ._collectConnectionSfx(board, new Set<string>());
+/** Call gameConnectionSfx's collectConnectionSfx for a test (moved out of Game in the src/game.ts hotspot sweep). */
+function collectConnectionSfx(_game: Game, board: Board): SfxId[] {
+  return _collectConnectionSfx(board, new Set<string>());
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
