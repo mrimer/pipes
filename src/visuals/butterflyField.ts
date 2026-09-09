@@ -52,6 +52,22 @@ interface ButterflyBoard {
   ambientDecorations?: ReadonlyMap<string, { type: AmbientDecorationType; offsetX?: number; offsetY?: number }>;
 }
 
+type PerchDecor = { type: AmbientDecorationType; offsetX?: number; offsetY?: number } | undefined;
+
+/** True if `(x, y)` falls outside the `width` x `height` field bounds. */
+function _isOutOfFieldBounds(x: number, y: number, width: number, height: number): boolean {
+  return x < 0 || y < 0 || x >= width || y >= height;
+}
+
+/** True if `decor` names a landable decoration and `tile` is an empty floor tile that supports it. */
+function _hasPerchDecor(decor: PerchDecor, tile: { shape: PipeShape } | null): boolean {
+  const decorType = decor?.type;
+  return decorType !== undefined
+    && PERCH_DECORATION_TYPES.has(decorType)
+    && tile !== null
+    && EMPTY_PERCH_TILE_SHAPES.has(tile.shape);
+}
+
 interface Butterfly {
   x: number;
   y: number;
@@ -217,41 +233,46 @@ export class ButterflyField {
 
   private _canLandOnPerchTile(butterfly: Butterfly, now: number): boolean {
     if (!this._board) return false;
-    if (
-      butterfly.x < 0 ||
-      butterfly.y < 0 ||
-      butterfly.x >= this._width ||
-      butterfly.y >= this._height
-    ) return false;
+    if (_isOutOfFieldBounds(butterfly.x, butterfly.y, this._width, this._height)) return false;
+
     const col = Math.floor(butterfly.x / this._tileSize);
     const row = Math.floor(butterfly.y / this._tileSize);
     const tile = this._board.getTile({ row, col });
     const decor = this._board.ambientDecorations?.get(`${row},${col}`);
-    const decorType = decor?.type;
-    const hasPerchDecor = decorType !== undefined
-      && PERCH_DECORATION_TYPES.has(decorType)
-      && tile !== null
-      && EMPTY_PERCH_TILE_SHAPES.has(tile.shape);
+    const hasPerchDecor = _hasPerchDecor(decor, tile);
     const canPerchHere = hasPerchDecor || tile?.shape === PipeShape.Granite;
     if (!canPerchHere) return false;
-    if (hasPerchDecor) {
-      const targetX = col * this._tileSize + (decor?.offsetX ?? 0.5) * this._tileSize;
-      const targetY = row * this._tileSize + (decor?.offsetY ?? 0.5) * this._tileSize;
-      const dx = targetX - butterfly.x;
-      const dy = targetY - butterfly.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > PERCH_CENTERING_THRESHOLD_PX) {
-        butterfly.heading = Math.atan2(dy, dx);
-        butterfly.segmentStartX = butterfly.x;
-        butterfly.segmentStartY = butterfly.y;
-        butterfly.segmentStartTime = now;
-        return false;
-      }
-      butterfly.x = targetX;
-      butterfly.y = targetY;
-      return true;
-    }
 
+    if (hasPerchDecor) return this._perchOnDecor(butterfly, now, { col, row, decor });
+    return this._isBodyInsideTile(butterfly, col, row);
+  }
+
+  /** Nudge `butterfly` toward the decor's perch point; land once close enough. */
+  private _perchOnDecor(
+    butterfly: Butterfly,
+    now: number,
+    opts: { col: number; row: number; decor: PerchDecor },
+  ): boolean {
+    const { col, row, decor } = opts;
+    const targetX = col * this._tileSize + (decor?.offsetX ?? 0.5) * this._tileSize;
+    const targetY = row * this._tileSize + (decor?.offsetY ?? 0.5) * this._tileSize;
+    const dx = targetX - butterfly.x;
+    const dy = targetY - butterfly.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > PERCH_CENTERING_THRESHOLD_PX) {
+      butterfly.heading = Math.atan2(dy, dx);
+      butterfly.segmentStartX = butterfly.x;
+      butterfly.segmentStartY = butterfly.y;
+      butterfly.segmentStartTime = now;
+      return false;
+    }
+    butterfly.x = targetX;
+    butterfly.y = targetY;
+    return true;
+  }
+
+  /** True if `butterfly`'s whole body (head, tail, center) fits within tile (`col`, `row`)'s inset bounds. */
+  private _isBodyInsideTile(butterfly: Butterfly, col: number, row: number): boolean {
     const bodyHalfLength = butterfly.sizePx * BODY_LENGTH_SCALE * 0.5;
     const dirX = Math.cos(butterfly.heading);
     const dirY = Math.sin(butterfly.heading);
@@ -300,8 +321,7 @@ export class ButterflyField {
     const bodyHalfLength = bodyLength * 0.5;
     const bodyLineWidth = Math.max(1, butterfly.sizePx * BODY_LINE_WIDTH_SCALE);
     const wingStrokeWidth = Math.max(1, butterfly.sizePx * WING_STROKE_WIDTH_SCALE);
-    const openness = this._wingOpenness(butterfly, now);
-    const wingYScale = openness;
+    const wingYScale = this._wingOpenness(butterfly, now);
     const headX = bodyHalfLength * HEAD_RATIO;
 
     ctx.save();
@@ -317,6 +337,13 @@ export class ButterflyField {
     ctx.lineTo(bodyHalfLength, 0);
     ctx.stroke();
 
+    this._drawButterflyAntennae(ctx, butterfly, headX);
+    this._drawButterflyWings(ctx, butterfly, { bodyHalfLength, wingStrokeWidth, wingYScale });
+
+    ctx.restore();
+  }
+
+  private _drawButterflyAntennae(ctx: CanvasRenderingContext2D, butterfly: Butterfly, headX: number): void {
     const antennaLength = butterfly.sizePx * 0.8;
     const antennaOutX = headX + antennaLength * 0.55;
     const antennaOutY = antennaLength * 0.35;
@@ -326,7 +353,14 @@ export class ButterflyField {
     ctx.moveTo(headX, 0);
     ctx.quadraticCurveTo(headX + antennaLength * 0.25, antennaLength * 0.15, antennaOutX, antennaOutY);
     ctx.stroke();
+  }
 
+  private _drawButterflyWings(
+    ctx: CanvasRenderingContext2D,
+    butterfly: Butterfly,
+    opts: { bodyHalfLength: number; wingStrokeWidth: number; wingYScale: number },
+  ): void {
+    const { bodyHalfLength, wingStrokeWidth, wingYScale } = opts;
     ctx.fillStyle = butterfly.color;
     ctx.globalAlpha = WING_ALPHA;
     const wingJoinX = bodyHalfLength * WING_JOIN_X_RATIO;
@@ -369,6 +403,5 @@ export class ButterflyField {
       ctx.lineWidth = wingStrokeWidth;
       ctx.stroke();
     }
-    ctx.restore();
   }
 }
