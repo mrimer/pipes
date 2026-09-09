@@ -1,5 +1,5 @@
 import type { MoveResult} from './board';
-import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, posKey, parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, isEmptyFloor, SPIN_PIPE_SHAPES } from './board';
+import { Board, ERR_GOLD_SPACE, ERR_SANDSTONE_TOO_HARD, ERR_REGULATOR_CHECK, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, isEmptyFloor, SPIN_PIPE_SHAPES } from './board';
 import type { Tile } from './tile';
 import type { ChapterMapScreen } from './screens/chapterMapScreen';
 import type { GridPos, InventoryItem, LevelDef, CampaignDef, Rotation, AmbientDecoration, PlaySequenceRecord, PipeShape } from './types';
@@ -63,6 +63,7 @@ import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './visuals/levelTransition';
 import { sfxManager, SfxId } from './audio/sfxManager';
 import { playAfterTilePlacedSfx, playAfterTileRotatedSfx, playLeakSfxIfNeeded, playGoldSfxIfNeeded } from './gameConnectionSfx';
+import { snapshotPlacedTiles, collectRemovedTileFlashes, collectAddedTileFlashes, buildAvailableInventoryShapes } from './gameBoardDiff';
 import { musicManager, selectGroupForContext } from './audio/musicManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
 import { ERROR_COLOR, ERROR_DARK, RADIUS_MD, UI_BG, UI_BORDER, UI_GOLD, UI_OVERLAY_BG, UI_TEXT } from './uiConstants';
@@ -1820,7 +1821,7 @@ export class Game implements InputCallbacks {
    */
   selectNextAvailableInventory(): void {
     if (!this.board) return;
-    const available = this._buildAvailableInventoryShapes(this.board);
+    const available = buildAvailableInventoryShapes(this.board);
     if (available.length === 0) return;
 
     const currentIdx = this.selectedShape !== null ? available.indexOf(this.selectedShape) : -1;
@@ -1830,40 +1831,6 @@ export class Game implements InputCallbacks {
     this.pendingRotation = this._input.lastPlacedRotations.get(nextShape) ?? 0;
     this._renderInventoryBar();
     this.canvas.focus();
-  }
-
-  /** Ordered list of selectable shapes (positive effective count), matching the inventory bar's visual order. */
-  private _buildAvailableInventoryShapes(board: Board): PipeShape[] {
-    const bonuses = board.getContainerBonuses();
-    const seen = new Set<PipeShape>();
-
-    // Build the ordered list of selectable shapes, exactly as rendered by the
-    // inventory bar, so the visual order and the cycling order agree.
-    // Shapes with a zero or negative effective count are skipped.
-    const available = this._collectBaseInventoryShapes(board, bonuses, seen);
-    available.push(...this._collectBonusOnlyShapes(bonuses, seen));
-    return available;
-  }
-
-  /** Base-inventory shapes with positive effective count, recording each shape into `seen`. */
-  private _collectBaseInventoryShapes(board: Board, bonuses: Map<PipeShape, number>, seen: Set<PipeShape>): PipeShape[] {
-    const available: PipeShape[] = [];
-    for (const item of board.inventory) {
-      seen.add(item.shape);
-      const effectiveCount = item.count + (bonuses.get(item.shape) ?? 0);
-      if (effectiveCount > 0) available.push(item.shape);
-    }
-    return available;
-  }
-
-  /** Shapes that are only available via container bonuses (not in base inventory). */
-  private _collectBonusOnlyShapes(bonuses: Map<PipeShape, number>, seen: Set<PipeShape>): PipeShape[] {
-    const available: PipeShape[] = [];
-    for (const [bonusShape, bonusCount] of bonuses) {
-      if (seen.has(bonusShape)) continue;
-      if (bonusCount > 0) available.push(bonusShape);
-    }
-    return available;
   }
 
   /**
@@ -2186,51 +2153,13 @@ export class Game implements InputCallbacks {
     this._finalizeHistoryJump();
   }
 
-  /** Returns the set of pos-keys for all non-empty tiles on the current board. */
-  private _snapshotPlacedTiles(): Set<string> {
-    if (!this.board) return new Set();
-    const placed = new Set<string>();
-    for (let r = 0; r < this.board.rows; r++) {
-      for (let c = 0; c < this.board.cols; c++) {
-        if (!isEmptyFloor(this.board.grid[r][c].shape)) {
-          placed.add(posKey(r, c));
-        }
-      }
-    }
-    return placed;
-  }
-
   /** Diff two placed-tile snapshots and spawn undo/redo flash effects on changed tiles. */
   private _spawnUndoFlashes(before: Set<string>, after: Set<string>): void {
     const flashes: Array<{ row: number; col: number; type: 'add' | 'remove' }> = [
-      ...this._collectRemovedTileFlashes(before, after),
-      ...this._collectAddedTileFlashes(before, after),
+      ...collectRemovedTileFlashes(before, after),
+      ...collectAddedTileFlashes(before, after),
     ];
     if (flashes.length > 0) this._animMgr.spawnUndoFlashes(flashes);
-  }
-
-  /** Flashes for tiles present in `before` but no longer in `after`. */
-  private _collectRemovedTileFlashes(before: Set<string>, after: Set<string>): Array<{ row: number; col: number; type: 'remove' }> {
-    const flashes: Array<{ row: number; col: number; type: 'remove' }> = [];
-    for (const key of before) {
-      if (!after.has(key)) {
-        const [row, col] = parseKey(key);
-        flashes.push({ row, col, type: 'remove' });
-      }
-    }
-    return flashes;
-  }
-
-  /** Flashes for tiles present in `after` but not in `before`. */
-  private _collectAddedTileFlashes(before: Set<string>, after: Set<string>): Array<{ row: number; col: number; type: 'add' }> {
-    const flashes: Array<{ row: number; col: number; type: 'add' }> = [];
-    for (const key of after) {
-      if (!before.has(key)) {
-        const [row, col] = parseKey(key);
-        flashes.push({ row, col, type: 'add' });
-      }
-    }
-    return flashes;
   }
 
   /**
@@ -2262,14 +2191,14 @@ export class Game implements InputCallbacks {
     }
     if (!this._canPerformUndo()) return;
 
-    const placedBeforeUndo = this._snapshotPlacedTiles();
+    const placedBeforeUndo = snapshotPlacedTiles(this.board);
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const turnBefore = this.board.turnNumber;
     const filledBefore = this.board.getFilledPositions();
     this._restoreBoardForUndo();
     this._playUndoSfx(turnBefore);
-    this._spawnUndoFlashes(placedBeforeUndo, this._snapshotPlacedTiles());
+    this._spawnUndoFlashes(placedBeforeUndo, snapshotPlacedTiles(this.board));
     this.gameState = GameState.Playing;
     this._closeModal(this.gameoverModalEl);
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, this._metrics.sparkleCallbacks());
@@ -2314,12 +2243,12 @@ export class Game implements InputCallbacks {
     if (!this.board || !this.board.canRedo()) return;
     sfxManager.play(SfxId.Redo);
     this._animMgr.resetIdleTimer();
-    const placedBeforeRedo = this._snapshotPlacedTiles();
+    const placedBeforeRedo = snapshotPlacedTiles(this.board);
     const filledBefore = this.board.getFilledPositions();
     const lockedWaterImpactBefore = this.board.captureLockedWaterImpacts();
     const lockedHotPlateGainBefore = this.board.captureLockedHotPlateGains();
     this.board.redoMove();
-    this._spawnUndoFlashes(placedBeforeRedo, this._snapshotPlacedTiles());
+    this._spawnUndoFlashes(placedBeforeRedo, snapshotPlacedTiles(this.board));
     const sparkle = this._metrics.sparkleCallbacks();
     this._animMgr.spawnConnectionAnimations(this.board, filledBefore, sparkle);
     this._animMgr.spawnDisconnectionAnimations(
