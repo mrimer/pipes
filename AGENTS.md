@@ -79,6 +79,8 @@ When adding, removing, or renaming source files, update the directory tree and n
 src/
 ├── main.ts                      # Entry point — mounts game, campaign editor, level select
 ├── game.ts                      # Game orchestrator (delegates to sub-managers below)
+├── gameConnectionSfx.ts         # Pure sfx-selection logic for tile placement/rotation (split out of game.ts)
+├── gameBoardDiff.ts             # Pure board-diff/inventory-ordering helpers (split out of game.ts)
 ├── board.ts                     # Pure game state: grid, BFS water flow, undo/redo
 ├── tile.ts                      # Tile data model
 ├── types.ts                     # All shared TypeScript types and interfaces, incl. LocalizedText
@@ -357,6 +359,8 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 | Active profile slot / namespacing | `profile/activeProfile.ts` |
 | Profile import/export (file I/O) | `profile/profileIO.ts` |
 | Sound effect playback | `audio/sfxManager.ts` |
+| Which sfx to play for a tile placement/rotation | `gameConnectionSfx.ts` |
+| Undo/redo tile-diff flashes, inventory-cycling order | `gameBoardDiff.ts` |
 | Background music scheduling | `audio/musicScheduler.ts` |
 | Level screen transition animation | `visuals/levelTransition.ts` |
 | Splash screen (Caravel Games logo) | `screens/splashScreen.ts` |
