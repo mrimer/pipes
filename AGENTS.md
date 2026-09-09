@@ -233,6 +233,16 @@ src/
 Other top-level directories:
 ```
 tests/                           # Jest test suite (TypeScript, jsdom opt-in per file)
+├── gameTestHelpers.ts            # Shared Game test fixtures (MOCK_CTX, makeGame, gameHooks) for tests/game/*.test.ts
+├── game/                         # game.test.ts split by feature area (CodeScene hotspot split)
+│   ├── gameScreensAndInventory.test.ts   # Screen transitions, playtest labels, inventory selection/shift-cycle, reset progress
+│   ├── gameRotationAndUndoLast.test.ts   # Chapter numbering, pendingRotation, undoLastMove, tile connection animations
+│   ├── gameWinLoseCore.test.ts           # _checkWinLose precedence, retryLevel history graft, renderInventoryBar
+│   ├── gameModalsAndReclaim.test.ts      # Modal positioning, reclaim/replace animations, profile/Escape/playtest flows
+│   ├── gameUndoRedoShortcuts.test.ts     # performRedo animations, Ctrl-Z/Y/Backspace shortcuts, note/hint boxes
+│   ├── gameRetryAndChapterModals.test.ts # retryLevel undo history, new-chapter modal, challenge-level modal
+│   ├── gameSpinnerAndMisc.test.ts        # Campaign auto-selection, challenge icon, spinner click/wheel/right-click
+│   └── gameConnectionSfx.test.ts         # Game._collectConnectionSfx chamber-content sfx selection
 └── board/                       # board.test.ts split by feature area (CodeScene hotspot split)
     ├── boardConnections.test.ts       # Connection/rotation mechanics, cross/container-grant rotation
     ├── boardContainers.test.ts        # Chamber tank/dirt/item content, inventory placement/reclaim, Levels 2-4
