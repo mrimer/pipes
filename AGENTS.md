@@ -233,6 +233,15 @@ src/
 Other top-level directories:
 ```
 tests/                           # Jest test suite (TypeScript, jsdom opt-in per file)
+└── board/                       # board.test.ts split by feature area (CodeScene hotspot split)
+    ├── boardConnections.test.ts       # Connection/rotation mechanics, cross/container-grant rotation
+    ├── boardContainers.test.ts        # Chamber tank/dirt/item content, inventory placement/reclaim, Levels 2-4
+    ├── boardHistory.test.ts           # Undo/redo history, snapshot restore, replaceInventoryTile
+    ├── boardTemperature.test.ts       # Heater/ice/frozen mechanics, Levels 5-7, applyTurnDelta
+    ├── boardPipeShapes.test.ts        # getTileDisplayName, pump/snow/sandstone/shatter chambers, spinnable pipes
+    ├── boardCoolerVacuum.test.ts      # Cooler/Vacuum negative-stat constraints, hot_plate chamber
+    ├── boardMaterials.test.ts         # Cement drying, leaky pipes, valve rules
+    └── boardAdvancedChambers.test.ts  # Gel/Siphon incremental water, regulator chambers, getFilledPositions cache
 tools/
 └── e2e/
     └── campaign_editor_harness.py  # Playwright runtime harness — canvas render regression guard
