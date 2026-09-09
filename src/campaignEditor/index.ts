@@ -593,10 +593,6 @@ export class CampaignEditor {
     return meta?.guid === campaign.authorGuid;
   }
 
-  private _labeledInput(labelText: string, value: string, onInput: (v: string) => void, type = 'text', inputWidth?: string): HTMLElement {
-    return this._paramsPanel.labeledInput(labelText, value, onInput, type, inputWidth);
-  }
-
   // ─── Screen: Campaign list ────────────────────────────────────────────────
 
   private _showCampaignList(): void {
