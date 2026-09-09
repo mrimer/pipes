@@ -91,6 +91,7 @@ src/
 │   ├── ambientDecoration.ts     # Grass/rock ambient sprites on empty tiles
 │   ├── graniteRenderer.ts       # Granite tile drawing (seamed border/fill geometry, split out of renderer.ts)
 │   ├── seaRenderer.ts           # Sea tile drawing (animated water fill, ripples, land border, split out of renderer.ts)
+│   ├── treeRenderer.ts          # Tree drawing (drawTree/2/3/4, table-driven variant config, split out of renderer.ts)
 │   ├── tileDisplayNames.ts      # Human-readable pipe-shape labels
 │   └── rendererState.ts        # Shared renderer state passed across render calls
 ├── inventoryRenderer.ts         # Draws the pipe inventory sidebar
@@ -346,6 +347,7 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 | Ambient grass/rocks | `renderer/ambientDecoration.ts` |
 | Granite tile drawing | `renderer/graniteRenderer.ts` |
 | Sea tile drawing | `renderer/seaRenderer.ts` |
+| Tree drawing (4 variants) | `renderer/treeRenderer.ts` |
 | Modal dialogs (game) | `gameModals.ts`, `recordingModals.ts`, `rulesModal.ts` |
 | Modal accessibility plumbing | `modals/modalUtils.ts` |
 | Keyboard shortcuts | `commandKeyManager.ts` |
