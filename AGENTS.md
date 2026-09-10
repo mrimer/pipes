@@ -202,6 +202,7 @@ src/
 │
 └── campaignEditor/
     ├── index.ts                 # Editor orchestrator — wires all editor sub-modules
+    ├── campaignImportExportFlow.ts # Import/export sequencing (file pick, gzip/JSON sniffing, version-conflict routing, text-pack merge) — collaborator extracted from index.ts
     ├── campaignService.ts       # Campaign/chapter/level CRUD, import/export, text-pack export/import (exportTextPack/parseTextPack/mergeTextPack), findLevelLocation
     ├── mapEditorBase.ts         # Abstract base for both map editors: history, grid ops, undo/redo
     ├── chapterMapEditor.ts      # Chapter map editor (extends MapEditorBase)
@@ -413,6 +414,7 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 | Campaign-map wheel zoom + zoom sizing clamps | `screens/mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
 | Map sea-wave animation on chapter/campaign screens | `screens/mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |
 | Campaign CRUD | `campaignEditor/campaignService.ts` |
+| Campaign import/export sequencing (file pick, gzip/JSON sniff, version-conflict routing, text-pack merge dispatch) | `campaignEditor/campaignImportExportFlow.ts` |
 | Chapter/campaign completion + mastery sequencing, win/mastery modals | `campaignCompletionFlow.ts` |
 | Editor undo/redo | `campaignEditor/historyManager.ts` + `mapEditorBase.ts` |
 | Validation error messages | `campaignEditor/validationMessages.ts` |

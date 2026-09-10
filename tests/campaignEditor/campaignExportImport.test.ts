@@ -102,7 +102,7 @@ describe('CampaignEditor – _exportCampaign', () => {
     });
 
     jest.useFakeTimers();
-    (editor as unknown as { _exportCampaign(c: CampaignDef): void })._exportCampaign(campaign);
+    (editor as unknown as { _importExportFlow: { exportCampaign(c: CampaignDef): void } })._importExportFlow.exportCampaign(campaign);
 
     await waitFor(() => gzipSpy.mock.calls.length > 0 && appendedAnchors.length === 1 && clickedAnchors.length === 1 && removedAnchors.length === 1);
 
@@ -148,7 +148,7 @@ describe('CampaignEditor – _exportCampaign', () => {
     jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     jest.useFakeTimers();
 
-    (editor as unknown as { _exportCampaign(c: CampaignDef): void })._exportCampaign(campaign);
+    (editor as unknown as { _importExportFlow: { exportCampaign(c: CampaignDef): void } })._importExportFlow.exportCampaign(campaign);
     await waitFor(() => downloadNames.length === 1);
 
     expect(downloadNames).toHaveLength(1);
@@ -191,7 +191,7 @@ describe('CampaignEditor – gzip import', () => {
 
     const editor = makeEditor();
     fileInputs.length = 0; // discard inputs from constructor
-    (editor as unknown as { _importCampaign(): void })._importCampaign();
+    (editor as unknown as { _importExportFlow: { importCampaign(): void } })._importExportFlow.importCampaign();
 
     const fileInput = fileInputs.find((el) => el.type === 'file');
     expect(fileInput).toBeDefined();
@@ -241,7 +241,7 @@ describe('CampaignEditor – import version comparison', () => {
     });
 
     try {
-      (editor as unknown as { _importCampaign(): void })._importCampaign();
+      (editor as unknown as { _importExportFlow: { importCampaign(): void } })._importExportFlow.importCampaign();
     } finally {
       createSpy.mockRestore();
     }
@@ -570,7 +570,7 @@ describe('CampaignEditor – import activates the campaign', () => {
     });
 
     try {
-      (editor as unknown as { _importCampaign(): void })._importCampaign();
+      (editor as unknown as { _importExportFlow: { importCampaign(): void } })._importExportFlow.importCampaign();
     } finally {
       createSpy.mockRestore();
     }

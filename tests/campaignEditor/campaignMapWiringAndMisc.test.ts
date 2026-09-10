@@ -149,7 +149,7 @@ describe('CampaignEditor import read errors', () => {
 
     try {
       const editor = makeEditor();
-      (editor as unknown as { _importCampaign(): void })._importCampaign();
+      (editor as unknown as { _importExportFlow: { importCampaign(): void } })._importExportFlow.importCampaign();
     } finally {
       createSpy.mockRestore();
     }
