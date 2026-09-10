@@ -79,8 +79,8 @@ describe('GridGestureEngine — attach/detach', () => {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules();
     const renderCanvas = jest.fn();
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas });
+    engine.attach(canvas);
 
     leftMouseDown(canvas);
 
@@ -91,8 +91,8 @@ describe('GridGestureEngine — attach/detach', () => {
   test('an "immediate" action starts no drag', () => {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules();
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
 
     leftMouseDown(canvas);
 
@@ -103,13 +103,35 @@ describe('GridGestureEngine — attach/detach', () => {
   test('detach() removes listeners — mousedown after detach does not call rules', () => {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules();
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     engine.detach();
 
     leftMouseDown(canvas);
 
     expect(rules.decideLeftMouseDown).not.toHaveBeenCalled();
+  });
+
+  test('detach() before any attach() is a safe no-op', () => {
+    const rules = createFakeRules();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+
+    expect(() => engine.detach()).not.toThrow();
+  });
+
+  test('re-attaching to a different canvas moves listeners off the old one', () => {
+    const oldCanvas = createAttachedCanvas();
+    const newCanvas = createAttachedCanvas();
+    const rules = createFakeRules();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(oldCanvas);
+
+    engine.attach(newCanvas);
+    leftMouseDown(oldCanvas);
+    expect(rules.decideLeftMouseDown).not.toHaveBeenCalled();
+
+    leftMouseDown(newCanvas);
+    expect(rules.decideLeftMouseDown).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -119,8 +141,8 @@ describe('GridGestureEngine — paint-drag', () => {
     const rules = createFakeRules({
       decideLeftMouseDown: jest.fn((): LeftMouseDownAction => ({ type: 'startPaintDrag' })),
     });
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     return { canvas, rules, engine };
   }
 
@@ -152,7 +174,7 @@ describe('GridGestureEngine — paint-drag', () => {
     mouseUp(canvas);
 
     expect(engine.paintDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag', 'mouseup');
   });
 });
 
@@ -164,8 +186,8 @@ describe('GridGestureEngine — tile-drag', () => {
       decideLeftMouseDown: jest.fn((): LeftMouseDownAction => ({ type: 'startTileDrag', tile })),
       ...overrides,
     });
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     return { canvas, rules, engine, tile };
   }
 
@@ -255,8 +277,8 @@ describe('GridGestureEngine — erase-drag and contextmenu suppression', () => {
   function attachEngine(overrides: Partial<GestureRules> = {}) {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules(overrides);
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     return { canvas, rules, engine };
   }
 
@@ -288,7 +310,7 @@ describe('GridGestureEngine — erase-drag and contextmenu suppression', () => {
     mouseUp(canvas, 2);
 
     expect(engine.rightEraseDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag', 'mouseup');
   });
 
   test('erase-drag end fires nothing when nothing changed', () => {
@@ -344,8 +366,8 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     const rules = createFakeRules({
       decideLeftMouseDown: jest.fn((): LeftMouseDownAction => ({ type: 'startTileDrag', tile })),
     });
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     leftMouseDown(canvas);
     rules.canvasPos.mockReturnValue({ row: 3, col: 4 });
     mouseMove(canvas);
@@ -357,19 +379,32 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     expect(rules.onTileClicked).not.toHaveBeenCalled();
   });
 
-  test('mouseleave during a paint-drag ends it and fires onGestureEnd', () => {
+  test('mouseleave during a paint-drag ends it and fires onGestureEnd with trigger "mouseleave"', () => {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules({
       decideLeftMouseDown: jest.fn((): LeftMouseDownAction => ({ type: 'startPaintDrag' })),
     });
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     leftMouseDown(canvas);
 
     mouseLeave(canvas);
 
     expect(engine.paintDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag', 'mouseleave');
+  });
+
+  test('mouseleave during an erase-drag that changed something fires onGestureEnd with trigger "mouseleave"', () => {
+    const canvas = createAttachedCanvas();
+    const rules = createFakeRules({ eraseCell: jest.fn(() => true) });
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
+    rightMouseDown(canvas);
+
+    mouseLeave(canvas);
+
+    expect(engine.rightEraseDragActive).toBe(false);
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag', 'mouseleave');
   });
 
   test('mouseup on window (outside the canvas) still ends an active paint-drag', () => {
@@ -377,14 +412,14 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     const rules = createFakeRules({
       decideLeftMouseDown: jest.fn((): LeftMouseDownAction => ({ type: 'startPaintDrag' })),
     });
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     leftMouseDown(canvas);
 
     window.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
 
     expect(engine.paintDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag', 'mouseup');
   });
 });
 
@@ -396,8 +431,8 @@ describe('GridGestureEngine — hover tracking and wheel', () => {
   function attachEngine(overrides: Partial<GestureRules> = {}) {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules(overrides);
-    const engine = createTrackedEngine(canvas, rules, { renderCanvas: jest.fn() });
-    engine.attach();
+    const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
+    engine.attach(canvas);
     return { canvas, rules, engine };
   }
 

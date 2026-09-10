@@ -72,7 +72,7 @@ export class EditorInputHandler {
       onGestureEnd: (kind) => this._onGestureEnd(kind),
       onHoverChanged: (pos) => { this._cb.getState().hover = pos; },
     };
-    this._engine = new GridGestureEngine(this._canvas, rules, { renderCanvas: () => this._cb.renderCanvas() });
+    this._engine = new GridGestureEngine(rules, { renderCanvas: () => this._cb.renderCanvas() });
   }
 
   /** Read-only view of drag state for the renderer. Returns null when no drag is active. */
@@ -92,7 +92,7 @@ export class EditorInputHandler {
   get suppressNextContextMenu(): boolean { return this._engine.suppressNextContextMenu; }
 
   /** Register all canvas and window event listeners. */
-  attach(): void { this._engine.attach(); }
+  attach(): void { this._engine.attach(this._canvas); }
 
   /** Remove all listeners. Call when leaving the level editor. */
   detach(): void { this._engine.detach(); }

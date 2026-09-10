@@ -46,7 +46,7 @@ export interface GestureRules {
   onRightClick(pos: GridPos): void;
   onWheel(e: WheelEvent, hoverPos: GridPos | null): void;
   /** A paint-drag or erase-drag gesture just ended (mouseup or mouseleave). */
-  onGestureEnd(kind: 'paintDrag' | 'eraseDrag'): void;
+  onGestureEnd(kind: 'paintDrag' | 'eraseDrag', trigger: 'mouseup' | 'mouseleave'): void;
   /** Hover position changed (every mousemove, and null on mouseleave) — sync into external state, tooltips, etc. */
   onHoverChanged(pos: GridPos | null): void;
 }
@@ -56,6 +56,7 @@ export interface GridGestureCallbacks {
 }
 
 export class GridGestureEngine {
+  private _canvas: HTMLCanvasElement | null = null;
   private _dragState: DragInFlight | null = null;
   private _hover: GridPos | null = null;
   private _paintDragActive = false;
@@ -71,7 +72,6 @@ export class GridGestureEngine {
   private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
 
   constructor(
-    private readonly _canvas: HTMLCanvasElement,
     private readonly _rules: GestureRules,
     private readonly _cb: GridGestureCallbacks,
   ) {}
@@ -96,24 +96,30 @@ export class GridGestureEngine {
     return this._suppressNextContextMenu;
   }
 
-  attach(): void {
+  /** Wires listeners onto `canvas`. Safe to call again with a different canvas
+   *  (e.g. the DOM was rebuilt) — the previous canvas's listeners are removed first. */
+  attach(canvas: HTMLCanvasElement): void {
     this.detach();
-    this._canvas.addEventListener('mousedown', this._mouseDownHandler);
-    this._canvas.addEventListener('mousemove', this._mouseMoveHandler);
-    this._canvas.addEventListener('contextmenu', this._contextMenuHandler);
-    this._canvas.addEventListener('mouseleave', this._mouseLeaveHandler);
-    this._canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
+    this._canvas = canvas;
+    canvas.addEventListener('mousedown', this._mouseDownHandler);
+    canvas.addEventListener('mousemove', this._mouseMoveHandler);
+    canvas.addEventListener('contextmenu', this._contextMenuHandler);
+    canvas.addEventListener('mouseleave', this._mouseLeaveHandler);
+    canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
 
     this._windowMouseUpHandler = (e: MouseEvent) => this.onMouseUp(e);
     window.addEventListener('mouseup', this._windowMouseUpHandler);
   }
 
   detach(): void {
-    this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
-    this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
-    this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
-    this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
-    this._canvas.removeEventListener('wheel', this._wheelHandler);
+    if (this._canvas) {
+      this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
+      this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
+      this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
+      this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
+      this._canvas.removeEventListener('wheel', this._wheelHandler);
+      this._canvas = null;
+    }
     if (this._windowMouseUpHandler) {
       window.removeEventListener('mouseup', this._windowMouseUpHandler);
       this._windowMouseUpHandler = null;
@@ -199,12 +205,12 @@ export class GridGestureEngine {
     }
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._rules.onGestureEnd('paintDrag');
+      this._rules.onGestureEnd('paintDrag', 'mouseleave');
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
       if (this._rightEraseChanged) {
-        this._rules.onGestureEnd('eraseDrag');
+        this._rules.onGestureEnd('eraseDrag', 'mouseleave');
       }
       this._rightEraseChanged = false;
     }
@@ -222,7 +228,7 @@ export class GridGestureEngine {
 
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._rules.onGestureEnd('paintDrag');
+      this._rules.onGestureEnd('paintDrag', 'mouseup');
       this._cb.renderCanvas();
       return;
     }
@@ -243,7 +249,7 @@ export class GridGestureEngine {
     this._rightEraseDragActive = false;
     this._suppressNextContextMenu = true;
     if (this._rightEraseChanged) {
-      this._rules.onGestureEnd('eraseDrag');
+      this._rules.onGestureEnd('eraseDrag', 'mouseup');
     }
     this._rightEraseChanged = false;
     this._cb.renderCanvas();
