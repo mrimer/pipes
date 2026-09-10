@@ -1,7 +1,13 @@
 /**
- * EditorInputHandler – owns all canvas gesture state and event handlers for
- * the level editor canvas.  Follows the same attach/detach pattern as the
- * game's InputHandler.
+ * EditorInputHandler – level-editor canvas placement/erase/rotate rules.
+ * The gesture state machine itself (paint-drag, right-erase-drag, tile-drag,
+ * contextmenu suppression, mouseleave cancellation, attach/detach wiring) is
+ * owned by GridGestureEngine — shared with the chapter map editor's
+ * ChapterMapInput. This class supplies the level-editor-specific decisions:
+ * what a click/drag/wheel should do to the grid. Its own public methods
+ * (onMouseDown/onMouseMove/onMouseUp/onWheel/onRightClick/canvasPos) match
+ * the pre-engine API exactly, since tests exercise gestures by calling them
+ * directly rather than dispatching real DOM events.
  *
  * CampaignEditor wires callbacks via EditorInputCallbacks and calls
  * attach() / detach() as the editor screen is entered / exited.
@@ -17,6 +23,8 @@ import type { LevelEditorState } from './levelEditorState';
 import { sfxManager, SfxId } from '../audio/sfxManager';
 import { isTileConnectedToSource } from '../tile';
 import { canvasPos as computeCanvasPos } from './canvasUtils';
+import type { GestureRules, LeftMouseDownAction, DragInFlight, GridPos } from './gridGestureEngine';
+import { GridGestureEngine } from './gridGestureEngine';
 
 /** All tree tile shapes — any tree variant may overwrite any other. */
 const TREE_SHAPES = new Set<PipeShape>([
@@ -40,129 +48,76 @@ export interface EditorInputCallbacks {
   showSinkError(): void;
 }
 
-// ─── Internal gesture state ────────────────────────────────────────────────────
-
-interface InternalDragState {
-  startPos: { row: number; col: number };
-  tile: TileDef;
-  currentPos: { row: number; col: number };
-  moved: boolean;
-}
-
 // ─── EditorInputHandler ────────────────────────────────────────────────────────
 
 export class EditorInputHandler {
-  // Gesture state
-  private _dragState: InternalDragState | null = null;
-  private _paintDragActive = false;
-  private _rightEraseDragActive = false;
-  private _rightEraseChanged = false;
-  private _suppressNextContextMenu = false;
-  private _windowMouseUpHandler: ((e: MouseEvent) => void) | null = null;
-  private readonly _mouseDownHandler = (e: MouseEvent) => this.onMouseDown(e);
-  private readonly _mouseMoveHandler = (e: MouseEvent) => this.onMouseMove(e);
-  private readonly _contextMenuHandler = (e: MouseEvent) => {
-    e.preventDefault();
-    if (this._suppressNextContextMenu) {
-      this._suppressNextContextMenu = false;
-      return;
-    }
-    this.onRightClick(e);
-  };
-  private readonly _mouseLeaveHandler = () => this.onMouseLeave();
-  private readonly _wheelHandler = (e: WheelEvent) => this.onWheel(e);
+  private readonly _engine: GridGestureEngine;
+  /** True for exactly the first paintCell() call after a paint-drag starts — only that placement plays sfx. */
+  private _isFirstPaintOfDrag = false;
 
   constructor(
     private readonly _canvas: HTMLCanvasElement,
     private readonly _cb: EditorInputCallbacks,
-  ) {}
-
-  /**
-   * Read-only view of drag state for the renderer (option a from the plan).
-   * Returns null when no drag is active.
-   */
-  get dragState(): DragState | null {
-    if (!this._dragState) return null;
-    return {
-      fromPos: this._dragState.startPos,
-      toPos: this._dragState.currentPos,
-      tile: this._dragState.tile,
+  ) {
+    const rules: GestureRules = {
+      canvasPos: (e) => this.canvasPos(e),
+      decideLeftMouseDown: (pos, e) => this._decideLeftMouseDown(pos, e),
+      paintCell: (pos) => this._paintCellRule(pos),
+      eraseCell: (pos) => this._eraseCellRule(pos),
+      canDropTileAt: (pos) => this._canDropTileAt(pos),
+      onTileMoved: (drag) => this._commitTileMove(drag),
+      onTileClicked: (drag, e) => this._handleStationaryTileClick(drag.startPos, drag.tile, e),
+      onRightClick: (pos) => this._eraseAtRightClick(pos),
+      onWheel: (e) => this._applyWheel(e),
+      onGestureEnd: (kind) => this._onGestureEnd(kind),
+      onHoverChanged: (pos) => { this._cb.getState().hover = pos; },
     };
+    this._engine = new GridGestureEngine(this._canvas, rules, { renderCanvas: () => this._cb.renderCanvas() });
+  }
+
+  /** Read-only view of drag state for the renderer. Returns null when no drag is active. */
+  get dragState(): DragState | null {
+    const drag = this._engine.dragState;
+    if (!drag) return null;
+    return { fromPos: drag.startPos, toPos: drag.currentPos, tile: drag.tile };
   }
 
   /** True while a paint-drag is active (read-only for external observers). */
-  get paintDragActive(): boolean { return this._paintDragActive; }
+  get paintDragActive(): boolean { return this._engine.paintDragActive; }
 
   /** True while a right-button erase-drag is active (read-only for external observers). */
-  get rightEraseDragActive(): boolean { return this._rightEraseDragActive; }
+  get rightEraseDragActive(): boolean { return this._engine.rightEraseDragActive; }
 
   /** True when the next contextmenu event should be suppressed (read-only for external observers). */
-  get suppressNextContextMenu(): boolean { return this._suppressNextContextMenu; }
+  get suppressNextContextMenu(): boolean { return this._engine.suppressNextContextMenu; }
 
   /** Register all canvas and window event listeners. */
-  attach(): void {
-    this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
-    this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
-    this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
-    this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
-    this._canvas.removeEventListener('wheel', this._wheelHandler);
-
-    this._canvas.addEventListener('mousedown', this._mouseDownHandler);
-    this._canvas.addEventListener('mousemove', this._mouseMoveHandler);
-    this._canvas.addEventListener('contextmenu', this._contextMenuHandler);
-    this._canvas.addEventListener('mouseleave', this._mouseLeaveHandler);
-    this._canvas.addEventListener('wheel', this._wheelHandler, { passive: false });
-
-    // Listen on window so mouseup is captured even when released outside the canvas.
-    // Remove any previous handler first to avoid duplicates.
-    if (this._windowMouseUpHandler) {
-      window.removeEventListener('mouseup', this._windowMouseUpHandler);
-    }
-    this._windowMouseUpHandler = (e: MouseEvent) => this.onMouseUp(e);
-    window.addEventListener('mouseup', this._windowMouseUpHandler);
-  }
+  attach(): void { this._engine.attach(); }
 
   /** Remove all listeners. Call when leaving the level editor. */
-  detach(): void {
-    this._canvas.removeEventListener('mousedown', this._mouseDownHandler);
-    this._canvas.removeEventListener('mousemove', this._mouseMoveHandler);
-    this._canvas.removeEventListener('contextmenu', this._contextMenuHandler);
-    this._canvas.removeEventListener('mouseleave', this._mouseLeaveHandler);
-    this._canvas.removeEventListener('wheel', this._wheelHandler);
-    if (this._windowMouseUpHandler) {
-      window.removeEventListener('mouseup', this._windowMouseUpHandler);
-      this._windowMouseUpHandler = null;
-    }
-  }
+  detach(): void { this._engine.detach(); }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-  private _paintCell(pos: { row: number; col: number }): void {
-    const state = this._cb.getState();
-    // Empty-Summer palette: clear to null (summer)
-    if (state.palette === PipeShape.Empty) {
-      state.grid[pos.row][pos.col] = null;
-      return;
-    }
-    state.grid[pos.row][pos.col] = state.buildTileDef();
-    if (state.paletteHasNonRotationParams()) {
-      state.linkTile(pos);
-    }
-  }
-
-  canvasPos(e: MouseEvent): { row: number; col: number } | null {
+  canvasPos(e: MouseEvent): GridPos | null {
     const state = this._cb.getState();
     return computeCanvasPos(e, this._canvas, state.rows, state.cols);
   }
 
-  // ─── Event handlers ───────────────────────────────────────────────────────────
+  onMouseDown(e: MouseEvent): void { this._engine.onMouseDown(e); }
+  onMouseMove(e: MouseEvent): void { this._engine.onMouseMove(e); }
+  onMouseUp(e: MouseEvent): void { this._engine.onMouseUp(e); }
 
-  onMouseDown(e: MouseEvent): void {
-    if (e.button === 2) { this._onRightButtonMouseDown(e); return; }
-    if (e.button !== 0) return; // left button only
+  /** Rare contextmenu-fallback path — no suppression check, matches the pre-engine public API tests call directly. */
+  onRightClick(e: MouseEvent): void {
     const pos = this.canvasPos(e);
     if (!pos) return;
+    this._eraseAtRightClick(pos);
+  }
 
+  onWheel(e: WheelEvent): void { this._applyWheel(e); }
+
+  // ─── GestureRules implementation (private — engine-facing only) ───────────────
+
+  private _decideLeftMouseDown(pos: GridPos, e: MouseEvent): LeftMouseDownAction {
     const state = this._cb.getState();
     const existingTile = state.grid[pos.row][pos.col];
     const existingIsEmpty = existingTile === null || isEmptyFloor(existingTile.shape);
@@ -170,38 +125,17 @@ export class EditorInputHandler {
     const existingIsTree = existingTile !== null && TREE_SHAPES.has(existingTile.shape);
 
     if (this._shouldStartPaintDragOnClick(state.palette, existingIsEmpty, paletteIsTree, existingIsTree)) {
-      this._paintDragActive = true;
-      this._paintCell(pos);
-      this._playPlacementSfx(pos);
-      this._cb.renderCanvas();
-      return;
+      this._isFirstPaintOfDrag = true;
+      return { type: 'startPaintDrag' };
     }
 
     if (this._shouldStartTileDrag(existingTile, existingIsEmpty, state.palette)) {
       this._startTileDrag(pos, existingTile, e.ctrlKey);
-      return;
+      return { type: 'startTileDrag', tile: existingTile };
     }
 
     this._placeOrClearTileOnClick(pos);
-  }
-
-  private _onRightButtonMouseDown(e: MouseEvent): void {
-    const pos = this.canvasPos(e);
-    if (!pos) return;
-    const state = this._cb.getState();
-    // Start a right-button erase-drag: erase the first cell immediately.
-    this._rightEraseDragActive = true;
-    this._rightEraseChanged = false;
-    this._suppressNextContextMenu = false;
-    const current = state.grid[pos.row][pos.col];
-    const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
-    if (!this._sameFloorDef(current, erased)) {
-      state.grid[pos.row][pos.col] = erased;
-      state.clearLinkAt(pos);
-      this._rightEraseChanged = true;
-      sfxManager.play(SfxId.Delete);
-      this._cb.renderCanvas();
-    }
+    return { type: 'immediate' };
   }
 
   /** Tree palette on a tree cell, or a repeatable tile on an empty cell: both start a paint-drag session. */
@@ -214,8 +148,7 @@ export class EditorInputHandler {
   }
 
   /** Start a drag: track the tile but don't modify the grid yet. */
-  private _startTileDrag(pos: { row: number; col: number }, existingTile: TileDef, ctrlKey: boolean): void {
-    this._dragState = { startPos: pos, tile: existingTile, currentPos: pos, moved: false };
+  private _startTileDrag(pos: GridPos, existingTile: TileDef, ctrlKey: boolean): void {
     // Bind Tile Params to the grabbed tile (full select + live-edit link where applicable).
     // Skip when ctrl is held so ctrl+click overwrite behavior remains unchanged.
     if (!ctrlKey) {
@@ -223,126 +156,72 @@ export class EditorInputHandler {
       state.selectTileFromDef(existingTile, pos);
       this._cb.refreshPaletteUI();
     }
-    this._cb.renderCanvas();
   }
 
-  /** Only one Source/Sink tile is allowed per level; shows the matching error and returns true if palette is blocked. */
-  private _isBlockedBySourceSinkLimit(excludePos?: { row: number; col: number }): boolean {
+  private _canPaintOverCell(curIsEmpty: boolean, paletteIsTree: boolean, curIsTree: boolean): boolean {
+    return curIsEmpty || (paletteIsTree && curIsTree);
+  }
+
+  private _paintCellRule(pos: GridPos): void {
+    const isFirst = this._isFirstPaintOfDrag;
+    this._isFirstPaintOfDrag = false;
     const state = this._cb.getState();
-    if (state.palette === PipeShape.Source && state.hasSourceElsewhere(excludePos)) {
-      this._cb.showSourceError();
-      return true;
-    }
-    if (state.palette === PipeShape.Sink && state.hasSinkElsewhere(excludePos)) {
-      this._cb.showSinkError();
-      return true;
-    }
-    return false;
+    const cur = state.grid[pos.row][pos.col];
+    const curIsEmpty = cur === null || isEmptyFloor(cur.shape);
+    const paletteIsTree = TREE_SHAPES.has(state.palette as PipeShape);
+    const curIsTree = cur !== null && TREE_SHAPES.has(cur.shape);
+    if (!this._canPaintOverCell(curIsEmpty, paletteIsTree, curIsTree)) return;
+
+    this._paintCell(pos);
+    if (isFirst) this._playPlacementSfx(pos);
   }
 
-  /**
-   * Paint / erase immediately; snapshot recorded after the change so that
-   * the placed/erased tile is captured in the new history entry.
-   */
-  private _playDeleteSfxIfOccupied(pos: { row: number; col: number }): void {
-    if (this._cb.getState().grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
-  }
-
-  /** Link the just-placed tile for live param editing only if it has parameters beyond rotation (Source, Sink, Chamber). */
-  private _linkTileIfHasParams(pos: { row: number; col: number }): void {
+  private _paintCell(pos: GridPos): void {
     const state = this._cb.getState();
+    // Empty-Summer palette: clear to null (summer)
+    if (state.palette === PipeShape.Empty) {
+      state.grid[pos.row][pos.col] = null;
+      return;
+    }
+    state.grid[pos.row][pos.col] = state.buildTileDef();
     if (state.paletteHasNonRotationParams()) {
       state.linkTile(pos);
     }
   }
 
-  private _placeOrClearTileOnClick(pos: { row: number; col: number }): void {
-    if (this._isBlockedBySourceSinkLimit()) return;
+  private _eraseCellRule(pos: GridPos): boolean {
     const state = this._cb.getState();
-    if (state.palette === 'erase') {
-      this._playDeleteSfxIfOccupied(pos);
-      state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
-      // Clear the link if the erased tile was linked
-      state.clearLinkAt(pos);
-    } else if (state.palette === PipeShape.Empty) {
-      // Empty-Summer palette: clear to floor-type-aware null
-      this._playDeleteSfxIfOccupied(pos);
-      state.grid[pos.row][pos.col] = null;
-      state.clearLinkAt(pos);
-    } else {
-      state.grid[pos.row][pos.col] = state.buildTileDef();
-      this._playPlacementSfx(pos);
-      this._linkTileIfHasParams(pos);
-    }
-    state.recordSnapshot();
-    this._cb.updateUndoRedoButtons();
-    this._cb.renderCanvas();
+    const current = state.grid[pos.row][pos.col];
+    const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
+    if (this._sameFloorDef(current, erased)) return false;
+    state.grid[pos.row][pos.col] = erased;
+    state.clearLinkAt(pos);
+    sfxManager.play(SfxId.Delete);
+    return true;
   }
 
-  onMouseUp(e: MouseEvent): void {
-    if (e.button === 2) { this._onRightButtonMouseUp(); return; }
-    if (e.button !== 0) return; // left button only
-
-    // End paint-drag session.
-    if (this._paintDragActive) {
-      this._paintDragActive = false;
-      const state = this._cb.getState();
-      state.recordSnapshot();
-      this._cb.updateUndoRedoButtons();
-      this._cb.renderCanvas();
-      return;
-    }
-
-    if (!this._dragState) return;
-    this._finishTileDrag(this._dragState, e);
+  private _canDropTileAt(pos: GridPos): boolean {
+    return this._cb.getState().grid[pos.row][pos.col] === null;
   }
 
-  private _onRightButtonMouseUp(): void {
-    if (!this._rightEraseDragActive) return;
-    // End right-erase-drag: record the undo snapshot now (PR #101 pattern).
-    this._rightEraseDragActive = false;
-    this._suppressNextContextMenu = true;
-    if (this._rightEraseChanged) {
-      const state = this._cb.getState();
-      state.recordSnapshot();
-      this._cb.updateUndoRedoButtons();
-    }
-    this._rightEraseChanged = false;
-    this._cb.renderCanvas();
-  }
-
-  private _hasNonRotationLinkableShape(shape: PipeShape): boolean {
-    return shape === PipeShape.Source || shape === PipeShape.Sink || shape === PipeShape.Chamber;
-  }
-
-  private _finishTileDrag(dragState: InternalDragState, e: MouseEvent): void {
-    const { startPos, tile, currentPos, moved } = dragState;
-    this._dragState = null;
-
-    if (moved) {
-      this._commitTileMove(startPos, currentPos, tile);
-    } else {
-      // It was a click on a non-empty tile (no movement occurred)
-      this._handleStationaryTileClick(startPos, tile, e);
-    }
-    this._cb.renderCanvas();
-  }
-
-  /** Commit the drag: move tile from startPos to currentPos; snapshot after. */
-  private _commitTileMove(startPos: { row: number; col: number }, currentPos: { row: number; col: number }, tile: TileDef): void {
+  private _commitTileMove(drag: DragInFlight): void {
     const state = this._cb.getState();
-    state.grid[startPos.row][startPos.col] = null;
-    state.grid[currentPos.row][currentPos.col] = tile;
+    state.grid[drag.startPos.row][drag.startPos.col] = null;
+    state.grid[drag.currentPos.row][drag.currentPos.col] = drag.tile;
     // Only link the moved tile if it has parameters beyond rotation.
-    if (this._hasNonRotationLinkableShape(tile.shape)) {
-      state.linkTile(currentPos);
+    if (this._hasNonRotationLinkableShape(drag.tile.shape)) {
+      state.linkTile(drag.currentPos);
     }
     state.recordSnapshot();
     this._cb.updateUndoRedoButtons();
     this._cb.refreshPaletteUI();
   }
 
-  private _handleStationaryTileClick(startPos: { row: number; col: number }, tile: TileDef, e: MouseEvent): void {
+  private _hasNonRotationLinkableShape(shape: PipeShape): boolean {
+    return shape === PipeShape.Source || shape === PipeShape.Sink || shape === PipeShape.Chamber;
+  }
+
+  private _handleStationaryTileClick(startPos: GridPos, tile: TileDef, e: MouseEvent): void {
     if (!e.ctrlKey && PIPE_SHAPES.has(tile.shape)) {
       // Click on a placed pipe tile: rotate it (shift = counter-clockwise)
       this._rotateClickedPipeTile(tile, e.shiftKey);
@@ -379,8 +258,60 @@ export class EditorInputHandler {
     this._cb.updateUndoRedoButtons();
   }
 
+  /** Only one Source/Sink tile is allowed per level; shows the matching error and returns true if palette is blocked. */
+  private _isBlockedBySourceSinkLimit(excludePos?: GridPos): boolean {
+    const state = this._cb.getState();
+    if (state.palette === PipeShape.Source && state.hasSourceElsewhere(excludePos)) {
+      this._cb.showSourceError();
+      return true;
+    }
+    if (state.palette === PipeShape.Sink && state.hasSinkElsewhere(excludePos)) {
+      this._cb.showSinkError();
+      return true;
+    }
+    return false;
+  }
+
+  private _playDeleteSfxIfOccupied(pos: GridPos): void {
+    if (this._cb.getState().grid[pos.row][pos.col] !== null) sfxManager.play(SfxId.Delete);
+  }
+
+  /** Link the just-placed tile for live param editing only if it has parameters beyond rotation (Source, Sink, Chamber). */
+  private _linkTileIfHasParams(pos: GridPos): void {
+    const state = this._cb.getState();
+    if (state.paletteHasNonRotationParams()) {
+      state.linkTile(pos);
+    }
+  }
+
+  /**
+   * Paint / erase immediately; snapshot recorded after the change so that
+   * the placed/erased tile is captured in the new history entry.
+   */
+  private _placeOrClearTileOnClick(pos: GridPos): void {
+    if (this._isBlockedBySourceSinkLimit()) return;
+    const state = this._cb.getState();
+    if (state.palette === 'erase') {
+      this._playDeleteSfxIfOccupied(pos);
+      state.grid[pos.row][pos.col] = state.eraseFloorTileDefAt(pos.row, pos.col);
+      // Clear the link if the erased tile was linked
+      state.clearLinkAt(pos);
+    } else if (state.palette === PipeShape.Empty) {
+      // Empty-Summer palette: clear to floor-type-aware null
+      this._playDeleteSfxIfOccupied(pos);
+      state.grid[pos.row][pos.col] = null;
+      state.clearLinkAt(pos);
+    } else {
+      state.grid[pos.row][pos.col] = state.buildTileDef();
+      this._playPlacementSfx(pos);
+      this._linkTileIfHasParams(pos);
+    }
+    state.recordSnapshot();
+    this._cb.updateUndoRedoButtons();
+  }
+
   /** Ctrl+click: force-overwrite; snapshot recorded after the change. */
-  private _forceOverwriteOnCtrlClick(startPos: { row: number; col: number }): void {
+  private _forceOverwriteOnCtrlClick(startPos: GridPos): void {
     if (this._isBlockedBySourceSinkLimit(startPos)) return;
     const state = this._cb.getState();
     if (state.palette === 'erase') {
@@ -398,7 +329,7 @@ export class EditorInputHandler {
   }
 
   /** Auto-replace; snapshot after. */
-  private _autoReplaceOneWayTile(startPos: { row: number; col: number }): void {
+  private _autoReplaceOneWayTile(startPos: GridPos): void {
     const state = this._cb.getState();
     state.grid[startPos.row][startPos.col] = state.buildTileDef();
     this._playPlacementSfx(startPos);
@@ -407,10 +338,8 @@ export class EditorInputHandler {
     this._cb.updateUndoRedoButtons();
   }
 
-  onRightClick(e: MouseEvent): void {
+  private _eraseAtRightClick(pos: GridPos): void {
     const state = this._cb.getState();
-    const pos = this.canvasPos(e);
-    if (!pos) return;
     const current = state.grid[pos.row][pos.col];
     const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
     if (this._sameFloorDef(current, erased)) return;
@@ -424,72 +353,9 @@ export class EditorInputHandler {
     this._cb.renderCanvas();
   }
 
-  onMouseMove(e: MouseEvent): void {
-    const state = this._cb.getState();
-    const pos = this.canvasPos(e);
-    state.hover = pos;
-
-    if (this._paintDragActive && pos) {
-      this._handlePaintDragMove(pos);
-    } else if (this._rightEraseDragActive && pos) {
-      this._handleRightEraseDragMove(pos);
-    } else if (this._dragState && pos) {
-      this._handleTileDragMove(this._dragState, pos);
-    }
-
-    this._cb.renderCanvas();
-  }
-
-  /**
-   * Paint each empty (or empty-floor-typed) cell the cursor enters during a paint-drag.
-   * Also allow a tree palette to overwrite any other tree tile.
-   */
-  private _handlePaintDragMove(pos: { row: number; col: number }): void {
-    const state = this._cb.getState();
-    const cur = state.grid[pos.row][pos.col];
-    const curIsEmpty = cur === null || isEmptyFloor(cur.shape);
-    const paletteIsTree = TREE_SHAPES.has(state.palette as PipeShape);
-    const curIsTree = cur !== null && TREE_SHAPES.has(cur.shape);
-    if (this._canPaintOverCell(curIsEmpty, paletteIsTree, curIsTree)) {
-      this._paintCell(pos);
-    }
-  }
-
-  private _canPaintOverCell(curIsEmpty: boolean, paletteIsTree: boolean, curIsTree: boolean): boolean {
-    return curIsEmpty || (paletteIsTree && curIsTree);
-  }
-
-  /** Erase each non-empty cell the cursor enters during a right-erase-drag. */
-  private _handleRightEraseDragMove(pos: { row: number; col: number }): void {
-    const state = this._cb.getState();
-    const current = state.grid[pos.row][pos.col];
-    const erased = state.eraseFloorTileDefAt(pos.row, pos.col);
-    if (!this._sameFloorDef(current, erased)) {
-      state.grid[pos.row][pos.col] = erased;
-      state.clearLinkAt(pos);
-      this._rightEraseChanged = true;
-    }
-  }
-
-  private _handleTileDragMove(dragState: InternalDragState, pos: { row: number; col: number }): void {
-    const { startPos, currentPos } = dragState;
-    if (pos.row === currentPos.row && pos.col === currentPos.col) return;
-    if (pos.row === startPos.row && pos.col === startPos.col) {
-      // Moved back to start: cancel the move
-      dragState.currentPos = pos;
-      dragState.moved = false;
-      return;
-    }
-    if (this._cb.getState().grid[pos.row][pos.col] === null) {
-      // Empty cell: move tile here
-      dragState.currentPos = pos;
-      dragState.moved = true;
-    }
-    // Non-empty cell (other than start): tile stays at currentPos
-  }
-
-  onWheel(e: WheelEvent): void {
-    e.preventDefault();
+  /** Reads state.hover directly (not the engine's own hover tracking) — matches the pre-engine
+   *  contract where onWheel() can be called standalone without a prior mousemove. */
+  private _applyWheel(e: WheelEvent): void {
     const state = this._cb.getState();
     const clockwise = e.deltaY > 0;
     sfxManager.play(clockwise ? SfxId.PendingCW : SfxId.PendingCCW);
@@ -506,31 +372,16 @@ export class EditorInputHandler {
     this._cb.renderCanvas();
   }
 
-  private _isHoveringLinkedTile(hover: { row: number; col: number } | null, linked: { row: number; col: number } | null): boolean {
+  private _isHoveringLinkedTile(hover: GridPos | null, linked: GridPos | null): boolean {
     return linked !== null && hover !== null && hover.row === linked.row && hover.col === linked.col;
   }
 
-  onMouseLeave(): void {
+  private _onGestureEnd(_kind: 'paintDrag' | 'eraseDrag'): void {
+    // 'eraseDrag' only reaches here when something was actually erased (GridGestureEngine
+    // tracks that); 'paintDrag' always does, since starting one always paints the first cell.
     const state = this._cb.getState();
-    state.hover = null;
-    // Cancel any active drag when the mouse leaves the canvas.
-    if (this._dragState) {
-      this._dragState = null;
-    }
-    if (this._paintDragActive) {
-      this._paintDragActive = false;
-      state.recordSnapshot();
-      this._cb.updateUndoRedoButtons();
-    }
-    if (this._rightEraseDragActive) {
-      this._rightEraseDragActive = false;
-      if (this._rightEraseChanged) {
-        state.recordSnapshot();
-        this._cb.updateUndoRedoButtons();
-      }
-      this._rightEraseChanged = false;
-    }
-    this._cb.renderCanvas();
+    state.recordSnapshot();
+    this._cb.updateUndoRedoButtons();
   }
 
   private _sameFloorDef(a: TileDef | null, b: TileDef | null): boolean {
@@ -552,12 +403,12 @@ export class EditorInputHandler {
    * @param pos - The grid position where the tile was just placed.  Used to
    *   check source connectivity for pipe/source/sink tiles.
    */
-  private _playPlacementSfx(pos: { row: number; col: number }): void {
+  private _playPlacementSfx(pos: GridPos): void {
     const sfx = this._resolvePlacementSfxId(pos);
     if (sfx !== null) sfxManager.play(sfx);
   }
 
-  private _resolvePlacementSfxId(pos: { row: number; col: number }): SfxId | null {
+  private _resolvePlacementSfxId(pos: GridPos): SfxId | null {
     const state = this._cb.getState();
     const palette = state.palette;
     if (LEAKY_PIPE_SHAPES.has(palette as PipeShape)) return SfxId.Leak;

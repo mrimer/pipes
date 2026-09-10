@@ -206,8 +206,9 @@ src/
     ├── chapterMapEditor.ts      # Chapter map editor (extends MapEditorBase)
     ├── campaignMapEditor.ts     # Campaign map editor (extends MapEditorBase)
     ├── chapterEditorUI.ts       # Chapter map editor UI panel
-    ├── chapterMapInput.ts       # Mouse/keyboard input for chapter map editor
-    ├── editorInputHandler.ts    # Input handling for level editor
+    ├── gridGestureEngine.ts     # Shared paint/erase/tile-drag gesture state machine (attach/detach, contextmenu suppression, hover tracking) used by chapterMapInput.ts and editorInputHandler.ts
+    ├── chapterMapInput.ts       # Mouse/keyboard input for chapter map editor (placement/erase/rotate rules; gestures via GridGestureEngine)
+    ├── editorInputHandler.ts    # Input handling for level editor (placement/erase/rotate rules; gestures via GridGestureEngine)
     ├── levelEditorState.ts      # Level editor mutable state
     ├── tileParamsPanel.ts       # Tile-parameter side panel UI
     ├── levelMetadataPanel.ts    # Level metadata form UI
