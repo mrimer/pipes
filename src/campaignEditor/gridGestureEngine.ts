@@ -46,7 +46,7 @@ export interface GestureRules {
   onRightClick(pos: GridPos): void;
   onWheel(e: WheelEvent, hoverPos: GridPos | null): void;
   /** A paint-drag or erase-drag gesture just ended (mouseup or mouseleave). */
-  onGestureEnd(kind: 'paintDrag' | 'eraseDrag', trigger: 'mouseup' | 'mouseleave'): void;
+  onGestureEnd(kind: 'paintDrag' | 'eraseDrag'): void;
   /** Hover position changed (every mousemove, and null on mouseleave) — sync into external state, tooltips, etc. */
   onHoverChanged(pos: GridPos | null): void;
 }
@@ -205,12 +205,12 @@ export class GridGestureEngine {
     }
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._rules.onGestureEnd('paintDrag', 'mouseleave');
+      this._rules.onGestureEnd('paintDrag');
     }
     if (this._rightEraseDragActive) {
       this._rightEraseDragActive = false;
       if (this._rightEraseChanged) {
-        this._rules.onGestureEnd('eraseDrag', 'mouseleave');
+        this._rules.onGestureEnd('eraseDrag');
       }
       this._rightEraseChanged = false;
     }
@@ -228,7 +228,7 @@ export class GridGestureEngine {
 
     if (this._paintDragActive) {
       this._paintDragActive = false;
-      this._rules.onGestureEnd('paintDrag', 'mouseup');
+      this._rules.onGestureEnd('paintDrag');
       this._cb.renderCanvas();
       return;
     }
@@ -249,7 +249,7 @@ export class GridGestureEngine {
     this._rightEraseDragActive = false;
     this._suppressNextContextMenu = true;
     if (this._rightEraseChanged) {
-      this._rules.onGestureEnd('eraseDrag', 'mouseup');
+      this._rules.onGestureEnd('eraseDrag');
     }
     this._rightEraseChanged = false;
     this._cb.renderCanvas();

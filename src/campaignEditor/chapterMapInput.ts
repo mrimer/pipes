@@ -87,7 +87,7 @@ export class ChapterMapInput {
       onTileClicked: (drag, e) => this._onTileDragClicked(drag, e),
       onRightClick: (pos) => this._eraseAtRightClick(pos),
       onWheel: (e) => this._applyWheel(e),
-      onGestureEnd: (kind, trigger) => this._onGestureEnd(kind, trigger),
+      onGestureEnd: (kind) => this._onGestureEnd(kind),
       onHoverChanged: (pos) => this._updateHoverTooltip(pos),
     };
     this._engine = new GridGestureEngine(rules, { renderCanvas: () => this._cb.renderCanvas() });
@@ -366,12 +366,11 @@ export class ChapterMapInput {
       (tile.shape === PipeShape.Chamber && tile.chamberContent === 'level');
   }
 
-  private _onGestureEnd(kind: 'paintDrag' | 'eraseDrag', trigger: 'mouseup' | 'mouseleave'): void {
+  private _onGestureEnd(kind: 'paintDrag' | 'eraseDrag'): void {
     const { chapter, campaign } = this._requireContext();
-    // Matches the pre-engine asymmetry: an erase-drag ended by releasing the mouse
-    // rebuilds the level inventory (a level chamber may have been erased); one
-    // ended by the cursor leaving the canvas does not.
-    if (kind === 'eraseDrag' && trigger === 'mouseup') this._cb.rebuildLevelInventory(chapter, campaign);
+    // An erase-drag may have erased a level chamber, so the inventory needs a rebuild
+    // regardless of whether the drag ended by mouseup or the cursor leaving the canvas.
+    if (kind === 'eraseDrag') this._cb.rebuildLevelInventory(chapter, campaign);
     this._cb.recordSnapshot(chapter);
     this._cb.saveGridState(chapter, campaign);
   }

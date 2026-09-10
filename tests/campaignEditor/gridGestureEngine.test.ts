@@ -174,7 +174,7 @@ describe('GridGestureEngine — paint-drag', () => {
     mouseUp(canvas);
 
     expect(engine.paintDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag', 'mouseup');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag');
   });
 });
 
@@ -310,7 +310,7 @@ describe('GridGestureEngine — erase-drag and contextmenu suppression', () => {
     mouseUp(canvas, 2);
 
     expect(engine.rightEraseDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag', 'mouseup');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag');
   });
 
   test('erase-drag end fires nothing when nothing changed', () => {
@@ -379,7 +379,7 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     expect(rules.onTileClicked).not.toHaveBeenCalled();
   });
 
-  test('mouseleave during a paint-drag ends it and fires onGestureEnd with trigger "mouseleave"', () => {
+  test('mouseleave during a paint-drag ends it and fires onGestureEnd', () => {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules({
       decideLeftMouseDown: jest.fn((): LeftMouseDownAction => ({ type: 'startPaintDrag' })),
@@ -391,10 +391,10 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     mouseLeave(canvas);
 
     expect(engine.paintDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag', 'mouseleave');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag');
   });
 
-  test('mouseleave during an erase-drag that changed something fires onGestureEnd with trigger "mouseleave"', () => {
+  test('mouseleave during an erase-drag that changed something fires onGestureEnd', () => {
     const canvas = createAttachedCanvas();
     const rules = createFakeRules({ eraseCell: jest.fn(() => true) });
     const engine = createTrackedEngine(rules, { renderCanvas: jest.fn() });
@@ -404,7 +404,7 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     mouseLeave(canvas);
 
     expect(engine.rightEraseDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag', 'mouseleave');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('eraseDrag');
   });
 
   test('mouseup on window (outside the canvas) still ends an active paint-drag', () => {
@@ -419,7 +419,7 @@ describe('GridGestureEngine — mouseleave and window-level mouseup', () => {
     window.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
 
     expect(engine.paintDragActive).toBe(false);
-    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag', 'mouseup');
+    expect(rules.onGestureEnd).toHaveBeenCalledWith('paintDrag');
   });
 });
 
