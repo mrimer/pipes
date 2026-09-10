@@ -98,7 +98,8 @@ src/
 │
 ├── inputHandler.ts              # Keyboard/mouse/touch input → game actions
 ├── animationManager.ts          # requestAnimationFrame loop, frame timing
-├── campaignManager.ts           # Campaign/chapter navigation state
+├── campaignManager.ts           # Campaign/chapter navigation state; completion sequencing delegates to campaignCompletionFlow.ts
+├── campaignCompletionFlow.ts    # Chapter/campaign completion+mastery sequencing (recognize progress, win/mastery modals) — shared collaborator extracted from campaignManager.ts
 ├── metricsDisplay.ts            # HUD metrics bar (moves, water score, stars)
 ├── tooltipManager.ts            # Hover tooltip rendering
 ├── turnStateManager.ts          # Per-turn scoring and water-state bookkeeping
@@ -412,6 +413,7 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 | Campaign-map wheel zoom + zoom sizing clamps | `screens/mapScreenBase.ts` → `clampCampaignZoomScale()`, `computeCampaignZoomFitMinTileSize()`, `_updateCampaignZoomFromWheel()` |
 | Map sea-wave animation on chapter/campaign screens | `screens/mapScreenBase.ts` → `_compositeFrame()` + `visuals/chapterMap.ts` → `renderChapterMapSeaTiles()` |
 | Campaign CRUD | `campaignEditor/campaignService.ts` |
+| Chapter/campaign completion + mastery sequencing, win/mastery modals | `campaignCompletionFlow.ts` |
 | Editor undo/redo | `campaignEditor/historyManager.ts` + `mapEditorBase.ts` |
 | Validation error messages | `campaignEditor/validationMessages.ts` |
 | Game event pub/sub | `systems/gameEventBus.ts` |

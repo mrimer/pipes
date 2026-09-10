@@ -161,14 +161,14 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
     const managerAny = manager as unknown as {
       _activeCampaign: CampaignDef | null;
       _activeCampaignProgress: Set<number>;
-      _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void;
+      _completionFlow: { _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void };
     };
     const campaign = makeCampaign(true);
     managerAny._activeCampaign = campaign;
     managerAny._activeCampaignProgress = new Set<number>([1]);
     const showCampaignMapSpy = jest.spyOn(manager, 'showCampaignMap').mockImplementation(() => {});
 
-    managerAny._showChapterCompleteModal(0, campaign);
+    managerAny._completionFlow._showChapterCompleteModal(0, campaign);
 
     const button = Array.from(document.querySelectorAll<HTMLButtonElement>('#chapter-complete-modal button'))
       .find((btn) => btn.textContent === 'Campaign Map');
@@ -185,14 +185,14 @@ describe('CampaignManager chapter-complete modal navigation button', () => {
     const managerAny = manager as unknown as {
       _activeCampaign: CampaignDef | null;
       _activeCampaignProgress: Set<number>;
-      _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void;
+      _completionFlow: { _showChapterCompleteModal(chapterIdx: number, campaign: CampaignDef): void };
     };
     const campaign = makeCampaign(false);
     managerAny._activeCampaign = campaign;
     managerAny._activeCampaignProgress = new Set<number>([1]);
     const showCampaignMapSpy = jest.spyOn(manager, 'showCampaignMap').mockImplementation(() => {});
 
-    managerAny._showChapterCompleteModal(0, campaign);
+    managerAny._completionFlow._showChapterCompleteModal(0, campaign);
 
     const button = Array.from(document.querySelectorAll<HTMLButtonElement>('#chapter-complete-modal button'))
       .find((btn) => btn.textContent === 'Main Menu');
