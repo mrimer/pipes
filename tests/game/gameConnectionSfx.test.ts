@@ -5,6 +5,8 @@
 import { PipeShape } from '../../src/types';
 import { SfxId } from '../../src/audio/sfxManager';
 import { Tile } from '../../src/tile';
+import { Board } from '../../src/board';
+import { collectLeakSfx, collectGoldSfx, collectTilePlacedSfx, collectTileRotatedSfx } from '../../src/gameConnectionSfx';
 import {
   makeGame,
   makeChamberConnectionBoard,
@@ -254,5 +256,148 @@ describe('Game._collectConnectionSfx', () => {
     // hot_plate → ice → snow → dirt → sandstone order — so Tank is always first here
     // regardless of the tiles' left-to-right board order.
     expect(collectConnectionSfx(game, board)).toEqual([SfxId.Tank, SfxId.Ice1, SfxId.Dirt1]);
+  });
+});
+
+describe('collectLeakSfx', () => {
+  it('returns Leak when a changed position holds a leaky pipe shape', () => {
+    const board = new Board(1, 1);
+    board.grid[0][0] = new Tile(PipeShape.LeakyElbow, 0, true);
+    expect(collectLeakSfx(board, [{ row: 0, col: 0, delta: -1 }])).toEqual([SfxId.Leak]);
+  });
+
+  it('returns nothing when no changed position holds a leaky pipe shape', () => {
+    const board = new Board(1, 1);
+    board.grid[0][0] = new Tile(PipeShape.Straight, 0, true);
+    expect(collectLeakSfx(board, [{ row: 0, col: 0, delta: -1 }])).toEqual([]);
+  });
+
+  it('returns nothing when there are no changes', () => {
+    const board = new Board(1, 1);
+    board.grid[0][0] = new Tile(PipeShape.LeakyElbow, 0, true);
+    expect(collectLeakSfx(board, [])).toEqual([]);
+  });
+});
+
+describe('collectGoldSfx', () => {
+  it('returns Gold when a newly-connected item chamber holds a gold item shape', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldElbow, 1, null, 'item'),
+    ]);
+    expect(collectGoldSfx(board, new Set())).toEqual([SfxId.Gold]);
+  });
+
+  it('returns Pickup when a newly-connected item chamber holds a non-gold item with a positive count', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item'),
+    ]);
+    expect(collectGoldSfx(board, new Set())).toEqual([SfxId.Pickup]);
+  });
+
+  it('prefers Gold over Pickup when both a pickup and a gold item connect the same turn, regardless of scan order', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.Elbow, 2, null, 'item'),    // pickup, scanned first
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldElbow, 1, null, 'item'), // gold, scanned second
+    ]);
+    expect(collectGoldSfx(board, new Set())).toEqual([SfxId.Gold]);
+  });
+
+  it('returns nothing when no item chamber connects this turn', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank'),
+    ]);
+    expect(collectGoldSfx(board, new Set())).toEqual([]);
+  });
+});
+
+describe('collectTilePlacedSfx', () => {
+  it('returns only Leak when the placed tile is leaky and connected, suppressing everything else', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank'),
+    ]);
+    const result = collectTilePlacedSfx({
+      board, filledBefore: new Set(), changes: [], placedIsLeakyAndConnected: true, placedPosKey: null,
+    });
+    expect(result).toEqual([SfxId.Leak]);
+  });
+
+  it('returns PipeConnected when the placed tile connects to the source and nothing else fires', () => {
+    const board = makeChamberConnectionBoard([]);
+    const result = collectTilePlacedSfx({
+      board, filledBefore: new Set(), changes: [], placedIsLeakyAndConnected: false, placedPosKey: '0,1',
+    });
+    expect(result).toEqual([SfxId.PipeConnected]);
+  });
+
+  it('returns PipePlacement when the placed tile does not connect to the source and nothing else fires', () => {
+    const board = makeChamberConnectionBoard([]);
+    const result = collectTilePlacedSfx({
+      board, filledBefore: new Set(), changes: [], placedIsLeakyAndConnected: false, placedPosKey: '9,9',
+    });
+    expect(result).toEqual([SfxId.PipePlacement]);
+  });
+
+  it('suppresses PipePlacement/PipeConnected when a chamber-connection sfx fires', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank'),
+    ]);
+    const result = collectTilePlacedSfx({
+      board, filledBefore: new Set(), changes: [], placedIsLeakyAndConnected: false, placedPosKey: '0,1',
+    });
+    expect(result).toEqual([SfxId.Tank]);
+  });
+
+  it('orders Leak before Gold before chamber-connection sfx, all suppressing PipePlacement/PipeConnected', () => {
+    const board = new Board(1, 5);
+    board.source = { row: 0, col: 0 };
+    board.sink = { row: 0, col: 3 };
+    board.grid[0][0] = new Tile(PipeShape.Source, 0, true, 0, 0, null, 1, null, null, 0, 1);
+    board.grid[0][1] = new Tile(PipeShape.Chamber, 0, true, 0, 0, PipeShape.GoldElbow, 1, null, 'item');
+    board.grid[0][2] = new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank');
+    board.grid[0][3] = new Tile(PipeShape.Sink, 0, true);
+    board.grid[0][4] = new Tile(PipeShape.LeakyElbow, 0, true); // dangling: unconnected, only referenced via `changes`
+    board.sourceCapacity = 100;
+
+    const result = collectTilePlacedSfx({
+      board,
+      filledBefore: new Set(),
+      changes: [{ row: 0, col: 4, delta: -1 }],
+      placedIsLeakyAndConnected: false,
+      placedPosKey: null,
+    });
+    expect(result).toEqual([SfxId.Leak, SfxId.Gold, SfxId.Tank]);
+  });
+});
+
+describe('collectTileRotatedSfx', () => {
+  it('returns PipeConnected when a position newly fills and no chamber-connection sfx fires', () => {
+    const board = makeChamberConnectionBoard([]);
+    const filledAfter = board.getFilledPositions();
+    expect(collectTileRotatedSfx(board, new Set())).toEqual([SfxId.PipeConnected]);
+    // Sanity: this scenario really did add positions (source+sink), not remove any.
+    expect(filledAfter.size).toBeGreaterThan(0);
+  });
+
+  it('returns Disconnect when a previously-filled position is no longer filled', () => {
+    const board = makeChamberConnectionBoard([]);
+    const filledAfter = board.getFilledPositions();
+    const filledBefore = new Set([...filledAfter, 'unrelated-now-empty']);
+    expect(collectTileRotatedSfx(board, filledBefore)).toEqual([SfxId.Disconnect]);
+  });
+
+  it('returns PipeConnected then Disconnect when a position newly fills and another empties in the same turn', () => {
+    const board = makeChamberConnectionBoard([]);
+    const filledAfter = [...board.getFilledPositions()];
+    // Drop one currently-filled key (so it reads as newly-connected) and add an unrelated one (so it reads as disconnected).
+    const filledBefore = new Set([filledAfter[0], 'unrelated-now-empty']);
+    expect(collectTileRotatedSfx(board, filledBefore)).toEqual([SfxId.PipeConnected, SfxId.Disconnect]);
+  });
+
+  it('suppresses PipeConnected (but not Disconnect) when a chamber-connection sfx fires, appending it last', () => {
+    const board = makeChamberConnectionBoard([
+      new Tile(PipeShape.Chamber, 0, true, 0, 0, null, 1, null, 'tank'),
+    ]);
+    const filledBefore = new Set(['unrelated-now-empty']);
+    expect(collectTileRotatedSfx(board, filledBefore)).toEqual([SfxId.Disconnect, SfxId.Tank]);
   });
 });

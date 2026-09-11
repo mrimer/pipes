@@ -62,7 +62,7 @@ import { TooltipManager } from './tooltipManager';
 import { MetricsDisplay } from './metricsDisplay';
 import { playLevelTransition, playLevelExitTransition } from './visuals/levelTransition';
 import { sfxManager, SfxId } from './audio/sfxManager';
-import { playAfterTilePlacedSfx, playAfterTileRotatedSfx, playLeakSfxIfNeeded, playGoldSfxIfNeeded } from './gameConnectionSfx';
+import { collectTilePlacedSfx, collectTileRotatedSfx, collectLeakSfx, collectGoldSfx } from './gameConnectionSfx';
 import { snapshotPlacedTiles, collectRemovedTileFlashes, collectAddedTileFlashes, buildAvailableInventoryShapes } from './gameBoardDiff';
 import { musicManager, selectGroupForContext } from './audio/musicManager';
 import { hasTouchUiSupport, isPortrait, isTouchDevice, setTouchUiEnabledOverride } from './deviceUtils';
@@ -1614,8 +1614,8 @@ export class Game implements InputCallbacks {
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = board.applyTurnDelta();
-    playLeakSfxIfNeeded(board, changes);
-    playGoldSfxIfNeeded(board, filledBefore);
+    this._playSfxList(collectLeakSfx(board, changes));
+    this._playSfxList(collectGoldSfx(board, filledBefore));
 
     // Record delete move before board.recordMove() increments historyIndex.
     board.recordMove(encodeDeleteMove(pos.row, pos.col));
@@ -1675,9 +1675,9 @@ export class Game implements InputCallbacks {
     this._animMgr.completeAnims();
     this._animMgr.resetIdleTimer();
     const changes = this.board.applyTurnDelta();
-    playLeakSfxIfNeeded(this.board, changes);
-    playGoldSfxIfNeeded(this.board, filledBefore);
-    playAfterTileRotatedSfx(this.board, filledBefore);
+    this._playSfxList(collectLeakSfx(this.board, changes));
+    this._playSfxList(collectGoldSfx(this.board, filledBefore));
+    this._playSfxList(collectTileRotatedSfx(this.board, filledBefore));
 
     // Compute the encoded move string and record the snapshot.
     this.board.recordMove(this._encodeRotationMove(tile, rotationInfo, delta));
@@ -1701,6 +1701,11 @@ export class Game implements InputCallbacks {
     const delta = tile ? (tile.rotation - oldRotation + 360) % 360 : 0;
     sfxManager.play(delta > 180 ? SfxId.RotateCCW : SfxId.RotateCW);
     return delta;
+  }
+
+  /** Play each sfx in `sfxIds`, in order, via sfxManager. */
+  private _playSfxList(sfxIds: SfxId[]): void {
+    for (const sfx of sfxIds) sfxManager.play(sfx);
   }
 
   /** Encode the rotate move for the move log, or '' when no tile was rotated. */
@@ -1880,7 +1885,7 @@ export class Game implements InputCallbacks {
     this._metrics.scheduleCountBounce(placedShape);
     if (replacedTile) this._metrics.scheduleCountBounce(replacedTile.shape);
 
-    playAfterTilePlacedSfx({ board: this.board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey: posKey });
+    this._playSfxList(collectTilePlacedSfx({ board: this.board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey: posKey }));
 
     this._input.lastPlacedRotations.set(placedShape, this.pendingRotation);
     this._deselectIfDepleted();

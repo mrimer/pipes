@@ -1,14 +1,16 @@
 /**
  * Sfx-selection logic for tile placement/rotation connection events. Pure
- * functions over board/tile state — no DOM, animation, or Game instance
- * dependencies — split out of game.ts to shrink its function count.
+ * functions over board/tile state — no DOM, animation, Game instance, or
+ * sfxManager side effects — split out of game.ts to shrink its function
+ * count. Every exported function returns an ordered `SfxId[]`; callers play
+ * each entry in order via `sfxManager.play()`.
  */
 
 import { parseKey, GOLD_PIPE_SHAPES, LEAKY_PIPE_SHAPES, computeDeltaTemp, snowCostPerDeltaTemp, sandstoneCostFactors } from './board';
 import type { Board } from './board';
 import type { Tile } from './tile';
 import { PipeShape } from './types';
-import { sfxManager, SfxId } from './audio/sfxManager';
+import { SfxId } from './audio/sfxManager';
 
 /** Ice-sfx threshold: raw cost at or above this uses Ice2 sfx (instead of Ice1). */
 const ICE_SFX_THRESHOLD_MID = 5;
@@ -36,7 +38,7 @@ interface ConnectionSfxTrackers {
   maxSandstoneInfo: { cost: number; shattered: boolean } | null;
 }
 
-export interface PlayAfterTilePlacedSfxOptions {
+export interface CollectTilePlacedSfxOptions {
   board: Board;
   filledBefore: Set<string>;
   changes: Array<{ row: number; col: number; delta: number }>;
@@ -260,14 +262,15 @@ function _hasSetDifference(source: Set<string>, other: Set<string>): boolean {
 }
 
 /**
- * Play the leak sound if any leaky-pipe penalty was applied in `changes`.
- * Called once per board action so the sound plays at most once per turn.
+ * Return the leak sfx (at most once) if any leaky-pipe penalty was applied
+ * in `changes`. Called once per board action so the sound plays at most
+ * once per turn.
  */
-export function playLeakSfxIfNeeded(board: Board, changes: Array<{ row: number; col: number; delta: number }>): void {
+export function collectLeakSfx(board: Board, changes: Array<{ row: number; col: number; delta: number }>): SfxId[] {
   const hasLeak = changes.some(({ row, col }) =>
     LEAKY_PIPE_SHAPES.has(board.grid[row]?.[col]?.shape),
   );
-  if (hasLeak) sfxManager.play(SfxId.Leak);
+  return hasLeak ? [SfxId.Leak] : [];
 }
 
 /**
@@ -278,7 +281,7 @@ function _isPickupableItemTile(tile: Tile | undefined): boolean {
   return tile?.shape === PipeShape.Chamber && tile.chamberContent === 'item' && tile.itemShape !== null;
 }
 
-/** Classify a newly-connected board position for {@link _playGoldSfxIfNeeded}'s gold-vs-pickup sfx choice. */
+/** Classify a newly-connected board position for {@link collectGoldSfx}'s gold-vs-pickup sfx choice. */
 function _classifyNewlyConnectedPickup(board: Board, key: string): 'gold' | 'pickup' | 'none' {
   const [r, c] = parseKey(key);
   const tile = board.grid[r]?.[c];
@@ -288,71 +291,74 @@ function _classifyNewlyConnectedPickup(board: Board, key: string): 'gold' | 'pic
 }
 
 /**
- * Play the gold sound if any gold item chamber became newly connected since
+ * Return the gold sfx if any gold item chamber became newly connected since
  * `filledBefore` was captured.  If no gold item connected but a positive-count
- * non-gold item chamber did, play the pickup sound instead.
+ * non-gold item chamber did, return the pickup sfx instead.
  * Gold takes precedence over pickup.
  */
-export function playGoldSfxIfNeeded(board: Board, filledBefore: Set<string>): void {
+export function collectGoldSfx(board: Board, filledBefore: Set<string>): SfxId[] {
   const filledAfter = board.getFilledPositions();
   let hasPickup = false;
   for (const key of filledAfter) {
     if (filledBefore.has(key)) continue;
     const outcome = _classifyNewlyConnectedPickup(board, key);
-    if (outcome === 'gold') { sfxManager.play(SfxId.Gold); return; }
+    if (outcome === 'gold') return [SfxId.Gold];
     if (outcome === 'pickup') hasPickup = true;
   }
-  if (hasPickup) sfxManager.play(SfxId.Pickup);
+  return hasPickup ? [SfxId.Pickup] : [];
 }
 
 /**
- * Play all SFX for a tile-placement action.
+ * Return, in play order, all SFX for a tile-placement action.
  *
  * - When a leaky pipe tile is placed and immediately connected to the source,
- *   plays only the Leak sound (suppresses PipePlacement and connection sounds).
- * - Otherwise plays PipeConnected when the placed tile is connected to the source
+ *   returns only the Leak sound (suppresses PipePlacement and connection sounds).
+ * - Otherwise returns PipeConnected when the placed tile is connected to the source
  *   (only when no chamber-connection sounds fire), or PipePlacement when it is not
  *   connected to the source (only when no chamber-connection sounds fire),
- *   Leak (if a leaky tile penalty was applied), Gold/Pickup (if applicable),
- *   and all chamber-connection sounds collected by {@link collectConnectionSfx}.
+ *   then Leak (if a leaky tile penalty was applied), then Gold/Pickup (if applicable),
+ *   then all chamber-connection sounds collected by {@link collectConnectionSfx}.
  */
-export function playAfterTilePlacedSfx(opts: PlayAfterTilePlacedSfxOptions): void {
+export function collectTilePlacedSfx(opts: CollectTilePlacedSfxOptions): SfxId[] {
   const { board, filledBefore, changes, placedIsLeakyAndConnected, placedPosKey } = opts;
   if (placedIsLeakyAndConnected) {
-    sfxManager.play(SfxId.Leak);
-    return;
+    return [SfxId.Leak];
   }
   const connectionSfx = collectConnectionSfx(board, filledBefore);
+  const sfxToPlay: SfxId[] = [];
   // Only play PipePlacement/PipeConnected when no chamber-connection sounds fire this turn.
   if (connectionSfx.length === 0) {
     const filledAfter = board.getFilledPositions();
     const isConnected = placedPosKey !== null && filledAfter.has(placedPosKey);
-    sfxManager.play(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
+    sfxToPlay.push(isConnected ? SfxId.PipeConnected : SfxId.PipePlacement);
   }
-  playLeakSfxIfNeeded(board, changes);
-  playGoldSfxIfNeeded(board, filledBefore);
-  for (const sfx of connectionSfx) {
-    sfxManager.play(sfx);
-  }
+  sfxToPlay.push(...collectLeakSfx(board, changes));
+  sfxToPlay.push(...collectGoldSfx(board, filledBefore));
+  sfxToPlay.push(...connectionSfx);
+  return sfxToPlay;
 }
 
 /**
- * Play connection and disconnection SFX after a tile rotation.
+ * Return, in play order, connection and disconnection SFX after a tile rotation.
  *
- * - Plays the chamber-specific connection sound for each newly connected chamber.
- * - Plays PipeConnected if any tile is newly connected and no chamber-specific sfx fired.
- * - Plays Disconnect if any previously filled position is no longer filled.
+ * - The chamber-specific connection sound for each newly connected chamber.
+ * - PipeConnected if any tile is newly connected and no chamber-specific sfx fired.
+ * - Disconnect if any previously filled position is no longer filled.
+ *
+ * Does not include Leak/Gold/Pickup — callers collect those separately via
+ * {@link collectLeakSfx}/{@link collectGoldSfx} (they fire on rotation too,
+ * but are computed before rotation-specific connection state).
  */
-export function playAfterTileRotatedSfx(board: Board, filledBefore: Set<string>): void {
+export function collectTileRotatedSfx(board: Board, filledBefore: Set<string>): SfxId[] {
   const filledAfter = board.getFilledPositions();
   const connectionSfx = collectConnectionSfx(board, filledBefore);
+  const sfxToPlay: SfxId[] = [];
   if (connectionSfx.length === 0 && _hasSetDifference(filledAfter, filledBefore)) {
-    sfxManager.play(SfxId.PipeConnected);
+    sfxToPlay.push(SfxId.PipeConnected);
   }
   if (_hasSetDifference(filledBefore, filledAfter)) {
-    sfxManager.play(SfxId.Disconnect);
+    sfxToPlay.push(SfxId.Disconnect);
   }
-  for (const sfx of connectionSfx) {
-    sfxManager.play(sfx);
-  }
+  sfxToPlay.push(...connectionSfx);
+  return sfxToPlay;
 }
