@@ -115,7 +115,8 @@ src/
 ├── bundledCampaigns.ts          # Syncs bundled official campaign(s) from BUNDLED_CAMPAIGNS into localStorage at startup
 ├── persistence.ts               # All localStorage access — single source of truth for storage keys
 ├── campaignLocalization.ts      # resolveLocalizedText/writeLocalizedText/etc. — localization for user-authored campaign text (separate from src/i18n.ts)
-├── fileIO.ts                    # Gzip+download, plain-JSON download, and gzip-or-JSON file reading helpers
+├── gzip.ts                      # Generic gzip compress/decompress + Blob→bytes helpers (kept out of campaignEditor/ so non-campaign code, e.g. profile persistence, doesn't depend on a campaign-editor module)
+├── fileIO.ts                    # Gzip+download, plain-JSON download, and gzip-or-JSON file reading helpers (built on gzip.ts)
 ├── uiConstants.ts               # UI color tokens, border-radius constants, modal CSS strings
 ├── uiBackground.ts              # Shared dim scrolling pipe-pattern background helper for full-screen UI layers
 ├── graphicsSettings.ts          # In-memory cache for background and environmental graphics flags
@@ -343,7 +344,7 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 
 **`uiConstants.ts` owns all UI style tokens.** Color strings, border-radius values, and modal CSS template strings are defined once here and imported everywhere. `colors.ts` is separate and covers only canvas-rendering colors (not UI chrome).
 
-**`fileIO.ts` centralises gzip I/O.** `downloadGzipJson` and `readGzipOrJsonFile` are the only place gzip/blob/download logic should appear. Three callers previously duplicated this; they now all import from here.
+**`fileIO.ts` centralises gzip I/O.** `downloadGzipJson` and `readGzipOrJsonFile` are the only place gzip/blob/download logic should appear. Three callers previously duplicated this; they now all import from here. The raw compression primitives (`gzipString`/`ungzipBytes`/`blobToBytes`/`isGzipBytes`) live in `gzip.ts`, which `fileIO.ts` builds on — kept as a separate, campaign-agnostic module since non-campaign code (`profile/profileIO.ts`, via `fileIO.ts`) depends on it too.
 
 **`campaignEditor/historyManager.ts` is generic.** `HistoryManager<T>` is parameterised on snapshot type and used by both map editors. Do not add domain logic to it.
 
@@ -387,6 +388,7 @@ A **second, independent** localization mechanism — separate from the `t()` sys
 | Modal accessibility plumbing | `modals/modalUtils.ts` |
 | Keyboard shortcuts | `commandKeyManager.ts` |
 | localStorage keys | `persistence.ts` |
+| Gzip compress/decompress, Blob→bytes | `gzip.ts` |
 | Gzip download / file read | `fileIO.ts` |
 | Menu/settings/profile background pattern | `uiBackground.ts` |
 | Localization helper and catalogs (app-chrome strings) | `i18n.ts`, `i18n/en.ts` |

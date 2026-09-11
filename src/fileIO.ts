@@ -1,4 +1,4 @@
-import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from './campaignEditor/types';
+import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from './gzip';
 
 /** Delay (ms) before revoking the object URL after triggering a file download. */
 const DOWNLOAD_URL_REVOKE_DELAY_MS = 10_000;

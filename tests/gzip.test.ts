@@ -5,7 +5,7 @@
  * all available as globals in Node.js 18+.
  */
 
-import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from '../src/campaignEditor/types';
+import { gzipString, ungzipBytes, blobToBytes, isGzipBytes } from '../src/gzip';
 import {
   CompressionStream,
   DecompressionStream,

@@ -67,8 +67,8 @@ describe('CampaignEditor – _exportCampaign', () => {
     const editor = makeEditor([campaign]);
 
     // Mock gzipString to resolve immediately with a trivial Uint8Array.
-    const typesModule = await import('../../src/campaignEditor/types');
-    const gzipSpy = jest.spyOn(typesModule, 'gzipString').mockResolvedValue(new Uint8Array([1, 2, 3]));
+    const gzipModule = await import('../../src/gzip');
+    const gzipSpy = jest.spyOn(gzipModule, 'gzipString').mockResolvedValue(new Uint8Array([1, 2, 3]));
 
     const appendedAnchors: HTMLAnchorElement[] = [];
     const removedAnchors: HTMLAnchorElement[] = [];
@@ -129,8 +129,8 @@ describe('CampaignEditor – _exportCampaign', () => {
     };
     const editor = makeEditor([campaign]);
 
-    const typesModule = await import('../../src/campaignEditor/types');
-    jest.spyOn(typesModule, 'gzipString').mockResolvedValue(new Uint8Array([1, 2, 3]));
+    const gzipModule = await import('../../src/gzip');
+    jest.spyOn(gzipModule, 'gzipString').mockResolvedValue(new Uint8Array([1, 2, 3]));
 
     const downloadNames: string[] = [];
     const origCreate = document.createElement.bind(document);
