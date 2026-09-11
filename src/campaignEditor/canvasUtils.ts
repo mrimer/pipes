@@ -7,6 +7,11 @@ import { TILE_SIZE, setTileSize, BASE_TILE_SIZE, computeTileSize } from '../rend
 import { invalidateMinimapRectCache } from '../visuals/chapterMap';
 import { MAX_EDITOR_CANVAS_PX, EDITOR_CANVAS_BORDER } from './types';
 
+/** Largest tile size either canvas-fit function will expand to, regardless of available room. */
+const MAX_TILE_SIZE = 128;
+/** Margin (px) kept clear below the canvas when computing available vertical room. */
+const BOTTOM_MARGIN = 16;
+
 /**
  * Draw a dashed gold focus-outline around the tile at `focusedPos`.
  * No-op when `focusedPos` is `null`.
@@ -108,7 +113,6 @@ export function updateCanvasDisplaySize(
   },
 ): void {
   const { rows, cols, mainLayout, layoutGap, layoutPadding, constrainHeight } = opts;
-  const MAX_TILE_SIZE = 128;
   let availW = MAX_EDITOR_CANVAS_PX;
   let availH = MAX_EDITOR_CANVAS_PX;
 
@@ -124,20 +128,38 @@ export function updateCanvasDisplaySize(
   const fitW = Math.floor(availW / cols);
   const fit = constrainHeight ? Math.floor(Math.min(fitW, availH / rows)) : fitW;
   const newTileSize = Math.max(BASE_TILE_SIZE, Math.min(MAX_TILE_SIZE, fit));
-  setTileSize(newTileSize);
-  invalidateMinimapRectCache();
-  const intrinsicW = cols * TILE_SIZE;
-  const intrinsicH = rows * TILE_SIZE;
-  canvas.width  = intrinsicW;
-  canvas.height = intrinsicH;
 
   // CSS scale: only downscale if the base tile size forces the canvas to
   // overflow the available space (should be rare).
+  const intrinsicW = cols * newTileSize;
+  const intrinsicH = rows * newTileSize;
   const scale = constrainHeight
     ? Math.min(1, availW / intrinsicW, availH / intrinsicH)
     : Math.min(1, availW / intrinsicW);
-  canvas.style.width  = Math.round(intrinsicW * scale) + 'px';
-  canvas.style.height = Math.round(intrinsicH * scale) + 'px';
+  _applyResolvedCanvasSize(canvas, rows, cols, newTileSize, scale);
+}
+
+/**
+ * Apply a resolved tile size and CSS scale factor to `canvas`: set the shared
+ * {@link TILE_SIZE}, invalidate the minimap rect cache, size the canvas's
+ * intrinsic (drawing-buffer) dimensions to `cols`x`rows` tiles, and size its
+ * CSS display dimensions by `scale`. Shared tail for both
+ * {@link updateCanvasDisplaySize} and {@link updateMapEditorCanvas}, which
+ * differ only in how they resolve `tileSize` and `scale`.
+ */
+function _applyResolvedCanvasSize(
+  canvas: HTMLCanvasElement,
+  rows: number,
+  cols: number,
+  tileSize: number,
+  scale: number,
+): void {
+  setTileSize(tileSize);
+  invalidateMinimapRectCache();
+  canvas.width  = cols * TILE_SIZE;
+  canvas.height = rows * TILE_SIZE;
+  canvas.style.width  = Math.round(cols * TILE_SIZE * scale) + 'px';
+  canvas.style.height = Math.round(rows * TILE_SIZE * scale) + 'px';
 }
 
 /** Resolve `availW` for `updateCanvasDisplaySize`: the horizontal room left after `mainLayout`'s other columns. */
@@ -206,26 +228,25 @@ function _computeInnerColumnsWidth(
 function _computeConstrainedAvailHeight(canvas: HTMLCanvasElement): number | null {
   const absTop = _computeAbsoluteTop(canvas);
   if (absTop <= 0) return null;
-  const BOTTOM_MARGIN = 16;
   const computedAvailH = window.innerHeight + window.scrollY - absTop - 2 * EDITOR_CANVAS_BORDER - BOTTOM_MARGIN;
   return computedAvailH > 0 ? computedAvailH : null;
 }
 
 /**
  * Update the canvas tile size and CSS display dimensions for the map editors
- * (campaign map editor and chapter map editor).
+ * (campaign map editor and chapter map editor). Always constrains both width
+ * and height, unlike `updateCanvasDisplaySize`'s optional height constraint.
  *
- * Uses a simple outer-column traversal – the 3-column layout is
- * `[left-panel | canvas-column | right-panel]` where the canvas-column stacks
- * its children vertically, so only the *sibling columns* consume horizontal
- * space.  This is intentionally simpler than `updateCanvasDisplaySize` (which
- * also traverses inner siblings for the level editor's side-by-side layout).
+ * When `mainLayout` is unavailable or not yet laid out (`clientWidth === 0`),
+ * falls back to `computeTileSize()` — a viewport-relative heuristic — rather
+ * than `updateCanvasDisplaySize`'s fixed-box fallback, since this is the size
+ * estimate needed before the map editor's own layout has settled.
  *
  * @param canvas     The map editor canvas to resize.
  * @param rows       Current grid row count.
  * @param cols       Current grid column count.
- * @param mainLayout The outer flex-row container.  When `null` the canvas falls
- *                   back to `MAX_EDITOR_CANVAS_PX`.
+ * @param mainLayout The outer flex-row container.  When `null` (or not yet
+ *                   laid out) the canvas falls back to `computeTileSize()`.
  */
 export function updateMapEditorCanvas(
   canvas: HTMLCanvasElement,
@@ -239,18 +260,16 @@ export function updateMapEditorCanvas(
   let scale = 1;
 
   if (mainLayout && mainLayout.clientWidth > 0) {
-    const { siblingW, siblingCount } = _computeSiblingsWidth(mainLayout, canvas);
-    const availW = mainLayout.clientWidth - siblingW - siblingCount * GAP - 2 * BORDER;
+    const { otherW, colCount } = _computeOtherColumnsWidth(mainLayout, canvas);
+    const availW = mainLayout.clientWidth - otherW - colCount * GAP - 2 * BORDER;
 
     let availH = Infinity;
     const absTop = _computeAbsoluteTop(canvas);
     if (absTop > 0) {
-      const BOTTOM_MARGIN = 16;
       availH = window.innerHeight + window.scrollY - absTop - 2 * BORDER - BOTTOM_MARGIN;
     }
 
     if (availW > 0 && availH > 0) {
-      const MAX_TILE_SIZE = 128;
       const fit = Math.floor(Math.min(availW / cols, availH / rows));
       newTileSize = Math.max(BASE_TILE_SIZE, Math.min(MAX_TILE_SIZE, fit));
       const intrinsicW = cols * newTileSize;
@@ -263,26 +282,5 @@ export function updateMapEditorCanvas(
     scale = Math.min(1, MAX_EDITOR_CANVAS_PX / intrinsicW, MAX_EDITOR_CANVAS_PX / intrinsicH);
   }
 
-  setTileSize(newTileSize);
-  invalidateMinimapRectCache();
-  canvas.width  = cols * TILE_SIZE;
-  canvas.height = rows * TILE_SIZE;
-  canvas.style.width  = Math.round(cols * TILE_SIZE * scale) + 'px';
-  canvas.style.height = Math.round(rows * TILE_SIZE * scale) + 'px';
-}
-
-/** Sum the widths (and count) of `mainLayout`'s direct-child columns other than the one containing `canvas`. */
-function _computeSiblingsWidth(
-  mainLayout: HTMLElement,
-  canvas: HTMLCanvasElement,
-): { siblingW: number; siblingCount: number } {
-  let siblingW = 0;
-  let siblingCount = 0;
-  for (const child of mainLayout.children) {
-    if (!child.contains(canvas)) {
-      siblingW += (child as HTMLElement).offsetWidth;
-      siblingCount++;
-    }
-  }
-  return { siblingW, siblingCount };
+  _applyResolvedCanvasSize(canvas, rows, cols, newTileSize, scale);
 }
