@@ -52,7 +52,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
       _gridState: { grid: (TileDef | null)[][] };
       _recordSnapshot(campaign: CampaignDef): void;
     };
-    _showCampaignDetail(): void;
+    _browserSection: { showCampaignDetail(): void };
     _service: { campaigns: readonly CampaignDef[] };
   };
 
@@ -70,7 +70,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on campaign map screen', () => {
     editor.show();
     const state = editor as unknown as CampaignMapState;
     state._activeCampaignId = 'cmp_kd_test';
-    state._showCampaignDetail();
+    state._browserSection.showCampaignDetail();
     state._el.style.display = 'flex';
     return state;
   }
@@ -174,14 +174,14 @@ describe('CampaignEditor – campaign map editor pan-drag precedence', () => {
     const state = editor as unknown as {
       _el: HTMLElement;
       _activeCampaignId: string | null;
-      _showCampaignDetail(): void;
+      _browserSection: { showCampaignDetail(): void };
       _campaignMapEditor: {
         _dragState: unknown;
         _panPixelX: number;
       };
     };
     state._activeCampaignId = 'cmp_pan_priority';
-    state._showCampaignDetail();
+    state._browserSection.showCampaignDetail();
     state._el.style.display = 'flex';
 
     const canvas = document.querySelector<HTMLCanvasElement>('#campaign-map-editor-section canvas');
@@ -272,14 +272,14 @@ describe('CampaignEditor – tree overwrite on map editors', () => {
     const state = editor as unknown as {
       _el: HTMLElement;
       _activeCampaignId: string | null;
-      _showCampaignDetail(): void;
+      _browserSection: { showCampaignDetail(): void };
       _campaignMapEditor: {
         _palette: EditorPalette;
         _gridState: { grid: (TileDef | null)[][] };
       };
     };
     state._activeCampaignId = 'cmp_tree_overwrite';
-    state._showCampaignDetail();
+    state._browserSection.showCampaignDetail();
     state._el.style.display = 'flex';
 
     const canvas = document.querySelector<HTMLCanvasElement>('#campaign-map-editor-section canvas');
@@ -315,7 +315,7 @@ describe('CampaignEditor – tree overwrite on map editors', () => {
       _el: HTMLElement;
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
-      _showChapterDetail(chapterIdx: number): void;
+      _browserSection: { showChapterDetail(): void };
       _chapterMapEditor: {
         _palette: EditorPalette;
         _gridState: { grid: (TileDef | null)[][] };
@@ -323,7 +323,7 @@ describe('CampaignEditor – tree overwrite on map editors', () => {
     };
     state._activeCampaignId = 'cmp_ch_tree_overwrite';
     state._activeChapterIdx = 0;
-    state._showChapterDetail(0);
+    state._browserSection.showChapterDetail();
     state._el.style.display = 'flex';
 
     const canvas = document.querySelector<HTMLCanvasElement>('#chapter-map-editor-section canvas');
@@ -382,7 +382,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
       _gridState: { grid: (TileDef | null)[][] };
       _recordChapterSnapshot(chapter: ChapterDef): void;
     };
-    _showChapterDetail(chapterIdx: number): void;
+    _browserSection: { showChapterDetail(): void };
     _service: { campaigns: readonly CampaignDef[] };
   };
 
@@ -405,7 +405,7 @@ describe('CampaignEditor – Ctrl+Z/Y undo/redo on chapter map screen', () => {
     const state = editor as unknown as ChapterMapState;
     state._activeCampaignId = 'cmp_ch_kd_test';
     state._activeChapterIdx = 0;
-    state._showChapterDetail(0);
+    state._browserSection.showChapterDetail();
     state._el.style.display = 'flex';
     return state;
   }

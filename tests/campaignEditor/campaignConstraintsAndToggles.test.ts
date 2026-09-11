@@ -189,10 +189,10 @@ describe('CampaignEditor – Dev Official Campaign toggle', () => {
   function openCampaignDetail(editor: CampaignEditor, campaignId: string): void {
     const state = editor as unknown as {
       _activeCampaignId: string | null;
-      _showCampaignDetail(): void;
+      _browserSection: { showCampaignDetail(): void };
     };
     state._activeCampaignId = campaignId;
-    state._showCampaignDetail();
+    state._browserSection.showCampaignDetail();
   }
 
   it('renders a campaign map editor on the campaign detail page when map data exists', () => {

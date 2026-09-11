@@ -386,7 +386,7 @@ describe('CampaignEditor – import version comparison', () => {
       .mockReturnValueOnce('Author');
 
     const editor = makeEditor();
-    (editor as unknown as { _createCampaign(): void })._createCampaign();
+    (editor as unknown as { _browserSection: { createCampaign(): void } })._browserSection.createCampaign();
 
     const campaigns = loadImportedCampaigns();
     expect(campaigns).toHaveLength(1);
@@ -400,7 +400,7 @@ describe('CampaignEditor – import version comparison', () => {
       .mockReturnValueOnce('New Campaign');
 
     const editor = makeEditor();
-    (editor as unknown as { _createCampaign(): void })._createCampaign();
+    (editor as unknown as { _browserSection: { createCampaign(): void } })._browserSection.createCampaign();
 
     // Only one prompt (campaign name) — no author prompt any more
     expect(promptSpy).toHaveBeenCalledTimes(1);
@@ -419,7 +419,7 @@ describe('CampaignEditor – import version comparison', () => {
     jest.spyOn(window, 'prompt').mockReturnValueOnce('Chapter 1');
 
     const before = Date.now();
-    (editor as unknown as { _addChapter(c: CampaignDef): void })._addChapter(internalCampaign);
+    (editor as unknown as { _browserSection: { addChapter(c: CampaignDef): void } })._browserSection.addChapter(internalCampaign);
 
     const saved = loadImportedCampaigns()[0];
     expect(new Date(saved.lastUpdated!).getTime()).toBeGreaterThanOrEqual(before);
@@ -434,13 +434,13 @@ describe('CampaignEditor – import version comparison', () => {
       _activeCampaignId: string | null;
       _activeChapterIdx: number;
       _screen: string;
-      _addChapter(c: CampaignDef): void;
+      _browserSection: { addChapter(c: CampaignDef): void };
     };
     const internalCampaign = state._service.campaigns[0];
     state._activeCampaignId = internalCampaign.id;
     jest.spyOn(window, 'prompt').mockReturnValueOnce('Chapter 1');
 
-    state._addChapter(internalCampaign);
+    state._browserSection.addChapter(internalCampaign);
 
     expect(state._activeChapterIdx).toBe(0);
     expect(state._screen).toBe('chapter');
